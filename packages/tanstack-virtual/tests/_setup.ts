@@ -32,23 +32,25 @@ if (!('ResizeObserver' in globalThis)) {
 	};
 }
 
-const proto = Element.prototype as any;
-proto.scrollTo = function scrollTo(optionsOrX?: ScrollToOptions | number, y?: number) {
-	let left: number | undefined;
-	let top: number | undefined;
-	if (typeof optionsOrX === 'object' && optionsOrX !== null) {
-		left = optionsOrX.left;
-		top = optionsOrX.top;
-	} else {
-		left = optionsOrX;
-		top = y;
-	}
-	if (left !== undefined) this.scrollLeft = left;
-	if (top !== undefined) this.scrollTop = top;
-	this.dispatchEvent(new Event('scroll'));
-};
+if (typeof Element !== 'undefined') {
+	const proto = Element.prototype as any;
+	proto.scrollTo = function scrollTo(optionsOrX?: ScrollToOptions | number, y?: number) {
+		let left: number | undefined;
+		let top: number | undefined;
+		if (typeof optionsOrX === 'object' && optionsOrX !== null) {
+			left = optionsOrX.left;
+			top = optionsOrX.top;
+		} else {
+			left = optionsOrX;
+			top = y;
+		}
+		if (left !== undefined) this.scrollLeft = left;
+		if (top !== undefined) this.scrollTop = top;
+		this.dispatchEvent(new Event('scroll'));
+	};
 
-Object.defineProperties(HTMLElement.prototype, {
-	scrollHeight: { configurable: true, get: () => Number.MAX_SAFE_INTEGER },
-	scrollWidth: { configurable: true, get: () => Number.MAX_SAFE_INTEGER },
-});
+	Object.defineProperties(HTMLElement.prototype, {
+		scrollHeight: { configurable: true, get: () => Number.MAX_SAFE_INTEGER },
+		scrollWidth: { configurable: true, get: () => Number.MAX_SAFE_INTEGER },
+	});
+}

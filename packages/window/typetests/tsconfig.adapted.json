@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "skipLibCheck": false,
+    "noEmit": true,
+    "noErrorTruncation": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "baseUrl": ".",
+    "paths": {
+      "react-window-under-test": ["../src/index.ts"]
+    }
+  },
+  "include": ["./parity.test-d.ts", "../src/**/*.ts", "../src/**/*.tsx"]
+}

@@ -15,6 +15,7 @@ afterEach(() => {
 });
 
 describe('layout (FLIP)', () => {
+	// @parity-case conformance:bounded-layout-flip
 	it('FLIPs from the old box to the new when layout changes between renders', async () => {
 		let box: any = { left: 0, top: 0, width: 100, height: 100 };
 		Element.prototype.getBoundingClientRect = vi.fn(() => box);

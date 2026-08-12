@@ -1,0 +1,134 @@
+import * as React from 'react';
+import {
+	act as reactThreeAct,
+	createRoot as createReactThreeRoot,
+	extend as extendReactThree,
+	type ReconcilerRoot,
+} from '@react-three/fiber';
+import { RoundedBoxGeometry as ReactRoundedBoxGeometry } from '@react-three/drei';
+import { create as createOctaneThree } from '@octanejs/three/testing';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import * as THREE from 'three';
+import { RoundedBoxGeometryScene } from './_fixtures/rounded-box.three.tsrx';
+
+interface Input {
+	args?: [width?: number, height?: number, depth?: number];
+	radius?: number;
+	smoothness?: number;
+	bevelSegments?: number;
+	steps?: number;
+	creaseAngle?: number;
+}
+
+const previousActEnvironment = (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean })
+	.IS_REACT_ACT_ENVIRONMENT;
+
+beforeAll(() => {
+	(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+	extendReactThree(THREE as unknown as Record<string, new (...args: any[]) => any>);
+});
+
+afterAll(() => {
+	if (previousActEnvironment === undefined) {
+		delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+	} else {
+		(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
+			previousActEnvironment;
+	}
+});
+
+function noWebGLRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
+	return {
+		domElement: canvas,
+		outputColorSpace: THREE.SRGBColorSpace,
+		toneMapping: THREE.NoToneMapping,
+		render() {},
+		setPixelRatio() {},
+		setSize() {},
+		renderLists: { dispose() {} },
+		forceContextLoss() {},
+	} as unknown as THREE.WebGLRenderer;
+}
+
+function geometrySnapshot(geometry: THREE.ExtrudeGeometry) {
+	geometry.computeBoundingBox();
+	const position = geometry.getAttribute('position');
+	const normal = geometry.getAttribute('normal');
+	return {
+		parameters: {
+			depth: geometry.parameters.options.depth,
+			bevelEnabled: geometry.parameters.options.bevelEnabled,
+			bevelSegments: geometry.parameters.options.bevelSegments,
+			steps: geometry.parameters.options.steps,
+			bevelSize: geometry.parameters.options.bevelSize,
+			bevelThickness: geometry.parameters.options.bevelThickness,
+			curveSegments: geometry.parameters.options.curveSegments,
+		},
+		positionCount: position.count,
+		normalCount: normal.count,
+		boundingBox: [geometry.boundingBox!.min.toArray(), geometry.boundingBox!.max.toArray()],
+		positions: Array.from(position.array),
+		normals: Array.from(normal.array),
+	};
+}
+
+async function mountReact(input: Input): Promise<{
+	geometry: THREE.ExtrudeGeometry;
+	root: ReconcilerRoot<HTMLCanvasElement>;
+}> {
+	const canvas = document.createElement('canvas');
+	const root = createReactThreeRoot(canvas);
+	await root.configure({
+		gl: noWebGLRenderer(canvas),
+		frameloop: 'never',
+		dpr: 1,
+		size: { width: 64, height: 64, top: 0, left: 0 },
+	});
+	let geometry: THREE.ExtrudeGeometry | null = null;
+	await reactThreeAct(async () => {
+		root.render(
+			React.createElement(
+				'mesh',
+				null,
+				React.createElement(ReactRoundedBoxGeometry, {
+					...input,
+					ref: (value) => (geometry = value),
+				}),
+			),
+		);
+	});
+	if (geometry === null) throw new Error('React Drei did not attach RoundedBoxGeometry.');
+	return { geometry, root };
+}
+
+describe('RoundedBoxGeometry', () => {
+	it.each([
+		['defaults', {}],
+		[
+			'custom dimensions and smoothing',
+			{
+				args: [2.5, 1.25, 0.75],
+				radius: 0.12,
+				smoothness: 7,
+				bevelSegments: 3,
+				steps: 2,
+				creaseAngle: 0.65,
+			},
+		],
+	] as const)('matches the pinned React Drei oracle for %s', async (_name, input) => {
+		const octaneRefs: Array<THREE.ExtrudeGeometry | null> = [];
+		const octane = await createOctaneThree(RoundedBoxGeometryScene, {
+			...input,
+			geometryRef: (value: THREE.ExtrudeGeometry | null) => octaneRefs.push(value),
+		});
+		const react = await mountReact(input);
+		const octaneGeometry = octaneRefs.at(-1);
+		if (octaneGeometry == null) throw new Error('Octane did not attach RoundedBoxGeometry.');
+
+		expect(geometrySnapshot(octaneGeometry)).toEqual(geometrySnapshot(react.geometry));
+		expect(octaneGeometry.boundingBox!.getCenter(new THREE.Vector3()).toArray()).toEqual([0, 0, 0]);
+		octane.unmount();
+		await reactThreeAct(async () => react.root.unmount());
+		expect(octaneRefs.at(-1)).toBeNull();
+	});
+});

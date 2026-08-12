@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "baseUrl": "../../upstream/packages/core/src",
+    "paths": {
+      "@react-spring/shared": [
+        "../../../../node_modules/@react-spring/shared/dist/react-spring_shared.modern.d.mts"
+      ],
+      "@react-spring/types": [
+        "../../../../node_modules/@react-spring/types/dist/react-spring_types.modern.d.mts"
+      ],
+      "@react-spring/animated": [
+        "../../../../node_modules/@react-spring/animated/dist/react-spring_animated.modern.d.mts"
+      ],
+      "@react-spring/rafz": [
+        "../../../../node_modules/@react-spring/rafz/dist/react-spring_rafz.modern.d.mts"
+      ]
+    }
+  },
+  "include": [
+    "../../upstream/packages/core/src/**/*.test-d.ts",
+    "../../upstream/packages/core/src/**/*.test-d.tsx",
+    "../../upstream/packages/core/src/**/*.ts",
+    "../../upstream/packages/core/src/**/*.tsx"
+  ],
+  "exclude": [
+    "../../upstream/packages/core/src/**/*.test.ts",
+    "../../upstream/packages/core/src/**/*.test.tsx"
+  ]
+}

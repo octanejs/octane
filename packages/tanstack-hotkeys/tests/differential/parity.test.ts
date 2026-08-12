@@ -2,7 +2,11 @@ import { resolve } from 'node:path';
 import { HotkeyManager, SequenceManager } from '@tanstack/hotkeys';
 import { drainPassiveEffects } from 'octane';
 import { describe, expect, it } from 'vitest';
-import { mountDifferential, type DiffMount } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+	type DiffMount,
+} from '../../../octane/tests/differential/_rig.js';
 
 const fixture = resolve(__dirname, '../_fixtures/hotkeys-diff.tsrx');
 const cache = resolve(__dirname, '.react-cache');
@@ -27,6 +31,8 @@ async function pressBoth(
 	await octane.keydown('#hotkeys-parity', key, init);
 	await react.keydown('#hotkeys-parity', key, init);
 }
+
+await Promise.all([preloadDifferentialFixture(fixture, cache)]);
 
 describe('differential: @octanejs/tanstack-hotkeys vs @tanstack/react-hotkeys', function () {
 	// @parity-case differential:tanstack-hotkeys-keyboard-lifecycle

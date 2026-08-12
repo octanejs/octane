@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/tanstack-store/tests/conformance/binding.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane subscription, creation, context, and cleanup behavior; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-store/tests/conformance/experimental-use-store.parity.test.ts",
+      "disposition": "octane-only-divergence",
+      "divergenceId": "tanstack-store-experimental-use-store",
+      "reason": "Authenticates the documented omission of the upstream experimental _useStore export."
+    },
+    {
+      "path": "packages/tanstack-store/tests/conformance/parity.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks that store-core re-exports are the same module instance used by the differential oracle."
+    },
+    {
+      "path": "packages/tanstack-store/tests/conformance/upstream-index.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapts packages/react-store/tests/index.test.tsx from the pinned repository into the TSRX fixture, omitting the experimental _useStore describe block."
+    },
+    {
+      "path": "packages/tanstack-store/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the exact selector, atom, created-store, action, and context scenario against @tanstack/react-store@0.11.0."
+    },
+    {
+      "path": "packages/tanstack-store/tests/differential/setup.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks fail-closed React fixture compilation for the parity harness itself."
+    },
+    {
+      "path": "packages/tanstack-store/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane server rendering without a DOM; it is not compared with React SSR."
+    },
+    {
+      "path": "packages/tanstack-store/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs the byte-exact pinned @tanstack/react-store@0.11.0 Vitest suite against React after vendored-byte verification."
+    },
+    {
+      "path": "packages/tanstack-store/typetests/_useStore-omission.test-d.ts",
+      "disposition": "octane-only-divergence",
+      "divergenceId": "tanstack-store-experimental-use-store",
+      "reason": "Paired divergence evidence: authenticates the documented type-level omission of the experimental _useStore export against the same divergence as the runtime export-surface check."
+    },
+    {
+      "path": "packages/tanstack-store/typetests/test.test-d.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted packages/react-store/tests/test.test-d.ts assertion groups against @octanejs/tanstack-store after permitted import-root transformation and intentional _useStore omission."
+    }
+  ]
+}

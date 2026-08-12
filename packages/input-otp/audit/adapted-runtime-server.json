@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "input-otp-server",
+  "roots": ["packages/input-otp/tests"],
+  "files": ["packages/input-otp/tests/ssr/input.server.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:input-otp-server:0001",
+      "file": "packages/input-otp/tests/ssr/input.server.test.ts",
+      "fullName": "@octanejs/input-otp SSR renders deterministic single-input markup without browser globals"
+    }
+  ]
+}

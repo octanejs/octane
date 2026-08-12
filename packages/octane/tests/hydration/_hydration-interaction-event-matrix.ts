@@ -330,7 +330,7 @@ export function createHydrationInteractionEvent(
 				typeof ownerWindow.Touch === 'function'
 					? new ownerWindow.Touch(properties)
 					: (properties as Touch);
-			return new ownerWindow.TouchEvent(testCase.type, {
+			const init = {
 				...base,
 				ctrlKey: sequence % 2 === 0,
 				shiftKey: sequence % 3 === 0,
@@ -339,7 +339,25 @@ export function createHydrationInteractionEvent(
 				touches: testCase.type === 'touchend' ? [] : [touch],
 				targetTouches: testCase.type === 'touchend' ? [] : [touch],
 				changedTouches: [touch],
+			};
+			if (typeof ownerWindow.TouchEvent === 'function') {
+				return new ownerWindow.TouchEvent(testCase.type, init);
+			}
+
+			// Desktop Firefox can expose touch event names without exposing the
+			// Touch/TouchEvent constructors. A generic event still exercises capture,
+			// ordering, cancellation, and replay for that public event family.
+			const event = new ownerWindow.Event(testCase.type, base);
+			Object.defineProperties(event, {
+				ctrlKey: { value: init.ctrlKey },
+				shiftKey: { value: init.shiftKey },
+				altKey: { value: init.altKey },
+				metaKey: { value: init.metaKey },
+				touches: { value: init.touches },
+				targetTouches: { value: init.targetTouches },
+				changedTouches: { value: init.changedTouches },
 			});
+			return event;
 		}
 	}
 }
@@ -513,6 +531,7 @@ export function observeHydrationReplays(
 
 export function expectedHydrationReplayMetadata(
 	testCase: HydrationInteractionEventCase,
+	options: { touchEventConstructorName?: 'Event' | 'TouchEvent' } = {},
 ): Partial<HydrationReplayRecord> {
 	const sequence = testCase.sequence;
 	const button = testCase.type === 'auxclick' ? 1 : testCase.type === 'contextmenu' ? 2 : 0;
@@ -589,6 +608,9 @@ export function expectedHydrationReplayMetadata(
 				...modifiers,
 			};
 		case 'touch':
+			if (options.touchEventConstructorName === 'Event') {
+				return { constructorName: 'Event' };
+			}
 			return {
 				constructorName: 'TouchEvent',
 				touches: testCase.type === 'touchend' ? 0 : 1,

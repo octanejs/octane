@@ -1,0 +1,1931 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "runtime:6cdf6a4cc127c1d9",
+      "upstreamFile": "packages/animated/src/createHost.test.ts",
+      "upstreamFullName": "createHost caches the animated wrapper on the component itself",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8a11c3a1a6e800a2",
+      "upstreamFile": "packages/animated/src/createHost.test.ts",
+      "upstreamFullName": "createHost falls back to a WeakMap when the component is non-extensible",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:4660e2133c28eeb1",
+      "upstreamFile": "packages/animated/src/createHost.test.ts",
+      "upstreamFullName": "createHost handles frozen components without throwing",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:755312ebce91030f",
+      "upstreamFile": "packages/animated/src/createHost.test.ts",
+      "upstreamFullName": "createHost sets displayName on the animated wrapper",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:94a5068bfad88bb0",
+      "upstreamFile": "packages/animated/src/createHost.test.ts",
+      "upstreamFullName": "createHost sets displayName on wrappers for non-extensible components",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:ee95b0e91361dc43",
+      "upstreamFile": "packages/core/src/AnimationConfig.test.ts",
+      "upstreamFullName": "mergeConfig can merge partial configs",
+      "disposition": "adapted",
+      "adaptedFile": "packages/spring/tests/upstream/AnimationConfig.test.ts",
+      "adaptedFullName": "mergeConfig can merge partial configs"
+    },
+    {
+      "id": "runtime:0c01431134cf022c",
+      "upstreamFile": "packages/core/src/AnimationConfig.test.ts",
+      "upstreamFullName": "mergeConfig frequency/damping props prevents a damping ratio less than 0",
+      "disposition": "adapted",
+      "adaptedFile": "packages/spring/tests/upstream/AnimationConfig.test.ts",
+      "adaptedFullName": "mergeConfig frequency/damping props prevents a damping ratio less than 0"
+    },
+    {
+      "id": "runtime:99de37211c68677d",
+      "upstreamFile": "packages/core/src/AnimationConfig.test.ts",
+      "upstreamFullName": "mergeConfig frequency/damping props prevents a frequency response less than 0.01",
+      "disposition": "adapted",
+      "adaptedFile": "packages/spring/tests/upstream/AnimationConfig.test.ts",
+      "adaptedFullName": "mergeConfig frequency/damping props prevents a frequency response less than 0.01"
+    },
+    {
+      "id": "runtime:6ad0078ba86e4461",
+      "upstreamFile": "packages/core/src/AnimationConfig.test.ts",
+      "upstreamFullName": "mergeConfig frequency/damping props properly converts to tension/friction",
+      "disposition": "adapted",
+      "adaptedFile": "packages/spring/tests/upstream/AnimationConfig.test.ts",
+      "adaptedFullName": "mergeConfig frequency/damping props properly converts to tension/friction"
+    },
+    {
+      "id": "runtime:ad84d17e29100f8f",
+      "upstreamFile": "packages/core/src/AnimationConfig.test.ts",
+      "upstreamFullName": "mergeConfig frequency/damping props works with extreme but valid values",
+      "disposition": "adapted",
+      "adaptedFile": "packages/spring/tests/upstream/AnimationConfig.test.ts",
+      "adaptedFullName": "mergeConfig frequency/damping props works with extreme but valid values"
+    },
+    {
+      "id": "runtime:1a2cb381578239e8",
+      "upstreamFile": "packages/core/src/AnimationConfig.test.ts",
+      "upstreamFullName": "mergeConfig resets the \"decay\" when props are incompatible",
+      "disposition": "adapted",
+      "adaptedFile": "packages/spring/tests/upstream/AnimationConfig.test.ts",
+      "adaptedFullName": "mergeConfig resets the \"decay\" when props are incompatible"
+    },
+    {
+      "id": "runtime:6242c07b88bcb03e",
+      "upstreamFile": "packages/core/src/AnimationConfig.test.ts",
+      "upstreamFullName": "mergeConfig resets the \"duration\" when props are incompatible",
+      "disposition": "adapted",
+      "adaptedFile": "packages/spring/tests/upstream/AnimationConfig.test.ts",
+      "adaptedFullName": "mergeConfig resets the \"duration\" when props are incompatible"
+    },
+    {
+      "id": "runtime:e9e867f2d5a09a83",
+      "upstreamFile": "packages/core/src/AnimationConfig.test.ts",
+      "upstreamFullName": "mergeConfig resets the \"frequency\" when props are incompatible",
+      "disposition": "adapted",
+      "adaptedFile": "packages/spring/tests/upstream/AnimationConfig.test.ts",
+      "adaptedFullName": "mergeConfig resets the \"frequency\" when props are incompatible"
+    },
+    {
+      "id": "runtime:4edcf259c9124125",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller can animate a number",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:3125c9b574391e7e",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller can animate an array of numbers",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:257c13d0c86924bb",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller events events recieve also recieve the item if set as the third",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8e174ae1c9073964",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller events events recieve an AnimationResult and the Controller as the first two args",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:1a2db4f42e4664e4",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller events onStart & onRest are flushed even if the `immediate` prop is true",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:b7ef638f5ea8d0f9",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller settles when a target differs from the current value by less than float precision",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:dbb0d53f4705588e",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller the \"loop\" prop can be combined with the \"reverse\" prop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:4e168a94a1412b49",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller the \"loop\" prop used on a noop update does not loop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:77bb5125eeafb4ad",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller the \"loop\" prop used when \"to\" is an array repeats the chain of updates",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:44e975f26f0c26ad",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller the \"loop\" prop used when \"to\" is an async function calls the \"to\" function repeatedly",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:ec003c68f335ecea",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller the \"loop\" prop used with multiple values loops all values at the same time",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:dec16cc08af62c0c",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller the \"loop\" prop when \"finish\" is called while paused does not loop until resumed",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:eaf83ab0b70f7a5c",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller the \"loop\" prop when \"finish\" is called while paused finishes immediately",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:dd775dd40bcd7df2",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller the \"loop\" prop when changed on a later update stops looping when toggled from true to false",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d3436f87dff8a0bf",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller the \"stop\" method prevents any updates with pending delays",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:1d843ae8cc058e49",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller the \"stop\" method stops the active runAsync call",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:063f6fb890247bb0",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"onStart\" prop is defined can be different per key",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:7ccd3f6af077b4f5",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"onStart\" prop is defined is called once per \"start\" call maximum",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:26961460e089b4f3",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function acts strangely without the \"from\" prop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:fa4e9ab0cc7d1d95",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function nested async animation stops the parent on bail",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d4b051cbabb8c9d2",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function respects the \"cancel\" prop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e95718afeb4d2969",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function respects the \"pause\" prop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d34a5feb67f1c6db",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function respects the \"stop\" method",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:73f7c4c1322d3ec7",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function the \"animate\" function can start its own async animation",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:4c5bfcfd8730eb85",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function the \"animate\" function inherits any default props",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d4dcd2be8edbc1f8",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function when skipAnimations is true applies values from an async function `to` (regression for #1429)",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e4a24db85a394138",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function when skipAnimations is true does not hang on an unterminating async script",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:c5540a9758a0712b",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function when skipAnimations is true lets the script run to completion when set mid animation",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:f4bf0867f547928b",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function when skipAnimations is true runs an async script to completion and lands on its final value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:b3c89f0c0830b51a",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function when the \"to\" prop is changed stops the old \"to\" prop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:85a52631292e4702",
+      "upstreamFile": "packages/core/src/Controller.test.ts",
+      "upstreamFullName": "Controller when the \"to\" prop is an async function while paused stays paused when its values are force-finished",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:afe9e8249e45982b",
+      "upstreamFile": "packages/core/src/FrameLoopDemand.test.ts",
+      "upstreamFullName": "frameLoop \"demand\" drives a looping to-array with no user workarounds (regression for #2402)",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:fd3dc5c601df1662",
+      "upstreamFile": "packages/core/src/helpers.test.ts",
+      "upstreamFullName": "helpers interpolateTo",
+      "disposition": "adapted",
+      "adaptedFile": "packages/spring/tests/upstream/helpers.test.ts",
+      "adaptedFullName": "helpers interpolateTo"
+    },
+    {
+      "id": "runtime:df25e59673abf6d2",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when a declarative props object is passed with no ref (StrictMode) animates from→to on mount",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:4319c4a532e9bbb8",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when a declarative props object is passed with no ref (StrictMode) keeps a looped animation running on mount",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:87c681df7cbfb510",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when an external SpringRef is attached via the `ref` prop fires events declared on render when `ref.start()` is called with no args",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:394c3b1fa39928da",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when an external SpringRef is attached via the `ref` prop fires events under StrictMode (double-mount)",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e216712957b83739",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when an external SpringRef is attached via the `ref` prop fires events when `springRef.start()` is called from a useEffect (issue #1991 repro)",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:aab7346a86b534db",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when api.set is called inside onResolve alongside a React setState snaps the spring to the set value (event-driven repro from #1661)",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:448083d786ec708b",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when both a props function and a deps array are passed is updated when a dependency changes",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:64e8f3c469644d4a",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when both a props function and a deps array are passed returns a ref",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:be90e026401ede34",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when both a props object and a deps array are passed is updated only when a dependency changes",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:47656d63394236b9",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when both a props object and a deps array are passed returns a ref",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:a5ec4964cd7fb6f9",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when only a props function is passed is never updated on render",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:b62b448a92ed8b9b",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when only a props function is passed returns a ref",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8904a591a1f57acf",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when only a props object is passed does not return a ref",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:bd670fdddc912812",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when only a props object is passed is updated every render",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:1c0c24b7da902f20",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when only a props object is passed when SpringContext has \"pause={false}\" stays paused if last rendered with \"pause: true\"",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:f7986ae2a92111c3",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when the initial value is 0 and start() is called in useLayoutEffect animates to the new goal via imperative ref.start()",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:50c850e726db49ad",
+      "upstreamFile": "packages/core/src/hooks/useSpring.test.tsx",
+      "upstreamFullName": "useSpring when the initial value is 0 and start() is called in useLayoutEffect animates when state set in useLayoutEffect drives a declarative useSpring",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:334d9c75274e200b",
+      "upstreamFile": "packages/core/src/hooks/useSprings.test.tsx",
+      "upstreamFullName": "useSprings when both a props function and a deps array are passed updates each spring when the deps have changed",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:7e1025e2f970bfe2",
+      "upstreamFile": "packages/core/src/hooks/useSprings.test.tsx",
+      "upstreamFullName": "useSprings when only a props array is passed updates each spring on every render",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:24778037044d0339",
+      "upstreamFile": "packages/core/src/hooks/useSprings.test.tsx",
+      "upstreamFullName": "useSprings when only a props function is passed calls the props function once per new spring",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:b898bebc9df3a7c0",
+      "upstreamFile": "packages/core/src/hooks/useSprings.test.tsx",
+      "upstreamFullName": "useSprings when only a props function is passed imperative start is not overridden by stale declarative updates on re-render",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:ac7a5346fd94631f",
+      "upstreamFile": "packages/core/src/hooks/useSprings.test.tsx",
+      "upstreamFullName": "useSprings when only a props function is passed should reach final value in strict mode",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e4541d4891b429c5",
+      "upstreamFile": "packages/core/src/hooks/useSprings.test.tsx",
+      "upstreamFullName": "useSprings when the length argument decreases removes old springs",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:56e559a856bafe3a",
+      "upstreamFile": "packages/core/src/hooks/useSprings.test.tsx",
+      "upstreamFullName": "useSprings when the length argument increases creates new springs",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:012a7a5d3de0c646",
+      "upstreamFile": "packages/core/src/hooks/useSpringValue.test.ts",
+      "upstreamFullName": "useSpringValue should not update the initial value on rerender",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:65b48d4f075c9bc5",
+      "upstreamFile": "packages/core/src/hooks/useSpringValue.test.ts",
+      "upstreamFullName": "useSpringValue should pass the props to the SpringValue",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:6a09001e8619c0e4",
+      "upstreamFile": "packages/core/src/hooks/useSpringValue.test.ts",
+      "upstreamFullName": "useSpringValue should return a SpringValue with the initial value set & be animatable",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:50e91eedaf11b804",
+      "upstreamFile": "packages/core/src/hooks/useSpringValue.test.ts",
+      "upstreamFullName": "useSpringValue should stop the animation when the hook is unmounted",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:3af1f570ceb20e8e",
+      "upstreamFile": "packages/core/src/hooks/useTrail.test.tsx",
+      "upstreamFullName": "useTrail has each spring follow the spring before it",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:4ffec08a5c6322e8",
+      "upstreamFile": "packages/core/src/hooks/useTrail.test.tsx",
+      "upstreamFullName": "useTrail when a props function is passed does nothing on rerender",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:4303a482e4564ad1",
+      "upstreamFile": "packages/core/src/hooks/useTrail.test.tsx",
+      "upstreamFullName": "useTrail when a props object is passed updates every spring on rerender",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:9b73f29e94526867",
+      "upstreamFile": "packages/core/src/hooks/useTrail.test.tsx",
+      "upstreamFullName": "useTrail with the \"loop\" prop (issue #1063) phase-syncs every spring on each loop iteration",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:af51283a0fe79f10",
+      "upstreamFile": "packages/core/src/hooks/useTrail.test.tsx",
+      "upstreamFullName": "useTrail with the \"reverse\" prop when \"reverse\" becomes false has each spring follow the spring before it",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:0c4e61e5ca6b1904",
+      "upstreamFile": "packages/core/src/hooks/useTrail.test.tsx",
+      "upstreamFullName": "useTrail with the \"reverse\" prop when \"reverse\" becomes false uses the \"to\" and \"from\" props as-is",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:6629efc58e7e9ddd",
+      "upstreamFile": "packages/core/src/hooks/useTrail.test.tsx",
+      "upstreamFullName": "useTrail with the \"reverse\" prop when \"reverse\" becomes true has each spring follow the spring after it",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:88289c1bc312f047",
+      "upstreamFile": "packages/core/src/hooks/useTrail.test.tsx",
+      "upstreamFullName": "useTrail with the \"reverse\" prop when \"reverse\" becomes true swaps the \"to\" and \"from\" props",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:f6d5d51a04971f9d",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition assign controllers to provided \"ref\"",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:4e1a268b9cd58285",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition auto-starts the enter animation when props is a function with deps",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:360a773b0830a8ff",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition defers the enter animation when an injected ref is provided",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:f6903293f1d4b84c",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition exposes phase === \"leave\" to the render fn during a normal leave",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d6633afc73a30595",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition keeps an injected ref deferred across a StrictMode double-mount",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:57c9a18ca570f685",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition passes immediate through to payload",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:a5a7b9de8c185fc1",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition returns a ref if the props argument is a function",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:88ebfbafacc659a9",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition sequences a transition behind a spring with useChain",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:1e14dd0f7771d48d",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition should allow items to leave before entering new items when exitBeforeEnter is true",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:b6c05bea6f90045d",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition should work with both exitBeforeEnter and trail together",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:5080284d1b139f95",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition unmounts after leave",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:19a932a83ab17317",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition when \"enter\" is a function still has its \"onRest\" prop called",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e0a2a80e9ab73301",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition when \"leave\" is a function unmounts after leave",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:0f16b7e85d26443d",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition when \"leave\" is a no-op update still unmounts the transition",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:3cde4602b661f364",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition when \"leave\" is an array unmounts after leave",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:b5bc11e228c44086",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition when \"reverse\" is true keeps trail order forward when reverse is false (default)",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:f0714e6baaa70321",
+      "upstreamFile": "packages/core/src/hooks/useTransition.test.tsx",
+      "upstreamFullName": "useTransition when \"reverse\" is true reverses the trail order across leaving items",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:591e7ba32fe49ebc",
+      "upstreamFile": "packages/core/src/interpolate.test.ts",
+      "upstreamFullName": "AnimatedValue interpolation options accepts a config object with extrapolate clamp",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8871668b0a5904f9",
+      "upstreamFile": "packages/core/src/interpolate.test.ts",
+      "upstreamFullName": "AnimatedValue interpolation options accepts a config object with extrapolate extend",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:93c7adc1bd70b036",
+      "upstreamFile": "packages/core/src/interpolate.test.ts",
+      "upstreamFullName": "AnimatedValue interpolation options accepts a config object with extrapolate identity",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d1468f879f853939",
+      "upstreamFile": "packages/core/src/interpolate.test.ts",
+      "upstreamFullName": "AnimatedValue interpolation options accepts an AnimatedValue and a range shortcut config",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:6a723ab93bc94efe",
+      "upstreamFile": "packages/core/src/interpolate.test.ts",
+      "upstreamFullName": "AnimatedValue interpolation options accepts an AnimatedValueArray and a range shortcut config",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:b0bfc668cfcbe017",
+      "upstreamFile": "packages/core/src/interpolate.test.ts",
+      "upstreamFullName": "AnimatedValue interpolation options accepts an AnimatedValueArray and an interpolation function",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:af852c7c4fb1963c",
+      "upstreamFile": "packages/core/src/interpolate.test.ts",
+      "upstreamFullName": "AnimatedValue interpolation options accepts multiple AnimatedValues and a range shortcut config",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8df8b07f9cc08bd5",
+      "upstreamFile": "packages/core/src/interpolate.test.ts",
+      "upstreamFullName": "AnimatedValue interpolation options accepts multiple AnimatedValues and an interpolation function",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:30f5a018b5ea1a78",
+      "upstreamFile": "packages/core/src/interpolate.test.ts",
+      "upstreamFullName": "AnimatedValue interpolation options chains interpolations",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:35a3645e1c263943",
+      "upstreamFile": "packages/core/src/Interpolation.test.ts",
+      "upstreamFullName": "Interpolation can use a non-animated FluidValue",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:26248ce29f546a0a",
+      "upstreamFile": "packages/core/src/Interpolation.test.ts",
+      "upstreamFullName": "Interpolation can use a SpringValue",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:a590f0fa3513d362",
+      "upstreamFile": "packages/core/src/Interpolation.test.ts",
+      "upstreamFullName": "Interpolation can use another Interpolation",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:6aaff42904b3a159",
+      "upstreamFile": "packages/core/src/Interpolation.test.ts",
+      "upstreamFullName": "Interpolation when all inputs are paused leaves the frameloop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:96d5b129caf5c82a",
+      "upstreamFile": "packages/core/src/Interpolation.test.ts",
+      "upstreamFullName": "Interpolation when an input resets its animation computes its value before the first frame",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:4025aec70e02fc83",
+      "upstreamFile": "packages/core/src/Interpolation.test.ts",
+      "upstreamFullName": "Interpolation when multiple inputs change in the same frame only computes its value once",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:ac9345b05210122e",
+      "upstreamFile": "packages/core/src/SpringContext.test.tsx",
+      "upstreamFullName": "SpringContext can make current animations immediate",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:0305d9e81e7ebbd4",
+      "upstreamFile": "packages/core/src/SpringContext.test.tsx",
+      "upstreamFullName": "SpringContext can make future animations immediate",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:dab09fdcfc43c5ee",
+      "upstreamFile": "packages/core/src/SpringContext.test.tsx",
+      "upstreamFullName": "SpringContext can pause current animations",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:71ec7bf940109f6e",
+      "upstreamFile": "packages/core/src/SpringContext.test.tsx",
+      "upstreamFullName": "SpringContext can pause future animations",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:aee0e06cb3334faa",
+      "upstreamFile": "packages/core/src/SpringContext.test.tsx",
+      "upstreamFullName": "SpringContext only merges when changed",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:5de995cb298818eb",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue \"set\" method stops the active animation",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:ed67346b5f6ea91a",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue \"skipAnimation\" global should skip animations",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:31c9b333ebf45b7f",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue \"skipAnimation\" global should skip to end even if delay is present",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:dc295e169965534f",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue \"skipAnimation\" global still calls \"onStart\", \"onChange\", and \"onRest\" props",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d82c5f0747273be5",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue animates a number the same as a numeric string",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:c5c1df173d3738e1",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue can animate a number",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e2c9c55709035400",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue can animate a string",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:814252c1fa9c4085",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue can animate an array of numbers",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:51c1970f58bcc415",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue can have an animated string as its target",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:0d6f33f963929f72",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue no-op updates resolves when the animation is finished",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:f940925c6ddcbaeb",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue passes an AnimationResult to onChange whose value is the current value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:c69f8a256dd6c2b4",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop decay continues animating after retarget (#1843)",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:061b91237edb8391",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop preserves velocity across \"to\" updates when decay is set",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:41556b81528e03f1",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop resets the velocity when \"to\" changes",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:4862f53908cae5d7",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops decay easing when step difference is less than precision with precision: 0.0001",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:7c23e8bec37fa072",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops decay easing when step difference is less than precision with precision: 0.001",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:6a75930e692a3bcd",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops decay easing when step difference is less than precision with precision: 0.01",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:58344dbdf2052454",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops decay easing when step difference is less than precision with precision: 0.1",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:c0788c50b73e4d1e",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops decay easing when step difference is less than precision with precision: 1",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:6d5e0d528a2186cd",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops decay easing when step difference is less than precision with precision: 10",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:3f01677f943fd022",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops decay easing when step difference is less than precision with precision: 100",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:3ed21ca749206880",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops spring easing when step difference is less than precision with precision: 0.0001",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:f2a8115948c91ac9",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops spring easing when step difference is less than precision with precision: 0.001",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e9a202b3841a53ae",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops spring easing when step difference is less than precision with precision: 0.01",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:cbd780c79a3c9720",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops spring easing when step difference is less than precision with precision: 0.1",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:63d4d80ca509af3d",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops spring easing when step difference is less than precision with precision: 1",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:906381bc79c75712",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops spring easing when step difference is less than precision with precision: 10",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:1db39957bd416ed5",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop the \"precision\" prop stops spring easing when step difference is less than precision with precision: 100",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:bf1405ebfcd03042",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop when \"damping\" is 1.0 should prevent bouncing",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:03950e8bf8535b5b",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"config\" prop when \"damping\" is less than 1.0 should bounce",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:94939a4a7618815f",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"delay\" prop allows the update to be temporally prevented",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:613dbbdf9fd26f34",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"loop\" prop can be combined with the \"reset\" prop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:40a820eb442f9426",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"loop\" prop can be combined with the \"reverse\" prop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:324afc5bfab31e75",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"loop\" prop can pass a custom delay",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:51c5e157a2ddd3f1",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"loop\" prop does not affect later updates",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:074a747cfc8b504d",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"loop\" prop resets the animation once finished",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:192819b9b6d927f6",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"loop\" prop supports deferred evaluation",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:fc43a9d2727e7435",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onChange\" event is called by the \"set\" method",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:1aab888b45170a76",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onChange\" event is called on every frame",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:9776da72824b0ca6",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onChange\" event receives the \"to\" value on the last frame",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:df196049f19c05b3",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onChange\" event when active handler is never called by the \"set\" method",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:2ba49d0f4f2d9e93",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onPause\" event is called by the \"pause\" method",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:4cc95653c2d43148",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onRest\" event is called after an async animation",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:edd3950042a74197",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onRest\" event is called by the \"finish\" method",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e56b410470c530a1",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onRest\" event is called by the \"stop\" method",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:5b9a020352bd58ae",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onRest\" event is called on the last frame",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:a907ad7576cd6d64",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onRest\" event is called when immediate is set to true",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:cf5a33e41bf375a2",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onRest\" event is called when the \"cancel\" prop is true",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:93682d73e472ba6b",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onRest\" event is called when two starts cancel each other before the first frame",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:044ffe9a2ad5a29a",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onResume\" event is called by the \"resume\" method",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8d293d1f6357378c",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onStart\" event is called by the \"finish\" method",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:c7c00309aa925341",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onStart\" event is called on the first frame",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:615c36915624cbbd",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue the \"onStart\" event is called when immediate is set to true",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:f79fd746b74dedf6",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"default\" prop is false and \"from\" prop is defined and \"to\" prop is undefined stops the active animation",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:0d9fba7b66189713",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"default\" prop is false and \"from\" prop is defined and \"to\" prop is undefined updates the \"to\" value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:b1a51876a721ce3c",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"default\" prop is false and \"from\" prop is defined updates the \"from\" value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:0142739b408c6b23",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"default\" prop is false and \"from\" prop is defined updates the current value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:3c5d8a8f2dccb414",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"default\" prop is true and \"from\" prop is changed after the first animation and \"reset\" prop is true starts at the \"from\" prop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:99cea7b171e032fc",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"default\" prop is true and \"from\" prop is changed after the first animation does not start animating",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:a0d701d3b8fcdabb",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"default\" prop is true and \"from\" prop is changed before the first animation updates the current value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:6f98cf0b2708f853",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"from\" prop is defined controls the start value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d5b4c354c270426b",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"immediate: true\" is followed by \"immediate: false\" in same frame applies the immediate goal synchronously",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:50c47f39c2dcce39",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"immediate: true\" is followed by \"immediate: false\" in same frame does nothing if the 2nd update has \"reset: true\"",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:6aa97f2838595727",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"immediate\" prop is true calls the \"onRest\" prop with finished: true",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e5d00664d1ba2ccd",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"immediate\" prop is true calls the \"onStart\" prop with finished: true",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:861ca24d5e6726b5",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"immediate\" prop is true still resolves the \"start\" promise",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:114bdebcf3ac545d",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"immediate\" prop is true stops animating",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8dbd8864f77c45f7",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"reset\" prop is true calls \"onRest\" before jumping back to its \"from\" value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:f076c622b1055ea7",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"reset\" prop is true calls the \"onRest\" prop with (finished: false)",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:60e4eedfb20622e1",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"reset\" prop is true resolves the \"start\" promise with (finished: false)",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:6dd33019707dd150",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"reverse\" prop is true preserves the reversal for future updates",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:2b39e13ab80d8287",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"reverse\" prop is true swaps the \"to\" and \"from\" props",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:96a02f28edf54e3c",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"reverse\" prop is true works when \"from\" was set by an earlier update",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:355116f03de48529",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"reverse\" prop is true works when \"to\" and \"from\" were set by an earlier update",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:eca116e8e94ec0e4",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"to\" prop equals current value avoids interrupting an active animation",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:143efe1a1000409d",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"to\" prop equals current value cancels any pending animation",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:578ab38d984a2ce3",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"to\" prop is a function and \"from\" prop is defined stops the active animation before \"to\" is called",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:5f1b47b03131e6bc",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"to\" prop is changed avoids calling the \"onStart\" prop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d82af230eff8f984",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when \"to\" prop is changed resolves the \"start\" promise with (finished: false)",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:759557d2434e7316",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is an Interpolation animates toward the current value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:46664a8764e4867f",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is an Interpolation can change its target while animating",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:dbcf9c4fd50a2786",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is an Interpolation preserves its \"onRest\" prop between animations",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:108aa15340a566aa",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is an Interpolation when our last child is detached detaches from the target",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:0e3ced79f689013e",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is an Interpolation when target animates after we go idle starts animating",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:120f93bd0967faaa",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is an Interpolation when target has its value set (not animated) animates toward the new value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8431451d904b9394",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is an Interpolation when target is done animating keeps animating until the target is reached",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:7dcb20b83a6250b8",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is an Interpolation when target resets its animation keeps animating",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:6fa91e7a7e7486b1",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is another SpringValue animates toward the current value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:776c2f959d5c36c3",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is another SpringValue can change its target while animating",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d9b7b965bbca869c",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is another SpringValue preserves its \"onRest\" prop between animations",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8ab10ae31d66993c",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is another SpringValue when our last child is detached detaches from the target",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8d6e80ccfec037eb",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is another SpringValue when target animates after we go idle starts animating",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:a63bf8aa2cf567a1",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is another SpringValue when target has its value set (not animated) animates toward the new value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:da172497e9746a90",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is another SpringValue when target is done animating keeps animating until the target is reached",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8cb736e49e04c515",
+      "upstreamFile": "packages/core/src/SpringValue.test.ts",
+      "upstreamFullName": "SpringValue when our target is another SpringValue when target resets its animation keeps animating",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:ba149858d737d69d",
+      "upstreamFile": "packages/rafz/src/index.test.ts",
+      "upstreamFullName": "raf looping is not initially looping",
+      "disposition": "reused-dependency",
+      "evidence": ["package.json"],
+      "reason": "Executed unchanged in the pristine lane against vendored rafz; the published package reuses exact @react-spring/rafz@10.1.2."
+    },
+    {
+      "id": "runtime:a06c0f2ddf23ae27",
+      "upstreamFile": "packages/rafz/src/index.test.ts",
+      "upstreamFullName": "raf looping loops as long as one update loop is scheduled",
+      "disposition": "reused-dependency",
+      "evidence": ["package.json"],
+      "reason": "Executed unchanged in the pristine lane against vendored rafz; the published package reuses exact @react-spring/rafz@10.1.2."
+    },
+    {
+      "id": "runtime:48aac5c422dc1a53",
+      "upstreamFile": "packages/rafz/src/index.test.ts",
+      "upstreamFullName": "raf looping loops when update is registered",
+      "disposition": "reused-dependency",
+      "evidence": ["package.json"],
+      "reason": "Executed unchanged in the pristine lane against vendored rafz; the published package reuses exact @react-spring/rafz@10.1.2."
+    },
+    {
+      "id": "runtime:06978ca71a4a1893",
+      "upstreamFile": "packages/rafz/src/index.test.ts",
+      "upstreamFullName": "raf looping resumes running jobs after stopping looping",
+      "disposition": "reused-dependency",
+      "evidence": ["package.json"],
+      "reason": "Executed unchanged in the pristine lane against vendored rafz; the published package reuses exact @react-spring/rafz@10.1.2."
+    },
+    {
+      "id": "runtime:eeb0e8391cdcb292",
+      "upstreamFile": "packages/rafz/src/index.test.ts",
+      "upstreamFullName": "raf looping stops looping after single job",
+      "disposition": "reused-dependency",
+      "evidence": ["package.json"],
+      "reason": "Executed unchanged in the pristine lane against vendored rafz; the published package reuses exact @react-spring/rafz@10.1.2."
+    },
+    {
+      "id": "runtime:920aaacb9a2aeb76",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation CSS Variables should correctly parse the fallback if its a variable",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:dbe42df876b02ddc",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation CSS Variables should correctly parse variables",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:f16abb68ba54e6a9",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation CSS Variables should return the fallbacks if the variable cannot be found",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:09f4963306c855ae",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation preserves decimal precision mid-animation does not pad whole-number keyframes (preserves fractional alpha)",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:27c56efc24c6157e",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation preserves decimal precision mid-animation pads each number-position independently",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:a59f50d1b8031604",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation preserves decimal precision mid-animation pads to the shared decimal count of the keyframes",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:2d7239f0ffd81cce",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation preserves decimal precision mid-animation rounds when the raw value has more precision than the template",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:23bc0f6f8a9a9054",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation preserves decimal precision mid-animation skips padding when keyframes have differing decimal counts",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e2c078071fa8db51",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation preserves keyframe formatting at exact range values keeps non-numeric template text intact",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:3070e7989eda1c25",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation preserves keyframe formatting at exact range values keeps trailing zeros across multi-stop ranges",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:af68a16e3f814ba8",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation preserves keyframe formatting at exact range values keeps trailing zeros on floats",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:b00d596f23491390",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should interpolate between number and unit",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:fc602b3285222766",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should not match partial color names",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:b1f32eaff49ee2bd",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should round rgb values",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:93df592d1de5f067",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should support a mix of color patterns",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:4fde39532aec16bd",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should work with defaults",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:34df68c14f5ba5ad",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should work with input range",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:068dfaeed4990122",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should work with interpolation function as argument",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:3e89212d598a19fa",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should work with keyframes without extrapolate",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:5aefbb0e532c6999",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should work with negative and decimal values in string ranges",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:2f2129d3db31ea7f",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should work with output range",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:0c48cc8053b28118",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should work with output ranges as long hex string",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:1c13cc17806293a4",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should work with output ranges as short hex string",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8afa8b18b261748d",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should work with output ranges as string",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:7c031a978b93a8c4",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should work with output ranges with mixed hex and rgba strings",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:cdbba93055b3fa1e",
+      "upstreamFile": "packages/shared/src/createInterpolator.test.ts",
+      "upstreamFullName": "Interpolation should work with range arrays as arguments",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e23f3031e4d85d34",
+      "upstreamFile": "packages/shared/src/dom-events/resize/resizeElement.test.ts",
+      "upstreamFullName": "resizeElement maps inline/block to width/height for vertical writing modes",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:464a19c6708d080b",
+      "upstreamFile": "packages/shared/src/dom-events/resize/resizeElement.test.ts",
+      "upstreamFullName": "resizeElement reports the border-box size, including padding and border",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:9a069e6b156421ad",
+      "upstreamFile": "packages/shared/src/hooks/useReducedMotion.test.ts",
+      "upstreamFullName": "useReducedMotion handles change of \"prefers-reduce-motion\" media query value",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:62bc2e0846d924f2",
+      "upstreamFile": "packages/shared/src/hooks/useReducedMotion.test.ts",
+      "upstreamFullName": "useReducedMotion returns false if \"Reduce motion\" is disabled",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:75a1001871340891",
+      "upstreamFile": "packages/shared/src/hooks/useReducedMotion.test.ts",
+      "upstreamFullName": "useReducedMotion returns true if \"Reduce motion\" is enabled",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:8fad608fc3453bbd",
+      "upstreamFile": "packages/shared/src/hooks/useReducedMotion.test.ts",
+      "upstreamFullName": "useReducedMotion successfully removes listener on unmount",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e33cc72330d5d2ff",
+      "upstreamFile": "packages/shared/src/stringInterpolation.test.ts",
+      "upstreamFullName": "interpolates a number-less output value instead of throwing on a null match",
+      "disposition": "adapted",
+      "adaptedFile": "packages/spring/tests/upstream/stringInterpolation.test.ts",
+      "adaptedFullName": "interpolates a number-less output value instead of throwing on a null match"
+    },
+    {
+      "id": "runtime:7597149190008bc3",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component accepts Animated values in custom style prop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e018b5bac895c5be",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component accepts Animated values in style prop",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:b08451b588e4af6c",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component accepts Animated values or Animated arrays as attributes",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:c5916b3addbf428b",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component accepts arrays for transform functions used as style keys",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:9449ed5dd8857229",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component accepts scrollTop and scrollLeft properties",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:995b8bf198533a93",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component accepts the className property",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:00d0bb89d6d14e90",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component accepts x/y/z as style keys equivalent to `translate3d`transform function",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:3614bbeed74a0bea",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component applies `transform:none` when identity transform is detected",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:ef4b8581477dbbdc",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component attribute removal clears textContent when children becomes undefined",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d14ceeca198ed493",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component attribute removal removes a boolean-style attribute when its animated value becomes undefined",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:2b72c44428a0b1e2",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component attribute removal removes a generic attribute when its animated value becomes undefined",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:fe979fb5326932c8",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component attribute removal removes the class attribute when className becomes undefined",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d70e40af119c30c4",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component attribute removal removes the viewBox attribute when its animated value becomes undefined",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:b1724c972cfdca97",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component attribute removal still applies defined falsy attribute values rather than removing them",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e1c8e173d03066c1",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component creates an HTML element from a tag name",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:fbb0b9e19416bec6",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component does not treat custom spring keys that start with transform-function names as transforms",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:fe30635611d5a7d9",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component only applies default units to the fourth value of `rotate3d`",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:d5244e9ae2a11e46",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component preserves transform-style and transform-origin properties",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:c36910248f53ac1a",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component sets default units to unit-less values passed as transform functions",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:abeffcc7cde3eea6",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component updates all values of Animated arrays",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    },
+    {
+      "id": "runtime:e239497d294b85f5",
+      "upstreamFile": "targets/web/src/animated.test.tsx",
+      "upstreamFullName": "animated component wraps a component",
+      "disposition": "awaiting-adaptation",
+      "reason": "Pinned upstream identity inventoried by the pristine lane; one-for-one Octane adapted counterpart not yet landed."
+    }
+  ]
+}

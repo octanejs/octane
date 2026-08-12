@@ -1,0 +1,55 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SyntaxHighlighter component renders monospace text when text is passed as language 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            "const woah = fun => fun + 1;
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "const dude = woah(2) + 3;
+",
+        "function thisIsAFunction() {
+",
+        "  return [1,2,3].map(n => n + 1).filter(n !== 3);
+",
+        "}
+",
+        "console.log('making up fake code is really hard');
+",
+        "
+",
+        "function itIs() {
+",
+        "  return 'no seriously really it is';
+",
+        "}
+",
+      ],
+      "props": {
+        "className": "language-text",
+        "style": {
+          "whiteSpace": "pre",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(240, 240, 240)",
+      "color": "rgb(68, 68, 68)",
+      "display": "block",
+      "overflowX": "auto",
+      "padding": "0.5em",
+    },
+  },
+  "type": "pre",
+}
+`;

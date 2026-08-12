@@ -30,6 +30,22 @@ function Test() {
 	return null;
 }
 
+class ClassComponent {
+	render() {
+		return null;
+	}
+}
+
+createFormHook({
+	fieldComponents: {
+		// @ts-expect-error Octane component registration accepts callable function components only.
+		ClassComponent,
+	},
+	formComponents: {},
+	fieldContext,
+	formContext,
+});
+
 const { useAppForm, withForm, withFieldGroup } = createFormHook({
 	fieldComponents: {
 		Test,

@@ -45,8 +45,10 @@
     "cmdk": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",
-    "react": "catalog:default",
-    "react-dom": "catalog:default",
+    "@types/react": "catalog:cmdk-react-oracle",
+    "@types/react-dom": "catalog:cmdk-react-oracle",
+    "react": "catalog:cmdk-react-oracle",
+    "react-dom": "catalog:cmdk-react-oracle",
     "vitest": "catalog:default"
   }
 }

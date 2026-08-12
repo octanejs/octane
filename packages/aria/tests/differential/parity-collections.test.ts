@@ -7,18 +7,29 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/aria-diff-tabs.tsrx');
+const LISTBOX_FIXTURE = resolve(__dirname, '../_fixtures/aria-diff-listbox.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
+await Promise.all([
+	preloadDifferentialFixture(FIXTURE, CACHE),
+	preloadDifferentialFixture(LISTBOX_FIXTURE, CACHE),
+]);
+
 describe('differential: @octanejs/aria Phase-2 tabs vs real react-aria', () => {
+	// @parity-case differential:aria-default-selection-roles-aria-wiring
 	it('default selection + roles + aria wiring, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'TabsSpec', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-clicking-tab-moves-selection
 	it('clicking a tab moves selection, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'TabsSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -30,15 +41,15 @@ describe('differential: @octanejs/aria Phase-2 tabs vs real react-aria', () => {
 	});
 });
 
-const LISTBOX_FIXTURE = resolve(__dirname, '../_fixtures/aria-diff-listbox.tsrx');
-
 describe('differential: @octanejs/aria Phase-2 listbox vs real react-aria', () => {
+	// @parity-case differential:aria-roles-labelling-mount
 	it('roles + labelling on mount, byte-identical', async () => {
 		const d = await mountDifferential(LISTBOX_FIXTURE, 'ListBoxSpec', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-listbox-selection
 	it('clicking an option selects it, byte-identical', async () => {
 		const d = await mountDifferential(LISTBOX_FIXTURE, 'ListBoxSpec', undefined, CACHE);
 		await d.step('mount', () => {});

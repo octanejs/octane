@@ -97,7 +97,7 @@ export function useChat<
       }),
       devtools: {
         ...initialOptions.devtools,
-        // OCTANE DIVERGENCE: identify this binding as Octane (not 'react') in TanStack AI Devtools.
+        // Octane divergence note.
         framework: 'octane',
         hookName: 'useChat',
         outputKind: initialOptions.outputSchema ? 'structured' : 'chat',
@@ -168,7 +168,7 @@ export function useChat<
     }
   }, [client])
 
-  // OCTANE DIVERGENCE: upstream captures the initial transport. ChatClient
+  // Octane divergence note: Upstream captures the initial transport. ChatClient
   // owns transport swaps, including aborting an active request and
   // resubscribing when needed, so keep its conversation state stable while
   // applying the latest transport.

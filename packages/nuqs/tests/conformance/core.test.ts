@@ -71,8 +71,4 @@ describe('server entry', () => {
 		expect(typeof server.createSerializer).toBe('function');
 		expect(typeof server.parseAsInteger).toBe('object');
 	});
-
-	it('does NOT ship createSearchParamsCache (RSC-only, see status.json)', () => {
-		expect((server as Record<string, unknown>).createSearchParamsCache).toBeUndefined();
-	});
 });

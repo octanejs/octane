@@ -30,6 +30,11 @@
       "path": "packages/redux-toolkit/tests/ssr/preloaded.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane server rendering of preloaded query state; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/redux-toolkit/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
     }
   ]
 }

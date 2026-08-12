@@ -8099,6 +8099,10 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		isVoidComponentImport:
 			typeof options?.isVoidComponentImport === 'function' ? options.isVoidComponentImport : null,
+		descriptorChildrenBindings: collectDescriptorChildrenBindings(
+			ast,
+			options?.isDescriptorChildrenImport,
+		),
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		profileRuntimeNeeded: new Set(), // compiler ABI helpers imported from `octane/profiling`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
@@ -9290,6 +9294,10 @@ function compileServer(source, filename, options, analyzedAst = null) {
 		nextFragId: 0,
 		nextHelperId: 0,
 		componentInfo: new Map(),
+		descriptorChildrenBindings: collectDescriptorChildrenBindings(
+			ast,
+			options?.isDescriptorChildrenImport,
+		),
 		ssrSingleRootComponents: new Set(),
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
@@ -11116,6 +11124,8 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
 		const opaqueChildren = !isActivityLongForm(node) && !isFragmentLongForm(node, ctx);
 		const descriptorChildren =
+			(tagBindingName(node) !== null &&
+				ctx.descriptorChildrenBindings?.has(tagBindingName(node))) ||
 			ctx._tsxValuePos ||
 			(returnedFragmentTemplate && !requiresTemplateNormalization(node, parentNs, true, ctx));
 		if (descriptorChildren) {
@@ -11126,10 +11136,17 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 			// matching the client's childSlot(descriptor). A `__children` render-fn would
 			// instead add a wrapping block (ssrChild wraps the fn), making the server one
 			// block deeper than the client and desyncing the hydration cursor.
-			const kids = children.map((c) => lowerJsxChild(c, ctx)).filter((e) => e != null);
+			const kids = children.map((c) => lowerInspectableJsxChild(c, ctx)).filter((e) => e != null);
 			if (kids.length > 0) {
 				// The children array shell maps to the authored component element.
-				const childrenExpr = kids.length === 1 ? kids[0] : inheritOriginLoc(b.array(kids), node);
+				let childrenExpr = kids[0];
+				if (kids.length > 1) {
+					ctx.runtimeNeeded.add('positionalChildren');
+					childrenExpr = inheritOriginLoc(
+						b.call(rtAlias('positionalChildren'), inheritOriginLoc(b.array(kids), node)),
+						node,
+					);
+				}
 				propNodes.push(
 					inheritOriginLoc(
 						b.prop(
@@ -11192,6 +11209,60 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		args.push(b.literal(true, 'true'));
 	}
 	return ssrCall(helper, args, node);
+}
+
+// ---------------------------------------------------------------------------
+// Server control flow — @if/@for/@switch/@try lowered to HTML-string builders.
+// Each branch/item/case body is compiled (via ssrCompileSub) into a server
+// sub-function returning a string, and the chosen branch's output is wrapped in
+// `_$ssrBlock(…)` (BLOCK_OPEN/BLOCK_CLOSE markers) so a future client hydrate
+// cursor can find the boundaries. Expressions (test/items/discriminant) are
+// printed and evaluated at render time.
+// ---------------------------------------------------------------------------
+
+// Compile a list of body statements into a server sub-function `function NAME(__s,
+// …params, __extra) { return <html>; }`. Returns { fnName, fn }; the caller pushes
+// `fn` into the enclosing inlinedSubs.
+function collectDescriptorChildrenBindings(ast, isDescriptorChildrenImport) {
+	const markerNames = new Set();
+	const bindings = new Set();
+	for (const statement of ast.body || []) {
+		if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type') continue;
+		for (const specifier of statement.specifiers || []) {
+			if (specifier.importKind === 'type' || !specifier.local?.name) continue;
+			const imported =
+				specifier.type === 'ImportDefaultSpecifier'
+					? 'default'
+					: (specifier.imported?.name ?? specifier.imported?.value);
+			if (statement.source.value === 'octane' && imported === 'descriptorChildren') {
+				markerNames.add(specifier.local.name);
+			}
+			if (
+				typeof imported === 'string' &&
+				typeof isDescriptorChildrenImport === 'function' &&
+				isDescriptorChildrenImport(statement.source.value, imported) === true
+			) {
+				bindings.add(specifier.local.name);
+			}
+		}
+	}
+	for (const statement of ast.body || []) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const item of declaration.declarations || []) {
+			if (
+				item.id?.type === 'Identifier' &&
+				item.init?.type === 'CallExpression' &&
+				item.init.callee?.type === 'Identifier' &&
+				markerNames.has(item.init.callee.name) &&
+				item.init.arguments?.length === 1
+			) {
+				bindings.add(item.id.name);
+			}
+		}
+	}
+	return bindings;
 }
 
 // ---------------------------------------------------------------------------
@@ -17635,6 +17706,30 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 // drop it). Text → string literal (whitespace-only-with-newline indentation is
 // dropped, JSX rule); `{expr}` → the lowered inner expression; nested element →
 // recurse; fragment → positional children or a scope-preserving descriptor.
+function lowerInspectableJsxChild(child, ctx) {
+	const fold = ctx._valueDirectiveLowering;
+	if (fold == null) return lowerJsxChild(child, ctx);
+	const prepared = lowerSetupValueDirectives(child, fold);
+	const t = prepared && prepared.type;
+	if (
+		t === 'JSXText' ||
+		t === 'Text' ||
+		t === 'JSXExpressionContainer' ||
+		t === 'JSXElement' ||
+		t === 'Element' ||
+		t === 'JSXFragment' ||
+		t === 'Fragment'
+	) {
+		return lowerJsxChild(prepared, ctx);
+	}
+	// A bare directive / code-block folds to an ordinary expression.
+	return prepared;
+}
+
+// Lower one JSX child node to a `createElement` argument expression (or null to
+// drop it). Text → string literal (whitespace-only-with-newline indentation is
+// dropped, JSX rule); `{expr}` → the lowered inner expression; nested element →
+// recurse; fragment → positional children or a scope-preserving descriptor.
 function lowerJsxChild(child, ctx) {
 	const t = child && child.type;
 	if (t === 'JSXText' || t === 'Text') {
@@ -17648,11 +17743,15 @@ function lowerJsxChild(child, ctx) {
 		return rewriteJsxValues(child.expression, ctx);
 	}
 	if (t === 'JSXElement' || t === 'Element') return jsxElementToCreateElement(child, ctx);
-	if (VALUE_DIRECTIVE_ARM_TYPES.has(t)) rejectUnownedValueDirective(child);
+	if (VALUE_DIRECTIVE_ARM_TYPES.has(t)) {
+		const fold = ctx._valueDirectiveLowering;
+		if (fold != null) return fold(child);
+		rejectUnownedValueDirective(child);
+	}
 	if (t === 'JSXFragment' || t === 'Fragment') {
 		const els = [];
 		for (const c of child.children || []) {
-			const e = lowerJsxChild(c, ctx);
+			const e = lowerInspectableJsxChild(c, ctx);
 			if (e !== null) els.push(e);
 		}
 		// A fragment's children are FIXED siblings (React's "static children" —
@@ -24421,35 +24520,53 @@ function makeCompCall(
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
 		const childrenParentNs =
 			!isActivityLongForm(node) && !isFragmentLongForm(node, ctx) ? 'opaque' : parentNs;
-		// Compile children as a render function: (scope) => { renders JSX into scope }.
-		// The function is inlined inside the parent component body so its closures
-		// capture the parent's locals (props, state, etc.).
-		// Phase 2 NOTE: children render-fns stay INLINE (envNames=null) — they are
-		// invoked through props (childrenAsBody / render-prop checks), not through
-		// a construct block, so there is no block.extra channel for captures.
-		const childrenHelperName = hoistBodyHelper(
-			ctx,
-			inlinedSubs,
-			'__children',
-			children,
-			[],
-			childrenParentNs,
-			cssHash,
-			null,
-		);
-		// Tag the children-block render fn so a consumer can tell it from a render-prop
-		// function child (`<C>{(x) => …}</C>`, passed RAW above) — both are `typeof === 'function'`,
-		// so React-ecosystem `typeof children === 'function'` checks need `isChildrenBlock` to
-		// exclude compiled element/text children. See runtime `markChildrenBlock`/`isChildrenBlock`.
-		ctx.runtimeNeeded.add('markChildrenBlock');
-		hasChildrenProp = true;
-		propNodes.push(
-			b.prop(
-				'init',
-				b.literal('children'),
-				b.call('_$markChildrenBlock', b.id(childrenHelperName)),
-			),
-		);
+		if (compName !== null && ctx.descriptorChildrenBindings?.has(compName)) {
+			const kids = children
+				.map((child) => lowerInspectableJsxChild(child, ctx))
+				.filter((child) => child != null);
+			if (kids.length > 0) {
+				hasChildrenProp = true;
+				let childrenValue = kids[0];
+				if (kids.length > 1) {
+					ctx.runtimeNeeded.add('positionalChildren');
+					childrenValue = inheritOriginLoc(
+						b.call(rtAlias('positionalChildren'), inheritOriginLoc(b.array(kids), node)),
+						node,
+					);
+				}
+				propNodes.push(b.prop('init', b.literal('children'), childrenValue));
+			}
+		} else {
+			// Compile children as a render function: (scope) => { renders JSX into scope }.
+			// The function is inlined inside the parent component body so its closures
+			// capture the parent's locals (props, state, etc.).
+			// Phase 2 NOTE: children render-fns stay INLINE (envNames=null) — they are
+			// invoked through props (childrenAsBody / render-prop checks), not through
+			// a construct block, so there is no block.extra channel for captures.
+			const childrenHelperName = hoistBodyHelper(
+				ctx,
+				inlinedSubs,
+				'__children',
+				children,
+				[],
+				childrenParentNs,
+				cssHash,
+				null,
+			);
+			// Tag the children-block render fn so a consumer can tell it from a render-prop
+			// function child (`<C>{(x) => …}</C>`, passed RAW above) — both are `typeof === 'function'`,
+			// so React-ecosystem `typeof children === 'function'` checks need `isChildrenBlock` to
+			// exclude compiled element/text children. See runtime `markChildrenBlock`/`isChildrenBlock`.
+			ctx.runtimeNeeded.add('markChildrenBlock');
+			hasChildrenProp = true;
+			propNodes.push(
+				b.prop(
+					'init',
+					b.literal('children'),
+					b.call('_$markChildrenBlock', b.id(childrenHelperName)),
+				),
+			);
+		}
 	}
 
 	// The props object as a node; the call-site emit embeds it directly.

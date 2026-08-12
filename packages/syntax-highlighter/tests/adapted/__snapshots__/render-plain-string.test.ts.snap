@@ -1,0 +1,31 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SyntaxHighlighter renders childre unadultered when no language disocvered in highlight auto 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            "Contacts* contacts = [[Contacts alloc]init];",
+          ],
+          "props": {},
+          "type": "span",
+        },
+      ],
+      "props": {
+        "style": {
+          "whiteSpace": "pre",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "backgroundColor": "rgb(255, 255, 255)",
+    },
+  },
+  "type": "pre",
+}
+`;

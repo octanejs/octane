@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "upstreamRoot": "packages/transition-group/upstream-types",
+  "adaptedRoot": "packages/transition-group/typetests",
+  "inventories": {
+    "upstream": "packages/transition-group/audit/pristine-types.json",
+    "adapted": "packages/transition-group/audit/adapted-types.json"
+  },
+  "lanes": {
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/transition-group/upstream-types/tsconfig.json",
+      "sourcePolicy": "Byte-exact DefinitelyTyped react-transition-group-tests.tsx at cccd2a9ffecb708ac0606faa7f81f0b7ec535bf9, compiled against npm @types/react-transition-group@4.4.12 and pinned React types."
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/transition-group/typetests/tsconfig.json",
+      "sourcePolicy": "One-for-one Octane adaptation of the DefinitelyTyped suite after the permitted React-to-Octane type and import transformations."
+    }
+  },
+  "permittedTransformations": [
+    {
+      "kind": "import-root",
+      "rule": "react-transition-group root imports become ../src/index.ts; Transition and SwitchTransition subpaths become their corresponding ../src/*.tsrx modules."
+    },
+    {
+      "kind": "react-type",
+      "rule": "React.ReactElement, React.FunctionComponent, React.useRef, and JSX resolve to ElementDescriptor, a local FunctionComponent alias, useRef, and Octane's jsxImportSource types respectively."
+    },
+    {
+      "kind": "formatting",
+      "rule": "TypeScript printer output must remain structurally identical after the permitted import and React type rewrites."
+    }
+  ],
+  "divergences": []
+}

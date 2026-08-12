@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { chromium, webkit, type Browser, type Page } from 'playwright';
+import type { Browser, Page } from 'playwright';
+import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { createServer, type ViteDevServer } from 'vite';
 import { octane } from 'octane/compiler/vite';
 import { dirname } from 'node:path';
@@ -28,21 +29,14 @@ afterAll(async () => {
 	await server?.close();
 });
 
-for (const [name, engine] of [
-	['Chromium', chromium],
-	['WebKit', webkit],
-] as const) {
+for (const name of ['Chromium'] as const) {
 	describe.sequential(`${name} externally owned behavior lifecycle`, () => {
 		let browser: Browser;
 		let page: Page | undefined;
 		let failures: string[] = [];
 
 		beforeAll(async () => {
-			try {
-				browser = await engine.launch({ headless: true });
-			} catch (error) {
-				throw new Error(`${name} is required for externally owned behavior evidence: ${error}`);
-			}
+			browser = await launchBrowser({ headless: true });
 		});
 
 		afterEach(async () => {

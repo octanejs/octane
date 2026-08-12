@@ -4,6 +4,7 @@
 //   to the created element (octane attaches refs from props natively).
 // - No RSC/`__SERVER__` build flags: server output is selected by the active
 //   stylesheet backend at runtime.
+// Package contract (ordinary test evidence, not parity-counted):
 // - `defaultProps` is resolved by this factory at render time (octane's
 //   compiled call sites do not apply component defaultProps).
 import isPropValid from '@emotion/is-prop-valid';
@@ -135,7 +136,8 @@ function buildPropsForElement(
 		} else if (key === 'forwardedAs') {
 			propsForElement.as = context.forwardedAs;
 		} else if (key === 'ref') {
-			// octane refs are plain props; a ref always attaches to the created
+			// Package contract (ordinary test evidence, not parity-counted):
+			// ref is a plain Octane prop that always attaches to the rendered
 			// element and is never subject to shouldForwardProp filtering.
 			propsForElement.ref = context.ref;
 		} else if (!shouldForwardProp || shouldForwardProp(key, elementToBeCreated)) {

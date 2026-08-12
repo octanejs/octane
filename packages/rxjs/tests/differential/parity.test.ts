@@ -1,9 +1,14 @@
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/parity.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
+
+await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
 
 describe('differential: @octanejs/rxjs vs real @react-rxjs/core', () => {
 	// @parity-case differential:bound-value

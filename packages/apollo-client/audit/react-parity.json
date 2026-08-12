@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "47137830d3f76e5a87be45044717ec5360f2f11880e3f8a8de83cb9b1d01db28"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -110,12 +110,12 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "d655cda963da8e255cf0b519a00b34ca8f0604f7e6631c447f6585b4a93c51a7"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         },
         {
           "path": "packages/apollo-client/audit/test-classifications.json",
           "role": "support",
-          "sha256": "61a7e95b273ad8f7eb7d53bfeb8ce66f2dd0fa03157ce60364847bd2eca5fb6b"
+          "sha256": "118ca56781ad444a1782e54090deeb3ec3e6543641a564e626f79df9d55bde16"
         }
       ]
     },
@@ -131,7 +131,7 @@
         {
           "path": "packages/apollo-client/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "7cdab8fb95c4c889f659cd47e1d22cff832fa7d65cf409fa87133dce6133a397",
+          "sha256": "4d80ed1922b0cd7a2d545825765027a279ac190a7da539cc662da423c046cbac",
           "cases": [
             {
               "id": "differential:apollo-cache-query",

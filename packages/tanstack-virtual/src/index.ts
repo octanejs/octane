@@ -162,6 +162,8 @@ function useVirtualizerBase<TScrollElement extends Element | Window, TItemElemen
 			}
 			if (shouldRerender) {
 				if (useFlushSync && sync) {
+					// OCTANE DIVERGENCE[nested-flushsync-degradation][conformance:nested-flush-sync-scroll]:
+					// nested flushSync degrades to the ambient flush under Octane.
 					flushSync(rerender);
 				} else {
 					rerender();

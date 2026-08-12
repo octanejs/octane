@@ -304,7 +304,7 @@
             "then": {
               "properties": {
                 "execution": {
-                  "properties": { "compiler": { "const": "tsrx-tsc" } },
+                  "properties": { "compiler": { "enum": ["tsc", "tsrx-tsc"] } },
                   "required": ["compiler"]
                 }
               },
@@ -523,6 +523,32 @@
                     }
                   }
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ordinaryEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "cases"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "cases": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "testName", "fullName"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "testName": { "type": "string", "minLength": 1 },
+                "fullName": { "type": "string", "minLength": 1 }
               }
             }
           }

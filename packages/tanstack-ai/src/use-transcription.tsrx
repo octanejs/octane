@@ -98,6 +98,7 @@ export interface UseTranscriptionReturn<TOutput = TranscriptionResult> {
  * }
  * ```
  */
+// Octane divergence note.
 export function useTranscription<TTransformed = void>(
   options: Omit<UseTranscriptionOptions, 'onResult'> & {
     onResult?: (result: TranscriptionResult) => TTransformed
@@ -107,7 +108,7 @@ export function useTranscription<TTransformed = void>(
 > {
   const devtools = {
     ...options.devtools,
-    // OCTANE DIVERGENCE: identify this binding as Octane (not 'react') in TanStack AI Devtools.
+    // Octane divergence note.
     framework: 'octane',
     hookName: 'useTranscription',
     outputKind: 'text' as const,

@@ -1,0 +1,57 @@
+{
+  "name": "@octanejs/input-otp",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "Accessible one-time password inputs for Octane, ported from input-otp 1.4.2.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/input-otp"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "audit:generate": "node ../../scripts/react-parity/input-otp-generate.mjs",
+    "audit:verify": "node ../../scripts/react-parity/input-otp-check.mjs",
+    "audit:negative-controls": "node ../../scripts/react-parity/input-otp-negative-controls.mjs",
+    "test": "vitest run --root ../.. --project input-otp-pristine-browser && vitest run --root ../.. --project input-otp && vitest run --root ../.. --project input-otp-server && vitest run --root ../.. --project input-otp-browser && vitest run --root ../.. --project input-otp-differential",
+    "typecheck": "tsrx-tsc --noEmit -p typetests/tsconfig.json",
+    "typecheck:pristine": "tsc --noEmit -p audit/type-probes/tsconfig.pristine.json"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@testing-library/react": "16.3.2",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@tsrx/react": "catalog:default",
+    "octane": "workspace:*",
+    "input-otp": "1.4.2",
+    "playwright": "catalog:default",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

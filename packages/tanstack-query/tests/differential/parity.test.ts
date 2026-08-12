@@ -8,21 +8,31 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const CACHED = resolve(__dirname, '../_fixtures/cached-diff.tsrx');
 const ASYNC = resolve(__dirname, '../_fixtures/async-diff.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
+await Promise.all([
+	preloadDifferentialFixture(CACHED, CACHE),
+	preloadDifferentialFixture(ASYNC, CACHE),
+]);
+
 const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
 describe('differential: @octanejs/tanstack-query vs real @tanstack/react-query', () => {
+	// @parity-case differential:tanstack-query-cached
 	it('CachedApp: initialData query renders byte-identical result shape', async () => {
 		const d = await mountDifferential(CACHED, 'CachedApp', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-query-async
 	it('AsyncApp: pending → success renders byte-identical at both steps', async () => {
 		const d = await mountDifferential(ASYNC, 'AsyncApp', undefined, CACHE);
 		await d.step('mount (pending)', () => {});
@@ -32,6 +42,7 @@ describe('differential: @octanejs/tanstack-query vs real @tanstack/react-query',
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-query-mutation
 	it('MutationApp: idle → pending → success renders byte-identical', async () => {
 		const d = await mountDifferential(ASYNC, 'MutationApp', undefined, CACHE);
 		await d.step('mount (idle)', () => {});

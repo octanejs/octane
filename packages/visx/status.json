@@ -12,7 +12,7 @@
     "Props upstream types as React.ReactNode are octane renderables (octane's OctaneNode = unknown): octane elements are nominal, so ReactNode-typed props would reject them. Render-prop signatures keep their parameters and return octane renderables."
   ],
   "ssr": "Fixed-dimension primitives, wrapped XYChart series, annotations, text, and wordclouds emit complete deterministic SVG on the server. Real hydrateRoot adoption preserves the same SVG/definition/axis/text/series/annotation/wordcloud nodes without warnings, replacement, or post-effect markup changes; generated IDs, measurement fallbacks, portals, and responsive initial sizes are covered.",
-  "verified": "2026-07-14",
+  "verified": "2026-08-02",
   "notes": [
     "The released v4.0.0 tag is the differential runtime oracle; current master commit 485c035 adds a11y, chart, kernel, theme, and the nested subpaths before their next registry publication.",
     "All 258 React-owned component and hook modules ship as TSRX and pass both client and server compiler gates; framework-neutral D3/math/data modules remain TypeScript.",

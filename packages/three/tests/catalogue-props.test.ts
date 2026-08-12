@@ -141,6 +141,8 @@ describe('@octanejs/three catalogue', () => {
 });
 
 describe('@octanejs/three host observations', () => {
+	// OCTANE DIVERGENCE[pierced-prop-reset-target][adapted:three-pierced-reset]
+	// @parity-case adapted:three-pierced-reset
 	it('applies Three math, color, pierced, and ordinary properties without leaking renderer props', () => {
 		const material = new THREE.MeshBasicMaterial();
 		const mesh = new THREE.Mesh(new THREE.BoxGeometry(), material);

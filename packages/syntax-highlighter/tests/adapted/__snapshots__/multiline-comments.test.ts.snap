@@ -1,0 +1,223 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Syntaxhighliter correctly renders multi-line comments in arduino language 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": null,
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "/* This is a multi-
+",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 136, 136)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "   line comment. 
+",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 136, 136)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "*/",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 136, 136)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "
+",
+        {
+          "children": null,
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "void",
+          ],
+          "props": {
+            "className": "hljs-function",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {
+            "className": "hljs-function",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "setup",
+          ],
+          "props": {
+            "className": "hljs-function",
+            "style": {
+              "color": "rgb(136, 0, 0)",
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "()",
+          ],
+          "props": {
+            "className": "hljs-function hljs-params",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {
+            "className": "hljs-function",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "{
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "}
+",
+        "
+",
+        {
+          "children": null,
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "void",
+          ],
+          "props": {
+            "className": "hljs-function",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {
+            "className": "hljs-function",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "loop",
+          ],
+          "props": {
+            "className": "hljs-function",
+            "style": {
+              "color": "rgb(136, 0, 0)",
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "()",
+          ],
+          "props": {
+            "className": "hljs-function hljs-params",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {
+            "className": "hljs-function",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "{
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "}
+",
+      ],
+      "props": {
+        "className": "language-arduino",
+        "style": {
+          "whiteSpace": "pre",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(240, 240, 240)",
+      "color": "rgb(68, 68, 68)",
+      "display": "block",
+      "overflowX": "auto",
+      "padding": "0.5em",
+    },
+  },
+  "type": "pre",
+}
+`;

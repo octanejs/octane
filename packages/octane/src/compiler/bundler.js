@@ -333,6 +333,136 @@ export function findVoidComponentExports(source, id) {
 	return exports;
 }
 
+export function findDescriptorChildrenExports(source, id) {
+	let ast;
+	try {
+		ast = source && typeof source === 'object' ? source : parseModule(source, id);
+	} catch {
+		return [];
+	}
+	const markers = new Set();
+	const bindings = new Set();
+	for (const node of ast.body || []) {
+		if (node.type !== 'ImportDeclaration' || node.source?.value !== 'octane') continue;
+		for (const specifier of node.specifiers || []) {
+			if ((specifier.imported?.name ?? specifier.imported?.value) === 'descriptorChildren') {
+				markers.add(specifier.local.name);
+			}
+		}
+	}
+	for (const node of ast.body || []) {
+		const declaration = node.type === 'ExportNamedDeclaration' ? node.declaration : node;
+		if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const item of declaration.declarations || []) {
+			if (
+				item.id?.type === 'Identifier' &&
+				item.init?.type === 'CallExpression' &&
+				item.init.callee?.type === 'Identifier' &&
+				markers.has(item.init.callee.name) &&
+				item.init.arguments?.length === 1
+			)
+				bindings.add(item.id.name);
+		}
+	}
+	const exports = [];
+	for (const node of ast.body || []) {
+		if (node.type === 'ExportDefaultDeclaration') {
+			const declaration = node.declaration;
+			if (
+				(declaration?.type === 'Identifier' && bindings.has(declaration.name)) ||
+				(declaration?.type === 'CallExpression' &&
+					declaration.callee?.type === 'Identifier' &&
+					markers.has(declaration.callee.name) &&
+					declaration.arguments?.length === 1)
+			) {
+				exports.push('default');
+			}
+			continue;
+		}
+		if (node.type !== 'ExportNamedDeclaration') continue;
+		if (node.declaration?.type === 'VariableDeclaration') {
+			for (const item of node.declaration.declarations || []) {
+				if (item.id?.type === 'Identifier' && bindings.has(item.id.name))
+					exports.push(item.id.name);
+			}
+		}
+		for (const specifier of node.specifiers || []) {
+			if (bindings.has(specifier.local?.name))
+				exports.push(specifier.exported?.name ?? specifier.exported?.value);
+		}
+	}
+	return exports;
+}
+
+export function findDescriptorChildrenImports(source, id) {
+	let ast;
+	try {
+		ast = source && typeof source === 'object' ? source : parseModule(source, id);
+	} catch {
+		return [];
+	}
+	const importedBindings = new Map();
+	for (const node of ast.body || []) {
+		if (node.type !== 'ImportDeclaration' || node.importKind === 'type') continue;
+		for (const specifier of node.specifiers || []) {
+			if (specifier.type === 'ImportSpecifier') {
+				importedBindings.set(specifier.local.name, {
+					request: node.source.value,
+					imported: specifier.imported?.name ?? specifier.imported?.value,
+				});
+			} else if (specifier.type === 'ImportDefaultSpecifier') {
+				importedBindings.set(specifier.local.name, {
+					request: node.source.value,
+					imported: 'default',
+				});
+			}
+		}
+	}
+	const jsxBindings = new Set();
+	const visited = new WeakSet();
+	const pending = [ast];
+	while (pending.length > 0) {
+		const value = pending.pop();
+		if (value === null || typeof value !== 'object' || visited.has(value)) continue;
+		visited.add(value);
+		// Match void-import discovery: JSX tags use openingElement.name
+		// (JSXIdentifier), while TSRX Element nodes expose the tag as id/name
+		// (Identifier). Only JSXOpeningElement/JSXIdentifier missed the latter.
+		if (value.type === 'JSXElement' || value.type === 'Element') {
+			const tag = value.openingElement?.name || value.id || value.name;
+			if (tag?.type === 'Identifier' || tag?.type === 'JSXIdentifier') {
+				jsxBindings.add(tag.name);
+			}
+		}
+		for (const [key, child] of Object.entries(value)) {
+			if (key === 'loc' || key === 'metadata') continue;
+			if (Array.isArray(child)) pending.push(...child);
+			else pending.push(child);
+		}
+	}
+	const candidates = [];
+	for (const [local, imported] of importedBindings) {
+		if (jsxBindings.has(local)) candidates.push({ ...imported, local });
+	}
+	for (const node of ast.body || []) {
+		if (node.type !== 'ExportNamedDeclaration') continue;
+		for (const specifier of node.specifiers || []) {
+			const exported = specifier.exported?.name ?? specifier.exported?.value;
+			if (node.source?.value) {
+				candidates.push({
+					request: node.source.value,
+					imported: specifier.local?.name ?? specifier.local?.value,
+					exported,
+				});
+				continue;
+			}
+			const imported = importedBindings.get(specifier.local?.name);
+			if (imported !== undefined) candidates.push({ ...imported, exported });
+		}
+	}
+	return candidates;
+}
+
 class OctaneBundlerCompiler {
 	constructor(options) {
 		if (options.strong !== undefined && typeof options.strong !== 'boolean') {
@@ -973,6 +1103,9 @@ class OctaneBundlerCompiler {
 				...(environment === 'client' && typeof options.isVoidComponentImport === 'function'
 					? { isVoidComponentImport: options.isVoidComponentImport }
 					: null),
+				...(typeof options.isDescriptorChildrenImport === 'function'
+					? { isDescriptorChildrenImport: options.isDescriptorChildrenImport }
+					: null),
 			};
 			const collectVoidComponentExports =
 				environment === 'client' && options.collectVoidComponentExports === true;
@@ -999,6 +1132,7 @@ class OctaneBundlerCompiler {
 					: {
 							voidComponentExports: findVoidComponentExports(voidComponentAst, filename),
 						}),
+				descriptorChildrenExports: findDescriptorChildrenExports(code, filename),
 				...finishMetadata(collected),
 			};
 		}

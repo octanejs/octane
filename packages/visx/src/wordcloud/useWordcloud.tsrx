@@ -1,3 +1,5 @@
+// OCTANE DIVERGENCE[visx-deterministic-measurement][adapted:visx-deterministic-measurement]:
+// Deterministic estimated word bounds replace browser/font/d3-cloud packing measurement.
 import { useMemo } from 'octane';
 import getStringWidth from '../text/util/getStringWidth';
 import type { BaseDatum, CloudWord, WordcloudConfig } from './types';

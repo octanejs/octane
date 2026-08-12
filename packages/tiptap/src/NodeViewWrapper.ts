@@ -12,6 +12,7 @@ export interface NodeViewWrapperProps {
 }
 
 export function NodeViewWrapper({ as: Tag = 'div', ...props }: NodeViewWrapperProps): unknown {
+	// OCTANE DIVERGENCE[tiptap-node-view-as-prop][differential:tiptap-node-view-as-prop]
 	const { onDragStart } = useReactNodeView();
 
 	return createElement(Tag, {

@@ -60,8 +60,12 @@ export function renderPackedExampleWorkspace(archiveSpecs) {
 export const PACKED_TSRX_CONSUMER_PACKAGES = [
 	'@octanejs/cmdk',
 	'@octanejs/floating-ui',
+	'@octanejs/input-otp',
 	'@octanejs/radix',
+	'@octanejs/spring',
 	'@octanejs/sonner',
+	'@octanejs/syntax-highlighter',
+	'@octanejs/textarea-autosize',
 	'@octanejs/tiptap',
 	'octane',
 ];
@@ -73,9 +77,16 @@ export const PACKED_COMMONJS_CONSUMER_PACKAGES = [
 	'octane',
 ];
 
-export function createPackedCommonjsConsumerManifest(archiveSpecs) {
+export const PACKED_ESM_ONLY_CONSUMER_PACKAGES = ['@octanejs/draggable'];
+
+export const PACKED_JAVASCRIPT_CONSUMER_PACKAGES = [
+	...PACKED_COMMONJS_CONSUMER_PACKAGES,
+	...PACKED_ESM_ONLY_CONSUMER_PACKAGES,
+];
+
+export function createPackedJavascriptConsumerManifest(archiveSpecs) {
 	const dependencies = {};
-	for (const packageName of PACKED_COMMONJS_CONSUMER_PACKAGES) {
+	for (const packageName of PACKED_JAVASCRIPT_CONSUMER_PACKAGES) {
 		const archiveSpec = archiveSpecs[packageName];
 		if (typeof archiveSpec !== 'string' || !archiveSpec.startsWith('file:')) {
 			throw new Error(`no packed archive was provided for ${packageName}`);
@@ -83,7 +94,7 @@ export function createPackedCommonjsConsumerManifest(archiveSpecs) {
 		dependencies[packageName] = archiveSpec;
 	}
 	return {
-		name: 'octane-packed-commonjs-consumer',
+		name: 'octane-packed-javascript-consumer',
 		private: true,
 		engines: { node: '>=22' },
 		dependencies,
@@ -140,6 +151,19 @@ process.stdout.write(JSON.stringify({
 `;
 }
 
+export function renderPackedDraggableEsmConsumerSource() {
+	return `import * as draggable from '@octanejs/draggable';
+
+if (typeof draggable.default !== 'function') {
+	throw new Error('packed Draggable default export is not a function');
+}
+if (typeof draggable.DraggableCore !== 'function') {
+	throw new Error('packed DraggableCore export is not a function');
+}
+process.stdout.write(JSON.stringify(['default', 'DraggableCore'].filter((key) => key in draggable)));
+`;
+}
+
 export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions) {
 	const dependencies = {};
 
@@ -191,7 +215,14 @@ export function createPackedTsrxConsumerConfig() {
 
 export function renderPackedTsrxConsumerSource() {
 	return `import { Command } from '@octanejs/cmdk';
+import { animated, useSpring } from '@octanejs/spring';
+import { Parallax, ParallaxLayer } from '@octanejs/spring/parallax';
+import { OTPInput, REGEXP_ONLY_DIGITS } from '@octanejs/input-otp';
 import { toast, Toaster } from '@octanejs/sonner';
+import { Light } from '@octanejs/syntax-highlighter';
+import javascript from '@octanejs/syntax-highlighter/dist/esm/languages/hljs/javascript';
+import docco from '@octanejs/syntax-highlighter/dist/esm/styles/hljs/docco';
+import TextareaAutosize from '@octanejs/textarea-autosize';
 import {
 	Editor,
 	EditorProvider,
@@ -202,6 +233,7 @@ import {
 import { useRef } from 'octane';
 
 const editor = new Editor({ extensions: [] });
+Light.registerLanguage('javascript', javascript);
 
 function EditorStateProbe() @{
 	const currentEditor = useTiptap();
@@ -216,8 +248,15 @@ export function PublishedSourceConsumer() @{
 	const commandRef = useRef<HTMLDivElement | null>(null);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 	const toasterRef = useRef<HTMLElement | null>(null);
+	const [springStyles] = useSpring({ from: { opacity: 0 }, to: { opacity: 1 } });
 
 	<section>
+		<animated.div style={springStyles}>Packed spring</animated.div>
+		<div style={{ height: 120 }}>
+			<Parallax pages={2}>
+				<ParallaxLayer offset={1} speed={0.5}>Packed Parallax</ParallaxLayer>
+			</Parallax>
+		</div>
 		<Command ref={commandRef} label="Commands">
 			<Command.Input ref={inputRef} placeholder="Search commands" />
 			<Command.List>
@@ -234,6 +273,20 @@ export function PublishedSourceConsumer() @{
 			position="bottom-right"
 			style={{ '--consumer-offset': '8px', maxWidth: 360 }}
 		/>
+		<OTPInput
+			maxLength={6}
+			pattern={REGEXP_ONLY_DIGITS}
+			aria-label="Verification code"
+		>
+			<span>Verification slots</span>
+		</OTPInput>
+		<label>
+			Message
+		<TextareaAutosize minRows={2} maxRows={6} defaultValue="Packed source" />
+		</label>
+		<Light language="javascript" style={docco} showLineNumbers>
+			{'const packed = true;'}
+		</Light>
 		<EditorProvider
 			extensions={[]}
 			immediatelyRender={false}
@@ -252,7 +305,12 @@ export function PublishedSourceConsumer() @{
 
 export function renderPackedTsrxConsumerTypeProbe() {
 	return `import { Command, type CommandProps } from '@octanejs/cmdk';
+import { Controller, SpringValue, type ControllerUpdate } from '@octanejs/spring';
+import type { IParallax, ParallaxProps } from '@octanejs/spring/parallax';
+import { OTPInput, type OTPInputProps } from '@octanejs/input-otp';
 import { Toaster, useSonner, type ToasterProps } from '@octanejs/sonner';
+import SyntaxHighlighter, { type SyntaxHighlighterProps } from '@octanejs/syntax-highlighter';
+import TextareaAutosize, { type TextareaAutosizeProps } from '@octanejs/textarea-autosize';
 import {
 	EditorContent,
 	EditorProvider,
@@ -267,9 +325,21 @@ type IsAny<T> = 0 extends 1 & T ? true : false;
 type AssertNotAny<T> = IsAny<T> extends false ? true : never;
 
 const commandPropsArePrecise: AssertNotAny<CommandProps> = true;
+const springValueIsPrecise: AssertNotAny<SpringValue<number>> = true;
+const controllerUpdateIsPrecise: AssertNotAny<ControllerUpdate<{ x: number }>> = true;
+const parallaxPropsArePrecise: AssertNotAny<ParallaxProps> = true;
+const parallaxApiIsPrecise: AssertNotAny<IParallax> = true;
+const springController = new Controller<{ x: number }>({ from: { x: 0 } });
+const springPosition: number = springController.springs.x.get();
 const commandComponentPropsArePrecise: AssertNotAny<Parameters<typeof Command>[0]> = true;
+const otpPropsArePrecise: AssertNotAny<OTPInputProps> = true;
+const otpComponentPropsArePrecise: AssertNotAny<Parameters<typeof OTPInput>[0]> = true;
 const toasterPropsArePrecise: AssertNotAny<ToasterProps> = true;
 const toasterComponentPropsArePrecise: AssertNotAny<Parameters<typeof Toaster>[0]> = true;
+const textareaPropsArePrecise: AssertNotAny<TextareaAutosizeProps> = true;
+const textareaComponentPropsArePrecise: AssertNotAny<Parameters<typeof TextareaAutosize>[0]> = true;
+const syntaxPropsArePrecise: AssertNotAny<SyntaxHighlighterProps> = true;
+const syntaxComponentPropsArePrecise: AssertNotAny<Parameters<typeof SyntaxHighlighter>[0]> = true;
 const toastStateIsPrecise: AssertNotAny<ReturnType<typeof useSonner>> = true;
 const editorPropsArePrecise: AssertNotAny<EditorContentProps> = true;
 const editorComponentPropsArePrecise: AssertNotAny<Parameters<typeof EditorContent>[0]> = true;
@@ -284,12 +354,18 @@ const customPropertyToast: ToasterProps = {
 
 // @ts-expect-error Command callbacks receive the selected string.
 const invalidCommand: CommandProps = { onValueChange: (value: number) => value };
+// @ts-expect-error maxLength is required.
+const invalidOtp: OTPInputProps = { children: 'slots' };
 // @ts-expect-error Toast positions must remain the published position union.
 const invalidToaster: ToasterProps = { position: 'middle-center' };
 // @ts-expect-error Native CSS properties cannot accept arbitrary booleans.
 const invalidToastStyle: ToasterProps = { style: { maxWidth: true } };
 // @ts-expect-error CSS custom properties accept strings and numbers, not booleans.
 const invalidToastCustomProperty: ToasterProps = { style: { '--consumer-offset': true } };
+// @ts-expect-error TextareaAutosize owns vertical sizing through row bounds.
+const invalidTextareaStyle: TextareaAutosizeProps = { style: { minHeight: 20 } };
+// @ts-expect-error Highlighted children are source text, not arbitrary nodes.
+const invalidSyntaxChildren: SyntaxHighlighterProps = { children: 42 };
 // @ts-expect-error EditorContent must own an explicit editor, including null.
 const invalidEditorContent: EditorContentProps = {};
 // @ts-expect-error Tiptap.Content reads its editor from context.
@@ -301,22 +377,37 @@ export function verifyTypedEditorSelection(): string {
 
 export const verifiedPublishedTypes = {
 	commandComponentPropsArePrecise,
+	controllerUpdateIsPrecise,
 	commandPropsArePrecise,
 	customPropertyToast,
 	editorComponentPropsArePrecise,
 	editorPropsArePrecise,
 	invalidCommand,
+	invalidOtp,
 	invalidEditorContent,
 	invalidTiptapContent,
 	invalidToastCustomProperty,
 	invalidToastStyle,
+	invalidTextareaStyle,
+	invalidSyntaxChildren,
 	invalidToaster,
 	providerComponentPropsArePrecise,
 	providerPropsArePrecise,
+	parallaxApiIsPrecise,
+	parallaxPropsArePrecise,
+	springController,
+	springPosition,
+	springValueIsPrecise,
+	otpComponentPropsArePrecise,
+	otpPropsArePrecise,
 	tiptapContentPropsArePrecise,
 	toastStateIsPrecise,
 	toasterComponentPropsArePrecise,
 	toasterPropsArePrecise,
+	textareaComponentPropsArePrecise,
+	textareaPropsArePrecise,
+	syntaxComponentPropsArePrecise,
+	syntaxPropsArePrecise,
 };
 `;
 }

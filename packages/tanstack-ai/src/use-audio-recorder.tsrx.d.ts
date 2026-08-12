@@ -1,5 +1,5 @@
 // Declaration companion generated from use-audio-recorder.tsrx.
-import type { AudioRecorderOptions, AudioRecording, InferAudioRecordingOutput } from '@tanstack/ai-client';
+import type { AudioRecorderOptions, AudioRecording } from '@tanstack/ai-client';
 export type UseAudioRecorderOptions<TOnComplete> = AudioRecorderOptions & {
     /**
      * Optional transform applied to the recording when `stop()` resolves. Its
@@ -40,5 +40,4 @@ export interface UseAudioRecorderReturn<TOutput> {
  * sendMessage({ content: [rec.part] })
  * ```
  */
-export declare function useAudioRecorder<TOnComplete extends (recording: AudioRecording) => unknown>(options: UseAudioRecorderOptions<TOnComplete>): UseAudioRecorderReturn<InferAudioRecordingOutput<TOnComplete>>;
-export declare function useAudioRecorder(options?: UseAudioRecorderOptions<undefined>): UseAudioRecorderReturn<AudioRecording>;
+export declare function useAudioRecorder<TOnComplete extends (recording: AudioRecording) => unknown = (recording: AudioRecording) => AudioRecording>(options?: UseAudioRecorderOptions<TOnComplete>): UseAudioRecorderReturn<import('@tanstack/ai-client').InferAudioRecordingOutput<TOnComplete>>;

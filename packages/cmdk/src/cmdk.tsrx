@@ -19,7 +19,8 @@
 // - `sort()` reorders only the surviving (score > 0) items — moving a
 //   to-be-unmounted node orphans it in an octane hydrated tree (see
 //   ./components/command.tsrx).
-// - `asChild` is NOT supported: cmdk's SlottableWithNestedChildren clones a child
+// - OCTANE DIVERGENCE[as-child-unsupported][differential:cmdk-as-child]:
+//   `asChild` is NOT supported: cmdk's SlottableWithNestedChildren clones a child
 //   element via React.cloneElement/isValidElement and re-parents the component's
 //   own content into it. Octane's compiled children are opaque render bodies, so
 //   that introspect-and-clone has no faithful equivalent — components always

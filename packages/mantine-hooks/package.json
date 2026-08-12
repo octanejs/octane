@@ -31,13 +31,14 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project mantine-hooks --project mantine-hooks-ssr"
+    "test": "vitest run --root ../.. --project mantine-hooks --project mantine-hooks-differential --project mantine-hooks-ssr"
   },
   "peerDependencies": {
     "octane": "workspace:*"
   },
   "devDependencies": {
     "@mantine/hooks": "9.5.0",
+    "@tsrx/react": "catalog:default",
     "@types/react": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",

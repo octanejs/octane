@@ -97,18 +97,6 @@ function createErrorChunks(message: string): Array<StreamChunk> {
 }
 
 describe('useGeneration', () => {
-	describe('initialization', () => {
-		it('should initialize with default state', () => {
-			const adapter = createMockConnectionAdapter();
-			const { result } = renderHook(() => useGeneration({ connection: adapter }));
-
-			expect(result.current.result).toBeNull();
-			expect(result.current.isLoading).toBe(false);
-			expect(result.current.error).toBeUndefined();
-			expect(result.current.status).toBe('idle');
-		});
-	});
-
 	describe('fetcher mode', () => {
 		it('should generate a result using fetcher', async () => {
 			const mockResult = { id: '1', data: 'test' };

@@ -1,1 +1,1 @@
-export { mount, nextPaint } from '../../octane/tests/_helpers';
+export { act, mount, nextPaint } from '../../octane/tests/_helpers';

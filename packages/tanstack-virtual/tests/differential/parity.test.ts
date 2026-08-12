@@ -9,7 +9,10 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const BASIC = resolve(__dirname, '../_fixtures/basic-list-diff.tsrx');
 const HORIZONTAL = resolve(__dirname, '../_fixtures/horizontal-diff.tsrx');
@@ -23,7 +26,15 @@ const CACHE = resolve(__dirname, '.react-cache');
 // rAF reconcile all settle inside this window.
 const settle = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 
+await Promise.all([
+	preloadDifferentialFixture(BASIC, CACHE),
+	preloadDifferentialFixture(HORIZONTAL, CACHE),
+	preloadDifferentialFixture(DYNAMIC, CACHE),
+	preloadDifferentialFixture(WINDOW, CACHE),
+]);
+
 describe('differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtual', () => {
+	// @parity-case differential:tanstack-virtual-basic
 	it('BasicList: scroll windows + count clamp + scrollToIndex, byte-identical', async () => {
 		const d = await mountDifferential(BASIC, 'BasicList', undefined, CACHE);
 		await d.step('mount', async () => {
@@ -62,6 +73,7 @@ describe('differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtu
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-virtual-horizontal
 	it('HorizontalList: scrollLeft windowing, byte-identical', async () => {
 		const d = await mountDifferential(HORIZONTAL, 'HorizontalList', undefined, CACHE);
 		await d.step('mount', async () => {
@@ -80,6 +92,7 @@ describe('differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtu
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-virtual-dynamic
 	it('DynamicList: measureElement + resizeItem + measure(), byte-identical', async () => {
 		const d = await mountDifferential(DYNAMIC, 'DynamicList', undefined, CACHE);
 		await d.step('mount (initial ref-measure pass)', async () => {
@@ -108,6 +121,7 @@ describe('differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtu
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-virtual-window
 	it('WindowList: window scroll windowing, byte-identical', async () => {
 		const d = await mountDifferential(WINDOW, 'WindowList', undefined, CACHE);
 		await d.step('mount', async () => {

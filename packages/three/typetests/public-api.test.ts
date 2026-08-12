@@ -153,6 +153,11 @@ unmountComponentAtNode(offscreenCanvas, (unmountedCanvas) => {
 
 const domRegionTarget: DOMRegionTarget = { current: document.body };
 const domRegionProps: DOMRegionProps = { target: domRegionTarget };
+const forwardedDomRegionProps: DOMRegionProps = {
+	target: domRegionTarget,
+	region: undefined,
+	containerRef: { current: null },
+};
 
 const canvasProps: CanvasProps = {
 	gl: () => renderer,
@@ -269,6 +274,7 @@ void acted;
 void flushed;
 void configuredOffscreen;
 void domRegionProps;
+void forwardedDomRegionProps;
 void canvasProps;
 void coreEvents;
 void coreEventHandler;

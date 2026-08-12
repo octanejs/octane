@@ -1,0 +1,9 @@
+{
+  "upstream": { "package": "react-colorful", "version": "5.8.0" },
+  "surface": "Complete against the published react-colorful 5.8.0 root runtime and type surface: all 14 picker variants, HexColorInput, setNonce, six public color types, controlled updates, mouse/touch/keyboard input, commit callbacks, ARIA state, and automatic closest-root styling.",
+  "divergences": [
+    "React synthetic event attribute types are represented by Octane native DOM event attributes; observable DOM events and callback values retain the upstream contract."
+  ],
+  "ssr": "All pickers and HexColorInput render deterministically without browser globals, hydrate by adopting existing nodes, install styles only on the client, and become interactive after hydration.",
+  "verified": "2026-08-03"
+}

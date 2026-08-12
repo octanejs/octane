@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
 	buildLaneArgv,
 	buildTypeScriptCompilerRuns,
+	isVitestLane,
 	loadManifest,
 	requiredExecutableLanes,
 	verifyLaneEnvironment,
@@ -29,9 +30,9 @@ for (let index = 0; index < args.length; index += 2) {
 		throw new Error('Invalid or missing flag value');
 }
 
-if (!['validate', 'list', 'run', 'run-required'].includes(action)) {
+if (!['validate', 'list', 'run', 'run-required', 'run-required-non-vitest'].includes(action)) {
 	throw new Error(
-		'Usage: harness.mjs <validate|list|run|run-required> [--lane ID] [--manifest PATH]',
+		'Usage: harness.mjs <validate|list|run|run-required|run-required-non-vitest> [--lane ID] [--manifest PATH]',
 	);
 }
 
@@ -55,18 +56,29 @@ if (action === 'validate') {
 		);
 	}
 } else {
-	if (action === 'run-required' && laneId) {
-		throw new Error('run-required does not accept --lane');
+	if (['run-required', 'run-required-non-vitest'].includes(action) && laneId) {
+		throw new Error(`${action} does not accept --lane`);
 	}
 	const selected =
 		action === 'run-required'
 			? requiredExecutableLanes(manifest)
-			: laneId
-				? manifest.lanes.filter((lane) => lane.id === laneId)
-				: manifest.lanes;
-	if (selected.length === 0) throw new Error(`Unknown lane: ${laneId}`);
+			: action === 'run-required-non-vitest'
+				? requiredExecutableLanes(manifest).filter((lane) => !isVitestLane(lane))
+				: laneId
+					? manifest.lanes.filter((lane) => lane.id === laneId)
+					: manifest.lanes;
+	if (selected.length === 0) {
+		if (['run-required', 'run-required-non-vitest'].includes(action)) {
+			console.log(
+				`${action === 'run-required' ? 'no required executable lanes' : 'no required non-Vitest lanes'}: ${manifestPath}`,
+			);
+			process.exit(0);
+		}
+		throw new Error(`Unknown lane: ${laneId}`);
+	}
 	const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
 	for (const lane of selected) {
+		const laneStartedAt = Date.now();
 		await verifyLaneEnvironment(manifest, lane, root, pnpmVersion);
 		const runs =
 			lane.execution?.kind === 'typescript'
@@ -92,5 +104,6 @@ if (action === 'validate') {
 			}
 		}
 		verifyLaneRunResult(lane, stdout, root);
+		console.log(`completed ${lane.id} in ${((Date.now() - laneStartedAt) / 1000).toFixed(1)}s`);
 	}
 }

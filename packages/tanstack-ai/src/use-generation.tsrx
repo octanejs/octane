@@ -128,7 +128,7 @@ export function useGeneration<
       devtoolsBridgeFactory: createGenerationDevtoolsBridge,
       devtools: {
         hookName: 'useGeneration',
-        // OCTANE DIVERGENCE: identify this binding as Octane (not 'react') in TanStack AI Devtools.
+        // Octane divergence note.
         framework: 'octane',
         ...opts.devtools,
       },

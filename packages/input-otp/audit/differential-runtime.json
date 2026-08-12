@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "project": "input-otp-differential",
+  "roots": ["packages/input-otp/tests"],
+  "files": ["packages/input-otp/tests/differential/input.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:input-otp-differential:0001",
+      "file": "packages/input-otp/tests/differential/input.test.tsx",
+      "fullName": "@octanejs/input-otp differential React oracle matches initial native input attributes and projected slots"
+    },
+    {
+      "id": "runtime:input-otp-differential:0002",
+      "file": "packages/input-otp/tests/differential/input.test.tsx",
+      "fullName": "@octanejs/input-otp differential React oracle matches pattern rejection after an invalid edit"
+    },
+    {
+      "id": "runtime:input-otp-differential:0003",
+      "file": "packages/input-otp/tests/differential/input.test.tsx",
+      "fullName": "@octanejs/input-otp differential React oracle matches uncontrolled native input and callback behavior"
+    }
+  ]
+}

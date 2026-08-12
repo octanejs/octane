@@ -1,0 +1,880 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SyntaxHighlighter component renders correctly with refractor instead of lowlight 1`] = `
+<pre
+  style={
+    Object {
+      "MozHyphens": "none",
+      "MozTabSize": "4",
+      "OTabSize": "4",
+      "WebkitHyphens": "none",
+      "background": "#f5f2f0",
+      "color": "black",
+      "fontFamily": "Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace",
+      "fontSize": "1em",
+      "hyphens": "none",
+      "lineHeight": "1.5",
+      "margin": ".5em 0",
+      "msHyphens": "none",
+      "overflow": "auto",
+      "padding": "1em",
+      "tabSize": "4",
+      "textAlign": "left",
+      "textShadow": "0 1px white",
+      "whiteSpace": "pre",
+      "wordBreak": "normal",
+      "wordSpacing": "normal",
+      "wordWrap": "normal",
+    }
+  }
+>
+  <code
+    className="language-javascript"
+    style={
+      Object {
+        "MozHyphens": "none",
+        "MozTabSize": "4",
+        "OTabSize": "4",
+        "WebkitHyphens": "none",
+        "background": "none",
+        "color": "black",
+        "fontFamily": "Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace",
+        "fontSize": "1em",
+        "hyphens": "none",
+        "lineHeight": "1.5",
+        "msHyphens": "none",
+        "tabSize": "4",
+        "textAlign": "left",
+        "textShadow": "0 1px white",
+        "whiteSpace": "pre",
+        "wordBreak": "normal",
+        "wordSpacing": "normal",
+        "wordWrap": "normal",
+      }
+    }
+  >
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#07a",
+        }
+      }
+    >
+      const
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token function-variable"
+      style={
+        Object {
+          "color": "#DD4A68",
+        }
+      }
+    >
+      woah
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "background": "hsla(0, 0%, 100%, .5)",
+          "color": "#9a6e3a",
+        }
+      }
+    >
+      =
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token parameter"
+      style={Object {}}
+    >
+      fun
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token arrow"
+      style={
+        Object {
+          "background": "hsla(0, 0%, 100%, .5)",
+          "color": "#9a6e3a",
+        }
+      }
+    >
+      =&gt;
+    </span>
+    <span
+      style={Object {}}
+    >
+       fun 
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "background": "hsla(0, 0%, 100%, .5)",
+          "color": "#9a6e3a",
+        }
+      }
+    >
+      +
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#905",
+        }
+      }
+    >
+      1
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      ;
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#07a",
+        }
+      }
+    >
+      const
+    </span>
+    <span
+      style={Object {}}
+    >
+       dude 
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "background": "hsla(0, 0%, 100%, .5)",
+          "color": "#9a6e3a",
+        }
+      }
+    >
+      =
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#DD4A68",
+        }
+      }
+    >
+      woah
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      (
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#905",
+        }
+      }
+    >
+      2
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      )
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "background": "hsla(0, 0%, 100%, .5)",
+          "color": "#9a6e3a",
+        }
+      }
+    >
+      +
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#905",
+        }
+      }
+    >
+      3
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      ;
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#07a",
+        }
+      }
+    >
+      function
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#DD4A68",
+        }
+      }
+    >
+      thisIsAFunction
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      (
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      )
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      {
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+
+    </span>
+    <span
+      style={Object {}}
+    >
+        
+    </span>
+    <span
+      className="token control-flow"
+      style={
+        Object {
+          "color": "#07a",
+        }
+      }
+    >
+      return
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      [
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#905",
+        }
+      }
+    >
+      1
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      ,
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#905",
+        }
+      }
+    >
+      2
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      ,
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#905",
+        }
+      }
+    >
+      3
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      ]
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      .
+    </span>
+    <span
+      className="token method property-access"
+      style={
+        Object {
+          "color": "#DD4A68",
+        }
+      }
+    >
+      map
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      (
+    </span>
+    <span
+      className="token parameter"
+      style={Object {}}
+    >
+      n
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token arrow"
+      style={
+        Object {
+          "background": "hsla(0, 0%, 100%, .5)",
+          "color": "#9a6e3a",
+        }
+      }
+    >
+      =&gt;
+    </span>
+    <span
+      style={Object {}}
+    >
+       n 
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "background": "hsla(0, 0%, 100%, .5)",
+          "color": "#9a6e3a",
+        }
+      }
+    >
+      +
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#905",
+        }
+      }
+    >
+      1
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      )
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      .
+    </span>
+    <span
+      className="token method property-access"
+      style={
+        Object {
+          "color": "#DD4A68",
+        }
+      }
+    >
+      filter
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      (
+    </span>
+    <span
+      style={Object {}}
+    >
+      n 
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "background": "hsla(0, 0%, 100%, .5)",
+          "color": "#9a6e3a",
+        }
+      }
+    >
+      !==
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#905",
+        }
+      }
+    >
+      3
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      )
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      ;
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      }
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+    </span>
+    <span
+      className="token console"
+      style={
+        Object {
+          "color": "#DD4A68",
+        }
+      }
+    >
+      console
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      .
+    </span>
+    <span
+      className="token method property-access"
+      style={
+        Object {
+          "color": "#DD4A68",
+        }
+      }
+    >
+      log
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      (
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#690",
+        }
+      }
+    >
+      'making up fake code is really hard'
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      )
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      ;
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+
+    </span>
+    
+
+    <span
+      style={Object {}}
+    >
+      
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#07a",
+        }
+      }
+    >
+      function
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#DD4A68",
+        }
+      }
+    >
+      itIs
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      (
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      )
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      {
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+
+    </span>
+    <span
+      style={Object {}}
+    >
+        
+    </span>
+    <span
+      className="token control-flow"
+      style={
+        Object {
+          "color": "#07a",
+        }
+      }
+    >
+      return
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#690",
+        }
+      }
+    >
+      'no seriously really it is'
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      ;
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+    </span>
+    <span
+      className="token"
+      style={
+        Object {
+          "color": "#999",
+        }
+      }
+    >
+      }
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+
+    </span>
+    
+  </code>
+</pre>
+`;

@@ -5,10 +5,13 @@ import { octane } from '../src/compiler/vite.js';
 import type { RenderResult } from '../src/runtime.server';
 
 type HydrationBinding =
+	| 'alien-signals'
 	| 'apollo-client'
 	| 'aria'
 	| 'base-ui'
 	| 'docusaurus'
+	| 'monaco-editor'
+	| 'pdf'
 	| 'rainbowkit'
 	| 'react-map-gl'
 	| 'solana-react'
@@ -18,6 +21,10 @@ const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
 function bindingAliases(binding: HydrationBinding) {
 	const source = resolve(repositoryRoot, 'packages', binding, 'src');
+	if (binding === 'alien-signals') {
+		return [{ find: /^@octanejs\/alien-signals$/, replacement: resolve(source, 'index.ts') }];
+	}
+
 	if (binding === 'apollo-client') {
 		return [
 			{
@@ -74,6 +81,28 @@ function bindingAliases(binding: HydrationBinding) {
 			{
 				find: /^@octanejs\/tanstack-query$/,
 				replacement: resolve(repositoryRoot, 'packages/tanstack-query/src/index.ts'),
+			},
+		];
+	}
+
+	if (binding === 'monaco-editor') {
+		return [
+			{
+				find: /^@octanejs\/monaco-editor$/,
+				replacement: resolve(source, 'index.ts'),
+			},
+			{
+				find: /^@monaco-editor\/loader$/,
+				replacement: resolve(repositoryRoot, 'packages/monaco-editor/tests/_mocks/loader.ts'),
+			},
+		];
+	}
+
+	if (binding === 'pdf') {
+		return [
+			{
+				find: /^@octanejs\/pdf$/,
+				replacement: resolve(source, 'index.server.ts'),
 			},
 		];
 	}

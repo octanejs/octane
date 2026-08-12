@@ -1,0 +1,14 @@
+{
+  "extends": "../upstream/test/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "swr": ["tests/pristine/package/dist/index/index.d.mts"],
+      "swr/infinite": ["tests/pristine/package/dist/infinite/index.d.mts"],
+      "swr/immutable": ["tests/pristine/package/dist/immutable/index.d.mts"],
+      "swr/mutation": ["tests/pristine/package/dist/mutation/index.d.mts"],
+      "swr/_internal": ["tests/pristine/package/dist/_internal/index.d.mts"],
+      "swr/subscription": ["tests/pristine/package/dist/subscription/index.d.mts"]
+    }
+  }
+}

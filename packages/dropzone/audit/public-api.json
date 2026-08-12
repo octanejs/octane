@@ -1,0 +1,22 @@
+{
+  "runtime": ["default", "useDropzone", "ErrorCode"],
+  "types": [
+    "Accept",
+    "AcceptGroup",
+    "DropEvent",
+    "DropzoneInputProps",
+    "DropzoneOptions",
+    "DropzoneProps",
+    "DropzoneRef",
+    "DropzoneRootProps",
+    "DropzoneState",
+    "FileError",
+    "FileRejection",
+    "FileWithPath",
+    "ValidatorResult"
+  ],
+  "exports": {
+    ".": { "conditions": ["types", "import", "require"] },
+    "./package.json": true
+  }
+}

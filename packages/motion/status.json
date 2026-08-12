@@ -3,10 +3,11 @@
   "surface": "Core surface: `motion.<tag>` (animate, gestures, variants with propagation/stagger, drag, layout basics), `AnimatePresence`, `MotionConfig`, live `useReducedMotion`, reduced-motion enforcement, `LayoutGroup` layoutId namespaces, `LazyMotion` with `domAnimation`/`domMax`, the `m` proxy and complete `./react-m` named host entry, plus the motion-value hooks (`useMotionValue`, `useScroll`, `useTransform`, `useSpring`, `useAnimate`, `useMotionValueEvent`); motion-dom's animation engine and gesture primitives are reused verbatim.",
   "divergences": [
     "Exit animations run via cleanup-before-detach instead of React's deferred-deletion machinery.",
-    "`layout`/`layoutId` use single-element FLIP, not the full projection tree."
+    "`layout`/`layoutId` use single-element FLIP, not the full projection tree.",
+    "An `initial` target without an `animate` target does not materialize inline initial styles; set the starting style explicitly or provide an animation target."
   ],
   "ssr": "No SSR-specific surface; no dedicated SSR tests.",
-  "verified": "2026-07-31",
+  "verified": "2026-08-02",
   "notes": [
     "Not yet ported: nested/shared layout projection (incl. child scale correction and shared layout during drag), drag momentum + elastic physics, the `useTransform` output-map form, and `when: 'beforeChildren' | 'afterChildren'` sequencing."
   ]

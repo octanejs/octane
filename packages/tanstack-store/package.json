@@ -37,7 +37,10 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:upstream": "node scripts/run-pristine-upstream.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
+    "upstream:verify": "node scripts/verify-upstream.mjs"
   },
   "dependencies": {
     "@tanstack/store": "0.11.0"
@@ -46,12 +49,20 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
-    "@tanstack/react-store": "catalog:default",
+    "@octanejs/testing-library": "workspace:*",
+    "@tanstack/react-store": "catalog:tanstack-store-react-oracle",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "catalog:tanstack-store-react-oracle",
+    "@testing-library/user-event": "^14.6.1",
     "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:tanstack-store-react-oracle",
+    "@types/react-dom": "catalog:tanstack-store-react-oracle",
+    "@types/use-sync-external-store": "^1.5.0",
     "esbuild": "catalog:default",
     "octane": "workspace:*",
-    "react": "catalog:default",
-    "react-dom": "catalog:default",
+    "react": "catalog:tanstack-store-react-oracle",
+    "react-dom": "catalog:tanstack-store-react-oracle",
+    "use-sync-external-store": "catalog:tanstack-store-react-oracle",
     "vitest": "catalog:default"
   }
 }

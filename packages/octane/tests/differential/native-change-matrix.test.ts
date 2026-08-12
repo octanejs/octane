@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { act as reactAct } from 'react';
 import { resolve } from 'node:path';
-import { mountDifferential, type DiffMount } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture, type DiffMount } from './_rig.js';
 
 const FIX = resolve(__dirname, '../_fixtures/native-change-matrix.tsrx');
+
+await preloadDifferentialFixture(FIX);
 
 // Pinned React 19.2.7 behavior source for the same-source expectations:
 // - host routing/capture: https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-dom-bindings/src/events/plugins/ChangeEventPlugin.js#L277-L342

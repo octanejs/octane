@@ -8,7 +8,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 import {
 	readGsapLifecycleLog,
 	resetGsapLifecycleLog,
@@ -28,6 +31,8 @@ function assertCleanupParity(expected: string[]): void {
 	expect(octaneCleanup).toEqual(expected);
 	expect(reactCleanup).toEqual(expected);
 }
+
+await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
 
 describe('differential: @octanejs/gsap vs @gsap/react 2.1.2', function differentialSuite() {
 	// @parity-case differential:revert-on-update

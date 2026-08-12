@@ -1,0 +1,18 @@
+{
+  "upstream": {
+    "package": "@react-spring/web",
+    "version": "10.1.2"
+  },
+  "surface": "Stable React Spring web target at the package root and Parallax through the ./parallax subpath. The port provides spring values, controllers, interpolation, Octane hooks and render-prop components, animated DOM hosts, browser observers, SSR-safe initial rendering, and Parallax scrolling.",
+  "divergences": [
+    "React renderables and refs are represented by Octane renderables and refs-as-props.",
+    "The all-renderer react-spring meta-package is intentionally not mapped."
+  ],
+  "ssr": "Initial and immediate values render on the server; browser observers and frame work start after client commit.",
+  "verified": "2026-08-02",
+  "notes": [
+    "All 26 pinned upstream test files have machine-checked adapted or reused dispositions.",
+    "Development and production playground journeys cover animation, interruption, keyed transitions, reduced motion, Parallax, and route-away cleanup.",
+    "Renderer targets for native, Three, Konva, and Zdog are outside this binding."
+  ]
+}

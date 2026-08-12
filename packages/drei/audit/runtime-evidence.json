@@ -1,0 +1,786 @@
+{
+  "schemaVersion": 1,
+  "oracle": "@react-three/drei@10.7.7 with React 19 and @react-three/fiber@9.6.1",
+  "files": [
+    {
+      "path": "packages/drei/tests/accumulative-shadows.test.ts",
+      "sha256": "1eb9d23f27b4ab93981acfb6714deb56d2b7bd6640ce3bc28407c6f8f545439f",
+      "assertionCount": 1,
+      "assertionInventorySha256": "0d970b528c85983f6dbbabf570b6481dbfc18e82544755c54eec7a0b3ecd6f0c"
+    },
+    {
+      "path": "packages/drei/tests/adaptive-performance.test.ts",
+      "sha256": "57f0cba0a162e08ffa45ed163a80a02f0cf537ce414643d514f15334a3eace72",
+      "assertionCount": 4,
+      "assertionInventorySha256": "13b8e461f51c3785303f89e429a4959707e71b744136c39c4799abfc31780f89"
+    },
+    {
+      "path": "packages/drei/tests/ascii-renderer.test.ts",
+      "sha256": "19e81b0a93ba0bba2eabeba32cbe2bf05daf87f5c3a4c28c1ea2bbc457df44e3",
+      "assertionCount": 1,
+      "assertionInventorySha256": "0bacba3a1de615dca4d42313b70ed4680f55c5256dac28c7bb5b3627d962d0e3"
+    },
+    {
+      "path": "packages/drei/tests/basic-controls.test.ts",
+      "sha256": "5e0add3b109e10a053a7eeb8d0020459e59f866973adb78c96c167dc1995fe3b",
+      "assertionCount": 7,
+      "assertionInventorySha256": "711b30b2d6aeb9fa77f78d04aae3a23122b69d5b8cb8592fa0a6e5c89a703a33"
+    },
+    {
+      "path": "packages/drei/tests/bounds.test.ts",
+      "sha256": "ebc402ed5e5750cdb78c43aa26707ecd95fcf067c0f4b2485c792cca28315bd2",
+      "assertionCount": 4,
+      "assertionInventorySha256": "73e246b7c1f721d0fc1fded18bbf76bc5f650ef177858eab10ffd8d058a56e9c"
+    },
+    {
+      "path": "packages/drei/tests/box-projected-env.test.ts",
+      "sha256": "3ddee5844a5621ce218cc1db3c138530eed083bd728dd0d4ca73db5ff6dfc6ca",
+      "assertionCount": 1,
+      "assertionInventorySha256": "3ab838b226511b02346d1815b244356679bff1ad7bb8cdb73d244305bc06def3"
+    },
+    {
+      "path": "packages/drei/tests/browser/upstream-e2e.browser.test.ts",
+      "sha256": "707bd9d44f4fc0ae0b11364c7a7cc8b688c4925962c8c17ea69773454910019e",
+      "assertionCount": 0,
+      "assertionInventorySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "packages/drei/tests/bvh.test.ts",
+      "sha256": "4d221d1b315e244aca0be0d1a4639cceef74443b91d5b8a8ac48947b16f21448",
+      "assertionCount": 2,
+      "assertionInventorySha256": "5e7d147dcf7187624f5572f7078a0c09570d01670ca14e7c90bd8fb87cd18a05"
+    },
+    {
+      "path": "packages/drei/tests/camera-controls.test.ts",
+      "sha256": "d170e243202e33199a008123e8454cc34068c3d350b7a4dba7c3de2b45a604da",
+      "assertionCount": 1,
+      "assertionInventorySha256": "d1f51d3ec124fa9217ca65e86a8ecbb4a0a888b3462a584e7f84e02d6abe364c"
+    },
+    {
+      "path": "packages/drei/tests/camera-shake.test.ts",
+      "sha256": "6eb33cd8cb011279e97eceb6bee616a55ed815a6687e7106a12283ca710e98bb",
+      "assertionCount": 2,
+      "assertionInventorySha256": "ad90b3e1a930455b2bdafb6c7cbef899cda2dfa2ee7000886cc7ad213da8449b"
+    },
+    {
+      "path": "packages/drei/tests/cameras.test.ts",
+      "sha256": "cd3c6b55a17982ff26eaa34f28b2b78e630180af001e7ad6c23475923023efda",
+      "assertionCount": 4,
+      "assertionInventorySha256": "4a7c25e408d835ae1c5e1a1ec5b7e258777909eb160af86c18909051ce14a6d5"
+    },
+    {
+      "path": "packages/drei/tests/catalog-textures.test.ts",
+      "sha256": "37ecc811c291851e72fcec87ddda5096e2687ff35c2bfa41e5bf3f18282e7124",
+      "assertionCount": 4,
+      "assertionInventorySha256": "6638e0a3bda55bd7606da8e8cb7b3b5eef67050192d161474522c2427bbda45c"
+    },
+    {
+      "path": "packages/drei/tests/caustics.test.ts",
+      "sha256": "02a689ffe66e225fb2d0c443341c8757dbcabf232e9c98e371f6994e2e68dd05",
+      "assertionCount": 1,
+      "assertionInventorySha256": "c4c1e5daf05c7de7d97d07b9ef83d94640dbbec700b22de29a07a66cf0d1c983"
+    },
+    {
+      "path": "packages/drei/tests/center.test.ts",
+      "sha256": "bef86be3cc8b28cb8746e1733e565cdfb2cbba7545860f4fab2b6576bcfd1885",
+      "assertionCount": 5,
+      "assertionInventorySha256": "3461502e197c66532f3928ed87f1f1684ccfd10a0013ad17ae227dbab13a7598"
+    },
+    {
+      "path": "packages/drei/tests/clone.test.ts",
+      "sha256": "7d220396c109105592fc860add7e9e3ebb91ce1a4b358326926d4a87275742dc",
+      "assertionCount": 5,
+      "assertionInventorySha256": "6c5d2988fbac9cba1e6b22dc807c135e697de8866bbaf4650e81c510bab4dd05"
+    },
+    {
+      "path": "packages/drei/tests/cloud.test.ts",
+      "sha256": "e9f93206bb06076f6f9c5b87adbbfe3dc23c79f087660e2a61a33f959ecdbec4",
+      "assertionCount": 1,
+      "assertionInventorySha256": "26d7299fce15fe36291d440ad37cf73223908133720f6da3ddb8d814c672eb50"
+    },
+    {
+      "path": "packages/drei/tests/config.test.ts",
+      "sha256": "35cc3b0bc747638e4154d962795a4a55f1154a8297986bc465b71d6008942912",
+      "assertionCount": 1,
+      "assertionInventorySha256": "a922bd098161ce058d1807efef074b7e2d61ccf80ab988f616616983cd747688"
+    },
+    {
+      "path": "packages/drei/tests/contact-shadows.test.ts",
+      "sha256": "ba16b4b06f95f8cd5fb2a249524ce2b97d1df16db33b73e00c0d730ea21b59dd",
+      "assertionCount": 1,
+      "assertionInventorySha256": "6043bc8a784e6c9c9daf91c7600fbcd66be2ce14c281e3c3f4634cbd5e41d9ce"
+    },
+    {
+      "path": "packages/drei/tests/context-bridge.test.ts",
+      "sha256": "2a72c5ba5c88b9473e630908c49f751b6e3e9015fff75ed0093a1e1834e842b7",
+      "assertionCount": 1,
+      "assertionInventorySha256": "473e7536e6a712bc32a13951bb4980bf7dd960bd05fceab79695d78e5255ad6e"
+    },
+    {
+      "path": "packages/drei/tests/core-utilities.test.ts",
+      "sha256": "786408bcda299b5cdff8acd7fd2a4112c66f0a306b2f15281d4364f24a6fcd38",
+      "assertionCount": 4,
+      "assertionInventorySha256": "4c5e3dbcc346ca11e0db6d2e32f78232be3c125e046d7bff6f8148cd20a4ee99"
+    },
+    {
+      "path": "packages/drei/tests/crosswalk-guard.test.ts",
+      "sha256": "cef8ca41c33014512dcdd5aaf9fbb4d98e4c94c6727137ca5fc077f4d2511a18",
+      "assertionCount": 6,
+      "assertionInventorySha256": "5d780278ac32976ec62afdb186db70ba0122b9f89d51a6e0c9e71d8a4fc6fef1"
+    },
+    {
+      "path": "packages/drei/tests/curve-modifier.test.ts",
+      "sha256": "26f5f9b50f63f4c27aa9fef507412200f89b8e0e015bbce399f1694411a6908f",
+      "assertionCount": 1,
+      "assertionInventorySha256": "371e9e6187bfad63fd1c751ffc4d0ef3bbac48406c583ff8a8d7522cce60c3db"
+    },
+    {
+      "path": "packages/drei/tests/cycle-raycast.test.ts",
+      "sha256": "410dc8d0febb9caccf0d00940bf931e308589dcb29161be7809275dda8d04b8c",
+      "assertionCount": 1,
+      "assertionInventorySha256": "fe1ff34aa4ea9d27619706dceef43efdd4da8fddbaca498fbb7eb6269b0b2b2b"
+    },
+    {
+      "path": "packages/drei/tests/decal.test.ts",
+      "sha256": "244165b7213129d241d7937af51d7dc13e376ffdd50f2c8e55d7db24a7fde6d8",
+      "assertionCount": 3,
+      "assertionInventorySha256": "4b44ee56d8b9111ef73e41c1184d7c75c95d9dfdc1cbc3442e19cc2bf2ab3e37"
+    },
+    {
+      "path": "packages/drei/tests/depth-buffer.test.ts",
+      "sha256": "b1d54be7980ffdb9af4b612096ea4329d380227cc8ceed3bfc90720a43904c7d",
+      "assertionCount": 2,
+      "assertionInventorySha256": "9cc5049161cd6bc8e20cc870f47dfcd7bdd65288c07be050933df6a2bd849714"
+    },
+    {
+      "path": "packages/drei/tests/detect-gpu.test.ts",
+      "sha256": "19675c2d71a9a575cd012d5165c3d605747bc992fad4c24072fa30557c0d4332",
+      "assertionCount": 1,
+      "assertionInventorySha256": "78bd444b194cbe885e137e210bd1ae725ad6c48c7f874bbc0c6e998b0f25539a"
+    },
+    {
+      "path": "packages/drei/tests/differential/view.test.ts",
+      "sha256": "deeb76074dc54419c24bb23e55e2d04da0c1b2d741dccdbcd1b0e4a419476112",
+      "assertionCount": 2,
+      "assertionInventorySha256": "942f1b0c1121682fbc35c1e1b4e52d286e199e94be192d94d7032a0a59588b57"
+    },
+    {
+      "path": "packages/drei/tests/drag-controls.test.ts",
+      "sha256": "38a5d91d36da225dc05d2a0335bec67dfd15313320ae94a7c94fa815abaa3eae",
+      "assertionCount": 1,
+      "assertionInventorySha256": "526e319db6315537a981d9687158a433780bdb96cbbc09a294e964b1e955cab9"
+    },
+    {
+      "path": "packages/drei/tests/effects-utils.test.ts",
+      "sha256": "cad6c0049b57299f5199d67894bec28a108197295d494b6853c11b1ebf4d3287",
+      "assertionCount": 2,
+      "assertionInventorySha256": "e1832dc85c914cf00d79c96cc7e8c33f48225062b91d209522eee25d82bfbb84"
+    },
+    {
+      "path": "packages/drei/tests/effects.test.ts",
+      "sha256": "e7e5b3ee37e95a53599157e870c6c32ff44d7317a43c69af7c450432f92dee5e",
+      "assertionCount": 3,
+      "assertionInventorySha256": "dac8bebd9e1de4aedf9407748685b1b02c33b6ab07bdb583f37726c33d107949"
+    },
+    {
+      "path": "packages/drei/tests/environment-components.test.ts",
+      "sha256": "b893a633840f0619a3164b5d95408925afd85f4aea172a60b903489a68d90770",
+      "assertionCount": 6,
+      "assertionInventorySha256": "9fec4df09663ede41589b84a65c22735889bb75c22ac856c83fb84b28d182c5b"
+    },
+    {
+      "path": "packages/drei/tests/environment.test.ts",
+      "sha256": "b23a3d1ea3022fd8f55010c5f1edaa67109a680bd633e959961c9d40a7187d71",
+      "assertionCount": 5,
+      "assertionInventorySha256": "64279b50757fe22873417750871260df5623eaf10871e614fa973b02c272a44b"
+    },
+    {
+      "path": "packages/drei/tests/example.test.ts",
+      "sha256": "a7fdfa4cef9c27af181b5328356f356708fdb96c1b0bfc47c7466c912ae76d86",
+      "assertionCount": 1,
+      "assertionInventorySha256": "ac3554bd6ffa42bc70b644306fcc9d6412eb17cb1944ebba95158205d6907f61"
+    },
+    {
+      "path": "packages/drei/tests/face-controls.test.ts",
+      "sha256": "29eb64abc7021b7858bb3f4aa8b7f424d8dc6c2a43aa92e05eea8b40d89ca93e",
+      "assertionCount": 3,
+      "assertionInventorySha256": "948f251336e89a2fe516bfeed2465060a010cfee0a1f53b5fa5a6de7c54b9515"
+    },
+    {
+      "path": "packages/drei/tests/face-landmarker.test.ts",
+      "sha256": "e6a45b376e28f1f88f37dc1dd07de2c1fca428ccd015aa342a293a9e042d0424",
+      "assertionCount": 1,
+      "assertionInventorySha256": "ee2f47112167acce17a10bb45af8fb9fc0d819305fe287f4f3b2f725996631ac"
+    },
+    {
+      "path": "packages/drei/tests/facemesh.test.ts",
+      "sha256": "4fab5f624afb080f932a8cb99a3b7c5f3e1d6dd27bc601f3956ff04bf896e895",
+      "assertionCount": 3,
+      "assertionInventorySha256": "58bbb3d1261b7bbbb693e5fb53666565caaca51e4e358b532fa311bbd1b2117b"
+    },
+    {
+      "path": "packages/drei/tests/fbo.test.ts",
+      "sha256": "4b37856a8c05deecfb7b34ec99977d826245c6032769e85d4b74a162ea8433f0",
+      "assertionCount": 3,
+      "assertionInventorySha256": "34d34028aa24b563cb81fb252d46f3d70f126356f16983c92dcd016571bdfd95"
+    },
+    {
+      "path": "packages/drei/tests/fisheye.test.ts",
+      "sha256": "59541b0cba5475117b05c492cd2238fbcea9bac5797cc3ff9099d62f721be448",
+      "assertionCount": 1,
+      "assertionInventorySha256": "65a0f4ff50b5255db515c171f9502ce126b77887530d42e0d8ae71ab2b4650a9"
+    },
+    {
+      "path": "packages/drei/tests/font.test.ts",
+      "sha256": "a2fe34a2249361f0b9e1cb5c5482bae0f6398ff16ae65404d4d1ab04024d7691",
+      "assertionCount": 1,
+      "assertionInventorySha256": "ac026a1931dd420e9ca6a916a028c207830c34da95ab4c5f71ea2e4383e278a2"
+    },
+    {
+      "path": "packages/drei/tests/gizmo-helper.test.ts",
+      "sha256": "59c5395e22b994e59d5203221462f7537dc7df5d27a42da753ed49b183fd020e",
+      "assertionCount": 1,
+      "assertionInventorySha256": "eb4e90893b0234dc7664f9eca89820f89fb73e5c108e43d0ae4022c0b751a102"
+    },
+    {
+      "path": "packages/drei/tests/gizmo-widgets.test.ts",
+      "sha256": "dc488d332c6411877ddcfbe534d834d34cac3b77ca99c7e7cea10a7e8e4cca7a",
+      "assertionCount": 1,
+      "assertionInventorySha256": "f1a93fe3f1efc96bfccfafe8219a116c2bc0b5d88e61289bac4696d9f6f0c6fc"
+    },
+    {
+      "path": "packages/drei/tests/grid.test.ts",
+      "sha256": "444f140285883170cd9575607fd0a2dba74b01fa1af167eaa487c1e623f4a9e8",
+      "assertionCount": 2,
+      "assertionInventorySha256": "418007e108ddd01cec7c110b2d2a0f814ff7d3329d4c640054fd13bdbad5dc69"
+    },
+    {
+      "path": "packages/drei/tests/helper.test.ts",
+      "sha256": "3deca2fa2f7f2135a36a15c3f4b5b570032cf84a2aa7ef13ce57e19ba119858f",
+      "assertionCount": 2,
+      "assertionInventorySha256": "54addedb5afa1533d80cdd446589c309769f94ac4df213ca33cf98fb006853d5"
+    },
+    {
+      "path": "packages/drei/tests/hooks.test.ts",
+      "sha256": "46c7bbb215f957aba96e9ed964b3535f51a3cd32b4bb4819606af1d2063ed7d6",
+      "assertionCount": 2,
+      "assertionInventorySha256": "aaeeb5953e647867cc7e507708f107b1706d46ee5e56c1c78f733b2137fde977"
+    },
+    {
+      "path": "packages/drei/tests/html.test.ts",
+      "sha256": "7ca6b96b13f6b8f5c8a0bc27e454f838fb2da32a4d62992953e68b15de59e910",
+      "assertionCount": 6,
+      "assertionInventorySha256": "818953973ef24f43abf87484bb4491c843a805532adaccffec6908e213eedfd6"
+    },
+    {
+      "path": "packages/drei/tests/hud.test.ts",
+      "sha256": "654bdb027c1cba62e438907627e2c5859cfb421a8927822212d68ec2748252cb",
+      "assertionCount": 2,
+      "assertionInventorySha256": "a4822b4dc1552bf334d5dfdaa58b915687e12e3f45610ad77dd571e38a4d3141"
+    },
+    {
+      "path": "packages/drei/tests/image.test.ts",
+      "sha256": "8b617c90631857870b1fe30913b3f60cdfdc35c484c0ebb0cc41e48ed813d0aa",
+      "assertionCount": 2,
+      "assertionInventorySha256": "3fd0aa1af07b320a3017f6bad22059478180ce7065158072297400b0996bb48e"
+    },
+    {
+      "path": "packages/drei/tests/instances.test.ts",
+      "sha256": "93e6b0e51bce4e9b1f1e584c06f6d86098adb1af048dc37b71a465c5814d541d",
+      "assertionCount": 3,
+      "assertionInventorySha256": "ef6e690427df21fc8d43440b2d830f5dbc6b1444c7a40492438e304da553a94f"
+    },
+    {
+      "path": "packages/drei/tests/keyboard-controls.test.ts",
+      "sha256": "943cbc9724594d40dd09e2fe521197464b2f09383179356119f64d00da4563db",
+      "assertionCount": 1,
+      "assertionInventorySha256": "8a5acf9e03b51a7393de19798cf443e6f8c561af019e7a0f37eaa20c9108add7"
+    },
+    {
+      "path": "packages/drei/tests/lightformer.test.ts",
+      "sha256": "9e40bb6d19691663f440a1eb3de733dff0570e6aea4c144d05014c62c58ef2eb",
+      "assertionCount": 6,
+      "assertionInventorySha256": "fddcb32a298c465a5784958d797ea6309c4860df8c0d05647cc960fe1f16f45a"
+    },
+    {
+      "path": "packages/drei/tests/lines.test.ts",
+      "sha256": "e29388c63e4d30e29f13c9e6b538982bbca90711bc55e236c6594386b543feeb",
+      "assertionCount": 5,
+      "assertionInventorySha256": "b977ec667f8538c1d3c90545fe381e73727e1d2ca3775e9ace473a77e87545e5"
+    },
+    {
+      "path": "packages/drei/tests/loader.test.ts",
+      "sha256": "683305449fc8a5708be78737a95285a981234d6032c69c008caf58107af620aa",
+      "assertionCount": 1,
+      "assertionInventorySha256": "5c89505a5a7d7efebacddbb1337333d168daba0f6c9663ae699eff45a2088606"
+    },
+    {
+      "path": "packages/drei/tests/marching-cubes.test.ts",
+      "sha256": "b3e6eeb228e097928fc0263f7cf7b4a473a67b06e458da78f26b424461b4d085",
+      "assertionCount": 1,
+      "assertionInventorySha256": "e849299fe98dae379a68971ca78c8c61915ba2d603509669d85c183f40c6dab6"
+    },
+    {
+      "path": "packages/drei/tests/mesh-portal-material.test.ts",
+      "sha256": "38e25349b3807b292c181b8ea304174ae87e85aec531d0480368e4421081d3f7",
+      "assertionCount": 1,
+      "assertionInventorySha256": "c419470aa064ba4b8f584132b41c56c73ad5e5cc687e1f84e570644a2a17cb5e"
+    },
+    {
+      "path": "packages/drei/tests/mesh-reflector-material.test.ts",
+      "sha256": "43ce9ecdb961e1e27bfaa7995f4645f8b99d19e6ef63574471bdc3f238361d3f",
+      "assertionCount": 1,
+      "assertionInventorySha256": "1e14bbab4e04d851877984e9ab67385ccee50212d88a2b42c65037777f232bd7"
+    },
+    {
+      "path": "packages/drei/tests/mesh-refraction-material.test.ts",
+      "sha256": "62ec32968a57dbf78a37dbb5ef6c9082f2135c1ea4cff1199f5a99743c253a63",
+      "assertionCount": 1,
+      "assertionInventorySha256": "3bdbaa323fbb77728f33a404a3de47e9bd6ee966606fceb039756261f909cd3b"
+    },
+    {
+      "path": "packages/drei/tests/mesh-transmission-material.test.ts",
+      "sha256": "d9061989bf5f40c6cfb1cd40f0896cacb0a085d1747683e3f8875598a0f6a91b",
+      "assertionCount": 1,
+      "assertionInventorySha256": "46f1aef40f62b4f8749a4283ea55a141814114d0449e7e7863c7fefcd3d61db2"
+    },
+    {
+      "path": "packages/drei/tests/models.test.ts",
+      "sha256": "d1ce80a3f6512f6a8af39b71553de7e72d78be30d004d7f8c395342aa7d237dd",
+      "assertionCount": 3,
+      "assertionInventorySha256": "4c072ba2bb69dc692b179e027a36c9b6a05846c89320502bf3b1793ad1f4c045"
+    },
+    {
+      "path": "packages/drei/tests/motion-materials.test.ts",
+      "sha256": "d04c91e8ca56f613988b4e6e6e842b5bf8b365fbdf970e754323140b049f46ac",
+      "assertionCount": 2,
+      "assertionInventorySha256": "4ca294e5aac1756331e13b8c40f55fc5f1310f61dc9add90fca36607b75ae8d9"
+    },
+    {
+      "path": "packages/drei/tests/motion-path.test.ts",
+      "sha256": "2b260d122b82c56a49f76e7f87b0112992bdc73ed370371ef5c0fd32d33a508a",
+      "assertionCount": 1,
+      "assertionInventorySha256": "2afb2713cbe443f560feb8bee66526b084702de5cd5b7d85f781d21093a71373"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/ascii-renderer.test.ts",
+      "sha256": "e8bf86b7a27a14204cb34d43da818ef370f1211396ed1091c579382a377eb582",
+      "assertionCount": 1,
+      "assertionInventorySha256": "19b4b8134f377f128b0bd506f174cf6de84c78ec3dcce303416bf836fd515d1b"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/camera-controls.test.ts",
+      "sha256": "7c0ade93d4c3324f8c57462e7ae58c2c5bc814384b5dc53e2e009fe787423bd1",
+      "assertionCount": 1,
+      "assertionInventorySha256": "2f299192994e43aca9bbc96c0fe3e64e2ef9d958024a28a7a540b5b78052e17a"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/cloud.test.ts",
+      "sha256": "0c5e3f3de7c41a50f491a1191c87a3bdc54af6bae71634dabc88adc70687be9f",
+      "assertionCount": 2,
+      "assertionInventorySha256": "9f4e53affc42f4a9da56969d796778d5136382bae4008356df6498f85abf188d"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/core-utilities.test.ts",
+      "sha256": "383f9d90dd23c5025db6f678aeb45f5f3836e8b192956fdfaba8457918e01aab",
+      "assertionCount": 1,
+      "assertionInventorySha256": "0a5bcdb46bda282dac490b607b45e8d7838faf3fd54765badd91c3a219c172c2"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/depth-buffer.test.ts",
+      "sha256": "070964e2082112358e8886d96476703209a4bbe9feac57fcb5ddd9d92c6cfb49",
+      "assertionCount": 1,
+      "assertionInventorySha256": "e69ce9e9cc3ac3704db140f93e130dc3b015202f23f6b39223a63af6261f569f"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/environment.test.ts",
+      "sha256": "37bc35c6e608fbf662dca7b7707bf1236cbdc5d612c92d6adae574b380caa413",
+      "assertionCount": 2,
+      "assertionInventorySha256": "62e9a31f1b6991371b5006fb981867c84356194eae77f619bd2a829e66129922"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/fbo.test.ts",
+      "sha256": "de0aa20c8c3bee9474585b8cfc82eb20c15eca37a010e20a584dbce165a20cf6",
+      "assertionCount": 1,
+      "assertionInventorySha256": "361f16fbc8c08beb80ed7e5c2766501b5b76f7530296da99ef399cbd416894ea"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/font.test.ts",
+      "sha256": "8d246f203de337eabc27810cc0f4801f28a710dac9abb718b471a8519f53c71b",
+      "assertionCount": 1,
+      "assertionInventorySha256": "8156d75c9093270371f3a4ae1467ef25af63864d2fdb99993cf92011b423cfb3"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/html.test.ts",
+      "sha256": "ac0a106c418162d9df47b3bf56300dbc7add347520c7ee38ddcd77b977d44875",
+      "assertionCount": 1,
+      "assertionInventorySha256": "54afa266a73ec83eaef50dac32996d372be4982dbf3fe940a7dbced4edf51952"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/instances.test.ts",
+      "sha256": "4518acc875857c3fb1ba9b20ea3d59e7b809d96606a43ead8029ef4d4f3928e0",
+      "assertionCount": 3,
+      "assertionInventorySha256": "ad52b2359e1ee303bdb3b6f472da9932cdc9d90c43c34e2903e763f8ebe2b067"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/motion-path.test.ts",
+      "sha256": "a43107fc9652029fccec2191271136c228e938a98b48acd725ebf9793fc188dd",
+      "assertionCount": 1,
+      "assertionInventorySha256": "7f408f807a0b0db971e16166acc6942c54e35512cde1f9e74f2b4a0eab38eded"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/performance-monitor.test.ts",
+      "sha256": "e41872b57980c2d89ccd2f3c8a0bf9a64113988951f914c891f2e69b811bd317",
+      "assertionCount": 1,
+      "assertionInventorySha256": "d979f90773e2449bdd1063eca65456ecb20961eefbff4254fa1aebaa5b421c53"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/pivot-controls.test.ts",
+      "sha256": "af5410608a189b4ab99097f93928102cbe0fdf4b65754a86d861d1fd8c1e1b42",
+      "assertionCount": 1,
+      "assertionInventorySha256": "5ebfe4b18b5802181ba5defca435bd20c3e6bdc7ad3a31b4763106f0224b84d0"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/points.test.ts",
+      "sha256": "30ff3acc4b1d39282c646d717f321eed729965dab68d20228ccd0c47359a4322",
+      "assertionCount": 1,
+      "assertionInventorySha256": "4419e510fd1d73815fedc81bf2d12701ce42bb2e12f50412b56c0309900792a5"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/positional-audio.test.ts",
+      "sha256": "a914d522bff016c5b9838ed8cd5e17baf737a5377aa878ac8df453981b632f81",
+      "assertionCount": 1,
+      "assertionInventorySha256": "4a63385cf0dd8492152106197d1c5fb10438e6f4d2d198c54ae24d0b04af400f"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/progress.test.ts",
+      "sha256": "6a6a79a60599f261784123d67bcdc694a349c41c403af29d8e1c2f5579141a19",
+      "assertionCount": 1,
+      "assertionInventorySha256": "c3bdcfbafa4ca58307747da659326b1fedbafd6b7099b4bb33e6920096b48740"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/rounded-box.test.ts",
+      "sha256": "e33071acb9f3c73ac3a0e29d5ca28cea57db5b7c9dfe8153aa2b26983293815d",
+      "assertionCount": 1,
+      "assertionInventorySha256": "baafd1bbd74f9fada903d15893d6aefbee3286501b26197fa8e550f0bf71469c"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/sampler.test.ts",
+      "sha256": "445df05dec8dbd35f19bc8724b052a9a642a372f2272460312a02cb119cbf3e0",
+      "assertionCount": 1,
+      "assertionInventorySha256": "01f1fcc65b1675802f68bc90f7c4ebba2d5b4e8060e64ebc87876ba6c93bd028"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/soft-shadows.test.ts",
+      "sha256": "52a46303c794a740a7f9471616f324cb3ad303b09ac0ebdc74b51b2d70900d02",
+      "assertionCount": 1,
+      "assertionInventorySha256": "a462f322d02e3f1921792e7214cc1d40f6ad94c6e5eeb5ebb1b72009fbaf111c"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/textures.test.ts",
+      "sha256": "878d31532323568f94f42a24897d07bd4770f65747279bf15e2444ada82990e4",
+      "assertionCount": 1,
+      "assertionInventorySha256": "26c714457d69f3f883b1aebb49484c17d26de358be12294f1b7ac97fa4c06f11"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/trail-texture.test.ts",
+      "sha256": "6f8d140e7fb448b5d0eb81860405ee7d0369a6821de391e35255d6132f5ecab0",
+      "assertionCount": 1,
+      "assertionInventorySha256": "76b15866808c93a49c4994627375966f0e448c1cdc2a55764f312a40a4cf4575"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/trail.test.ts",
+      "sha256": "67381be0b5fa054e719038d0b9cd89f5e162ea99ca0e69d5bd81b47ac8376142",
+      "assertionCount": 1,
+      "assertionInventorySha256": "23f92c8012f35331c2b6febe2a9529cc35b54f0a452f08c95b66513ad37c67a3"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/transform-controls.test.ts",
+      "sha256": "7030c831747568799241268c667272f97cd3724d230e2faa75b9a188dc51ed22",
+      "assertionCount": 1,
+      "assertionInventorySha256": "d56c52bae36165ec3be2db92e3824d6b7484e3775f66bc2c3954ec3e79664383"
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/use-cursor.test.ts",
+      "sha256": "d6c3d4927496288631206f9095d4724224fee3c05ba114f84a14bf562407be6f",
+      "assertionCount": 1,
+      "assertionInventorySha256": "f2e6bfc06b8fa6363f92d70c38dcb1180e2eb23604d3434569bdba4919e821a4"
+    },
+    {
+      "path": "packages/drei/tests/outlines.test.ts",
+      "sha256": "71bfc8df7f5573f3c8f34d27b3eeccd34c60e63d611f63eb7341257a8145f9f3",
+      "assertionCount": 2,
+      "assertionInventorySha256": "600ea531f079d18983bd9879dad963e23998ad010cd86db687c5414ad92a8334"
+    },
+    {
+      "path": "packages/drei/tests/performance-monitor.test.ts",
+      "sha256": "08d68e353c3ec5ef7a1b3052a76a0b6344d3b3d4630b7ab7b39e9cefd9533436",
+      "assertionCount": 1,
+      "assertionInventorySha256": "e7d3cc6fbb249b8ef6be906acde97686edbc7e8e8a1d42447f52556ef430c683"
+    },
+    {
+      "path": "packages/drei/tests/pivot-controls.test.ts",
+      "sha256": "5fe5ec520719322cfeebccc530e8996f97ed94223f4102216174ca930b4dae22",
+      "assertionCount": 7,
+      "assertionInventorySha256": "7fbdde852bd8236d4747a8dac085c175e1cf4552c1039b3ee2074b9f0f57b4c3"
+    },
+    {
+      "path": "packages/drei/tests/pointer-lock.test.ts",
+      "sha256": "bf0f56ba291d7e1b69141620b81ff23e0cd6c4b271e36dd68fa0dc8a86536543",
+      "assertionCount": 2,
+      "assertionInventorySha256": "e6676abcafae759fbb16c3d4a54aa03fc1f49ac8edfc5791aea25274d72c2cf2"
+    },
+    {
+      "path": "packages/drei/tests/points.test.ts",
+      "sha256": "ea19f6a4bf0342abd5586a1d4b35edee074f43d67aa1316ab8b8f04691adb736",
+      "assertionCount": 4,
+      "assertionInventorySha256": "d8b611d674005a3df823e9e7ef235fffa77570e1e873090ab2076ffa658eb74f"
+    },
+    {
+      "path": "packages/drei/tests/positional-audio.test.ts",
+      "sha256": "41fba7997e93ece4b4cbdd126f92f6b72b1a3ef1ef0b1e88240de54d5119cc02",
+      "assertionCount": 1,
+      "assertionInventorySha256": "96d6d8821c07575819bb1f8f33f27dc1545ec35fbc90f6f46fbecd3c365da200"
+    },
+    {
+      "path": "packages/drei/tests/preload.test.ts",
+      "sha256": "e427a469711e75ff7cc6dc0474a4c306eef8d04c489b228796ef5024ef9f05f1",
+      "assertionCount": 2,
+      "assertionInventorySha256": "6484b686fdc56ce916f7a709653e71d7e60591c491affecdf6cd871e1e5c475f"
+    },
+    {
+      "path": "packages/drei/tests/presentation-controls.test.ts",
+      "sha256": "8f82715f856ab04fc843e4a3a8413522982d95ed3a74bd2d46ed1b84f0ec72a2",
+      "assertionCount": 1,
+      "assertionInventorySha256": "a320c3ee4d1030be1937b8f2792cfe33505c6b030fb673d6de122039c8a613a5"
+    },
+    {
+      "path": "packages/drei/tests/progress.test.ts",
+      "sha256": "efedf5d71151c9fa600581e5a0443e48870b0833f9ac09de2a9873326db7d033",
+      "assertionCount": 1,
+      "assertionInventorySha256": "056ee81682f5352027fefbd6cdad1b4c7be9f1a06c2631ecb3c1384e42d5bcf0"
+    },
+    {
+      "path": "packages/drei/tests/react-parity-guard.test.ts",
+      "sha256": "93581cbd5f96600c32f49b2c3b214c5de0c3fe52d6c262291141f8905656f0ff",
+      "assertionCount": 7,
+      "assertionInventorySha256": "fb638aa9b9ffdca8f04365589d93810277541a3718b31c04cbad80e4b8950162"
+    },
+    {
+      "path": "packages/drei/tests/render-textures.test.ts",
+      "sha256": "266c2769557294a5575d5012f1f44ac4a5e3f62a6c9acee3aec8237bf8ed7366",
+      "assertionCount": 2,
+      "assertionInventorySha256": "e754bd820d53cb6b404714b18ee87ff1c53ba793f601dc46839c25c7d746f33a"
+    },
+    {
+      "path": "packages/drei/tests/resize.test.ts",
+      "sha256": "94082e47ce9527fc4c4515ce9dc5e2e0f683db141a02fd36d238bb535286f71d",
+      "assertionCount": 5,
+      "assertionInventorySha256": "4a6bab29ff5e05d1764b5e838967a5964500e0ff23431e5a686f4cf4f153bf98"
+    },
+    {
+      "path": "packages/drei/tests/rounded-box.test.ts",
+      "sha256": "130d18a7a2907965cd5aace038333ae55f79fe0bf986fcaac38ea41f317c57f3",
+      "assertionCount": 2,
+      "assertionInventorySha256": "73db3ea77ba9c6bdc793486040ae55a4bcc29b44c49769a740a3a26c1ea60b7a"
+    },
+    {
+      "path": "packages/drei/tests/sampler.test.ts",
+      "sha256": "dc62cebdc2d9c5c470920d44127d77c1009b92ee6aea3d63dc6f220d2b6ce086",
+      "assertionCount": 2,
+      "assertionInventorySha256": "1a4c74675b197f000cd9f19e71a1d11adb5ccbfc26f1b6909f4210c3e2dbed75"
+    },
+    {
+      "path": "packages/drei/tests/scene-helpers.test.ts",
+      "sha256": "17ae7f64aef4c5f12618c0b73451bd1bc25e853037d3adeb18c8e2625137da81",
+      "assertionCount": 4,
+      "assertionInventorySha256": "5578b420844da6d281d189184b207ea091d3508811831e45a471a88aef3315d7"
+    },
+    {
+      "path": "packages/drei/tests/scene-motion.test.ts",
+      "sha256": "56a9adf1ed979e3da3d12a088900511bcce048de8b062706b8c71c0cedf5c1be",
+      "assertionCount": 4,
+      "assertionInventorySha256": "aac8dbed4dc0798bc9f312100770b54d7457719a2b59ea7fa4ab01d704df104d"
+    },
+    {
+      "path": "packages/drei/tests/screen-sizer.test.ts",
+      "sha256": "311562b090563d316c2cb5a7b8845bca3030c368cbefa8f7152261aad9ecd22e",
+      "assertionCount": 2,
+      "assertionInventorySha256": "4a26f0204e91717594a8c8d8c7637e95e0f581ae05cc19ef1c08e1cc814c670d"
+    },
+    {
+      "path": "packages/drei/tests/scroll-controls.test.ts",
+      "sha256": "4d5ce60cb914a1e5c2c4cbfcd01f3b4aeb039c02383c4e54da59d4749c398f30",
+      "assertionCount": 3,
+      "assertionInventorySha256": "24440764fe75d1447c4df95d69e48b2678a89d3235269f1e9af55cd399ad447e"
+    },
+    {
+      "path": "packages/drei/tests/segments.test.ts",
+      "sha256": "d58d936870823a99c64fa92a937fffc5cd48e4c1c46c56d8bcb1da7e4c3afd89",
+      "assertionCount": 1,
+      "assertionInventorySha256": "b23f4fcebe4b4f9be744bfcf64e0afbc030167c54aa0357ec5512b25bcf56de1"
+    },
+    {
+      "path": "packages/drei/tests/select.test.ts",
+      "sha256": "e66c9d2f865ab9233b29e2c597fb026e3591e977b650c67d0f53edb7f5320480",
+      "assertionCount": 3,
+      "assertionInventorySha256": "be36be109becdb4626fcb0856ac47efb5f7a72239e8eaf30954dcff2b153a6cd"
+    },
+    {
+      "path": "packages/drei/tests/shadows.test.ts",
+      "sha256": "7f19f24ee55cdb0a4323efd87b018145f838ad905798d39a1142db16470e7eec",
+      "assertionCount": 4,
+      "assertionInventorySha256": "1a82f0251e56dbb066b175c14c14c405e117968bfa21a317d4eca5d6f0debb13"
+    },
+    {
+      "path": "packages/drei/tests/shapes.test.ts",
+      "sha256": "7d180000da09bccf584fc3d530749bb4e1a6e77cb849e9a9879a65227ed02750",
+      "assertionCount": 19,
+      "assertionInventorySha256": "791f9d4d8365607c3e68292a0fd33b0c44a135c681261f281c07109d025c6ba8"
+    },
+    {
+      "path": "packages/drei/tests/simple-materials.test.ts",
+      "sha256": "c9f91580c01802569b5d0a2d2b927e880ce709f1786321da1282aeddbe3da1eb",
+      "assertionCount": 4,
+      "assertionInventorySha256": "65f920adc2df3c79f516862f59c613e4121f035c40758d79f67a2359c703a0b5"
+    },
+    {
+      "path": "packages/drei/tests/sky.test.ts",
+      "sha256": "87d6fe07558ae46d14e58c9cf1bf3e6c2353ebd799ab35f73c71128dd3f2ba30",
+      "assertionCount": 2,
+      "assertionInventorySha256": "aaf807ce2dec69b089d608cfc966404e9450ff097c0bd54e7bf2021e0a49a17b"
+    },
+    {
+      "path": "packages/drei/tests/soft-shadows.test.ts",
+      "sha256": "24fe1c0566e4754a2db14c24c6abcdd05dd7923d7d44a03ce11bcc26709dae9e",
+      "assertionCount": 1,
+      "assertionInventorySha256": "6d72a3cf6ce2d94a6bf56f773cee74b20de225a792a4ec89ad6179f58e377c03"
+    },
+    {
+      "path": "packages/drei/tests/sparkles.test.ts",
+      "sha256": "a07e3ee081e3211fe4ea65e2043c5fa4f662173ffd5bef33bf1532e1a2e863a2",
+      "assertionCount": 1,
+      "assertionInventorySha256": "e37eafbdde4ee1eb5d555828bbb384a6e974765cc594b6cdca557813861075d5"
+    },
+    {
+      "path": "packages/drei/tests/splat.test.ts",
+      "sha256": "8c5d2db855d0116722d4dc23c15999c266cbb2d2054155299cf67a5b43e51c0e",
+      "assertionCount": 2,
+      "assertionInventorySha256": "96be9f48a6cee52c38906d68a0385421a627edb3f11838cf809842270b6c3e4b"
+    },
+    {
+      "path": "packages/drei/tests/spot-light.test.ts",
+      "sha256": "c951f6115196173ac61328ba49da1a79b3e281ffc3238cf9eb9d3b8e30842373",
+      "assertionCount": 3,
+      "assertionInventorySha256": "94fbf3ccb21e12cce66916ea1d937b0ace88e046d40ba022cb1ecb77760f4245"
+    },
+    {
+      "path": "packages/drei/tests/sprite-animator.test.ts",
+      "sha256": "32a1edc53f0328d7cd0c11d6b6e2f969bc348eddb0543741eb9fce9e7c207ab7",
+      "assertionCount": 3,
+      "assertionInventorySha256": "16895c439e3a9aeaea7008078335268852cadc40d515bd10c3b29f70ff59d41d"
+    },
+    {
+      "path": "packages/drei/tests/sprite-loader-utils.test.ts",
+      "sha256": "34bcc0e0cf199b8dcc0add2b8aa274fa98315fc2bee75bd7c779e1ef1a1540a4",
+      "assertionCount": 2,
+      "assertionInventorySha256": "dc3cddd0f88697654480f8cbb35f1ebc9df1e9f5b73b09695ba664a285ac9dfe"
+    },
+    {
+      "path": "packages/drei/tests/sprite-loader.test.ts",
+      "sha256": "a533a6129597cc32c24fbaa74f749bfd7bbb7704b3667ddae4820b0c16f75491",
+      "assertionCount": 3,
+      "assertionInventorySha256": "3fe5b2732b57a411b1142ef297cb25c682ba9a727eaea251391b7e71b35c9b8a"
+    },
+    {
+      "path": "packages/drei/tests/stage.test.ts",
+      "sha256": "4e140dd94ce79337fe0c074221c3c5ffdbb1d47e269a6263f99010a99ac3eae0",
+      "assertionCount": 5,
+      "assertionInventorySha256": "2faf9221fcb631fc85b72603031011270079fb99c0acc74a5ea7fd275bf0889e"
+    },
+    {
+      "path": "packages/drei/tests/stars.test.ts",
+      "sha256": "8924835119d4af4c141a40431fa0fb9d80f9c018abfa5b46d0db9f907e57b8e9",
+      "assertionCount": 1,
+      "assertionInventorySha256": "be69aa55125233b132e3a73fd51e9698a2a0f383de36b95a260d26dd392f3408"
+    },
+    {
+      "path": "packages/drei/tests/stats.test.ts",
+      "sha256": "934894f4fb601d27ce2b1e6473149e679a27544539a930ed332f9f1c43024b99",
+      "assertionCount": 2,
+      "assertionInventorySha256": "f40a7993af92110314d9cf221b42915c508634d2f0a7d11025c9fcffebd0f599"
+    },
+    {
+      "path": "packages/drei/tests/svg.test.ts",
+      "sha256": "4beaeb45fdf8135b6549b4b8709eb0d1df744106d8ef3f29b59e32e7eddc7fca",
+      "assertionCount": 3,
+      "assertionInventorySha256": "21f4e58e14e8f27cdc1fe887095a1308493208e8d2c6d119af69fb27224c10a1"
+    },
+    {
+      "path": "packages/drei/tests/text.test.ts",
+      "sha256": "501a2fc5b317d92a3939f9cccaf038b15f3b77c4cc294fc00ee3c2d6058aaa25",
+      "assertionCount": 1,
+      "assertionInventorySha256": "8cb0dcd668b10a421e618d75545e64168a5d2fd67394d6ed29e138c7dde2e268"
+    },
+    {
+      "path": "packages/drei/tests/text3d.test.ts",
+      "sha256": "486110c5d23406ab24a15a16cf67d1ec1d2b86d893cd64e031f58328cd814e11",
+      "assertionCount": 1,
+      "assertionInventorySha256": "16fddf4ed8af4a2d42604dd8db715358706adba6dbb0ac2b582fd26a9ca3df88"
+    },
+    {
+      "path": "packages/drei/tests/textures.test.ts",
+      "sha256": "738efbb9b33dd3d3948e0ed66e67574fef435c64ed7c054683cfc6f2cf3f6418",
+      "assertionCount": 8,
+      "assertionInventorySha256": "bb57f5e9c090904997f9a48a238d7b5c3b81c0eb25626e2d8825e5800e0f04dc"
+    },
+    {
+      "path": "packages/drei/tests/trail-texture.test.ts",
+      "sha256": "4dc3cd1614a133f8d4d0ef474e5a5885427791f817ec6cb95335e10db3eb3486",
+      "assertionCount": 1,
+      "assertionInventorySha256": "5ee172e16f6e85fd41f6bcd6c04b8825238cdca3b6757bb908bd3030adbef52e"
+    },
+    {
+      "path": "packages/drei/tests/trail.test.ts",
+      "sha256": "7ee4c5e517cf56f5b79cfbe96cb95170b3670fa18b820a5532b1aa46dfd869f3",
+      "assertionCount": 2,
+      "assertionInventorySha256": "d6882c21153f047959b7b5cff7eaa091d4ba11da014d2e3d1a6b90ab1f743546"
+    },
+    {
+      "path": "packages/drei/tests/transform-controls.test.ts",
+      "sha256": "9e8f6d4ec213eae3f398f6655939b9263ee92b8420f197bd6ef262d52452e6e1",
+      "assertionCount": 1,
+      "assertionInventorySha256": "a197ff59e63b3949f46e857a41f60a106bc9c83fc8af64f859582d14f9266e5c"
+    },
+    {
+      "path": "packages/drei/tests/use-animations.test.ts",
+      "sha256": "c839aa7e2184c4b4b432f706bee6d67e198700df0ab0e55f3f3bd6b28129140b",
+      "assertionCount": 1,
+      "assertionInventorySha256": "21c27f467080cb8ed93827b231f3e78092342aac5bb1416083c81ffcdd195cf8"
+    },
+    {
+      "path": "packages/drei/tests/use-cursor.test.ts",
+      "sha256": "d1caec29226da64e2fac13d9d08801e1a8f6bc4f9fef7d89fdcbf891001056e7",
+      "assertionCount": 1,
+      "assertionInventorySha256": "b407bffd90e515238e9e99f05f3dd09f4e4830ce88b859886dfc2da719f1ea73"
+    },
+    {
+      "path": "packages/drei/tests/video-textures.test.ts",
+      "sha256": "61f91373a1be970d31a3defa82dea760338bc002fbc1c714e2d73c286715228e",
+      "assertionCount": 3,
+      "assertionInventorySha256": "236937023f0ce9cdbec67928927c4930ca0cf7ceee9900f2be912de587f669b8"
+    },
+    {
+      "path": "packages/drei/tests/view-renderer-boundary.test.ts",
+      "sha256": "cb7ba202238e852df230ad227a78880bbafa1a4f6b8bd6bd2ea6a0d9f50ec731",
+      "assertionCount": 1,
+      "assertionInventorySha256": "94da7a2764f9178115fa4c3a2c6b2b62f74c4c7e760ee513483f76f36c9113fc"
+    },
+    {
+      "path": "packages/drei/tests/wireframe.test.ts",
+      "sha256": "50097827709321762d9332f1a3f093a262b51fcd448631588cbd0b1ab7e65ad3",
+      "assertionCount": 2,
+      "assertionInventorySha256": "c1502ddf1550e85d619f66d8f12a270c10d9a1abec190cc83f556c9b48ec9a56"
+    }
+  ]
+}

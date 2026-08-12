@@ -1,0 +1,65 @@
+{
+  "name": "@octanejs/alien-signals",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "Alien Signals bindings for Octane, reusing the framework-neutral core with Octane-native subscription and lifecycle hooks.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/alien-signals"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "upstream:verify": "node ./scripts/verify-upstream.mjs",
+    "parity:inventory": "node ../../scripts/react-parity/alien-signals-runtime-inventory.mjs"
+  },
+  "dependencies": {
+    "alien-signals": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "20.11.2",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "16.3.2",
+    "@types/bun": "1.2.3",
+    "@types/node": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "bun": "1.3.14",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

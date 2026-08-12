@@ -483,6 +483,7 @@ async function runReactReconstruction(): Promise<ReconstructionResult> {
 }
 
 describe('R3F 9.6.1 event oracle', () => {
+	// @parity-case differential:three-events
 	it('matches hit payloads, propagation, hover transitions, and misses', async () => {
 		const [octane, react] = await Promise.all([runOctaneScenario(), runReactScenario()]);
 
@@ -547,6 +548,7 @@ describe('R3F 9.6.1 event oracle', () => {
 		);
 	});
 
+	// @parity-case adapted:three-captured-reconstruction
 	it('matches captured event state across reconstruction, release, and exit', async () => {
 		const [octane, react] = await Promise.all([
 			runOctaneReconstruction(),

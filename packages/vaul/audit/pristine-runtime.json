@@ -1,0 +1,207 @@
+{
+  "schemaVersion": 1,
+  "root": "packages/vaul/upstream",
+  "tests": [
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should be open by defafult when `defaultOpen` is true [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should be open by defafult when `defaultOpen` is true [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close on background interaction [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close on background interaction [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close when `Drawer.Close` is clicked [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close when `Drawer.Close` is clicked [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close when controlled [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close when controlled [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close when dragged down [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close when dragged down [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should not close when dragged up [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should not close when dragged up [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should open drawer [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should open drawer [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts should close when dragged down and cancelled [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts should close when dragged down and cancelled [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/controlled.spec.ts",
+      "fullName": "tests/controlled.spec.ts Initial-snap should close when clicked on overlay and open and onOpenChange props are passed [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/controlled.spec.ts",
+      "fullName": "tests/controlled.spec.ts Initial-snap should close when clicked on overlay and open and onOpenChange props are passed [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/controlled.spec.ts",
+      "fullName": "tests/controlled.spec.ts Initial-snap should not close when clicked on overlay and only the open prop is passsed [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/controlled.spec.ts",
+      "fullName": "tests/controlled.spec.ts Initial-snap should not close when clicked on overlay and only the open prop is passsed [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/initial-snap.spec.ts",
+      "fullName": "tests/initial-snap.spec.ts Initial-snap should be open and snapped on initial load [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/initial-snap.spec.ts",
+      "fullName": "tests/initial-snap.spec.ts Initial-snap should be open and snapped on initial load [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/nested.spec.ts",
+      "fullName": "tests/nested.spec.ts Nested tests should open and close nested drawer [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/nested.spec.ts",
+      "fullName": "tests/nested.spec.ts Nested tests should open and close nested drawer [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/non-dismissible.spec.ts",
+      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should close when the dismiss button is clicked [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/non-dismissible.spec.ts",
+      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should close when the dismiss button is clicked [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/non-dismissible.spec.ts",
+      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should not close on background interaction [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/non-dismissible.spec.ts",
+      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should not close on background interaction [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/non-dismissible.spec.ts",
+      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should not close when dragged down [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/non-dismissible.spec.ts",
+      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should not close when dragged down [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/with-handle.spec.ts",
+      "fullName": "tests/with-handle.spec.ts With handle click should cycle to the next snap point [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/with-handle.spec.ts",
+      "fullName": "tests/with-handle.spec.ts With handle click should cycle to the next snap point [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/with-redirect.spec.ts",
+      "fullName": "tests/with-redirect.spec.ts With redirect should restore body position settings [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/with-redirect.spec.ts",
+      "fullName": "tests/with-redirect.spec.ts With redirect should restore body position settings [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/with-scaled-background.spec.ts",
+      "fullName": "tests/with-scaled-background.spec.ts With scaled background should scale background [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/with-scaled-background.spec.ts",
+      "fullName": "tests/with-scaled-background.spec.ts With scaled background should scale background [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/with-scaled-background.spec.ts",
+      "fullName": "tests/with-scaled-background.spec.ts With scaled background should scale background when dragging [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/with-scaled-background.spec.ts",
+      "fullName": "tests/with-scaled-background.spec.ts With scaled background should scale background when dragging [iPhone]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/without-scaled-background.spec.ts",
+      "fullName": "tests/without-scaled-background.spec.ts Without scaled background should not scale background [Pixel]",
+      "status": "passed"
+    },
+    {
+      "file": "test/tests/without-scaled-background.spec.ts",
+      "fullName": "tests/without-scaled-background.spec.ts Without scaled background should not scale background [iPhone]",
+      "status": "passed"
+    }
+  ],
+  "snapshots": 0
+}

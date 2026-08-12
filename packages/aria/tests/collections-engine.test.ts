@@ -63,8 +63,7 @@ describe('@octanejs/aria/stately — collection building', () => {
 
 	it('walks literal static <Item> children passed through a component', async () => {
 		// Component-only children compile to positional descriptors (not a children
-		// block), so the builder walks literal static collections too — narrower
-		// than the planned divergence, and worth pinning as a contract.
+		// block), so the builder walks literal static collections as well.
 		const r = mount(StaticChildrenHarness);
 		const out = r.container.querySelector('output')!;
 		expect(out.textContent).toBe('no error');

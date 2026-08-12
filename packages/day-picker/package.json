@@ -1,0 +1,77 @@
+{
+  "name": "@octanejs/day-picker",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [
+    "./src/style.css",
+    "./src/style.module.css"
+  ],
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "React DayPicker-compatible calendar components for Octane.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/day-picker"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "UPSTREAM.md",
+    "status.json"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./locale": "./src/locale.ts",
+    "./locale/*": "./src/locale/*.ts",
+    "./style": "./src/style.css",
+    "./style.css": "./src/style.css",
+    "./style.module": "./src/style.module.css",
+    "./style.module.css": "./src/style.module.css",
+    "./src/style.css": "./src/style.css",
+    "./src/style.module.css": "./src/style.module.css",
+    "./dist/style.css": "./src/style.css",
+    "./dist/style.module.css": "./src/style.module.css",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "pnpm upstream:check && vitest run --root ../.. --project day-picker --project day-picker-ssr --project day-picker-browser --project day-picker-differential",
+    "parity:inventory": "node ../../scripts/react-parity/react-day-picker-runtime-inventory.mjs",
+    "upstream:check": "node audit/check-upstream.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@date-fns/tz": "catalog:default",
+    "date-fns": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-day-picker": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

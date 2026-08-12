@@ -10,6 +10,12 @@
     "React is retained only as a source-compatibility type vocabulary for refs, events, actions, and CSS properties; it is not loaded at runtime."
   ],
   "ssr": "Dedicated Node-mode coverage verifies deterministic state-hook output and guarded media-query initial values without a browser. DOM-only effects remain inert during server rendering.",
-  "verified": "2026-07-28",
+  "verified": "2026-08-02",
+  "provenance": {
+    "source": "https://github.com/mantinedev/mantine",
+    "license": "MIT",
+    "commit": "bb3d25ca42244e996a73e49f6ad94d0047f607d9",
+    "verification": "recorded-unverified"
+  },
   "notes": []
 }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential, type DiffMount } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+	type DiffMount,
+} from '../../../octane/tests/differential/_rig.js';
 
 const fixture = resolve(__dirname, '../_fixtures/parity.tsrx');
 const cache = resolve(__dirname, '.react-cache');
@@ -21,6 +25,8 @@ async function waitForConnectedStatus(...mounts: DiffMount[]): Promise<void> {
 
 	throw new Error('connection status did not reach connected within 200ms');
 }
+
+await Promise.all([preloadDifferentialFixture(fixture, cache)]);
 
 describe('differential: @octanejs/wagmi vs real wagmi', () => {
 	// @parity-case differential:wagmi-connection

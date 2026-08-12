@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 // Smoke-level differential coverage for createPortal. The previous blocker
@@ -16,6 +16,8 @@ import { resolve } from 'node:path';
 // reaches into the portal target directly to assert content parity there.
 
 const FIXTURE = resolve(__dirname, '../_fixtures/portal-events.tsrx');
+
+await preloadDifferentialFixture(FIXTURE);
 
 function makeTargets() {
 	const iTarget = document.createElement('div');

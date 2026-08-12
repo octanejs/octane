@@ -1,0 +1,577 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/react-dropzone/.github/main/brand/assets/logo.png" alt="react-dropzone logo" width="120" />
+</p>
+
+# react-dropzone
+
+[![npm](https://img.shields.io/npm/v/react-dropzone.svg?style=flat-square)](https://www.npmjs.com/package/react-dropzone)
+![Tests](https://img.shields.io/github/actions/workflow/status/react-dropzone/react-dropzone/test.yml?branch=master&style=flat-square&label=tests)
+[![codecov](https://img.shields.io/codecov/c/gh/react-dropzone/react-dropzone/master.svg?style=flat-square)](https://codecov.io/gh/react-dropzone/react-dropzone)
+[![Open Collective Backers](https://img.shields.io/opencollective/backers/react-dropzone.svg?style=flat-square)](#backers)
+[![Open Collective Sponsors](https://img.shields.io/opencollective/sponsors/react-dropzone.svg?style=flat-square)](#sponsors)
+[![Gitpod](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod&style=flat-square)](https://gitpod.io/#https://github.com/react-dropzone/react-dropzone)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg?style=flat-square)](https://github.com/react-dropzone/.github/blob/main/CODE_OF_CONDUCT.md)
+
+Simple React hook to create a HTML5-compliant drag'n'drop zone for files.
+
+Documentation and examples at https://react-dropzone.js.org. Source code at https://github.com/react-dropzone/react-dropzone/.
+
+## Installation
+
+Install it from npm. `react-dropzone` ships as ESM and CommonJS with TypeScript types included, and works with any modern bundler ([Vite](https://vite.dev/), [webpack](https://webpack.js.org/), [Rspack](https://rspack.rs/), etc.).
+
+```bash
+npm install react-dropzone
+```
+
+or:
+
+```bash
+yarn add react-dropzone
+```
+
+## Usage
+
+You can either use the hook:
+
+```jsx static
+import React, {useCallback} from "react";
+import {useDropzone} from "react-dropzone";
+
+function MyDropzone() {
+  const onDrop = useCallback(acceptedFiles => {
+    // Do something with the files
+  }, []);
+  const {getRootProps, getInputProps, isDragActive} = useDropzone({onDrop});
+
+  return (
+    <div {...getRootProps()}>
+      <input {...getInputProps()} />
+      {isDragActive ? <p>Drop the files here ...</p> : <p>Drag 'n' drop some files here, or click to select files</p>}
+    </div>
+  );
+}
+```
+
+Or the wrapper component for the hook:
+
+```jsx static
+import React from "react";
+import Dropzone from "react-dropzone";
+
+<Dropzone onDrop={acceptedFiles => console.log(acceptedFiles)}>
+  {({getRootProps, getInputProps}) => (
+    <section>
+      <div {...getRootProps()}>
+        <input {...getInputProps()} />
+        <p>Drag 'n' drop some files here, or click to select files</p>
+      </div>
+    </section>
+  )}
+</Dropzone>;
+```
+
+If you want to access file contents you have to use the [FileReader API](https://developer.mozilla.org/en-US/docs/Web/API/FileReader):
+
+```jsx static
+import React, {useCallback} from "react";
+import {useDropzone} from "react-dropzone";
+
+function MyDropzone() {
+  const onDrop = useCallback(acceptedFiles => {
+    acceptedFiles.forEach(file => {
+      const reader = new FileReader();
+
+      reader.onabort = () => console.log("file reading was aborted");
+      reader.onerror = () => console.log("file reading has failed");
+      reader.onload = () => {
+        // Do whatever you want with the file contents
+        const binaryStr = reader.result;
+        console.log(binaryStr);
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }, []);
+  const {getRootProps, getInputProps} = useDropzone({onDrop});
+
+  return (
+    <div {...getRootProps()}>
+      <input {...getInputProps()} />
+      <p>Drag 'n' drop some files here, or click to select files</p>
+    </div>
+  );
+}
+```
+
+## Dropzone Props Getters
+
+The dropzone property getters are just two functions that return objects with properties which you need to use to create the drag 'n' drop zone.
+The root properties can be applied to whatever element you want, whereas the input properties must be applied to an `<input>`:
+
+```jsx static
+import React from "react";
+import {useDropzone} from "react-dropzone";
+
+function MyDropzone() {
+  const {getRootProps, getInputProps} = useDropzone();
+
+  return (
+    <div {...getRootProps()}>
+      <input {...getInputProps()} />
+      <p>Drag 'n' drop some files here, or click to select files</p>
+    </div>
+  );
+}
+```
+
+Note that whatever other props you want to add to the element where the props from `getRootProps()` are set, you should always pass them through that function rather than applying them on the element itself.
+This is in order to avoid your props being overridden (or overriding the props returned by `getRootProps()`):
+
+```jsx static
+<div
+  {...getRootProps({
+    onClick: event => console.log(event),
+    role: "button",
+    "aria-label": "drag and drop area"
+    // ...and any other props
+  })}
+/>
+```
+
+In the example above, the provided `{onClick}` handler will be invoked before the internal one, therefore, internal callbacks can be prevented by simply using [stopPropagation](https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation).
+See [Events](https://react-dropzone.js.org#events) for more examples.
+
+_Important_: if you omit rendering an `<input>` and/or binding the props from `getInputProps()`, opening a file dialog will not be possible.
+
+## Refs
+
+Both `getRootProps` and `getInputProps` accept a custom `refKey` (defaults to `ref`) as one of the attributes passed down in the parameter.
+
+This can be useful when the element you're trying to apply the props from either one of those fns does not expose a reference to the element, e.g:
+
+```jsx static
+import React from "react";
+import {useDropzone} from "react-dropzone";
+// NOTE: After v4.0.0, styled components exposes a ref using forwardRef,
+// therefore, no need for using innerRef as refKey
+import styled from "styled-components";
+
+const StyledDiv = styled.div`
+  // Some styling here
+`;
+function Example() {
+  const {getRootProps, getInputProps} = useDropzone();
+  return (
+    <StyledDiv {...getRootProps({refKey: "innerRef"})}>
+      <input {...getInputProps()} />
+      <p>Drag 'n' drop some files here, or click to select files</p>
+    </StyledDiv>
+  );
+}
+```
+
+If you're working with [Material UI v4](https://v4.mui.com/) and would like to apply the root props on some component that does not expose a ref, use [RootRef](https://v4.mui.com/api/root-ref/):
+
+```jsx static
+import React from "react";
+import {useDropzone} from "react-dropzone";
+import RootRef from "@material-ui/core/RootRef";
+
+function PaperDropzone() {
+  const {getRootProps, getInputProps} = useDropzone();
+  const {ref, ...rootProps} = getRootProps();
+
+  return (
+    <RootRef rootRef={ref}>
+      <Paper {...rootProps}>
+        <input {...getInputProps()} />
+        <p>Drag 'n' drop some files here, or click to select files</p>
+      </Paper>
+    </RootRef>
+  );
+}
+```
+
+**IMPORTANT**: do not set the `ref` prop on the elements where `getRootProps()`/`getInputProps()` props are set, instead, get the refs from the hook itself:
+
+```jsx static
+import React from "react";
+import {useDropzone} from "react-dropzone";
+
+function Refs() {
+  const {
+    getRootProps,
+    getInputProps,
+    rootRef, // Ref to the `<div>`
+    inputRef // Ref to the `<input>`
+  } = useDropzone();
+  return (
+    <div {...getRootProps()}>
+      <input {...getInputProps()} />
+      <p>Drag 'n' drop some files here, or click to select files</p>
+    </div>
+  );
+}
+```
+
+If you're using the `<Dropzone>` component, though, you can set the `ref` prop on the component itself which will expose the `{open}` prop that can be used to open the file dialog programmatically:
+
+```jsx static
+import React, {createRef} from "react";
+import Dropzone from "react-dropzone";
+
+const dropzoneRef = createRef();
+
+<Dropzone ref={dropzoneRef}>
+  {({getRootProps, getInputProps}) => (
+    <div {...getRootProps()}>
+      <input {...getInputProps()} />
+      <p>Drag 'n' drop some files here, or click to select files</p>
+    </div>
+  )}
+</Dropzone>;
+
+dropzoneRef.open();
+```
+
+## Testing
+
+`react-dropzone` makes some of its drag 'n' drop callbacks asynchronous to enable promise based `getFilesFromEvent()` functions. In order to test components that use this library, you need to use the [react-testing-library](https://github.com/testing-library/react-testing-library):
+
+```js static
+import React from "react";
+import Dropzone from "react-dropzone";
+import {act, fireEvent, render} from "@testing-library/react";
+
+test("invoke onDragEnter when dragenter event occurs", async () => {
+  const file = new File([JSON.stringify({ping: true})], "ping.json", {type: "application/json"});
+  const data = mockData([file]);
+  const onDragEnter = jest.fn();
+
+  const ui = (
+    <Dropzone onDragEnter={onDragEnter}>
+      {({getRootProps, getInputProps}) => (
+        <div {...getRootProps()}>
+          <input {...getInputProps()} />
+        </div>
+      )}
+    </Dropzone>
+  );
+  const {container} = render(ui);
+
+  await act(() => fireEvent.dragEnter(container.querySelector("div"), data));
+  expect(onDragEnter).toHaveBeenCalled();
+});
+
+function mockData(files) {
+  return {
+    dataTransfer: {
+      files,
+      items: files.map(file => ({
+        kind: "file",
+        type: file.type,
+        getAsFile: () => file
+      })),
+      types: ["Files"]
+    }
+  };
+}
+```
+
+**NOTE**: using [Enzyme](https://airbnb.io/enzyme) for testing is not supported at the moment, see [#2011](https://github.com/airbnb/enzyme/issues/2011).
+
+More examples for this can be found in `react-dropzone`'s own [test suites](https://github.com/react-dropzone/react-dropzone/blob/master/src/index.spec.tsx).
+
+## Caveats
+
+### Required React Version
+
+React [18](https://react.dev/blog/2022/03/29/react-v18) or above is required because we use [hooks](https://react.dev/reference/react/hooks) (the lib itself is a hook).
+
+### File Paths
+
+Files returned by the hook or passed as arg to the `onDrop` cb won't have the properties `path` or `fullPath`.
+For more inf check [this SO question](https://stackoverflow.com/a/23005925/2275818) and [this issue](https://github.com/react-dropzone/react-dropzone/issues/477).
+
+### Tauri (and other native webviews)
+
+Inside a [Tauri](https://tauri.app/) webview, OS file drops are intercepted by the native window layer before the webview sees them, so the browser's drag 'n' drop events never fire and the dropzone appears to ignore drops. Disable Tauri's native handling to let `react-dropzone` work unchanged: set `dragDropEnabled: false` (Tauri v2) or `fileDropEnabled: false` (Tauri v1) in `tauri.conf.json`. If you instead need the absolute paths of dropped files, keep native handling on and drive your own state from Tauri's drag-drop event. See the [Using with Tauri](https://react-dropzone.js.org/guide/tauri) guide and [#1316](https://github.com/react-dropzone/react-dropzone/issues/1316).
+
+### Not a File Uploader
+
+This lib is not a file uploader; as such, it does not process files or provide any way to make HTTP requests to some server; if you're looking for that, checkout [filepond](https://pqina.nl/filepond) or [uppy.io](https://uppy.io/).
+
+### Paste to Upload
+
+Pasting files into the dropzone is supported out of the box: when the dropzone (or a focused child, e.g. a `<textarea>`) has focus and the user pastes files with <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>V</kbd> - for instance a screenshot copied to the clipboard - those files run through the same `accept`, size and `validator` checks and the same `onDrop`/`onDropAccepted`/`onDropRejected` callbacks as a drop. Pastes that carry no files (plain text and the like) are ignored and left untouched, so pasting into inputs keeps working.
+
+The paste is only received when the dropzone has focus, so pair it with [`autoFocus`](https://react-dropzone.js.org) or let the user click/tab into it first. To disable paste handling, set `noPaste`:
+
+```jsx static
+import React from "react";
+import {useDropzone} from "react-dropzone";
+
+function MyDropzone() {
+  const {getRootProps, getInputProps} = useDropzone({noPaste: true});
+
+  return (
+    <div {...getRootProps()}>
+      <input {...getInputProps()} />
+      <p>Drag 'n' drop or click - pasting is disabled</p>
+    </div>
+  );
+}
+```
+
+### Using \<label\> as Root
+
+If you use [\<label\>](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/label) as the root element, the file dialog will be opened twice; see [#1107](https://github.com/react-dropzone/react-dropzone/issues/1107) and [#1432](https://github.com/react-dropzone/react-dropzone/issues/1432) why. A `<label>` natively forwards clicks to the `<input>` it wraps, so the dialog opens once from that and once from our own click handler. To avoid this, use `noClick`:
+
+```jsx static
+import React, {useCallback} from "react";
+import {useDropzone} from "react-dropzone";
+
+function MyDropzone() {
+  const {getRootProps, getInputProps} = useDropzone({noClick: true});
+
+  return (
+    <label {...getRootProps()}>
+      <input {...getInputProps()} />
+    </label>
+  );
+}
+```
+
+### Using open() on Click
+
+If you bind a click event on an inner element and use `open()`, it will trigger a click on the root element too, resulting in the file dialog opening twice. To prevent this, use the `noClick` on the root:
+
+```jsx static
+import React, {useCallback} from "react";
+import {useDropzone} from "react-dropzone";
+
+function MyDropzone() {
+  const {getRootProps, getInputProps, open} = useDropzone({noClick: true});
+
+  return (
+    <div {...getRootProps()}>
+      <input {...getInputProps()} />
+      <button type="button" onClick={open}>
+        Open
+      </button>
+    </div>
+  );
+}
+```
+
+### Changing Props Before open()
+
+Browsers only let you open the file dialog from within a short window after a user gesture (a "[transient user activation](https://developer.mozilla.org/en-US/docs/Web/Security/User_activation)"). Because of this, `open()` must run synchronously in the same event that the user triggered - it cannot wait for React to re-render.
+
+So if you update a prop (e.g. `accept`) and call `open()` in the same handler, `open()` runs against the _previous_ render, before the new prop is applied. Some browsers (notably Safari) may also drop the file dialog entirely, so it appears to require a second click. See [#1188](https://github.com/react-dropzone/react-dropzone/issues/1188).
+
+```jsx static
+// 🚫 open() runs with the old `accept` - and may not open at all on Safari
+function MyDropzone() {
+  const [accept, setAccept] = useState({"image/*": []});
+  const {getRootProps, getInputProps, open} = useDropzone({accept, noClick: true});
+
+  const pickPdfs = () => {
+    setAccept({"application/pdf": []}); // applied on the next render
+    open(); // still uses {"image/*": []}
+  };
+
+  return (
+    <div {...getRootProps()}>
+      <input {...getInputProps()} />
+      <button type="button" onClick={pickPdfs}>
+        Pick PDFs
+      </button>
+    </div>
+  );
+}
+```
+
+Instead, render one dropzone per set of props (each with its own `open`) and call the right one, so no state change has to land before opening:
+
+```jsx static
+function MyDropzone() {
+  const images = useDropzone({accept: {"image/*": []}, noClick: true});
+  const pdfs = useDropzone({accept: {"application/pdf": []}, noClick: true});
+
+  return (
+    <div {...images.getRootProps()}>
+      <input {...images.getInputProps()} />
+      <input {...pdfs.getInputProps()} />
+      <button type="button" onClick={images.open}>
+        Pick images
+      </button>
+      <button type="button" onClick={pdfs.open}>
+        Pick PDFs
+      </button>
+    </div>
+  );
+}
+```
+
+### Camera Option Missing on Android
+
+On Android 13+, Chrome and Edge open the native [Android photo picker](https://developer.android.com/training/data-storage/shared/photopicker) whenever a file input's `accept` attribute resolves to _only_ image and/or video types (e.g. `accept={{"image/*": []}}`). That picker only lists the gallery and files - it has no "take a photo"/camera action - so the camera appears to be missing. See [#1417](https://github.com/react-dropzone/react-dropzone/issues/1417).
+
+This is browser/OS behavior, not something the lib controls, and it's unrelated to how the `<input>` is styled: a plain `<input type="file">` with no `accept` (or one that also allows a non-media type) falls back to the older chooser that _does_ include the Camera app.
+
+If you need the camera, use the [`capture`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/file#capture) attribute, which you can pass straight through `getInputProps()`:
+
+```jsx static
+// Camera only (no gallery/files)
+<input {...getInputProps({capture: "environment"})} />
+```
+
+To offer both the camera and the gallery, render one dropzone per input (each with its own `open`) and let the user pick which one to trigger:
+
+```jsx static
+import React from "react";
+import {useDropzone} from "react-dropzone";
+
+function MyDropzone({onDrop}) {
+  const gallery = useDropzone({accept: {"image/*": []}, noClick: true, onDrop});
+  const camera = useDropzone({accept: {"image/*": []}, noClick: true, onDrop});
+
+  return (
+    <>
+      <button type="button" onClick={gallery.open}>
+        Choose from gallery
+      </button>
+      <input {...gallery.getInputProps()} />
+
+      <button type="button" onClick={camera.open}>
+        Take a photo
+      </button>
+      <input {...camera.getInputProps({capture: "environment"})} />
+    </>
+  );
+}
+```
+
+### File Dialog Cancel Callback
+
+The `onFileDialogCancel()` cb is unstable in most browsers, meaning, there's a good chance of it being triggered even though you have selected files.
+
+We rely on using a timeout of `300ms` after the window is focused (the window `onfocus` event is triggered when the file select dialog is closed) to check if any files were selected and trigger `onFileDialogCancel` if none were selected.
+
+As one can imagine, this doesn't really work if there's a lot of files or large files as by the time we trigger the check, the browser is still processing the files and no `onchange` events are triggered yet on the input. Check [#1031](https://github.com/react-dropzone/react-dropzone/issues/1031) for more info.
+
+Fortunately, there's the [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API), which is currently a working draft and some browsers support it (see [browser compatibility](https://developer.mozilla.org/en-US/docs/Web/API/window/showOpenFilePicker#browser_compatibility)), that provides a reliable way to prompt the user for file selection and capture cancellation.
+
+Also keep in mind that the FS access API can only be used in [secure contexts](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts).
+
+**NOTE** You can enable using the FS access API with the `useFsAccessApi` property: `useDropzone({useFsAccessApi: true})`.
+
+### File System Access API
+
+When setting `useFsAccessApi` to `true`, you're switching to the [File System API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API) (see the [file system access](https://wicg.github.io/file-system-access/) RFC).
+
+What this essentially does is that it will use the [showOpenFilePicker](https://developer.mozilla.org/en-US/docs/Web/API/Window/showOpenFilePicker) method to open the file picker window so that the user can select files.
+
+In contrast, the traditional way (when the `useFsAccessApi` is not set to `true` or not specified) uses an `<input type="file">` (see [docs](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/file)) on which a click event is triggered.
+
+With the use of the file system access API enabled, there's a couple of caveats to keep in mind:
+
+1. The users will not be able to select directories
+2. It requires the app to run in a [secure context](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts)
+3. In [Electron](https://www.electronjs.org/), the path may not be set (see [#1249](https://github.com/react-dropzone/react-dropzone/issues/1249))
+4. Some browsers/configurations block `showOpenFilePicker()` and reject with a `NotAllowedError` (e.g. Microsoft Edge for Business or other restrictive enterprise/security policies). When this happens we automatically fall back to the native `<input>` so the file dialog still opens, provided you render one via `getInputProps()` (see [#1429](https://github.com/react-dropzone/react-dropzone/issues/1429))
+
+## Supported Browsers
+
+We use [browserslist](https://github.com/browserslist/browserslist) config to state the browser support for this lib, so check it out on [browserslist.dev](https://browserslist.dev/?q=ZGVmYXVsdHM%3D).
+
+## Need image editing?
+
+React Dropzone integrates perfectly with [Pintura Image Editor](https://pqina.nl/pintura/?ref=react-dropzone), creating a modern image editing experience. Pintura supports crop aspect ratios, resizing, rotating, cropping, annotating, filtering, and much more.
+
+Checkout the [Pintura integration example](https://codesandbox.io/s/react-dropzone-pintura-40xh4?file=/src/App.js).
+
+## Support
+
+### Backers
+
+Support us with a monthly donation and help us continue our activities. [[Become a backer](https://opencollective.com/react-dropzone#backer)]
+
+<a href="https://opencollective.com/react-dropzone/backer/0/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/0/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/1/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/1/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/2/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/2/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/3/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/3/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/4/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/4/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/5/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/5/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/6/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/6/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/7/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/7/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/8/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/8/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/9/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/9/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/10/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/10/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/11/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/11/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/12/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/12/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/13/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/13/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/14/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/14/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/15/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/15/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/16/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/16/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/17/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/17/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/18/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/18/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/19/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/19/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/20/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/20/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/21/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/21/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/22/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/22/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/23/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/23/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/24/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/24/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/25/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/25/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/26/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/26/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/27/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/27/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/28/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/28/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/backer/29/website" target="_blank"><img src="https://opencollective.com/react-dropzone/backer/29/avatar.svg"></a>
+
+### Sponsors
+
+Become a sponsor and get your logo on our README on Github with a link to your site. [[Become a sponsor](https://opencollective.com/react-dropzone#sponsor)]
+
+<a href="https://opencollective.com/react-dropzone/sponsor/0/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/0/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/1/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/1/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/2/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/2/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/3/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/3/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/4/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/4/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/5/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/5/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/6/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/6/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/7/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/7/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/8/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/8/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/9/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/9/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/10/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/10/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/11/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/11/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/12/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/12/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/13/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/13/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/14/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/14/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/15/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/15/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/16/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/16/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/17/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/17/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/18/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/18/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/19/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/19/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/20/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/20/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/21/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/21/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/22/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/22/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/23/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/23/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/24/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/24/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/25/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/25/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/26/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/26/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/27/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/27/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/28/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/28/avatar.svg"></a>
+<a href="https://opencollective.com/react-dropzone/sponsor/29/website" target="_blank"><img src="https://opencollective.com/react-dropzone/sponsor/29/avatar.svg"></a>
+
+### Hosting
+
+[react-dropzone.js.org](https://react-dropzone.js.org/) hosting provided by [netlify](https://www.netlify.com/).
+
+## Contribute
+
+Checkout the organization [CONTRIBUTING.md](https://github.com/react-dropzone/.github/blob/main/CONTRIBUTING.md).
+
+## License
+
+MIT

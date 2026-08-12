@@ -1,6 +1,6 @@
 import { compile as compileToReact } from '@tsrx/react';
 import { transformSync } from 'esbuild';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -43,25 +43,11 @@ function compileFixture(sourcePath: string): void {
 	writeFileSync(join(cacheDirectory, `${slug}-${hashString(sourcePath)}.js`), rewritten);
 }
 
-function findFixtures(directory: string): string[] {
-	if (!existsSync(directory)) return [];
-	return readdirSync(directory).flatMap((name) => {
-		const sourcePath = join(directory, name);
-		return statSync(sourcePath).isDirectory()
-			? findFixtures(sourcePath)
-			: sourcePath.endsWith('.tsrx')
-				? [sourcePath]
-				: [];
-	});
-}
-
 export async function setup(): Promise<void> {
-	if (!existsSync(cacheDirectory)) {
-		mkdirSync(cacheDirectory, { recursive: true });
-	}
-	for (const fixture of findFixtures(fixtureDirectory)) {
-		compileFixture(fixture);
-	}
+	rmSync(cacheDirectory, { recursive: true, force: true });
+	mkdirSync(cacheDirectory, { recursive: true });
+	compileFixture(join(fixtureDirectory, 'markdown-parity.tsrx'));
+	compileFixture(join(fixtureDirectory, 'feature-parity.tsrx'));
 }
 
 export async function teardown(): Promise<void> {}

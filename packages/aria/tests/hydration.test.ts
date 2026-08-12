@@ -1,9 +1,9 @@
 import { flushSync, hydrateRoot } from 'octane';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { flushEffects } from '../../octane/tests/_helpers';
 import { renderHydrationFixture } from '../../octane/tests/_hydration-ssr';
-import { AriaServerFixture } from './ssr/_fixtures/server.tsx';
+import { AriaHydrationFixture } from './hydration/_fixtures/server';
 
 async function settle(): Promise<void> {
 	for (let index = 0; index < 3; index += 1) {
@@ -13,14 +13,19 @@ async function settle(): Promise<void> {
 	}
 }
 
+let serverResult: Awaited<ReturnType<typeof renderHydrationFixture>>;
+
+beforeAll(async () => {
+	serverResult = await renderHydrationFixture(
+		'aria',
+		'packages/aria/tests/hydration/_fixtures/server.tsx',
+		'AriaHydrationFixture',
+		{ locale: 'ar-AE' },
+	);
+});
+
 describe('@octanejs/aria hydration', () => {
 	it('adopts labelled Octane server nodes, preserves locale, and switches snapshots', async () => {
-		const serverResult = await renderHydrationFixture(
-			'aria',
-			'packages/aria/tests/ssr/_fixtures/server.tsx',
-			'AriaServerFixture',
-			{ locale: 'ar-AE' },
-		);
 		const container = document.createElement('div');
 		container.innerHTML = serverResult.html;
 		document.body.appendChild(container);
@@ -33,7 +38,7 @@ describe('@octanejs/aria hydration', () => {
 		try {
 			expect(container.querySelector('#aria-render-phase')?.textContent).toBe('server');
 
-			root = hydrateRoot(container, AriaServerFixture, { locale: 'ar-AE' });
+			root = hydrateRoot(container, AriaHydrationFixture, { locale: 'ar-AE' });
 			await settle();
 
 			expect(container.querySelector('#aria-server')).toBe(serverMain);

@@ -22,6 +22,7 @@ describe('@octanejs/cmdk — server rendering', () => {
 		expect(banana).toBeLessThan(cherry);
 	});
 
+	// @parity-case octane:ssr-empty
 	it('does not ship the empty state above the results', () => {
 		// Items register in layout effects, which never run on the server, so the
 		// match count is unavoidably 0 during SSR. Rendering Empty on that would put

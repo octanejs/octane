@@ -10,7 +10,10 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const BASIC = resolve(__dirname, '../_fixtures/basic-table-diff.tsrx');
 const SORTING = resolve(__dirname, '../_fixtures/sorting-diff.tsrx');
@@ -25,7 +28,16 @@ const CACHE = resolve(__dirname, '.react-cache');
 // in microtasks; give them a beat before the byte-compare.
 const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
+await Promise.all([
+	preloadDifferentialFixture(BASIC, CACHE),
+	preloadDifferentialFixture(SORTING, CACHE),
+	preloadDifferentialFixture(FILTER_PAGINATE, CACHE),
+	preloadDifferentialFixture(SELECTION, CACHE),
+	preloadDifferentialFixture(VIS_EXPAND, CACHE),
+]);
+
 describe('differential: @octanejs/tanstack-table vs real @tanstack/react-table', () => {
+	// @parity-case differential:tanstack-table-basic
 	it('BasicTable: flexRender shapes + data swap, byte-identical', async () => {
 		const d = await mountDifferential(BASIC, 'BasicTable', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -40,6 +52,7 @@ describe('differential: @octanejs/tanstack-table vs real @tanstack/react-table',
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-table-sorting
 	it('SortingTable: asc → desc → cleared → replace, byte-identical', async () => {
 		const d = await mountDifferential(SORTING, 'SortingTable', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -71,6 +84,7 @@ describe('differential: @octanejs/tanstack-table vs real @tanstack/react-table',
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-table-filter-pagination
 	it('FilterPaginate: filter input + pagination buttons, byte-identical', async () => {
 		const d = await mountDifferential(FILTER_PAGINATE, 'FilterPaginate', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -108,6 +122,7 @@ describe('differential: @octanejs/tanstack-table vs real @tanstack/react-table',
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-table-selection
 	it('SelectionTable: predicate select-all + row toggles, byte-identical', async () => {
 		const d = await mountDifferential(SELECTION, 'SelectionTable', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -134,6 +149,7 @@ describe('differential: @octanejs/tanstack-table vs real @tanstack/react-table',
 		d.unmount();
 	});
 
+	// @parity-case differential:tanstack-table-visibility-expanding
 	it('VisExpand: visibility toggles + nested expanding, byte-identical', async () => {
 		const d = await mountDifferential(VIS_EXPAND, 'VisExpand', undefined, CACHE);
 		await d.step('mount', () => {});

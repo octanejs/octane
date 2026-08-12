@@ -13,6 +13,8 @@ import { tmpdir } from 'node:os';
 import { extname, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { launchBrowser } from '../../../../test-utils/playwright-browser.js';
+import { webglLaunchOptions } from './_playwright.js';
 
 // The helper stages a copy of the fixture here and builds it, so no bundler
 // output, resolver cache, or `node_modules` link lands in the checkout. The
@@ -163,20 +165,7 @@ describe('Three Canvas bundler and browser integration', () => {
 	});
 
 	it('loads and caches a real browser asset through the Three loader path', async () => {
-		let browser: import('playwright').Browser | undefined;
-		try {
-			const { chromium } = await import('playwright');
-			browser = await chromium.launch({
-				headless: true,
-				args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
-			});
-		} catch (error) {
-			throw new Error(
-				'[@octanejs/three browser] Chromium is required ' +
-					'(run `pnpm exec playwright install chromium`): ' +
-					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
-			);
-		}
+		const browser = await launchBrowser(webglLaunchOptions());
 
 		const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
 		const errors: string[] = [];
@@ -235,21 +224,8 @@ describe('Three Canvas bundler and browser integration', () => {
 		expect(bundlerEvidence.rspackBundleHasScene).toBe(true);
 	});
 
-	it('renders one non-blank manual WebGL frame in Chromium', async () => {
-		let browser: import('playwright').Browser | undefined;
-		try {
-			const { chromium } = await import('playwright');
-			browser = await chromium.launch({
-				headless: true,
-				args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
-			});
-		} catch (error) {
-			throw new Error(
-				'[@octanejs/three browser] Chromium is required ' +
-					'(run `pnpm exec playwright install chromium`): ' +
-					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
-			);
-		}
+	it('renders one non-blank manual WebGL frame in a real browser', async () => {
+		const browser = await launchBrowser(webglLaunchOptions());
 
 		const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
 		const errors: string[] = [];
@@ -288,7 +264,8 @@ describe('Three Canvas bundler and browser integration', () => {
 					throw new Error('The Three Canvas did not expose its configured scene.');
 				}
 				const context = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
-				if (context === null) throw new Error('Chromium did not create a WebGL context.');
+				if (context === null)
+					throw new Error('The selected browser did not create a WebGL context.');
 
 				const pixels = new Uint8Array(context.drawingBufferWidth * context.drawingBufferHeight * 4);
 				context.readPixels(
@@ -366,17 +343,7 @@ describe('Three Canvas bundler and browser integration', () => {
 	}, 60_000);
 
 	it('projects a real WebGL context-creation failure without starting the scene', async () => {
-		let browser: import('playwright').Browser | undefined;
-		try {
-			const { chromium } = await import('playwright');
-			browser = await chromium.launch({ headless: true });
-		} catch (error) {
-			throw new Error(
-				'[@octanejs/three browser] Chromium is required ' +
-					'(run `pnpm exec playwright install chromium`): ' +
-					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
-			);
-		}
+		const browser = await launchBrowser({ headless: true });
 
 		const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
 		const consoleErrors: string[] = [];
@@ -440,20 +407,7 @@ describe('Three Canvas bundler and browser integration', () => {
 	}, 60_000);
 
 	it('restores a real lost WebGL context and renders the retained demand scene', async () => {
-		let browser: import('playwright').Browser | undefined;
-		try {
-			const { chromium } = await import('playwright');
-			browser = await chromium.launch({
-				headless: true,
-				args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
-			});
-		} catch (error) {
-			throw new Error(
-				'[@octanejs/three browser] Chromium is required ' +
-					'(run `pnpm exec playwright install chromium`): ' +
-					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
-			);
-		}
+		const browser = await launchBrowser(webglLaunchOptions());
 
 		const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
 		const errors: string[] = [];
@@ -499,7 +453,7 @@ describe('Three Canvas bundler and browser integration', () => {
 				const renderer = state.gl;
 				const context = renderer.getContext();
 				if (context.getExtension('WEBGL_lose_context') === null) {
-					throw new Error('Chromium did not expose WEBGL_lose_context.');
+					throw new Error('The selected browser did not expose WEBGL_lose_context.');
 				}
 				const mesh = state.scene.getObjectByName('bundler-proof-cube');
 				if (mesh === undefined) throw new Error('The retained mesh was not mounted.');
@@ -522,7 +476,7 @@ describe('Three Canvas bundler and browser integration', () => {
 				renderer.forceContextLoss();
 				await within(lost, 'webglcontextlost');
 				const contextWasLost = context.isContextLost();
-				// Chromium only accepts restoreContext after the loss event's task has
+				// Browsers only accept restoreContext after the loss event's task has
 				// completed; restoring from the event-resolution microtask is ignored.
 				await new Promise<void>((resolveTask) => setTimeout(resolveTask, 0));
 				const restored = new Promise<void>((resolveRestored) => {
@@ -597,20 +551,7 @@ describe('Three Canvas bundler and browser integration', () => {
 	}, 60_000);
 
 	it('delivers real offset pointer events and native capture through Canvas', async () => {
-		let browser: import('playwright').Browser | undefined;
-		try {
-			const { chromium } = await import('playwright');
-			browser = await chromium.launch({
-				headless: true,
-				args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
-			});
-		} catch (error) {
-			throw new Error(
-				'[@octanejs/three browser] Chromium is required ' +
-					'(run `pnpm exec playwright install chromium`): ' +
-					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
-			);
-		}
+		const browser = await launchBrowser(webglLaunchOptions());
 
 		const page = await browser.newPage({ viewport: { width: 192, height: 160 } });
 		const errors: string[] = [];

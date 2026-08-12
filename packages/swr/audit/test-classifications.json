@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/swr/tests/adoption/adoption.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks published import roots resolve for migration; it is not a one-for-one upstream suite adaptation."
+    },
+    {
+      "path": "packages/swr/tests/differential/cache.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Compares serialize/stableHash/mergeConfigs/cache helper traces against pinned upstream/src/_internal utilities."
+    },
+    {
+      "path": "packages/swr/tests/differential/root.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Compares the Octane root binding export surface with pinned upstream/src/index."
+    },
+    {
+      "path": "packages/swr/tests/differential/specialized-exports.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Compares infinite/immutable/mutation/subscription export surfaces with the pinned upstream specialized entrypoints."
+    },
+    {
+      "path": "packages/swr/tests/probes/architecture.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Architecture gates for external-store, transitions, and Octane devtools identity; unpaired Octane probes."
+    },
+    {
+      "path": "packages/swr/tests/unit/core.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Framework-neutral core unit coverage and Octane devtools helpers; not counted as React parity evidence."
+    },
+    {
+      "path": "packages/swr/tests/unit/internal-exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Literal export-name oracle against public-api.json; it does not run a paired React/Octane scenario."
+    },
+    {
+      "path": "packages/swr/tests/unit/provider-slot.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Proves SWRConfig layout-effect slot stability under Octane; unpaired framework contract."
+    },
+    {
+      "path": "packages/swr/tests/unit/root-trace.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only request-state oracle; unpaired because it drives only the Octane fixture."
+    }
+  ]
+}

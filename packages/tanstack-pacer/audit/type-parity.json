@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "upstreamRoot": "packages/tanstack-pacer/upstream/package/src",
+  "adaptedRoot": "packages/tanstack-pacer/src",
+  "permittedTransforms": [
+    "import-root: react -> octane",
+    "import-root: @tanstack/react-store -> @octanejs/tanstack-store",
+    "provider-options import: ../provider/PacerProvider -> ../provider/context",
+    "extension: .tsx -> .tsrx for provider/PacerProvider",
+    "setter-types: React.Dispatch/React.SetStateAction -> local Dispatch/SetStateAction (+ internal import)",
+    "selector-slots: useSelector -> useSelectorSlot with Symbol.for call-site slots",
+    "renderable types: ReactNode/FunctionComponent -> OctaneNode/unknown in Subscribe signatures",
+    "provider split: context helpers extracted to adapted-only provider/context.ts",
+    "adapted-only modules: internal.ts and provider/context.ts"
+  ],
+  "pathMaps": [
+    {
+      "upstream": "async-batcher/index.ts",
+      "adapted": "async-batcher/index.ts"
+    },
+    {
+      "upstream": "async-batcher/useAsyncBatchedCallback.ts",
+      "adapted": "async-batcher/useAsyncBatchedCallback.ts"
+    },
+    {
+      "upstream": "async-batcher/useAsyncBatcher.ts",
+      "adapted": "async-batcher/useAsyncBatcher.ts"
+    },
+    {
+      "upstream": "async-debouncer/index.ts",
+      "adapted": "async-debouncer/index.ts"
+    },
+    {
+      "upstream": "async-debouncer/useAsyncDebouncedCallback.ts",
+      "adapted": "async-debouncer/useAsyncDebouncedCallback.ts"
+    },
+    {
+      "upstream": "async-debouncer/useAsyncDebouncer.ts",
+      "adapted": "async-debouncer/useAsyncDebouncer.ts"
+    },
+    {
+      "upstream": "async-queuer/index.ts",
+      "adapted": "async-queuer/index.ts"
+    },
+    {
+      "upstream": "async-queuer/useAsyncQueuedState.ts",
+      "adapted": "async-queuer/useAsyncQueuedState.ts"
+    },
+    {
+      "upstream": "async-queuer/useAsyncQueuer.ts",
+      "adapted": "async-queuer/useAsyncQueuer.ts"
+    },
+    {
+      "upstream": "async-rate-limiter/index.ts",
+      "adapted": "async-rate-limiter/index.ts"
+    },
+    {
+      "upstream": "async-rate-limiter/useAsyncRateLimitedCallback.ts",
+      "adapted": "async-rate-limiter/useAsyncRateLimitedCallback.ts"
+    },
+    {
+      "upstream": "async-rate-limiter/useAsyncRateLimiter.ts",
+      "adapted": "async-rate-limiter/useAsyncRateLimiter.ts"
+    },
+    {
+      "upstream": "async-retryer/index.ts",
+      "adapted": "async-retryer/index.ts"
+    },
+    {
+      "upstream": "async-throttler/index.ts",
+      "adapted": "async-throttler/index.ts"
+    },
+    {
+      "upstream": "async-throttler/useAsyncThrottledCallback.ts",
+      "adapted": "async-throttler/useAsyncThrottledCallback.ts"
+    },
+    {
+      "upstream": "async-throttler/useAsyncThrottler.ts",
+      "adapted": "async-throttler/useAsyncThrottler.ts"
+    },
+    {
+      "upstream": "batcher/index.ts",
+      "adapted": "batcher/index.ts"
+    },
+    {
+      "upstream": "batcher/useBatchedCallback.ts",
+      "adapted": "batcher/useBatchedCallback.ts"
+    },
+    {
+      "upstream": "batcher/useBatcher.ts",
+      "adapted": "batcher/useBatcher.ts"
+    },
+    {
+      "upstream": "debouncer/index.ts",
+      "adapted": "debouncer/index.ts"
+    },
+    {
+      "upstream": "debouncer/useDebouncedCallback.ts",
+      "adapted": "debouncer/useDebouncedCallback.ts"
+    },
+    {
+      "upstream": "debouncer/useDebouncedState.ts",
+      "adapted": "debouncer/useDebouncedState.ts"
+    },
+    {
+      "upstream": "debouncer/useDebouncedValue.ts",
+      "adapted": "debouncer/useDebouncedValue.ts"
+    },
+    {
+      "upstream": "debouncer/useDebouncer.ts",
+      "adapted": "debouncer/useDebouncer.ts"
+    },
+    {
+      "upstream": "index.ts",
+      "adapted": "index.ts"
+    },
+    {
+      "upstream": "provider/PacerProvider.tsx",
+      "adapted": "provider/PacerProvider.tsrx"
+    },
+    {
+      "upstream": "provider/index.ts",
+      "adapted": "provider/index.ts"
+    },
+    {
+      "upstream": "queuer/index.ts",
+      "adapted": "queuer/index.ts"
+    },
+    {
+      "upstream": "queuer/useQueuedState.ts",
+      "adapted": "queuer/useQueuedState.ts"
+    },
+    {
+      "upstream": "queuer/useQueuedValue.ts",
+      "adapted": "queuer/useQueuedValue.ts"
+    },
+    {
+      "upstream": "queuer/useQueuer.ts",
+      "adapted": "queuer/useQueuer.ts"
+    },
+    {
+      "upstream": "rate-limiter/index.ts",
+      "adapted": "rate-limiter/index.ts"
+    },
+    {
+      "upstream": "rate-limiter/useRateLimitedCallback.ts",
+      "adapted": "rate-limiter/useRateLimitedCallback.ts"
+    },
+    {
+      "upstream": "rate-limiter/useRateLimitedState.ts",
+      "adapted": "rate-limiter/useRateLimitedState.ts"
+    },
+    {
+      "upstream": "rate-limiter/useRateLimitedValue.ts",
+      "adapted": "rate-limiter/useRateLimitedValue.ts"
+    },
+    {
+      "upstream": "rate-limiter/useRateLimiter.ts",
+      "adapted": "rate-limiter/useRateLimiter.ts"
+    },
+    {
+      "upstream": "throttler/index.ts",
+      "adapted": "throttler/index.ts"
+    },
+    {
+      "upstream": "throttler/useThrottledCallback.ts",
+      "adapted": "throttler/useThrottledCallback.ts"
+    },
+    {
+      "upstream": "throttler/useThrottledState.ts",
+      "adapted": "throttler/useThrottledState.ts"
+    },
+    {
+      "upstream": "throttler/useThrottledValue.ts",
+      "adapted": "throttler/useThrottledValue.ts"
+    },
+    {
+      "upstream": "throttler/useThrottler.ts",
+      "adapted": "throttler/useThrottler.ts"
+    },
+    {
+      "upstream": "types/index.ts",
+      "adapted": "types/index.ts"
+    },
+    {
+      "upstream": "utils/index.ts",
+      "adapted": "utils/index.ts"
+    }
+  ],
+  "adaptedOnly": [
+    {
+      "path": "internal.ts",
+      "rationale": "Octane-local Dispatch/SetStateAction aliases that replace React setter spellings without a React type dependency."
+    },
+    {
+      "path": "provider/context.ts",
+      "rationale": "Provider context helpers split out of upstream's single PacerProvider.tsx module for Octane module layout."
+    }
+  ],
+  "inventories": {
+    "pristine": "packages/tanstack-pacer/audit/upstream-types.json",
+    "adapted": "packages/tanstack-pacer/audit/adapted-types.json"
+  },
+  "projects": {
+    "pristine": "packages/tanstack-pacer/typetests/pristine/tsconfig.json",
+    "adapted": "packages/tanstack-pacer/typetests/adapted/tsconfig.json"
+  }
+}

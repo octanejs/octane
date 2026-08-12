@@ -6,7 +6,10 @@ import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
 import { act } from 'react';
 import { drainPassiveEffects, flushSync } from 'octane';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/sonner-diff.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
@@ -22,6 +25,8 @@ async function waitFor(condition: () => boolean, timeout = 2000): Promise<void> 
 		await new Promise((resolvePromise) => setTimeout(resolvePromise, 10));
 	}
 }
+
+await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
 
 describe('differential: @octanejs/sonner vs sonner@2.0.7', () => {
 	// @parity-case differential:sonner-toast-lifecycle

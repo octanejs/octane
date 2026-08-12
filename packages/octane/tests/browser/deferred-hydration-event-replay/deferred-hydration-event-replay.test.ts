@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { chromium, devices, type Browser, type Page } from 'playwright';
+import type { Browser, Page } from 'playwright';
+import { devices, launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { createServer, type Plugin, type ViteDevServer } from 'vite';
 import { renderToString } from 'octane/server';
 import { octane } from 'octane/compiler/vite';
@@ -22,6 +23,12 @@ const FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration-ev
 const serverFixture = loadServerFixture<typeof client>(FIXTURE);
 const EDITOR_FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration-contract.tsrx';
 const editorServerFixture = loadServerFixture<typeof editorClient>(EDITOR_FIXTURE);
+
+function expectedBrowserReplayMetadata(
+	testCase: (typeof HYDRATION_INTERACTION_EVENT_CASES)[number],
+) {
+	return expectedHydrationReplayMetadata(testCase);
+}
 
 let server: ViteDevServer;
 let browser: Browser;
@@ -56,13 +63,7 @@ beforeAll(async () => {
 	const address = server.httpServer!.address();
 	if (!address || typeof address === 'string') throw new Error('Vite did not expose a TCP port');
 	baseUrl = `http://127.0.0.1:${address.port}`;
-	try {
-		browser = await chromium.launch({ headless: true });
-	} catch (error) {
-		throw new Error(
-			`Chromium is required for deferred hydration event replay evidence (run \`pnpm --filter octane exec playwright install chromium\`): ${String(error)}`,
-		);
-	}
+	browser = await launchBrowser({ headless: true });
 });
 
 afterEach(async () => {
@@ -155,7 +156,7 @@ describe.sequential('deferred hydration event replay in a real browser', () => {
 				composed: testCase.composed,
 				defaultPreventedBefore: false,
 				defaultPreventedAfter: testCase.type === 'click',
-				...expectedHydrationReplayMetadata(testCase),
+				...expectedBrowserReplayMetadata(testCase),
 			});
 		}
 		for (let i = 0; i < parentRecords.length; i++) {
@@ -171,12 +172,14 @@ describe.sequential('deferred hydration event replay in a real browser', () => {
 				composed: testCase.composed,
 				defaultPreventedBefore: testCase.type === 'click',
 				defaultPreventedAfter: testCase.type === 'click',
-				...expectedHydrationReplayMetadata(testCase),
+				...expectedBrowserReplayMetadata(testCase),
 			});
 		}
 		expect(state.hash).toBe('');
 	});
+});
 
+describe.sequential('Chromium IME and touch-emulation replay', () => {
 	for (const galaxy of [false, true]) {
 		const platform = galaxy ? 'Galaxy S24 touch emulation' : 'desktop Chromium';
 		it(`preserves the first tap, original focused SSR editor, and active IME composition while hydration suspends (${platform})`, async () => {

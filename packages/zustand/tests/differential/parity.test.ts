@@ -8,7 +8,10 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const COUNTER = resolve(__dirname, '../_fixtures/counter-diff.tsrx');
 const MULTISTORE = resolve(__dirname, '../_fixtures/multistore-diff.tsrx');
@@ -16,7 +19,13 @@ const MULTISTORE = resolve(__dirname, '../_fixtures/multistore-diff.tsrx');
 // _setup.ts) so the React side resolves zustand from here.
 const CACHE = resolve(__dirname, '.react-cache');
 
+await Promise.all([
+	preloadDifferentialFixture(COUNTER, CACHE),
+	preloadDifferentialFixture(MULTISTORE, CACHE),
+]);
+
 describe('differential: @octanejs/zustand vs real zustand on React', () => {
+	// @parity-case differential:zustand-counter
 	it('Counter: independent slices + derived selector + action, byte-identical', async () => {
 		const d = await mountDifferential(COUNTER, 'Counter', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -39,6 +48,7 @@ describe('differential: @octanejs/zustand vs real zustand on React', () => {
 		d.unmount();
 	});
 
+	// @parity-case differential:zustand-multistore
 	it('Zoo: two independent stores in one component, byte-identical', async () => {
 		const d = await mountDifferential(MULTISTORE, 'Zoo', undefined, CACHE);
 		await d.step('mount', () => {});

@@ -1,0 +1,703 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SyntaxHighlighter component renders custom react component where pre tag is by default 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            "const",
+          ],
+          "props": {
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " woah = ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "fun",
+          ],
+          "props": {
+            "className": "hljs-function",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " => ",
+          ],
+          "props": {
+            "className": "hljs-function",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "fun",
+          ],
+          "props": {
+            "className": "hljs-function",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " + 1;",
+          ],
+          "props": {
+            "className": "hljs-function",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": null,
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "const",
+          ],
+          "props": {
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " dude = woah(",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "2",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ") + ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "3",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "function thisIsAFunction() {
+",
+        {
+          "children": [
+            "  ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "return",
+          ],
+          "props": {
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " [",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "1",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ",",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "2",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ",",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "3",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "].map(n => n + ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "1",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ").filter(n !== ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "3",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ");
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "}
+",
+        {
+          "children": [
+            "console.log(",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "'making up fake code is really hard'",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ");
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "
+",
+        "function itIs() {
+",
+        {
+          "children": [
+            "  ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "return",
+          ],
+          "props": {
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "'no seriously really it is'",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "}
+",
+      ],
+      "props": {
+        "style": {
+          "whiteSpace": "pre",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(240, 240, 240)",
+      "color": "rgb(68, 68, 68)",
+      "display": "block",
+      "overflowX": "auto",
+      "padding": "0.5em",
+    },
+  },
+  "type": "p",
+}
+`;
+
+exports[`SyntaxHighlighter renders div where pre tag is by default 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            "const",
+          ],
+          "props": {
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " woah = ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "fun",
+          ],
+          "props": {
+            "className": "hljs-function",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " => ",
+          ],
+          "props": {
+            "className": "hljs-function",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "fun",
+          ],
+          "props": {
+            "className": "hljs-function",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " + 1;",
+          ],
+          "props": {
+            "className": "hljs-function",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": null,
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "const",
+          ],
+          "props": {
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " dude = woah(",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "2",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ") + ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "3",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "function thisIsAFunction() {
+",
+        {
+          "children": [
+            "  ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "return",
+          ],
+          "props": {
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " [",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "1",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ",",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "2",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ",",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "3",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "].map(n => n + ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "1",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ").filter(n !== ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "3",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ");
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "}
+",
+        {
+          "children": [
+            "console.log(",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "'making up fake code is really hard'",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ");
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "
+",
+        "function itIs() {
+",
+        {
+          "children": [
+            "  ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "return",
+          ],
+          "props": {
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "'no seriously really it is'",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "}
+",
+      ],
+      "props": {
+        "style": {
+          "whiteSpace": "pre",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(240, 240, 240)",
+      "color": "rgb(68, 68, 68)",
+      "display": "block",
+      "overflowX": "auto",
+      "padding": "0.5em",
+    },
+  },
+  "type": "div",
+}
+`;

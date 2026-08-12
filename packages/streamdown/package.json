@@ -67,7 +67,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepack": "pnpm run build",
-    "test": "vitest run --root ../.. --project streamdown --project streamdown-ssr",
+    "test": "vitest run --root ../.. --project streamdown --project streamdown-differential --project streamdown-ssr",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsgo --noEmit -p typetests/tsconfig.json",
     "types:check": "node scripts/generate-tsrx-types.mjs --check && node scripts/check-public-types.mjs",
     "types:generate": "node scripts/generate-tsrx-types.mjs"

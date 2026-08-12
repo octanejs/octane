@@ -5,6 +5,7 @@ This port targets the immutable React Three Fiber release `v9.6.1`:
 - repository: `https://github.com/pmndrs/react-three-fiber`;
 - tag commit: `2a528745e9aa7c9e6cca41e404b59d45cf0d0cc7`;
 - package: `@react-three/fiber@9.6.1`;
+- source archive SHA-256: `01177da508a5551b38908e3da7ce51601f140fd35497e3b3daf73af58f75e67c`;
 - exact Three behavior and type oracle: `three@0.172.0` and
   `@types/three@0.172.0`.
 

@@ -110,10 +110,22 @@ For each Vitest-backed lane:
 - package-authored conformance or framework-contract tests that are not parity
   evidence must stay outside `testExecution.include`.
 
+A measured `vitest-full` lane may set `execution.fileParallelism`. The
+parity-wide Vitest configuration applies that setting to the selected project
+while keeping the exact inventory under harness control. Keep the field absent
+unless a repeatable project-specific measurement justifies it; leave worker
+sizing to Vitest unless the project has separate evidence for a fixed bound.
+
 TypeScript and pristine Jest lanes are still declared in the manifest even
 though they are not selected through a Vitest project. A Vitest wrapper around
 an already-executed pristine Jest suite is not another oracle and should not be
 run again in the ordinary shards.
+
+Structured divergences that pin unpaired Octane-only ordinary-shard cases must
+not invent a required parity lane for identity alone. Declare those cases under
+optional `ordinaryEvidence` (path, sha256, and `@parity-case` identities) so the
+ledger can bind `divergences[].caseIds` without counting them as React evidence
+or re-executing them under `react-parity:check`.
 
 ## CI execution
 
@@ -129,12 +141,18 @@ pnpm react-parity:validate
 generated coverage, environments, and public claims. It does not collect or
 execute Vitest, Jest, or type-test lanes.
 
-The generic `react_parity_checks` job runs the complete package suites on Node
-24:
+The generic React parity workers run the complete package suites on Node 24. CI
+currently requests three native Vitest file shards:
 
 ```bash
-pnpm react-parity:check
+pnpm react-parity:check --shard 1/3
+pnpm react-parity:check --shard 2/3
+pnpm react-parity:check --shard 3/3
 ```
+
+`pnpm react-parity:check` without `--shard` retains the complete single-runner
+local view. The workflow's stable `React parity checks` aggregate succeeds only
+after every worker succeeds.
 
 The ordinary test matrix uses `vitest.ci-sharded.config.js`. Do not add:
 
@@ -147,6 +165,55 @@ The parity harness executes every available required lane and uses each runner's
 JSON report to verify that every declared file and test identity passed exactly
 once. It does not run a separate Vitest collection pass before execution.
 `harness.mjs validate` retains collection for an explicit validation-only check.
+Each shard completes metadata and environment preflight for every manifest
+before it starts expensive work. Vitest applies its native path-hash sharding to
+the combined parity file set, so a lane may span workers and a new suite needs no
+timing-ledger update. Each worker uploads its validated subset report; the stable
+aggregate merges all reports and rechecks every required lane's complete exact
+identity inventory. Increasing the shard total therefore changes only the CI
+matrix and `--shard` coordinates, not package metadata.
+
+Within a shard, the harness narrows every selected Vitest-backed project to its
+manifest-owned files and test names and executes the native file subset through
+one Vitest process. One scheduler therefore sizes workers for that runner
+instead of starting a new scheduler for every lane. Selected non-Vitest type and
+custom-runner lanes execute afterward without overlapping Vitest's worker pool.
+They retain a deterministic structural plan based on declared work, with each
+manifest assigned whole to one shard. Their manifest queue is bounded by the
+CPUs available to the process; each child is internally single-process
+(`tsc`/Node, Jest `--runInBand`, or one Playwright worker), so the queue does not
+multiply nested worker pools.
+
+`playwright-full` lanes must use a lockfile-backed dependency workspace under
+`scripts/react-parity/fixtures/`. The shared runner links that already-installed
+workspace into its temporary application; it must not run a nested package
+install or install another browser revision. When the upstream application has
+its own committed manifest and lockfile, declare them as `dependencySource` and
+let `pnpm sync` generate the active fixture instead of copying dependency
+versions by hand. Active workspace declarations use the default Playwright
+catalog, and the workspace override keeps transitive `playwright` and
+`@playwright/test` consumers on that same revision. Historical package manifests
+copied into an `upstream/` tree remain immutable evidence and are not themselves
+active workspace declarations.
+
+Differential fixtures must preload both runtime modules at the test-module
+boundary, before the first timed case. `globalSetup` compiles the React-side
+fixture, but the first dynamic import can still traverse a large oracle package
+graph. Await that one-time work during collection so a slow import cannot consume
+an individual case's timeout and leave React's `act()` queue half-open:
+
+```ts
+await Promise.all([
+	preloadDifferentialFixture(FIXTURE, CACHE),
+	preloadDifferentialFixture(SECOND_FIXTURE, CACHE),
+]);
+```
+
+Use concurrent preloads only when fixture module evaluation order is independent.
+A custom rig whose modules allocate process-global identities must await each
+runtime pair in test order. `react-parity:test` verifies that every required
+differential mount fixture/cache pair, including package-specific rigs, has a
+matching top-level awaited preload.
 
 ## Adding or changing a binding
 

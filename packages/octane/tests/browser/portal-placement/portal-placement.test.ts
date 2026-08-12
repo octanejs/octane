@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { chromium, type Browser, type Page } from 'playwright';
+import type { Browser, Page } from 'playwright';
+import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { createServer, type ViteDevServer } from 'vite';
 import { octane } from 'octane/compiler/vite';
 import { dirname, resolve } from 'node:path';
@@ -10,13 +11,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 let browser: Browser;
 
 beforeAll(async () => {
-	try {
-		browser = await chromium.launch({ headless: true });
-	} catch (error) {
-		throw new Error(
-			`Chromium is required for portal-placement browser evidence (run \`pnpm --filter octane exec playwright install chromium\`): ${String(error)}`,
-		);
-	}
+	browser = await launchBrowser({ headless: true });
 });
 
 afterAll(async () => {
