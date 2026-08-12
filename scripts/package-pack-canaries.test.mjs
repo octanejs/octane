@@ -9,6 +9,7 @@ import {
 	findPackedTsrxSourceConsumerPackages,
 	findPackedTsrxSourceConsumerSpecifiers,
 	findPackedWorkspaceDependencyClosure,
+	findExternalDependencySpecs,
 	isForbiddenNativeGraphModule,
 	isWithinDirectory,
 	renderPackedExampleWorkspace,
@@ -213,26 +214,35 @@ describe('packed TSRX source consumers', () => {
 	});
 
 	test('typechecks TSRX with the Octane language plugin and full strict diagnostics', () => {
-		const config = createPackedTsrxConsumerConfig({ nodeTypes: true });
+		const config = createPackedTsrxConsumerConfig({
+			nodeTypes: true,
+			sourcePackageNames: ['@octanejs/jotai'],
+		});
 
 		assert.equal(config.compilerOptions.strict, true);
 		assert.equal(config.compilerOptions.skipLibCheck, false);
 		assert.equal(config.compilerOptions.jsx, 'react-jsx');
 		assert.equal(config.compilerOptions.jsxImportSource, 'octane');
+		assert.deepEqual(config.compilerOptions.lib, ['dom', 'dom.iterable', 'es2024']);
+		assert.equal(config.compilerOptions.target, 'es2024');
 		assert.deepEqual(config.compilerOptions.plugins, [{ name: '@tsrx/typescript-plugin' }]);
 		assert.deepEqual(config.tsrx, { compiler: 'octane/compiler/volar' });
 		assert.deepEqual(config.include, [
 			'src/**/*.ts',
 			'src/**/*.tsrx',
-			'node_modules/@octanejs/**/*.tsrx',
+			'node_modules/@octanejs/jotai/**/*.tsrx',
 		]);
 		assert.equal(config.compilerOptions.paths, undefined);
 	});
 
 	test('also models browser consumers without Node ambient types', () => {
-		const config = createPackedTsrxConsumerConfig({ nodeTypes: false });
+		const config = createPackedTsrxConsumerConfig({
+			consumerSourceFiles: ['src/published-browser-source-imports.ts'],
+			nodeTypes: false,
+		});
 
 		assert.deepEqual(config.compilerOptions.types, []);
+		assert.deepEqual(config.include, ['src/published-browser-source-imports.ts']);
 		assert.equal(config.compilerOptions.strict, true);
 		assert.equal(config.compilerOptions.skipLibCheck, false);
 		assert.deepEqual(config.tsrx, { compiler: 'octane/compiler/volar' });
@@ -285,6 +295,27 @@ describe('packed TSRX source consumers', () => {
 		);
 	});
 
+	test('promotes external dependencies and optional peers into the consumer', () => {
+		const manifests = new Map([
+			[
+				'@octanejs/source',
+				{
+					dependencies: { '@octanejs/helper': '1.0.0', concrete: '2.0.0' },
+					peerDependencies: { concrete: '^2.0.0', peer: '^3.0.0' },
+				},
+			],
+			[
+				'@octanejs/helper',
+				{ optionalDependencies: { optional: '4.0.0' }, peerDependencies: { peer: '>=3' } },
+			],
+		]);
+
+		assert.deepEqual(
+			findExternalDependencySpecs(manifests, ['@octanejs/source', '@octanejs/helper']),
+			{ concrete: '2.0.0', optional: '4.0.0', peer: '^3.0.0' },
+		);
+	});
+
 	test('imports each discovered package root through its published type entry', () => {
 		assert.equal(
 			renderPackedTsrxSourceImports(['@octanejs/jotai', '@octanejs/redux']),
@@ -324,6 +355,10 @@ describe('packed TSRX source consumers', () => {
 		assert.match(source, /<Command\b/);
 		assert.match(source, /<OTPInput\b/);
 		assert.match(source, /<BarChart\b/);
+		assert.doesNotMatch(
+			renderPackedTsrxConsumerSource({ includeRecharts: false }),
+			/from '@octanejs\/recharts'|<BarChart\b/,
+		);
 		assert.match(source, /<Toaster\b/);
 		assert.match(source, /<animated\.div\b/);
 		assert.match(source, /<Parallax\b/);

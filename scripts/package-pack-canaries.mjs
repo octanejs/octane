@@ -231,8 +231,37 @@ export function findPackedWorkspaceDependencyClosure(manifests, rootPackageNames
 	return [...packageNames].sort();
 }
 
-export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions, packageNames) {
-	const dependencies = {};
+export function findExternalDependencySpecs(manifests, packageNames) {
+	const dependencySpecs = new Map();
+	const fields = ['peerDependencies', 'optionalDependencies', 'dependencies'];
+
+	for (const packageName of packageNames) {
+		const manifest = manifests.get(packageName);
+		for (const [priority, field] of fields.entries()) {
+			for (const [dependencyName, spec] of Object.entries(manifest?.[field] ?? {})) {
+				if (manifests.has(dependencyName)) continue;
+				const existing = dependencySpecs.get(dependencyName);
+				if (!existing || priority > existing.priority) {
+					dependencySpecs.set(dependencyName, { priority, spec });
+				}
+			}
+		}
+	}
+
+	return Object.fromEntries(
+		[...dependencySpecs]
+			.sort(([left], [right]) => left.localeCompare(right))
+			.map(([dependencyName, { spec }]) => [dependencyName, spec]),
+	);
+}
+
+export function createPackedTsrxConsumerManifest(
+	archiveSpecs,
+	toolingVersions,
+	packageNames,
+	externalDependencies = {},
+) {
+	const dependencies = { ...externalDependencies };
 
 	for (const packageName of packageNames) {
 		const archiveSpec = archiveSpecs[packageName];
@@ -257,13 +286,17 @@ export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions, 
 	};
 }
 
-export function createPackedTsrxConsumerConfig({ nodeTypes = true } = {}) {
+export function createPackedTsrxConsumerConfig({
+	consumerSourceFiles = ['src/**/*.ts', 'src/**/*.tsrx'],
+	nodeTypes = true,
+	sourcePackageNames = [],
+} = {}) {
 	return {
 		compilerOptions: {
 			allowImportingTsExtensions: true,
 			jsx: 'react-jsx',
 			jsxImportSource: 'octane',
-			lib: ['dom', 'dom.iterable', 'esnext'],
+			lib: ['dom', 'dom.iterable', 'es2024'],
 			module: 'esnext',
 			moduleResolution: 'bundler',
 			noEmit: true,
@@ -271,7 +304,7 @@ export function createPackedTsrxConsumerConfig({ nodeTypes = true } = {}) {
 			plugins: [{ name: '@tsrx/typescript-plugin' }],
 			skipLibCheck: false,
 			strict: true,
-			target: 'esnext',
+			target: 'es2024',
 			types: nodeTypes ? ['node'] : [],
 		},
 		tsrx: {
@@ -279,7 +312,10 @@ export function createPackedTsrxConsumerConfig({ nodeTypes = true } = {}) {
 		},
 		// Compile the installed implementation files directly. A package import can
 		// resolve through a declaration condition and otherwise hide shipped TSRX.
-		include: ['src/**/*.ts', 'src/**/*.tsrx', 'node_modules/@octanejs/**/*.tsrx'],
+		include: [
+			...consumerSourceFiles,
+			...sourcePackageNames.map((packageName) => `node_modules/${packageName}/**/*.tsrx`),
+		],
 	};
 }
 
@@ -309,10 +345,20 @@ export function renderPackedTsrxSourceImports(specifiers) {
 	);
 }
 
-export function renderPackedTsrxConsumerSource() {
+export function renderPackedTsrxConsumerSource({ includeRecharts = true } = {}) {
+	const rechartsImport = includeRecharts
+		? "import { Bar, BarChart, XAxis, YAxis } from '@octanejs/recharts';\n"
+		: '';
+	const rechartsMarkup = includeRecharts
+		? `		<BarChart width={320} height={160} data={[{ name: 'Packed', value: 1 }]}>
+			<XAxis dataKey="name" />
+			<YAxis />
+			<Bar dataKey="value" fill="#8884d8" />
+		</BarChart>
+`
+		: '';
 	return `import { Command } from '@octanejs/cmdk';
-import { Bar, BarChart, XAxis, YAxis } from '@octanejs/recharts';
-import { animated, useSpring } from '@octanejs/spring';
+${rechartsImport}import { animated, useSpring } from '@octanejs/spring';
 import { Parallax, ParallaxLayer } from '@octanejs/spring/parallax';
 import { OTPInput, REGEXP_ONLY_DIGITS } from '@octanejs/input-otp';
 import { toast, Toaster } from '@octanejs/sonner';
@@ -348,12 +394,7 @@ export function PublishedSourceConsumer() @{
 	const [springStyles] = useSpring({ from: { opacity: 0 }, to: { opacity: 1 } });
 
 	<section>
-		<BarChart width={320} height={160} data={[{ name: 'Packed', value: 1 }]}>
-			<XAxis dataKey="name" />
-			<YAxis />
-			<Bar dataKey="value" fill="#8884d8" />
-		</BarChart>
-		<animated.div style={springStyles}>Packed spring</animated.div>
+	${rechartsMarkup}		<animated.div style={springStyles}>Packed spring</animated.div>
 		<div style={{ height: 120 }}>
 			<Parallax pages={2}>
 				<ParallaxLayer offset={1} speed={0.5}>Packed Parallax</ParallaxLayer>

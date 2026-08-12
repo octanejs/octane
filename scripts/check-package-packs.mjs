@@ -29,6 +29,7 @@ import {
 	findPackedTsrxSourceConsumerPackages,
 	findPackedTsrxSourceConsumerSpecifiers,
 	findPackedWorkspaceDependencyClosure,
+	findExternalDependencySpecs,
 	NATIVE_GRAPH_FORBIDDEN_MODULE,
 	PACKED_COMMONJS_CONSUMER_PACKAGES,
 	PACKED_JAVASCRIPT_CONSUMER_PACKAGES,
@@ -106,15 +107,57 @@ const packedExampleCanaries = [
 // Keep known upstream type-graph debt explicit while every new source binding
 // is enrolled automatically. Issue #721 owns removing these exceptions.
 const packedTsrxSourceExceptions = new Map([
+	['@octanejs/aria', 'its browser source still reads process.env.NODE_ENV'],
+	['@octanejs/base-ui', 'its browser source still reads process.env.NODE_ENV'],
+	['@octanejs/cmdk', 'its browser source still reads process.env.NODE_ENV'],
+	['@octanejs/dnd-kit', 'its browser source still reads process.env.NODE_ENV'],
+	[
+		'@octanejs/drei',
+		'its source and upstream Three declarations are not yet compatible with strict TypeScript',
+	],
 	[
 		'@octanejs/livestore',
 		'LiveStore 0.4 declarations require the exact Effect peer graph from the workspace lockfile',
 	],
 	[
+		'@octanejs/lexical',
+		'its upstream declarations require explicit disposable globals outside the stable ES2024 library',
+	],
+	[
+		'@octanejs/monaco-editor',
+		'its published source reaches Monaco declarations that are not available from the loader peer',
+	],
+	[
+		'@octanejs/rainbowkit',
+		'its Wagmi and TanStack Query peer declarations are not yet mutually compatible under strict checking',
+	],
+	['@octanejs/jotai', 'its browser source still reads process.env.NODE_ENV'],
+	['@octanejs/popper', 'its browser source still reads process.env.NODE_ENV'],
+	['@octanejs/react-map-gl', 'its published source requires Mapbox GeoJSON ambient declarations'],
+	[
 		'@octanejs/recharts',
 		'extensionless relative imports do not yet resolve to sibling TSRX modules in tsrx-tsc',
 	],
+	[
+		'@octanejs/remix-router',
+		'its ref and browser-global source typing debt is tracked by companion PR #734',
+	],
+	['@octanejs/redux', 'its browser source still reads process.env.NODE_ENV'],
+	[
+		'@octanejs/solana-react',
+		'its TanStack Query peer declarations are not yet compatible with the installed strict consumer graph',
+	],
+	['@octanejs/tanstack-query', 'its browser source still reads process.env.NODE_ENV'],
+	[
+		'@octanejs/tanstack-router',
+		'its browser source reads process.env.NODE_ENV and its upstream declarations import node:http2',
+	],
+	['@octanejs/tiptap', 'its browser source still reads process.env.NODE_ENV'],
 	['@octanejs/visx', 'React SVG and event prop types are not yet Octane-native'],
+	[
+		'@octanejs/wagmi',
+		'its Wagmi and TanStack Query peer declarations are not yet mutually compatible under strict checking',
+	],
 ]);
 const inventoryErrors = validateWorkspacePackages(packages);
 if (inventoryErrors.length) {
@@ -1090,6 +1133,14 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 				return [packageName, specifiers];
 			}),
 	);
+	const sourceExceptionNames = new Set(packedTsrxSourceExceptions.keys());
+	const browserSourceConsumerSpecifiers = new Map(
+		[...sourceConsumerSpecifiers].filter(([packageName]) =>
+			findPackedWorkspaceDependencyClosure(packedManifests, [packageName]).every(
+				(dependencyName) => !sourceExceptionNames.has(dependencyName),
+			),
+		),
+	);
 	const validatedPackages = [...sourceConsumerSpecifiers.keys(), 'octane'];
 	const installedPackages = findPackedWorkspaceDependencyClosure(packedManifests, [
 		...new Set([...validatedPackages, ...PACKED_TSRX_PROBE_PACKAGES]),
@@ -1097,6 +1148,7 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 	const archiveSpecs = Object.fromEntries(
 		installedPackages.map((packageName) => [packageName, fileArchiveSpec(archives, packageName)]),
 	);
+	const externalDependencies = findExternalDependencySpecs(packedManifests, installedPackages);
 	const manifest = createPackedTsrxConsumerManifest(
 		archiveSpecs,
 		{
@@ -1106,6 +1158,7 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 			typescript: typescriptVersion,
 		},
 		installedPackages,
+		externalDependencies,
 	);
 
 	writeFileSync(
@@ -1114,11 +1167,26 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 	);
 	writeFileSync(
 		path.join(consumerDirectory, 'tsconfig.json'),
-		`${JSON.stringify(createPackedTsrxConsumerConfig({ nodeTypes: true }), null, 2)}\n`,
+		`${JSON.stringify(
+			createPackedTsrxConsumerConfig({
+				nodeTypes: true,
+				sourcePackageNames: [...sourceConsumerSpecifiers.keys()],
+			}),
+			null,
+			2,
+		)}\n`,
 	);
 	writeFileSync(
 		path.join(consumerDirectory, 'tsconfig.browser.json'),
-		`${JSON.stringify(createPackedTsrxConsumerConfig({ nodeTypes: false }), null, 2)}\n`,
+		`${JSON.stringify(
+			createPackedTsrxConsumerConfig({
+				consumerSourceFiles: ['src/published-browser-source-imports.ts'],
+				nodeTypes: false,
+				sourcePackageNames: [...browserSourceConsumerSpecifiers.keys()],
+			}),
+			null,
+			2,
+		)}\n`,
 	);
 	writeFileSync(
 		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
@@ -1126,7 +1194,7 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'PublishedSourceConsumer.tsrx'),
-		renderPackedTsrxConsumerSource(),
+		renderPackedTsrxConsumerSource({ includeRecharts: false }),
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'published-types.ts'),
@@ -1135,6 +1203,10 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 	writeFileSync(
 		path.join(sourceDirectory, 'published-source-imports.ts'),
 		renderPackedTsrxSourceImports([...sourceConsumerSpecifiers.values()].flat()),
+	);
+	writeFileSync(
+		path.join(sourceDirectory, 'published-browser-source-imports.ts'),
+		renderPackedTsrxSourceImports([...browserSourceConsumerSpecifiers.values()].flat()),
 	);
 
 	execFileSync(
