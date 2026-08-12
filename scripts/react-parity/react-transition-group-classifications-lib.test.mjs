@@ -25,6 +25,7 @@ async function fixture() {
 	await mkdir(join(root, 'scripts/react-parity'), { recursive: true });
 	for (const file of [
 		'react-transition-group-classifications-lib.test.mjs',
+		'react-transition-group-timer-order.test.mjs',
 		'react-transition-group-types-lib.test.mjs',
 		'react-transition-group-upstream-lib.test.mjs',
 	]) {

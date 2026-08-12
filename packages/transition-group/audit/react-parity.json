@@ -96,7 +96,12 @@
         {
           "path": "packages/transition-group/tests/upstream-testing-library.cjs",
           "role": "support",
-          "sha256": "4e1d1dff6b8b0734d6e8553a848e7a68605f298261adac78533b4e97413e381b"
+          "sha256": "a9eb42194e51a92da00c14cd6e63c557d3c5e78811c7fe9385424b27f602d27f"
+        },
+        {
+          "path": "packages/transition-group/tests/upstream-timer-order.cjs",
+          "role": "support",
+          "sha256": "4d990ba97cb9b78766053966d3ef055569fbd6f6df6ceb4721e637a22979613e"
         },
         {
           "path": "packages/transition-group/tests/upstream-jest.setup.cjs",
@@ -127,6 +132,11 @@
           "path": "scripts/react-parity/react-transition-group-upstream-lib.test.mjs",
           "role": "support",
           "sha256": "ff5ac86500475b922f1450e5cafcb6f80aa99a8bfd46b0ddace64fa343c702ec"
+        },
+        {
+          "path": "scripts/react-parity/react-transition-group-timer-order.test.mjs",
+          "role": "support",
+          "sha256": "10ed0b68a0344a58ea00ae80d1af1af267635965a4ea8bec9d87236448ab8ee8"
         },
         {
           "path": "scripts/react-parity/jest-full-runner.mjs",
