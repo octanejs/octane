@@ -1,5 +1,26 @@
 # @octanejs/floating-ui
 
+## 0.1.35
+
+### Patch Changes
+
+- 9c397a2: Publish executable CommonJS conditions for Octane core, Floating UI, Base UI, and Radix while preserving their existing ESM and source-first entry points.
+- Updated dependencies [972fdd3]
+- Updated dependencies [4a792e3]
+- Updated dependencies [581b8bd]
+- Updated dependencies [24aa236]
+- Updated dependencies [9c397a2]
+- Updated dependencies [24aa236]
+- Updated dependencies [5377ef3]
+- Updated dependencies [6b65644]
+- Updated dependencies [f12a9a9]
+- Updated dependencies [972fdd3]
+- Updated dependencies [1039b7d]
+- Updated dependencies [ffadd39]
+- Updated dependencies [a03ff0f]
+- Updated dependencies [4c1ecd1]
+  - octane@0.1.36
+
 ## 0.1.34
 
 ### Patch Changes
