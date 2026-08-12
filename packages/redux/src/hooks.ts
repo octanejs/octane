@@ -12,6 +12,12 @@ import type { ReactReduxContextValue } from './Context';
 import { useSyncExternalStoreWithSelector } from './utils/useSyncExternalStoreWithSelector';
 import { splitSlot, subSlot } from './internal';
 
+// The consumer's bundler substitutes the whole `process.env.NODE_ENV` expression
+// below, so it must stay written out literally. Declared module-locally — never
+// `declare global`, which would ship in the tarball — so this file type-checks in
+// a browser app that has no `@types/node`.
+declare const process: { env: { NODE_ENV?: string } };
+
 const refEquality = (a: unknown, b: unknown) => a === b;
 
 // useReduxContext — throws without a <Provider> (upstream parity). Context

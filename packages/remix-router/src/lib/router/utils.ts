@@ -11,6 +11,11 @@ import {
 	PROTOCOL_RELATIVE_URL_REGEX,
 } from './url';
 
+// The consumer's bundler substitutes the whole `process.env.NODE_ENV` expression
+// below, so it must stay written out literally. Declared module-locally — never
+// `declare global`, which would ship in the tarball — so this file type-checks in
+// a browser app that has no `@types/node`.
+declare const process: { env: { NODE_ENV?: string } };
 export const ENABLE_DEV_WARNINGS = process.env.NODE_ENV !== 'production';
 
 export type MaybePromise<T> = T | Promise<T>;
