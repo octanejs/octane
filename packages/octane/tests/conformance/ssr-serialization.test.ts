@@ -164,7 +164,7 @@ export function FragEmpty() @{ <div><></></div> }
 function evalMod(rt: any, opts: any): Record<string, any> {
 	let { code } = compile(SRC, FILE, opts);
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/(?:server|internal\/(?:client|server)))?['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

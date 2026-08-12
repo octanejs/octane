@@ -134,6 +134,7 @@ export {
 	ssrInnerHtml,
 	ssrScriptInnerHtml,
 	ssrChildrenSources,
+	ssrSpreadContent,
 	ssrVoidContent,
 	// Controlled form serialization (value/checked attrs, textarea content,
 	// select option-projection scope)

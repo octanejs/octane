@@ -186,6 +186,8 @@ export {
 	attachRef,
 	queueRefAttach,
 	queueRefDetach,
+	replaceRef,
+	queueOwnRefDetach,
 	injectStyle,
 	headBlock,
 	// React Float resources (stylesheet precedence links, style resources, async scripts)

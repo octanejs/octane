@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+	type ObjectHostContainer,
 	type ObjectHostInstance,
+	type UniversalAsyncCommitTransport,
 	type UniversalHostCommand,
 	createContext,
 	createObjectContainer,
@@ -140,6 +142,114 @@ function createTemplateObjectDriver(
 }
 
 describe('universal prepared host SDK', () => {
+	it('rejects invalid prepared tokens without publishing or losing accepted hosts', () => {
+		const container = createObjectContainer();
+		const objectDriver = createObjectDriver();
+		const valid = Symbol('valid prepared token');
+		let nextToken: unknown = valid;
+		const driver = {
+			...objectDriver,
+			prepareBatch(
+				host: Parameters<typeof objectDriver.prepareBatch>[0],
+				batch: Parameters<typeof objectDriver.prepareBatch>[1],
+				context: Parameters<typeof objectDriver.prepareBatch>[2],
+			) {
+				return nextToken === valid
+					? objectDriver.prepareBatch(host, batch, context)
+					: (nextToken as ReturnType<typeof objectDriver.prepareBatch>);
+			},
+		};
+		const root = createUniversalRoot(container, driver);
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'validated',
+			bindings: [['value', 0]],
+		});
+		const Scene = defineUniversalComponent('object', ({ value }: { value: string }) =>
+			universalValue(plan, [value]),
+		);
+
+		root.render(Scene, { value: 'accepted' });
+		const accepted = container.children[0];
+		for (const invalid of [
+			null,
+			{},
+			{ apply() {}, abort: 1 },
+			{ apply() {}, abort() {}, afterAccept: 1 },
+		]) {
+			nextToken = invalid;
+			expect(() => root.render(Scene, { value: 'rejected' })).toThrow(/valid prepared batch token/);
+			expect(container.children).toEqual([accepted]);
+			expect(accepted.props.value).toBe('accepted');
+		}
+
+		nextToken = valid;
+		root.render(Scene, { value: 'recovered' });
+		expect(container.children).toEqual([accepted]);
+		expect(accepted.props.value).toBe('recovered');
+		root.unmount();
+	});
+
+	it('keeps an async root usable after rejecting an invalid unmount token', async () => {
+		const container = createObjectContainer();
+		const objectDriver = createObjectDriver();
+		const driver = {
+			...objectDriver,
+			capabilities: { ...objectDriver.capabilities, localHostCallbacks: false },
+		};
+		let invalid = false;
+		const transport: UniversalAsyncCommitTransport<ObjectHostContainer> = {
+			mode: 'async',
+			prepareBatch(host, batch, identity) {
+				if (invalid) {
+					return {
+						async apply() {},
+						abort() {},
+						afterAccept: 1,
+					} as unknown as ReturnType<
+						UniversalAsyncCommitTransport<ObjectHostContainer>['prepareBatch']
+					>;
+				}
+				const prepared = driver.prepareBatch(host, batch, {
+					invokeLocalCallback() {
+						throw new Error('No local callbacks are registered.');
+					},
+				});
+				return {
+					async apply(acknowledge) {
+						prepared.apply();
+						acknowledge({ ...identity, type: 'ack' });
+					},
+					afterAccept: prepared.afterAccept,
+					abort: prepared.abort,
+				};
+			},
+		};
+		const root = createUniversalRoot(container, driver, { transport });
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'async-validated',
+			bindings: [['value', 0]],
+		});
+		const Scene = defineUniversalComponent('object', ({ value }: { value: string }) =>
+			universalValue(plan, [value]),
+		);
+
+		await root.renderAsync(Scene, { value: 'accepted' });
+		const accepted = container.children[0];
+		invalid = true;
+		await expect(root.unmountAsync()).rejects.toThrow(/valid prepared batch token/);
+		expect(container.children).toEqual([accepted]);
+		expect(accepted.props.value).toBe('accepted');
+
+		invalid = false;
+		await root.renderAsync(Scene, { value: 'recovered' });
+		expect(container.children).toEqual([accepted]);
+		expect(accepted.props.value).toBe('recovered');
+		await root.unmountAsync();
+		expect(container.children).toEqual([]);
+	});
+
 	it('rejects host adapters whose renderer, forwarding plan, or hot-reload contract differs', () => {
 		const plan = universalPlan('object', { kind: 'host', type: 'wrapped', propsSlot: 0 });
 		const component = defineUniversalComponent<Record<string, unknown>>('object', (props) =>

@@ -30,7 +30,7 @@ const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/a
 function serverModule(): Record<string, any> {
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'attr-matrix.tsrx', { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/(?:server|internal\/server)['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

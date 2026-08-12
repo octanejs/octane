@@ -53,7 +53,7 @@ async function compileHmrComponent(
 	const transformed =
 		code
 			.replace(
-				/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])octane\2;/m,
+				/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])octane(?:\/internal\/client)?\2;/gm,
 				(_match: string, imports: string) => {
 					const properties = imports
 						.split(',')

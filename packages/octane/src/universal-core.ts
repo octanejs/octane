@@ -20,6 +20,7 @@ import {
 	__profileTrackComponent,
 } from './profiling.js';
 import { getRendererHostFlusher } from './renderer-bridge.js';
+import { resolveLazyDefaultProps } from './shared-value-helpers.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -701,6 +702,21 @@ export interface UniversalAsyncPreparedHostBatch {
 	afterAccept?(): void;
 	abort(): void;
 }
+
+function isValidPreparedHostBatch(
+	prepared: unknown,
+): prepared is UniversalPreparedHostBatch | UniversalAsyncPreparedHostBatch {
+	return (
+		prepared !== null &&
+		typeof prepared === 'object' &&
+		typeof (prepared as UniversalPreparedHostBatch).apply === 'function' &&
+		typeof (prepared as UniversalPreparedHostBatch).abort === 'function' &&
+		((prepared as UniversalPreparedHostBatch).afterAccept === undefined ||
+			typeof (prepared as UniversalPreparedHostBatch).afterAccept === 'function')
+	);
+}
+
+function noopUniversalCommitTask(): void {}
 
 export interface UniversalHostDriver<Container = unknown, PublicInstance = unknown> {
 	readonly id: string;
@@ -6019,22 +6035,6 @@ export function warmChild(component: any, props: any): void {
 	}
 }
 
-function universalLazyResolvedProps(
-	component: UniversalComponent<any>,
-	props: any,
-): Readonly<Record<string, unknown>> {
-	const defaults = (component as any).defaultProps;
-	if (defaults == null || typeof defaults !== 'object') return props;
-	let resolved = props;
-	for (const key of Object.keys(defaults)) {
-		if (props == null || props[key] === undefined) {
-			if (resolved === props) resolved = props == null ? {} : { ...props };
-			resolved[key] = defaults[key];
-		}
-	}
-	return resolved;
-}
-
 function resolveUniversalLazyModule(module: unknown, renderer: string): UniversalComponent<any> {
 	let component = module;
 	if (module != null) {
@@ -6104,14 +6104,14 @@ export function lazy<C extends UniversalComponent<any>>(
 		let settledStatus = status as 'pending' | 'fulfilled' | 'rejected';
 		if (settledStatus === 'fulfilled') {
 			const component = resolveUniversalLazyModule(result, context.renderer);
-			return component(universalLazyResolvedProps(component, props), context);
+			return component(resolveLazyDefaultProps(component, props), context);
 		}
 		if (settledStatus === 'rejected') throw result;
 		useBatch([thenable!]);
 		settledStatus = status as 'pending' | 'fulfilled' | 'rejected';
 		if (settledStatus === 'fulfilled') {
 			const component = resolveUniversalLazyModule(result, context.renderer);
-			return component(universalLazyResolvedProps(component, props), context);
+			return component(resolveLazyDefaultProps(component, props), context);
 		}
 		if (settledStatus === 'rejected') throw result;
 		throw new UniversalSuspense(thenable!);
@@ -9069,13 +9069,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					: this.transport.prepareBatch(this.container, batch, prepareHost);
 		}
 		const prepared = sync ?? async;
-		if (
-			prepared === null ||
-			typeof prepared !== 'object' ||
-			typeof prepared.apply !== 'function' ||
-			typeof prepared.abort !== 'function' ||
-			(prepared.afterAccept !== undefined && typeof prepared.afterAccept !== 'function')
-		) {
+		if (!isValidPreparedHostBatch(prepared)) {
 			throw new TypeError('A universal host driver must return a valid prepared batch token.');
 		}
 		return new UniversalTransactionImpl(
@@ -9133,14 +9127,48 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				this.treeFeatures = attempt.treeFeatures;
 			},
 			() => prepared.afterAccept?.(),
-			() => {},
-			() => {},
-			() => {},
+			noopUniversalCommitTask,
+			noopUniversalCommitTask,
+			noopUniversalCommitTask,
 			null,
 			() => prepared.abort(),
 			() => this.discardDraftOwners(attempt.owners),
 			attempt.transitionBatches,
 		);
+	}
+
+	/** Publish stable owner records only after their compact host batch is accepted. */
+	private publishAcceptedCompactOwners(
+		attempt: RenderAttempt,
+		component: UniversalComponent<any>,
+		props: any,
+	): void {
+		for (const draft of attempt.owners) {
+			const record = draft.record;
+			record.componentProps = draft.componentProps;
+			record.componentRevision = draft.componentRevision;
+			record.parent = draft.parent?.record ?? null;
+			record.hooks = draft.hooks;
+			record.effectOrder = [...draft.seenEffects];
+			record.children = draft.children.map((child) => child.record);
+			record.contextValues = draft.contextValues;
+			record.isBoundary = draft.isBoundary;
+			record.canHandleSuspense = draft.canHandleSuspense;
+			record.boundaryError = draft.boundaryError;
+			record.hasBoundaryError = draft.hasBoundaryError;
+			record.boundaryThenable = draft.boundaryThenable;
+			record.visibility = draft.visibility;
+			record.mounted = true;
+			record.disposed = false;
+		}
+		this.owner = attempt.owner.record;
+		this.lastComponent = component;
+		this.lastProps = props;
+		this.retryRenderInput = null;
+		this.urgentBoundarySuspension = null;
+		this.bridgeContextReads = attempt.bridgeContextReads;
+		this.nextUniversalId = attempt.nextUniversalId;
+		this.treeFeatures = 0;
 	}
 
 	private tryCreateCompactLeafUpdateTransaction(
@@ -9263,13 +9291,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		const preparedHost = this.driver.prepareBatch(this.container, batch, {
 			invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
 		});
-		if (
-			preparedHost === null ||
-			typeof preparedHost !== 'object' ||
-			typeof preparedHost.apply !== 'function' ||
-			typeof preparedHost.abort !== 'function' ||
-			(preparedHost.afterAccept !== undefined && typeof preparedHost.afterAccept !== 'function')
-		) {
+		if (!isValidPreparedHostBatch(preparedHost)) {
 			throw new TypeError('A universal host driver must return a valid prepared batch token.');
 		}
 		return new UniversalTransactionImpl(
@@ -9284,37 +9306,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 						records[start + index].props = list.props[index]!;
 					}
 				}
-				for (const draft of attempt.owners) {
-					const record = draft.record;
-					record.componentProps = draft.componentProps;
-					record.componentRevision = draft.componentRevision;
-					record.parent = draft.parent?.record ?? null;
-					record.hooks = draft.hooks;
-					record.effectOrder = [...draft.seenEffects];
-					record.children = draft.children.map((child) => child.record);
-					record.contextValues = draft.contextValues;
-					record.isBoundary = draft.isBoundary;
-					record.canHandleSuspense = draft.canHandleSuspense;
-					record.boundaryError = draft.boundaryError;
-					record.hasBoundaryError = draft.hasBoundaryError;
-					record.boundaryThenable = draft.boundaryThenable;
-					record.visibility = draft.visibility;
-					record.mounted = true;
-					record.disposed = false;
-				}
-				this.owner = attempt.owner.record;
-				this.lastComponent = component;
-				this.lastProps = props;
-				this.retryRenderInput = null;
-				this.urgentBoundarySuspension = null;
-				this.bridgeContextReads = attempt.bridgeContextReads;
-				this.nextUniversalId = attempt.nextUniversalId;
-				this.treeFeatures = 0;
+				this.publishAcceptedCompactOwners(attempt, component, props);
 			},
 			() => preparedHost.afterAccept?.(),
-			() => {},
-			() => {},
-			() => {},
+			noopUniversalCommitTask,
+			noopUniversalCommitTask,
+			noopUniversalCommitTask,
 			null,
 			() => preparedHost.abort(),
 			() => this.discardDraftOwners(attempt.owners),
@@ -9398,13 +9395,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		const preparedHost = this.driver.prepareBatch(this.container, batch, {
 			invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
 		});
-		if (
-			preparedHost === null ||
-			typeof preparedHost !== 'object' ||
-			typeof preparedHost.apply !== 'function' ||
-			typeof preparedHost.abort !== 'function' ||
-			(preparedHost.afterAccept !== undefined && typeof preparedHost.afterAccept !== 'function')
-		) {
+		if (!isValidPreparedHostBatch(preparedHost)) {
 			throw new TypeError('A universal host driver must return a valid prepared batch token.');
 		}
 		const transaction = new UniversalTransactionImpl(
@@ -9420,37 +9411,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					record.props = host.props;
 					record.owner = host.owner;
 				}
-				for (const draft of attempt.owners) {
-					const record = draft.record;
-					record.componentProps = draft.componentProps;
-					record.componentRevision = draft.componentRevision;
-					record.parent = draft.parent?.record ?? null;
-					record.hooks = draft.hooks;
-					record.effectOrder = [...draft.seenEffects];
-					record.children = draft.children.map((child) => child.record);
-					record.contextValues = draft.contextValues;
-					record.isBoundary = draft.isBoundary;
-					record.canHandleSuspense = draft.canHandleSuspense;
-					record.boundaryError = draft.boundaryError;
-					record.hasBoundaryError = draft.hasBoundaryError;
-					record.boundaryThenable = draft.boundaryThenable;
-					record.visibility = draft.visibility;
-					record.mounted = true;
-					record.disposed = false;
-				}
-				this.owner = attempt.owner.record;
-				this.lastComponent = component;
-				this.lastProps = props;
-				this.retryRenderInput = null;
-				this.urgentBoundarySuspension = null;
-				this.bridgeContextReads = attempt.bridgeContextReads;
-				this.nextUniversalId = attempt.nextUniversalId;
-				this.treeFeatures = 0;
+				this.publishAcceptedCompactOwners(attempt, component, props);
 			},
 			() => preparedHost.afterAccept?.(),
-			() => {},
-			() => {},
-			() => {},
+			noopUniversalCommitTask,
+			noopUniversalCommitTask,
+			noopUniversalCommitTask,
 			null,
 			() => preparedHost.abort(),
 			() => this.discardDraftOwners(attempt.owners),
@@ -10960,14 +10926,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		let preparedAsyncHost: UniversalAsyncPreparedHostBatch | null = null;
 		if (this.transport?.mode === 'async') {
 			preparedAsyncHost = this.transport.prepareBatch(this.container, batch, identity);
-			if (
-				preparedAsyncHost === null ||
-				typeof preparedAsyncHost !== 'object' ||
-				typeof preparedAsyncHost.apply !== 'function' ||
-				typeof preparedAsyncHost.abort !== 'function' ||
-				(preparedAsyncHost.afterAccept !== undefined &&
-					typeof preparedAsyncHost.afterAccept !== 'function')
-			) {
+			if (!isValidPreparedHostBatch(preparedAsyncHost)) {
 				throw new TypeError(
 					'A universal async transport must return a valid prepared batch token.',
 				);
@@ -10977,13 +10936,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				this.transport === null
 					? prepareHost(batch)
 					: this.transport.prepareBatch(this.container, batch, prepareHost);
-			if (
-				preparedHost === null ||
-				typeof preparedHost !== 'object' ||
-				typeof preparedHost.apply !== 'function' ||
-				typeof preparedHost.abort !== 'function' ||
-				(preparedHost.afterAccept !== undefined && typeof preparedHost.afterAccept !== 'function')
-			) {
+			if (!isValidPreparedHostBatch(preparedHost)) {
 				throw new TypeError('A universal host driver must return a valid prepared batch token.');
 			}
 		}
@@ -11371,13 +11324,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			this.resumeAfterRejectedUnmount();
 			return Promise.reject(error);
 		}
-		if (
-			prepared === null ||
-			typeof prepared !== 'object' ||
-			typeof prepared.apply !== 'function' ||
-			typeof prepared.abort !== 'function' ||
-			(prepared.afterAccept !== undefined && typeof prepared.afterAccept !== 'function')
-		) {
+		if (!isValidPreparedHostBatch(prepared)) {
 			this.resumeAfterRejectedUnmount();
 			return Promise.reject(
 				new TypeError('A universal async transport must return a valid prepared batch token.'),

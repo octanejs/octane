@@ -101,6 +101,51 @@ describe('spread-supplied ref (React 19 parity with ref={})', () => {
 		expect(log).toEqual(['A:attach', 'A:cleanup']);
 	});
 
+	it('detaches the latest committed spread ref after multiple replacements and removals', () => {
+		const log: string[] = [];
+		const trackedRef = (name: string) => (element: Element | null) => {
+			if (element !== null) log.push(`${name}:attach`);
+			return () => log.push(`${name}:cleanup`);
+		};
+		const first = trackedRef('first');
+		const second = trackedRef('second');
+		const third = trackedRef('third');
+		const root = mount(SpreadDirect, { attrs: { id: 'target', ref: first } });
+		const host = root.find('#target');
+
+		root.update(SpreadDirect, { attrs: { id: 'target', ref: second } });
+		root.update(SpreadDirect, { attrs: { id: 'target' } });
+		root.update(SpreadDirect, { attrs: { id: 'target', ref: third } });
+		expect(root.find('#target')).toBe(host);
+		expect(log).toEqual([
+			'first:attach',
+			'first:cleanup',
+			'second:attach',
+			'second:cleanup',
+			'third:attach',
+		]);
+
+		root.unmount();
+		expect(log.at(-1)).toBe('third:cleanup');
+	});
+
+	it('does not attach or detach inherited or non-enumerable spread refs', () => {
+		const calls: Array<Element | null> = [];
+		const observe = (element: Element | null) => calls.push(element);
+		const inherited: Record<string, unknown> = Object.create({ ref: observe });
+		inherited.id = 'target';
+		const hidden: Record<string, unknown> = { id: 'target' };
+		Object.defineProperty(hidden, 'ref', { value: observe, enumerable: false });
+
+		for (const attrs of [inherited, hidden]) {
+			const root = mount(SpreadDirect, { attrs });
+			expect(root.find('#target')).toBeInstanceOf(HTMLElement);
+			expect(calls).toEqual([]);
+			root.unmount();
+			expect(calls).toEqual([]);
+		}
+	});
+
 	it('preserves one host across changing spread refs, attributes, events, and conditional children', () => {
 		const log: string[] = [];
 		const firstRef = (element: Element | null) => {

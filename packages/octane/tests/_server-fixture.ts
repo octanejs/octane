@@ -42,7 +42,7 @@ export function loadCompiledFixtureSource<T extends CompiledFixtureModule = Comp
 
 	const runtime = mode === 'server' ? ServerRuntime : ClientRuntime;
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/(?:server|internal\/(?:client|server)))?['"];?/g,
 		(_match: string, names: string) => `const {${names.replace(/\s+as\s+/g, ': ')}} = __runtime;`,
 	);
 	code = code.replace(
