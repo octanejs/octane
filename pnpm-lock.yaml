@@ -1163,7 +1163,7 @@ importers:
         version: 0.3.118(prettier@3.9.6)
       '@tsrx/typescript-plugin':
         specifier: catalog:default
-        version: 0.3.118(@tsrx/react@0.2.56(react@19.2.8))(@tsrx/ripple@0.1.57)(@tsrx/solid@0.1.56(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.35(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
+        version: 0.3.118(@tsrx/react@0.2.56(react@19.2.8))(@tsrx/ripple@0.1.57)(@tsrx/solid@0.1.56(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.36(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -5222,6 +5222,9 @@ importers:
       jest-environment-jsdom:
         specifier: 30.4.1
         version: 30.4.1(bufferutil@4.1.0)(supports-color@10.2.2)(utf-8-validate@5.0.10)
+      jest-environment-node:
+        specifier: 30.4.1
+        version: 30.4.1
       jest-fixed-jsdom:
         specifier: 0.0.10
         version: 0.0.10(jest-environment-jsdom@30.4.1(bufferutil@4.1.0)(supports-color@10.2.2)(utf-8-validate@5.0.10))
@@ -24556,8 +24559,8 @@ packages:
   ocache@0.1.5:
     resolution: {integrity: sha512-kNNnkkVQup/QDvmTz8Q84wc2ntiyoVHDxa6eHWKt5qdGAmFRBIxy83rxgCYEjW0x06UJ9E3P6VgM2yY4rOBH4w==}
 
-  octane@0.1.35:
-    resolution: {integrity: sha512-QL2aB8/EqDHvqtqCT8CJ/z6yBgWawZjBARpyhWEuOX+ibFWtvdHnZo9tD3KbI2uUvdINbr9n0KmGTjljW9UnWw==}
+  octane@0.1.36:
+    resolution: {integrity: sha512-egscdNROPtLh0Kd4TijYXr3/rVdjyDVCr7r4/mArAAjAuvqhRVsYcLDGr88MT4JSvZwDtISsOALNZY2crLETjg==}
     engines: {node: '>=22.22.2'}
     peerDependencies:
       react: ^19.0.0
@@ -32850,10 +32853,10 @@ snapshots:
 
   '@jest/environment@29.5.0':
     dependencies:
-      '@jest/fake-timers': 29.5.0
+      '@jest/fake-timers': 29.7.0
       '@jest/types': 29.6.3
       '@types/node': 25.9.5
-      jest-mock: 29.5.0
+      jest-mock: 29.7.0
 
   '@jest/environment@29.7.0':
     dependencies:
@@ -32913,7 +32916,7 @@ snapshots:
       '@sinonjs/fake-timers': 10.3.0
       '@types/node': 25.9.5
       jest-message-util: 29.7.0
-      jest-mock: 29.5.0
+      jest-mock: 29.7.0
       jest-util: 29.7.0
 
   '@jest/fake-timers@29.7.0':
@@ -40903,7 +40906,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/typescript-plugin@0.3.118(@tsrx/react@0.2.56(react@19.2.8))(@tsrx/ripple@0.1.57)(@tsrx/solid@0.1.56(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.35(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
+  '@tsrx/typescript-plugin@0.3.118(@tsrx/react@0.2.56(react@19.2.8))(@tsrx/ripple@0.1.57)(@tsrx/solid@0.1.56(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.36(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.28
       '@volar/typescript': 2.4.28
@@ -40912,7 +40915,7 @@ snapshots:
       '@tsrx/react': 0.2.56(react@19.2.8)
       '@tsrx/ripple': 0.1.57
       '@tsrx/solid': 0.1.56(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15)
-      octane: 0.1.35(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      octane: 0.1.36(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
   '@tsrx/typescript-plugin@0.3.118(@tsrx/react@0.2.56(react@19.2.8))(@tsrx/ripple@0.1.57)(@tsrx/solid@0.1.56(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@packages+octane)(typescript@5.9.3)':
     dependencies:
@@ -51612,7 +51615,7 @@ snapshots:
     dependencies:
       ohash: 2.0.11
 
-  octane@0.1.35(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+  octane@0.1.36(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       '@tsrx/core': 0.1.56
       '@types/react': 19.2.17
