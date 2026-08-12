@@ -8,10 +8,23 @@ import {
 	useDayPicker,
 } from '../../src/index.ts';
 
+/** DayPicker reports local-midnight Dates; UTC rendering shifts the day east of UTC. */
+const localIsoDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+	2,
+	'0',
+)}-${String(date.getDate()).padStart(2, '0')}`;
+
+const localIsoMonth = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+	2,
+	'0',
+)}`;
+
 export function CalendarFixture() @{
 	const [selected, setSelected] = useState<Date | undefined>();
 	<main>
-		<output id="selection">{selected?.toISOString().slice(0, 10) ?? 'none'}</output>
+		<output id="selection">
+			{selected ? localIsoDate(selected) : 'none'}
+		</output>
 		<DayPicker
 			mode="single"
 			month={new Date(2026, 7, 1)}
@@ -35,7 +48,7 @@ export function ControlledNavigationFixture() @{
 		<output id="requested-month">{requestedMonth}</output>
 		<DayPicker
 			month={new Date(2026, 7, 1)}
-			onMonthChange={(month) => setRequestedMonth(month.toISOString().slice(0, 7))}
+			onMonthChange={(month) => setRequestedMonth(localIsoMonth(month))}
 		/>
 	</main>
 }
