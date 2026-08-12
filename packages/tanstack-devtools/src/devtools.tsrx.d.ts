@@ -36,6 +36,6 @@ export interface TanStackDevtoolsOctaneInit {
 	eventBusConfig?: ClientEventBusConfig;
 }
 
-export declare function TanStackDevtools(props: TanStackDevtoolsOctaneInit): unknown;
+export declare const TanStackDevtools: (props: TanStackDevtoolsOctaneInit) => Renderable;
 
 export {};

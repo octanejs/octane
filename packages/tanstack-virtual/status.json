@@ -8,5 +8,5 @@
   "notes": [
     "Smooth scrolling (`behavior: 'smooth'`) and the default ResizeObserver measurement path are untestable in jsdom (no layout); their code is verbatim upstream/virtual-core. Tests drive rects via the public `initialRect`/`observeElementRect`/`measureElement` options, mirroring upstream's own harness."
   ],
-  "verified": "2026-07-12"
+  "verified": "2026-08-02"
 }

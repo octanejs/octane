@@ -68,6 +68,8 @@ afterEach(() => {
 });
 
 describe('Three root configuration', () => {
+	// OCTANE DIVERGENCE[component-props-root-api][adapted:three-root-component-props]
+	// @parity-case adapted:three-root-component-props
 	it('configures and tears down a structurally typed offscreen canvas', async () => {
 		const canvas = { width: 256, height: 144 };
 		const renderer = createRenderer(canvas);
@@ -93,6 +95,8 @@ describe('Three root configuration', () => {
 		expect(renderer.dispose).toHaveBeenCalledOnce();
 	});
 
+	// OCTANE DIVERGENCE[synchronous-root-teardown][adapted:three-synchronous-teardown]
+	// @parity-case adapted:three-synchronous-teardown
 	it('unmounts a registered canvas synchronously and notifies only that removal', async () => {
 		const canvas = document.createElement('canvas');
 		const renderer = createRenderer(canvas);

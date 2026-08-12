@@ -1,0 +1,65 @@
+{
+  "authority": {
+    "package": "react-pdf",
+    "version": "10.4.1",
+    "exports": {
+      ".": "./dist/index.js",
+      "./*": "./*"
+    }
+  },
+  "rootRuntimeExports": [
+    "Document",
+    "Outline",
+    "Page",
+    "PasswordResponses",
+    "Thumbnail",
+    "pdfjs",
+    "useDocumentContext",
+    "useOutlineContext",
+    "usePageContext"
+  ],
+  "rootTypeExports": [
+    "DocumentProps",
+    "LinkService",
+    "OutlineProps",
+    "PageProps",
+    "PasswordResponsesType",
+    "StructTreeNode",
+    "TextContent",
+    "TextItem",
+    "TextMarkedContent",
+    "ThumbnailProps"
+  ],
+  "documentedSubpaths": [
+    {
+      "upstream": "react-pdf/dist/Page/AnnotationLayer.css",
+      "octane": "@octanejs/pdf/dist/Page/AnnotationLayer.css",
+      "classification": "exact-public-support"
+    },
+    {
+      "upstream": "react-pdf/dist/Page/TextLayer.css",
+      "octane": "@octanejs/pdf/dist/Page/TextLayer.css",
+      "classification": "exact-public-support"
+    },
+    {
+      "upstream": "pdfjs-dist/build/pdf.worker.min.mjs",
+      "octane": "pdfjs-dist/build/pdf.worker.min.mjs",
+      "classification": "unchanged-framework-neutral-dependency"
+    }
+  ],
+  "wildcardPolicy": {
+    "classification": "framework-private-evidence-only",
+    "reason": "The permissive ./* export exposes React implementation, declarations, tests, and source artifacts that are not documented component entry points. They remain pinned parity evidence. Root exports and the two documented CSS imports are the Octane compatibility contract; direct imports of React implementation files are not remapped.",
+    "artifactRules": [
+      "LICENSE",
+      "README.md",
+      "package.json",
+      "dist/**/*.d.ts",
+      "dist/**/*.js",
+      "src/**/*.css",
+      "src/**/*.ts",
+      "src/**/*.tsx"
+    ],
+    "exactPublicExceptions": ["dist/Page/AnnotationLayer.css", "dist/Page/TextLayer.css"]
+  }
+}

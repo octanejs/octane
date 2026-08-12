@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "skipLibCheck": false,
+    "noEmit": true,
+    "noErrorTruncation": true,
+    "baseUrl": ".",
+    "paths": {
+      "react-window-under-test": ["../upstream/dist/react-window.d.ts"]
+    }
+  },
+  "include": ["./parity.test-d.ts"]
+}

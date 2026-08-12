@@ -12,8 +12,9 @@
   "ssr": "Supported and tested: fields and form subscriptions render their initial snapshots through octane/server without a DOM.",
   "notes": [
     "Renderer-bearing adapter modules are authored as TSRX and ship checked declaration emits with inline renderer aliases, Octane-prefixed public adapter types, and source-owned recursive contracts.",
-    "The ported React adapter suite has 82 executable behavioral tests with no skipped, todo, or expected-failure cases; upstream compile-time tests cover hook, field, group, and component-composition inference.",
-    "Differential coverage compiles one shared form through this adapter and real @tanstack/react-form@1.33.2, comparing values, validation, array mutations, and reset output after every interaction."
+    "The complete package suite has 87 executable behavioral tests with no skipped, todo, or expected-failure cases; upstream compile-time tests cover hook, field, group, and component-composition inference.",
+    "Differential coverage compiles one shared form through this adapter and real @tanstack/react-form@1.33.2, comparing values, validation, array mutations, and reset output after every interaction.",
+    "The bounded React parity manifest pins the official release tag and commit, classifies every local runtime test, and executes required adapted-upstream and differential lanes. The adapted-types lane is optional package type-contract evidence only. Provenance remains recorded-unverified because pristine repository-suite lanes are still open follow-up work."
   ],
-  "verified": "2026-07-15"
+  "verified": "2026-08-09"
 }

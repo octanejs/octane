@@ -1,23 +1,85 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertPristineOracleEnvironment } from './alien-signals-pristine-runtime.mjs';
+import { verifyAlienSignalsTestClassifications } from './alien-signals-classifications-lib.mjs';
+import { verifyAlienSignalsRuntimeStructure } from './alien-signals-runtime-lib.mjs';
+import { verifyAlienSignalsTypes } from './alien-signals-types-lib.mjs';
+import { verifyPortTestClassifications } from './binding-classifications-lib.mjs';
+import {
+	createRequiredNonVitestManifestShardPlan,
+	runRequiredNonVitestBindingLanes,
+	runRequiredVitestLanes,
+} from './check-lib.mjs';
+import { verifyDreiReactParity } from './drei-parity-lib.mjs';
+import { verifyDreiTypes } from './drei-types-lib.mjs';
+import { verifyEmblaCarouselTestClassifications } from './embla-carousel-classifications-lib.mjs';
+import {
+	isVitestLane,
+	loadManifest,
+	requiredExecutableLanes,
+	verifyLaneEnvironment,
+	verifyManifestFiles,
+} from './harness-lib.mjs';
+import { verifyHookFormTypes } from './hook-form-types-lib.mjs';
+import { verifyHookFormUpstream } from './hook-form-upstream-lib.mjs';
+import { verifyIntersectionObserverTestClassifications } from './intersection-observer-classifications-lib.mjs';
+import { verifyIntersectionObserverTypes } from './intersection-observer-types-lib.mjs';
+import { verifyIntersectionObserverUpstream } from './intersection-observer-upstream-lib.mjs';
 import {
 	renderCoverageReport,
 	validateInventory,
 	validateLedger,
 	validateUpstreams,
 } from './inventory-lib.mjs';
-import { verifyHookFormUpstream } from './hook-form-upstream-lib.mjs';
-import { verifyHookFormTypes } from './hook-form-types-lib.mjs';
-import { verifyPortTestClassifications } from './binding-classifications-lib.mjs';
 import { verifyLivestoreTestClassifications } from './livestore-classifications-lib.mjs';
 import { verifyLivestoreTypes } from './livestore-types-lib.mjs';
+import { verifyMotionTypes } from './motion-types-lib.mjs';
+import { verifyNuqsTypes } from './nuqs-types-lib.mjs';
+import { verifyPdfTestClassifications } from './pdf-classifications-lib.mjs';
+import { verifyPopperTestClassifications } from './popper-classifications-lib.mjs';
+import { verifyPopperTypes } from './popper-types-lib.mjs';
+import { verifyReactColorfulTestClassifications } from './react-colorful-classifications-lib.mjs';
+import { verifyReactColorfulTypes } from './react-colorful-types-lib.mjs';
+import { verifyReactColorfulUpstream } from './react-colorful-upstream-lib.mjs';
+import { verifyReactDraggableTestClassifications } from './react-draggable-classifications-lib.mjs';
+import { verifyReactDraggableTypes } from './react-draggable-types-lib.mjs';
+import { verifyReactDropzoneEvidence } from './react-dropzone-evidence-lib.mjs';
+import { verifyReactMarkdownTestClassifications } from './react-markdown-classifications-lib.mjs';
+import { verifyReactMarkdownTypes } from './react-markdown-types-lib.mjs';
+import { verifyReactSpringUpstream } from './react-spring-upstream-lib.mjs';
+import { verifyReactTextareaAutosizeTestClassifications } from './react-textarea-autosize-classifications-lib.mjs';
+import { verifyReactTextareaAutosizeCrosswalk } from './react-textarea-autosize-crosswalk-lib.mjs';
+import { verifyReactTextareaAutosizeTypes } from './react-textarea-autosize-types-lib.mjs';
+import { verifyReactTransitionGroupTestClassifications } from './react-transition-group-classifications-lib.mjs';
+import { verifyReactTransitionGroupTypes } from './react-transition-group-types-lib.mjs';
+import { verifyReactTransitionGroupUpstream } from './react-transition-group-upstream-lib.mjs';
 import { verifySolanaReactTypes } from './solana-react-types-lib.mjs';
-import { loadManifest, verifyLaneEnvironment, verifyManifestFiles } from './harness-lib.mjs';
-import { runRequiredBindingLanes } from './check-lib.mjs';
+import { verifyTanstackDevtoolsTestClassifications } from './tanstack-devtools-classifications-lib.mjs';
+import { verifyTanstackHotkeysTestClassifications } from './tanstack-hotkeys-classifications-lib.mjs';
+import { verifyTanstackPacerTypes } from './tanstack-pacer-types-lib.mjs';
+import { verifyTanstackStoreTypes } from './tanstack-store-types-lib.mjs';
+import { verifyTanstackStoreUpstreamEvidence } from './tanstack-store-upstream-lib.mjs';
+import { verifyTanstackTableTestClassifications } from './tanstack-table-classifications-lib.mjs';
+import { verifyTanstackTableTypes } from './tanstack-table-types-lib.mjs';
+import { verifyTiptapTestClassifications } from './tiptap-classifications-lib.mjs';
+import { verifyTiptapRuntimeCrosswalk } from './tiptap-runtime-lib.mjs';
+import { verifyTiptapTypes } from './tiptap-types-lib.mjs';
+import { verifyVaulTestClassifications } from './vaul-classifications-lib.mjs';
+import { verifyVaulAdaptedRuntimeStructure } from './vaul-runtime-lib.mjs';
+import { verifyVaulUpstream } from './vaul-upstream-lib.mjs';
+import { verifyVisxTestClassifications } from './visx-classifications-lib.mjs';
+import { verifyVisxTypes } from './visx-types-lib.mjs';
+import { verifyZagTestClassifications } from './zag-classifications-lib.mjs';
+import { verifyZagRuntimeCrosswalk } from './zag-runtime-crosswalk.mjs';
+import { verifyZagTypes } from './zag-types-lib.mjs';
+import { parseShard } from './shard-lib.mjs';
+import { loadRequiredVitestLanes } from './vitest-batch-lib.mjs';
+import { verifyZagUpstream } from '../../packages/zag/scripts/verify-upstream.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const AUDIT = path.join(REPO, 'packages/octane/audit');
@@ -25,51 +87,190 @@ const UPSTREAMS_PATH = path.join(AUDIT, 'react-upstreams.json');
 const LEDGER_PATH = path.join(AUDIT, 'react-conformance-ledger.json');
 const REPORT_PATH = path.join(REPO, 'docs/react-parity-coverage.md');
 const args = process.argv.slice(2);
-if (args.length > 1 || (args.length === 1 && args[0] !== '--validate-only')) {
-	throw new Error('Usage: check.mjs [--validate-only]');
+let validateOnly = false;
+let shardValue = '1/1';
+for (let index = 0; index < args.length; index++) {
+	const argument = args[index];
+	if (argument === '--validate-only') {
+		validateOnly = true;
+	} else if (argument === '--shard') {
+		shardValue = args[++index];
+	} else if (argument.startsWith('--shard=')) {
+		shardValue = argument.slice('--shard='.length);
+	} else {
+		throw new Error('Usage: check.mjs [--validate-only] [--shard <index>/<total>]');
+	}
 }
-const validateOnly = args[0] === '--validate-only';
+const parityShard = parseShard(shardValue);
+if (validateOnly && parityShard.value !== '1/1') {
+	throw new Error('--validate-only cannot be combined with --shard');
+}
 const BINDING_MANIFESTS = readdirSync(path.join(REPO, 'packages'), { withFileTypes: true })
 	.filter((entry) => entry.isDirectory())
 	.map((entry) => `packages/${entry.name}/audit/react-parity.json`)
 	.filter((manifest) => existsSync(path.join(REPO, manifest)))
 	.sort();
 const HARNESS_PATH = path.join(REPO, 'scripts/react-parity/harness.mjs');
+// Vitest owns the runner until its parity-wide batch exits. The remaining
+// runners are internally single-process: TypeScript/Node use one process, Jest
+// is runInBand, and Playwright uses one worker. One manifest per available CPU
+// therefore uses the released runner capacity without competing schedulers.
+const NON_VITEST_MANIFEST_CONCURRENCY = availableParallelism();
+const NON_VITEST_BINDING_MANIFESTS = [];
+const SPECIALIZED_CLASSIFICATION_BINDINGS = new Set([
+	'alien-signals',
+	'colorful',
+	'draggable',
+	'dropzone',
+	'drei',
+	'embla-carousel',
+	'intersection-observer',
+	'livestore',
+	'markdown',
+	'pdf',
+	'popper',
+	'transition-group',
+	'tanstack-devtools',
+	'tanstack-hotkeys',
+	'tanstack-table',
+	'textarea-autosize',
+	'tiptap',
+	'vaul',
+	'visx',
+	'zag',
+]);
 const errors = [];
-try {
-	verifyHookFormUpstream(REPO);
-} catch (error) {
-	errors.push(`react-hook-form upstream evidence is invalid: ${error.message}`);
+
+async function capture(label, check) {
+	try {
+		await check();
+	} catch (error) {
+		errors.push(`${label} is invalid: ${error.message}`);
+	}
 }
-try {
-	verifyHookFormTypes(REPO);
-} catch (error) {
-	errors.push(`react-hook-form type evidence is invalid: ${error.message}`);
+
+await capture('react-hook-form upstream evidence', () => verifyHookFormUpstream(REPO));
+await capture('react-hook-form type evidence', () => verifyHookFormTypes(REPO));
+await capture('react-intersection-observer upstream evidence', () =>
+	verifyIntersectionObserverUpstream(REPO),
+);
+await capture('intersection-observer type evidence', () => verifyIntersectionObserverTypes(REPO));
+await capture('intersection-observer test classifications', () =>
+	verifyIntersectionObserverTestClassifications(REPO),
+);
+await capture('react-dropzone evidence', () => verifyReactDropzoneEvidence(REPO));
+await capture('livestore type evidence', () => verifyLivestoreTypes(REPO));
+await capture('livestore test classifications', () => verifyLivestoreTestClassifications(REPO));
+await capture('alien-signals type evidence', () => verifyAlienSignalsTypes(REPO));
+await capture('alien-signals runtime structure evidence', () =>
+	verifyAlienSignalsRuntimeStructure(REPO),
+);
+await capture('alien-signals pristine oracle environment', () =>
+	assertPristineOracleEnvironment({
+		environmentPath: path.join(
+			REPO,
+			'packages/alien-signals/audit/pristine-oracle-environment.json',
+		),
+		fromPath: path.join(REPO, 'packages/alien-signals'),
+	}),
+);
+await capture('alien-signals test classifications', () =>
+	verifyAlienSignalsTestClassifications(REPO),
+);
+await capture('@octanejs/tanstack-store type evidence', () => verifyTanstackStoreTypes(REPO));
+await capture('@octanejs/tanstack-store upstream evidence', () =>
+	verifyTanstackStoreUpstreamEvidence(REPO),
+);
+await capture('react-markdown type evidence', () => verifyReactMarkdownTypes(REPO));
+await capture('react-markdown test classifications', () =>
+	verifyReactMarkdownTestClassifications(REPO),
+);
+await capture('@octanejs/solana-react type evidence', () => verifySolanaReactTypes(REPO));
+await capture('react-spring upstream evidence', () => verifyReactSpringUpstream(REPO));
+await capture('@octanejs/tanstack-table type evidence', () => verifyTanstackTableTypes(REPO));
+await capture('tanstack-table test classifications', () =>
+	verifyTanstackTableTestClassifications(REPO),
+);
+await capture('@octanejs/tiptap type evidence', () => verifyTiptapTypes(REPO));
+await capture('@octanejs/tiptap runtime crosswalk', () => verifyTiptapRuntimeCrosswalk(REPO));
+await capture('@octanejs/tiptap test classifications', () => verifyTiptapTestClassifications(REPO));
+await capture('@octanejs/motion type evidence', () => verifyMotionTypes(REPO));
+await capture('@octanejs/nuqs type evidence', () => verifyNuqsTypes(REPO));
+await capture('@octanejs/tanstack-pacer type evidence', () => verifyTanstackPacerTypes(REPO));
+await capture('@octanejs/colorful upstream evidence', () => verifyReactColorfulUpstream(REPO));
+await capture('@octanejs/colorful type evidence', () => verifyReactColorfulTypes(REPO));
+await capture('@octanejs/colorful test classifications', () =>
+	verifyReactColorfulTestClassifications(REPO),
+);
+await capture('zag upstream evidence', () => verifyZagUpstream(path.join(REPO, 'packages/zag')));
+await capture('zag type evidence', () => verifyZagTypes(REPO));
+await capture('zag test classifications', () => verifyZagTestClassifications(REPO));
+await capture('zag runtime inventory crosswalk', () => verifyZagRuntimeCrosswalk(REPO));
+await capture('embla-carousel test classifications', () =>
+	verifyEmblaCarouselTestClassifications(REPO),
+);
+await capture('embla-carousel type parity', async () => {
+	const { verifyCommittedTypeParity } = await import(
+		path.join(REPO, 'packages/embla-carousel/audit/type-parity.mjs')
+	);
+	await verifyCommittedTypeParity();
+});
+if (!validateOnly) {
+	await capture('embla-carousel parity negative controls', () =>
+		execFileSync(
+			process.execPath,
+			[
+				'node_modules/vitest/vitest.mjs',
+				'run',
+				'--project',
+				'embla-carousel-audit',
+				'packages/embla-carousel/tests/audit/parity-negative-controls.test.ts',
+			],
+			{ cwd: REPO, stdio: 'inherit' },
+		),
+	);
 }
-try {
-	verifyPortTestClassifications(REPO);
-} catch (error) {
-	errors.push(`react-hook-form test classifications are invalid: ${error.message}`);
-}
-try {
-	verifyLivestoreTypes(REPO);
-} catch (error) {
-	errors.push(`livestore type evidence is invalid: ${error.message}`);
-}
-try {
-	verifySolanaReactTypes(REPO);
-} catch (error) {
-	errors.push(`@octanejs/solana-react type evidence is invalid: ${error.message}`);
-}
-try {
-	verifyLivestoreTestClassifications(REPO);
-} catch (error) {
-	errors.push(`livestore test classifications are invalid: ${error.message}`);
-}
+await capture('react-transition-group upstream evidence', () =>
+	verifyReactTransitionGroupUpstream(REPO),
+);
+await capture('react-transition-group type evidence', () => verifyReactTransitionGroupTypes(REPO));
+await capture('react-transition-group test classifications', () =>
+	verifyReactTransitionGroupTestClassifications(REPO),
+);
+await capture('vaul upstream evidence', () => verifyVaulUpstream(REPO));
+await capture('vaul test classifications', () => verifyVaulTestClassifications(REPO));
+await capture('vaul adapted runtime structural evidence', () =>
+	verifyVaulAdaptedRuntimeStructure(REPO),
+);
+await capture('drei React-parity evidence', () => verifyDreiReactParity(REPO));
+await capture('drei type evidence', () => verifyDreiTypes(REPO));
+await capture('tanstack-hotkeys test classifications', () =>
+	verifyTanstackHotkeysTestClassifications(REPO),
+);
+await capture('tanstack-devtools test classifications', () =>
+	verifyTanstackDevtoolsTestClassifications(REPO),
+);
+await capture('@octanejs/visx type evidence', () => verifyVisxTypes(REPO));
+await capture('visx test classifications', () => verifyVisxTestClassifications(REPO));
+await capture('react-textarea-autosize test classifications', () =>
+	verifyReactTextareaAutosizeTestClassifications(REPO),
+);
+await capture('react-textarea-autosize upstream crosswalk', () =>
+	verifyReactTextareaAutosizeCrosswalk(REPO),
+);
+await capture('react-textarea-autosize type evidence', () =>
+	verifyReactTextareaAutosizeTypes(REPO),
+);
+await capture('react-draggable type evidence', () => verifyReactDraggableTypes(REPO));
+await capture('react-draggable test classifications', () =>
+	verifyReactDraggableTestClassifications(REPO),
+);
+await capture('@octanejs/popper type evidence', () => verifyPopperTypes(REPO));
+await capture('@octanejs/popper test classifications', () => verifyPopperTestClassifications(REPO));
+await capture('pdf test classifications', () => verifyPdfTestClassifications(REPO));
+
 // The home marketing surface was split from a single Home.tsrx into per-section
-// .tsrx files, and its benchmark/marketing copy also moved into shared components
-// (BenchmarkExplorer, BenchBars, …). Scan both trees so a misleading claim can't
-// slip in via a new section or a shared home component.
+// .tsrx files, and its benchmark/marketing copy also moved into shared components.
 function listTsrxFiles(relativeDir) {
 	const absoluteDir = path.join(REPO, relativeDir);
 	if (!existsSync(absoluteDir)) return [];
@@ -139,19 +340,60 @@ for (const relativeFile of CLAIM_FILES) {
 			errors.push(`${relativeFile} contains a misleading React-port count claim (${pattern}).`);
 	}
 }
+
+const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
 for (const relativeFile of BINDING_MANIFESTS) {
 	try {
 		const manifest = await loadManifest(path.join(REPO, relativeFile));
+		if (requiredExecutableLanes(manifest).some((lane) => !isVitestLane(lane))) {
+			NON_VITEST_BINDING_MANIFESTS.push({ relativeFile, manifest });
+		}
+		const binding = relativeFile.split('/')[1];
+		if (
+			!SPECIALIZED_CLASSIFICATION_BINDINGS.has(binding) &&
+			existsSync(path.join(REPO, `packages/${binding}/audit/test-classifications.json`))
+		) {
+			verifyPortTestClassifications(REPO, binding);
+		}
 		await verifyManifestFiles(manifest, REPO);
-		const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
 		for (const lane of manifest.lanes) {
 			await verifyLaneEnvironment(manifest, lane, REPO, pnpmVersion);
 		}
-		if (!validateOnly) {
-			runRequiredBindingLanes({ relativeFile, harnessPath: HARNESS_PATH, repo: REPO });
-		}
 	} catch (error) {
 		errors.push(`${relativeFile} is invalid: ${error.message}`);
+	}
+}
+
+if (!validateOnly && errors.length === 0) {
+	const vitestLanes = loadRequiredVitestLanes(REPO);
+	console.log(
+		`planned native Vitest file shard ${parityShard.value} across ${vitestLanes.length} required lanes`,
+	);
+	await capture('required Vitest React parity lanes', () =>
+		runRequiredVitestLanes({
+			lanes: vitestLanes,
+			repo: REPO,
+			shard: parityShard.value,
+			reportPath: process.env.REACT_PARITY_VITEST_REPORT,
+		}),
+	);
+	if (errors.length === 0) {
+		const nonVitestShard = createRequiredNonVitestManifestShardPlan(
+			NON_VITEST_BINDING_MANIFESTS,
+			REPO,
+			parityShard.total,
+		)[parityShard.index - 1];
+		console.log(
+			`planned non-Vitest shard ${parityShard.value}: ${nonVitestShard.items.length} manifests, estimated weight ${nonVitestShard.estimatedWeight}`,
+		);
+		await capture('required non-Vitest React parity lanes', () =>
+			runRequiredNonVitestBindingLanes({
+				relativeFiles: nonVitestShard.items.map((item) => item.relativeFile),
+				harnessPath: HARNESS_PATH,
+				repo: REPO,
+				concurrency: NON_VITEST_MANIFEST_CONCURRENCY,
+			}),
+		);
 	}
 }
 
@@ -161,7 +403,7 @@ if (errors.length) {
 }
 
 console.log(
-	`React parity ${validateOnly ? 'metadata' : 'audit'} is current (${loadedInventories
+	`React parity ${validateOnly ? 'metadata' : parityShard.total === 1 ? 'audit' : `audit shard ${parityShard.value}`} is current (${loadedInventories
 		.map((inventory) => `${inventory.baseline}: ${inventory.summary.concreteCases} cases`)
 		.join(', ')}).`,
 );

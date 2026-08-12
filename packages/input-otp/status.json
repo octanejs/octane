@@ -1,0 +1,12 @@
+{
+  "upstream": { "package": "input-otp", "version": "1.4.2" },
+  "surface": "Complete against input-otp@1.4.2: OTPInput, OTPInputContext, the three exported regexp patterns, public props and slot types, controlled and uncontrolled values, one-input accessibility and mobile-autofill markup, render/context projection, keyboard selection and deletion, paste transformation, completion callbacks, password-manager displacement, SSR, and hydration.",
+  "divergences": [
+    "Octane's native per-edit `input` event drives the hidden text input internally; the public callback remains the source-compatible `onChange(newValue)`.",
+    "Refs are ordinary Octane ref props rather than React `forwardRef`; consumer ref behavior is unchanged."
+  ],
+  "ssr": "Supported and tested — rendering is deterministic and browser-global-free; hydration adopts the server input and cleanup removes owned listeners, observers, timers, and styles.",
+  "verified": "2026-08-02",
+  "parityEvidence": "packages/input-otp/audit/react-parity.json",
+  "docs": ["docs/plans/2026-08-02-005-feat-input-otp-binding-plan.md"]
+}

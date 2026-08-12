@@ -1,0 +1,273 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/47ng/nuqs.git",
+    "version": "v2.9.1",
+    "commit": "b72c526f9dd94bf5a105b320fcb5955cbc68a8b3",
+    "sourceRoot": "packages/nuqs/src",
+    "testRoot": "packages/nuqs/src",
+    "license": "MIT",
+    "integrity": "sha256:23b331aa1371c760b349b81a26ca87c505e5991c14e23b6fd0ab8759dc3784c5",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/nuqs/src"],
+      "include": ["\\.ts$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/nuqs/tests"],
+      "include": ["\\.test\\.(?:ts|tsx|tsrx)$"],
+      "exclude": ["packages/nuqs/tests/differential/"]
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+    }
+  },
+  "lanes": [
+    {
+      "id": "nuqs-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "nuqs-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs initial parsing, functional updates, and URL reconciliation against both adapters. Upstream suites are present but not yet vendored; this differential is interim evidence while the manifest stays recorded-unverified.",
+      "files": [
+        {
+          "path": "packages/nuqs/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "d329e069845ec0bf3c10a8fb04d2aba84b15553e31a65f1a492634a0e71bacd0",
+          "cases": [
+            {
+              "id": "differential:nuqs-query-state",
+              "testName": "initial parsing, functional updates, and URL reconciliation are byte-identical",
+              "fullName": "differential: @octanejs/nuqs vs nuqs initial parsing, functional updates, and URL reconciliation are byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/nuqs/tests/differential/fixture-compiler.mjs",
+          "role": "support",
+          "sha256": "fa7e006bc8324b4d8d8a0cef8d319831a9d1aa273ea99db2c878cbcb4938ba9d"
+        },
+        {
+          "path": "packages/nuqs/tests/_fixtures/query.tsrx",
+          "role": "support",
+          "sha256": "f9de71db674b1bc33cff9cc52aefa6261627b5d455509c8a140322b0e36219e0"
+        },
+        {
+          "path": "packages/nuqs/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "9b1c002294a83e6155b2beedcb36265f004b9740624440fcee40d6c9d61f8ac7"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
+        }
+      ]
+    },
+    {
+      "id": "nuqs-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "available": true,
+      "environment": "workspace-node",
+      "project": "nuqs-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Repo-authored public-API typetests compiled with tsc against published nuqs@2.9.1. Upstream type suites remain present but unvendored; structural verification pairs this lane with the adapted typetest.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/nuqs/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/nuqs/audit/pristine-types.json",
+          "role": "test",
+          "sha256": "6e46b5713a746889fd9738c5c2ad35a250d69040fbf8191efaf885f38f219f23",
+          "cases": [
+            {
+              "id": "types:nuqs-pristine-public-api",
+              "testName": "Nuqs pristine public declarations",
+              "fullName": "Nuqs pristine public declarations"
+            }
+          ]
+        },
+        {
+          "path": "packages/nuqs/typetests/pristine/public-api.test-d.ts",
+          "role": "support",
+          "sha256": "b07f6a9e02d8ab3f526bfb12084b3aabc35f5129b67628e2310fe4712c92f684"
+        },
+        {
+          "path": "packages/nuqs/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "ac8f8e2771d0c8f261bcd8776dcd6045d1eb0c70b9452279141aeb26ed012cc8"
+        },
+        {
+          "path": "packages/nuqs/audit/type-parity.json",
+          "role": "support",
+          "sha256": "3514a7776973b1eb1ad4b9a2a160668a9f28d6394d4203fba6f459ec0d09a4ac"
+        }
+      ]
+    },
+    {
+      "id": "nuqs-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "nuqs-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Repo-authored adapted public-API typetests. Structural verification permits only the nuqs → @octanejs/nuqs import transformation against the pristine pair.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/nuqs/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/nuqs/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "e8de08e55ded0a01f5188a844b20f7b9b8510bb474654f1e6889dd3a29700813",
+          "cases": [
+            {
+              "id": "types:nuqs-public-api",
+              "testName": "Nuqs public declarations",
+              "fullName": "Nuqs public declarations"
+            }
+          ]
+        },
+        {
+          "path": "packages/nuqs/typetests/public-api.test-d.ts",
+          "role": "support",
+          "sha256": "00cd196ad1e45a380b872ae791846865214923a66be2cb46a002773018b0848e"
+        },
+        {
+          "path": "packages/nuqs/typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "d999d9d832e80137a5a0b485aba5348581dd6a45d703bfc2bb659c33361cd13c"
+        },
+        {
+          "path": "packages/nuqs/audit/type-parity.json",
+          "role": "support",
+          "sha256": "3514a7776973b1eb1ad4b9a2a160668a9f28d6394d4203fba6f459ec0d09a4ac"
+        }
+      ]
+    }
+  ],
+  "ordinaryEvidence": [
+    {
+      "path": "packages/nuqs/tests/parity/divergences.test.ts",
+      "sha256": "d98c65625978e8c79bd2e2ecf2237521e18627a344b1a3034822c1c77f28ec41",
+      "cases": [
+        {
+          "id": "conformance:nuqs-router-adapters",
+          "testName": "exports only the standalone, custom, and testing adapters",
+          "fullName": "@octanejs/nuqs documented integration divergences exports only the standalone, custom, and testing adapters"
+        },
+        {
+          "id": "conformance:nuqs-transition-type",
+          "testName": "declares TransitionStartFunction without a React type dependency",
+          "fullName": "@octanejs/nuqs documented integration divergences declares TransitionStartFunction without a React type dependency"
+        }
+      ]
+    },
+    {
+      "path": "packages/nuqs/tests/parity/rsc-cache.test.ts",
+      "sha256": "a9a4fc0ae72a0a01c2154d3e6deb396e6688b25fe6c7169f0e536a8e30903acc",
+      "cases": [
+        {
+          "id": "conformance:nuqs-rsc-cache",
+          "testName": "does NOT ship createSearchParamsCache (RSC-only, see status.json)",
+          "fullName": "server entry does NOT ship createSearchParamsCache (RSC-only, see status.json)"
+        }
+      ]
+    },
+    {
+      "path": "packages/nuqs/tests/conformance/reset-queue.test.ts",
+      "sha256": "9b10c6da93cd9c9ac53760cb7412e20fe5c85949737670a0bd3087b6f81c6daa",
+      "cases": [
+        {
+          "id": "conformance:nuqs-testing-reset",
+          "testName": "does not drop a pending debounced write when a re-render happens before it flushes",
+          "fullName": "NuqsTestingAdapter shared-queue reset does not drop a pending debounced write when a re-render happens before it flushes"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "router-adapters-unavailable",
+      "caseIds": ["conformance:nuqs-router-adapters"],
+      "upstreamResult": "Nuqs ships Next, Remix, React Router, and TanStack Router adapters.",
+      "octaneResult": "The Octane binding ships standalone React-style, custom, and testing adapters only.",
+      "rationale": "Router-specific adapters require renderer-specific ports and integration contracts.",
+      "classification": "framework-integration",
+      "consumerImpact": "Applications using a router-specific Nuqs adapter must provide an Octane custom adapter.",
+      "migrationGuidance": "Use @octanejs/nuqs/adapters/react or unstable_createAdapterProvider from the custom adapter.",
+      "owner": "@octanejs/nuqs",
+      "reviewCondition": "Review when the corresponding Octane router integrations are available."
+    },
+    {
+      "id": "rsc-cache-unavailable",
+      "caseIds": ["conformance:nuqs-rsc-cache"],
+      "upstreamResult": "nuqs/server exports createSearchParamsCache backed by React.cache.",
+      "octaneResult": "The server entry omits createSearchParamsCache.",
+      "rationale": "Octane does not implement the React Server Components cache primitive.",
+      "classification": "framework-integration",
+      "consumerImpact": "Request-scoped cached search-param access is not available through this helper.",
+      "migrationGuidance": "Use createLoader per request.",
+      "owner": "@octanejs/nuqs",
+      "reviewCondition": "Review if Octane gains an equivalent request-scoped cache primitive."
+    },
+    {
+      "id": "local-transition-start-type",
+      "caseIds": ["conformance:nuqs-transition-type"],
+      "upstreamResult": "Nuqs imports TransitionStartFunction from React's type declarations.",
+      "octaneResult": "The binding declares the compatible function shape locally.",
+      "rationale": "The Octane package intentionally carries no React type dependency.",
+      "classification": "framework-integration",
+      "consumerImpact": "The structural callback shape is preserved without React type identity.",
+      "migrationGuidance": "Use the exported structurally compatible callback type.",
+      "owner": "@octanejs/nuqs",
+      "reviewCondition": "Review if a shared renderer-neutral transition type is introduced."
+    },
+    {
+      "id": "testing-adapter-reset-once",
+      "caseIds": ["conformance:nuqs-testing-reset"],
+      "upstreamResult": "NuqsTestingAdapter resets the shared update queue during every render.",
+      "octaneResult": "The Octane adapter resets the queue once per mount before child hooks consume it.",
+      "rationale": "Repeated render-time resets abort pending debounced writes under Octane's update scheduling.",
+      "classification": "framework-integration",
+      "consumerImpact": "Pending debounced writes survive adapter re-renders.",
+      "migrationGuidance": "No consumer change is required; do not rely on re-renders aborting queued writes.",
+      "owner": "@octanejs/nuqs",
+      "reviewCondition": "Review if queue ownership or adapter scheduling changes."
+    }
+  ]
+}

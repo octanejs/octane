@@ -43,8 +43,7 @@ export function rebuild(
 	return [...builder.build({ items, children: renderItem as any })];
 }
 
-// A component whose STATIC children arrive as a compiled children block — the
-// documented hooks-tier divergence: the builder must reject it descriptively.
+// Probe whether component children arrive as descriptors or an opaque compiled block.
 export function ChildrenBlockProbe(props: { children?: any }) {
 	let message = 'no error';
 	let keys = '';

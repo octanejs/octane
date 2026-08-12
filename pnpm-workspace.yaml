@@ -1,5 +1,6 @@
 packages:
   - packages/*
+  - scripts/react-parity/fixtures/*
   - benchmarks/news
   - benchmarks/news/*
   - benchmarks/js-framework
@@ -90,11 +91,16 @@ allowBuilds:
   bufferutil: false
   keccak: false
   utf-8-validate: false
+  bun: true
 
 # Variables
 esrap_common: &esrap_common ^2.3.0
 
 overrides:
+  # Browser parity tooling and its transitive consumers must share one runner
+  # and Chromium revision. Direct dependencies reference the same catalog.
+  '@playwright/test': ^1.61.1
+  playwright: ^1.61.1
   esrap: ^2.3.0
   # Solid 2.0 SSR alignment: vite-plugin-solid@3.0.0-next.5 pulls an older
   # beta preset transitively. Keep the transform on the beta.20 line required
@@ -448,12 +454,82 @@ catalogs:
     vitest: ^4.1.10
     yjs: ^13.6.31
     zustand: ^5.0.14
+    "@zag-js/core": 1.42.0
+    "@zag-js/react": 1.42.0
+    "@zag-js/store": 1.42.0
+    "@zag-js/types": 1.42.0
+    "@zag-js/utils": 1.42.0
+    alien-signals: 1.0.4
+    react-transition-group: 4.4.5
+    "@date-fns/tz": ^1.4.1
+    date-fns: ^4.1.0
+    react-day-picker: 10.0.1
+    vaul: 1.1.2
+    "@react-three/drei": 10.7.7
+    react-dropzone: 20.0.0
+  zag-react-oracle:
+    "@testing-library/react": 16.3.2
+    "@types/react": 19.2.7
+    "@types/react-dom": 19.2.3
+    jsdom: 29.0.1
+    react: 19.2.7
+    react-dom: 19.2.7
+  tanstack-store-react-oracle:
+    "@tanstack/react-store": 0.11.0
+    "@testing-library/react": 16.3.1
+    "@types/react": 19.2.7
+    "@types/react-dom": 19.2.3
+    react: 19.2.3
+    react-dom: 19.2.3
+    use-sync-external-store: 1.6.0
+  cmdk-react-oracle:
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    react: 19.2.7
+    react-dom: 19.2.7
+  dnd-kit-react-oracle:
+    react: 19.2.7
+    react-dom: 19.2.7
+  tanstack-pacer-react-oracle:
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    react: 19.2.7
+    react-dom: 19.2.7
+  tanstack-devtools-react-oracle:
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    react: 19.2.7
+    react-dom: 19.2.7
+  markdown-react-oracle:
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+  react-textarea-autosize-react-oracle:
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    react: 19.2.7
+    react-dom: 19.2.7
+  react-draggable-react-oracle:
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    react: 19.2.7
+    react-dom: 19.2.7
+  react-colorful-react-oracle:
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    react: 19.2.7
+    react-dom: 19.2.7
+  react-pdf-react-oracle:
+    "@types/react": 19.2.7
+    "@types/react-dom": 19.2.3
+    react: 19.2.3
+    react-dom: 19.2.3
 
 # patchedDependencies: the @tsrx/core@0.1.37/0.1.40 JSX parse patches are
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - octane@0.1.29 || 0.1.31 || 0.1.32
+  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34
+  - react-dropzone@20.0.0
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

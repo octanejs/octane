@@ -111,6 +111,7 @@ const initialItems: readonly PortalItem[] = [
 ];
 
 describe('R3F 9.6.1 portal scene oracle', () => {
+	// @parity-case differential:three-portal
 	it('matches external target placement across mount, update, and unmount', async () => {
 		const ReactScene = await loadReactScene();
 		const octaneTarget = createPortalTarget();

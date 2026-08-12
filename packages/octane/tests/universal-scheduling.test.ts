@@ -17,6 +17,7 @@ import {
 	use,
 	useContext,
 	useDeferredValue,
+	useEffect,
 	useLayoutEffect,
 	useMemo,
 	useReducer,
@@ -86,7 +87,12 @@ function controlledObjectRoot() {
 	};
 }
 
-function controlledTransportObjectRoot() {
+interface RootErrorCallbackOptions {
+	onCaughtError?: (error: unknown) => void;
+	onUncaughtError?: (error: unknown) => void;
+}
+
+function controlledTransportObjectRoot(rootOptions: RootErrorCallbackOptions = {}) {
 	const container = createObjectContainer();
 	const objectDriver = createObjectDriver();
 	const driver = {
@@ -130,6 +136,7 @@ function controlledTransportObjectRoot() {
 		scheduleMicrotask(callback) {
 			scheduled.push(callback);
 		},
+		...rootOptions,
 	});
 	return {
 		container,
@@ -1144,5 +1151,300 @@ describe('universal transition scheduling', () => {
 		await drainMicrotasks();
 		expect(values(container)).toEqual({ pending: false });
 		root.unmount();
+	});
+});
+
+// React 19 parity for universal roots: createUniversalRoot accepts onCaughtError
+// and onUncaughtError, mirroring the DOM runtime's createRoot options. The
+// callbacks replace or accompany reports only — recovery, retry, and committed
+// content stay exactly as without the options.
+describe('universal root error callbacks', () => {
+	function errorCallbackRoot(rootOptions: RootErrorCallbackOptions = {}) {
+		const container = createObjectContainer();
+		const scheduled: Array<() => void> = [];
+		const root = createUniversalRoot(container, createObjectDriver(), {
+			scheduleMicrotask(callback) {
+				scheduled.push(callback);
+			},
+			...rootOptions,
+		});
+		return {
+			container,
+			root,
+			flushNext() {
+				const callback = scheduled.shift();
+				if (callback === undefined) throw new Error('Expected scheduled universal work.');
+				callback();
+			},
+			flushAll() {
+				for (let count = 0; scheduled.length > 0; count++) {
+					if (count === 50) throw new Error('Controlled universal scheduler did not stabilize.');
+					scheduled.shift()!();
+				}
+			},
+		};
+	}
+
+	function failableScene() {
+		const handles = { fail: () => {}, recover: () => {} };
+		const Scene = defineUniversalComponent('object', () => {
+			const [bad, setBad] = useState(false, 'bad');
+			handles.fail = () => setBad(true);
+			handles.recover = () => setBad(false);
+			if (bad) throw new Error('scheduled render failed');
+			return node('content', 'ready');
+		});
+		return { Scene, handles };
+	}
+
+	it('onUncaughtError consumes an unhandled scheduled render error and keeps the root recoverable', () => {
+		const errors: unknown[] = [];
+		const { Scene, handles } = failableScene();
+		const { container, root, flushAll } = errorCallbackRoot({
+			onUncaughtError: (error) => errors.push(error),
+		});
+
+		root.render(Scene, undefined);
+		expect(values(container)).toEqual({ content: 'ready' });
+
+		handles.fail();
+		expect(flushAll).not.toThrow();
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toMatchObject({ message: 'scheduled render failed' });
+		// The failed attempt is discarded exactly as without the option: committed
+		// content survives and the root stays live for later updates.
+		expect(values(container)).toEqual({ content: 'ready' });
+
+		handles.recover();
+		flushAll();
+		expect(errors).toHaveLength(1);
+		expect(values(container)).toEqual({ content: 'ready' });
+		root.unmount();
+	});
+
+	it('an unhandled scheduled render error still rethrows from the scheduled flush by default', () => {
+		const { Scene, handles } = failableScene();
+		const { container, root, flushNext } = errorCallbackRoot();
+
+		root.render(Scene, undefined);
+		handles.fail();
+		expect(() => flushNext()).toThrow('scheduled render failed');
+		expect(values(container)).toEqual({ content: 'ready' });
+		root.unmount();
+	});
+
+	it('a direct render() call still throws an unhandled render error to its caller', () => {
+		const errors: unknown[] = [];
+		const Bad = defineUniversalComponent('object', (): UniversalRenderable => {
+			throw new Error('mount render failed');
+		});
+		const { root } = errorCallbackRoot({
+			onUncaughtError: (error) => errors.push(error),
+		});
+
+		// The thrown attempt is render()/prepare()'s documented result channel, so
+		// a direct caller keeps observing it even with onUncaughtError registered.
+		expect(() => root.render(Bad, undefined)).toThrow('mount render failed');
+		expect(errors).toEqual([]);
+		root.unmount();
+	});
+
+	it('onCaughtError reports a render error a universalTry catch arm claims, once per claim', () => {
+		const caught: unknown[] = [];
+		const uncaught: unknown[] = [];
+		const Boundary = defineUniversalComponent('object', () =>
+			universalTry(
+				(): UniversalRenderable => {
+					throw new Error('boundary render failed');
+				},
+				null,
+				(error) => node('caught', (error as Error).message),
+			),
+		);
+		const { container, root } = errorCallbackRoot({
+			onCaughtError: (error) => caught.push(error),
+			onUncaughtError: (error) => uncaught.push(error),
+		});
+
+		root.render(Boundary, undefined);
+		expect(values(container)).toEqual({ caught: 'boundary render failed' });
+		expect(caught).toHaveLength(1);
+		expect(caught[0]).toMatchObject({ message: 'boundary render failed' });
+		expect(uncaught).toEqual([]);
+
+		// Re-rendering while the claimed error is still active replays the catch
+		// arm without a second report.
+		root.render(Boundary, undefined);
+		expect(values(container)).toEqual({ caught: 'boundary render failed' });
+		expect(caught).toHaveLength(1);
+		root.unmount();
+	});
+
+	it('onCaughtError reports an effect error a universalTry catch arm claims', async () => {
+		const caught: unknown[] = [];
+		const uncaught: unknown[] = [];
+		const Boundary = defineUniversalComponent('object', () =>
+			universalTry(
+				() => {
+					useEffect(
+						() => {
+							throw new Error('effect failed');
+						},
+						[],
+						'failing-effect',
+					);
+					return node('content', 'ready');
+				},
+				null,
+				(error) => node('caught', (error as Error).message),
+			),
+		);
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver(), {
+			onCaughtError: (error) => caught.push(error),
+			onUncaughtError: (error) => uncaught.push(error),
+		});
+
+		root.render(Boundary, undefined);
+		expect(values(container)).toEqual({ content: 'ready' });
+		await drainMicrotasks();
+		expect(values(container)).toEqual({ caught: 'effect failed' });
+		expect(caught).toHaveLength(1);
+		expect(caught[0]).toMatchObject({ message: 'effect failed' });
+		expect(uncaught).toEqual([]);
+		root.unmount();
+	});
+
+	it('onUncaughtError consumes an unrouted effect error from the passive flush', () => {
+		const errors: unknown[] = [];
+		const Scene = defineUniversalComponent('object', () => {
+			useEffect(
+				() => {
+					throw new Error('effect failed');
+				},
+				[],
+				'exploding-effect',
+			);
+			return node('content', 'ready');
+		});
+		const { container, root, flushAll } = errorCallbackRoot({
+			onUncaughtError: (error) => errors.push(error),
+		});
+
+		root.render(Scene, undefined);
+		expect(flushAll).not.toThrow();
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toMatchObject({ message: 'effect failed' });
+		expect(values(container)).toEqual({ content: 'ready' });
+		root.unmount();
+	});
+
+	it('an unrouted effect error still rethrows from the passive flush by default', () => {
+		const Scene = defineUniversalComponent('object', () => {
+			useEffect(
+				() => {
+					throw new Error('effect failed');
+				},
+				[],
+				'exploding-effect',
+			);
+			return node('content', 'ready');
+		});
+		const { container, root, flushNext } = errorCallbackRoot();
+
+		root.render(Scene, undefined);
+		expect(() => flushNext()).toThrow('effect failed');
+		expect(values(container)).toEqual({ content: 'ready' });
+		root.unmount();
+	});
+
+	function failOnResumeScene() {
+		const gate = deferred<string>();
+		const handles = { failOnResume: false };
+		const Scene = defineUniversalComponent('object', () => {
+			const value = use(gate.promise);
+			if (handles.failOnResume) throw new Error('replay render failed');
+			return node('content', value);
+		});
+		return { Scene, gate, handles };
+	}
+
+	it('onUncaughtError consumes a render error thrown by a resumed suspense replay', async () => {
+		const errors: unknown[] = [];
+		const { Scene, gate, handles } = failOnResumeScene();
+		const { container, root, flushAll } = errorCallbackRoot({
+			onUncaughtError: (error) => errors.push(error),
+		});
+
+		expect(root.render(Scene, undefined).status).toBe('suspended');
+		handles.failOnResume = true;
+		gate.resolve('ready');
+		await drainMicrotasks();
+		expect(flushAll).not.toThrow();
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toMatchObject({ message: 'replay render failed' });
+		expect(values(container)).toEqual({});
+		root.unmount();
+	});
+
+	it('a render error thrown by a resumed suspense replay still rethrows by default', async () => {
+		const { Scene, gate, handles } = failOnResumeScene();
+		const { container, root, flushAll } = errorCallbackRoot();
+
+		expect(root.render(Scene, undefined).status).toBe('suspended');
+		handles.failOnResume = true;
+		gate.resolve('ready');
+		await drainMicrotasks();
+		expect(flushAll).toThrow('replay render failed');
+		expect(values(container)).toEqual({});
+		root.unmount();
+	});
+
+	it('onUncaughtError consumes a transported suspense-replay render error instead of failing flushTransport', async () => {
+		const errors: unknown[] = [];
+		const { Scene, gate, handles } = failOnResumeScene();
+		const transported = controlledTransportObjectRoot({
+			onUncaughtError: (error) => errors.push(error),
+		});
+
+		const attempt = await transported.root.renderAsync(Scene, undefined);
+		expect(attempt.status).toBe('suspended');
+		handles.failOnResume = true;
+		gate.resolve('ready');
+		await expect(transported.root.flushTransport()).resolves.toBeUndefined();
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toMatchObject({ message: 'replay render failed' });
+		await transported.root.unmountAsync();
+	});
+
+	it('onUncaughtError consumes a transported scheduled render error instead of failing flushTransport', async () => {
+		const errors: unknown[] = [];
+		const { Scene, handles } = failableScene();
+		const transported = controlledTransportObjectRoot({
+			onUncaughtError: (error) => errors.push(error),
+		});
+
+		await transported.root.renderAsync(Scene, undefined);
+		expect(values(transported.container)).toEqual({ content: 'ready' });
+
+		handles.fail();
+		transported.flushNext();
+		await expect(transported.root.flushTransport()).resolves.toBeUndefined();
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toMatchObject({ message: 'scheduled render failed' });
+		expect(values(transported.container)).toEqual({ content: 'ready' });
+		await transported.root.unmountAsync();
+	});
+
+	it('a transported scheduled render error still rejects flushTransport by default', async () => {
+		const { Scene, handles } = failableScene();
+		const transported = controlledTransportObjectRoot();
+
+		await transported.root.renderAsync(Scene, undefined);
+		handles.fail();
+		transported.flushNext();
+		await expect(transported.root.flushTransport()).rejects.toThrow('scheduled render failed');
+		expect(values(transported.container)).toEqual({ content: 'ready' });
+		await transported.root.unmountAsync();
 	});
 });

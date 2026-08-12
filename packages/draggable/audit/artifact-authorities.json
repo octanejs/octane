@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "consumerAuthority": {
+    "artifact": "npm:react-draggable@4.7.1",
+    "root": "upstream/npm",
+    "scope": [
+      "published runtime",
+      "published declarations",
+      "package metadata",
+      "public exports",
+      "public subpaths"
+    ]
+  },
+  "provenanceAuthority": {
+    "artifact": "git:https://github.com/react-grid-layout/react-draggable.git#v4.7.1",
+    "tagObject": "cec7498ff84e91215987636d3edbb6ca132ee9e5",
+    "commit": "bcbaa8eb285aea49865ca8870c0b7b441c2fe6a4",
+    "root": "upstream/tag",
+    "scope": ["authored source", "unit and type tests", "browser tests", "fixtures", "license"]
+  },
+  "discrepancies": [
+    {
+      "identity": "generated-build-only-in-npm",
+      "npm": "build/cjs/** and build/web/** are published",
+      "tag": "generated build output is absent from the repository archive",
+      "disposition": "npm-authoritative: vendor and hash the published bytes; use tag/lib as source provenance"
+    },
+    {
+      "identity": "source-tests-only-in-tag",
+      "npm": "lib/**, test/**, and typings/** are not published",
+      "tag": "authored sources, 204 unit/type cases, 23 browser cases, and fixtures are present",
+      "disposition": "tag-authoritative: vendor and inventory for parity evidence; exclude from the Octane package tarball"
+    },
+    {
+      "identity": "package-metadata",
+      "npm": "package.json is npm-normalized and includes registry metadata fields",
+      "tag": "package.json contains development scripts and dependencies",
+      "disposition": "npm-authoritative for consumer conditions; tag-authoritative for reconstructing the upstream suites"
+    },
+    {
+      "identity": "license-copy",
+      "npm": "LICENSE is published byte-for-byte",
+      "tag": "LICENSE is present at the pinned commit",
+      "disposition": "identical MIT notice; package root carries the same bytes"
+    }
+  ]
+}

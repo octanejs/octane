@@ -262,6 +262,57 @@ pre.boom {
 	will-change: transform;
 }
 
+.react-spring-track {
+	position: relative;
+	height: 48px;
+	margin: 16px 0;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--muted);
+	overflow: hidden;
+}
+.react-spring-dot {
+	position: absolute;
+	top: 8px;
+	width: 30px;
+	height: 30px;
+	border-radius: 999px;
+	background: var(--primary);
+}
+.react-spring-items {
+	display: flex;
+	gap: 8px;
+	min-height: 38px;
+}
+.react-spring-items > div {
+	padding: 8px 12px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+.react-spring-parallax {
+	position: relative;
+	height: 260px;
+	margin-top: 16px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	overflow: hidden;
+}
+.react-spring-page {
+	display: grid;
+	height: 100%;
+	place-items: center;
+	font-size: 18px;
+	font-weight: 600;
+}
+.react-spring-sticky {
+	width: fit-content;
+	margin: 12px;
+	padding: 6px 10px;
+	border-radius: 999px;
+	background: var(--primary);
+	color: var(--primary-foreground);
+}
+
 /* @octanejs/cmdk ships unstyled — it exposes a DOM contract of `cmdk-*`
  * attributes to style against. Ported here from the playground's old inline
  * <style> block when that was retired, with the original hard-coded palette

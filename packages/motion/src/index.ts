@@ -27,7 +27,12 @@ import {
 	resolveVariant,
 	splitVariant,
 } from './context';
-import { isMotionValue, isTransformKey, applyStyleValue } from './useMotionValue';
+import {
+	isMotionValue,
+	isTransformKey,
+	applyStyleValue,
+	removeTransformFn,
+} from './useMotionValue';
 import { useReducedMotionAtSlot } from './useReducedMotion';
 import {
 	layoutAnimationMode,
@@ -58,6 +63,10 @@ const LAYOUT_GROUP_STATE = Symbol.for('octane-motion:layout-group-state');
 const LAZY_STATE = Symbol.for('octane-motion:lazy-state');
 const LAZY_EFFECT = Symbol.for('octane-motion:lazy-effect');
 
+// Tracks MotionValue / transform shorthand keys last applied to a host so a
+// rebind can clear stale inline styles without wiping them on unmount (exit
+// clones still need the live visual state).
+const motionStyleKeys = new WeakMap<HTMLElement, string[]>();
 const boxOf = (n: HTMLElement): LayoutBox => {
 	const r = n.getBoundingClientRect();
 	return { left: r.left, top: r.top, width: r.width, height: r.height };
@@ -303,6 +312,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		latest.layoutMode = layoutAnimationMode(props.layout);
 
 		// `initial`: apply instantly on mount (before the animate effect runs).
+		// OCTANE DIVERGENCE[motion-initial-only-no-style-materialization][conformance:initial-only-no-style-materialization]
 		useLayoutEffect(
 			() => {
 				if (animationEnabled && resolvedInitial) {
@@ -359,25 +369,64 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 
 		// Motion values + static transform shorthands in `style`. MotionValues are
 		// subscribed (and update the element without a re-render); shorthands apply once.
+		// Re-bind when the style bag's MotionValue identities or shorthand values change
+		// so callers can swap `style={{ x }}` across updates (upstream useMotionValue).
+		const styleMvDeps: any[] = [];
+		if (props.style && typeof props.style === 'object') {
+			for (const key in props.style) {
+				const v = props.style[key];
+				if (isMotionValue(v) || isTransformKey(key)) styleMvDeps.push(key, v);
+			}
+		}
 		useLayoutEffect(
 			() => {
+				// Clear only keys this effect previously managed that are absent from the
+				// new style bag. Patch transform functions in place so animate/layout/drag
+				// values on `style.transform` survive a MotionValue rebind.
+				// Do not clear in cleanup: on unmount the exit effect clones this node
+				// after layout-effect cleanups, and still needs the live transforms.
 				const style = props.style;
+				const prevKeys = motionStyleKeys.get(node);
+				if (prevKeys) {
+					for (const key of prevKeys) {
+						const next = style && typeof style === 'object' ? style[key] : undefined;
+						const stillManaged = next !== undefined && (isMotionValue(next) || isTransformKey(key));
+						if (stillManaged) continue;
+						// Plain static values stay in the style bag for host/domProps — do not blank
+						// them after a MotionValue→static switch (domProps already applied them).
+						if (next !== undefined) continue;
+						if (isTransformKey(key)) removeTransformFn(node, key);
+						else (node.style as any)[key] = '';
+					}
+					motionStyleKeys.delete(node);
+				}
+
 				if (!style || typeof style !== 'object') return;
-				const transformState: Record<string, any> = {};
+				const appliedKeys: string[] = [];
 				const cleanups: Array<() => void> = [];
+				// Shared bag of currently bound transform shorthands so a compound
+				// FLIP patch can keep sibling axes owned by other style MotionValues.
+				const transformState: Record<string, any> = {};
 				for (const key in style) {
 					const v = style[key];
 					if (isMotionValue(v)) {
-						const apply = (val: any) => applyStyleValue(node, key, val, transformState);
+						function apply(val: any) {
+							applyStyleValue(node, key, val, transformState);
+						}
 						apply(v.get());
+						appliedKeys.push(key);
 						cleanups.push(v.on('change', apply));
 					} else if (isTransformKey(key)) {
 						applyStyleValue(node, key, v, transformState);
+						appliedKeys.push(key);
 					}
 				}
-				return () => cleanups.forEach((c) => c());
+				if (appliedKeys.length) motionStyleKeys.set(node, appliedKeys);
+				return function unsubscribeMotionStyles() {
+					for (const cleanup of cleanups) cleanup();
+				};
 			},
-			[],
+			styleMvDeps,
 			MV,
 		);
 
@@ -518,6 +567,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// moved/resized vs the previous commit, apply the inverse transform instantly
 		// then animate it back to identity. (A single-element FLIP; the full projection
 		// tree — nested/shared layout, scale correction — is out of scope.)
+		// OCTANE DIVERGENCE[motion-bounded-layout-flip][conformance:bounded-layout-flip]
 		useLayoutEffect(
 			() => {
 				if (!layoutEnabled || !props.layout) {
@@ -552,6 +602,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 
 		// `layoutId`: shared-element crossfade. On mount, if a same-id element recently
 		// unmounted, FLIP from its recorded box to ours.
+		// OCTANE DIVERGENCE[motion-bounded-layoutId][conformance:bounded-layoutId]
 		useLayoutEffect(
 			() => {
 				if (!layoutEnabled) return;
@@ -580,6 +631,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// Unmount: this cleanup runs while the node is still in the DOM. Record shared
 		// layout state here—not in the keyed claim effect, whose cleanup also runs on
 		// dependency changes—then clone any exiting node outside the block's range.
+		// OCTANE DIVERGENCE[motion-exit-cleanup-before-detach][conformance:exit-cleanup-before-detach]
 		useLayoutEffect(
 			() => () => {
 				const n: HTMLElement | null = latest.node;

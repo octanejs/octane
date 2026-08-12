@@ -56,10 +56,12 @@ try {
 					status: test.status,
 				})),
 			)
+			.filter((test) => test.status === 'passed')
 			.sort(compareTestIdentities);
 		process.stdout.write(
 			JSON.stringify({
 				schemaVersion: 1,
+				root: suiteRoot,
 				tests,
 				snapshots: reportJson.snapshot?.total ?? 0,
 			}),

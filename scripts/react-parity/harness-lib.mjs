@@ -39,6 +39,7 @@ const ROOT_KEYS = new Set([
 	'provenance',
 	'environments',
 	'lanes',
+	'ordinaryEvidence',
 	'divergences',
 	'upstreamSuites',
 	'adaptedRoots',
@@ -47,6 +48,7 @@ const ROOT_KEYS = new Set([
 const PROVENANCE_KEYS = new Set([...PROVENANCE_FIELDS, 'verification']);
 const ENVIRONMENT_KEYS = new Set(ENVIRONMENT_FIELDS);
 const FILE_KEYS = new Set(['path', 'role', 'sha256', 'cases']);
+const ORDINARY_EVIDENCE_FILE_KEYS = new Set(['path', 'sha256', 'cases']);
 const CASE_KEYS = new Set(['id', 'testName', 'fullName']);
 const LANE_KEYS = new Set([
 	'id',
@@ -68,10 +70,18 @@ const EXECUTION_KEYS = new Set([
 	'inventory',
 	'config',
 	'root',
+	'file',
+	'loader',
+	'fileParallelism',
 ]);
 const SUITE_STATES = new Set(['present', 'absent', 'insufficient']);
 const TYPE_EVIDENCE_ORIGINS = new Set(['upstream-suite', 'repo-authored']);
-const FULL_RUNTIME_EXECUTIONS = new Set(['vitest-full', 'jest-full', 'playwright-full']);
+const FULL_RUNTIME_EXECUTIONS = new Set([
+	'vitest-full',
+	'jest-full',
+	'playwright-full',
+	'node-full',
+]);
 const ADAPTED_ROOT_KEYS = new Set(['source', 'tests']);
 const ADAPTED_SCAN_KEYS = new Set(['roots', 'include', 'exclude']);
 const ADAPTED_RUNTIME_SUMMARY_KEYS = new Set([
@@ -90,7 +100,8 @@ const DIVERGENCE_FIELDS = [
 	'owner',
 	'reviewCondition',
 ];
-const DIVERGENCE_KEYS = new Set(['id', 'caseIds', ...DIVERGENCE_FIELDS]);
+const ORDINARY_EVIDENCE_KEYS = new Set(['id', 'path', 'sha256', 'testName', 'fullName']);
+const DIVERGENCE_KEYS = new Set(['id', 'caseIds', 'ordinaryEvidence', ...DIVERGENCE_FIELDS]);
 
 function fail(message) {
 	throw new Error(`Invalid React parity manifest: ${message}`);
@@ -320,9 +331,13 @@ export function validateManifest(manifest) {
 			for (const key of Object.keys(lane.execution))
 				if (!EXECUTION_KEYS.has(key)) fail(`lane ${lane.id} execution has unknown key "${key}"`);
 			if (
-				!['typescript', 'vitest-full', 'jest-full', 'playwright-full'].includes(lane.execution.kind)
+				!['typescript', 'vitest-full', 'jest-full', 'playwright-full', 'node-full'].includes(
+					lane.execution.kind,
+				)
 			)
 				fail(`lane ${lane.id} execution kind is unsupported`);
+			if (lane.execution.kind !== 'vitest-full' && lane.execution.fileParallelism !== undefined)
+				fail(`lane ${lane.id} fileParallelism is only valid for Vitest full-suite execution`);
 			if (lane.execution.kind === 'typescript') {
 				if (!['tsc', 'tsgo', 'tsrx-tsc'].includes(lane.execution.compiler))
 					fail(`lane ${lane.id} execution compiler is unsupported`);
@@ -350,9 +365,16 @@ export function validateManifest(manifest) {
 					lane.execution.config !== undefined ||
 					lane.execution.root !== undefined
 				)
-					fail(`lane ${lane.id} full-suite execution only accepts an inventory`);
+					fail(
+						`lane ${lane.id} full-suite execution only accepts an inventory and fileParallelism`,
+					);
 				exactPath(lane.execution.inventory, `lane ${lane.id} execution inventory`);
-			} else {
+				if (
+					lane.execution.fileParallelism !== undefined &&
+					typeof lane.execution.fileParallelism !== 'boolean'
+				)
+					fail(`lane ${lane.id} execution fileParallelism must be boolean`);
+			} else if (lane.execution.kind === 'jest-full' || lane.execution.kind === 'playwright-full') {
 				if (
 					lane.execution.compiler !== undefined ||
 					lane.execution.compilerBins !== undefined ||
@@ -363,6 +385,18 @@ export function validateManifest(manifest) {
 					);
 				exactPath(lane.execution.config, `lane ${lane.id} execution config`);
 				exactPath(lane.execution.root, `lane ${lane.id} execution root`);
+				exactPath(lane.execution.inventory, `lane ${lane.id} execution inventory`);
+			} else {
+				if (
+					lane.execution.compiler !== undefined ||
+					lane.execution.compilerBins !== undefined ||
+					lane.execution.project !== undefined ||
+					lane.execution.config !== undefined
+				)
+					fail(`lane ${lane.id} Node execution must not declare a compiler, project, or config`);
+				exactPath(lane.execution.root, `lane ${lane.id} execution root`);
+				exactPath(lane.execution.file, `lane ${lane.id} execution file`);
+				exactPath(lane.execution.loader, `lane ${lane.id} execution loader`);
 				exactPath(lane.execution.inventory, `lane ${lane.id} execution inventory`);
 			}
 		}
@@ -384,7 +418,7 @@ export function validateManifest(manifest) {
 			fail(`lane ${lane.id} non-type lane must not declare evidenceOrigin`);
 		}
 		if (
-			['jest-full', 'playwright-full'].includes(lane.execution?.kind) &&
+			['jest-full', 'playwright-full', 'node-full'].includes(lane.execution?.kind) &&
 			lane.type !== 'pristine-upstream'
 		)
 			fail(
@@ -392,8 +426,8 @@ export function validateManifest(manifest) {
 			);
 		if (lane.type === 'pristine-types' && lane.execution.compiler !== 'tsc')
 			fail(`lane ${lane.id} pristine-types execution must use tsc`);
-		if (lane.type === 'adapted-types' && lane.execution.compiler !== 'tsrx-tsc')
-			fail(`lane ${lane.id} adapted-types execution must use tsrx-tsc`);
+		if (lane.type === 'adapted-types' && !['tsc', 'tsrx-tsc'].includes(lane.execution.compiler))
+			fail(`lane ${lane.id} adapted-types execution must use tsc or tsrx-tsc`);
 		if (!Array.isArray(lane.files) || lane.files.length === 0)
 			fail(`lane ${lane.id} files must be non-empty`);
 		for (const file of lane.files) {
@@ -423,6 +457,27 @@ export function validateManifest(manifest) {
 		}
 		if (laneCaseCount === 0 && !FULL_RUNTIME_EXECUTIONS.has(lane.execution?.kind))
 			fail(`lane ${lane.id} must declare at least one executable case`);
+	}
+	if (manifest.ordinaryEvidence !== undefined) {
+		if (!Array.isArray(manifest.ordinaryEvidence)) fail('ordinaryEvidence must be an array');
+		for (const file of manifest.ordinaryEvidence) {
+			for (const key of Object.keys(file))
+				if (!ORDINARY_EVIDENCE_FILE_KEYS.has(key))
+					fail(`ordinaryEvidence file has unknown key "${key}"`);
+			exactPath(file.path, 'ordinaryEvidence file path');
+			if (!/^[a-f0-9]{64}$/.test(file.sha256)) fail('ordinaryEvidence file sha256 is invalid');
+			if (!Array.isArray(file.cases) || file.cases.length === 0)
+				fail(`ordinaryEvidence ${file.path} cases must be non-empty`);
+			for (const parityCase of file.cases) {
+				for (const key of Object.keys(parityCase))
+					if (!CASE_KEYS.has(key)) fail(`ordinaryEvidence case has unknown key "${key}"`);
+				requiredString(parityCase.id, `ordinaryEvidence ${file.path} case id`);
+				requiredString(parityCase.testName, `ordinaryEvidence case ${parityCase.id} testName`);
+				requiredString(parityCase.fullName, `ordinaryEvidence case ${parityCase.id} fullName`);
+				if (caseIds.has(parityCase.id)) fail(`duplicate case id "${parityCase.id}"`);
+				caseIds.add(parityCase.id);
+			}
+		}
 	}
 	if (manifest.provenance.verification === 'verified') {
 		const requiredFullRuntime = (type, evidenceOrigin) =>
@@ -459,13 +514,17 @@ export function validateManifest(manifest) {
 					'verified provenance with insufficient upstream runtime tests requires full upstream-suite lanes plus repo-authored differential evidence',
 				);
 		} else if (!requiredDifferential) {
+			// Absent upstream adapter suites have nothing to port into a full
+			// adapted-octane inventory. Repo-authored differential evidence is the
+			// runtime contract; optional focused adapted-octane lanes may still
+			// document divergences when they carry same-scenario React observations.
 			fail(
-				'verified provenance with absent upstream runtime tests requires a required differential lane with repo-authored evidence',
+				'verified provenance with absent upstream runtime tests requires differential lanes with repo-authored evidence',
 			);
 		}
 
-		const expectedOrigin =
-			manifest.upstreamSuites.types === 'present' ? 'upstream-suite' : 'repo-authored';
+		const typeSuiteState = manifest.upstreamSuites.types;
+		const expectedOrigin = typeSuiteState === 'present' ? 'upstream-suite' : 'repo-authored';
 		const requiredTypeEvidence = (type) =>
 			manifest.lanes.some(
 				(lane) =>
@@ -474,9 +533,14 @@ export function validateManifest(manifest) {
 					lane.available !== false &&
 					lane.evidenceOrigin === expectedOrigin,
 			);
-		if (!requiredTypeEvidence('pristine-types') || !requiredTypeEvidence('adapted-types'))
+		const hasDeclaredTypeLane = manifest.lanes.some((lane) => lane.type.endsWith('-types'));
+		const requiresTypeEvidence = typeSuiteState !== 'absent' || hasDeclaredTypeLane;
+		if (
+			requiresTypeEvidence &&
+			(!requiredTypeEvidence('pristine-types') || !requiredTypeEvidence('adapted-types'))
+		)
 			fail(
-				`verified provenance with ${manifest.upstreamSuites.types} upstream type tests requires available required pristine-types and adapted-types lanes with ${expectedOrigin} evidence`,
+				`verified provenance with ${typeSuiteState} upstream type tests requires available required pristine-types and adapted-types lanes with ${expectedOrigin} evidence${typeSuiteState === 'absent' ? ' when type lanes are declared' : ''}`,
 			);
 	}
 
@@ -492,11 +556,43 @@ export function validateManifest(manifest) {
 		if (!Array.isArray(divergence.caseIds) || divergence.caseIds.length === 0) {
 			fail(`divergence ${divergence.id} must match at least one case id`);
 		}
+		const ordinaryIds = new Set();
+		if (divergence.ordinaryEvidence !== undefined) {
+			if (!Array.isArray(divergence.ordinaryEvidence) || divergence.ordinaryEvidence.length === 0) {
+				fail(`divergence ${divergence.id} ordinaryEvidence must be a non-empty array`);
+			}
+			for (const evidence of divergence.ordinaryEvidence) {
+				for (const key of Object.keys(evidence))
+					if (!ORDINARY_EVIDENCE_KEYS.has(key))
+						fail(`divergence ${divergence.id} ordinaryEvidence has unknown key "${key}"`);
+				requiredString(evidence.id, `divergence ${divergence.id} ordinaryEvidence.id`);
+				if (!evidence.id.startsWith('ordinary:'))
+					fail(`divergence ${divergence.id} ordinaryEvidence.id must start with "ordinary:"`);
+				if (ordinaryIds.has(evidence.id))
+					fail(`divergence ${divergence.id} duplicate ordinaryEvidence id "${evidence.id}"`);
+				ordinaryIds.add(evidence.id);
+				exactPath(evidence.path, `divergence ${divergence.id} ordinaryEvidence.path`);
+				if (!/^[a-f0-9]{64}$/.test(evidence.sha256))
+					fail(`divergence ${divergence.id} ordinaryEvidence.sha256 is invalid`);
+				requiredString(evidence.testName, `divergence ${divergence.id} ordinaryEvidence.testName`);
+				requiredString(evidence.fullName, `divergence ${divergence.id} ordinaryEvidence.fullName`);
+			}
+		}
 		for (const caseId of divergence.caseIds) {
-			if (!caseIds.has(caseId) && !caseId.startsWith('runtime:'))
+			if (!caseIds.has(caseId) && !caseId.startsWith('runtime:') && !ordinaryIds.has(caseId))
 				fail(`divergence ${divergence.id} references unknown case id "${caseId}"`);
+			if (caseId.startsWith('ordinary:') && !ordinaryIds.has(caseId))
+				fail(
+					`divergence ${divergence.id} ordinary case id "${caseId}" must be declared in ordinaryEvidence`,
+				);
 			if (divergentCases.has(caseId)) fail(`case id "${caseId}" has multiple divergences`);
 			divergentCases.add(caseId);
+		}
+		for (const ordinaryId of ordinaryIds) {
+			if (!divergence.caseIds.includes(ordinaryId))
+				fail(
+					`divergence ${divergence.id} ordinaryEvidence id "${ordinaryId}" must also appear in caseIds`,
+				);
 		}
 		for (const field of DIVERGENCE_FIELDS) {
 			requiredString(divergence[field], `divergence ${divergence.id} ${field}`);
@@ -514,23 +610,33 @@ export async function verifyManifestFiles(manifest, root) {
 	const absoluteRoot = resolve(root);
 	const runtimeCaseIds = new Set();
 	const adaptedRuntimeInventories = [];
+	const fullVitestInventories = [];
 	for (const lane of manifest.lanes) {
+		let fullVitestInventory;
+		if (
+			lane.oracle === 'required' &&
+			lane.available !== false &&
+			lane.execution?.kind === 'vitest-full'
+		) {
+			fullVitestInventory = JSON.parse(
+				await readFile(resolve(absoluteRoot, lane.execution.inventory), 'utf8'),
+			);
+			fullVitestInventories.push({ lane, inventory: fullVitestInventory });
+		}
 		if (
 			lane.oracle === 'required' &&
 			lane.available !== false &&
 			lane.type === 'adapted-octane' &&
 			lane.execution?.kind === 'vitest-full'
 		) {
-			const inventory = JSON.parse(
-				await readFile(resolve(absoluteRoot, lane.execution.inventory), 'utf8'),
-			);
+			const inventory = fullVitestInventory;
 			validateRuntimeInventory(inventory, lane, manifest.adaptedRoots.tests.roots);
 			adaptedRuntimeInventories.push(inventory);
 			for (const test of inventory.tests) runtimeCaseIds.add(test.id);
 		} else if (
 			lane.oracle === 'required' &&
 			lane.available !== false &&
-			['jest-full', 'playwright-full'].includes(lane.execution?.kind)
+			['jest-full', 'playwright-full', 'node-full'].includes(lane.execution?.kind)
 		) {
 			const inventory = JSON.parse(
 				await readFile(resolve(absoluteRoot, lane.execution.inventory), 'utf8'),
@@ -538,44 +644,39 @@ export async function verifyManifestFiles(manifest, root) {
 			validateJestRuntimeInventory(inventory, lane);
 		}
 		for (const file of lane.files) {
-			const absolute = resolve(absoluteRoot, file.path);
-			if (relative(absoluteRoot, absolute).startsWith('..'))
-				fail(`file escapes repository: ${file.path}`);
-			let contents;
-			try {
-				contents = await readFile(absolute);
-			} catch (error) {
-				if (error.code === 'ENOENT') throw new Error(`missing evidence file: ${file.path}`);
-				throw error;
-			}
-			const actual = createHash('sha256').update(contents).digest('hex');
-			if (actual !== file.sha256) {
-				throw new Error(`integrity mismatch for evidence file: ${file.path}`);
-			}
+			const contents = await readEvidenceFile(absoluteRoot, file);
 			if (file.role === 'test' && lane.execution?.kind !== 'typescript') {
-				const source = contents.toString('utf8');
-				for (const parityCase of file.cases) {
-					const marker = `@parity-case ${parityCase.id}`;
-					const escapedId = parityCase.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-					const matches = [
-						...source.matchAll(new RegExp(`^\\s*//\\s*@parity-case\\s+${escapedId}\\s*$`, 'gm')),
-					];
-					if (matches.length !== 1)
-						throw new Error(`${file.path}: ${marker} must appear exactly once`);
-					const markerEnd = matches[0].index + matches[0][0].length;
-					const tail = source.slice(markerEnd).trimStart();
-					const declaration = /^(?:it|test)(?:\.(skip|todo))?\s*\(\s*/.exec(tail);
-					const exactTitle = declaration
-						? sourceStringLiterals(parityCase.testName).some((literal) =>
-								tail.slice(declaration[0].length).startsWith(literal),
-							)
-						: false;
-					if (!declaration || declaration[1] || !exactTitle) {
-						throw new Error(
-							`${file.path}: ${marker} must immediately precede one active test named ${JSON.stringify(parityCase.testName)}`,
-						);
-					}
-				}
+				assertParityCaseBindings(file.path, contents.toString('utf8'), file.cases);
+			}
+		}
+	}
+	for (const file of manifest.ordinaryEvidence ?? []) {
+		const contents = await readEvidenceFile(absoluteRoot, file);
+		assertParityCaseBindings(file.path, contents.toString('utf8'), file.cases);
+	}
+	for (const { lane: fullLane, inventory } of fullVitestInventories) {
+		const fullIdentities = new Set(inventory.tests.map((test) => `${test.file}\0${test.fullName}`));
+		for (const selectedLane of manifest.lanes) {
+			if (
+				selectedLane.id === fullLane.id ||
+				selectedLane.oracle !== 'required' ||
+				selectedLane.available === false ||
+				selectedLane.project !== fullLane.project ||
+				selectedLane.execution?.kind === 'vitest-full'
+			) {
+				continue;
+			}
+			const repeated = selectedLane.files
+				.filter((file) => file.role === 'test')
+				.flatMap((file) =>
+					(file.cases ?? [])
+						.filter((test) => fullIdentities.has(`${file.path}\0${test.fullName}`))
+						.map((test) => test.fullName),
+				);
+			if (repeated.length > 0) {
+				throw new Error(
+					`lane ${selectedLane.id} repeats ${repeated.length} test identities already executed by full-suite lane ${fullLane.id}; attach its semantic case metadata to the full-suite lane instead`,
+				);
 			}
 		}
 	}
@@ -606,6 +707,58 @@ export async function verifyManifestFiles(manifest, root) {
 				);
 		}
 	}
+	const requiredLaneTestPaths = new Set(
+		manifest.lanes
+			.filter((lane) => lane.oracle === 'required' && lane.available !== false)
+			.flatMap((lane) =>
+				lane.files.filter((file) => file.role === 'test').map((file) => file.path),
+			),
+	);
+	const ordinaryCaseIds = new Set();
+	for (const divergence of manifest.divergences) {
+		for (const evidence of divergence.ordinaryEvidence ?? []) {
+			if (requiredLaneTestPaths.has(evidence.path))
+				throw new Error(
+					`divergence ${divergence.id} ordinaryEvidence path "${evidence.path}" must not be required parity-lane test evidence`,
+				);
+			const absolute = resolve(absoluteRoot, evidence.path);
+			if (relative(absoluteRoot, absolute).startsWith('..'))
+				throw new Error(`file escapes repository: ${evidence.path}`);
+			let contents;
+			try {
+				contents = await readFile(absolute);
+			} catch (error) {
+				if (error.code === 'ENOENT') throw new Error(`missing evidence file: ${evidence.path}`);
+				throw error;
+			}
+			const actual = createHash('sha256').update(contents).digest('hex');
+			if (actual !== evidence.sha256) {
+				throw new Error(`integrity mismatch for evidence file: ${evidence.path}`);
+			}
+			const source = contents.toString('utf8');
+			const marker = `@parity-case ${evidence.id}`;
+			const escapedId = evidence.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const matches = [
+				...source.matchAll(new RegExp(`^\\s*//\\s*@parity-case\\s+${escapedId}\\s*$`, 'gm')),
+			];
+			if (matches.length !== 1)
+				throw new Error(`${evidence.path}: ${marker} must appear exactly once`);
+			const markerEnd = matches[0].index + matches[0][0].length;
+			const tail = source.slice(markerEnd).trimStart();
+			const declaration = /^(?:it|test)(?:\.(skip|todo))?\s*\(\s*/.exec(tail);
+			const exactTitle = declaration
+				? sourceStringLiterals(evidence.testName).some((literal) =>
+						tail.slice(declaration[0].length).startsWith(literal),
+					)
+				: false;
+			if (!declaration || declaration[1] || !exactTitle) {
+				throw new Error(
+					`${evidence.path}: ${marker} must immediately precede one active test named ${JSON.stringify(evidence.testName)}`,
+				);
+			}
+			ordinaryCaseIds.add(evidence.id);
+		}
+	}
 	const markerCounts = new Map();
 	const markerFiles = new Set([
 		...(await discoverAdaptedFiles(absoluteRoot, manifest.adaptedRoots.source)),
@@ -621,10 +774,12 @@ export async function verifyManifestFiles(manifest, root) {
 			const entry = manifest.divergences.find((candidate) => candidate.id === match[1]);
 			if (
 				!entry.caseIds.includes(match[2]) ||
-				(!runtimeCaseIds.has(match[2]) && !caseIdsForManifest(manifest).has(match[2]))
+				(!runtimeCaseIds.has(match[2]) &&
+					!caseIdsForManifest(manifest).has(match[2]) &&
+					!ordinaryCaseIds.has(match[2]))
 			)
 				throw new Error(
-					`${path}: divergence marker "${match[1]}" is not bound to required executed case "${match[2]}"`,
+					`${path}: divergence marker "${match[1]}" is not bound to a declared case "${match[2]}"`,
 				);
 			markerCounts.set(match[1], (markerCounts.get(match[1]) ?? 0) + 1);
 		}
@@ -639,11 +794,55 @@ export async function verifyManifestFiles(manifest, root) {
 }
 
 function caseIdsForManifest(manifest) {
-	return new Set(
-		manifest.lanes
-			.filter((lane) => lane.oracle === 'required' && lane.available !== false)
-			.flatMap((lane) => lane.files.flatMap((file) => (file.cases ?? []).map((entry) => entry.id))),
+	const laneCaseIds = manifest.lanes
+		.filter((lane) => lane.oracle === 'required' && lane.available !== false)
+		.flatMap((lane) => lane.files.flatMap((file) => (file.cases ?? []).map((entry) => entry.id)));
+	const ordinaryCaseIds = (manifest.ordinaryEvidence ?? []).flatMap((file) =>
+		file.cases.map((entry) => entry.id),
 	);
+	return new Set([...laneCaseIds, ...ordinaryCaseIds]);
+}
+
+async function readEvidenceFile(absoluteRoot, file) {
+	const absolute = resolve(absoluteRoot, file.path);
+	if (relative(absoluteRoot, absolute).startsWith('..'))
+		fail(`file escapes repository: ${file.path}`);
+	let contents;
+	try {
+		contents = await readFile(absolute);
+	} catch (error) {
+		if (error.code === 'ENOENT') throw new Error(`missing evidence file: ${file.path}`);
+		throw error;
+	}
+	const actual = createHash('sha256').update(contents).digest('hex');
+	if (actual !== file.sha256) {
+		throw new Error(`integrity mismatch for evidence file: ${file.path}`);
+	}
+	return contents;
+}
+
+function assertParityCaseBindings(path, source, cases) {
+	for (const parityCase of cases) {
+		const marker = `@parity-case ${parityCase.id}`;
+		const escapedId = parityCase.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		const matches = [
+			...source.matchAll(new RegExp(`^\\s*//\\s*@parity-case\\s+${escapedId}\\s*$`, 'gm')),
+		];
+		if (matches.length !== 1) throw new Error(`${path}: ${marker} must appear exactly once`);
+		const markerEnd = matches[0].index + matches[0][0].length;
+		const tail = source.slice(markerEnd).trimStart();
+		const declaration = /^(?:it|test)(?:\.(skip|todo))?\s*\(\s*/.exec(tail);
+		const exactTitle = declaration
+			? sourceStringLiterals(parityCase.testName).some((literal) =>
+					tail.slice(declaration[0].length).startsWith(literal),
+				)
+			: false;
+		if (!declaration || declaration[1] || !exactTitle) {
+			throw new Error(
+				`${path}: ${marker} must immediately precede one active test named ${JSON.stringify(parityCase.testName)}`,
+			);
+		}
+	}
 }
 
 function validateRuntimeInventory(inventory, lane, expectedRoots) {
@@ -765,7 +964,9 @@ export async function verifyManifestTestSelections(manifest, root) {
 	for (const lane of manifest.lanes.filter(
 		(candidate) =>
 			candidate.available !== false &&
-			!['typescript', 'jest-full', 'playwright-full'].includes(candidate.execution?.kind),
+			!['typescript', 'jest-full', 'playwright-full', 'node-full'].includes(
+				candidate.execution?.kind,
+			),
 	)) {
 		let collectedTests = testsByProject.get(lane.project);
 		if (!collectedTests) {
@@ -836,6 +1037,9 @@ export function buildLaneArgv(lane, root = process.cwd()) {
 			'run',
 			'--project',
 			lane.project,
+			...(lane.execution.fileParallelism === undefined
+				? []
+				: [lane.execution.fileParallelism ? '--fileParallelism' : '--no-file-parallelism']),
 			...inventory.files,
 			'--reporter=json',
 		];
@@ -848,6 +1052,20 @@ export function buildLaneArgv(lane, root = process.cwd()) {
 			lane.execution.config,
 			'--root',
 			lane.execution.root,
+		];
+	}
+	if (lane.execution?.kind === 'node-full') {
+		return [
+			process.execPath,
+			'scripts/react-parity/node-full-runner.mjs',
+			'--root',
+			lane.execution.root,
+			'--file',
+			lane.execution.file,
+			'--loader',
+			lane.execution.loader,
+			'--inventory',
+			lane.execution.inventory,
 		];
 	}
 	if (lane.execution?.kind === 'playwright-full') {
@@ -889,7 +1107,9 @@ function vitestRunIdentities(lane, result, root) {
 		}
 		return suite.assertionResults.map((test) => ({
 			file: toPortablePath(relative(root, suite.name)),
-			fullName: test.fullName,
+			// Vitest list uses spaces between suite segments while JSON execution
+			// results use ` > `. Normalize both immutable titles and separators.
+			fullName: test.fullName.replaceAll(' > ', ' '),
 			status: test.status,
 		}));
 	});
@@ -929,6 +1149,18 @@ export function verifyLaneRunResult(lane, stdout, root = process.cwd()) {
 			);
 		return true;
 	}
+	if (lane.execution?.kind === 'node-full') {
+		const inventory = JSON.parse(readFileSync(resolve(root, lane.execution.inventory), 'utf8'));
+		if (result?.schemaVersion !== 1 || !Array.isArray(result.tests))
+			throw new Error(`lane ${lane.id} returned an invalid Node full-suite result`);
+		const executed = result.tests.sort(compareTestIdentities);
+		const expected = inventory.tests.sort(compareTestIdentities);
+		if (JSON.stringify(executed) !== JSON.stringify(expected))
+			throw new Error(
+				`lane ${lane.id} did not execute every inventoried Node identity exactly once:\n  ${describeTestIdentityMismatch(expected, executed)}`,
+			);
+		return true;
+	}
 	const expected = lane.files
 		.flatMap((file) =>
 			(file.cases ?? []).map((test) => ({
@@ -952,6 +1184,10 @@ export function verifyLaneRunResult(lane, stdout, root = process.cwd()) {
 
 export function requiredExecutableLanes(manifest) {
 	return manifest.lanes.filter((lane) => lane.oracle === 'required' && lane.available !== false);
+}
+
+export function isVitestLane(lane) {
+	return lane.execution === undefined || lane.execution?.kind === 'vitest-full';
 }
 
 /**

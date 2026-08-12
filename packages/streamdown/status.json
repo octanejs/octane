@@ -3,15 +3,25 @@
     "package": "streamdown",
     "version": "2.5.0"
   },
+  "provenance": {
+    "source": "https://github.com/vercel/streamdown/tree/e5deed330aa4231751a106445d93d62e4716a22f",
+    "license": "Apache-2.0",
+    "commit": "e5deed330aa4231751a106445d93d62e4716a22f",
+    "verification": "recorded-unverified"
+  },
   "surface": "Complete Streamdown 2.5.0 root runtime and public type surface, plus the official code 1.1.1, math 1.0.2, Mermaid 1.0.2, and CJK 1.0.3 plugins exposed through ./code, ./math, ./mermaid, and ./cjk.",
   "divergences": [
     "Components, hooks, contexts, lazy boundaries, portals, element inspection, and the HAST JSX runtime target Octane; callbacks receive native DOM events instead of React synthetic events.",
-    "The four official plugins are consolidated as subpath exports of @octanejs/streamdown instead of separate packages."
+    "The four official plugins are consolidated as subpath exports of @octanejs/streamdown instead of separate packages.",
+    "Animation progress is isolated per streaming block instead of sharing upstream 2.5.0's sibling progress, so new sibling text receives its own duration and delay.",
+    "Code-block background arbitrary-value classes have balanced parentheses instead of the malformed class strings published by upstream 2.5.0.",
+    "Built-in icon size props set SVG width and height; upstream 2.5.0 leaves the size attribute inert and renders the default 16x16 dimensions."
   ],
   "ssr": "Static and streaming Markdown, custom components, code blocks, math markup, and hydration are covered by dedicated server and hydration tests. Browser-only controls and deferred Mermaid rendering remain inert until mounted.",
-  "verified": "2026-07-30",
+  "verified": "2026-08-02",
   "notes": [
     "The HAST adapter delegates to Octane createElement while preserving hast-util-to-jsx-runtime key, component, node, and Fragment semantics.",
-    "Upstream source provenance and the Apache-2.0 license are retained in UPSTREAM.md and LICENSE."
+    "Upstream source provenance and the Apache-2.0 license are retained in UPSTREAM.md and LICENSE.",
+    "Bounded React parity inventories the pinned repository suite, runs eight exact same-fixture differential scenarios under the react-parity job, and keeps native-event plus consolidated-plugin contracts as ordinary package tests. Structured differential divergences cover independent animation timing and controls-surface class/icon corrections."
   ]
 }

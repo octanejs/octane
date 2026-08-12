@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/three/tests/auto-attach.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane-owned framework integration contract outside the React parity lanes."
+    },
+    {
+      "path": "packages/three/tests/browser/bundlers.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks production bundlers, real WebGL, loaders, HMR, events, and context recovery."
+    },
+    {
+      "path": "packages/three/tests/browser/canvas.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks production Canvas SSR, hydration, pending, and error projection."
+    },
+    {
+      "path": "packages/three/tests/browser/xr.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks OffscreenCanvas, WebXR, frame-loop, and context lifecycle in Chromium."
+    },
+    {
+      "path": "packages/three/tests/canvas.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane Canvas shell and nested root boundary."
+    },
+    {
+      "path": "packages/three/tests/catalogue-props.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Checks catalogue, props, ownership, and the corrected pierced-prop reset target.",
+      "divergenceId": "pierced-prop-reset-target"
+    },
+    {
+      "path": "packages/three/tests/config.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Three renderer configuration under Octane."
+    },
+    {
+      "path": "packages/three/tests/differential.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Compares scene lifecycle output with @react-three/fiber@9.6.1."
+    },
+    {
+      "path": "packages/three/tests/dom-region.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Checks the Octane-specific explicit-target DOMRegion primitive.",
+      "divergenceId": "octane-dom-region"
+    },
+    {
+      "path": "packages/three/tests/driver.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the renderer driver and transport contract."
+    },
+    {
+      "path": "packages/three/tests/events-differential.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Compares event and capture behavior with @react-three/fiber@9.6.1."
+    },
+    {
+      "path": "packages/three/tests/events.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Checks Octane Three pointer-event delivery plus hidden-Activity and reconstructed-intersection corrections.",
+      "divergenceIds": ["hidden-activity-raycast", "reconstructed-intersection-rewrite"]
+    },
+    {
+      "path": "packages/three/tests/hmr.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks compatible and reconstructing HMR behavior."
+    },
+    {
+      "path": "packages/three/tests/hooks.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Checks hook/store semantics and named-only graph construction.",
+      "divergenceIds": ["order-based-callable-selector", "build-graph-named-only"]
+    },
+    {
+      "path": "packages/three/tests/lifecycle.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks attachment, refs, moves, recreation, and removal lifecycle."
+    },
+    {
+      "path": "packages/three/tests/loader.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks loader cache, preload, clear, and graph augmentation."
+    },
+    {
+      "path": "packages/three/tests/loop.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks frame-loop and global effect scheduling."
+    },
+    {
+      "path": "packages/three/tests/portal-differential.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Compares external portal target placement with @react-three/fiber@9.6.1."
+    },
+    {
+      "path": "packages/three/tests/portal.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Checks portal ownership, event enclaves, cycles, and root-scoped targets.",
+      "divergenceId": "root-scoped-portal-targets"
+    },
+    {
+      "path": "packages/three/tests/public-api.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Checks the public scheduling API under Octane renderer ownership.",
+      "divergenceId": "octane-renderer-ownership"
+    },
+    {
+      "path": "packages/three/tests/root.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Checks component-plus-props root rendering and synchronous teardown.",
+      "divergenceIds": ["component-props-root-api", "synchronous-root-teardown"]
+    },
+    {
+      "path": "packages/three/tests/suspense-differential.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Compares Suspense retention and identity with @react-three/fiber@9.6.1."
+    },
+    {
+      "path": "packages/three/tests/suspense.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane-owned retained Suspense and Activity behavior."
+    },
+    {
+      "path": "packages/three/tests/testing-events.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks deterministic testing event helpers."
+    },
+    {
+      "path": "packages/three/tests/testing.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the deterministic Three testing harness."
+    },
+    {
+      "path": "packages/three/tests/upstream-crosswalk.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Runs the local checker over the pinned 90-export and 157-test upstream classification crosswalk."
+    },
+    {
+      "path": "packages/three/typetests/loader-api.test.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
+    },
+    {
+      "path": "packages/three/typetests/public-api.test.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
+    },
+    {
+      "path": "packages/three/typetests/renderer-local.test.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
+    },
+    {
+      "path": "packages/three/typetests/subpath-api.test.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
+    }
+  ]
+}

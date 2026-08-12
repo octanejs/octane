@@ -1,8 +1,10 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/switch.tsrx');
+
+await preloadDifferentialFixture(FIXTURE);
 
 // Cross-runtime pin for @switch / @case / @default lowering. The octane-
 // next runtime mounts a switchBlock slot whose case selection mirrors

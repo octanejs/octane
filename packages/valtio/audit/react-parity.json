@@ -1,0 +1,203 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/pmndrs/valtio.git",
+    "version": "valtio@2.3.2",
+    "commit": "15c64d4d7a7a9bd55d750fa6a317b440978a2b25",
+    "sourceRoot": "src",
+    "testRoot": "tests",
+    "license": "MIT",
+    "integrity": "sha256:90ba3507f7fefcf8654c36bcedffa1f7b96d5a9ed7cde14a9df52107eb90c825",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "insufficient"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/valtio/src"],
+      "include": ["\\.ts$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/valtio/tests/upstream"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 3,
+    "uniqueIdentities": 3,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+    }
+  },
+  "lanes": [
+    {
+      "id": "valtio-adapted-full-suite",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "valtio",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Repo-authored adapted suite citing pinned valtio@2.3.2 React hook source for useSnapshot and useProxy. Broader Octane-only binding coverage stays in ordinary shards.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/valtio/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/valtio/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "aeaa79e9a90be03924bf1a36d12cc99923fb135c644bbff2b3043354786b84da"
+        },
+        {
+          "path": "packages/valtio/tests/upstream/use-hooks.test.ts",
+          "role": "support",
+          "sha256": "6764b9a57602e0cb95203aa7cbee80ef6ba22644ad3e269e79623c4b54d0b0c3"
+        }
+      ]
+    },
+    {
+      "id": "valtio-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "valtio-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs exact accessed-snapshot and mutable useProxy scenarios against valtio@2.3.2.",
+      "files": [
+        {
+          "path": "packages/valtio/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "2fbe10f2d0addfb20be18d46b20493780174c6c522e6808a4c9422a531f65f43",
+          "cases": [
+            {
+              "id": "differential:valtio-snapshot",
+              "testName": "renders and updates accessed snapshot paths identically",
+              "fullName": "differential: @octanejs/valtio vs valtio renders and updates accessed snapshot paths identically"
+            },
+            {
+              "id": "differential:valtio-use-proxy",
+              "testName": "reads snapshots and mutates the source proxy identically through useProxy",
+              "fullName": "differential: @octanejs/valtio vs valtio reads snapshots and mutates the source proxy identically through useProxy"
+            }
+          ]
+        },
+        {
+          "path": "packages/valtio/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "f44418aef38ea7f997470c2ddda6964f71b8287f2f9b290d27bb408a28520bc9"
+        },
+        {
+          "path": "packages/valtio/tests/differential/fixture-compiler.ts",
+          "role": "support",
+          "sha256": "35644601b67415e7cd2f1255fee7664442e288cafce47bb894d61172fee45fb4"
+        },
+        {
+          "path": "packages/valtio/tests/_fixtures/store.tsrx",
+          "role": "support",
+          "sha256": "a4ce7f3e535cd5c28698b688fbdf6c967e1649b19f39ef9b10b96fcf196335d2"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
+        }
+      ]
+    },
+    {
+      "id": "valtio-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "valtio-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Repo-authored React declaration probes against pinned valtio@2.3.2 public hooks.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/valtio/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/valtio/audit/pristine-types.json",
+          "role": "test",
+          "sha256": "ac45ae631e7f5607d9fb9a138b0093ee4bee47a8018d45342a1739e6e251674d",
+          "cases": [
+            {
+              "id": "types:valtio-pristine",
+              "testName": "snapshot and mutable proxy inference",
+              "fullName": "snapshot and mutable proxy inference"
+            }
+          ]
+        },
+        {
+          "path": "packages/valtio/typetests/pristine/public-api.test-d.ts",
+          "role": "support",
+          "sha256": "72757925fcf425ce405e0c14b5d1826bc77a35d2b29cb8876cf4ef175988d47a"
+        },
+        {
+          "path": "packages/valtio/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "5233feb2555d83b7b6d99a472d83c1b41c12aa64834e39a034f1bd58892c4f16"
+        }
+      ]
+    },
+    {
+      "id": "valtio-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "valtio-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles readonly snapshot and mutable proxy inference through the Octane public entries.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/valtio/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/valtio/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "6dc621d10ab422b3b75a6b480cd2858a526382fd86a38c35c972644524485a57",
+          "cases": [
+            {
+              "id": "types:valtio-public-api",
+              "testName": "snapshot and mutable proxy inference",
+              "fullName": "snapshot and mutable proxy inference"
+            }
+          ]
+        },
+        {
+          "path": "packages/valtio/typetests/public-api.test-d.ts",
+          "role": "support",
+          "sha256": "442b77ee0d951d0f79790a5db2cc811faa6f8974e68c11d8802502517be05891"
+        },
+        {
+          "path": "packages/valtio/typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "d9433c155d7cbd58d462e12960140ce259f8bf0ef84d45bf748c78703ed0c791"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

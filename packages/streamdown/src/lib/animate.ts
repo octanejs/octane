@@ -1,4 +1,6 @@
 import type { Element, Node, Parent, Root, Text } from 'hast';
+// OCTANE DIVERGENCE[streamdown-independent-animation-timing][differential:streamdown-streaming-append]:
+// Octane tracks animation progress per block; upstream 2.5 shares progress across siblings.
 import type { Pluggable } from 'unified';
 import { SKIP, visitParents } from 'unist-util-visit-parents';
 

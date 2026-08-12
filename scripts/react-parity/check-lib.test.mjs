@@ -1,33 +1,292 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
-import { runRequiredBindingLanes } from './check-lib.mjs';
 
-const options = (execFile) => ({
-	relativeFile: 'packages/example/audit/react-parity.json',
+import {
+	buildHarnessArgv,
+	buildParityVitestArgv,
+	createRequiredNonVitestManifestShardPlan,
+	estimateRequiredNonVitestManifestWeight,
+	runRequiredNonVitestBindingLanes,
+	runRequiredNonVitestBindingManifest,
+	runRequiredVitestLanes,
+} from './check-lib.mjs';
+import ReactParityUnhandledReporter from './vitest-unhandled-reporter.mjs';
+
+const options = (relativeFiles, runManifest, concurrency = 2) => ({
+	relativeFiles,
 	harnessPath: '/repo/scripts/react-parity/harness.mjs',
 	repo: '/repo',
-	execFile,
+	concurrency,
+	runManifest,
 });
 
-test('runs required lanes without conditioning execution on verification status', () => {
-	const calls = [];
-	runRequiredBindingLanes(options((...args) => calls.push(args)));
-	assert.deepEqual(calls[0][1], [
-		'/repo/scripts/react-parity/harness.mjs',
-		'run-required',
-		'--manifest',
-		'packages/example/audit/react-parity.json',
+function deferred() {
+	let resolve;
+	const promise = new Promise((resolvePromise) => (resolve = resolvePromise));
+	return { promise, resolve };
+}
+
+async function waitFor(predicate) {
+	for (let attempt = 0; attempt < 20; attempt++) {
+		if (predicate()) return;
+		await new Promise((resolve) => setImmediate(resolve));
+	}
+	throw new Error('condition was not reached');
+}
+
+test('builds a shell-free required-lane harness command', () => {
+	assert.deepEqual(
+		buildHarnessArgv(
+			'/repo/scripts/react-parity/harness.mjs',
+			'packages/example/audit/react-parity.json',
+		),
+		[
+			'/repo/scripts/react-parity/harness.mjs',
+			'run-required-non-vitest',
+			'--manifest',
+			'packages/example/audit/react-parity.json',
+		],
+	);
+});
+
+test('builds the parity-wide Vitest command', () => {
+	assert.deepEqual(buildParityVitestArgv('vitest.react-parity.config.js'), [
+		'node_modules/vitest/vitest.mjs',
+		'run',
+		'--config',
+		'vitest.react-parity.config.js',
+		'--reporter=json',
+		'--reporter=./scripts/react-parity/vitest-unhandled-reporter.mjs',
+	]);
+	assert.deepEqual(buildParityVitestArgv('vitest.react-parity.config.js', '2/3'), [
+		'node_modules/vitest/vitest.mjs',
+		'run',
+		'--config',
+		'vitest.react-parity.config.js',
+		'--reporter=json',
+		'--reporter=./scripts/react-parity/vitest-unhandled-reporter.mjs',
+		'--shard=2/3',
 	]);
 });
 
-test('propagates a required lane failure to the global check', () => {
-	assert.throws(
-		() =>
-			runRequiredBindingLanes(
-				options(() => {
-					throw new Error('lane failed');
+test('prints runner-level Vitest errors that the JSON reporter omits', () => {
+	const messages = [];
+	const originalError = console.error;
+	console.error = (message) => messages.push(message);
+	try {
+		new ReactParityUnhandledReporter().onTestRunEnd(
+			[],
+			[{ stack: 'Error: worker failed\n    at worker.js:1:1' }],
+		);
+	} finally {
+		console.error = originalError;
+	}
+	assert.deepEqual(messages, [
+		'Vitest reported 1 unhandled error(s):',
+		'Error: worker failed\n    at worker.js:1:1',
+	]);
+});
+
+test('spawns the required non-Vitest harness without a shell and propagates failures', async () => {
+	const calls = [];
+	const spawnProcess = (...args) => {
+		calls.push(args);
+		const child = new EventEmitter();
+		setImmediate(() => child.emit('close', calls.length === 1 ? 0 : 7, null));
+		return child;
+	};
+	const run = () =>
+		runRequiredNonVitestBindingManifest({
+			relativeFile: 'packages/example/audit/react-parity.json',
+			harnessPath: '/repo/scripts/react-parity/harness.mjs',
+			repo: '/repo',
+			spawnProcess,
+		});
+
+	await run();
+	assert.deepEqual(calls[0], [
+		process.execPath,
+		[
+			'/repo/scripts/react-parity/harness.mjs',
+			'run-required-non-vitest',
+			'--manifest',
+			'packages/example/audit/react-parity.json',
+		],
+		{ cwd: '/repo', stdio: 'inherit' },
+	]);
+	await assert.rejects(run, /with exit code 7/);
+});
+
+test('runs one native Vitest file shard and writes its verified report', async (t) => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-vitest-report-'));
+	t.after(() => rm(root, { recursive: true, force: true }));
+	const reportPath = join(root, 'shard-2.json');
+	const calls = [];
+	const spawnProcess = (...args) => {
+		calls.push(args);
+		const child = new EventEmitter();
+		child.stdout = new EventEmitter();
+		setImmediate(() => {
+			child.stdout.emit(
+				'data',
+				JSON.stringify({
+					testResults: [
+						{
+							name: '/repo/packages/example/example.test.ts',
+							assertionResults: [{ fullName: 'suite > works', status: 'passed' }],
+						},
+					],
 				}),
-			),
-		/lane failed/,
+			);
+			child.emit('close', 0, null);
+		});
+		return child;
+	};
+	const lanes = [
+		{
+			id: 'example-runtime',
+			project: 'example',
+			files: [
+				{
+					path: 'packages/example/example.test.ts',
+					role: 'test',
+					cases: [{ fullName: 'suite works' }],
+				},
+			],
+		},
+	];
+
+	await runRequiredVitestLanes({
+		lanes,
+		repo: '/repo',
+		shard: '2/3',
+		reportPath,
+		spawnProcess,
+	});
+	assert.equal(calls.length, 1);
+	assert.equal(calls[0][0], process.execPath);
+	assert.deepEqual(calls[0][1], buildParityVitestArgv('vitest.react-parity.config.js', '2/3'));
+	assert.equal(calls[0][2].cwd, '/repo');
+	assert.deepEqual(calls[0][2].stdio, ['inherit', 'pipe', 'inherit']);
+	assert.equal(calls[0][2].env, process.env);
+	assert.deepEqual(JSON.parse(await readFile(reportPath, 'utf8')).testResults, [
+		{
+			name: '/repo/packages/example/example.test.ts',
+			assertionResults: [{ fullName: 'suite > works', status: 'passed' }],
+		},
+	]);
+});
+
+test('balances complete non-Vitest manifests using their declared runner work', async (t) => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-non-vitest-shards-'));
+	t.after(() => rm(root, { recursive: true, force: true }));
+	await writeFile(
+		join(root, 'browser-inventory.json'),
+		JSON.stringify({ tests: Array.from({ length: 12 }, (_, index) => ({ id: index })) }),
+	);
+	const manifest = (id, lanes) => ({ id, lanes });
+	const requiredLane = (id, execution, files = [{ path: `${id}.json`, role: 'support' }]) => ({
+		id,
+		oracle: 'required',
+		execution,
+		files,
+	});
+	const entries = [
+		{
+			relativeFile: 'browser.json',
+			manifest: manifest('browser', [
+				requiredLane('browser', {
+					kind: 'playwright-full',
+					inventory: 'browser-inventory.json',
+				}),
+			]),
+		},
+		{
+			relativeFile: 'types-a.json',
+			manifest: manifest('types-a', [requiredLane('types-a', { kind: 'typescript' })]),
+		},
+		{
+			relativeFile: 'types-b.json',
+			manifest: manifest('types-b', [requiredLane('types-b', { kind: 'typescript' })]),
+		},
+	];
+	assert.equal(estimateRequiredNonVitestManifestWeight(entries[0].manifest, root), 17);
+	assert.deepEqual(
+		createRequiredNonVitestManifestShardPlan(entries, root, 2).map((shard) =>
+			shard.items.map((item) => item.relativeFile),
+		),
+		[['browser.json'], ['types-a.json', 'types-b.json']],
+	);
+});
+
+test('runs manifests through a bounded work queue', async () => {
+	const relativeFiles = ['a.json', 'b.json', 'c.json', 'd.json'];
+	const gates = new Map(relativeFiles.map((relativeFile) => [relativeFile, deferred()]));
+	const started = [];
+	let active = 0;
+	let maxActive = 0;
+	const running = runRequiredNonVitestBindingLanes(
+		options(relativeFiles, async (relativeFile) => {
+			started.push(relativeFile);
+			active++;
+			maxActive = Math.max(maxActive, active);
+			await gates.get(relativeFile).promise;
+			active--;
+		}),
+	);
+
+	await waitFor(() => started.length === 2);
+	assert.deepEqual(started, ['a.json', 'b.json']);
+	assert.equal(maxActive, 2);
+
+	gates.get('a.json').resolve();
+	await waitFor(() => started.length === 3);
+	assert.deepEqual(started, ['a.json', 'b.json', 'c.json']);
+
+	gates.get('b.json').resolve();
+	await waitFor(() => started.length === 4);
+	assert.deepEqual(started, relativeFiles);
+	assert.equal(maxActive, 2);
+
+	gates.get('c.json').resolve();
+	gates.get('d.json').resolve();
+	await running;
+	assert.equal(active, 0);
+});
+
+test('stops scheduling new manifests after a required lane fails', async () => {
+	const badGate = deferred();
+	const slowGate = deferred();
+	const started = [];
+	const running = runRequiredNonVitestBindingLanes(
+		options(['bad.json', 'slow.json', 'never.json'], async (relativeFile) => {
+			started.push(relativeFile);
+			if (relativeFile === 'bad.json') {
+				await badGate.promise;
+				throw new Error('lane failed');
+			}
+			await slowGate.promise;
+		}),
+	);
+	const rejected = assert.rejects(running, /lane failed/);
+
+	await waitFor(() => started.length === 2);
+	badGate.resolve();
+	await waitFor(() => started.includes('bad.json'));
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.deepEqual(started, ['bad.json', 'slow.json']);
+
+	slowGate.resolve();
+	await rejected;
+});
+
+test('rejects an invalid manifest concurrency', async () => {
+	await assert.rejects(
+		() => runRequiredNonVitestBindingLanes(options([], async () => {}, 0)),
+		/concurrency must be a positive integer/,
 	);
 });

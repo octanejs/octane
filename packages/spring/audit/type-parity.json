@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "upstreamRoot": "packages/spring/upstream/packages/core/src",
+  "adaptedRoot": "packages/spring/typetests/upstream",
+  "inventories": {
+    "upstream": "packages/spring/audit/upstream-types.json",
+    "adapted": "packages/spring/audit/adapted-types-inventory.json"
+  },
+  "lanes": {
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/spring/audit/type-probes/tsconfig.pristine-upstream.json",
+      "sourcePolicy": "byte-exact pinned upstream programs"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/spring/typetests/tsconfig.upstream.json",
+      "sourcePolicy": "structurally equivalent after permitted import-root transforms"
+    }
+  },
+  "permittedTransformations": [
+    {
+      "kind": "import-root",
+      "rule": "relative upstream source imports may become @octanejs/spring"
+    },
+    {
+      "kind": "jsx-import-source",
+      "rule": "adapted component type tests use jsxImportSource octane"
+    }
+  ],
+  "divergences": [],
+  "notes": "Adapted type programs are inventoried one-for-one with the vendored *.test-d.ts/*.test-d.tsx suite and executed by the adapted-types lane."
+}

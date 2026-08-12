@@ -10,5 +10,5 @@
     "`useTable` and `useAppTable` end in an OPTIONAL `selector` parameter, so both split the compiler-injected trailing hook slot off their rest args (see src/internal.ts) — otherwise `useTable(options)` would read the slot symbol as the selector.",
     "Column sizing/resizing and pinning/ordering drag interactions are untested-by-interaction (the differential rig has no mousemove driver); their state APIs are table-core computation reused verbatim."
   ],
-  "verified": "2026-07-26"
+  "verified": "2026-08-02"
 }

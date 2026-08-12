@@ -1,0 +1,18 @@
+{
+  "upstream": {
+    "package": "react-markdown",
+    "version": "10.1.0"
+  },
+  "surface": "Complete react-markdown 10.1.0 root runtime and public type surface: Markdown, MarkdownAsync, MarkdownHooks, defaultUrlTransform, and all six exported type families.",
+  "divergences": [
+    "Rendered elements, component mappings, hooks, and public renderable types target Octane instead of React.",
+    "React 19 may emit automatic image preload hints during server rendering; Octane preserves the Markdown image output without that renderer-specific hint.",
+    "React's synchronous renderer throws when MarkdownAsync suspends; Octane's MarkdownAsync returns an awaitable ElementDescriptor."
+  ],
+  "ssr": "Synchronous and awaited asynchronous Markdown are deterministic and browser-global-free; hydration adoption and updates are covered for default output, plugins, filtering, URLs, and component mappings. MarkdownHooks preserves its fallback and resolves on the client.",
+  "verified": "2026-08-02",
+  "notes": [
+    "The vendored upstream test.jsx executes unchanged: all 87 leaf tests retain their original fixtures, assertions, and interactions. Every source-line identity has an integrity-locked adapted-test crosswalk entry.",
+    "Upstream source provenance and the MIT license are retained in UPSTREAM.md and LICENSE."
+  ]
+}

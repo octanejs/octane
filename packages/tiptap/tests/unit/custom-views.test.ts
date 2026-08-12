@@ -39,6 +39,7 @@ afterEach(() => {
 });
 
 describe('@octanejs/tiptap custom views', () => {
+	// Octane framework contract: ordinary renderer refs (not parity-owned).
 	it('updates and destroys a public ReactRenderer while preserving context, state, effects, and refs', async () => {
 		let editor: Editor | undefined;
 		let renderer: any;
@@ -109,6 +110,8 @@ describe('@octanejs/tiptap custom views', () => {
 		editor?.destroy();
 	});
 
+	// NodeViewWrapper `as` consumption and ReactMarkView portal teardown live in
+	// dedicated divergence files (node-view-as-prop / mark-view-portal-cleanup).
 	it('keeps non-leaf node and mark content live across updates, then cleans both views up', async () => {
 		let editor: Editor | undefined;
 		const nodeLifecycle: string[] = [];
@@ -145,6 +148,7 @@ describe('@octanejs/tiptap custom views', () => {
 		expect(nodeRenderer.getAttribute('data-panel-label')).toBe('initial');
 		expect(nodeRenderer.getAttribute('data-panel-shell')).toBe('true');
 		expect(nodeView.tagName).toBe('ARTICLE');
+		expect(nodeView.hasAttribute('as')).toBe(false);
 		expect(nodeView.hasAttribute('data-node-view-wrapper')).toBe(true);
 		expect(nodeContent.tagName).toBe('SECTION');
 		expect(nodeContent.textContent).toBe('Editable panel content');

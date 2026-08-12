@@ -1,9 +1,11 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 const COMPONENTS = resolve(__dirname, '../_fixtures/components.tsrx');
 const CONTEXT = resolve(__dirname, '../_fixtures/context.tsrx');
+
+await Promise.all([preloadDifferentialFixture(COMPONENTS), preloadDifferentialFixture(CONTEXT)]);
 
 describe('differential: components.tsrx — component nesting + context flow', () => {
 	it('Greeting: nested child component (Greeting → Label) renders prop text', async () => {

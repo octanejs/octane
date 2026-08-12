@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { chromium, type Browser, type Page } from 'playwright';
+import type { Browser, Locator, Page } from 'playwright';
+import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { createServer, type Plugin, type ViteDevServer } from 'vite';
 import { compile as compileToReact } from '@tsrx/react';
 import { transformSync } from 'esbuild';
@@ -57,13 +58,7 @@ beforeAll(async () => {
 	const address = server.httpServer!.address();
 	if (!address || typeof address === 'string') throw new Error('Vite did not expose a TCP port');
 	baseUrl = `http://127.0.0.1:${address.port}`;
-	try {
-		browser = await chromium.launch({ headless: true });
-	} catch (error) {
-		throw new Error(
-			`Chromium is required for native event evidence (run \`pnpm --filter octane exec playwright install chromium\`): ${String(error)}`,
-		);
-	}
+	browser = await launchBrowser({ headless: true });
 });
 
 afterEach(async () => {
@@ -108,6 +103,20 @@ async function waitForPageTimerTask(page: Page): Promise<void> {
 	// A timer queued by the preceding browser event runs before this
 	// same-page timer barrier, independent of runner scheduling latency.
 	await page.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+}
+
+async function driveAcceptedComposition(page: Page, input: Locator): Promise<void> {
+	await input.focus();
+	await input.evaluate(function (element: HTMLInputElement) {
+		element.select();
+	});
+	const cdp = await page.context().newCDPSession(page);
+	await cdp.send('Input.imeSetComposition', {
+		text: '候',
+		selectionStart: 1,
+		selectionEnd: 1,
+	});
+	await cdp.send('Input.insertText', { text: '候' });
 }
 
 describe.sequential('native checkbox and radio browser evidence', () => {
@@ -302,7 +311,7 @@ describe.sequential('native checkbox and radio browser evidence', () => {
 		]);
 		// React restores during its click-derived synthetic change dispatch. In
 		// Chromium that leaves no successful activation for native input/change
-		// post-steps to report; Octane restores only after its native change above.
+		// post-steps to report. Octane restores only after its native change above.
 	});
 
 	it('clicking the already-selected radio emits click without input or change', async () => {
@@ -410,20 +419,12 @@ describe.sequential('trusted text commit browser evidence', () => {
 		expect((await state('react')).inputs[0].value).toBe('edited');
 	});
 
-	it('preserves accepted candidate text through a CDP-generated composition session', async () => {
+	it('preserves accepted candidate text through an engine-scoped composition session', async () => {
 		const page = await openCase('CompositionTimeline');
-		const cdp = await page.context().newCDPSession(page);
 
 		for (const runtime of ['octane', 'react'] as const) {
 			const input = page.locator(`#${runtime}-root #matrix-composition`);
-			await input.focus();
-			await input.evaluate((element: HTMLInputElement) => element.select());
-			await cdp.send('Input.imeSetComposition', {
-				text: '候',
-				selectionStart: 1,
-				selectionEnd: 1,
-			});
-			await cdp.send('Input.insertText', { text: '候' });
+			await driveAcceptedComposition(page, input);
 		}
 
 		for (const runtime of ['octane', 'react'] as const) {

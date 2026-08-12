@@ -37,3 +37,4 @@ export { Toggle } from './toggle';
 export { ToggleGroup } from './toggle-group';
 export { useRender } from './use-render';
 export { mergeProps, mergePropsN, mergeClassNames } from './merge-props';
+// OCTANE DIVERGENCE[unported-internal-hover][differential:base-ui-tooltip-open]

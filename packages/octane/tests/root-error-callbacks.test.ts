@@ -11,7 +11,14 @@
 // Roots created WITHOUT the options keep today's behavior byte-for-byte; the
 // control tests below pin that.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, createRoot, hydrateRoot, flushSync } from '../src/index.js';
+import {
+	act,
+	createRoot,
+	createContext,
+	createElement,
+	hydrateRoot,
+	flushSync,
+} from '../src/index.js';
 import {
 	CaughtHost,
 	UncaughtHost,
@@ -19,8 +26,13 @@ import {
 	UncaughtEffectHost,
 	MountThrower,
 	ClickCounter,
+	CleanupThrower,
+	CleanupHost,
+	CaughtCleanupHost,
+	RefCleanupHost,
 	triggerRenderThrow,
 	triggerEffectThrow,
+	triggerCleanupThrowerRemoval,
 } from './_fixtures/root-error-callbacks.tsrx';
 
 describe('root error callbacks — onCaughtError / onUncaughtError', () => {
@@ -172,6 +184,74 @@ describe('root error callbacks — onCaughtError / onUncaughtError', () => {
 	it('control: a hydration render error without the option still throws', () => {
 		container.innerHTML = '<div>server</div>';
 		expect(() => hydrateRoot(container, MountThrower, {})).toThrow('mount-boom');
+	});
+
+	it('onUncaughtError consumes a passive-cleanup throw during root unmount', async () => {
+		const onUncaughtError = vi.fn();
+		const root = createRoot(container, { onUncaughtError });
+		await act(() => root.render(CleanupHost, {}));
+		errSpy.mockClear();
+		await act(() => root.unmount());
+		expect(onUncaughtError).toHaveBeenCalledTimes(1);
+		expect((onUncaughtError.mock.calls[0][0] as Error).message).toBe('cleanup-boom');
+		expect(errSpy).not.toHaveBeenCalled();
+	});
+
+	it('onCaughtError fires when a boundary claims a deletion-phase cleanup throw', async () => {
+		const onCaughtError = vi.fn();
+		const root = createRoot(container, { onCaughtError });
+		await act(() => root.render(CaughtCleanupHost, {}));
+		expect(container.querySelector('#ct')).not.toBeNull();
+		await act(() => triggerCleanupThrowerRemoval());
+		// The deletion's enclosing boundary claimed the error (existing routing)…
+		expect(container.textContent).toBe('cleanup-caught');
+		// …and the root's reporting callback observed the claim.
+		expect(onCaughtError).toHaveBeenCalledTimes(1);
+		expect((onCaughtError.mock.calls[0][0] as Error).message).toBe('cleanup-boom');
+		root.unmount();
+	});
+
+	it('onUncaughtError consumes a ref-cleanup throw during root unmount', async () => {
+		const onUncaughtError = vi.fn();
+		const root = createRoot(container, { onUncaughtError });
+		await act(() => root.render(RefCleanupHost, {}));
+		errSpy.mockClear();
+		await act(() => root.unmount());
+		expect(onUncaughtError).toHaveBeenCalledTimes(1);
+		expect((onUncaughtError.mock.calls[0][0] as Error).message).toBe('ref-boom');
+		expect(errSpy).not.toHaveBeenCalled();
+	});
+
+	it('onUncaughtError consumes a cleanup throw from a Provider children-dialect flip', async () => {
+		// A Provider whose `children` prop flips between a value (element) and a
+		// function tears the outgoing dialect down MID-RENDER through its own
+		// teardown bracket — that path must thread the owner exactly like a
+		// normal unmount.
+		const onUncaughtError = vi.fn();
+		const root = createRoot(container, { onUncaughtError });
+		const Ctx = createContext(0);
+		const App = (props: any) =>
+			createElement(Ctx as any, {
+				value: 1,
+				children: props.fn ? () => null : createElement(CleanupThrower as any, {}),
+			});
+		await act(() => root.render(App as any, { fn: false }));
+		expect(container.textContent).toBe('ct');
+		errSpy.mockClear();
+		await act(() => root.render(App as any, { fn: true }));
+		expect(onUncaughtError).toHaveBeenCalledTimes(1);
+		expect((onUncaughtError.mock.calls[0][0] as Error).message).toBe('cleanup-boom');
+		expect(errSpy).not.toHaveBeenCalled();
+		root.unmount();
+	});
+
+	it('control: teardown throws without the options keep console.error', async () => {
+		const root = createRoot(container);
+		await act(() => root.render(CleanupHost, {}));
+		errSpy.mockClear();
+		await act(() => root.unmount());
+		expect(errSpy).toHaveBeenCalled();
+		expect((errSpy.mock.calls[0][0] as Error).message).toBe('cleanup-boom');
 	});
 
 	// ── Controls: roots WITHOUT the options keep the existing contract ──────────

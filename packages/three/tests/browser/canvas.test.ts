@@ -7,7 +7,9 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { launchBrowser } from '../../../../test-utils/playwright-browser.js';
 import { createNodeServer } from '../../../app-core/src/server/node-http.js';
+import { webglLaunchOptions } from './_playwright.js';
 
 // The helper stages a copy of the fixture here and builds it, so no bundler
 // output, resolver cache, or `node_modules` link lands in the checkout. The
@@ -187,20 +189,7 @@ describe('Three Canvas production SSR and hydration', () => {
 	});
 
 	it('hydrates one adopted Canvas/root/scene and tears it down in Vite and Rsbuild', async () => {
-		let browser: import('playwright').Browser | undefined;
-		try {
-			const { chromium } = await import('playwright');
-			browser = await chromium.launch({
-				headless: true,
-				args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
-			});
-		} catch (error) {
-			throw new Error(
-				'[@octanejs/three SSR] Chromium is required ' +
-					'(run `pnpm exec playwright install chromium`): ' +
-					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
-			);
-		}
+		const browser = await launchBrowser(webglLaunchOptions());
 
 		try {
 			for (const variant of variants) {
@@ -306,20 +295,7 @@ describe('Three Canvas production SSR and hydration', () => {
 	}, 120_000);
 
 	it('projects a client-only Three asset pending state and starts it once', async () => {
-		let browser: import('playwright').Browser | undefined;
-		try {
-			const { chromium } = await import('playwright');
-			browser = await chromium.launch({
-				headless: true,
-				args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
-			});
-		} catch (error) {
-			throw new Error(
-				'[@octanejs/three SSR] Chromium is required ' +
-					'(run `pnpm exec playwright install chromium`): ' +
-					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
-			);
-		}
+		const browser = await launchBrowser(webglLaunchOptions());
 
 		const page = await browser.newPage({ viewport: { width: 96, height: 96 } });
 		const errors: string[] = [];
@@ -375,20 +351,7 @@ describe('Three Canvas production SSR and hydration', () => {
 	}, 60_000);
 
 	it('projects a client-only Three render error to the DOM owner', async () => {
-		let browser: import('playwright').Browser | undefined;
-		try {
-			const { chromium } = await import('playwright');
-			browser = await chromium.launch({
-				headless: true,
-				args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
-			});
-		} catch (error) {
-			throw new Error(
-				'[@octanejs/three SSR] Chromium is required ' +
-					'(run `pnpm exec playwright install chromium`): ' +
-					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
-			);
-		}
+		const browser = await launchBrowser(webglLaunchOptions());
 
 		const page = await browser.newPage({ viewport: { width: 96, height: 96 } });
 		const errors: string[] = [];

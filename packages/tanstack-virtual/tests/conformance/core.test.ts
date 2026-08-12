@@ -3,8 +3,8 @@
  * through octane's render path, against the REAL @tanstack/virtual-core.
  * Ports upstream react-virtual's tests/index.test.tsx behaviors (should
  * render / overscan / rangeExtractor / count change / height change) and adds
- * the octane-specific matrix (instance stability, flushSync degradation,
- * getVirtualItems identity, unmount detach).
+ * the octane-specific matrix (instance stability, getVirtualItems identity,
+ * unmount detach). Nested flushSync degradation lives in nested-flush.test.ts.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
@@ -200,20 +200,6 @@ describe('state wiring + scrolling', () => {
 		// Scroll notify is sync; the isScrolling reset after the delay is not.
 		expect(captured.onChangeArgs[0]).toEqual({ sync: true });
 		expect(captured.onChangeArgs[captured.onChangeArgs.length - 1]).toEqual({ sync: false });
-		r.unmount();
-	});
-
-	it('sync scroll update inside a discrete-event flush still lands (flushSync degradation)', async () => {
-		// #scroll-500's onClick dispatches the scroll event synchronously INSIDE
-		// octane's click flush → core notifies sync=true → the adapter's
-		// flushSync(rerender) hits octane's re-entrancy guard and degrades to a
-		// plain dispatch drained by the ambient flush. The window must still be
-		// updated once the click settles.
-		const r = mount(BasicList, {});
-		await flush();
-
-		r.click('#scroll-500'); // r.click itself wraps in flushSync
-		expect(indices(r)).toEqual([9, 10, 11, 12, 13, 14]); // already landed, pre-settle
 		r.unmount();
 	});
 

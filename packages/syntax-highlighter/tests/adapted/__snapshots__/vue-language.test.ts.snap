@@ -1,0 +1,424 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SyntaxHighlighter component renders vue 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            "<",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "script",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "lang",
+          ],
+          "props": {
+            "className": "xml hljs-tag hljs-attr",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "=",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ""ts"",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "setup",
+          ],
+          "props": {
+            "className": "xml hljs-tag hljs-attr",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ">",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {
+            "className": "xml javascript",
+          },
+          "type": "span",
+        },
+        {
+          "children": null,
+          "props": {
+            "className": "xml javascript",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "import",
+          ],
+          "props": {
+            "className": "xml javascript",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {
+            "className": "xml javascript",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "{ Layout }",
+          ],
+          "props": {
+            "style": {
+              "color": "rgb(188, 96, 96)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {
+            "className": "xml javascript",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "from",
+          ],
+          "props": {
+            "className": "xml javascript",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {
+            "className": "xml javascript",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ""@ui/libs"",
+          ],
+          "props": {
+            "className": "xml javascript",
+            "style": {
+              "color": "rgb(136, 0, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";
+",
+          ],
+          "props": {
+            "className": "xml javascript",
+          },
+          "type": "span",
+        },
+        {
+          "children": null,
+          "props": {
+            "className": "xml javascript",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "</",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "script",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ">",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {
+            "className": "xml",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {
+            "className": "xml",
+          },
+          "type": "span",
+        },
+        {
+          "children": null,
+          "props": {
+            "className": "xml",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "<",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "template",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ">",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {
+            "className": "xml",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "    ",
+          ],
+          "props": {
+            "className": "xml",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "<",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "Layout",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " />",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {
+            "className": "xml",
+          },
+          "type": "span",
+        },
+        {
+          "children": null,
+          "props": {
+            "className": "xml",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "</",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "template",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+            "style": {
+              "fontWeight": "bold",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ">",
+          ],
+          "props": {
+            "className": "xml hljs-tag",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {
+            "className": "xml",
+          },
+          "type": "span",
+        },
+        {
+          "children": null,
+          "props": {
+            "className": "xml",
+          },
+          "type": "span",
+        },
+      ],
+      "props": {
+        "className": "language-vue",
+        "style": {
+          "whiteSpace": "pre",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(240, 240, 240)",
+      "color": "rgb(68, 68, 68)",
+      "display": "block",
+      "overflowX": "auto",
+      "padding": "0.5em",
+    },
+  },
+  "type": "pre",
+}
+`;

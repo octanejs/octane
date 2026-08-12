@@ -9,12 +9,18 @@
  */
 import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/aria-diff-leaf.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
+await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
+
 describe('differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria', () => {
+	// @parity-case differential:aria-usebutton-native-button-onpress-click
 	it('useButton: native button + onPress via click, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'ButtonBasic', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -25,6 +31,7 @@ describe('differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria', (
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-usebutton-span-elementtype-gets-role-tabindex-presses
 	it('useButton: span elementType gets role/tabIndex and presses, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'SpanButton', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -35,6 +42,7 @@ describe('differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria', (
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-usetogglebutton-aria-pressed-toggles-click
 	it('useToggleButton: aria-pressed toggles on click, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'ToggleButtonSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -49,6 +57,7 @@ describe('differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria', (
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-usecheckbox-click-toggles-selection-through-native-input-event
 	it('useCheckbox: click toggles selection through the native input event, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'CheckboxSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -63,6 +72,7 @@ describe('differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria', (
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-useswitch-role-switch-click-toggles
 	it('useSwitch: role=switch + click toggles, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'SwitchSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -73,6 +83,7 @@ describe('differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria', (
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-useradiogroup-useradio-selection-moves-click-shared-group-name
 	it('useRadioGroup/useRadio: selection moves on click with shared group name, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'RadioGroupSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -83,6 +94,8 @@ describe('differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria', (
 		d.unmount();
 	});
 
+	// OCTANE DIVERGENCE[native-input-event-wiring][differential:aria-leaf-textfield]
+	// @parity-case differential:aria-leaf-textfield
 	it('useTextField: typing updates value through the native input event + field ids, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'TextFieldSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -95,12 +108,14 @@ describe('differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria', (
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-useprogressbar-aria-value-attributes-formatted-valuetext
 	it('useProgressBar: aria value attributes + formatted valuetext, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'ProgressSpec', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-usenumberfieldstate-controlled-values-unfinished-edits-match-pinned-react
 	it('useNumberFieldState: controlled values and unfinished edits match pinned react-stately', async () => {
 		const d = await mountDifferential(FIXTURE, 'NumberFieldStateSpec', undefined, CACHE);
 		await d.step('initial controlled format', () => {
@@ -125,6 +140,7 @@ describe('differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria', (
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-usenumberfieldstate-locale-formatting-user-selected-numerals-match-react
 	it('useNumberFieldState: locale, formatting and user-selected numerals match react-stately', async () => {
 		const d = await mountDifferential(FIXTURE, 'NumberFieldStateSpec', undefined, CACHE);
 		await d.step('switch locale and parser', async (octane, react) => {

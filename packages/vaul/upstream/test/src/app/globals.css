@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body,
+main {
+  min-height: 500vh;
+}
+
+html {
+  height: -webkit-fill-available;
+}
+
+a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration: underline;
+}

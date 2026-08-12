@@ -8,12 +8,7 @@ import {
 	useSelector,
 	useStore,
 } from '../src';
-import * as binding from '../src';
 import type { Atom, ReadonlyStore } from '@tanstack/store';
-
-test('omits the upstream experimental _useStore hook', () => {
-	expectTypeOf(binding).not.toHaveProperty('_useStore');
-});
 
 test('useCreateAtom returns a writable atom for initial values', () => {
 	const atom = useCreateAtom(12);

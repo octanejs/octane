@@ -1,0 +1,14 @@
+{
+  "upstream": {
+    "package": "embla-carousel-react",
+    "version": "8.6.0",
+    "core": "embla-carousel@8.6.0"
+  },
+  "surface": "Complete package-root adapter: default useEmblaCarousel hook, its viewport-ref and tuple types, and globalOptions; the framework-neutral Embla core and reactive equality utilities are reused unchanged.",
+  "divergences": [],
+  "ssr": "The hook constructs no carousel without DOM globals; client attachment initializes the core.",
+  "verified": "2026-08-02",
+  "notes": [
+    "The live React differential covers adapter lifecycle. A required Chromium lane verifies real layout, scrolling, selection updates, and destroy cleanup."
+  ]
+}

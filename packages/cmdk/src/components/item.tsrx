@@ -40,11 +40,10 @@ export function Item(props: ItemProps) @{
 					// treating it as zero deadlocks: the item renders null, so
 					// `ref.current` stays null, so `useValue` has no textContent to
 					// infer from, so it registers an empty value, which scores zero
-					// forever. Upstream cannot reach this because it reads the value
-					// out of `props.children` synchronously; octane's compiled
-					// children are opaque, so the first render IS the registration.
-					// Rendering unscored items lets that first pass happen; the very
-					// next filter pass hides it if it genuinely does not match.
+					// forever. Upstream reads string children synchronously; octane's
+					// compiled children are opaque, so the first render IS the
+					// registration. Rendering unscored items lets that first pass
+					// happen; the next filter pass hides it if it does not match.
 					s.filtered.items.has(id)
 						? (s.filtered.items.get(id) ?? 0) > 0
 						: true,

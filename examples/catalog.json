@@ -739,6 +739,50 @@
       ]
     },
     {
+      "directory": "examples/monaco-playground",
+      "id": "monaco-playground",
+      "title": "Monaco Playground",
+      "summary": "A production-built Monaco Editor app exercising the Octane binding with npm monaco-editor + Vite workers, controlled value sync, and DiffEditor.",
+      "status": "active",
+      "host": "octane",
+      "renderModes": ["client"],
+      "dialects": ["tsrx"],
+      "bindings": ["@octanejs/monaco-editor"],
+      "octaneFeatures": ["effects", "native-events", "refs-as-props", "tsrx-control-flow"],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "edit-typescript-buffer",
+          "title": "Type into the Monaco editor and observe controlled value updates",
+          "kind": "golden",
+          "spec": "e2e/editor.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "toggle-theme-and-language",
+          "title": "Switch theme and language without remounting",
+          "kind": "golden",
+          "spec": "e2e/editor.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "diff-editor-smoke",
+          "title": "Mount DiffEditor and confirm both panes render",
+          "kind": "golden",
+          "spec": "e2e/editor.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "language-worker-controlled-value",
+          "title": "Switch language workers and keep controlled value sync",
+          "kind": "golden",
+          "spec": "e2e/editor.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": []
+    },
+    {
       "directory": "examples/pagecraft",
       "id": "pagecraft",
       "title": "Pagecraft",

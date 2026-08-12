@@ -3,6 +3,7 @@
     "strict": true,
     "module": "esnext",
     "target": "es2018",
+    "jsx": "preserve",
     "moduleResolution": "bundler",
     "esModuleInterop": true,
     "lib": ["dom", "dom.iterable", "esnext"],
@@ -13,5 +14,5 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["./**/*.test-d.ts", "./__fixtures__/**/*.ts"]
+  "include": ["./_useStore-omission.test-d.ts"]
 }

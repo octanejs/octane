@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { chromium, type Browser, type Page } from 'playwright';
+import type { Browser, Page } from 'playwright';
+import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { createServer, type Plugin, type ViteDevServer } from 'vite';
 import { renderToString } from 'octane/server';
 import { octane } from 'octane/compiler/vite';
@@ -13,13 +14,7 @@ const FIXTURE = 'packages/octane/tests/_fixtures/permanent-static-browser.tsrx';
 let browser: Browser;
 
 beforeAll(async () => {
-	try {
-		browser = await chromium.launch({ headless: true });
-	} catch (error) {
-		throw new Error(
-			`Chromium is required for permanent-static browser evidence (run \`pnpm --filter octane exec playwright install chromium\`): ${String(error)}`,
-		);
-	}
+	browser = await launchBrowser({ headless: true });
 });
 
 afterAll(async () => {

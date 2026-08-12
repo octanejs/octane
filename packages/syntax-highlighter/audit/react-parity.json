@@ -1,0 +1,452 @@
+{
+  "$schema": "../../../packages/hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/react-syntax-highlighter/react-syntax-highlighter.git",
+    "version": "16.1.1",
+    "commit": "ecac533ba1fce8cf4f98a79c5c913f1a7ffab34c",
+    "sourceRoot": "src",
+    "testRoot": "__tests__",
+    "license": "MIT",
+    "integrity": "sha256:8a324f3d4d79e6b40b2f2279ee97285a0a85d552ecdf6f1910f178907cda31aa",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "insufficient"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/syntax-highlighter/src"],
+      "include": ["\\.(?:js|d\\.ts)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/syntax-highlighter/tests/adapted"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 51,
+    "uniqueIdentities": 51,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+    }
+  },
+  "lanes": [
+    {
+      "id": "react-syntax-highlighter-pristine-runtime",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-syntax-highlighter-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 19 pinned upstream Jest suites, 51 identities, and 40 snapshots unchanged.",
+      "execution": {
+        "kind": "jest-full",
+        "config": "packages/syntax-highlighter/jest.pristine.config.cjs",
+        "root": "packages/syntax-highlighter/upstream",
+        "inventory": "packages/syntax-highlighter/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/syntax-highlighter/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "5472ac89a7a805ad3cb07c07ed6c0d2696a70fdd539eccc176a5632694293147"
+        },
+        {
+          "path": "packages/syntax-highlighter/jest.pristine.config.cjs",
+          "role": "support",
+          "sha256": "43c9ac4957fb7ca57315965bf087ea3beb6ffa924c39c273a31e654e1c606d9e"
+        },
+        {
+          "path": "packages/syntax-highlighter/audit/upstream-files.json",
+          "role": "support",
+          "sha256": "18f737cf2b465b01db238757e27460e0f34950dcff0368edf8a7994d6356c4b4"
+        }
+      ]
+    },
+    {
+      "id": "react-syntax-highlighter-adapted-runtime",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "syntax-highlighter",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs every generated one-for-one Octane adaptation with the same 51 titles and 40 structural snapshots.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/syntax-highlighter/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/syntax-highlighter/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "ff15891b8eb9dfc7c497b2128a61bc8fd72ad4c51f40b320e7a87df8c0306dc6"
+        },
+        {
+          "path": "packages/syntax-highlighter/audit/upstream-crosswalk.json",
+          "role": "support",
+          "sha256": "9a30d29768b05243d6a32d00c907548f3214c10d03a745e80472d2eae62678f5"
+        },
+        {
+          "path": "packages/syntax-highlighter/scripts/generate-adapted-tests.mjs",
+          "role": "support",
+          "sha256": "abcaac5eb9347c3fce3bf127e1c7d193f7f872d1126759fee464a123246452c8"
+        },
+        {
+          "path": "packages/syntax-highlighter/scripts/generate-parity-audit.mjs",
+          "role": "support",
+          "sha256": "7532517f76447db09e06026a1ee86213bd93d75ab063539f38167fb8916d4c5a"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/code-style-passed-to-line-numbers.test.ts.snap",
+          "role": "support",
+          "sha256": "2a044b804abcfa8c383981626d323eeb227be3602d7979f5488b39de9ba5b6f9"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/custom-code.test.ts.snap",
+          "role": "support",
+          "sha256": "8d3b0618a2fb313ad7aaeab95fa03cc54431427c3903dce7974a983928c6a835"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/custom-pre.test.ts.snap",
+          "role": "support",
+          "sha256": "e77003ce64ffb2d4bb103e2c110e82407a6a8cb7f4af46e7bf0a91a6d14198b7"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/light-async.test.ts.snap",
+          "role": "support",
+          "sha256": "de92dd4aa76923eec40beb0ce50bb9d8f0346e72d42e8468b0257ea1528ec61d"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/line-numbers.test.ts.snap",
+          "role": "support",
+          "sha256": "6c2177177eb82da6ff5c86cc21f74cb11e3dbaa388bedb3f17a08702292099cb"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/multiline-comments.test.ts.snap",
+          "role": "support",
+          "sha256": "84e47e18071052fd8cc24365d3d9f793fd28116996bf0ff322175d4ecdd61fa4"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/no-inline.test.ts.snap",
+          "role": "support",
+          "sha256": "d0528a041d88d058295a14dadd44accc4d74fc57855789e51a42e91fddd74739"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/no-language.test.ts.snap",
+          "role": "support",
+          "sha256": "4e0d37fea052a1cd7238a4998740737848cd68a981f2e0daa52e7c18cd38e205"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/prism-async-light.test.ts.snap",
+          "role": "support",
+          "sha256": "b5a8efabcda17ba6c814c42a9a4024fbe605b133d4b47b71e57c1e067c46555f"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/prism-async.test.ts.snap",
+          "role": "support",
+          "sha256": "fd58c848b543072ac7af1b4a98fe04249cbb389f9e799198ace5ca4db791fab6"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/prism-light.test.ts.snap",
+          "role": "support",
+          "sha256": "85a455e2ee9a1f10b8bae7affaa3f855eb88f4dd4ed07552793fbee53b39dee6"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/refractor.test.ts.snap",
+          "role": "support",
+          "sha256": "becf8ffb59e144d1603306d5bea84bd096cc2d7c8015f8882e5992d2c2fe1418"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/render-plain-string.test.ts.snap",
+          "role": "support",
+          "sha256": "ffe40cd0f36faa57e1dd4230bc970759058a8fb98dbb8a95ff52d9968db107ac"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/render.test.ts.snap",
+          "role": "support",
+          "sha256": "3646d954bdb114c4c52c86ab393447f800958620a8156b12e850cc73aa05ef23"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/text-language.test.ts.snap",
+          "role": "support",
+          "sha256": "8c3e54cd19533fbf85d878b68166322fee4720050a1e961461fc9d79884d37f9"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/unknown-language.test.ts.snap",
+          "role": "support",
+          "sha256": "a69979c9e12ff918d7d1421f7972d507761856358a15b860e19c72bf1d80a26f"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/vue-language.test.ts.snap",
+          "role": "support",
+          "sha256": "26bc8b42d19ab2e6ab62776388c2462231e0050f1245ca1ef254c1129086dd4d"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/wrap-lines.test.ts.snap",
+          "role": "support",
+          "sha256": "abffbd50c4b513affcda967872045d54833b97a6e125782206672f48732e33d8"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/async-syntax-highlighter.test.ts",
+          "role": "support",
+          "sha256": "e0a0466dfd436943925b60acd6c22cbcc1254da1320cf4cab8bb4f7d003cd108"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/code-style-passed-to-line-numbers.test.ts",
+          "role": "support",
+          "sha256": "1a8260525538dcf65e8f354f35642c3c87e99e5fbdeb3b5b45af71a41646ba7f"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/custom-code.test.ts",
+          "role": "support",
+          "sha256": "d015b04c0e8e29109925ade07ec988173cc6162fcb1a12418cc61eb7b30e3957"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/custom-pre.test.ts",
+          "role": "support",
+          "sha256": "fe52e07a0ef26f048088952c622b0334523660726ecf3a2fda1cccd2623fe417"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/light-async.test.ts",
+          "role": "support",
+          "sha256": "10c6725c6767a74246dd9f7fce6c38b8f59296f5064cbbb8d80466edddef6eb0"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/line-numbers.test.ts",
+          "role": "support",
+          "sha256": "eaf00439c123e171a71901f15f000ad0097b298b249aa6088c9e87c18bff011b"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/multiline-comments.test.ts",
+          "role": "support",
+          "sha256": "f6e7942400546def45da34cc3bd6cd306c728b76289e4b0bb599e8acb8b5c5e6"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/no-inline.test.ts",
+          "role": "support",
+          "sha256": "03176c1e21d91066e4f1a7dc83e11a646cc1e1eb0d31dab93259399636999504"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/no-language.test.ts",
+          "role": "support",
+          "sha256": "b5b6fe6cfc7ce38bc5701d790da2377c415dec3111bbc0852992289d9b71b878"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/prism-async-light.test.ts",
+          "role": "support",
+          "sha256": "2207bc64bdb2b1988e35a1bce6d9a81425c2cff25aaa871e4b6651629aa98aeb"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/prism-async.test.ts",
+          "role": "support",
+          "sha256": "09f13b5ef62cf965d20babc15b7d97556dd05ab24a912364d0b64926a0231818"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/prism-light.test.ts",
+          "role": "support",
+          "sha256": "38c144c0cb769939a7b5960b98a5f0efc233ed3f9d4f849149f1a86de09c6c8a"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/refractor.test.ts",
+          "role": "support",
+          "sha256": "67286efe88431cfda20e178bbb723a60c69b20890c62139795a3435247fd68da"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/render-plain-string.test.ts",
+          "role": "support",
+          "sha256": "fc1060a3a881feba0e95822b053e0e91d939c6c89d58d3e6197e3b1207ebb8db"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/render.test.ts",
+          "role": "support",
+          "sha256": "dde95be9188febb8baa7261e8859c84fb07d598e051eb12da0b4115fbc4c01b6"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/text-language.test.ts",
+          "role": "support",
+          "sha256": "c9635e6c7bd019af0364b70a4fa22fae4826a7dc7f708b2c55eb6eb4732aa610"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/unknown-language.test.ts",
+          "role": "support",
+          "sha256": "4e2319fb9d7997b994412d684a999110755985ec89c277a12ee40d8bd0f771aa"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/vue-language.test.ts",
+          "role": "support",
+          "sha256": "dce07fb06cf299a9a67b4dcee726ba19d48b897a04d858c742f1e114e7365c76"
+        },
+        {
+          "path": "packages/syntax-highlighter/tests/adapted/wrap-lines.test.ts",
+          "role": "support",
+          "sha256": "883210be29380e864347c7047528737fbbf551356ae449e80e6464911ab85141"
+        }
+      ]
+    },
+    {
+      "id": "react-syntax-highlighter-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "syntax-highlighter-differential",
+      "notes": "Runs React and Octane side by side and compares normalized DOM before and after a language update.",
+      "files": [
+        {
+          "path": "packages/syntax-highlighter/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "b2bb25ba5f69ba13677a04f9778c781e2ddc801d3ed4380a5cf4b0909998c700",
+          "cases": [
+            {
+              "id": "differential:render-and-update",
+              "testName": "matches React DOM across line rendering, custom tags, and a language update",
+              "fullName": "differential: react-syntax-highlighter matches React DOM across line rendering, custom tags, and a language update"
+            }
+          ]
+        }
+      ],
+      "evidenceOrigin": "repo-authored"
+    },
+    {
+      "id": "react-syntax-highlighter-browser",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "syntax-highlighter-browser",
+      "notes": "Runs real Chromium rendering, computed whitespace/wrapping, selection, updates, and async loading.",
+      "files": [
+        {
+          "path": "packages/syntax-highlighter/tests/browser/rendering.browser.test.ts",
+          "role": "test",
+          "sha256": "ec88204d1c2835c57ad2302bedfae132bac91280ed9322cf7dd242fbd3589f3a",
+          "cases": [
+            {
+              "id": "browser:chromium-render-update-async",
+              "testName": "matches rendering, selection, updates, and async loading in Chromium",
+              "fullName": "react-syntax-highlighter real-browser behavior matches rendering, selection, updates, and async loading in Chromium"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "react-syntax-highlighter-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-syntax-highlighter-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles the public contract against pinned @types/react-syntax-highlighter 15.5.13.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/syntax-highlighter/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/syntax-highlighter/typetests/pristine/public-api.test-d.ts",
+          "role": "test",
+          "sha256": "e80edb66d6c7fe45409b0254c53f5a716d0c9325d1bfbcd80eda1eb3d8dfe231",
+          "cases": [
+            {
+              "id": "types:pristine-public",
+              "testName": "pristine public type contract",
+              "fullName": "pristine public type contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/syntax-highlighter/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "f831307486bdd2b6715fa5f4913d7c5fb0d5a7e985b2e88493a576e198a3c8a7"
+        },
+        {
+          "path": "packages/syntax-highlighter/audit/type-crosswalk.json",
+          "role": "support",
+          "sha256": "7f19eacbcbfe54d102b933bc40f5f13ee883c3d10f7490277168ec9feddddbad"
+        }
+      ]
+    },
+    {
+      "id": "react-syntax-highlighter-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-syntax-highlighter-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles the same public contract against the generated Octane declarations and representative deep imports.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/syntax-highlighter/typetests/adapted/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/syntax-highlighter/typetests/adapted/public-api.test-d.ts",
+          "role": "test",
+          "sha256": "ea245d39a4c4a1a42185bf6f0a89801f03517d954465ac6bfe654d3224befa82",
+          "cases": [
+            {
+              "id": "types:adapted-compiled-children",
+              "testName": "adapted compiled children type contract",
+              "fullName": "adapted compiled children type contract"
+            },
+            {
+              "id": "types:adapted-custom-components",
+              "testName": "adapted custom component type contract",
+              "fullName": "adapted custom component type contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/syntax-highlighter/typetests/adapted/tsconfig.json",
+          "role": "support",
+          "sha256": "1b11c6c0b616ca3b0e66cb100b561b124ab5608836a422195ab116c93c25c0cb"
+        },
+        {
+          "path": "packages/syntax-highlighter/audit/type-crosswalk.json",
+          "role": "support",
+          "sha256": "7f19eacbcbfe54d102b933bc40f5f13ee883c3d10f7490277168ec9feddddbad"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "compiled-children-value",
+      "caseIds": ["types:adapted-compiled-children"],
+      "upstreamResult": "Nested React children are inspectable source-string values.",
+      "octaneResult": "TSRX nested component children are opaque renderer blocks; source text is passed with children={source}.",
+      "rationale": "The Octane compiler owns nested component child blocks and intentionally does not expose their captured render scope to userland.",
+      "classification": "compiler ownership boundary",
+      "consumerImpact": "Rewrite nested SyntaxHighlighter source to the explicit children prop in .tsrx.",
+      "migrationGuidance": "Replace <SyntaxHighlighter>{source}</SyntaxHighlighter> with <SyntaxHighlighter children={source} />.",
+      "owner": "@octanejs/syntax-highlighter",
+      "reviewCondition": "Remove only if Octane exposes a supported value-child lowering for text-inspecting component APIs."
+    },
+    {
+      "id": "custom-component-identity",
+      "caseIds": ["types:adapted-custom-components"],
+      "upstreamResult": "PreTag and CodeTag accept native tags or React class/function ComponentType values.",
+      "octaneResult": "PreTag and CodeTag accept native tags or Octane function ComponentBody values.",
+      "rationale": "React class instances and React element identity are renderer-owned objects that Octane cannot execute.",
+      "classification": "framework identity boundary",
+      "consumerImpact": "Native tags and ordinary function components migrate directly; React class components require a function adapter.",
+      "migrationGuidance": "Replace a React class-valued custom tag with an Octane function component returning the same native host.",
+      "owner": "@octanejs/syntax-highlighter",
+      "reviewCondition": "Remove only if Octane gains a supported React class-component execution bridge."
+    }
+  ]
+}

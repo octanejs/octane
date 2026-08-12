@@ -40,6 +40,11 @@
       "path": "packages/apollo-client/tests/ssr/prerender.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane prerenderStatic and request isolation; it is not a one-for-one upstream SSR suite adaptation."
+    },
+    {
+      "path": "packages/apollo-client/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only declaration coverage for the published Apollo client/react surface; it is not parity type evidence."
     }
   ]
 }

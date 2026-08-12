@@ -6,8 +6,15 @@
     "useSortable retains the upstream keyboard plugin by default but omits OptimisticSortingPlugin because moving one host element before application state commits can split an Octane keyed DOM range; explicit plugin arrays remain authoritative."
   ],
   "ssr": "Static SSR and hydration are covered; DOM plugins initialize only after client refs register.",
-  "verified": "2026-07-15",
+  "provenance": {
+    "source": "https://github.com/clauderic/dnd-kit/tree/cc98bdd52c06e55221e8cf77aaa0c2ec0f55b86f/packages/react",
+    "license": "MIT",
+    "commit": "cc98bdd52c06e55221e8cf77aaa0c2ec0f55b86f",
+    "verification": "recorded-unverified"
+  },
+  "verified": "2026-08-03",
   "notes": [
-    "Targets the modern @dnd-kit/react API. The legacy @dnd-kit/core 6.x API is intentionally out of scope."
+    "Targets the modern @dnd-kit/react API. The legacy @dnd-kit/core 6.x API is intentionally out of scope.",
+    "The canonical React adapter source is vendored and checksum-verified. Upstream ships no adapter test suite at this pin; one bounded jsdom differential is available, while real pointer geometry and browser lifecycle coverage remain open, so parity is recorded-unverified."
   ]
 }

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "node": "v22.14.0",
+  "tarball": "octanejs-swr-0.0.1.tgz",
+  "esm": {
+    "r": "@octanejs/swr/src/index/index.ts",
+    "i": "@octanejs/swr/src/infinite/index.ts",
+    "m": "@octanejs/swr/src/immutable/index.ts",
+    "u": "@octanejs/swr/src/mutation/index.ts",
+    "s": "@octanejs/swr/src/subscription/index.ts",
+    "x": "@octanejs/swr/src/_internal/index.ts"
+  },
+  "cjs": {
+    "r": "@octanejs/swr/src/index/index.cts",
+    "i": "@octanejs/swr/src/infinite/index.cts",
+    "name": "@octanejs/swr",
+    "version": "0.0.1"
+  },
+  "server": {
+    "r": "@octanejs/swr/src/index/index.react-server.ts",
+    "i": "@octanejs/swr/src/infinite/index.react-server.ts",
+    "x": "@octanejs/swr/src/_internal/index.react-server.ts"
+  },
+  "typescriptProjects": 3
+}

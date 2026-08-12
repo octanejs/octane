@@ -1,0 +1,100 @@
+{
+  "name": "react-draggable",
+  "version": "4.7.1",
+  "description": "React draggable component",
+  "main": "build/cjs/cjs.js",
+  "module": "build/cjs/cjs.mjs",
+  "unpkg": "build/web/react-draggable.min.js",
+  "exports": {
+    ".": {
+      "types": "./build/cjs/cjs.d.ts",
+      "import": "./build/cjs/cjs.mjs",
+      "require": "./build/cjs/cjs.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run --reporter=verbose",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "test:browser": "yarn build && vitest run --config vitest.browser.config.js",
+    "test:all": "yarn test && yarn test:browser",
+    "dev": "make dev",
+    "build": "make clean build",
+    "build-example": "mkdir -p example/build/web && cp build/web/react-draggable.min.js example/build/web/ && sed -i.bak 's|../build/web/react-draggable|build/web/react-draggable|g' example/index.html && rm -f example/index.html.bak",
+    "lint": "make lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "build"
+  ],
+  "typings": "./build/cjs/cjs.d.ts",
+  "types": "./build/cjs/cjs.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/react-grid-layout/react-draggable.git"
+  },
+  "keywords": [
+    "react",
+    "draggable",
+    "react-component"
+  ],
+  "author": "Matt Zabriskie",
+  "contributors": [
+    "Samuel Reed <samuel.trace.reed@gmail.com> (http://strml.net/)"
+  ],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/react-grid-layout/react-draggable/issues"
+  },
+  "homepage": "https://github.com/react-grid-layout/react-draggable",
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/js": "^9.39.2",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.1",
+    "@types/node": "^25.0.3",
+    "@types/prop-types": "^15.7.15",
+    "@types/react": "^19.2.7",
+    "@types/react-18": "npm:@types/react@^18.3.27",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "@vitejs/plugin-react": "^5.1.2",
+    "@vitest/coverage-v8": "^4.0.16",
+    "esbuild-loader": "^4.2.2",
+    "eslint": "^9.39.2",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^16.5.0",
+    "jsdom": "^27.4.0",
+    "pre-commit": "^1.2.2",
+    "process": "^0.11.10",
+    "puppeteer": "^24.34.0",
+    "react": "19",
+    "react-dom": "19",
+    "react-frame-component": "^5.2.7",
+    "semver": "^7.7.3",
+    "tsup": "^8.3.5",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16",
+    "webpack": "^5.104.1",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.2"
+  },
+  "resolutions": {
+    "minimist": "^1.2.5"
+  },
+  "precommit": [
+    "lint",
+    "test"
+  ],
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "prop-types": "^15.8.1"
+  },
+  "peerDependencies": {
+    "react": ">= 16.3.0",
+    "react-dom": ">= 16.3.0"
+  }
+}

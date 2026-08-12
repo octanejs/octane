@@ -38,3 +38,4 @@ export namespace useRender {
 	export type RenderProp<State = Record<string, unknown>> =
 		import('./utils/useRenderElement').RenderProp<State>;
 }
+// OCTANE DIVERGENCE[ref-as-prop-class-composition][differential:base-ui-render-element]

@@ -7,18 +7,25 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/aria-diff-combobox.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
+await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
+
 describe('differential: @octanejs/aria Phase-3 combobox vs real react-aria', () => {
+	// @parity-case differential:aria-closed-mount
 	it('closed on mount, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'ComboBoxSpec', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-combobox-filter
 	it('typing filters + opens the listbox, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'ComboBoxSpec', undefined, CACHE);
 		await d.step('mount', () => {});

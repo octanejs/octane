@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "types": ["node"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsrx",
+    "src/utils/**/*.ts",
+    "tests/upstream/**/*.ts",
+    "tests/runtime/**/*.ts",
+    "tests/runtime/**/*.tsrx",
+    "typetests/**/*.ts"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "upstream": { "package": "react-pdf", "version": "10.4.1" },
+  "surface": "Complete against the documented react-pdf 10.4.1 root contract: Document, Page, Thumbnail, Outline, all three context hooks, PasswordResponses, pdfjs, all ten root types, both documented layer styles, and the unchanged PDF.js worker import.",
+  "divergences": [
+    "React nodes, refs, DOM events, and CSS property types are represented by Octane nodes, refs-as-props, native DOM events, and Octane class/style values while preserving observable behavior.",
+    "The permissive upstream ./* export exposes React implementation and source artifacts; these are pinned framework-private evidence rather than supported Octane entry points. Root imports and the two documented CSS paths are exact public support."
+  ],
+  "ssr": "Document renders deterministic loading, no-data, and error shells without browser globals or workers. The browser build adopts the server shell before starting PDF.js and uses the modern worker-backed build; Node resolves the legacy PDF.js build.",
+  "verified": "2026-08-04"
+}

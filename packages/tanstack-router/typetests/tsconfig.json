@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "vitest"],
+    "baseUrl": "../../..",
+    "paths": {
+      "@octanejs/tanstack-router": ["packages/tanstack-router/src/index.ts"]
+    }
+  },
+  "include": ["./*.test-d.ts", "../src/**/*.ts", "../src/**/*.tsrx"],
+  "exclude": ["../src/**/*.d.ts"]
+}

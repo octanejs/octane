@@ -1,0 +1,291 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/TanStack/table.git",
+    "version": "@tanstack/react-table@9.0.0-beta.58",
+    "commit": "9fa764702b25d675f97deedd714e8b9133994927",
+    "sourceRoot": "packages/react-table/src",
+    "testRoot": "packages/react-table",
+    "license": "MIT",
+    "integrity": "sha256:924a64009738996f1a2f32ef950aed338a6aafb0dbf85af548c7c98388deb559",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "insufficient"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/tanstack-table/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/tanstack-table/tests/differential"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+    }
+  },
+  "lanes": [
+    {
+      "id": "tanstack-table-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-table-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs exact rendering, sorting, filtering/pagination, selection, and visibility/expanding scenarios against @tanstack/react-table@9.0.0-beta.58. Owned by testExecution.group react-parity so the five cases execute once via react-parity:check; recorded-unverified provenance still blocks a verified claim.",
+      "files": [
+        {
+          "path": "packages/tanstack-table/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "03f37b4787cd273c377074a7f225d709a0341b1ca45bdf48588f74aab5c83496",
+          "cases": [
+            {
+              "id": "differential:tanstack-table-basic",
+              "testName": "BasicTable: flexRender shapes + data swap, byte-identical",
+              "fullName": "differential: @octanejs/tanstack-table vs real @tanstack/react-table BasicTable: flexRender shapes + data swap, byte-identical"
+            },
+            {
+              "id": "differential:tanstack-table-sorting",
+              "testName": "SortingTable: asc \u2192 desc \u2192 cleared \u2192 replace, byte-identical",
+              "fullName": "differential: @octanejs/tanstack-table vs real @tanstack/react-table SortingTable: asc \u2192 desc \u2192 cleared \u2192 replace, byte-identical"
+            },
+            {
+              "id": "differential:tanstack-table-filter-pagination",
+              "testName": "FilterPaginate: filter input + pagination buttons, byte-identical",
+              "fullName": "differential: @octanejs/tanstack-table vs real @tanstack/react-table FilterPaginate: filter input + pagination buttons, byte-identical"
+            },
+            {
+              "id": "differential:tanstack-table-selection",
+              "testName": "SelectionTable: predicate select-all + row toggles, byte-identical",
+              "fullName": "differential: @octanejs/tanstack-table vs real @tanstack/react-table SelectionTable: predicate select-all + row toggles, byte-identical"
+            },
+            {
+              "id": "differential:tanstack-table-visibility-expanding",
+              "testName": "VisExpand: visibility toggles + nested expanding, byte-identical",
+              "fullName": "differential: @octanejs/tanstack-table vs real @tanstack/react-table VisExpand: visibility toggles + nested expanding, byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-table/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "ec7ad41f79b5d1d1c85d12e05942a5fa4017f0a7150071ddb29d3aada6d0d460"
+        },
+        {
+          "path": "packages/tanstack-table/tests/differential/fixture-compiler.ts",
+          "role": "support",
+          "sha256": "dc753997ee0edb8a82dca4fb6a5b737f35b5cd8805326bb970f1a631edf49a95"
+        },
+        {
+          "path": "packages/tanstack-table/tests/_fixtures/app-table.tsrx",
+          "role": "support",
+          "sha256": "5035133e84b23dbfaff0557998260e4ba5aae1403146211fe557a010c4dae7b7"
+        },
+        {
+          "path": "packages/tanstack-table/tests/_fixtures/basic-table-diff.tsrx",
+          "role": "support",
+          "sha256": "00af3daa3fbe2a2423edde221157903d640433779f41a36238164aa89d29a620"
+        },
+        {
+          "path": "packages/tanstack-table/tests/_fixtures/features.tsrx",
+          "role": "support",
+          "sha256": "c217c149cb2d362866078156f9f6cee054c5644e70e4467a2e57875297796679"
+        },
+        {
+          "path": "packages/tanstack-table/tests/_fixtures/filter-paginate-diff.tsrx",
+          "role": "support",
+          "sha256": "3c231375c46517f2555858d7203e8b1499f664f79770f1b194b59745d779ccd7"
+        },
+        {
+          "path": "packages/tanstack-table/tests/_fixtures/flex-render.tsrx",
+          "role": "support",
+          "sha256": "9f6e50aa65563fceb30bae8c0c2f4909f76e7bc0af47627ff5d44d83897c903e"
+        },
+        {
+          "path": "packages/tanstack-table/tests/_fixtures/selection-diff.tsrx",
+          "role": "support",
+          "sha256": "f03f1cc7e0039d75da176fb4360035ff139adba940b37fdf5f3d26637ecb5f6e"
+        },
+        {
+          "path": "packages/tanstack-table/tests/_fixtures/sorting-diff.tsrx",
+          "role": "support",
+          "sha256": "1b5e45128a12a7c1ea0bee05c20f3b6bc0cccdc177960867e66ff3eb1b3042c8"
+        },
+        {
+          "path": "packages/tanstack-table/tests/_fixtures/table-basic.tsrx",
+          "role": "support",
+          "sha256": "a8a3af972b735c2f09db3c40b697cd32a6a54f91ea6be3640ee734f2c78fa79b"
+        },
+        {
+          "path": "packages/tanstack-table/tests/_fixtures/visibility-expand-diff.tsrx",
+          "role": "support",
+          "sha256": "cdb2ac532b20a899c96c1aa8932ee674290b39194a6a104c0018453130c32ac8"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-table-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "available": true,
+      "environment": "workspace-node",
+      "project": "tanstack-table-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Type assertions for the public surface, compiled against @tanstack/react-table@9.0.0-beta.58 with tsc; per-file/per-group inventories and negative controls are enforced by tanstack-table-types-lib.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/tanstack-table/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-table/audit/pristine-types.json",
+          "role": "test",
+          "sha256": "e87c4b10c5f3619a7734647f17c298a3cea9b7a3d63b2c512ad26edd2232f5cd",
+          "cases": [
+            {
+              "id": "types:tanstack-table-pristine",
+              "testName": "public surface type assertions",
+              "fullName": "public surface type assertions"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-table/typetests/pristine/types.test-d.ts",
+          "role": "support",
+          "sha256": "c293e132f44058c8247be40904783a5cfbef93047b1cf389b3d33ce184c48ffc"
+        },
+        {
+          "path": "packages/tanstack-table/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "cb82e03159b832dd6a70589b26cd2a47d7361981f4b9ff8e7550692c2896b46c"
+        },
+        {
+          "path": "packages/tanstack-table/typetests/assertions.md",
+          "role": "support",
+          "sha256": "3c705814e055f8dd06438a1dc1dcf6b94d5049968ca1283fbe4d8546f1b4eee0"
+        },
+        {
+          "path": "packages/tanstack-table/audit/type-parity.json",
+          "role": "support",
+          "sha256": "73d82ea6996541d7b4b931af7b078b5f63fa62a88503ab77b9c8e499529a44af"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-table-types-lib.mjs",
+          "role": "support",
+          "sha256": "6da105d5ade5db790439261a1ff528bbd1c1a8f52dbba6cb420fef3d354a94e6"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-table-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "available": true,
+      "environment": "workspace-node",
+      "project": "tanstack-table-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "The same assertion groups against @octanejs/tanstack-table with tsrx-tsc; structural comparison and negative controls are enforced by tanstack-table-types-lib.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-table/typetests/adapted/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-table/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "cee81dff84e33d550e9b485d0af73c08825b5fe730416c748e350a0d9fd0fda0",
+          "cases": [
+            {
+              "id": "types:tanstack-table-adapted",
+              "testName": "public surface type assertions",
+              "fullName": "public surface type assertions"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-table/typetests/adapted/types.test-d.ts",
+          "role": "support",
+          "sha256": "eb1e9eb220da2212501ddb7b2fe2f7e82417eac1c0703b4ba607dd768197f237"
+        },
+        {
+          "path": "packages/tanstack-table/typetests/adapted/tsconfig.json",
+          "role": "support",
+          "sha256": "765b85e3b0cd62da394dee3faaf0c03438ceb783c73a4579fee7acc86d8a709d"
+        },
+        {
+          "path": "packages/tanstack-table/typetests/assertions.md",
+          "role": "support",
+          "sha256": "3c705814e055f8dd06438a1dc1dcf6b94d5049968ca1283fbe4d8546f1b4eee0"
+        },
+        {
+          "path": "packages/tanstack-table/audit/type-parity.json",
+          "role": "support",
+          "sha256": "73d82ea6996541d7b4b931af7b078b5f63fa62a88503ab77b9c8e499529a44af"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-table-types-lib.mjs",
+          "role": "support",
+          "sha256": "6da105d5ade5db790439261a1ff528bbd1c1a8f52dbba6cb420fef3d354a94e6"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-table-legacy-subpath",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "available": true,
+      "environment": "workspace-node",
+      "project": "tanstack-table",
+      "notes": "Focused same-scenario package-export observation for the ./legacy omission. Classified react-octane-differential; owned by file-granular testExecution.include on the mixed tanstack-table project so react-parity:check executes the case once and ordinary shards omit it; pins divergence legacy-migration-subpath.",
+      "files": [
+        {
+          "path": "packages/tanstack-table/tests/conformance/parity-legacy-api.test.ts",
+          "role": "test",
+          "sha256": "a1ce67f812df9a828c09c6a08985a7913242355b45dc8e8339ec35a2a100e2d8",
+          "cases": [
+            {
+              "id": "adapted:tanstack-table-legacy-subpath",
+              "testName": "records React ./legacy presence versus Octane omission",
+              "fullName": "export surface records React ./legacy presence versus Octane omission"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "legacy-migration-subpath",
+      "caseIds": ["adapted:tanstack-table-legacy-subpath"],
+      "upstreamResult": "@tanstack/react-table publishes a ./legacy migration subpath for React v8 codebases.",
+      "octaneResult": "@octanejs/tanstack-table omits ./legacy from package exports and does not port useLegacyTable.",
+      "rationale": "The legacy adapter exists only to migrate existing React v8 table apps; an Octane binding has no such migration surface and targets the v9 useTable API directly.",
+      "classification": "public-api",
+      "consumerImpact": "Imports of @octanejs/tanstack-table/legacy fail; consumers must use the v9 useTable surface.",
+      "migrationGuidance": "Replace any ./legacy or useLegacyTable usage with useTable and the shared @tanstack/table-core feature APIs.",
+      "owner": "@octanejs/tanstack-table",
+      "reviewCondition": "Review if Octane gains a React-table v8 migration audience that needs the legacy subpath."
+    }
+  ]
+}

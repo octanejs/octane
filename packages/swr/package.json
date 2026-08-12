@@ -1,0 +1,113 @@
+{
+  "name": "@octanejs/swr",
+  "version": "0.0.1",
+  "type": "module",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "UPSTREAM.md",
+    "status.json"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "react-server": "./src/index/index.react-server.ts",
+      "types": "./src/index/index.d.ts",
+      "import": "./src/index/index.ts",
+      "require": "./src/index/index.cts"
+    },
+    "./infinite": {
+      "react-server": "./src/infinite/index.react-server.ts",
+      "types": "./src/infinite/index.d.ts",
+      "import": "./src/infinite/index.ts",
+      "require": "./src/infinite/index.cts"
+    },
+    "./immutable": {
+      "import": {
+        "types": "./src/immutable/index.ts",
+        "default": "./src/immutable/index.ts"
+      },
+      "require": {
+        "types": "./src/immutable/index.ts",
+        "default": "./src/immutable/index.cts"
+      }
+    },
+    "./subscription": {
+      "types": "./src/subscription/index.d.ts",
+      "import": "./src/subscription/index.ts",
+      "require": "./src/subscription/index.cts"
+    },
+    "./mutation": {
+      "types": "./src/mutation/index.d.ts",
+      "import": "./src/mutation/index.ts",
+      "require": "./src/mutation/index.cts"
+    },
+    "./_internal": {
+      "react-server": "./src/_internal/index.react-server.ts",
+      "import": {
+        "types": "./src/_internal/index.ts",
+        "default": "./src/_internal/index.ts"
+      },
+      "require": {
+        "types": "./src/_internal/index.ts",
+        "default": "./src/_internal/index.cts"
+      }
+    }
+  },
+  "scripts": {
+    "u1:architecture": "vitest run ./tests/probes/architecture.test.ts ../../packages/octane/tests/hydration/hydration.test.ts ../../packages/octane/tests/hydration/suspense-hydrate.test.ts ../../packages/octane/tests/streaming-ssr.test.ts --config ./tests/probes/vitest.config.mjs",
+    "u1:pack": "node ./tests/probes/packed-exports.test.mjs",
+    "u2:test": "vitest run ./tests/unit ./tests/differential --config ./tests/probes/vitest.config.mjs",
+    "u2:types": "tsc -p ./typetests/internal/tsconfig.json",
+    "u3:test": "vitest run ./tests/upstream/root ./tests/differential/root.test.ts --config ./tests/probes/vitest.config.mjs",
+    "u3:types": "tsrx-tsc --noEmit -p ./typetests/root/tsconfig.json",
+    "u4:test": "vitest run ./tests/upstream/specialized ./tests/differential/specialized-exports.test.ts --config ./tests/probes/vitest.config.mjs",
+    "u4:types": "tsrx-tsc --noEmit -p ./typetests/specialized/tsconfig.json",
+    "upstream:verify": "node ./audit/verify-provenance.mjs",
+    "u6:adoption": "vitest run ./tests/adoption --config ./tests/probes/vitest.config.mjs",
+    "u6:types": "tsrx-tsc --noEmit -p ./tests/adoption/tsconfig.json"
+  },
+  "dependencies": {
+    "dequal": "^2.0.3"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@edge-runtime/jest-environment": "^4.0.0",
+    "@octanejs/testing-library": "workspace:*",
+    "@swc/core": "^1.15.3",
+    "@swc/jest": "0.2.39",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@type-challenges/utils": "0.1.1",
+    "@types/jest": "^30.0.0",
+    "@types/react": "^19.2.7",
+    "@types/use-sync-external-store": "^1.5.0",
+    "happy-dom": "catalog:",
+    "jest": "30.2.0",
+    "jest-environment-jsdom": "29.7.0",
+    "octane": "workspace:*",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-error-boundary": "^5.0.0",
+    "semver": "^7.5.1",
+    "typescript": "catalog:",
+    "use-sync-external-store": "^1.6.0",
+    "vitest": "catalog:"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/swr"
+  }
+}

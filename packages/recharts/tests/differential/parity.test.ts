@@ -7,10 +7,19 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/shapes.tsrx');
+const CHARTS_FIXTURE = resolve(__dirname, '../_fixtures/charts.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
+
+await Promise.all([
+	preloadDifferentialFixture(FIXTURE, CACHE),
+	preloadDifferentialFixture(CHARTS_FIXTURE, CACHE),
+]);
 
 describe('differential: @octanejs/recharts vs real recharts (Phase 0 shapes)', () => {
 	// @parity-case differential:recharts-shapes
@@ -20,8 +29,6 @@ describe('differential: @octanejs/recharts vs real recharts (Phase 0 shapes)', (
 		d.unmount();
 	});
 });
-
-const CHARTS_FIXTURE = resolve(__dirname, '../_fixtures/charts.tsrx');
 
 // The chart pipeline is multi-pass on BOTH sides (size effect → axis/item
 // registration → offset selectors → final paint, plus a rAF for the store's

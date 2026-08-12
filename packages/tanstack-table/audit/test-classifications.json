@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/tanstack-table/tests/conformance/app-table.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane createTableHook context and component integration; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-table/tests/conformance/core.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks adapted Octane table lifecycle and state wiring; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-table/tests/conformance/features.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks additional adapted feature behavior; it is not a React runtime oracle."
+    },
+    {
+      "path": "packages/tanstack-table/tests/conformance/fixture-compiler.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks fail-closed React fixture compilation for the parity harness itself."
+    },
+    {
+      "path": "packages/tanstack-table/tests/conformance/flex-render-component-shapes.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane plain-function component cells in flexRender without a paired React observation."
+    },
+    {
+      "path": "packages/tanstack-table/tests/conformance/flex-render.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks adapted flexRender renderer shapes through Octane; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-table/tests/conformance/parity-legacy-api.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Same-scenario package-export check: @tanstack/react-table publishes ./legacy and @octanejs/tanstack-table omits it (pins divergence legacy-migration-subpath)."
+    },
+    {
+      "path": "packages/tanstack-table/tests/conformance/parity.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks adapted export surface and shared table-core identity; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tanstack-table/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs five exact table scenarios against @tanstack/react-table@9.0.0-beta.58."
+    },
+    {
+      "path": "packages/tanstack-table/typetests/adapted/types.test-d.ts",
+      "disposition": "adapted-types",
+      "oracle": "Adapted public-surface type probes compiled with tsrx-tsc against @octanejs/tanstack-table (tanstack-table-adapted-types lane)."
+    },
+    {
+      "path": "packages/tanstack-table/typetests/pristine/types.test-d.ts",
+      "disposition": "pristine-types",
+      "oracle": "Repo-authored pristine public-surface type probes compiled with tsc against @tanstack/react-table@9.0.0-beta.58 (tanstack-table-pristine-types lane)."
+    }
+  ]
+}

@@ -7,6 +7,7 @@
 // additionally accumulates rules in-memory so `getStyleTags()` /
 // `getStyleElement()` keep working. `interleaveWithNodeStream` is not
 // supported — octane's `renderToPipeableStream` already streams styles.
+// Package contract (ordinary test evidence, not parity-counted).
 import { createElement } from 'octane';
 
 import { SC_ATTR, SC_ATTR_VERSION, SC_VERSION } from '../constants';
@@ -81,7 +82,8 @@ export default class ServerStyleSheet {
 	};
 
 	interleaveWithNodeStream(_input: unknown): never {
-		// OCTANE DIVERGENCE: octane's renderToPipeableStream already emits each
+		// Package contract (ordinary test evidence, not parity-counted):
+		// Octane's renderToPipeableStream already emits each
 		// pass's style chunks ahead of its html, so there is nothing to interleave.
 		throw styledError(3);
 	}

@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { chromium, type Browser, type Page } from 'playwright';
+import type { Browser, Page } from 'playwright';
+import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { createServer, type Plugin, type ViteDevServer } from 'vite';
 import { octane } from 'octane/compiler/vite';
 import * as ServerRuntime from 'octane/server';
@@ -66,13 +67,7 @@ beforeAll(async () => {
 	const address = server.httpServer!.address();
 	if (!address || typeof address === 'string') throw new Error('Vite did not expose a TCP port');
 	baseUrl = `http://127.0.0.1:${address.port}`;
-	try {
-		browser = await chromium.launch({ headless: true });
-	} catch (error) {
-		throw new Error(
-			`Chromium is required for Suspense/hydration evidence (run \`pnpm --filter octane exec playwright install chromium\`): ${String(error)}`,
-		);
-	}
+	browser = await launchBrowser({ headless: true });
 });
 
 afterEach(async () => {
@@ -121,6 +116,10 @@ async function waitForFallback(): Promise<void> {
 	await page!.waitForFunction(() => window.__suspenseHydration.snapshot().fallbackCount === 1);
 }
 
+async function waitForHiddenPrimaryBlur(): Promise<void> {
+	await page!.waitForFunction(() => window.__suspenseHydration.snapshot().activeId === '');
+}
+
 async function waitForReveal(): Promise<void> {
 	await page!.waitForFunction(() => {
 		const state = window.__suspenseHydration.snapshot();
@@ -151,6 +150,7 @@ async function expectUrgentPreservation(shape: 'same' | 'swap'): Promise<void> {
 
 	await page!.evaluate(() => window.__suspenseHydration.urgent!());
 	await waitForFallback();
+	await waitForHiddenPrimaryBlur();
 	state = await snapshot();
 	expectPreservedInput(state);
 	expect(state.panelVisible).toBe(false);
@@ -308,7 +308,8 @@ describe.sequential('real-browser Suspense and async hydration evidence', () => 
 		state = await snapshot();
 		expect(state.inputSame).toBe(true);
 		expect(state.inputVisible).toBe(true);
-		// Chromium normalizes focus to <body> before the async reveal completes.
+		// Chromium normalizes focus to <body> before the async
+		// reveal completes on this React baseline path.
 		expect(state.activeId).toBe('');
 		expect(state.globalFailures).toEqual([]);
 	});
@@ -375,6 +376,7 @@ describe.sequential('real-browser Suspense and async hydration evidence', () => 
 			window.__suspenseHydration.transition!();
 		});
 		await waitForFallback();
+		await waitForHiddenPrimaryBlur();
 		let state = await snapshot();
 		expectPreservedInput(state);
 		expect(state.panelVisible).toBe(false);

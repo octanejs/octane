@@ -1,0 +1,41 @@
+import { memo } from 'octane';
+import { clamp } from '../../utils/clamp';
+import { hsvaToHslString } from '../../utils/convert';
+import { formatClassName } from '../../utils/format';
+import { round } from '../../utils/round';
+import { Interactive, type Interaction } from './Interactive.tsrx';
+import { Pointer } from './Pointer.tsrx';
+
+interface Props {
+	className?: string;
+	hue: number;
+	onChange: (newHue: { h: number }) => void;
+	onChangeEnd?: () => void;
+}
+
+const HueBase = ({ className, hue, onChange, onChangeEnd }: Props) => {
+	const handleMove = (interaction: Interaction) => onChange({ h: 360 * interaction.left });
+	const handleKey = (offset: Interaction) => onChange({
+		h: clamp(hue + offset.left * 360, 0, 360),
+	});
+	const nodeClassName = formatClassName(['react-colorful__hue', className]);
+	return <div class={nodeClassName}>
+		<Interactive
+			onMove={handleMove}
+			onKey={handleKey}
+			onEnd={onChangeEnd}
+			aria-label="Hue"
+			aria-valuenow={round(hue)}
+			aria-valuemax={360}
+			aria-valuemin={0}
+		>
+			<Pointer
+				className="react-colorful__hue-pointer"
+				left={hue / 360}
+				color={hsvaToHslString({ h: hue, s: 100, v: 100, a: 1 })}
+			/>
+		</Interactive>
+	</div>;
+};
+
+export const Hue = memo(HueBase);

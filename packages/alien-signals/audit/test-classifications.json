@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/alien-signals/audit/type-probes/public-api.test-d.ts",
+      "disposition": "paired-repo-authored-react-type-oracle",
+      "oracle": "Repo-authored pristine React declaration/type-oracle probes against the vendored react-alien-signals 0.3.0 public surface, paired with packages/alien-signals/typetests/public-api.test-d.ts (alien-signals-pristine-types lane)."
+    },
+    {
+      "path": "packages/alien-signals/tests/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Hydration adoption for signal-backed views is an Octane SSR/hydration contract unpaired against the upstream bun React suite."
+    },
+    {
+      "path": "packages/alien-signals/tests/octane-contracts.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Cancellation-safe scope controllers, setter identity, and post-commit ownership are Octane lifecycle contracts outside the adapted upstream titles."
+    },
+    {
+      "path": "packages/alien-signals/tests/ssr/render-safety.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "SSR render-safety for effects/scopes is an Octane server contract; the upstream suite is client-only bun:test."
+    },
+    {
+      "path": "packages/alien-signals/tests/upstream-adapted.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted cases from pinned react-alien-signals 0.3.0 src/index.test.ts with Per-line citations and assertion/fixture crosswalk."
+    },
+    {
+      "path": "packages/alien-signals/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs the byte-exact pinned react-alien-signals 0.3.0 bun:test suite against the recorded workspace React oracle after vendored-byte verification."
+    },
+    {
+      "path": "packages/alien-signals/typetests/public-api.test-d.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Supplemental Octane public type probes paired with audit/type-probes; primary type evidence is the upstream typecheck suite."
+    },
+    {
+      "path": "packages/alien-signals/typetests/readable-computed.test-d.ts",
+      "disposition": "octane-only-divergence",
+      "divergenceId": "alien-signals-readable-computed",
+      "reason": "Octane useSignalValue accepts ReadableSignal/computed signals; the pinned React declaration narrows to WritableSignal, so this acceptance is unpaired from the pristine type oracle."
+    },
+    {
+      "path": "packages/alien-signals/typetests/upstream-typecheck.test-d.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted assertion group for the upstream typecheck @ts-expect-error at src/index.test.ts:392."
+    },
+    {
+      "path": "playground/octane/src/demos/AlienSignals.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Central playground registration and demo journey for @octanejs/alien-signals; unpaired against the upstream bun React suite."
+    },
+    {
+      "path": "scripts/react-parity/alien-signals-classifications-lib.test.mjs",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Negative-control suite for port-authored test classification discovery; supports the parity claim but is not an adapted upstream title."
+    },
+    {
+      "path": "scripts/react-parity/alien-signals-runtime-lib.test.mjs",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Negative-control suite for runtime assertion/fixture/transition crosswalk; supports the parity claim but is not an adapted upstream title."
+    },
+    {
+      "path": "scripts/react-parity/alien-signals-types-lib.test.mjs",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Negative-control suite for type-oracle crosswalk; supports the parity claim but is not an adapted upstream title."
+    }
+  ]
+}

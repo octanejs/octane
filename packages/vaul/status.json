@@ -1,0 +1,13 @@
+{
+  "upstream": {
+    "package": "vaul",
+    "version": "1.1.2",
+    "commit": "73d06cdd3fd990bf4b83214cfe240c246908af0d"
+  },
+  "surface": "Drawer, Root, NestedRoot, Portal, Overlay, Content, Handle, public props, and style.css.",
+  "divergences": [
+    "React DOM prop types are preserved publicly and normalized at Octane render boundaries."
+  ],
+  "ssr": "Closed drawer roots and triggers render without browser globals; portaled content remains absent while closed.",
+  "verified": "2026-08-02"
+}

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { build as buildEsbuild } from 'esbuild';
 import { octane } from 'octane/compiler/vite';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 const packageDirectory = resolve(import.meta.dirname, '..');
 const repositoryRoot = resolve(packageDirectory, '../..');
@@ -28,7 +28,8 @@ interface ProductionBundle {
 	modules: Array<string>;
 }
 
-const productionBundles = new Map<ProductionBundler, Promise<ProductionBundle>>();
+const productionBundlers = ['esbuild', 'vite'] as const;
+const productionBundles = new Map<ProductionBundler, ProductionBundle>();
 
 async function buildConsumer(bundler: ProductionBundler): Promise<ProductionBundle> {
 	if (bundler === 'esbuild') {
@@ -92,20 +93,23 @@ async function buildConsumer(bundler: ProductionBundler): Promise<ProductionBund
 	return { code: chunks[0].code, modules: Object.keys(chunks[0].modules) };
 }
 
-function consumerBundle(bundler: ProductionBundler): Promise<ProductionBundle> {
-	let bundle = productionBundles.get(bundler);
-	if (!bundle) {
-		bundle = buildConsumer(bundler);
-		productionBundles.set(bundler, bundle);
+beforeAll(async () => {
+	for (const bundler of productionBundlers) {
+		productionBundles.set(bundler, await buildConsumer(bundler));
 	}
+});
+
+function consumerBundle(bundler: ProductionBundler): ProductionBundle {
+	const bundle = productionBundles.get(bundler);
+	if (bundle === undefined) throw new Error(`Missing prepared ${bundler} production bundle.`);
 	return bundle;
 }
 
 describe('@octanejs/aria package boundary', () => {
-	it.each(['esbuild', 'vite'] as const)(
+	it.each(productionBundlers)(
 		'preserves public separator behavior and browser bootstrap in a production %s bundle',
 		async (bundler) => {
-			const bundle = await consumerBundle(bundler);
+			const bundle = consumerBundle(bundler);
 			const dom = new JSDOM('<!doctype html><html><body></body></html>', {
 				pretendToBeVisual: true,
 				runScripts: 'dangerously',
@@ -160,10 +164,10 @@ describe('@octanejs/aria package boundary', () => {
 		},
 	);
 
-	it.each(['esbuild', 'vite'] as const)(
+	it.each(productionBundlers)(
 		'removes unrelated package-root exports from a production %s bundle',
 		async (bundler) => {
-			const { modules } = await consumerBundle(bundler);
+			const { modules } = consumerBundle(bundler);
 			const unwantedSiblings = [
 				'focus/FocusScope.ts',
 				'i18n/I18nProvider.ts',

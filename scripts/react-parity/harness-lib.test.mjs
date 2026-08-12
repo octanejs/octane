@@ -354,6 +354,95 @@ test('routes harness execution from required lanes, not provenance verification'
 	assert.equal(selectHarnessAction(unavailableOnly), 'validate');
 });
 
+test('remix-router exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/remix-router/audit/react-parity.json');
+	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
+	const renamed = structuredClone(value);
+	renamed.lanes[0].files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
+		/must match exactly one collected Vitest test/,
+	);
+});
+
+test('routes harness execution from required lanes, not provenance verification', () => {
+	const unverified = manifest();
+	unverified.provenance.verification = 'recorded-unverified';
+	assert.equal(selectHarnessAction(unverified), 'run-required');
+
+	const empty = manifest({ lanes: [] });
+	assert.equal(selectHarnessAction(empty), 'validate');
+
+	const unavailableOnly = manifest({
+		lanes: [{ ...manifest().lanes[0], available: false }],
+	});
+	assert.equal(selectHarnessAction(unavailableOnly), 'validate');
+});
+
+test('streamdown exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/streamdown/audit/react-parity.json');
+	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
+	const renamed = structuredClone(value);
+	renamed.lanes[0].files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
+		/must match exactly one collected Vitest test/,
+	);
+});
+
+test('routes harness execution from required lanes, not provenance verification', () => {
+	const unverified = manifest();
+	unverified.provenance.verification = 'recorded-unverified';
+	assert.equal(selectHarnessAction(unverified), 'run-required');
+
+	const empty = manifest({ lanes: [] });
+	assert.equal(selectHarnessAction(empty), 'validate');
+
+	const unavailableOnly = manifest({
+		lanes: [{ ...manifest().lanes[0], available: false }],
+	});
+	assert.equal(selectHarnessAction(unavailableOnly), 'validate');
+});
+
+test('styled-components exact selection fails closed when a declared case is renamed', async () => {
+	const value = await loadManifest('packages/styled-components/audit/react-parity.json');
+	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
+	const renamed = structuredClone(value);
+	renamed.lanes[0].files[0].cases[0].fullName += ' renamed';
+	await assert.rejects(
+		() => verifyManifestTestSelections(renamed, process.cwd()),
+		/must match exactly one collected Vitest test/,
+	);
+});
+
+test('routes harness execution from required lanes, not provenance verification', () => {
+	const unverified = manifest();
+	unverified.provenance.verification = 'recorded-unverified';
+	assert.equal(selectHarnessAction(unverified), 'run-required');
+
+	const empty = manifest({ lanes: [] });
+	assert.equal(selectHarnessAction(empty), 'validate');
+
+	const unavailableOnly = manifest({
+		lanes: [{ ...manifest().lanes[0], available: false }],
+	});
+	assert.equal(selectHarnessAction(unavailableOnly), 'validate');
+});
+
+test('routes harness execution from required lanes, not provenance verification', () => {
+	const unverified = manifest();
+	unverified.provenance.verification = 'recorded-unverified';
+	assert.equal(selectHarnessAction(unverified), 'run-required');
+
+	const empty = manifest({ lanes: [] });
+	assert.equal(selectHarnessAction(empty), 'validate');
+
+	const unavailableOnly = manifest({
+		lanes: [{ ...manifest().lanes[0], available: false }],
+	});
+	assert.equal(selectHarnessAction(unavailableOnly), 'validate');
+});
+
 test('accepts explicit TypeScript lanes and builds portable compiler argv without a shell', () => {
 	const lane = {
 		...manifest().lanes[0],
@@ -477,6 +566,69 @@ test('normalizes Windows identity paths and resolves full-suite inventories from
 	]);
 });
 
+test('passes file parallelism through full Vitest lanes', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-workers-'));
+	await mkdir(join(root, 'audit'), { recursive: true });
+	await writeFile(
+		join(root, 'audit/inventory.json'),
+		JSON.stringify({ files: ['packages/example.test.ts'] }),
+	);
+	const lane = {
+		...manifest().lanes[0],
+		evidenceOrigin: 'upstream-suite',
+		execution: {
+			kind: 'vitest-full',
+			inventory: 'audit/inventory.json',
+			fileParallelism: true,
+		},
+	};
+	assert.deepEqual(validateManifest(manifest({ lanes: [lane] })).lanes[0], lane);
+	assert.deepEqual(buildLaneArgv(lane, root).slice(3), [
+		'--project',
+		'hook-form',
+		'--fileParallelism',
+		'packages/example.test.ts',
+		'--reporter=json',
+	]);
+	const invalidParallelism = structuredClone(lane);
+	invalidParallelism.execution.fileParallelism = 'true';
+	assert.throws(
+		() => validateManifest(manifest({ lanes: [invalidParallelism] })),
+		/fileParallelism must be boolean/,
+	);
+	const typeWithParallelism = typeLane('adapted-types');
+	typeWithParallelism.execution.fileParallelism = true;
+	assert.throws(
+		() => validateManifest(manifest({ lanes: [typeWithParallelism] })),
+		/fileParallelism is only valid for Vitest full-suite execution/,
+	);
+});
+
+test('normalizes Vitest suite separators symmetrically when a title contains greater-than', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-vitest-title-'));
+	await mkdir(join(root, 'audit'), { recursive: true });
+	const lane = {
+		...manifest().lanes[0],
+		execution: { kind: 'vitest-full', inventory: 'audit/inventory.json' },
+	};
+	await writeFile(
+		join(root, 'audit/inventory.json'),
+		JSON.stringify({
+			files: ['example.test.ts'],
+			tests: [{ file: 'example.test.ts', fullName: 'suite prints bytes when size 1' }],
+		}),
+	);
+	const result = {
+		testResults: [
+			{
+				name: join(root, 'example.test.ts'),
+				assertionResults: [{ fullName: 'suite prints bytes when size > 1', status: 'passed' }],
+			},
+		],
+	};
+	assert.equal(verifyLaneRunResult(lane, JSON.stringify(result), root), true);
+});
+
 test('runs Jest full suites directly and rejects identity or snapshot drift', async () => {
 	const root = await mkdtemp(join(tmpdir(), 'react-parity-jest-root-'));
 	const lane = fullRuntimeLane('pristine-upstream');
@@ -513,6 +665,49 @@ test('runs Jest full suites directly and rejects identity or snapshot drift', as
 	);
 });
 
+test('runs Node full suites directly and rejects leaf identity drift', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-node-root-'));
+	const lane = {
+		...fullRuntimeLane('pristine-upstream'),
+		execution: {
+			kind: 'node-full',
+			root: 'packages/example/upstream',
+			file: 'packages/example/upstream/test.jsx',
+			loader: 'packages/example/upstream/load-jsx.js',
+			inventory: 'audit/pristine-upstream.json',
+		},
+	};
+	const inventory = {
+		schemaVersion: 1,
+		root: lane.execution.root,
+		tests: [{ file: lane.execution.file, fullName: 'suite works', status: 'passed' }],
+		snapshots: 0,
+	};
+	await mkdir(join(root, 'audit'), { recursive: true });
+	await writeFile(join(root, lane.execution.inventory), JSON.stringify(inventory));
+
+	assert.deepEqual(buildLaneArgv(lane, root), [
+		process.execPath,
+		'scripts/react-parity/node-full-runner.mjs',
+		'--root',
+		lane.execution.root,
+		'--file',
+		lane.execution.file,
+		'--loader',
+		lane.execution.loader,
+		'--inventory',
+		lane.execution.inventory,
+	]);
+	assert.equal(
+		verifyLaneRunResult(lane, JSON.stringify({ schemaVersion: 1, tests: inventory.tests }), root),
+		true,
+	);
+	assert.throws(
+		() => verifyLaneRunResult(lane, JSON.stringify({ schemaVersion: 1, tests: [] }), root),
+		/did not execute every inventoried Node identity exactly once/,
+	);
+});
+
 test('sorts test identities by locale-independent code-unit order', () => {
 	const identities = [
 		{ file: 'test.ts', fullName: 'z' },
@@ -525,7 +720,13 @@ test('sorts test identities by locale-independent code-unit order', () => {
 	);
 });
 
-test('rejects adapted type evidence that bypasses the TSRX compiler', () => {
+test('accepts standard TypeScript for plain adapted type suites', () => {
+	const lane = typeLane('adapted-types');
+	lane.execution.compiler = 'tsc';
+	assert.doesNotThrow(() => validateManifest(manifest({ lanes: [lane] })));
+});
+
+test('rejects adapted type evidence that bypasses a supported TypeScript compiler', () => {
 	const lane = {
 		...manifest().lanes[0],
 		id: 'adapted-types',
@@ -539,7 +740,7 @@ test('rejects adapted type evidence that bypasses the TSRX compiler', () => {
 	};
 	assert.throws(
 		() => validateManifest(manifest({ lanes: [lane] })),
-		/adapted-types execution must use tsrx-tsc/,
+		/adapted-types execution must use tsc or tsrx-tsc/,
 	);
 });
 
@@ -685,6 +886,15 @@ test('makes every upstream runtime suite state an executable verified requiremen
 	insufficient.lanes.push(differentialLane());
 	assert.doesNotThrow(() => validateManifest(insufficient));
 
+	const missingInsufficientPristine = structuredClone(insufficient);
+	missingInsufficientPristine.lanes = missingInsufficientPristine.lanes.filter(
+		(lane) => lane.type !== 'pristine-upstream',
+	);
+	assert.throws(
+		() => validateManifest(missingInsufficientPristine),
+		/insufficient upstream runtime tests requires full upstream-suite lanes plus repo-authored differential evidence/,
+	);
+
 	const absent = structuredClone(present);
 	absent.upstreamSuites.runtime = 'absent';
 	absent.lanes = absent.lanes.filter(
@@ -692,13 +902,13 @@ test('makes every upstream runtime suite state an executable verified requiremen
 	);
 	assert.throws(
 		() => validateManifest(absent),
-		/absent upstream runtime tests requires a required differential lane with repo-authored evidence/,
+		/absent upstream runtime tests requires differential lanes with repo-authored evidence/,
 	);
 	absent.lanes.push(differentialLane());
 	assert.doesNotThrow(() => validateManifest(absent));
 });
 
-test('requires paired executable type lanes for every upstream type suite state', () => {
+test('requires paired executable type lanes only when upstream type evidence exists', () => {
 	const value = verifiedManifest();
 	for (const mutation of [
 		(candidate) =>
@@ -719,7 +929,7 @@ test('requires paired executable type lanes for every upstream type suite state'
 		);
 	}
 
-	for (const suiteState of ['absent', 'insufficient']) {
+	for (const suiteState of ['insufficient']) {
 		const repoAuthored = structuredClone(value);
 		repoAuthored.upstreamSuites.types = suiteState;
 		for (const lane of repoAuthored.lanes.filter((candidate) => candidate.type.endsWith('-types')))
@@ -759,9 +969,20 @@ test('requires paired executable type lanes for every upstream type suite state'
 			new RegExp(`with ${suiteState} upstream type tests.*repo-authored evidence`),
 		);
 	}
+
+	const absent = structuredClone(value);
+	absent.upstreamSuites.types = 'absent';
+	absent.lanes = absent.lanes.filter((lane) => !lane.type.endsWith('-types'));
+	assert.doesNotThrow(() => validateManifest(absent));
+	const synthetic = structuredClone(absent);
+	synthetic.lanes.push(typeLane('pristine-types'));
+	assert.throws(
+		() => validateManifest(synthetic),
+		/absent upstream type tests requires available required pristine-types and adapted-types lanes with repo-authored evidence when type lanes are declared/,
+	);
 });
 
-test('requires explicit type evidence origins and the framework-appropriate compilers', () => {
+test('requires explicit type evidence origins and supported compilers', () => {
 	for (const type of ['pristine-types', 'adapted-types']) {
 		const value = manifest();
 		value.lanes[0] = {
@@ -781,10 +1002,12 @@ test('requires explicit type evidence origins and the framework-appropriate comp
 		assert.throws(() => validateManifest(missingOrigin), /type evidenceOrigin/);
 
 		const wrongCompiler = structuredClone(value);
-		wrongCompiler.lanes[0].execution.compiler = type === 'pristine-types' ? 'tsrx-tsc' : 'tsc';
+		wrongCompiler.lanes[0].execution.compiler = type === 'pristine-types' ? 'tsrx-tsc' : 'tsgo';
 		assert.throws(
 			() => validateManifest(wrongCompiler),
-			new RegExp(`${type} execution must use ${type === 'pristine-types' ? 'tsc' : 'tsrx-tsc'}`),
+			new RegExp(
+				`${type} execution must use ${type === 'pristine-types' ? 'tsc' : 'tsc or tsrx-tsc'}`,
+			),
 		);
 	}
 
@@ -825,6 +1048,24 @@ test('rejects stale divergences and accepts one divergence matching multiple kno
 	});
 	assert.throws(() => validateManifest(stale), /unknown case id "missing"/);
 
+	const ordinary = manifest({
+		ordinaryEvidence: [
+			{
+				path: 'packages/example/tests/ordinary-contract.test.ts',
+				sha256: sha256('ordinary contract'),
+				cases: [
+					{
+						id: 'conformance:ordinary-contract',
+						testName: 'documents the ordinary contract',
+						fullName: 'ordinary contract documents the ordinary contract',
+					},
+				],
+			},
+		],
+		divergences: [divergence({ caseIds: ['conformance:ordinary-contract'] })],
+	});
+	assert.deepEqual(validateManifest(ordinary), ordinary);
+
 	const broad = manifest();
 	broad.lanes[0].files[0].cases.push({
 		id: 'adapted:other',
@@ -850,6 +1091,62 @@ test('rejects stale divergences and accepts one divergence matching multiple kno
 	}
 });
 
+test('accepts ordinary audit identities for divergences outside parity lanes', () => {
+	const ordinary = divergence({
+		caseIds: ['ordinary:view-boundary'],
+		ordinaryEvidence: [
+			{
+				id: 'ordinary:view-boundary',
+				path: 'packages/example/tests/view-boundary.test.ts',
+				sha256: sha256('boundary'),
+				testName: 'documents the boundary',
+				fullName: 'View boundary documents the boundary',
+			},
+		],
+	});
+	assert.deepEqual(
+		validateManifest(manifest({ divergences: [ordinary] })),
+		manifest({ divergences: [ordinary] }),
+	);
+
+	assert.throws(
+		() =>
+			validateManifest(
+				manifest({
+					divergences: [
+						divergence({
+							caseIds: ['ordinary:view-boundary'],
+						}),
+					],
+				}),
+			),
+		/unknown case id "ordinary:view-boundary"/,
+	);
+
+	assert.throws(
+		() =>
+			validateManifest(
+				manifest({
+					divergences: [
+						divergence({
+							caseIds: ['ordinary:view-boundary'],
+							ordinaryEvidence: [
+								{
+									id: 'adapted:example',
+									path: 'packages/example/tests/view-boundary.test.ts',
+									sha256: sha256('boundary'),
+									testName: 'documents the boundary',
+									fullName: 'View boundary documents the boundary',
+								},
+							],
+						}),
+					],
+				}),
+			),
+		/must start with "ordinary:"/,
+	);
+});
+
 test('rejects missing and tampered evidence files', async () => {
 	const root = await mkdtemp(join(tmpdir(), 'react-parity-'));
 	const value = manifest();
@@ -859,6 +1156,70 @@ test('rejects missing and tampered evidence files', async () => {
 	await mkdir(file.slice(0, file.lastIndexOf('/')), { recursive: true });
 	await writeFile(file, 'tampered');
 	await assert.rejects(() => verifyManifestFiles(value, root), /integrity mismatch/);
+});
+
+test('rejects a selected lane that repeats identities already owned by a full-suite lane', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-overlap-'));
+	const sourcePath = 'packages/example/tests/upstream/example.test.ts';
+	const inventoryPath = 'packages/example/audit/adapted-runtime.json';
+	const source = '// @parity-case adapted:example\n' + 'test("does the thing", () => {})\n';
+	const inventory = JSON.stringify({
+		schemaVersion: 1,
+		project: 'example',
+		roots: ['packages/example/tests/upstream'],
+		files: [sourcePath],
+		tests: [
+			{
+				id: 'runtime:example',
+				file: sourcePath,
+				fullName: 'example suite does the thing',
+			},
+		],
+	});
+	await mkdir(join(root, 'packages/example/tests/upstream'), { recursive: true });
+	await mkdir(join(root, 'packages/example/audit'), { recursive: true });
+	await writeFile(join(root, sourcePath), source);
+	await writeFile(join(root, inventoryPath), inventory);
+
+	const selected = manifest().lanes[0];
+	selected.project = 'example';
+	selected.files[0] = {
+		...selected.files[0],
+		path: sourcePath,
+		sha256: sha256(source),
+	};
+	const full = {
+		...fullRuntimeLane('adapted-octane'),
+		project: 'example',
+		files: [{ path: inventoryPath, role: 'support', sha256: sha256(inventory) }],
+		execution: { kind: 'vitest-full', inventory: inventoryPath },
+	};
+	const value = manifest({
+		adaptedRoots: {
+			source: {
+				roots: ['packages/example/tests/upstream'],
+				include: ['\\.ts$'],
+				exclude: [],
+			},
+			tests: {
+				roots: ['packages/example/tests/upstream'],
+				include: ['\\.test\\.ts$'],
+				exclude: [],
+			},
+		},
+		adaptedRuntimeSummary: {
+			inventoryEntries: 1,
+			uniqueIdentities: 1,
+			duplicateEntriesWithinLanes: 0,
+			identitiesSharedAcrossLanes: 0,
+		},
+		lanes: [full, selected],
+	});
+
+	await assert.rejects(
+		() => verifyManifestFiles(validateManifest(value), root),
+		/lane adapted repeats 1 test identities already executed by full-suite lane full-adapted-octane/,
+	);
 });
 
 test('rejects unstructured, undeclared, and unlinked full-suite divergences', async () => {
@@ -1067,6 +1428,92 @@ test('an unavailable optional oracle is never reported as parity evidence', () =
 	assert.throws(
 		() => buildLaneArgv(value.lanes[0]),
 		/optional oracle is unavailable; parity not established/,
+	);
+});
+
+test('conformance case ids authenticate structured divergences without a parity lane', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-conformance-divergence-'));
+	const probePath = 'packages/example/tests/optional/divergence.test.ts';
+	const requiredPath = 'packages/example/tests/required/required.test.ts';
+	await mkdir(join(root, 'packages/example/src'), { recursive: true });
+	await mkdir(join(root, 'packages/example/tests/optional'), { recursive: true });
+	await mkdir(join(root, 'packages/example/tests/required'), { recursive: true });
+	const probeSource =
+		'// OCTANE DIVERGENCE[example-divergence][conformance:example]\n' +
+		'// @parity-case conformance:example\n' +
+		'it("does the thing", () => {})\n';
+	const skippedSource =
+		'// OCTANE DIVERGENCE[example-divergence][conformance:example]\n' +
+		'// @parity-case conformance:example\n' +
+		'it.skip("is disabled", () => {})\n';
+	const requiredSource =
+		'// @parity-case differential:required\n' + 'it("stays required", () => {})\n';
+	await writeFile(join(root, probePath), probeSource);
+	await writeFile(join(root, requiredPath), requiredSource);
+	const value = manifest({
+		adaptedRoots: {
+			source: {
+				roots: ['packages/example/src'],
+				include: ['\\.ts$'],
+				exclude: [],
+			},
+			tests: {
+				roots: ['packages/example/tests'],
+				include: ['\\.test\\.ts$'],
+				exclude: [],
+			},
+		},
+		lanes: [
+			{
+				...manifest().lanes[0],
+				id: 'required-differential',
+				type: 'differential',
+				oracle: 'required',
+				evidenceOrigin: 'repo-authored',
+				files: [
+					{
+						path: requiredPath,
+						role: 'test',
+						sha256: sha256(requiredSource),
+						cases: [
+							{
+								id: 'differential:required',
+								testName: 'stays required',
+								fullName: 'example suite stays required',
+							},
+						],
+					},
+				],
+			},
+		],
+		ordinaryEvidence: [
+			{
+				path: probePath,
+				sha256: sha256(probeSource),
+				cases: [
+					{
+						id: 'conformance:example',
+						testName: 'does the thing',
+						fullName: 'example suite does the thing',
+					},
+				],
+			},
+		],
+		divergences: [divergence({ id: 'example-divergence', caseIds: ['conformance:example'] })],
+	});
+	assert.deepEqual(validateManifest(value), value);
+	assert.deepEqual(
+		requiredExecutableLanes(value).map((lane) => lane.id),
+		['required-differential'],
+	);
+	await assert.doesNotReject(() => verifyManifestFiles(validateManifest(value), root));
+
+	await writeFile(join(root, probePath), skippedSource);
+	const skippedValue = structuredClone(value);
+	skippedValue.ordinaryEvidence[0].sha256 = sha256(skippedSource);
+	await assert.rejects(
+		() => verifyManifestFiles(validateManifest(skippedValue), root),
+		/must immediately precede one active test/,
 	);
 });
 

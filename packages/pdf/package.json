@@ -1,0 +1,80 @@
+{
+  "name": "@octanejs/pdf",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "React PDF bindings for the Octane renderer.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/pdf"
+  },
+  "main": "src/index.server.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "dist",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "upstream-public-surface.json"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "browser": "./src/index.ts",
+      "default": "./src/index.server.ts"
+    },
+    "./dist/Page/AnnotationLayer.css": "./dist/Page/AnnotationLayer.css",
+    "./dist/Page/TextLayer.css": "./dist/Page/TextLayer.css"
+  },
+  "scripts": {
+    "test": "pnpm upstream:verify && vitest run --root ../.. --project pdf --project pdf-ssr --project pdf-parity --project pdf-packed",
+    "test:browser": "vitest run --root ../.. --project pdf-browser",
+    "test:feasibility": "vitest run --root ../.. --project pdf-feasibility --project pdf-feasibility-ssr --project pdf-feasibility-hydration",
+    "test:parity": "vitest run --root ../.. --project pdf-parity",
+    "test:ssr": "vitest run --root ../.. --project pdf-ssr",
+    "test:types": "tsc --noEmit -p typetests/tsconfig.pristine.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json",
+    "upstream:verify": "node --test tests/audit/upstream-inventory.test.mjs && node audit/upstream-inventory.mjs",
+    "test:pristine": "node ../../scripts/react-parity/pdf-pristine-runtime.mjs"
+  },
+  "dependencies": {
+    "make-event-props": "2.0.0",
+    "pdfjs-dist": "5.4.296"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:react-pdf-react-oracle",
+    "@types/react-dom": "catalog:react-pdf-react-oracle",
+    "@types/warning": "^3.0.4",
+    "@vitest/browser-playwright": "4.1.10",
+    "clsx": "catalog:",
+    "dequal": "^2.0.3",
+    "make-cancellable-promise": "^2.0.0",
+    "merge-refs": "^2.0.0",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "catalog:react-pdf-react-oracle",
+    "react-dom": "catalog:react-pdf-react-oracle",
+    "react-pdf": "10.4.1",
+    "tiny-invariant": "catalog:",
+    "vite": "catalog:default",
+    "vitest": "catalog:default",
+    "vitest-browser-react": "2.0.0",
+    "warning": "^4.0.3"
+  }
+}

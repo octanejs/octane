@@ -5,7 +5,7 @@
  */
 import { compile as compileToReact } from '@tsrx/react';
 import { transformSync as esbuildTransformSync } from 'esbuild';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,27 +25,20 @@ function hashString(value: string): string {
 
 function compileOne(sourcePath: string): void {
 	const source = readFileSync(sourcePath, 'utf8');
-	let compiled;
-	try {
-		compiled = compileToReact(source, sourcePath);
-	} catch {
-		return;
+	const compiled = compileToReact(source, sourcePath);
+	if (compiled.errors && compiled.errors.length > 0) {
+		throw new Error(
+			`React differential precompile failed for ${sourcePath}:\n${compiled.errors.join('\n')}`,
+		);
 	}
-	if (compiled.errors && compiled.errors.length > 0) return;
-
-	let transformed;
-	try {
-		transformed = esbuildTransformSync(compiled.code, {
-			loader: 'tsx',
-			jsx: 'automatic',
-			jsxImportSource: 'react',
-			target: 'esnext',
-			format: 'esm',
-			sourcefile: sourcePath,
-		});
-	} catch {
-		return;
-	}
+	const transformed = esbuildTransformSync(compiled.code, {
+		loader: 'tsx',
+		jsx: 'automatic',
+		jsxImportSource: 'react',
+		target: 'esnext',
+		format: 'esm',
+		sourcefile: sourcePath,
+	});
 
 	const rewritten = transformed.code
 		.replace(/from\s+["']@octanejs\/styled-components["']/g, 'from "styled-components"')
@@ -54,20 +47,19 @@ function compileOne(sourcePath: string): void {
 	writeFileSync(join(CACHE_DIR, `${slug}-${hashString(sourcePath)}.js`), rewritten);
 }
 
-function walk(directory: string): string[] {
-	const files: string[] = [];
-	for (const name of readdirSync(directory)) {
-		const fullPath = join(directory, name);
-		if (statSync(fullPath).isDirectory()) files.push(...walk(fullPath));
-		else if (fullPath.endsWith('.tsrx')) files.push(fullPath);
-	}
-	return files;
-}
-
 export async function setup(): Promise<void> {
-	if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
-	if (!existsSync(FIXTURE_DIR)) return;
-	for (const sourcePath of walk(FIXTURE_DIR)) compileOne(sourcePath);
+	rmSync(CACHE_DIR, { recursive: true, force: true });
+	mkdirSync(CACHE_DIR, { recursive: true });
+	for (const name of [
+		'basic-smoke',
+		'themed-card',
+		'attrs-input',
+		'as-polymorph',
+		'global-keyframes',
+		'compose',
+	]) {
+		compileOne(join(FIXTURE_DIR, `${name}.tsrx`));
+	}
 }
 
 export async function teardown(): Promise<void> {

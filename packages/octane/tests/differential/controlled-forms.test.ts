@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { act as reactAct } from 'react';
-import { mountDifferential, type DiffMount } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture, type DiffMount } from './_rig.js';
 import { resolve } from 'node:path';
 
 const FIX = resolve(__dirname, '../_fixtures/controlled-forms-diff.tsrx');
+
+await preloadDifferentialFixture(FIX);
 
 // ============================================================================
 // Controlled form components, differential: the SAME fixture drives octane

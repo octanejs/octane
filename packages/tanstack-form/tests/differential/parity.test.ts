@@ -1,11 +1,17 @@
 import { resolve } from 'node:path';
 import { describe, it } from 'vitest';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const fixture = resolve(__dirname, '../_fixtures/parity.tsrx');
 const cache = resolve(__dirname, '.react-cache');
 
+await Promise.all([preloadDifferentialFixture(fixture, cache)]);
+
 describe('differential: @octanejs/tanstack-form vs @tanstack/react-form', () => {
+	// @parity-case differential:tanstack-form-interactions
 	it('matches values, validation, arrays, and reset', async () => {
 		const differential = await mountDifferential(fixture, 'FormParity', undefined, cache);
 

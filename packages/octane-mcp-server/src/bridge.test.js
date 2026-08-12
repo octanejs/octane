@@ -10,6 +10,7 @@ import {
 	detectVanillaCore,
 	scanSource,
 	KNOWN_BINDINGS,
+	KNOWN_VANILLA_CORES,
 	KNOWN_NATIVE_BINDINGS,
 	KNOWN_BINDING_PACKAGE_DIRS,
 } from './bridge.js';
@@ -274,6 +275,19 @@ describe('bridgeReportFromSource', () => {
 });
 
 describe('KNOWN_BINDINGS', () => {
+	it('maps react-alien-signals to the Octane binding and vanilla core', () => {
+		expect(KNOWN_BINDINGS['react-alien-signals']).toBe('@octanejs/alien-signals');
+		expect(KNOWN_VANILLA_CORES['react-alien-signals']).toBe('alien-signals');
+	});
+
+	it('maps react-textarea-autosize to the exact Octane binding', () => {
+		expect(KNOWN_BINDINGS['react-textarea-autosize']).toBe('@octanejs/textarea-autosize');
+	});
+
+	it('maps react-window to its exact official Octane binding', () => {
+		expect(KNOWN_BINDINGS['react-window']).toBe('@octanejs/window');
+	});
+
 	it('maps Streamdown and every official plugin package to the consolidated binding', () => {
 		const upstreamPackages = [
 			'streamdown',

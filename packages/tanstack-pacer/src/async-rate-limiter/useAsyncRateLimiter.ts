@@ -96,8 +96,6 @@ export function useAsyncRateLimiter<TFn extends AnyAsyncFunction, TSelected = {}
 	asyncRateLimiter.fn = fn;
 	asyncRateLimiter.setOptions(mergedOptions);
 
-	const state = useSelectorSlot(asyncRateLimiter.store, selector, { compare: shallow }, stateSlot);
-
 	// Unmount cleanup only; empty deps keep teardown stable (as upstream).
 	useEffect(() => {
 		return () => {
@@ -108,6 +106,8 @@ export function useAsyncRateLimiter<TFn extends AnyAsyncFunction, TSelected = {}
 			}
 		};
 	}, []);
+
+	const state = useSelectorSlot(asyncRateLimiter.store, selector, { compare: shallow }, stateSlot);
 
 	return useMemo(
 		() =>

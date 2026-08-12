@@ -43,6 +43,58 @@ function throwOnMount(): string {
 	throw new Error('mount-boom');
 }
 
+// Teardown-phase throwers: a passive-effect cleanup and a callback-ref cleanup
+// that throw during deletion. Deletion-phase errors route to the enclosing
+// boundary when one exists; otherwise they are the uncaught teardown channel.
+export function CleanupThrower() @{
+	useEffect(() => {
+		return () => {
+			throw new Error('cleanup-boom');
+		};
+	}, []);
+	<span id="ct">ct</span>
+}
+
+export function CleanupHost() @{
+	<main>
+		<CleanupThrower />
+	</main>
+}
+
+let removeCleanupThrower: (() => void) | null = null;
+export function triggerCleanupThrowerRemoval(): void {
+	removeCleanupThrower!();
+}
+
+export function CaughtCleanupHost() @{
+	const [on, setOn] = useState(true);
+	removeCleanupThrower = () => setOn(false);
+	<ErrorBoundary fallback="cleanup-caught">
+		@if (on) {
+			<CleanupThrower />
+		} @else {
+			<span id="off">off</span>
+		}
+	</ErrorBoundary>
+}
+
+function RefThrower() @{
+	<span
+		id="rt"
+		ref={(_el) => {
+			return () => {
+				throw new Error('ref-boom');
+			};
+		}}
+	/>
+}
+
+export function RefCleanupHost() @{
+	<main>
+		<RefThrower />
+	</main>
+}
+
 // Interactive recovery probe: a recovered root must keep its container's event
 // delegation, so a click on freshly rendered content still reaches handlers.
 export function ClickCounter() @{

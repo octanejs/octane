@@ -1,0 +1,2261 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Prism SyntaxHighlighter renders template strings and JSX correctly 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            "import",
+          ],
+          "props": {
+            "className": "token module",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "React",
+          ],
+          "props": {
+            "className": "token imports maybe-class-name",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "from",
+          ],
+          "props": {
+            "className": "token module",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            ""react"",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(102, 153, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "
+",
+        {
+          "children": null,
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "const",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " x ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "=",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "background": "rgba(255, 255, 255, 0.5)",
+              "color": "rgb(154, 110, 58)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "\`",
+          ],
+          "props": {
+            "className": "token template-string template-punctuation",
+            "style": {
+              "color": "rgb(102, 153, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {
+            "className": "token template-string",
+            "style": {
+              "color": "rgb(102, 153, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "template string.
+",
+          ],
+          "props": {
+            "className": "token template-string",
+            "style": {
+              "color": "rgb(102, 153, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": null,
+          "props": {
+            "className": "token template-string",
+            "style": {
+              "color": "rgb(102, 153, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "\`",
+          ],
+          "props": {
+            "className": "token template-string template-punctuation",
+            "style": {
+              "color": "rgb(102, 153, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "
+",
+        {
+          "children": null,
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "const",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "y",
+          ],
+          "props": {
+            "className": "token function-variable",
+            "style": {
+              "color": "rgb(221, 74, 104)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "=",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "background": "rgba(255, 255, 255, 0.5)",
+              "color": "rgb(154, 110, 58)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "(",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ")",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "=>",
+          ],
+          "props": {
+            "className": "token arrow",
+            "style": {
+              "background": "rgba(255, 255, 255, 0.5)",
+              "color": "rgb(154, 110, 58)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "{",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "  ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "return",
+          ],
+          "props": {
+            "className": "token control-flow",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "(",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "    ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "<",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "div",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 0, 85)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ">",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {
+            "className": "token plain-text",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "      jsx
+",
+          ],
+          "props": {
+            "className": "token plain-text",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "    ",
+          ],
+          "props": {
+            "className": "token plain-text",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "</",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "div",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 0, 85)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ">",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "  ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            ")",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": null,
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "}",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+      ],
+      "props": {
+        "className": "language-jsx",
+        "style": {
+          "background": "none",
+          "color": "black",
+          "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+          "fontSize": "1em",
+          "hyphens": "none",
+          "lineHeight": "1.5",
+          "tabSize": "4",
+          "textAlign": "left",
+          "textShadow": "0 1px white",
+          "whiteSpace": "pre",
+          "wordBreak": "normal",
+          "wordSpacing": "normal",
+          "wordWrap": "normal",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(245, 242, 240)",
+      "color": "black",
+      "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+      "fontSize": "1em",
+      "hyphens": "none",
+      "lineHeight": "1.5",
+      "margin": "0.5em 0px",
+      "overflow": "auto",
+      "padding": "1em",
+      "tabSize": "4",
+      "textAlign": "left",
+      "textShadow": "0 1px white",
+      "whiteSpace": "pre",
+      "wordBreak": "normal",
+      "wordSpacing": "normal",
+      "wordWrap": "normal",
+    },
+  },
+  "type": "pre",
+}
+`;
+
+exports[`SyntaxHighlighter renders jsx highlighted text 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        "import React from "react";
+import uniquePropHOC from "./lib/unique-prop-hoc";
+
+class Expire extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { component: props.children }
+    }
+    componentDidMount() {
+        setTimeout(() => {
+            this.setState({
+                component: null
+            });
+        }, this.props.time || this.props.seconds * 1000);
+    }
+    render() {
+        return this.state.component;
+    }
+}",
+      ],
+      "props": {
+        "className": "language-jsx",
+        "style": {
+          "background": "none",
+          "color": "black",
+          "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+          "fontSize": "1em",
+          "hyphens": "none",
+          "lineHeight": "1.5",
+          "tabSize": "4",
+          "textAlign": "left",
+          "textShadow": "0 1px white",
+          "whiteSpace": "pre",
+          "wordBreak": "normal",
+          "wordSpacing": "normal",
+          "wordWrap": "normal",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(245, 242, 240)",
+      "color": "black",
+      "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+      "fontSize": "1em",
+      "hyphens": "none",
+      "lineHeight": "1.5",
+      "margin": "0.5em 0px",
+      "overflow": "auto",
+      "padding": "1em",
+      "tabSize": "4",
+      "textAlign": "left",
+      "textShadow": "0 1px white",
+      "whiteSpace": "pre",
+      "wordBreak": "normal",
+      "wordSpacing": "normal",
+      "wordWrap": "normal",
+    },
+  },
+  "type": "pre",
+}
+`;
+
+exports[`SyntaxHighlighter should just render text if syntax is not registered 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        "print('hello')",
+      ],
+      "props": {
+        "className": "language-python",
+        "style": {
+          "background": "none",
+          "color": "black",
+          "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+          "fontSize": "1em",
+          "hyphens": "none",
+          "lineHeight": "1.5",
+          "tabSize": "4",
+          "textAlign": "left",
+          "textShadow": "0 1px white",
+          "whiteSpace": "pre",
+          "wordBreak": "normal",
+          "wordSpacing": "normal",
+          "wordWrap": "normal",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(245, 242, 240)",
+      "color": "black",
+      "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+      "fontSize": "1em",
+      "hyphens": "none",
+      "lineHeight": "1.5",
+      "margin": "0.5em 0px",
+      "overflow": "auto",
+      "padding": "1em",
+      "tabSize": "4",
+      "textAlign": "left",
+      "textShadow": "0 1px white",
+      "whiteSpace": "pre",
+      "wordBreak": "normal",
+      "wordSpacing": "normal",
+      "wordWrap": "normal",
+    },
+  },
+  "type": "pre",
+}
+`;
+
+exports[`When the code split is loaded - SyntaxHighlighter renders jsx highlighted text 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            "import",
+          ],
+          "props": {
+            "className": "token module",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "React",
+          ],
+          "props": {
+            "className": "token imports maybe-class-name",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "from",
+          ],
+          "props": {
+            "className": "token module",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            ""react"",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(102, 153, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "  ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "import",
+          ],
+          "props": {
+            "className": "token module",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "uniquePropHOC",
+          ],
+          "props": {
+            "className": "token imports",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "from",
+          ],
+          "props": {
+            "className": "token module",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            ""./lib/unique-prop-hoc"",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(102, 153, 0)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "
+",
+        {
+          "children": [
+            "  ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "class",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "Expire",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(221, 74, 104)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "extends",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "React",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(221, 74, 104)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ".",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "Component",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(221, 74, 104)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "{",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "      ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "constructor",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(221, 74, 104)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "(",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "props",
+          ],
+          "props": {
+            "className": "token parameter",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ")",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "{",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "          ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "super",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "(",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "props",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            ")",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "          ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "this",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ".",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "state",
+          ],
+          "props": {
+            "className": "token property-access",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "=",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "background": "rgba(255, 255, 255, 0.5)",
+              "color": "rgb(154, 110, 58)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "{",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "component",
+          ],
+          "props": {
+            "className": "token literal-property",
+            "style": {
+              "color": "rgb(153, 0, 85)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ":",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "background": "rgba(255, 255, 255, 0.5)",
+              "color": "rgb(154, 110, 58)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " props",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            ".",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "children",
+          ],
+          "props": {
+            "className": "token property-access",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "}",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "      ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "}",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "      ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "componentDidMount",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(221, 74, 104)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "(",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ")",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "{",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "          ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "setTimeout",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(221, 74, 104)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "(",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "(",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ")",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "=>",
+          ],
+          "props": {
+            "className": "token arrow",
+            "style": {
+              "background": "rgba(255, 255, 255, 0.5)",
+              "color": "rgb(154, 110, 58)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "{",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "              ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "this",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ".",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "setState",
+          ],
+          "props": {
+            "className": "token method property-access",
+            "style": {
+              "color": "rgb(221, 74, 104)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "(",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "{",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "                  ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "component",
+          ],
+          "props": {
+            "className": "token literal-property",
+            "style": {
+              "color": "rgb(153, 0, 85)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ":",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "background": "rgba(255, 255, 255, 0.5)",
+              "color": "rgb(154, 110, 58)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "null",
+          ],
+          "props": {
+            "className": "token null nil",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "              ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "}",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ")",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "          ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "}",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ",",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "this",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ".",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "props",
+          ],
+          "props": {
+            "className": "token property-access",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ".",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "time",
+          ],
+          "props": {
+            "className": "token property-access",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "||",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "background": "rgba(255, 255, 255, 0.5)",
+              "color": "rgb(154, 110, 58)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "this",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ".",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "props",
+          ],
+          "props": {
+            "className": "token property-access",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ".",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "seconds",
+          ],
+          "props": {
+            "className": "token property-access",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "*",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "background": "rgba(255, 255, 255, 0.5)",
+              "color": "rgb(154, 110, 58)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "1000",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 0, 85)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ")",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "      ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "}",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "      ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "render",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(221, 74, 104)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "(",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ")",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "{",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "          ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "return",
+          ],
+          "props": {
+            "className": "token control-flow",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            " ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "this",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(0, 119, 170)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ".",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "state",
+          ],
+          "props": {
+            "className": "token property-access",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ".",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "component",
+          ],
+          "props": {
+            "className": "token property-access",
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            ";",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "      ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "}",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "  ",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        {
+          "children": [
+            "}",
+          ],
+          "props": {
+            "className": "token",
+            "style": {
+              "color": "rgb(153, 153, 153)",
+            },
+          },
+          "type": "span",
+        },
+      ],
+      "props": {
+        "className": "language-jsx",
+        "style": {
+          "background": "none",
+          "color": "black",
+          "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+          "fontSize": "1em",
+          "hyphens": "none",
+          "lineHeight": "1.5",
+          "tabSize": "4",
+          "textAlign": "left",
+          "textShadow": "0 1px white",
+          "whiteSpace": "pre",
+          "wordBreak": "normal",
+          "wordSpacing": "normal",
+          "wordWrap": "normal",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(245, 242, 240)",
+      "color": "black",
+      "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+      "fontSize": "1em",
+      "hyphens": "none",
+      "lineHeight": "1.5",
+      "margin": "0.5em 0px",
+      "overflow": "auto",
+      "padding": "1em",
+      "tabSize": "4",
+      "textAlign": "left",
+      "textShadow": "0 1px white",
+      "whiteSpace": "pre",
+      "wordBreak": "normal",
+      "wordSpacing": "normal",
+      "wordWrap": "normal",
+    },
+  },
+  "type": "pre",
+}
+`;

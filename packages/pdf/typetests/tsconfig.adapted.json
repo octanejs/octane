@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "preserve",
+    "jsxImportSource": "octane",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "baseUrl": "..",
+    "paths": {
+      "@octanejs/pdf": ["./src/index.ts"]
+    }
+  },
+  "include": ["./adapted.test.tsrx", "./adapted-negative.test.ts", "../src"]
+}

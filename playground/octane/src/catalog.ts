@@ -9,42 +9,77 @@ import { AnimeJsDemo } from './demos/AnimeJs.tsrx';
 import { Conditional } from './demos/Conditional.tsrx';
 import { Counter } from './demos/Counter.tsrx';
 import { DynamicDemo } from './demos/Dynamic.tsrx';
+import { DreiDemo } from './demos/Drei.tsrx';
+import { DoomDemo } from './demos/doom/Doom.tsrx';
 import { Inputs } from './demos/Inputs.tsrx';
 import { GSAPDemo } from './demos/GSAP.tsrx';
+import { IntersectionObserverDemo } from './demos/IntersectionObserver.tsrx';
+import { InputOTPDemo } from './demos/InputOTP.tsrx';
 import { KeyedList } from './demos/KeyedList.tsrx';
+import { ReactSpringDemo } from './demos/ReactSpring.tsrx';
 import { ErrorBoundaryDemo } from './demos/ErrorBoundary.tsrx';
 import { LiveStoreDemo } from './demos/LiveStore.tsrx';
+import { ReactTextareaAutosizeDemo } from './demos/ReactTextareaAutosize.tsrx';
+import { ReactSyntaxHighlighterDemo } from './demos/ReactSyntaxHighlighter.tsrx';
+import { ReactColorfulDemo } from './demos/ReactColorful.tsrx';
+import { PopperDemo } from './demos/Popper.tsrx';
+import { PdfDemo } from './demos/Pdf.tsrx';
 import { MantineHooksDemo } from './demos/MantineHooks.tsrx';
+import { ReactDraggableDemo } from './demos/ReactDraggable.tsrx';
 import { MobxDemo } from './demos/Mobx.tsrx';
 import { PhosphorIconsDemo } from './demos/PhosphorIcons.tsrx';
 import { RxJSDemo } from './demos/RxJS.tsrx';
 import { RainbowKitDemo } from './demos/RainbowKit.tsrx';
+import { ReactDropzoneDemo } from './demos/ReactDropzone.tsrx';
+import { ReactMarkdownDemo } from './demos/ReactMarkdown.tsrx';
+import { ReactWindowDemo } from './demos/ReactWindow.tsrx';
 import { ShadcnBasesDemo } from './demos/ShadcnBases.tsrx';
 import { SolanaDemo } from './demos/Solana.tsrx';
 import { SuspenseDemo } from './demos/Suspense.tsrx';
+import { SWRDemo } from './demos/SWR.tsrx';
 import { WagmiDemo } from './demos/Wagmi.tsrx';
 import { UseHooksTsDemo } from './demos/UseHooksTs.tsrx';
+import { AlienSignalsDemo } from './demos/AlienSignals.tsrx';
 
 import commandMenuSource from './demos/CommandMenu.tsrx?raw';
 import animeJsSource from './demos/AnimeJs.tsrx?raw';
 import conditionalSource from './demos/Conditional.tsrx?raw';
 import counterSource from './demos/Counter.tsrx?raw';
 import dynamicSource from './demos/Dynamic.tsrx?raw';
+import dreiSource from './demos/Drei.tsrx?raw';
+import doomShellSource from './demos/doom/Doom.tsrx?raw';
+import doomSceneSource from './demos/doom/Doom.three.tsrx?raw';
+import doomModelSource from './demos/doom/model.ts?raw';
+import doomAssetsSource from './demos/doom/assets.ts?raw';
 import inputsSource from './demos/Inputs.tsrx?raw';
 import gsapSource from './demos/GSAP.tsrx?raw';
+import intersectionObserverSource from './demos/IntersectionObserver.tsrx?raw';
+import inputOTPSource from './demos/InputOTP.tsrx?raw';
 import keyedListSource from './demos/KeyedList.tsrx?raw';
+import reactSpringSource from './demos/ReactSpring.tsrx?raw';
 import errorBoundarySource from './demos/ErrorBoundary.tsrx?raw';
 import liveStoreSource from './demos/LiveStore.tsrx?raw';
+import reactTextareaAutosizeSource from './demos/ReactTextareaAutosize.tsrx?raw';
+import reactSyntaxHighlighterSource from './demos/ReactSyntaxHighlighter.tsrx?raw';
+import reactColorfulSource from './demos/ReactColorful.tsrx?raw';
+import popperSource from './demos/Popper.tsrx?raw';
+import pdfSource from './demos/Pdf.tsrx?raw';
 import mantineHooksSource from './demos/MantineHooks.tsrx?raw';
+import reactDraggableSource from './demos/ReactDraggable.tsrx?raw';
 import mobxSource from './demos/Mobx.tsrx?raw';
 import phosphorIconsSource from './demos/PhosphorIcons.tsrx?raw';
 import rxjsSource from './demos/RxJS.tsrx?raw';
 import rainbowKitSource from './demos/RainbowKit.tsrx?raw';
+import reactDropzoneSource from './demos/ReactDropzone.tsrx?raw';
+import reactMarkdownSource from './demos/ReactMarkdown.tsrx?raw';
+import reactWindowSource from './demos/ReactWindow.tsrx?raw';
 import shadcnSource from './demos/ShadcnBases.tsrx?raw';
 import solanaSource from './demos/Solana.tsrx?raw';
 import suspenseSource from './demos/Suspense.tsrx?raw';
+import swrSource from './demos/SWR.tsrx?raw';
 import wagmiSource from './demos/Wagmi.tsrx?raw';
 import useHooksTsSource from './demos/UseHooksTs.tsrx?raw';
+import alienSignalsSource from './demos/AlienSignals.tsrx?raw';
 
 export interface Demo {
 	/** Stable id — also the URL route, so renaming one breaks shared links. */
@@ -62,9 +97,54 @@ export interface DemoGroup {
 
 export const GROUPS: readonly DemoGroup[] = [
 	{
+		id: 'state',
+		label: 'State',
+		demos: [
+			{
+				id: 'alien-signals',
+				title: 'Alien Signals',
+				Component: AlienSignalsDemo,
+				source: alienSignalsSource,
+			},
+		],
+	},
+	{
+		id: 'games',
+		label: 'Games',
+		demos: [
+			{
+				id: 'doom',
+				title: 'Doom',
+				Component: DoomDemo,
+				source: [
+					'// Doom.tsrx',
+					doomShellSource,
+					'// Doom.three.tsrx',
+					doomSceneSource,
+					'// model.ts',
+					doomModelSource,
+					'// assets.ts',
+					doomAssetsSource,
+				].join('\n\n'),
+			},
+		],
+	},
+	{
 		id: 'language',
 		label: 'Language',
 		demos: [
+			{
+				id: 'react-markdown',
+				title: 'react-markdown',
+				Component: ReactMarkdownDemo,
+				source: reactMarkdownSource,
+			},
+			{
+				id: 'react-draggable',
+				title: 'React Draggable',
+				Component: ReactDraggableDemo,
+				source: reactDraggableSource,
+			},
 			{
 				id: 'counter',
 				title: 'Counter',
@@ -108,16 +188,40 @@ export const GROUPS: readonly DemoGroup[] = [
 		label: 'Components',
 		demos: [
 			{
+				id: 'react-spring',
+				title: 'React Spring',
+				Component: ReactSpringDemo,
+				source: reactSpringSource,
+			},
+			{
+				id: 'input-otp',
+				title: 'Input OTP',
+				Component: InputOTPDemo,
+				source: inputOTPSource,
+			},
+			{
 				id: 'animejs',
 				title: 'Anime.js',
 				Component: AnimeJsDemo,
 				source: animeJsSource,
 			},
 			{
+				id: 'drei',
+				title: 'Drei',
+				Component: DreiDemo,
+				source: dreiSource,
+			},
+			{
 				id: 'gsap',
 				title: 'GSAP',
 				Component: GSAPDemo,
 				source: gsapSource,
+			},
+			{
+				id: 'intersection-observer',
+				title: 'Intersection Observer',
+				Component: IntersectionObserverDemo,
+				source: intersectionObserverSource,
 			},
 			{
 				id: 'cmdk',
@@ -144,6 +248,12 @@ export const GROUPS: readonly DemoGroup[] = [
 				source: phosphorIconsSource,
 			},
 			{
+				id: 'react-window',
+				title: 'react-window',
+				Component: ReactWindowDemo,
+				source: reactWindowSource,
+			},
+			{
 				id: 'solana',
 				title: 'Solana',
 				Component: SolanaDemo,
@@ -156,6 +266,12 @@ export const GROUPS: readonly DemoGroup[] = [
 				source: rxjsSource,
 			},
 			{
+				id: 'swr',
+				title: 'SWR',
+				Component: SWRDemo,
+				source: swrSource,
+			},
+			{
 				id: 'wagmi',
 				title: 'Wagmi',
 				Component: WagmiDemo,
@@ -166,6 +282,12 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'RainbowKit',
 				Component: RainbowKitDemo,
 				source: rainbowKitSource,
+			},
+			{
+				id: 'react-dropzone',
+				title: 'React Dropzone',
+				Component: ReactDropzoneDemo,
+				source: reactDropzoneSource,
 			},
 			{
 				id: 'usehooks-ts',
@@ -190,6 +312,36 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'Error boundary',
 				Component: ErrorBoundaryDemo,
 				source: errorBoundarySource,
+			},
+			{
+				id: 'react-textarea-autosize',
+				title: 'React Textarea Autosize',
+				Component: ReactTextareaAutosizeDemo,
+				source: reactTextareaAutosizeSource,
+			},
+			{
+				id: 'react-syntax-highlighter',
+				title: 'React Syntax Highlighter',
+				Component: ReactSyntaxHighlighterDemo,
+				source: reactSyntaxHighlighterSource,
+			},
+			{
+				id: 'react-colorful',
+				title: 'Color picker',
+				Component: ReactColorfulDemo,
+				source: reactColorfulSource,
+			},
+			{
+				id: 'popper',
+				title: 'Popper',
+				Component: PopperDemo,
+				source: popperSource,
+			},
+			{
+				id: 'pdf',
+				title: 'React PDF',
+				Component: PdfDemo,
+				source: pdfSource,
 			},
 		],
 	},

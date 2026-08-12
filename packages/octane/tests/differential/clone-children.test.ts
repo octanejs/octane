@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 // Byte-parity proof for octane's cloneElement / Children / isValidElement: the SAME
@@ -8,6 +8,8 @@ import { resolve } from 'node:path';
 // primitives to React's actual semantics.
 
 const FIXTURE = resolve(__dirname, '../_fixtures/clone-children.tsrx');
+
+await preloadDifferentialFixture(FIXTURE);
 
 describe('differential: clone-children.tsrx — cloneElement / Children vs React', () => {
 	it('cloneElement merges props onto a prop element identically', async () => {

@@ -1,8 +1,10 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 const BASIC_FIXTURE = resolve(__dirname, '../_fixtures/basic.tsrx');
+
+await preloadDifferentialFixture(BASIC_FIXTURE);
 
 describe('differential: basic.tsrx — static templates render identically', () => {
 	it('Hello: literal text', async () => {

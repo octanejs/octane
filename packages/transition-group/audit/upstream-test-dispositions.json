@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": ".eslintrc.yml",
+      "disposition": "support",
+      "rationale": "Upstream ESLint env for the Jest suite; not an executable case."
+    },
+    {
+      "path": "CSSTransition-test.js",
+      "disposition": "pristine-oracle-adapted",
+      "caseCount": 12,
+      "rationale": "Runs unchanged under the pristine Jest oracle. One-for-one Octane coverage lives in tests/upstream/CSSTransition.test.ts with Per path citations; findDOMNode-free nodeRef paths match Octane's required DOM access model.",
+      "adaptedEvidence": ["packages/transition-group/tests/upstream/CSSTransition.test.ts"]
+    },
+    {
+      "path": "CSSTransitionGroup-test.js",
+      "disposition": "pristine-oracle-adapted",
+      "caseCount": 10,
+      "rationale": "Runs unchanged under the pristine Jest oracle. One-for-one Octane coverage of TransitionGroup+CSSTransition wiring lives in tests/upstream/TransitionGroup.test.ts.",
+      "adaptedEvidence": ["packages/transition-group/tests/upstream/TransitionGroup.test.ts"]
+    },
+    {
+      "path": "ChildMapping-test.js",
+      "disposition": "pristine-oracle-adapted",
+      "caseCount": 6,
+      "rationale": "Runs unchanged under the pristine Jest oracle. Dedicated adapted unit coverage lives in tests/upstream/ChildMapping.test.ts.",
+      "adaptedEvidence": ["packages/transition-group/tests/upstream/ChildMapping.test.ts"]
+    },
+    {
+      "path": "SSR-test.js",
+      "disposition": "pristine-oracle-adapted",
+      "caseCount": 1,
+      "rationale": "Runs unchanged under the pristine Jest node environment. Octane covers the import-in-node case in tests/ssr/upstream-import.test.ts; authored SSR rendering contracts live beside it in tests/ssr/server.test.ts.",
+      "adaptedEvidence": ["packages/transition-group/tests/ssr/upstream-import.test.ts"]
+    },
+    {
+      "path": "SwitchTransition-test.js",
+      "disposition": "pristine-oracle-adapted",
+      "caseCount": 5,
+      "rationale": "Runs unchanged under the pristine Jest oracle. One-for-one Octane coverage lives in tests/upstream/SwitchTransition.test.ts.",
+      "adaptedEvidence": ["packages/transition-group/tests/upstream/SwitchTransition.test.ts"]
+    },
+    {
+      "path": "Transition-test.js",
+      "disposition": "pristine-oracle-adapted",
+      "caseCount": 18,
+      "rationale": "Runs unchanged under the pristine Jest oracle. One-for-one Octane coverage lives in tests/upstream/Transition.test.ts. Both upstream findDOMNode cases are recorded as not-applicable in audit/case-crosswalk.json.",
+      "adaptedEvidence": ["packages/transition-group/tests/upstream/Transition.test.ts"]
+    },
+    {
+      "path": "TransitionGroup-test.js",
+      "disposition": "pristine-oracle-adapted",
+      "caseCount": 4,
+      "rationale": "Runs unchanged under the pristine Jest oracle. One-for-one Octane coverage lives in tests/upstream/TransitionGroup.test.ts.",
+      "adaptedEvidence": ["packages/transition-group/tests/upstream/TransitionGroup.test.ts"]
+    },
+    {
+      "path": "setup.js",
+      "disposition": "support",
+      "rationale": "Upstream requestAnimationFrame polyfill loaded by Jest setupFiles."
+    },
+    {
+      "path": "setupAfterEnv.js",
+      "disposition": "support",
+      "rationale": "Upstream Testing Library cleanup hook loaded by Jest setupFilesAfterEnv."
+    },
+    {
+      "path": "utils.js",
+      "disposition": "support",
+      "rationale": "Upstream render helper wrapping @testing-library/react/pure."
+    }
+  ]
+}

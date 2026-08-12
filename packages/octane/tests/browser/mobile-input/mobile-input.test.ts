@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { chromium, devices, type Browser, type Page } from 'playwright';
+import type { Browser, Page } from 'playwright';
+import { devices, launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { createServer, type ViteDevServer } from 'vite';
 import { octane } from 'octane/compiler/vite';
 import { dirname, resolve } from 'node:path';
@@ -26,7 +27,7 @@ beforeAll(async () => {
 	const address = server.httpServer!.address();
 	if (!address || typeof address === 'string') throw new Error('Vite did not expose a TCP port');
 	baseUrl = `http://127.0.0.1:${address.port}`;
-	browser = await chromium.launch({ headless: true });
+	browser = await launchBrowser({ headless: true });
 });
 
 afterEach(async () => {

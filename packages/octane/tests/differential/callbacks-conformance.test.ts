@@ -19,13 +19,20 @@
  *     where the octane-side hook signature is the contract under test.
  */
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 const CALLBACKS = resolve(__dirname, '../_fixtures/callbacks.tsrx');
 const CONFORMANCE = resolve(__dirname, '../_fixtures/react-conformance.tsrx');
 const ATTRS_EVENTS = resolve(__dirname, '../_fixtures/attrs-events.tsrx');
 const FRAGMENTS = resolve(__dirname, '../_fixtures/fragments.tsrx');
+
+await Promise.all([
+	preloadDifferentialFixture(CALLBACKS),
+	preloadDifferentialFixture(CONFORMANCE),
+	preloadDifferentialFixture(ATTRS_EVENTS),
+	preloadDifferentialFixture(FRAGMENTS),
+]);
 
 describe('differential: callbacks.tsrx — useCallback / useEffectEvent rendering parity', () => {
 	it('CallbackIdentity: useCallback identity stable across re-renders (DOM parity proxy)', async () => {

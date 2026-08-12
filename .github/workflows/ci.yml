@@ -227,7 +227,7 @@ jobs:
                   head_sha: parentSha,
                   per_page: 10,
                 });
-              const requiredTestJobs = ["test (22)", "test (24)"];
+              const requiredTestJobs = ["test (24)"];
               let parentPassedTests = false;
 
               for (const run of parentRuns.workflow_runs) {
@@ -322,22 +322,15 @@ jobs:
                 "React parity checks",
                 "typecheck",
                 "validate publishable packages",
-                ...["package-builds", "eval-corpus", "browser"].map(
-                  (lane) => `heavy integration (${lane})`,
-                ),
+                "heavy integration (package builds, eval corpus, runtime loaders, Astro)",
+                "heavy integration (browser - chromium)",
                 ...["1/3", "2/3", "3/3"].map(
                   (shard) => `example apps (${shard})`,
                 ),
-                ...["minimum r156", "current"].map(
-                  (lane) => `Three compatibility (${lane})`,
-                ),
-                ...["minimum", "current"].map(
-                  (lane) => `Lynx compatibility (${lane})`,
-                ),
-                ...[22, 24].flatMap((node) =>
-                  ["1/4", "2/4", "3/4", "4/4"].map(
-                    (shard) => `test shard (Node ${node}, ${shard})`,
-                  ),
+                "Three compatibility",
+                "Lynx compatibility",
+                ...["1/4", "2/4", "3/4", "4/4"].map(
+                  (shard) => `test shard (Node 24, ${shard})`,
                 ),
               ];
               const { data: baseRuns } =
@@ -396,7 +389,7 @@ jobs:
             }
 
   test_shard:
-    name: test shard (Node ${{ matrix.node-version }}, ${{ matrix.shard }})
+    name: test shard (Node 24, ${{ matrix.shard }})
     needs: release_change
     # Each source change has already passed this matrix before Changesets
     # generates its metadata-only release commit. Keep the post-merge CI run
@@ -407,10 +400,9 @@ jobs:
 
     strategy:
       matrix:
-        node-version: ["22.22.2", 24]
-        # Keep the full supported-Node coverage while splitting the large
-        # Vitest suite across runners. Four shards cuts the CI critical path
-        # substantially without letting repeated global setup dominate.
+        # Split the large Vitest suite across four Node 24 runners. The
+        # published engine baseline remains Node 22.22.2, but duplicating the
+        # ordinary suite is not required to enforce that package metadata.
         shard: ["1/4", "2/4", "3/4", "4/4"]
 
     steps:
@@ -420,19 +412,17 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js 24
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24
           cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --prod false --frozen-lockfile
 
-      # Real builds, packed consumers, and browser suites run once on Node 24 in
-      # the dedicated integration jobs below. Keep both supported Nodes on the
-      # ordinary suite without making time-sensitive integration work compete
-      # with hundreds of unrelated files.
+      # Real builds, packed consumers, browser suites, and the ordinary suite
+      # all use the repository's Node 24 CI execution target.
       - name: Run tests
         # WEBSITE_DOCS_SPEC is excluded through the environment, not `--exclude`:
         # it lives in the `website-unit` project, and a project that declares its
@@ -455,18 +445,26 @@ jobs:
           --exclude "packages/vite-plugin-octane/tests/production.test.ts"
           --exclude "packages/octane/tests/browser/**/*.test.ts"
           --exclude "packages/dexie/tests/browser/**/*.test.ts"
+          --exclude "packages/input-otp/tests/browser/**/*"
+          --exclude "packages/monaco-editor/tests/browser/**/*.test.ts"
           --exclude "packages/tiptap/tests/browser/**/*.test.ts"
           --exclude "packages/three/tests/browser/**/*.test.ts"
           --exclude "$ASTRO_E2E_SPEC"
 
-  react_parity_checks:
-    name: React parity checks
+  react_parity_shard:
+    name: React parity shard (${{ matrix.shard }}/3)
     needs: release_change
     # The complete package suite is intentionally Node 24-only. Like the
     # general shards, an authenticated release or lightweight change inherits
     # the last successful full run through CI provenance.
     if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Vitest hashes parity file paths across these workers. Non-Vitest
+        # manifests remain whole and use the same generic shard coordinates.
+        shard: [1, 2, 3]
 
     steps:
       - name: Checkout code
@@ -484,29 +482,80 @@ jobs:
       - name: Install dependencies
         run: pnpm install --prod false --frozen-lockfile
 
+      # Browser parity lanes launch Chromium through Playwright.
+      # Keep this package-agnostic so adding a binding never patches the workflow.
+      - name: Install Playwright Chromium
+        run: pnpm --filter website exec playwright install --with-deps chromium
+
       # The manifest runner executes every required runtime and type lane. Each
       # runner's JSON report proves the exact identities without a separate
-      # pre-execution Vitest collection pass.
+      # pre-execution Vitest collection pass. The aggregate below combines the
+      # file shards before proving complete lane coverage.
       - name: Check React parity inventories and execute required lanes
-        run: pnpm react-parity:check
+        env:
+          REACT_PARITY_VITEST_REPORT: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json
+        run: pnpm react-parity:check --shard ${{ matrix.shard }}/3
 
-  # Keep the existing required check names while the work happens in parallel
+      - name: Upload React parity Vitest shard report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: react-parity-vitest-${{ matrix.shard }}
+          path: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json
+          retention-days: 1
+
+  react_parity_checks:
+    name: React parity checks
+    needs: [release_change, react_parity_shard]
+    if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify all React parity shards passed
+        env:
+          REACT_PARITY_SHARD_RESULT: ${{ needs.react_parity_shard.result }}
+        run: test "$REACT_PARITY_SHARD_RESULT" = success
+
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+
+      - name: Download React parity Vitest shard reports
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: react-parity-vitest-*
+          path: ${{ runner.temp }}/react-parity-vitest
+          merge-multiple: true
+
+      - name: Verify complete React parity Vitest coverage
+        run: >-
+          node scripts/react-parity/verify-vitest-shards.mjs
+          --reports-directory "${{ runner.temp }}/react-parity-vitest"
+          --expected-shards 3
+
+  # Keep the Node 24 aggregate check name while the work happens in parallel
   # above. `always()` makes a failed shard produce a failed required check and
   # folds the dedicated integration suites into the same merge and publishing
   # gates. An authenticated release or lightweight-change skip must satisfy
   # every prerequisite.
   test:
-    name: test (${{ matrix.required-context }})
-    needs: [release_change, test_shard, react_parity_checks, website_e2e, heavy_integration]
-    # The release PR does not need test contexts. The post-merge release run does:
-    # publish.yml verifies these stable aggregate names before publishing.
+    name: test (24)
+    needs:
+      [
+        release_change,
+        test_shard,
+        react_parity_checks,
+        website_e2e,
+        heavy_integration,
+        heavy_node_integration,
+      ]
+    # The release PR does not need this test context. The post-merge release run
+    # does: publish.yml verifies this stable aggregate name before publishing.
     if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' }}
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        # Keep one stable aggregate context for each supported Node release.
-        required-context: [22, 24]
 
     steps:
       - name: Verify all test suites passed
@@ -517,17 +566,20 @@ jobs:
           REACT_PARITY_RESULT: ${{ needs.react_parity_checks.result }}
           WEBSITE_E2E_RESULT: ${{ needs.website_e2e.result }}
           HEAVY_INTEGRATION_RESULT: ${{ needs.heavy_integration.result }}
+          HEAVY_NODE_INTEGRATION_RESULT: ${{ needs.heavy_node_integration.result }}
         run: |
           if [ "$IS_CHANGESET_RELEASE_MERGE" = true ] || [ "$FULL_CI" = false ]; then
             test "$SHARD_RESULT" = skipped
             test "$REACT_PARITY_RESULT" = skipped
             test "$WEBSITE_E2E_RESULT" = skipped
             test "$HEAVY_INTEGRATION_RESULT" = skipped
+            test "$HEAVY_NODE_INTEGRATION_RESULT" = skipped
           else
             test "$SHARD_RESULT" = success
             test "$REACT_PARITY_RESULT" = success
             test "$WEBSITE_E2E_RESULT" = success
             test "$HEAVY_INTEGRATION_RESULT" = success
+            test "$HEAVY_NODE_INTEGRATION_RESULT" = success
           fi
 
   website_e2e:
@@ -573,43 +625,98 @@ jobs:
           "$WEBSITE_E2E_SPEC"
           --maxWorkers=1
 
-  heavy_integration:
-    name: heavy integration (${{ matrix.lane }})
+  heavy_node_integration:
+    name: heavy integration (package builds, eval corpus, runtime loaders, Astro)
     needs: release_change
-    # Run build and browser coverage once on the newest supported Node. The
-    # ordinary suite still runs on both Node 22 and 24 above.
+    # These suites use one dependency graph on the Node 24 CI execution target.
+    # Node 22.22.2 remains the published package engine baseline.
+    if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        id: install_heavy_node_dependencies
+        run: pnpm install --prod false --frozen-lockfile
+
+      - name: Setup Bun
+        id: setup_heavy_node_bun
+        if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      - name: Install Playwright Chromium for package and Astro coverage
+        id: install_heavy_node_chromium
+        if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
+        run: pnpm --filter website exec playwright install --with-deps chromium
+
+      # Keep each former lane as a named step, and let independent suites run
+      # after a sibling failure when their own prerequisites are still valid.
+      - name: Run package-build integration tests
+        if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' && steps.install_heavy_node_chromium.outcome == 'success' }}
+        run: >-
+          pnpm vitest run
+          website-mcp/tests/built-handler.e2e.test.ts
+          packages/rspeedy-plugin-octane/tests/packed-consumer.test.ts
+          packages/rspeedy-plugin-octane/tests/demo.test.ts
+          packages/rspeedy-plugin-octane/tests/browser/web-host.test.ts
+          packages/rsbuild-plugin-octane/tests/rsbuild.integration.test.ts
+          packages/vite-plugin-octane/tests/production.test.ts
+          --maxWorkers=1
+
+      - name: Run eval-corpus integration tests
+        if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
+        run: >-
+          pnpm vitest run
+          packages/octane-evals/tests/user-app-corpus.test.ts
+          --maxWorkers=1
+
+      - name: Run runtime-loader integration tests
+        if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
+        run: >-
+          pnpm vitest run
+          packages/octane/tests/register-hook.test.ts
+          --maxWorkers=1
+
+      - name: Run Bun compiler-preload integration test
+        if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' && steps.setup_heavy_node_bun.outcome == 'success' }}
+        env:
+          BUN_BINARY: bun
+        run: node --test packages/octane/tests/register-hook-bun.integration.test.mjs
+
+      - name: Run Astro integration tests
+        if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' && steps.install_heavy_node_chromium.outcome == 'success' }}
+        run: >-
+          pnpm vitest run
+          packages/astro/tests/astro.e2e.test.ts
+          --maxWorkers=1
+
+  heavy_integration:
+    name: heavy integration (${{ matrix.lane }}${{ matrix.playwright_browser && format(' - {0}', matrix.playwright_browser) || '' }})
+    needs: release_change
+    # Run browser coverage once on the Node 24 CI execution target.
+    # Node 22.22.2 remains the published package engine baseline.
     if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
         include:
-          - lane: package-builds
-            chromium: true
-            specs: >-
-              website-mcp/tests/built-handler.e2e.test.ts
-              packages/rspeedy-plugin-octane/tests/packed-consumer.test.ts
-              packages/rspeedy-plugin-octane/tests/demo.test.ts
-              packages/rspeedy-plugin-octane/tests/browser/web-host.test.ts
-              packages/rsbuild-plugin-octane/tests/rsbuild.integration.test.ts
-              packages/vite-plugin-octane/tests/production.test.ts
-          - lane: eval-corpus
-            chromium: false
-            specs: packages/octane-evals/tests/user-app-corpus.test.ts
           - lane: browser
-            chromium: true
-            specs: >-
-              packages/octane/tests/browser
-              packages/dexie/tests/browser
-              packages/tiptap/tests/browser
-              packages/three/tests/browser
-          - lane: astro
-            chromium: true
-            specs: packages/astro/tests/astro.e2e.test.ts
-          - lane: runtime-loaders
-            bun: true
-            chromium: false
-            specs: packages/octane/tests/register-hook.test.ts
+            playwright_browser: chromium
+            specs: discovered
 
     steps:
       - name: Checkout code
@@ -627,32 +734,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --prod false --frozen-lockfile
 
-      - name: Setup Bun
-        if: ${{ matrix.bun }}
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.3.14
-
-      - name: Install Playwright Chromium
-        if: ${{ matrix.chromium && matrix.lane != 'astro' }}
-        run: pnpm --filter website exec playwright install --with-deps chromium
-
-      - name: Install Playwright WebKit for cross-browser ownership coverage
+      - name: Install selected Playwright browser
         if: ${{ matrix.lane == 'browser' }}
-        run: pnpm --filter octane exec playwright install --with-deps webkit
-
-      - name: Install Playwright Chromium (astro)
-        if: ${{ matrix.lane == 'astro' }}
-        run: pnpm --filter @octanejs/astro exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps ${{ matrix.playwright_browser }}
 
       - name: Run ${{ matrix.lane }} integration tests
-        run: pnpm vitest run ${{ matrix.specs }} --maxWorkers=1
-
-      - name: Run Bun compiler-preload integration test
-        if: ${{ matrix.bun }}
-        env:
-          BUN_BINARY: bun
-        run: node --test packages/octane/tests/register-hook-bun.integration.test.mjs
+        run: |
+          SPECS="$(node scripts/discover-heavy-browser-specs.mjs)"
+          pnpm vitest run ${SPECS} --maxWorkers=1
 
   lint_checks:
     name: lint checks
@@ -938,24 +1027,17 @@ jobs:
           fi
 
   three_compat:
-    name: Three compatibility (${{ matrix.lane }})
+    name: Three compatibility
     needs: release_change
     if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
-    # This matrix intentionally rewrites one importer without changing the
-    # repository lockfile after the frozen base install.
+    # Each lane rewrites one importer without changing the repository lockfile
+    # after its frozen base install. Distinct worktrees keep manifests,
+    # node_modules, and test artifacts isolated while sharing one runner and
+    # pnpm's content-addressed store.
     env:
       PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "false"
 
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - lane: minimum r156
-            version: 0.156.0
-          - lane: current
-            version: latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -969,49 +1051,67 @@ jobs:
           node-version: 24
           cache: "pnpm"
 
-      - name: Install pinned repository dependencies
-        run: pnpm install --frozen-lockfile
-
-      # Keep the r172 differential oracle immutable. These lanes replace only
-      # the Three runtime/type pair, then select the Octane-owned compatibility
-      # suite so current/minimum support cannot be faked by the pinned oracle.
-      - name: Install Three ${{ matrix.version }} compatibility pair
+      - name: Prepare isolated Three compatibility worktrees
+        id: prepare_three_compat
         run: |
-          THREE_VERSION="$(pnpm view three@${{ matrix.version }} version)"
+          THREE_MINIMUM_WORKSPACE="$RUNNER_TEMP/octane-three-compat-minimum-r156"
+          THREE_CURRENT_WORKSPACE="$RUNNER_TEMP/octane-three-compat-current"
+          git worktree add --detach "$THREE_MINIMUM_WORKSPACE" "$GITHUB_SHA"
+          git worktree add --detach "$THREE_CURRENT_WORKSPACE" "$GITHUB_SHA"
+          test "$(git -C "$THREE_MINIMUM_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C "$THREE_CURRENT_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C "$THREE_MINIMUM_WORKSPACE" rev-parse --git-dir)" != "$(git -C "$THREE_CURRENT_WORKSPACE" rev-parse --git-dir)"
+
+      # Keep the r172 differential oracle immutable. Each lane replaces only
+      # the Three runtime/type pair, then selects the Octane-owned compatibility
+      # suite so current/minimum support cannot be faked by the pinned oracle.
+      - name: Test Three compatibility (minimum r156)
+        working-directory: ${{ runner.temp }}/octane-three-compat-minimum-r156
+        env:
+          THREE_VERSION_SPEC: 0.156.0
+        run: |
+          pnpm install --frozen-lockfile
+          THREE_VERSION="$(pnpm view "three@$THREE_VERSION_SPEC" version)"
           THREE_RELEASE_LINE="${THREE_VERSION%.*}"
           pnpm --filter @octanejs/three add --save-dev --lockfile=false "three@$THREE_VERSION" "@types/three@${THREE_RELEASE_LINE}.x"
-          echo "OCTANE_THREE_COMPAT_VERSION=$THREE_VERSION" >> "$GITHUB_ENV"
-
-      - name: Verify resolved Three compatibility pair
-        run: |
-          THREE_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/three/package.json').version)")"
+          RESOLVED_THREE_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/three/package.json').version)")"
           TYPES_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/@types/three/package.json').version)")"
-          THREE_RELEASE_LINE="${THREE_VERSION%.*}"
           TYPES_RELEASE_LINE="${TYPES_VERSION%.*}"
-          echo "three=$THREE_VERSION @types/three=$TYPES_VERSION"
+          echo "three=$RESOLVED_THREE_VERSION @types/three=$TYPES_VERSION"
+          test "$RESOLVED_THREE_VERSION" = "$THREE_VERSION"
           test "$THREE_RELEASE_LINE" = "$TYPES_RELEASE_LINE"
-
-      - name: Typecheck Three source and public API
-        run: |
           pnpm exec tsgo --noEmit -p packages/three/tsconfig.json
           pnpm exec tsc --noEmit -p packages/three/typetests/tsconfig.json
+          OCTANE_THREE_COMPAT_VERSION="$THREE_VERSION" pnpm --dir packages/three test:compat
 
-      - name: Run Three compatibility behavior tests
-        run: pnpm --dir packages/three test:compat
+      # Preserve the matrix's fail-fast: false behavior: a minimum-lane failure
+      # must not hide whether the current release is compatible.
+      - name: Test Three compatibility (current)
+        if: ${{ !cancelled() && steps.prepare_three_compat.outcome == 'success' }}
+        working-directory: ${{ runner.temp }}/octane-three-compat-current
+        env:
+          THREE_VERSION_SPEC: latest
+        run: |
+          pnpm install --frozen-lockfile
+          THREE_VERSION="$(pnpm view "three@$THREE_VERSION_SPEC" version)"
+          THREE_RELEASE_LINE="${THREE_VERSION%.*}"
+          pnpm --filter @octanejs/three add --save-dev --lockfile=false "three@$THREE_VERSION" "@types/three@${THREE_RELEASE_LINE}.x"
+          RESOLVED_THREE_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/three/package.json').version)")"
+          TYPES_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/@types/three/package.json').version)")"
+          TYPES_RELEASE_LINE="${TYPES_VERSION%.*}"
+          echo "three=$RESOLVED_THREE_VERSION @types/three=$TYPES_VERSION"
+          test "$RESOLVED_THREE_VERSION" = "$THREE_VERSION"
+          test "$THREE_RELEASE_LINE" = "$TYPES_RELEASE_LINE"
+          pnpm exec tsgo --noEmit -p packages/three/tsconfig.json
+          pnpm exec tsc --noEmit -p packages/three/typetests/tsconfig.json
+          OCTANE_THREE_COMPAT_VERSION="$THREE_VERSION" pnpm --dir packages/three test:compat
 
   lynx_compat:
-    name: Lynx compatibility (${{ matrix.lane }})
+    name: Lynx compatibility
     needs: release_change
     if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' && needs.release_change.outputs.full_ci != 'false' }}
     runs-on: ubuntu-latest
 
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - lane: minimum
-          - lane: current
-
     steps:
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -1026,15 +1126,24 @@ jobs:
           cache: "pnpm"
 
       - name: Install pinned repository dependencies
+        id: install_lynx_dependencies
         run: pnpm install --frozen-lockfile
 
-      # The script packs the four Octane packages, installs one exact Lynx
-      # graph into a temporary external consumer without a lockfile, verifies
-      # physical dependency identity, and performs two clean native builds.
-      - name: Pack and build Lynx ${{ matrix.lane }} compatibility graph
+      # Each step is a separate Node process because Rspack and TASM load native
+      # state. The script also gives each lane a distinct temporary external
+      # consumer for its exact dependency graph and two clean native builds.
+      - name: Pack and build Lynx minimum compatibility graph
         run: >-
           node packages/rspeedy-plugin-octane/scripts/compatibility-smoke.mjs
-          --lane "${{ matrix.lane }}"
+          --lane minimum
+
+      # Preserve the matrix's fail-fast: false behavior so a minimum-lane
+      # failure does not hide whether the current graph is compatible.
+      - name: Pack and build Lynx current compatibility graph
+        if: ${{ !cancelled() && steps.install_lynx_dependencies.outcome == 'success' }}
+        run: >-
+          node packages/rspeedy-plugin-octane/scripts/compatibility-smoke.mjs
+          --lane current
 
       - name: Verify the repository lockfile stayed immutable
         run: git diff --exit-code -- pnpm-lock.yaml

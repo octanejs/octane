@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 // Differential pin for the source-order anchor fix applied to forBlock,
@@ -10,6 +10,8 @@ import { resolve } from 'node:path';
 // matches React's source-order DOM exactly.
 
 const FIXTURE = resolve(__dirname, '../_fixtures/anchor-order.tsrx');
+
+await preloadDifferentialFixture(FIXTURE);
 
 describe('differential: anchor-order.tsrx — forBlock source order', () => {
 	it('forBeforeSibling: items render BEFORE the static .after sibling', async () => {

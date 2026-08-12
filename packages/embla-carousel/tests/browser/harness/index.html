@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Embla Octane browser harness</title>
+		<style>
+			[data-carousel-viewport] {
+				width: 480px;
+				overflow: hidden;
+			}
+			[data-carousel-container] {
+				display: flex;
+			}
+			[data-carousel-slide] {
+				flex: 0 0 100%;
+				min-width: 0;
+				height: 120px;
+			}
+		</style>
+	</head>
+	<body>
+		<output data-carousel-destroyed>false</output>
+		<div id="root"></div>
+		<script type="module" src="/main.tsrx"></script>
+	</body>
+</html>

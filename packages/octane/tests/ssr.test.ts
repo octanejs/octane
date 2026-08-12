@@ -157,6 +157,13 @@ describe.each([
 					data-after={props.read('after')}
 				/>
 			}
+			export function SpreadFloatStyle(props) @{
+				<div {...props.attrs}>
+					<style href="spread-inline-tokens" precedence="default">
+						.spread-tokens { color: teal; }
+					</style>
+				</div>
+			}
 		`,
 		`single-spread-host-${dev ? 'development' : 'production'}.tsrx`,
 		{ dev, hmr: false },
@@ -172,6 +179,18 @@ describe.each([
 		const container = document.createElement('div');
 		container.innerHTML = html;
 		expect(container.querySelector('#spread-child')?.textContent).toBe('rich');
+	});
+
+	it('hoists a nested Float style resource from an otherwise empty spread host', () => {
+		const { html } = RT.renderToString(mod.SpreadFloatStyle, {
+			attrs: { id: 'spread-float-host' },
+		});
+		expect(html).toContain('data-href="spread-inline-tokens"');
+		expect(html).toContain('data-precedence="default"');
+		expect(html).toContain('.spread-tokens');
+		expect(html).toContain('color: teal');
+		expect(html).toContain('<div id="spread-float-host"></div>');
+		expect(html.indexOf('<style')).toBeLessThan(html.indexOf('<div'));
 	});
 
 	it('renders raw spread HTML and rejects conflicting or malformed content', () => {

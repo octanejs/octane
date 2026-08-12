@@ -8,7 +8,7 @@
     },
     {
       "path": "packages/tanstack-router-ssr-query/tests/parity/contracts.test.ts",
-      "disposition": "octane-only-audit-contract",
+      "disposition": "octane-only-framework-contract",
       "reason": "Authenticates the complete upstream source, entrypoint boundary, absent runtime suite, and published core dependency."
     },
     {

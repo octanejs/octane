@@ -5,6 +5,11 @@ import type { Monaco } from './types';
 const bindingOwnedModels = new WeakSet<editor.ITextModel>();
 const modelLeaseCounts = new WeakMap<editor.ITextModel, number>();
 
+/**
+ * Ownership-aware model helper. Upstream's utils/getOrCreateModel returns or
+ * creates a model by path; this port additionally tracks lease counts so shared
+ * and externally-created models are not disposed by the wrong owner.
+ */
 export function getOrCreateModel(
 	monaco: Monaco,
 	value: string,

@@ -130,6 +130,7 @@ export function CommandRoot(props: CommandProps) @{
 					}
 					ids.current.set(id, { value: itemValue ?? '', keywords });
 					state.current.filtered.items.set(id, score(itemValue ?? '', keywords));
+					// OCTANE DIVERGENCE[value-change-filter-refresh][differential:cmdk-value-change-filter]:
 					// Re-derive the aggregate before sorting. Scoring this one item
 					// updates `filtered.items` but leaves `filtered.count` and
 					// `filtered.groups` describing the previous values, and those two
@@ -167,7 +168,8 @@ export function CommandRoot(props: CommandProps) @{
 					// An item leaving its group has to be dropped from that group's member
 					// set too, or the set accumulates dead ids for the Command's lifetime
 					// (unbounded growth in a menu whose results churn) and filterItems()
-					// walks them on every keystroke.
+					// walks them on every keystroke. Documented in status.json; no paired
+					// DOM oracle distinguishes the bookkeeping from upstream.
 					if (groupId) allGroups.current.get(groupId)?.delete(id);
 					const selectedItem = getSelectedItem();
 
@@ -194,9 +196,13 @@ export function CommandRoot(props: CommandProps) @{
 				schedule(8, () => store.emit());
 
 				return () => {
+					// OCTANE DIVERGENCE[force-mount-empty-count][differential:cmdk-force-mount-empty]:
+					// Releasing the force-mount count on unmount is required so Empty can
+					// reappear once no force-mounted item remains visible.
 					releaseValue(id);
 					allForceMounted.current.delete(id);
 					state.current.forceMountedCount = allForceMounted.current.size;
+					// OCTANE DIVERGENCE[selected-force-mount-teardown][differential:cmdk-selected-force-mount]:
 					// A force-mounted item is selectable like any other, so losing the
 					// selected one has to move the selection on — exactly as the plain
 					// item teardown does. Without this the value stays pointing at a node
@@ -250,6 +256,8 @@ export function CommandRoot(props: CommandProps) @{
 		const owners = (valueOwners.current.get(next) ?? 0) + 1;
 		valueOwners.current.set(next, owners);
 		if (owners > 1) {
+			// OCTANE DIVERGENCE[duplicate-value-warning][differential:cmdk-duplicate-value]:
+			// Development builds report duplicate values; upstream accepts them silently.
 			console.warn(
 				`[@octanejs/cmdk] ${owners} items share the value ${JSON.stringify(next)}. ` +
 					`Selection is keyed by value, so they will all appear selected at once and ` +
@@ -399,7 +407,7 @@ export function CommandRoot(props: CommandProps) @{
 	/**
  * Order items by score, and groups by their best item score, using CSS `order`.
  *
- * OCTANE DIVERGENCE: cmdk's sort is DOM-authoritative — it puts matches in
+ * OCTANE DIVERGENCE[runtime-adaptation-divergences][differential:cmdk-filter-selection-empty]: cmdk's sort is DOM-authoritative — it puts matches in
  * score order by physically relocating item nodes into the list sizer. Octane
  * fences every component's DOM with a pair of comment markers and tracks the
  * range between them, and a template construct like `@for` or `@if` wraps each
@@ -418,7 +426,8 @@ export function CommandRoot(props: CommandProps) @{
  * The cost is that the sizer and each group's item container become flex
  * columns while a filter is active, so a consumer who relies on physical DOM
  * order (`:nth-child` styling, drag handles) or on a custom container
- * `display` sees a divergence from upstream. Recorded in status.json.
+ * `display` sees a divergence from upstream. This marker authenticates ranking
+ * and aria wiring only; event/ref adaptations are out of scope for this case.
  */
 	function sort() {
 		if (!state.current.search || propsRef.current.shouldFilter === false) {
@@ -453,6 +462,7 @@ export function CommandRoot(props: CommandProps) @{
 		// ranks below continue past them instead of tying.
 		let topLevel = 0;
 
+		// OCTANE DIVERGENCE[force-mount-rank-order][differential:cmdk-force-mount-rank]:
 		// EVERY valid item gets a rank, not just the matches. A non-match usually
 		// unmounts and never needs one, but a force-mounted item never scores and
 		// never unmounts — and an unranked child keeps the initial `order` of 0,
@@ -488,7 +498,7 @@ export function CommandRoot(props: CommandProps) @{
 			setStyle(node, 'order', String(group ? rank + 1 : topLevel += 1));
 		});
 
-		// OCTANE DIVERGENCE: upstream looks each group element up by
+		// OCTANE DIVERGENCE[corrected-group-ordering][differential:cmdk-groups]: upstream looks each group element up by
 		// `[cmdk-group=""][data-value="<groupId>"]`, but `data-value` holds the
 		// group's VALUE (its heading text), never its id — so upstream's selector
 		// can never match and its group reordering is effectively dead code.

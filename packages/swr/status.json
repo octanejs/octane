@@ -1,0 +1,12 @@
+{
+  "upstream": { "package": "swr", "version": "2.4.2" },
+  "surface": "Mapped port of SWR 2.4.2: root useSWR/config/cache/mutate/preload, infinite, immutable, remote mutation, subscription, _internal, and the published react-server condition branches. The harness executes the pinned pristine React suite plus selected adapted Octane cases, repo-authored adapted type probes, and differential/export oracles. Provenance remains recorded-unverified until the exhaustive adapted crosswalk lands.",
+  "divergences": [
+    "The binding exposes window.__SWR_DEVTOOLS_OCTANE__ and deliberately does not claim React's window.__SWR_DEVTOOLS_REACT__ global; React-only devtools that require that identity are incompatible.",
+    "SWR 2.4.2 behavior is pinned exactly, including the absence of automatic request abortion on consumer unmount."
+  ],
+  "ssr": "Supported and tested: browser-global-free server condition exports, deterministic fallback output, Octane streaming/hydration architecture gates, and pinned fallback/preload revalidation semantics.",
+  "verified": "",
+  "parityEvidence": "packages/swr/audit/react-parity.json",
+  "docs": ["docs/plans/2026-08-02-001-feat-swr-binding-plan.md"]
+}

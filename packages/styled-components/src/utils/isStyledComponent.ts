@@ -1,6 +1,7 @@
 import { StyledComponentBrand } from '../types';
 
 /**
+ * Package contract (ordinary test evidence, not parity-counted):
  * Octane adaptation: upstream brands styled components with React's
  * forward-ref `$$typeof` so HOCs that hoist statics (and therefore inherit
  * `styledComponentId`) are not mistaken for real styled components. Octane
