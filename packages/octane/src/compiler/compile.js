@@ -9766,7 +9766,42 @@ function ssrCompileBodyWithMapTemps(
 	if (mapTemps.length > 0) {
 		body.push(...mapTemps.map((temp) => inheritOriginLoc(b.let(temp), node)));
 	}
-	body.push(...emitHeadServer(headNodes, ctx), ...rewritten, ...inlinedSubs);
+	// Head statements lead the body so an arm-root Float registration runs
+	// ahead of a suspending setup and ships with the streaming shell. Leading
+	// is only evaluable when the statement reads nothing the body itself
+	// declares: an attr computed from a setup local would hit its TDZ there, so
+	// those statements run right after setup instead — still ahead of the
+	// return that renders children, preserving discovery order. Registration
+	// order IS precedence-group order, so the split must never reorder the
+	// list: only the capture-free PREFIX leads; from the first capturing
+	// statement on, everything defers together, keeping the same relative
+	// order the client produces. (A `var` inside a nested setup block escapes
+	// this scan and keeps the historical front placement; head attrs read
+	// top-level setup locals in practice.)
+	const headStatements = emitHeadServer(headNodes, ctx);
+	let frontHead = headStatements;
+	let deferredHead = [];
+	if (headStatements.length > 0) {
+		const bodyBindings = new Set();
+		for (const s of rewritten) collectStatementBindings(s, bodyBindings);
+		for (const s of inlinedSubs) collectStatementBindings(s, bodyBindings);
+		if (bodyBindings.size > 0) {
+			frontHead = [];
+			let deferring = false;
+			for (const stmt of headStatements) {
+				if (!deferring) {
+					for (const free of collectFreeIdentifiers(stmt, [])) {
+						if (bodyBindings.has(free)) {
+							deferring = true;
+							break;
+						}
+					}
+				}
+				(deferring ? deferredHead : frontHead).push(stmt);
+			}
+		}
+	}
+	body.push(...frontHead, ...rewritten, ...inlinedSubs, ...deferredHead);
 	// PROPS-FIRST ABI (matches the client): `(…userParams, __s, __extra)`. A leading
 	// `__props` placeholder stands in when there are no user params, so a verbatim
 	// `function Foo(props)` and a compiled component both bind props from arg 0.
@@ -13168,6 +13203,16 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		bodyStatements.push(...mapTemps.map((temp) => inheritOriginLoc(b.let(temp), node)));
 	}
 	bodyStatements.push(...rewrittenStatements);
+	// GLOBAL resource registrations (stylesheet precedence links, style
+	// resources, async scripts) run here: after setup, so an href computed from
+	// a body local is initialized, and BEFORE the constructs below mount any
+	// children — precedence groups are created in first-encounter order, and
+	// tree discovery order (parent before child, matching SSR and React) is
+	// only guaranteed while no child has rendered yet. A suspending setup means
+	// the resource registers on the arm's completing pass, like React's
+	// commit-time insertion; scope-owned `headBlock` metadata stays at the body
+	// tail (`plan.head`).
+	if (plan?.resources) bodyStatements.push(...plan.resources);
 	// Inlined sub-helpers (children render fns, legacy-placement construct
 	// bodies, hoisted `<tsrx>` blocks) are function DECLARATION nodes embedded
 	// directly in the body — they hoist, so their placement after the setup
@@ -18822,19 +18867,23 @@ function headResourceArgNodes(el, kind) {
 	return args;
 }
 
-// Build the CLIENT `headBlock(__s, …)` statement NODES for a component's
-// hoisted head elements (one per `HeadHoist`). Returns [] when there are none.
+// Build the CLIENT statement NODES for a component's hoisted head elements
+// (one per `HeadHoist`), partitioned by WHEN they must run. `head` carries the
+// `headBlock(__s, …)` calls: scope-owned metadata whose slots come after the
+// body's constructs, so they stay at the body tail (`plan.head`). `resources`
+// carries the GLOBAL resource calls (stylesheet precedence links, style
+// resources, async scripts): they dedupe by href/src at runtime, are
+// scope-free, and must run after setup but BEFORE the body's constructs mount
+// children — precedence GROUP order is first-encounter order, and a parent's
+// group has to be encountered before any child component's (tree discovery
+// order, matching SSR and React). Their slot index is left unoccupied to keep
+// the numbering of neighbouring headBlock slots stable regardless of
+// classification.
 /** @param {any[]} headNodes @param {any} ctx @param {number} slotBase */
 function emitHeadClient(headNodes, ctx, slotBase) {
-	if (!headNodes.length) return [];
-	// Each hoisted head element gets a dense scope slot (after the body's constructs);
-	// the content `key` stays as a later arg for SSR-adoption matching. RESOURCE
-	// elements (stylesheet precedence links, style resources, async scripts) are
-	// global and scope-free: they dedupe by href/src at runtime, so their call
-	// carries only the attrs object (plus the CSS text for style resources).
-	// Their slot index is left unoccupied to keep the numbering of neighbouring
-	// headBlock slots stable regardless of classification.
-	return headNodes.map((h, i) => {
+	const head = [];
+	const resources = [];
+	headNodes.forEach((h, i) => {
 		const kind = headResourceKind(h.element);
 		if (kind !== null) {
 			const fn =
@@ -18844,24 +18893,30 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 						? 'styleResource'
 						: 'scriptResource';
 			ctx.runtimeNeeded.add(fn);
-			return inheritOriginLoc(
-				b.stmt(b.call('_$' + fn, ...headResourceArgNodes(h.element, kind))),
-				h.element ?? h,
+			resources.push(
+				inheritOriginLoc(
+					b.stmt(b.call('_$' + fn, ...headResourceArgNodes(h.element, kind))),
+					h.element ?? h,
+				),
 			);
+			return;
 		}
 		ctx.runtimeNeeded.add('headBlock');
-		return inheritOriginLoc(
-			b.stmt(
-				b.call(
-					'_$headBlock',
-					b.id('__s'),
-					b.literal(slotBase + i),
-					...headElementArgNodes(h, i, ctx),
+		head.push(
+			inheritOriginLoc(
+				b.stmt(
+					b.call(
+						'_$headBlock',
+						b.id('__s'),
+						b.literal(slotBase + i),
+						...headElementArgNodes(h, i, ctx),
+					),
 				),
+				h.element ?? h,
 			),
-			h.element ?? h,
 		);
 	});
+	return { head, resources };
 }
 
 // Build the SERVER `ssrHeadEl(…)` statement nodes for a component's hoisted
@@ -19618,13 +19673,15 @@ function planJsx(
 	if (jsxNodes.length === 0) {
 		ctx._elemLocs = _prevElemLocs;
 		ctx._nestedHeadHoists = _prevNestedHeads;
+		const headOnlyEmit = emitHeadClient(headNodes, ctx, 0);
 		return {
 			hasBag: false,
 			mount: [],
 			update: [],
 			everyRender: [],
 			after: [],
-			head: emitHeadClient(headNodes, ctx, 0),
+			head: headOnlyEmit.head,
+			resources: headOnlyEmit.resources,
 			locs: null,
 		};
 	}
@@ -21238,7 +21295,8 @@ function planJsx(
 		update: updateLines,
 		everyRender: everyRenderLines,
 		after: afterStatements,
-		head: headEmit,
+		head: headEmit.head,
+		resources: headEmit.resources,
 		// DEV ONLY (`null` in prod → no body emission, byte-identical output): a structured
 		// `{ slotIndex: [line, column] }` literal for hydration-mismatch warnings + a future
 		// DevTools element→source layer. Keyed by the slot index the runtime already uses.

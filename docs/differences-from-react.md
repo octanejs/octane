@@ -590,7 +590,9 @@ React Float **resources** are supported with React's semantics:
   global resource: deduped by href across the page, hoisted into
   `document.head` with a `data-precedence` attribute, grouped by precedence in
   first-encounter order (later same-precedence sheets append to their group),
-  and retained after unmount. First instance wins; later differing props do
+  and retained after unmount. First encounter follows tree discovery order —
+  parent before child, suspended arms at reveal — so client mounts, SSR, and
+  React agree on group order. First instance wins; later differing props do
   not retarget a live sheet.
 - `<script async src>` (no children/handlers) hoists and dedupes by src, and
   is likewise never removed.

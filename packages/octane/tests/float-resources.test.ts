@@ -38,6 +38,14 @@ import {
 	ToggleHost,
 	setSheetVisible,
 } from './_fixtures/float-resources.tsrx';
+import {
+	ParentChild,
+	LateArmAfterSibling,
+	NestedTryOrder,
+	LocalHref,
+	MixedLocalStatic,
+	FailingArm,
+} from './_fixtures/float-group-order.tsrx';
 
 function sheetHrefs(): string[] {
 	return Array.from(
@@ -571,5 +579,116 @@ describe('Float resources — streamed late boundaries', () => {
 		expect(sheetHrefs()).toEqual(['/base.css', '/gated-x.css']);
 		expect(document.head.querySelectorAll('style[data-href="gated-tokens"]')).toHaveLength(1);
 		clientRoot.unmount();
+	});
+});
+
+// Precedence GROUP order is part of the resource contract: groups appear in
+// first-encounter order of tree DISCOVERY (what SSR serializes and React
+// produces), not in the order component bodies happen to finish executing.
+// Group order is CSS cascade order, so an inversion changes how equal-
+// specificity rules across groups resolve.
+describe('Float resources — precedence group discovery order', () => {
+	const containers: HTMLElement[] = [];
+	const roots: Array<{ unmount(): void }> = [];
+	function mountInto(body: any, props: Record<string, unknown> = {}): void {
+		const c = document.createElement('div');
+		document.body.appendChild(c);
+		containers.push(c);
+		const root = createRoot(c);
+		roots.push(root);
+		root.render(body, props);
+	}
+	afterEach(() => {
+		for (const r of roots.splice(0)) r.unmount();
+		for (const c of containers.splice(0)) c.remove();
+		document.head
+			.querySelectorAll('[data-precedence], [data-oct-res]')
+			.forEach((el) => el.remove());
+		resetFloatResourceState();
+	});
+
+	const srvOrder = loadServerFixture(
+		'packages/octane/tests/_fixtures/float-group-order.tsrx',
+	) as Record<string, any>;
+
+	it("a parent's group precedes its child component's group on a client mount", async () => {
+		await act(() => mountInto(ParentChild));
+		expect(sheetHrefs()).toEqual(['/parent-app.css', '/child-vendor.css']);
+	});
+
+	it("a suspended arm's group registers at reveal, after shell-rendered siblings", async () => {
+		const d = deferred<string>();
+		await act(() => mountInto(LateArmAfterSibling, { promise: d.promise }));
+		// While the arm is pending, the root and sibling groups exist in
+		// discovery order; the arm's group does not exist yet (the sheet is
+		// discovered when its content renders — matching React, where a
+		// suspended tree contributes no resources until it commits).
+		expect(sheetHrefs()).toEqual(['/root-one.css', '/sibling.css']);
+		await act(() => d.resolve('armed'));
+		expect(sheetHrefs()).toEqual(['/root-one.css', '/sibling.css', '/arm-three.css']);
+		expect(document.body.textContent).toContain('armed');
+	});
+
+	it('nested @try arms register their groups in discovery order across waves', async () => {
+		const mid = deferred<string>();
+		const deep = deferred<string>();
+		await act(() => mountInto(NestedTryOrder, { mid: mid.promise, deep: deep.promise }));
+		expect(sheetHrefs()).toEqual(['/outer-one.css']);
+		await act(() => mid.resolve('m'));
+		expect(sheetHrefs()).toEqual(['/outer-one.css', '/mid-two.css']);
+		await act(() => deep.resolve('d'));
+		expect(sheetHrefs()).toEqual(['/outer-one.css', '/mid-two.css', '/deep-three.css']);
+		expect(document.body.textContent).toContain('d');
+	});
+
+	it('SSR serializes nested-tree groups in the same discovery order', async () => {
+		const App = () => Server.createElement(srvOrder.ParentChild, null) as any;
+		const r = await Server.renderToString(App as any);
+		const app = r.html.indexOf('/parent-app.css');
+		const vendor = r.html.indexOf('/child-vendor.css');
+		expect(app).toBeGreaterThan(-1);
+		expect(vendor).toBeGreaterThan(app);
+	});
+
+	it('a setup-local-computed href renders on the server and matches the client', async () => {
+		// Server: the registration must not run before the local it reads is
+		// initialized.
+		const App = () => Server.createElement(srvOrder.LocalHref, { name: 'x' }) as any;
+		const r = await Server.renderToString(App as any);
+		expect(r.html.match(/\/x-dep\.css/g) || []).toHaveLength(1);
+		expect(r.html).toContain('data-precedence="app"');
+
+		// Client control: same component, same sheet.
+		await act(() => mountInto(LocalHref, { name: 'x' }));
+		expect(sheetHrefs()).toEqual(['/x-dep.css']);
+	});
+
+	it('mixed setup-local and static resources keep source order on both sides', async () => {
+		// Registration order is group order. A static sheet declared AFTER a
+		// setup-local-dependent one must not jump ahead of it on the server —
+		// SSR and a client mount have to agree on the cascade.
+		const App = () => Server.createElement(srvOrder.MixedLocalStatic, { name: 'x' }) as any;
+		const r = await Server.renderToString(App as any);
+		const dyn = r.html.indexOf('/x-first.css');
+		const stat = r.html.indexOf('/second-static.css');
+		expect(dyn).toBeGreaterThan(-1);
+		expect(stat).toBeGreaterThan(dyn);
+
+		await act(() => mountInto(MixedLocalStatic, { name: 'x' }));
+		expect(sheetHrefs()).toEqual(['/x-first.css', '/second-static.css']);
+	});
+
+	it('an arm that fails while rendering a child keeps its already-registered sheet', async () => {
+		// Resources are page-global and never removed; registration precedes
+		// child evaluation on the server too, so client and server agree that a
+		// failed arm's sheet stays.
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			await act(() => mountInto(FailingArm, { arm: true }));
+		} finally {
+			errSpy.mockRestore();
+		}
+		expect(document.body.textContent).toContain('caught');
+		expect(sheetHrefs()).toEqual(['/doomed.css']);
 	});
 });
