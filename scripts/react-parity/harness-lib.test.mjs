@@ -213,7 +213,7 @@ test('accepts distinct lane types and builds deterministic argv without a shell'
 		'-t',
 		'^(?:example suite does the thing)$',
 		'packages/hook-form/tests/upstream/example.test.ts',
-		'--reporter=json',
+		'--reporter=./scripts/react-parity/vitest-json-reporter.mjs',
 	]);
 });
 
@@ -562,7 +562,7 @@ test('normalizes Windows identity paths and resolves full-suite inventories from
 	};
 	assert.deepEqual(buildLaneArgv(lane, root).slice(5), [
 		'packages/example.test.ts',
-		'--reporter=json',
+		'--reporter=./scripts/react-parity/vitest-json-reporter.mjs',
 	]);
 });
 
@@ -588,7 +588,7 @@ test('passes file parallelism through full Vitest lanes', async () => {
 		'hook-form',
 		'--fileParallelism',
 		'packages/example.test.ts',
-		'--reporter=json',
+		'--reporter=./scripts/react-parity/vitest-json-reporter.mjs',
 	]);
 	const invalidParallelism = structuredClone(lane);
 	invalidParallelism.execution.fileParallelism = 'true';

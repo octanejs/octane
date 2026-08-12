@@ -6553,6 +6553,11 @@ export default defineConfig({
 					],
 					environment: 'node',
 					globals: false,
+					// The public-api conformance probe imports src/index inside the test
+					// body, so the package's first Octane compile counts against the test
+					// timeout and can exceed the 5s default under parity-batch contention.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 				},
 				plugins: [octane()],
 			},
