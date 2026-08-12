@@ -8090,7 +8090,7 @@
     },
     {
       "caseId": "react-case-v1:1af9ff57ae48745930fa",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "boundary stylesheet resource dependencies hoist to a parent boundary when flushed inline",
@@ -8098,7 +8098,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "A complete child boundary flushed inline with its parent's reveal ships its stylesheet with that same wave exactly once, joining the head precedence groups alongside the parent's.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "ships an inline-flushed complete child boundary's sheet with the parent's reveal",
+          "modes": ["server-stream"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:1affd15daf975fe92bdc",
@@ -24790,7 +24797,7 @@
     },
     {
       "caseId": "react-case-v1:51e93d2eb1927b6da8a5",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "will include child boundary stylesheet resources in the boundary reveal instruction",
@@ -24798,7 +24805,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Stylesheet resources discovered after the shell \u2014 including a child boundary's \u2014 ride the boundary reveal wave into document.head under client precedence grouping, and a hydrating client adopts them without duplicating.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "streams a use()-gated dynamic-href sheet late and moves it into document.head",
+          "modes": ["server-stream", "hydrate-match"]
+        },
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "hoists a nested pending boundary's sheet into the outer boundary's reveal wave",
+          "modes": ["server-stream"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:51f0342fc95c8a9c81ce",
@@ -41312,7 +41331,7 @@
     },
     {
       "caseId": "react-case-v1:89e6220224288d52f5f3",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "will hoist resources of child boundaries emitted as part of a partial boundary to the parent boundary",
@@ -41320,7 +41339,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "A still-blocked child boundary's stylesheet discovered while its parent flushes hoists into the parent boundary's reveal wave exactly once and joins the head precedence groups.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "hoists a nested pending boundary's sheet into the outer boundary's reveal wave",
+          "modes": ["server-stream"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:89f557479eaee39f9459",
