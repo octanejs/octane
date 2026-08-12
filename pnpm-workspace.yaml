@@ -94,14 +94,16 @@ allowBuilds:
   bun: true
 
 # Variables
-esrap_common: &esrap_common ^2.3.0
+esrap_common: &esrap_common ^2.3.2
 
 overrides:
   # Browser parity tooling and its transitive consumers must share one runner
   # and Chromium revision. Direct dependencies reference the same catalog.
   '@playwright/test': ^1.61.1
   playwright: ^1.61.1
-  esrap: ^2.3.0
+  # esrap <2.3.2 printed `declare` on every bodyless function, corrupting the
+  # virtual TSX for plain overload signatures (TS2384). See issue #736.
+  esrap: ^2.3.2
   # Solid 2.0 SSR alignment: vite-plugin-solid@3.0.0-next.5 pulls an older
   # beta preset transitively. Keep the transform on the beta.20 line required
   # by @tsrx/solid so generated SSR helpers match the installed runtime.
@@ -318,7 +320,7 @@ catalogs:
     devalue: ^5.8.2
     es-module-lexer: ^1.7.0
     esbuild: ^0.28.1
-    esrap: ^2.3.0
+    esrap: ^2.3.2
     sucrase: ^3.35.1
     graphql: ^16.14.2
     gsap: 3.15.0
