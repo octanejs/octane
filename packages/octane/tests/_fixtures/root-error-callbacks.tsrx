@@ -46,7 +46,7 @@ function throwOnMount(): string {
 // Teardown-phase throwers: a passive-effect cleanup and a callback-ref cleanup
 // that throw during deletion. Deletion-phase errors route to the enclosing
 // boundary when one exists; otherwise they are the uncaught teardown channel.
-function CleanupThrower() @{
+export function CleanupThrower() @{
 	useEffect(() => {
 		return () => {
 			throw new Error('cleanup-boom');

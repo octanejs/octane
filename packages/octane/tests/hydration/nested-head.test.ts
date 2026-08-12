@@ -5,7 +5,7 @@
 // same partition: metadata renders into the head channel, the host body keeps
 // only its real children, and hydration adopts without mismatch warnings.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { hydrateRoot, flushSync, resetFloatResourceState } from '../../src/index.js';
+import { createRoot, hydrateRoot, flushSync, resetFloatResourceState } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadServerFixture } from '../_server-fixture.js';
 import { NestedHead, DeepNestedHead } from './_fixtures/nested-head.tsrx';
@@ -53,6 +53,43 @@ describe('nested-under-host document metadata', () => {
 		const bodyStart = r.html.indexOf('<main');
 		expect(r.html.slice(bodyStart)).not.toContain('<meta');
 		expect(r.html.slice(bodyStart)).toContain('class="deep-p"');
+	});
+
+	it('client-only render mounts nested metadata into document.head, owned and removable', () => {
+		const root = createRoot(container);
+		root.render(NestedHead, { title: 'Client Title' });
+		flushSync(() => {});
+		// The metadata mounted out-of-band; the host body holds only real children.
+		expect(document.head.querySelector('title')?.textContent).toBe('Client Title');
+		expect(document.head.querySelector('meta[name="desc"]')).not.toBeNull();
+		expect(
+			document.head.querySelectorAll('link[rel="stylesheet"][href="/nested.css"]'),
+		).toHaveLength(1);
+		expect(container.querySelector('title, meta, link')).toBeNull();
+		expect(container.querySelector('.inner')).not.toBeNull();
+		// Reactive: the title tracks its expression.
+		root.render(NestedHead, { title: 'Updated Title' });
+		flushSync(() => {});
+		expect(document.head.querySelector('title')?.textContent).toBe('Updated Title');
+		// Per-site metadata is removed with its owning scope; the Float resource
+		// persists (resources are never removed).
+		root.unmount();
+		expect(document.head.querySelector('meta[name="desc"]')).toBeNull();
+		expect(
+			document.head.querySelectorAll('link[rel="stylesheet"][href="/nested.css"]'),
+		).toHaveLength(1);
+		document.head.querySelector('title')?.remove();
+	});
+
+	it('client-only render hoists metadata nested two hosts deep', () => {
+		const root = createRoot(container);
+		root.render(DeepNestedHead, {});
+		flushSync(() => {});
+		expect(document.head.querySelector('meta[name="deep"]')).not.toBeNull();
+		expect(container.querySelector('meta')).toBeNull();
+		expect(container.querySelector('.deep-p')).not.toBeNull();
+		root.unmount();
+		expect(document.head.querySelector('meta[name="deep"]')).toBeNull();
 	});
 
 	it('hydration adopts the nested-metadata host without mismatch warnings', async () => {

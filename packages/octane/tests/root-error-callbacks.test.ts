@@ -11,7 +11,14 @@
 // Roots created WITHOUT the options keep today's behavior byte-for-byte; the
 // control tests below pin that.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, createRoot, hydrateRoot, flushSync } from '../src/index.js';
+import {
+	act,
+	createRoot,
+	createContext,
+	createElement,
+	hydrateRoot,
+	flushSync,
+} from '../src/index.js';
 import {
 	CaughtHost,
 	UncaughtHost,
@@ -19,6 +26,7 @@ import {
 	UncaughtEffectHost,
 	MountThrower,
 	ClickCounter,
+	CleanupThrower,
 	CleanupHost,
 	CaughtCleanupHost,
 	RefCleanupHost,
@@ -212,6 +220,29 @@ describe('root error callbacks — onCaughtError / onUncaughtError', () => {
 		expect(onUncaughtError).toHaveBeenCalledTimes(1);
 		expect((onUncaughtError.mock.calls[0][0] as Error).message).toBe('ref-boom');
 		expect(errSpy).not.toHaveBeenCalled();
+	});
+
+	it('onUncaughtError consumes a cleanup throw from a Provider children-dialect flip', async () => {
+		// A Provider whose `children` prop flips between a value (element) and a
+		// function tears the outgoing dialect down MID-RENDER through its own
+		// teardown bracket — that path must thread the owner exactly like a
+		// normal unmount.
+		const onUncaughtError = vi.fn();
+		const root = createRoot(container, { onUncaughtError });
+		const Ctx = createContext(0);
+		const App = (props: any) =>
+			createElement(Ctx as any, {
+				value: 1,
+				children: props.fn ? () => null : createElement(CleanupThrower as any, {}),
+			});
+		await act(() => root.render(App as any, { fn: false }));
+		expect(container.textContent).toBe('ct');
+		errSpy.mockClear();
+		await act(() => root.render(App as any, { fn: true }));
+		expect(onUncaughtError).toHaveBeenCalledTimes(1);
+		expect((onUncaughtError.mock.calls[0][0] as Error).message).toBe('cleanup-boom');
+		expect(errSpy).not.toHaveBeenCalled();
+		root.unmount();
 	});
 
 	it('control: teardown throws without the options keep console.error', async () => {

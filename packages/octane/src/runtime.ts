@@ -7016,6 +7016,7 @@ function resetScopeChildren(scope: Scope): void {
 	const block = scope.block;
 	if (TEARDOWN_DEPTH === 0) {
 		TEARDOWN_HANDLER = findTryHandler(block.parentBlock) ?? rendererRegionTryHandler(block);
+		TEARDOWN_BLOCK = block;
 	}
 	TEARDOWN_DEPTH++;
 	// The bracket spans the WHOLE reset, not just the teardown call: a queued error is dispatched

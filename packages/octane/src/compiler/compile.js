@@ -19470,6 +19470,12 @@ function planJsx(
 	// `null` outside dev → zero work, prod output byte-identical.
 	const _prevElemLocs = ctx._elemLocs;
 	ctx._elemLocs = ctx.dev ? new Map() : null;
+	// NESTED HeadHoists lifted out of host-element children during the walk (see
+	// emitNodeHtml's element case) join this plan's head list, so client mounts
+	// match the server's any-depth hoisting. Saved/restored per plan: an @if
+	// arm's sub-plan owns its own list, keeping arm-conditional hoists scoped.
+	const _prevNestedHeads = ctx._nestedHeadHoists;
+	ctx._nestedHeadHoists = [];
 	const allNodes = normalizeChildren(jsxNodesRaw, parentNs === 'svg', ctx);
 	// Partition hoisted `<title>`/`<meta>`/eligible `<link>` out of the BODY-root set:
 	// `jsxNodes` (the body) drives single/multi-root + the template, while head
@@ -19488,6 +19494,7 @@ function planJsx(
 	// its constructs (see `headEmit` below), keeping every scope's `slots` packed.
 	if (jsxNodes.length === 0) {
 		ctx._elemLocs = _prevElemLocs;
+		ctx._nestedHeadHoists = _prevNestedHeads;
 		return {
 			hasBag: false,
 			mount: [],
@@ -20271,7 +20278,13 @@ function planJsx(
 	for (let i = 0; i < allConstructs.length; i++) allConstructs[i].slotIndex = i + slotBase;
 	// Hoisted head elements take the slots AFTER the constructs (and `plan.head` runs
 	// after `plan.after`), so the scope's `slots` array fills 0,1,…,N,N+1,… packed.
-	const headEmit = emitHeadClient(headNodes, ctx, allConstructs.length + slotBase);
+	const nestedHeadHoists = ctx._nestedHeadHoists ?? [];
+	ctx._nestedHeadHoists = _prevNestedHeads;
+	const headEmit = emitHeadClient(
+		[...headNodes, ...nestedHeadHoists],
+		ctx,
+		allConstructs.length + slotBase,
+	);
 	// Is a construct's host a real in-template element (append / insert INTO it) vs
 	// the block's own parentNode (insert BEFORE __block.endMarker so the slot's range
 	// stays inside the block)? In-template hosts are the navigated `_el…` vars and the
@@ -23279,7 +23292,22 @@ function emitElementHtml(
 		appendTemplatePart(html, escapeInlineScriptContent(authoredStaticScriptContent), 'raw');
 	}
 
-	const children = normalizeChildren(sourceChildren, childNs === 'svg', ctx);
+	let children = normalizeChildren(sourceChildren, childNs === 'svg', ctx);
+	// NESTED document metadata / Float resources are zero-DOM children: lift
+	// them to the enclosing plan's head list (mounted out-of-band by
+	// emitHeadClient — scope-owned metadata, global resources), mirroring the
+	// server's expression-position emission and keeping child indices aligned
+	// with the server markup for hydration.
+	if (ctx._nestedHeadHoists !== undefined && ctx._nestedHeadHoists !== null) {
+		let hasNestedHoist = false;
+		for (const child of children) {
+			if (child.type === 'HeadHoist') {
+				ctx._nestedHeadHoists.push(child);
+				hasNestedHoist = true;
+			}
+		}
+		if (hasNestedHoist) children = children.filter((n) => n.type !== 'HeadHoist');
+	}
 	// Special case: a single Text child (only-child text fast path).
 	if (children.length === 1 && children[0].type === 'Text') {
 		const txtChild = children[0];
