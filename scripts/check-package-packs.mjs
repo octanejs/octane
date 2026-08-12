@@ -33,6 +33,7 @@ import {
 	PACKED_COMMONJS_CONSUMER_PACKAGES,
 	PACKED_JAVASCRIPT_CONSUMER_PACKAGES,
 	PACKED_TSRX_CONSUMER_PROJECTS,
+	PACKED_TSRX_PROBE_PACKAGES,
 	renderPackedExampleWorkspace,
 	renderPackedCommonjsConsumerSource,
 	renderPackedDraggableEsmConsumerSource,
@@ -1090,10 +1091,9 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 			}),
 	);
 	const validatedPackages = [...sourceConsumerSpecifiers.keys(), 'octane'];
-	const installedPackages = findPackedWorkspaceDependencyClosure(
-		packedManifests,
-		validatedPackages,
-	);
+	const installedPackages = findPackedWorkspaceDependencyClosure(packedManifests, [
+		...new Set([...validatedPackages, ...PACKED_TSRX_PROBE_PACKAGES]),
+	]);
 	const archiveSpecs = Object.fromEntries(
 		installedPackages.map((packageName) => [packageName, fileArchiveSpec(archives, packageName)]),
 	);

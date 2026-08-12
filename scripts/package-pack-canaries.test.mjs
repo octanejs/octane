@@ -19,6 +19,7 @@ import {
 	renderPackedTsrxSourceImports,
 	renderPackedTsrxConsumerTypeProbe,
 	PACKED_TSRX_CONSUMER_PROJECTS,
+	PACKED_TSRX_PROBE_PACKAGES,
 } from './package-pack-canaries.mjs';
 
 describe('packed JavaScript consumers', () => {
@@ -239,6 +240,11 @@ describe('packed TSRX source consumers', () => {
 
 	test('executes both Node and browser ambient typecheck projects', () => {
 		assert.deepEqual(PACKED_TSRX_CONSUMER_PROJECTS, ['tsconfig.json', 'tsconfig.browser.json']);
+	});
+
+	test('keeps declaration-only probe packages installed independently of source enrollment', () => {
+		assert.ok(PACKED_TSRX_PROBE_PACKAGES.includes('@octanejs/recharts'));
+		assert.ok(PACKED_TSRX_PROBE_PACKAGES.includes('octane'));
 	});
 
 	test('discovers every published framework binding containing TSRX', () => {

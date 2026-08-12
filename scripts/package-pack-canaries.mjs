@@ -285,6 +285,21 @@ export function createPackedTsrxConsumerConfig({ nodeTypes = true } = {}) {
 
 export const PACKED_TSRX_CONSUMER_PROJECTS = ['tsconfig.json', 'tsconfig.browser.json'];
 
+// These packages have deliberate API assertions in the hand-authored consumer
+// probes. Keep them installed even when source compilation is temporarily
+// deferred for one of them.
+export const PACKED_TSRX_PROBE_PACKAGES = [
+	'@octanejs/cmdk',
+	'@octanejs/input-otp',
+	'@octanejs/recharts',
+	'@octanejs/sonner',
+	'@octanejs/spring',
+	'@octanejs/syntax-highlighter',
+	'@octanejs/textarea-autosize',
+	'@octanejs/tiptap',
+	'octane',
+];
+
 export function renderPackedTsrxSourceImports(specifiers) {
 	return (
 		specifiers
