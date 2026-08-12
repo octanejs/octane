@@ -20,14 +20,23 @@ export async function setup(): Promise<void> {
 		const path = join(fixtures, name);
 		const compiled = compileToReact(readFileSync(path, 'utf8'), path);
 		if (compiled.errors?.length) throw new Error(JSON.stringify(compiled.errors));
-		const output = transformSync(compiled.code, {
+		const transformed = transformSync(compiled.code, {
 			loader: 'tsx',
 			jsx: 'automatic',
 			jsxImportSource: 'react',
 			target: 'esnext',
 			format: 'esm',
 			sourcefile: path,
-		}).code.replace(/from\s+["']@octanejs\/phosphor-icons["']/g, 'from "@phosphor-icons/react"');
+		}).code;
+		const output = transformed.replace(
+			/from\s+["']@octanejs\/phosphor-icons\/icons\/camera["']/g,
+			'from "@phosphor-icons/react/Camera"',
+		);
+		if (output === transformed) {
+			throw new Error(
+				'Phosphor differential fixture must use the public per-icon export on both runtimes',
+			);
+		}
 		writeFileSync(join(cache, `${basename(path, '.tsrx')}-${hash(path)}.js`), output);
 	}
 }

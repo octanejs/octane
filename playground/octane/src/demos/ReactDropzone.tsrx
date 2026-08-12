@@ -1,4 +1,4 @@
-import { ErrorCode, useDropzone } from '@octanejs/react-dropzone';
+import { ErrorCode, useDropzone } from '@octanejs/dropzone';
 import { useState } from 'octane';
 
 export function ReactDropzoneDemo() @{

@@ -9,9 +9,6 @@
     "Programmatic value assignment does not synthesize a public change callback; dispatch a native input event when that behavior is required."
   ],
   "ssr": "Server rendering emits one plain textarea without accessing browser measurement globals; Octane hydration adopts the existing host and preserves pre-hydration uncontrolled edits.",
-  "docs": [
-    "packages/textarea-autosize/README.md",
-    "packages/textarea-autosize/UPSTREAM.md"
-  ],
+  "docs": ["packages/textarea-autosize/README.md", "packages/textarea-autosize/UPSTREAM.md"],
   "verified": "2026-08-03"
 }

@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "paths": {
+      "@octanejs/spring": ["../src/index.ts"],
+      "@octanejs/spring/*": ["../src/*"],
+      "@react-spring/rafz": [
+        "../../node_modules/@react-spring/rafz/dist/react-spring_rafz.modern.d.mts"
+      ],
+      "@react-spring/types": ["../src/types/index.ts"]
+    }
+  },
+  "include": ["./upstream/**/*.test-d.ts", "./upstream/**/*.test-d.tsx"]
+}

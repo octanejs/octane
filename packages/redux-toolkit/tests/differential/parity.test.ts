@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
 import { act as reactAct } from 'react';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const fixture = resolve(__dirname, '../_fixtures/rtk-query.tsrx');
 const cache = resolve(__dirname, '.react-cache');
@@ -40,6 +43,8 @@ async function waitForText(
 		})}`,
 	);
 }
+
+await Promise.all([preloadDifferentialFixture(fixture, cache)]);
 
 describe('differential: @octanejs/redux-toolkit vs @reduxjs/toolkit/react', () => {
 	// @parity-case differential:redux-toolkit-query

@@ -11,7 +11,10 @@
     "integrity": "sha256:205f5c607c68e1e42b8d7a036326bdb3a105ae55e6469ecfcaf998004609d5f7",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/markdown/src"],
@@ -46,7 +49,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "d56cc28b421defc4864fbbd27413d5e2fb4ccb0954cb4ee20176f11d54b88dd9"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -94,7 +97,7 @@
         {
           "path": "scripts/react-parity/node-full-runner.mjs",
           "role": "support",
-          "sha256": "48d55df3473153e93b275a19c828cf0c3f7647eda72e01ebed8a0e6b00ab54d3"
+          "sha256": "841872ec1d9acb734a24f36ab4ed0b9c3a9773fe64681dd985f04f2e7bb9e7c6"
         }
       ]
     },
@@ -134,7 +137,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "0dd872755fe1e7625c3022a004c22eb5e237878e71b7e67eb0caae004366898e"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },

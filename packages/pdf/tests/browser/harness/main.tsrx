@@ -10,6 +10,7 @@ import { createRoot as createReactRoot } from 'react-dom/client';
 import { Document as ReactDocument, Page as ReactPage, pdfjs as reactPdfjs } from 'react-pdf';
 
 import { createProbePdf } from '../../feasibility/fixture';
+import { PdfHydrationFixture } from './hydration.tsrx';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 reactPdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -135,32 +136,6 @@ function BrowserHarness() {
 	</main>;
 }
 
-function HydrationProbe() {
-	const file = useMemo(() => ({ data: createProbePdf() }), []);
-	return <Document
-		file={file}
-		loading="Hydrating PDF…"
-		onLoadSuccess={() => {
-			const container = document.getElementById('hydration-root');
-			container?.setAttribute(
-				'data-node-preserved',
-				String(container.firstElementChild === serverHydrationNode),
-			);
-		}}
-	>
-		<Page
-			pageNumber={1}
-			width={120}
-			renderAnnotationLayer={false}
-			renderTextLayer={false}
-			onRenderSuccess={() => document.getElementById('hydration-root')?.setAttribute(
-				'data-ready',
-				'true',
-			)}
-		/>
-	</Document>;
-}
-
 function ReactAuthority() {
 	const file = useReactMemo(() => ({ data: createProbePdf() }), []);
 	const [documentReady, setDocumentReady] = useReactState(false);
@@ -202,5 +177,15 @@ if (!reactElement) throw new Error('Missing #react-root');
 const serverHydrationNode = hydrationElement.firstElementChild;
 delegateEvents(['click', 'mousemove']);
 createRoot(rootElement).render(BrowserHarness);
-hydrateRoot(hydrationElement, HydrationProbe);
+hydrateRoot(hydrationElement, PdfHydrationFixture, {
+	onDocumentReady() {
+		hydrationElement.setAttribute(
+			'data-node-preserved',
+			String(hydrationElement.firstElementChild === serverHydrationNode),
+		);
+	},
+	onPageReady() {
+		hydrationElement.setAttribute('data-ready', 'true');
+	},
+});
 createReactRoot(reactElement).render(createReactElement(ReactAuthority));

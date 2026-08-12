@@ -77,8 +77,19 @@ export const unsplitProceduralPrefetch = {
 
 interaction({ events: 'click' });
 interaction({ events: ['focusin', 'keyup'] });
+interaction({
+	events: [
+		'beforeinput',
+		'input',
+		'compositionstart',
+		'compositionupdate',
+		'compositionend',
+		'touchstart',
+		'touchend',
+	],
+});
 // @ts-expect-error — only replay-safe intent events are supported
-interaction({ events: 'input' });
+interaction({ events: 'scroll' });
 
 idle({ timeout: 0 });
 visible({ rootMargin: '600px', threshold: 0.25 });

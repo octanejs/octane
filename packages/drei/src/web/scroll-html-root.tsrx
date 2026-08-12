@@ -1,6 +1,10 @@
 import { context as threeContext, type RootStore } from '@octanejs/three';
-import { createRoot, type OctaneNode } from 'octane';
+import { createRoot, type Context, type OctaneNode } from 'octane';
 import type { ScrollControlsState } from './ScrollControls.three.tsrx';
+
+// The Three context is registered with Octane's renderer bridge, so this DOM-owned
+// root must expose that same provider through the DOM Context call signature.
+const DomThreeContextProvider = threeContext.Provider as unknown as Context<RootStore | null>['Provider'];
 
 function ScrollHtmlContent({ state, fiberState, children }: {
 	state: ScrollControlsState;
@@ -8,7 +12,7 @@ function ScrollHtmlContent({ state, fiberState, children }: {
 	children?: OctaneNode;
 }) @{
 	<ScrollControlsStateProvider value={state}>
-		<threeContext.Provider value={fiberState}>{children}</threeContext.Provider>
+		<DomThreeContextProvider value={fiberState}>{children}</DomThreeContextProvider>
 	</ScrollControlsStateProvider>
 }
 

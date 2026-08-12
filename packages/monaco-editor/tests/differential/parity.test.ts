@@ -10,7 +10,10 @@
  */
 import { describe, it, beforeEach } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.ts';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.ts';
 import loader from '../_mocks/loader';
 
 const EDITOR_FIXTURE = resolve(__dirname, '../_fixtures/differential/editor-diff.tsrx');
@@ -19,6 +22,8 @@ const CACHE = resolve(__dirname, '.react-cache');
 beforeEach(() => {
 	loader.__reset();
 });
+
+await Promise.all([preloadDifferentialFixture(EDITOR_FIXTURE, CACHE)]);
 
 describe('differential: @octanejs/monaco-editor vs @monaco-editor/react 4.7.0', () => {
 	// @parity-case differential:f7ceb1f1e6

@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/markdown",
-  "version": "0.1.20",
+  "version": "0.0.1",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -27,13 +27,6 @@
   ],
   "exports": {
     ".": "./src/index.ts"
-  },
-  "octane": {
-    "hookSlots": {
-      "manual": [
-        "src"
-      ]
-    }
   },
   "scripts": {
     "test": "pnpm upstream:verify && pnpm test:pristine && vitest run --config vitest.config.ts --root . tests/probes/async-component.server.test.ts tests/adoption/consumer.test.ts tests/adoption/consumer.server.test.ts tests/audit tests/differential tests/conformance tests/async tests/hooks tests/validation.test.ts",

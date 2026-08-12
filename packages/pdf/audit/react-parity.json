@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "cc4e3fd313734d1340da61e3b4d7f97e5147d7fa407982548ac8b0a473dde958"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -59,12 +59,12 @@
         {
           "path": "packages/pdf/audit/pristine-wrapper-runtime.json",
           "role": "support",
-          "sha256": "00b42c967bfb11af931a146fa727cd2e329440aa26d226bb2b270df1c4f98fb1"
+          "sha256": "cb9278da6bb87b3ca75a9cadb77706ce7b04773d9384f0601dad5cd33e343da2"
         },
         {
           "path": "packages/pdf/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "7ee0306e0376b94f9342e6e3c7a1b12eef9871f73e7be31f0099208de379d9fa"
+          "sha256": "5f7cc0a4c2b022bb20b66b0b1db0f74dc25617c5865d7eff0e164546e19a85b3"
         },
         {
           "path": "packages/pdf/tests/upstream-original.test.ts",
@@ -104,7 +104,7 @@
         {
           "path": "packages/pdf/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "cf02180f1e4992d024b8f3ee84bc35ab66b5f597478100eeb772627a4ea40c81"
+          "sha256": "5f9d1ce93d494bccf3291a3b20e17ed300fa49481e73b70d476310ec7d8d4744"
         },
         {
           "path": "packages/pdf/tests/runtime/private-evidence.test.ts",

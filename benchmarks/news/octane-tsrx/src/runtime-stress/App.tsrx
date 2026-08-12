@@ -13,6 +13,14 @@ import {
 
 type IndexedProps = { index: number };
 
+function observeDelegatedInputCapture(event: Event) {
+	const benchmark = globalThis as
+		typeof globalThis & {
+			__octaneDelegatedInputCapture?: (event: Event) => void;
+		};
+	benchmark.__octaneDelegatedInputCapture?.(event);
+}
+
 function LifecycleRow(props: IndexedProps & { tick: number }) @{
 	useEffect(() => mountLifecycleResource(props.index), []);
 	<li data-lifecycle-row={String(props.index)}>{String(props.index) + ':' + props.tick}</li>
@@ -117,7 +125,11 @@ export function App() @{
 			}
 		</section>
 
-		<form id="stress-form" onSubmit={recordSubmission}>
+		<form
+			id="stress-form"
+			onSubmit={recordSubmission}
+			onInputCapture={observeDelegatedInputCapture}
+		>
 			@for (const index of FORM_FIELDS; key index) {
 				<FormField index={index} resetVersion={resetVersion} />
 			}

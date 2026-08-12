@@ -1,12 +1,8 @@
 {
   "schemaVersion": 1,
   "project": "base-ui-differential",
-  "roots": [
-    "packages/base-ui/tests/differential"
-  ],
-  "files": [
-    "packages/base-ui/tests/differential/parity.test.ts"
-  ],
+  "roots": ["packages/base-ui/tests/differential"],
+  "files": ["packages/base-ui/tests/differential/parity.test.ts"],
   "tests": [
     {
       "id": "runtime:f8ae4ec16456ee3c",

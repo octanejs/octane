@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/syntax-highlighter",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "license": "MIT",
   "type": "module",
   "engines": {

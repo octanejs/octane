@@ -8,13 +8,21 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const COUNTER = resolve(__dirname, '../_fixtures/counter-diff.tsrx');
 const MULTISTORE = resolve(__dirname, '../_fixtures/multistore-diff.tsrx');
 // React fixtures are precompiled into THIS package's cache (see differential
 // _setup.ts) so the React side resolves zustand from here.
 const CACHE = resolve(__dirname, '.react-cache');
+
+await Promise.all([
+	preloadDifferentialFixture(COUNTER, CACHE),
+	preloadDifferentialFixture(MULTISTORE, CACHE),
+]);
 
 describe('differential: @octanejs/zustand vs real zustand on React', () => {
 	// @parity-case differential:zustand-counter

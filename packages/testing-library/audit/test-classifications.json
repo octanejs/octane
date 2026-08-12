@@ -22,14 +22,14 @@
       "oracle": "Compares adapter output to an independent raw React 19.2.7 root using native DOM observations."
     },
     {
-      "path": "packages/testing-library/tests/events.test.ts",
-      "disposition": "octane-only-framework-contract",
-      "reason": "Checks fireEvent commit timing against Octane's native event model."
-    },
-    {
       "path": "packages/testing-library/tests/events-native-parity.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Ordinary coverage for native event semantics that intentionally differ from React remapping; not adapted React parity evidence."
+    },
+    {
+      "path": "packages/testing-library/tests/events.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks fireEvent commit timing against Octane's native event model."
     },
     {
       "path": "packages/testing-library/tests/hydrate.test.ts",

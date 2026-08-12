@@ -561,6 +561,7 @@ export function prepareLynxCompactHandleDeltas(
 	count: number,
 	identity: UniversalTransportIdentity,
 	knownHostCount?: number,
+	incremental = false,
 ): LynxPreparedHandleDeltas {
 	const state = containerState(container);
 	if (
@@ -573,7 +574,10 @@ export function prepareLynxCompactHandleDeltas(
 	) {
 		throw new Error('Octane Lynx compact acknowledgement has a foreign transport identity.');
 	}
-	if (state.handles.size !== 0 || state.generations.size !== 0 || state.compactHosts !== null) {
+	if (
+		state.compactHosts !== null ||
+		(!incremental && (state.handles.size !== 0 || state.generations.size !== 0))
+	) {
 		throw new Error('Octane Lynx compact acknowledgement requires a fresh client container.');
 	}
 	if (
@@ -589,8 +593,33 @@ export function prepareLynxCompactHandleDeltas(
 	const originalHandles = state.handles;
 	const originalGenerations = state.generations;
 	const originalCompactHosts = state.compactHosts;
-	const stagedHandles = new Map<number, LynxHandleEntry>();
-	const stagedGenerations = new Map<number, number>();
+	if (incremental) {
+		const run = batch.commands.length === 1 ? batch.commands[0] : undefined;
+		if (
+			run?.op !== 'mount-template-run' ||
+			!Object.isFrozen(run) ||
+			!Object.isFrozen(run.values) ||
+			!Object.isFrozen(run.program) ||
+			!Number.isSafeInteger(run.firstId) ||
+			run.firstId <= 0 ||
+			run.firstId > Number.MAX_SAFE_INTEGER - (count - 1)
+		) {
+			throw new Error('Octane Lynx incremental acknowledgement requires one frozen host run.');
+		}
+		const finalId = run.firstId + (count - 1);
+		for (const [id, handle] of originalHandles) {
+			if (handle.root !== identity.root || (id >= run.firstId && id <= finalId)) {
+				throw new Error('Octane Lynx incremental acknowledgement overlaps an accepted handle.');
+			}
+		}
+		for (const id of originalGenerations.keys()) {
+			if (id >= run.firstId && id <= finalId) {
+				throw new Error('Octane Lynx incremental acknowledgement reuses a retired handle.');
+			}
+		}
+	}
+	const stagedHandles = new Map<number, LynxHandleEntry>(incremental ? originalHandles : undefined);
+	const stagedGenerations = new Map<number, number>(incremental ? originalGenerations : undefined);
 	const names: string[] = [];
 	const codes = new Map<string, number>();
 	let base = 0;
@@ -766,7 +795,8 @@ export function prepareLynxCompactHandleDeltas(
 			state.handles = originalHandles;
 			state.generations = originalGenerations;
 			state.compactHosts = originalCompactHosts;
-			for (const handle of stagedHandles.values()) {
+			for (const [id, handle] of stagedHandles) {
+				if (originalHandles.get(id) === handle) continue;
 				handle.active = false;
 				handle.attached = false;
 				if (handle.facade !== null || handle.binding !== null) {

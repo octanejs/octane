@@ -62,7 +62,7 @@ export const PACKED_TSRX_CONSUMER_PACKAGES = [
 	'@octanejs/floating-ui',
 	'@octanejs/input-otp',
 	'@octanejs/radix',
-	'@octanejs/react-spring',
+	'@octanejs/spring',
 	'@octanejs/sonner',
 	'@octanejs/syntax-highlighter',
 	'@octanejs/textarea-autosize',
@@ -74,13 +74,19 @@ export const PACKED_COMMONJS_CONSUMER_PACKAGES = [
 	'@octanejs/base-ui',
 	'@octanejs/floating-ui',
 	'@octanejs/radix',
-	'@octanejs/react-draggable',
 	'octane',
 ];
 
-export function createPackedCommonjsConsumerManifest(archiveSpecs) {
+export const PACKED_ESM_ONLY_CONSUMER_PACKAGES = ['@octanejs/draggable'];
+
+export const PACKED_JAVASCRIPT_CONSUMER_PACKAGES = [
+	...PACKED_COMMONJS_CONSUMER_PACKAGES,
+	...PACKED_ESM_ONLY_CONSUMER_PACKAGES,
+];
+
+export function createPackedJavascriptConsumerManifest(archiveSpecs) {
 	const dependencies = {};
-	for (const packageName of PACKED_COMMONJS_CONSUMER_PACKAGES) {
+	for (const packageName of PACKED_JAVASCRIPT_CONSUMER_PACKAGES) {
 		const archiveSpec = archiveSpecs[packageName];
 		if (typeof archiveSpec !== 'string' || !archiveSpec.startsWith('file:')) {
 			throw new Error(`no packed archive was provided for ${packageName}`);
@@ -88,7 +94,7 @@ export function createPackedCommonjsConsumerManifest(archiveSpecs) {
 		dependencies[packageName] = archiveSpec;
 	}
 	return {
-		name: 'octane-packed-commonjs-consumer',
+		name: 'octane-packed-javascript-consumer',
 		private: true,
 		engines: { node: '>=22' },
 		dependencies,
@@ -102,16 +108,12 @@ const server = require('octane/server');
 const floating = require('@octanejs/floating-ui');
 const base = require('@octanejs/base-ui');
 const radix = require('@octanejs/radix');
-const draggable = require('@octanejs/react-draggable');
 
 assert.equal(typeof octane.createElement, 'function');
 assert.equal(typeof server.renderToString, 'function');
 assert.equal(typeof floating.useFloating, 'function');
 assert.equal(typeof base.Button, 'function');
 assert.equal(typeof radix.Accordion, 'object');
-assert.equal(typeof draggable, 'function');
-assert.equal(draggable.default, draggable);
-assert.equal(typeof draggable.DraggableCore, 'function');
 const ssr = server.renderToString(() => 'conditions');
 assert.deepEqual(ssr, { html: 'conditions', css: '' });
 process.stdout.write(JSON.stringify({
@@ -119,7 +121,6 @@ process.stdout.write(JSON.stringify({
 	floating: Object.keys(floating),
 	octane: Object.keys(octane),
 	radix: Object.keys(radix),
-	draggable: ['default', 'DraggableCore'].filter((key) => key in draggable),
 	ssr,
 }));
 `;
@@ -151,11 +152,14 @@ process.stdout.write(JSON.stringify({
 }
 
 export function renderPackedDraggableEsmConsumerSource() {
-	return `import assert from 'node:assert/strict';
-import * as draggable from '@octanejs/react-draggable';
+	return `import * as draggable from '@octanejs/draggable';
 
-assert.equal(typeof draggable.default, 'function');
-assert.equal(typeof draggable.DraggableCore, 'function');
+if (typeof draggable.default !== 'function') {
+	throw new Error('packed Draggable default export is not a function');
+}
+if (typeof draggable.DraggableCore !== 'function') {
+	throw new Error('packed DraggableCore export is not a function');
+}
 process.stdout.write(JSON.stringify(['default', 'DraggableCore'].filter((key) => key in draggable)));
 `;
 }
@@ -211,8 +215,8 @@ export function createPackedTsrxConsumerConfig() {
 
 export function renderPackedTsrxConsumerSource() {
 	return `import { Command } from '@octanejs/cmdk';
-import { animated, useSpring } from '@octanejs/react-spring';
-import { Parallax, ParallaxLayer } from '@octanejs/react-spring/parallax';
+import { animated, useSpring } from '@octanejs/spring';
+import { Parallax, ParallaxLayer } from '@octanejs/spring/parallax';
 import { OTPInput, REGEXP_ONLY_DIGITS } from '@octanejs/input-otp';
 import { toast, Toaster } from '@octanejs/sonner';
 import { Light } from '@octanejs/syntax-highlighter';
@@ -301,8 +305,8 @@ export function PublishedSourceConsumer() @{
 
 export function renderPackedTsrxConsumerTypeProbe() {
 	return `import { Command, type CommandProps } from '@octanejs/cmdk';
-import { Controller, SpringValue, type ControllerUpdate } from '@octanejs/react-spring';
-import type { IParallax, ParallaxProps } from '@octanejs/react-spring/parallax';
+import { Controller, SpringValue, type ControllerUpdate } from '@octanejs/spring';
+import type { IParallax, ParallaxProps } from '@octanejs/spring/parallax';
 import { OTPInput, type OTPInputProps } from '@octanejs/input-otp';
 import { Toaster, useSonner, type ToasterProps } from '@octanejs/sonner';
 import SyntaxHighlighter, { type SyntaxHighlighterProps } from '@octanejs/syntax-highlighter';

@@ -1,4 +1,4 @@
-import Draggable from '@octanejs/react-draggable';
+import Draggable from '@octanejs/draggable';
 import { useRef, useState } from 'octane';
 
 export function ReactDraggableDemo() @{

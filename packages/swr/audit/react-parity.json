@@ -17,21 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/swr/src"
-      ],
-      "include": [
-        "\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
-      ],
+      "roots": ["packages/swr/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/swr/tests/upstream"
-      ],
-      "include": [
-        "\\.test\\.ts$"
-      ],
+      "roots": ["packages/swr/tests/upstream"],
+      "include": ["\\.test\\.ts$"],
       "exclude": []
     }
   },
@@ -48,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "2d225d5c27bc7f34b85e9ed6c959e15580b81ecb73e5137ba520d96520fcbaf8"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -311,7 +303,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "bb846d31d99bc0f6d6975e5b8274d255e41d32889776670481b1ecb0c994287b"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },
@@ -368,7 +360,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "bb846d31d99bc0f6d6975e5b8274d255e41d32889776670481b1ecb0c994287b"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     }
@@ -376,9 +368,7 @@
   "divergences": [
     {
       "id": "swr-devtools-global",
-      "caseIds": [
-        "runtime:c00d484f4ecc81a0"
-      ],
+      "caseIds": ["runtime:c00d484f4ecc81a0"],
       "upstreamResult": "window.__SWR_DEVTOOLS_REACT__ is assigned the React package reference for React-only SWR DevTools.",
       "octaneResult": "window.__SWR_DEVTOOLS_OCTANE__ identifies the Octane binding; __SWR_DEVTOOLS_REACT__ is not claimed.",
       "rationale": "Octane is not React. Claiming the React identity would mislead React-only SWR DevTools about the host runtime.",

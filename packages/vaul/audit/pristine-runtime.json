@@ -1,218 +1,206 @@
 {
   "schemaVersion": 1,
-  "project": "vaul-pristine",
-  "roots": ["packages/vaul/upstream"],
-  "files": [
-    "packages/vaul/upstream/test/tests/base.spec.ts",
-    "packages/vaul/upstream/test/tests/controlled.spec.ts",
-    "packages/vaul/upstream/test/tests/initial-snap.spec.ts",
-    "packages/vaul/upstream/test/tests/nested.spec.ts",
-    "packages/vaul/upstream/test/tests/non-dismissible.spec.ts",
-    "packages/vaul/upstream/test/tests/with-handle.spec.ts",
-    "packages/vaul/upstream/test/tests/with-redirect.spec.ts",
-    "packages/vaul/upstream/test/tests/with-scaled-background.spec.ts",
-    "packages/vaul/upstream/test/tests/without-scaled-background.spec.ts"
-  ],
+  "root": "packages/vaul/upstream",
   "tests": [
     {
-      "id": "runtime:07b1e0a6c835e1a6",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should be open by defafult when `defaultOpen` is true [Pixel]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should be open by defafult when `defaultOpen` is true [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:60b0fd6a3a7fc0e4",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should be open by defafult when `defaultOpen` is true [iPhone]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should be open by defafult when `defaultOpen` is true [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:7ec8504d5b60d261",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should close on background interaction [Pixel]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close on background interaction [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:72da6f4ac87890fc",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should close on background interaction [iPhone]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close on background interaction [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:9585a9898a2bf43e",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should close when `Drawer.Close` is clicked [Pixel]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close when `Drawer.Close` is clicked [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:156daaf1fac77057",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should close when `Drawer.Close` is clicked [iPhone]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close when `Drawer.Close` is clicked [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:e8f087c8253ab797",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should close when controlled [Pixel]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close when controlled [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:f53d0cdeae92afb3",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should close when controlled [iPhone]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close when controlled [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:f23e8add549b0039",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should close when dragged down [Pixel]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close when dragged down [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:893d087614d14c8e",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should close when dragged down [iPhone]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should close when dragged down [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:343182645c66e949",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should not close when dragged up [Pixel]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should not close when dragged up [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:b68509f0a2b58407",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should not close when dragged up [iPhone]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should not close when dragged up [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:f9256e3ce476394c",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should open drawer [Pixel]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should open drawer [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:ecdcc8e00f02eeb6",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts Base tests should open drawer [iPhone]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts Base tests should open drawer [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:0ce21692b637fa60",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts should close when dragged down and cancelled [Pixel]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts should close when dragged down and cancelled [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:fde979e581b1d985",
-      "file": "packages/vaul/upstream/test/tests/base.spec.ts",
-      "fullName": "tests/base.spec.ts should close when dragged down and cancelled [iPhone]"
+      "file": "test/tests/base.spec.ts",
+      "fullName": "tests/base.spec.ts should close when dragged down and cancelled [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:0fea6128db7cba5f",
-      "file": "packages/vaul/upstream/test/tests/controlled.spec.ts",
-      "fullName": "tests/controlled.spec.ts Initial-snap should close when clicked on overlay and open and onOpenChange props are passed [Pixel]"
+      "file": "test/tests/controlled.spec.ts",
+      "fullName": "tests/controlled.spec.ts Initial-snap should close when clicked on overlay and open and onOpenChange props are passed [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:efedfdadfd747bd7",
-      "file": "packages/vaul/upstream/test/tests/controlled.spec.ts",
-      "fullName": "tests/controlled.spec.ts Initial-snap should close when clicked on overlay and open and onOpenChange props are passed [iPhone]"
+      "file": "test/tests/controlled.spec.ts",
+      "fullName": "tests/controlled.spec.ts Initial-snap should close when clicked on overlay and open and onOpenChange props are passed [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:999a47ca2656be34",
-      "file": "packages/vaul/upstream/test/tests/controlled.spec.ts",
-      "fullName": "tests/controlled.spec.ts Initial-snap should not close when clicked on overlay and only the open prop is passsed [Pixel]"
+      "file": "test/tests/controlled.spec.ts",
+      "fullName": "tests/controlled.spec.ts Initial-snap should not close when clicked on overlay and only the open prop is passsed [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:6daa56174195f242",
-      "file": "packages/vaul/upstream/test/tests/controlled.spec.ts",
-      "fullName": "tests/controlled.spec.ts Initial-snap should not close when clicked on overlay and only the open prop is passsed [iPhone]"
+      "file": "test/tests/controlled.spec.ts",
+      "fullName": "tests/controlled.spec.ts Initial-snap should not close when clicked on overlay and only the open prop is passsed [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:5967142738ba722b",
-      "file": "packages/vaul/upstream/test/tests/initial-snap.spec.ts",
-      "fullName": "tests/initial-snap.spec.ts Initial-snap should be open and snapped on initial load [Pixel]"
+      "file": "test/tests/initial-snap.spec.ts",
+      "fullName": "tests/initial-snap.spec.ts Initial-snap should be open and snapped on initial load [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:4b96b6e973a22da0",
-      "file": "packages/vaul/upstream/test/tests/initial-snap.spec.ts",
-      "fullName": "tests/initial-snap.spec.ts Initial-snap should be open and snapped on initial load [iPhone]"
+      "file": "test/tests/initial-snap.spec.ts",
+      "fullName": "tests/initial-snap.spec.ts Initial-snap should be open and snapped on initial load [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:535fdb219959092e",
-      "file": "packages/vaul/upstream/test/tests/nested.spec.ts",
-      "fullName": "tests/nested.spec.ts Nested tests should open and close nested drawer [Pixel]"
+      "file": "test/tests/nested.spec.ts",
+      "fullName": "tests/nested.spec.ts Nested tests should open and close nested drawer [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:61bbca2a77825f68",
-      "file": "packages/vaul/upstream/test/tests/nested.spec.ts",
-      "fullName": "tests/nested.spec.ts Nested tests should open and close nested drawer [iPhone]"
+      "file": "test/tests/nested.spec.ts",
+      "fullName": "tests/nested.spec.ts Nested tests should open and close nested drawer [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:8776e82be62bd8f1",
-      "file": "packages/vaul/upstream/test/tests/non-dismissible.spec.ts",
-      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should close when the dismiss button is clicked [Pixel]"
+      "file": "test/tests/non-dismissible.spec.ts",
+      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should close when the dismiss button is clicked [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:5bffd2b287d4bce4",
-      "file": "packages/vaul/upstream/test/tests/non-dismissible.spec.ts",
-      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should close when the dismiss button is clicked [iPhone]"
+      "file": "test/tests/non-dismissible.spec.ts",
+      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should close when the dismiss button is clicked [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:c8386b0655c1851b",
-      "file": "packages/vaul/upstream/test/tests/non-dismissible.spec.ts",
-      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should not close on background interaction [Pixel]"
+      "file": "test/tests/non-dismissible.spec.ts",
+      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should not close on background interaction [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:801c4089e6be8409",
-      "file": "packages/vaul/upstream/test/tests/non-dismissible.spec.ts",
-      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should not close on background interaction [iPhone]"
+      "file": "test/tests/non-dismissible.spec.ts",
+      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should not close on background interaction [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:e5fe7b1bafdc5c63",
-      "file": "packages/vaul/upstream/test/tests/non-dismissible.spec.ts",
-      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should not close when dragged down [Pixel]"
+      "file": "test/tests/non-dismissible.spec.ts",
+      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should not close when dragged down [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:e46536f5d0360bb2",
-      "file": "packages/vaul/upstream/test/tests/non-dismissible.spec.ts",
-      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should not close when dragged down [iPhone]"
+      "file": "test/tests/non-dismissible.spec.ts",
+      "fullName": "tests/non-dismissible.spec.ts Non-dismissible should not close when dragged down [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:4a436ea293ae6049",
-      "file": "packages/vaul/upstream/test/tests/with-handle.spec.ts",
-      "fullName": "tests/with-handle.spec.ts With handle click should cycle to the next snap point [Pixel]"
+      "file": "test/tests/with-handle.spec.ts",
+      "fullName": "tests/with-handle.spec.ts With handle click should cycle to the next snap point [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:153b80bac952d9a1",
-      "file": "packages/vaul/upstream/test/tests/with-handle.spec.ts",
-      "fullName": "tests/with-handle.spec.ts With handle click should cycle to the next snap point [iPhone]"
+      "file": "test/tests/with-handle.spec.ts",
+      "fullName": "tests/with-handle.spec.ts With handle click should cycle to the next snap point [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:df52d97927ae286b",
-      "file": "packages/vaul/upstream/test/tests/with-redirect.spec.ts",
-      "fullName": "tests/with-redirect.spec.ts With redirect should restore body position settings [Pixel]"
+      "file": "test/tests/with-redirect.spec.ts",
+      "fullName": "tests/with-redirect.spec.ts With redirect should restore body position settings [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:4c96e4a1a5022d6e",
-      "file": "packages/vaul/upstream/test/tests/with-redirect.spec.ts",
-      "fullName": "tests/with-redirect.spec.ts With redirect should restore body position settings [iPhone]"
+      "file": "test/tests/with-redirect.spec.ts",
+      "fullName": "tests/with-redirect.spec.ts With redirect should restore body position settings [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:a8ad255494c0bfe7",
-      "file": "packages/vaul/upstream/test/tests/with-scaled-background.spec.ts",
-      "fullName": "tests/with-scaled-background.spec.ts With scaled background should scale background [Pixel]"
+      "file": "test/tests/with-scaled-background.spec.ts",
+      "fullName": "tests/with-scaled-background.spec.ts With scaled background should scale background [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:a0a0769e2ba3c973",
-      "file": "packages/vaul/upstream/test/tests/with-scaled-background.spec.ts",
-      "fullName": "tests/with-scaled-background.spec.ts With scaled background should scale background [iPhone]"
+      "file": "test/tests/with-scaled-background.spec.ts",
+      "fullName": "tests/with-scaled-background.spec.ts With scaled background should scale background [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:ca3fc369d370a484",
-      "file": "packages/vaul/upstream/test/tests/with-scaled-background.spec.ts",
-      "fullName": "tests/with-scaled-background.spec.ts With scaled background should scale background when dragging [Pixel]"
+      "file": "test/tests/with-scaled-background.spec.ts",
+      "fullName": "tests/with-scaled-background.spec.ts With scaled background should scale background when dragging [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:4b99112065d6e6a6",
-      "file": "packages/vaul/upstream/test/tests/with-scaled-background.spec.ts",
-      "fullName": "tests/with-scaled-background.spec.ts With scaled background should scale background when dragging [iPhone]"
+      "file": "test/tests/with-scaled-background.spec.ts",
+      "fullName": "tests/with-scaled-background.spec.ts With scaled background should scale background when dragging [iPhone]",
+      "status": "passed"
     },
     {
-      "id": "runtime:eb7f867c5adfdbb7",
-      "file": "packages/vaul/upstream/test/tests/without-scaled-background.spec.ts",
-      "fullName": "tests/without-scaled-background.spec.ts Without scaled background should not scale background [Pixel]"
+      "file": "test/tests/without-scaled-background.spec.ts",
+      "fullName": "tests/without-scaled-background.spec.ts Without scaled background should not scale background [Pixel]",
+      "status": "passed"
     },
     {
-      "id": "runtime:a02010fbb5ad96b5",
-      "file": "packages/vaul/upstream/test/tests/without-scaled-background.spec.ts",
-      "fullName": "tests/without-scaled-background.spec.ts Without scaled background should not scale background [iPhone]"
+      "file": "test/tests/without-scaled-background.spec.ts",
+      "fullName": "tests/without-scaled-background.spec.ts Without scaled background should not scale background [iPhone]",
+      "status": "passed"
     }
   ],
   "snapshots": 0

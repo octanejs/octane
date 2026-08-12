@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, type ViteDevServer } from 'vite';
+import { browserName, launchBrowser } from '../../../../test-utils/playwright-browser.js';
 import { octane } from '../../../octane/src/compiler/vite.js';
 
 const browserTestRoot = dirname(fileURLToPath(import.meta.url));
@@ -46,9 +47,8 @@ afterAll(async () => {
 	await viteServer?.close().catch(() => {});
 });
 
-async function runBrowserCase(engine: 'chromium' | 'firefox') {
-	const playwright = await import('playwright');
-	const browser = await playwright[engine].launch({ headless: true });
+async function runBrowserCase() {
+	const browser = await launchBrowser({ headless: true });
 	const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(String(error)));
@@ -89,16 +89,10 @@ async function runBrowserCase(engine: 'chromium' | 'firefox') {
 }
 
 describe('@octanejs/popper real-browser parity', () => {
-	// @parity-case browser:popper-chromium
+	// @parity-case browser:popper-selected
 	it(
-		'chromium: positions, updates, wires arrows/virtual refs, and cleans up',
-		() => runBrowserCase('chromium'),
-		60_000,
-	);
-	// @parity-case browser:popper-firefox
-	it(
-		'firefox: positions, updates, wires arrows/virtual refs, and cleans up',
-		() => runBrowserCase('firefox'),
+		`${browserName}: positions, updates, wires arrows/virtual refs, and cleans up`,
+		() => runBrowserCase(),
 		60_000,
 	);
 });

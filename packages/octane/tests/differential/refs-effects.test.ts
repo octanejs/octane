@@ -1,9 +1,14 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 const USEREF_PATH = resolve(__dirname, '../_fixtures/useref.tsrx');
 const EFFECT_TIMING_PATH = resolve(__dirname, '../_fixtures/effect-timing.tsrx');
+
+await Promise.all([
+	preloadDifferentialFixture(USEREF_PATH),
+	preloadDifferentialFixture(EFFECT_TIMING_PATH),
+]);
 
 // ----------------------------------------------------------------------------
 // useref.tsrx

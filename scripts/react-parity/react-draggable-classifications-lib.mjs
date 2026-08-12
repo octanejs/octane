@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 
-const PACKAGE_PREFIX = 'packages/react-draggable/';
+const PACKAGE_PREFIX = 'packages/draggable/';
 const DISPOSITIONS = new Set([
 	'unmodified-upstream-suite-wrapper',
 	'adapted-upstream-suite',
@@ -34,7 +34,7 @@ function discoverPackageTests(packageRoot) {
 export function verifyReactDraggableTestClassifications(rootOrPackage, options = {}) {
 	const packageRoot = options.packageRoot
 		? resolve(options.packageRoot)
-		: resolve(rootOrPackage, 'packages/react-draggable');
+		: resolve(rootOrPackage, 'packages/draggable');
 	const discovered = discoverPackageTests(packageRoot);
 	const configPath = resolve(packageRoot, 'audit/test-classifications.json');
 	if (!existsSync(configPath)) {

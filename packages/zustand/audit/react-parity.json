@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "5966e99698b5f8099e3ef2e62625cc31f3a3e60305f1def8d4066c6cd9f98824"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -56,7 +56,7 @@
         {
           "path": "packages/zustand/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "dbdd1d378565d17f8b5f2ef939ac7f631fbca5b6bb911ce7e93dbbef264732bd",
+          "sha256": "8bcfb4f71e031046f3a537d9e2161e925dfd152f3376c1caeadd9c382eb72380",
           "cases": [
             {
               "id": "differential:zustand-counter",

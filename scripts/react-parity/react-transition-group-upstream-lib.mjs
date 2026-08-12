@@ -218,10 +218,7 @@ function isConsoleSpyAssertion(folded, assertion) {
 }
 
 function isLifecycleArrayObservation(observation) {
-	return (
-		observation[0] === 'array' &&
-		(observation[1] === 'callOrder' || observation[1] === 'log')
-	);
+	return observation[0] === 'array' && (observation[1] === 'callOrder' || observation[1] === 'log');
 }
 
 function isAbsenceObservation(observation) {

@@ -84,6 +84,7 @@ function playgroundRuntime(): Plugin {
 			bundle: true,
 			splitting: true,
 			format: 'esm',
+			target: ['chrome111', 'edge111', 'firefox114', 'safari16.4', 'ios16.4'],
 			minify: true,
 			write: false,
 			outdir: 'playground-runtime',
@@ -339,6 +340,9 @@ export default defineConfig({
 	},
 
 	build: {
-		target: 'esnext',
+		target: 'baseline-widely-available',
+		// The client emits hundreds of Shiki language chunks. Computing gzip
+		// sizes for every chunk adds minutes after the build has already succeeded.
+		reportCompressedSize: false,
 	},
 });

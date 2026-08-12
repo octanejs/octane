@@ -9,7 +9,11 @@
 import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
 import { act } from 'react';
-import { mountDifferential, type DiffMount } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+	type DiffMount,
+} from '../../../octane/tests/differential/_rig.js';
 import mapboxgl from '../_mocks/mapbox-gl';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/differential/map-diff.tsrx');
@@ -52,6 +56,15 @@ function containerChildren(mount: DiffMount): string[] {
 		return `${child.tagName.toLowerCase()}.${child.className}`;
 	});
 }
+
+await Promise.all([
+	preloadDifferentialFixture(FIXTURE, CACHE),
+	preloadDifferentialFixture(SOURCE_LAYER_FIXTURE, CACHE),
+	preloadDifferentialFixture(OVERLAY_FIXTURE, CACHE),
+	preloadDifferentialFixture(USE_MAP_FIXTURE, CACHE),
+	preloadDifferentialFixture(USE_CONTROL_FIXTURE, CACHE),
+	preloadDifferentialFixture(MARKER_CHILDREN_FIXTURE, CACHE),
+]);
 
 describe('differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2', () => {
 	// @parity-case differential:1

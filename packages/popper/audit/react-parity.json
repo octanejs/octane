@@ -16,21 +16,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/popper/src"
-      ],
-      "include": [
-        "\\.(?:ts|tsrx)$"
-      ],
+      "roots": ["packages/popper/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/popper/tests/upstream"
-      ],
-      "include": [
-        "\\.test\\.(?:ts|tsx)$"
-      ],
+      "roots": ["packages/popper/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
       "exclude": []
     }
   },
@@ -47,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "5bd55a02589b11ccbd85efd398d2bd283d0b0fe8680d9b27c9324d7cc19caed9"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -74,7 +66,7 @@
         {
           "path": "scripts/react-parity/jest-full-runner.mjs",
           "role": "support",
-          "sha256": "e6b4e02afb9953e3d469a026d21e0d4dbb9244debcf352926b017144fa6efacf"
+          "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
         },
         {
           "path": "packages/popper/tests/upstream-jest.config.cjs",
@@ -129,7 +121,7 @@
         {
           "path": "packages/popper/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "5de0df57f2031f0ccf28dbded8f758b72aee0ae0af447c456db3db8c31867fe1",
+          "sha256": "7370cb00afaa2c7f5e00bbaac893ea162c24c52b647ce8ace782e6da4927378b",
           "cases": [
             {
               "id": "differential:popper-components",
@@ -191,7 +183,7 @@
         {
           "path": "packages/popper/audit/type-parity.json",
           "role": "support",
-          "sha256": "7176b209314451e363654bf4b46e61382757ad0512ff587ff4b7c3f5bd5e9170"
+          "sha256": "4742d3b70db5bb1d52552bf9a99a5757fb4495f84e7938c36ac427abe35b53dc"
         },
         {
           "path": "packages/popper/audit/upstream-types.json",
@@ -241,12 +233,12 @@
         {
           "path": "packages/popper/typetests/tsconfig.adapted.json",
           "role": "support",
-          "sha256": "5145e94aa253762c02971a92effa172952287b56f0b48cc57f8fcd0a48242589"
+          "sha256": "37208c57a988ebb90dad45dc4ee9a8723910b089cd99472b38c9ad2b3c8ec110"
         },
         {
           "path": "packages/popper/audit/type-parity.json",
           "role": "support",
-          "sha256": "7176b209314451e363654bf4b46e61382757ad0512ff587ff4b7c3f5bd5e9170"
+          "sha256": "4742d3b70db5bb1d52552bf9a99a5757fb4495f84e7938c36ac427abe35b53dc"
         },
         {
           "path": "packages/popper/audit/upstream-types.json",
@@ -279,10 +271,7 @@
   "divergences": [
     {
       "id": "popper-octane-node-and-ref-types",
-      "caseIds": [
-        "types:popper-adapted-main",
-        "types:popper-adapted-svg"
-      ],
+      "caseIds": ["types:popper-adapted-main", "types:popper-adapted-svg"],
       "upstreamResult": "Public props use React.ReactNode, React.Ref, and React.CSSProperties around class components.",
       "octaneResult": "Public props use OctaneNode, plain Ref callback/object unions, and CSSProperties while Manager/Reference/Popper are function components.",
       "rationale": "Octane has no class components and represents renderables/refs with its own structural types.",
@@ -294,9 +283,7 @@
     },
     {
       "id": "popper-dev-warning-console",
-      "caseIds": [
-        "runtime:baa5fd0dba1358db"
-      ],
+      "caseIds": ["runtime:baa5fd0dba1358db"],
       "upstreamResult": "Reference misuse warnings go through react-popper's warning helper.",
       "octaneResult": "Reference misuse warnings are emitted with console.error using the same warning text.",
       "rationale": "The Octane binding avoids depending on the upstream warning helper while preserving the developer-facing message.",

@@ -579,6 +579,7 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 			const aliasedEntry = await (plugin.transform as any).call(
 				{
 					resolve: async () => ({ id: aliased }),
+					getModuleInfo: () => ({ meta: aliasedModule.meta }),
 					load: async () => ({
 						id: aliased,
 						code: aliasedModule.code,
@@ -592,6 +593,7 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 			const changedAfterOctane = await (plugin.transform as any).call(
 				{
 					resolve: async () => ({ id: aliased }),
+					getModuleInfo: () => ({ meta: aliasedModule.meta }),
 					load: async () => ({
 						id: aliased,
 						code: aliasedModule.code + '\n// changed by a later transform',
@@ -735,12 +737,13 @@ describe('manifest-declared manual hook slots', () => {
 			'radix',
 			'rainbowkit',
 			'react-error-boundary',
-			'react-spring',
 			'remix-router',
 			'rxjs',
 			'solana-react',
+			'spring',
 			'styled-components',
 			'stylex',
+			'syntax-highlighter',
 			'tanstack-query',
 			'tanstack-router',
 			'tanstack-start',
@@ -752,7 +755,9 @@ describe('manifest-declared manual hook slots', () => {
 			'tiptap',
 			'usehooks-ts',
 			'valtio',
+			'vaul',
 			'wagmi',
+			'window',
 			'zag',
 			'zustand',
 		]);

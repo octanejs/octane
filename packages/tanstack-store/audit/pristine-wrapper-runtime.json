@@ -1,12 +1,8 @@
 {
   "schemaVersion": 1,
   "project": "tanstack-store-pristine",
-  "roots": [
-    "packages/tanstack-store/tests"
-  ],
-  "files": [
-    "packages/tanstack-store/tests/upstream-original.test.ts"
-  ],
+  "roots": ["packages/tanstack-store/tests"],
+  "files": ["packages/tanstack-store/tests/upstream-original.test.ts"],
   "tests": [
     {
       "id": "runtime:b68dc9aee5878f33",

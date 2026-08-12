@@ -1,5 +1,5 @@
-import { assert } from '../utils/assert';
-import type { SizeFunction } from './types';
+import { assert } from '../utils/assert.js';
+import type { SizeFunction } from './types.js';
 
 export function useItemSize<Props extends object>({
 	containerSize,

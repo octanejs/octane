@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, test } from 'node:test';
@@ -13,11 +14,18 @@ const shardedVitestConfigSource = readFileSync(
 const vitestConfig = readFileSync(path.join(REPO, 'vitest.config.js'), 'utf8');
 const packageJson = JSON.parse(readFileSync(path.join(REPO, 'package.json'), 'utf8'));
 const reactParityCheck = readFileSync(path.join(REPO, 'scripts/react-parity/check.mjs'), 'utf8');
+const reactParityCheckLib = readFileSync(
+	path.join(REPO, 'scripts/react-parity/check-lib.mjs'),
+	'utf8',
+);
 const reactParityHarness = readFileSync(
 	path.join(REPO, 'scripts/react-parity/harness.mjs'),
 	'utf8',
 );
 const baseVitestModule = await import(pathToFileURL(path.join(REPO, 'vitest.config.js')));
+const parityVitestModule = await import(
+	pathToFileURL(path.join(REPO, 'vitest.react-parity.config.js'))
+);
 const { configureShardedProjects, default: shardedVitestConfig } = await import(
 	pathToFileURL(path.join(REPO, 'vitest.ci-sharded.config.js'))
 );
@@ -151,6 +159,106 @@ describe('CI workflow aggregation', () => {
 		assert.doesNotMatch(shard, /input-otp\/tests\/browser\/\*\*\/\*\.spec\.ts/);
 	});
 
+	test('runs and reports tests only on Node 24 while retaining the Node 22 engine baseline', () => {
+		const shard = jobSource('test_shard');
+		assert.match(shard, /name: test shard \(Node 24, \$\{\{ matrix\.shard \}\}\)/);
+		assert.equal([...shard.matchAll(/\bnode-version:/g)].length, 1);
+		assert.match(shard, /^\s+node-version: 24$/m);
+		assert.doesNotMatch(shard, /node-version: \[/);
+		assert.equal(packageJson.engines.node, '>=22.22.2');
+
+		const aggregate = jobSource('test');
+		assert.match(aggregate, /^    name: test \(24\)$/m);
+		assert.doesNotMatch(aggregate, /strategy:|matrix\.|required-context/);
+		assert.doesNotMatch(workflow, /test \(22\)/);
+		assert.doesNotMatch(publishWorkflow, /test \(22\)/);
+		assert.match(publishWorkflow, /"test \(24\)"/);
+
+		const provenance = stepScript(workflow, 'Verify full-suite provenance');
+		assert.match(provenance, /`test shard \(Node 24, \$\{shard\}\)`/);
+		assert.doesNotMatch(provenance, /\[22, 24\]/);
+	});
+
+	test('runs both Three compatibility lanes in one job with isolated worktrees', () => {
+		const compat = jobSource('three_compat');
+		const provenance = stepScript(workflow, 'Verify full-suite provenance');
+
+		assert.match(compat, /^    name: Three compatibility$/m);
+		assert.doesNotMatch(compat, /^    strategy:|matrix\./m);
+		assert.doesNotMatch(compat, /^      THREE_(?:MINIMUM|CURRENT)_WORKSPACE:/m);
+		assert.match(
+			compat,
+			/THREE_MINIMUM_WORKSPACE="\$RUNNER_TEMP\/octane-three-compat-minimum-r156"/,
+		);
+		assert.match(compat, /THREE_CURRENT_WORKSPACE="\$RUNNER_TEMP\/octane-three-compat-current"/);
+		assert.match(compat, /git worktree add --detach "\$THREE_MINIMUM_WORKSPACE" "\$GITHUB_SHA"/);
+		assert.match(compat, /git worktree add --detach "\$THREE_CURRENT_WORKSPACE" "\$GITHUB_SHA"/);
+		assert.match(
+			compat,
+			/test "\$\(git -C "\$THREE_MINIMUM_WORKSPACE" rev-parse --git-dir\)" != "\$\(git -C "\$THREE_CURRENT_WORKSPACE" rev-parse --git-dir\)"/,
+		);
+		assert.match(
+			compat,
+			/name: Test Three compatibility \(minimum r156\)[\s\S]*?working-directory: \$\{\{ runner\.temp \}\}\/octane-three-compat-minimum-r156[\s\S]*?THREE_VERSION_SPEC: 0\.156\.0/,
+		);
+		assert.match(
+			compat,
+			/name: Test Three compatibility \(current\)[\s\S]*?working-directory: \$\{\{ runner\.temp \}\}\/octane-three-compat-current[\s\S]*?THREE_VERSION_SPEC: latest/,
+		);
+		assert.match(
+			compat,
+			/if: \$\{\{ !cancelled\(\) && steps\.prepare_three_compat\.outcome == 'success' \}\}/,
+		);
+		assert.equal([...compat.matchAll(/pnpm install --frozen-lockfile/g)].length, 2);
+		assert.equal(
+			[...compat.matchAll(/test "\$RESOLVED_THREE_VERSION" = "\$THREE_VERSION"/g)].length,
+			2,
+		);
+		assert.equal(
+			[...compat.matchAll(/test "\$THREE_RELEASE_LINE" = "\$TYPES_RELEASE_LINE"/g)].length,
+			2,
+		);
+		assert.equal(
+			[...compat.matchAll(/pnpm exec tsgo --noEmit -p packages\/three\/tsconfig\.json/g)].length,
+			2,
+		);
+		assert.equal(
+			[...compat.matchAll(/pnpm exec tsc --noEmit -p packages\/three\/typetests\/tsconfig\.json/g)]
+				.length,
+			2,
+		);
+		assert.equal([...compat.matchAll(/pnpm --dir packages\/three test:compat/g)].length, 2);
+		assert.match(provenance, /^\s+"Three compatibility",$/m);
+		assert.doesNotMatch(provenance, /Three compatibility \(\$\{lane\}\)/);
+	});
+
+	test('runs both Lynx compatibility lanes in one job through isolated processes', () => {
+		const compat = jobSource('lynx_compat');
+		const provenance = stepScript(workflow, 'Verify full-suite provenance');
+
+		assert.match(compat, /^    name: Lynx compatibility$/m);
+		assert.doesNotMatch(compat, /^    strategy:|matrix\./m);
+		assert.equal([...compat.matchAll(/pnpm install --frozen-lockfile/g)].length, 1);
+		assert.equal(
+			[
+				...compat.matchAll(
+					/node packages\/rspeedy-plugin-octane\/scripts\/compatibility-smoke\.mjs/g,
+				),
+			].length,
+			2,
+		);
+		assert.match(
+			compat,
+			/name: Pack and build Lynx minimum compatibility graph[\s\S]*?--lane minimum/,
+		);
+		assert.match(
+			compat,
+			/name: Pack and build Lynx current compatibility graph[\s\S]*?if: \$\{\{ !cancelled\(\) && steps\.install_lynx_dependencies\.outcome == 'success' \}\}[\s\S]*?--lane current/,
+		);
+		assert.match(provenance, /^\s+"Lynx compatibility",$/m);
+		assert.doesNotMatch(provenance, /Lynx compatibility \(\$\{lane\}\)/);
+	});
+
 	test('skips expensive jobs only after the committed scope classifier opts out', () => {
 		assert.match(
 			jobSource('release_change'),
@@ -161,9 +269,11 @@ describe('CI workflow aggregation', () => {
 
 		for (const job of [
 			'test_shard',
+			'react_parity_shard',
 			'react_parity_checks',
 			'website_e2e',
 			'heavy_integration',
+			'heavy_node_integration',
 			'typecheck_checks',
 			'example_shard',
 			'three_compat',
@@ -200,14 +310,38 @@ describe('CI workflow aggregation', () => {
 	});
 
 	test('keeps cheap parity validation universal and full execution on Node 24', () => {
-		const parity = jobSource('react_parity_checks');
+		const parity = jobSource('react_parity_shard');
+		const parityAggregate = jobSource('react_parity_checks');
 		const lint = jobSource('lint_checks');
-		assert.match(parity, /name: React parity checks/);
+		assert.match(parity, /name: React parity shard \(\$\{\{ matrix\.shard \}\}\/3\)/);
 		assert.match(parity, /node-version: 24/);
 		assert.doesNotMatch(parity, /node-version: \[22, 24\]/);
-		assert.match(parity, /pnpm --filter website exec playwright install --with-deps chromium/);
-		assert.match(parity, /pnpm react-parity:check/);
+		assert.match(parity, /shard: \[1, 2, 3\]/);
+		assert.match(
+			parity,
+			/pnpm --filter website exec playwright install --with-deps chromium(?:\n|$)/,
+		);
+		assert.match(parity, /pnpm react-parity:check --shard \$\{\{ matrix\.shard \}\}\/3/);
+		assert.match(
+			parity,
+			/REACT_PARITY_VITEST_REPORT: \$\{\{ runner\.temp \}\}\/react-parity-vitest\/shard-\$\{\{ matrix\.shard \}\}\.json/,
+		);
+		assert.match(parity, /actions\/upload-artifact@/);
 		assert.doesNotMatch(parity, /pnpm react-parity:(?:test|validate)/);
+		assert.match(parityAggregate, /^    name: React parity checks$/m);
+		assert.match(parityAggregate, /needs: \[release_change, react_parity_shard\]/);
+		assert.match(
+			parityAggregate,
+			/REACT_PARITY_SHARD_RESULT: \$\{\{ needs\.react_parity_shard\.result \}\}/,
+		);
+		assert.match(parityAggregate, /actions\/checkout@/);
+		assert.match(parityAggregate, /actions\/download-artifact@/);
+		assert.match(
+			parityAggregate,
+			/node scripts\/react-parity\/verify-vitest-shards\.mjs\s+--reports-directory/,
+		);
+		assert.match(parityAggregate, /--expected-shards 3/);
+		assert.doesNotMatch(parityAggregate, /pnpm install|playwright install/);
 		assert.match(lint, /pnpm react-parity:test/);
 		assert.match(lint, /pnpm react-parity:validate/);
 		assert.doesNotMatch(lint, /pnpm react-parity:check/);
@@ -284,46 +418,142 @@ describe('CI workflow aggregation', () => {
 		const aggregate = jobSource('test');
 		assert.match(
 			aggregate,
-			/needs: \[release_change, test_shard, react_parity_checks, website_e2e, heavy_integration\]/,
+			/needs:\s+\[\s+release_change,\s+test_shard,\s+react_parity_checks,\s+website_e2e,\s+heavy_integration,\s+heavy_node_integration,\s+\]/,
 		);
 		assert.match(aggregate, /REACT_PARITY_RESULT: \$\{\{ needs\.react_parity_checks\.result \}\}/);
 		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = skipped/);
 		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = success/);
-
-		// The manifest runner owns all required lanes in one process. Execution
-		// reports prove exact identities, so only explicit validation collects.
-		// Provenance completeness must not suppress required-lane execution.
-		assert.match(reactParityCheck, /selectHarnessAction\(manifest\)/);
 		assert.match(
-			readFileSync(path.join(REPO, 'scripts/react-parity/harness-lib.mjs'), 'utf8'),
-			/requiredExecutableLanes\(manifest\)\.length > 0 \? 'run-required' : 'validate'/,
+			aggregate,
+			/HEAVY_NODE_INTEGRATION_RESULT: \$\{\{ needs\.heavy_node_integration\.result \}\}/,
 		);
+		assert.match(aggregate, /test "\$HEAVY_NODE_INTEGRATION_RESULT" = skipped/);
+		assert.match(aggregate, /test "\$HEAVY_NODE_INTEGRATION_RESULT" = success/);
+
+		// The manifest runner owns all required lanes for both verification states.
+		// recorded-unverified limits the claim, not execution. Finish the complete
+		// metadata preflight before starting the bounded executable work queue.
+		assert.doesNotMatch(reactParityCheck, /provenance\.verification/);
+		const manifestValidation = reactParityCheck.indexOf(
+			'for (const relativeFile of BINDING_MANIFESTS)',
+		);
+		const manifestExecution = reactParityCheck.indexOf(
+			"await capture('required Vitest React parity lanes'",
+		);
+		assert.notEqual(manifestValidation, -1);
+		assert.ok(manifestExecution > manifestValidation);
+		assert.match(reactParityCheck, /if \(!validateOnly && errors\.length === 0\)/);
 		assert.match(
 			reactParityCheck,
-			/if \(!validateOnly\) \{\s+const action =[^;]+;\s+execFileSync\(process\.execPath, \[HARNESS_PATH, action, '--manifest', relativeFile\]/,
+			/relativeFiles: nonVitestShard\.items\.map\(\(item\) => item\.relativeFile\)/,
 		);
-		assert.match(reactParityCheck, /\[HARNESS_PATH, action, '--manifest', relativeFile\]/);
-		assert.doesNotMatch(reactParityCheck, /'--lane'/);
-		const executionMarker = "} else {\n\tif (action === 'run-required'";
+		assert.match(reactParityCheck, /const vitestLanes = loadRequiredVitestLanes\(REPO\)/);
+		assert.doesNotMatch(reactParityCheck, /selectParityVitestShard|vitest-lane-timings/);
+		assert.match(reactParityCheck, /reportPath: process\.env\.REACT_PARITY_VITEST_REPORT/);
+		assert.match(reactParityCheck, /createRequiredNonVitestManifestShardPlan/);
+		assert.match(reactParityCheck, /runRequiredVitestLanes/);
+		assert.match(reactParityCheck, /concurrency: NON_VITEST_MANIFEST_CONCURRENCY/);
+		assert.match(
+			reactParityCheck,
+			/const NON_VITEST_MANIFEST_CONCURRENCY = availableParallelism\(\)/,
+		);
+		assert.match(
+			reactParityCheckLib,
+			/\[harnessPath, 'run-required-non-vitest', '--manifest', relativeFile\]/,
+		);
+		assert.match(reactParityCheckLib, /vitest\.react-parity\.config\.js/);
+		assert.match(reactParityCheckLib, /await Promise\.all\(/);
+		const executionMarker = "} else {\n\tif (['run-required', 'run-required-non-vitest']";
 		const executionStart = reactParityHarness.indexOf(executionMarker);
 		assert.notEqual(executionStart, -1);
 		const executionBranch = reactParityHarness.slice(executionStart);
 		assert.doesNotMatch(executionBranch, /verifyManifestTestSelections/);
 	});
 
-	test('routes the Lynx Web host smoke through the existing Chromium build lane', () => {
+	test('registers every Vitest-backed manifest lane as react-parity owned', () => {
+		const projects = new Map(
+			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
+		);
+		const requiredVitestProjects = [];
+		const nonVitestExecutions = new Set([
+			'typescript',
+			'jest-full',
+			'node-full',
+			'playwright-full',
+		]);
+		for (const entry of readdirSync(path.join(REPO, 'packages'), { withFileTypes: true })) {
+			if (!entry.isDirectory()) continue;
+			const manifestPath = path.join(REPO, 'packages', entry.name, 'audit/react-parity.json');
+			if (!existsSync(manifestPath)) continue;
+			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+			for (const lane of manifest.lanes) {
+				if (nonVitestExecutions.has(lane.execution?.kind)) continue;
+				assert.ok(lane.project, `${entry.name}/${lane.id}: missing Vitest project name`);
+				const project = projects.get(lane.project);
+				assert.ok(project, `${entry.name}/${lane.id}: unknown Vitest project ${lane.project}`);
+				assert.equal(
+					project.testExecution?.group,
+					'react-parity',
+					`${entry.name}/${lane.id}: ${lane.project} must be react-parity owned`,
+				);
+				if (lane.oracle === 'required' && lane.available !== false) {
+					requiredVitestProjects.push(lane.project);
+				}
+			}
+		}
+		assert.deepEqual(
+			parityVitestModule.default.test.projects.map((project) => project.test.name).sort(),
+			requiredVitestProjects.sort(),
+		);
+		const inputOtpBrowser = parityVitestModule.default.test.projects.find(
+			(project) => project.test.name === 'input-otp-browser',
+		);
+		assert.equal(inputOtpBrowser.test.fileParallelism, true);
+		assert.equal(inputOtpBrowser.test.maxWorkers, undefined);
+	});
+
+	test('combines package, eval, loader, and Astro integration suites without coupling prerequisites', () => {
+		const combined = jobSource('heavy_node_integration');
+		const browser = jobSource('heavy_integration');
+		const provenance = stepScript(workflow, 'Verify full-suite provenance');
+		const title = 'heavy integration (package builds, eval corpus, runtime loaders, Astro)';
+
+		assert.match(combined, new RegExp(`^    name: ${title.replace(/[()]/g, '\\$&')}$`, 'm'));
+		assert.doesNotMatch(combined, /^    strategy:|matrix\./m);
+		assert.equal([...combined.matchAll(/pnpm install --prod false --frozen-lockfile/g)].length, 1);
+		assert.equal([...combined.matchAll(/oven-sh\/setup-bun/g)].length, 1);
+		assert.equal([...combined.matchAll(/playwright install --with-deps chromium/g)].length, 1);
+		for (const spec of [
+			'website-mcp/tests/built-handler.e2e.test.ts',
+			'packages/rspeedy-plugin-octane/tests/packed-consumer.test.ts',
+			'packages/octane-evals/tests/user-app-corpus.test.ts',
+			'packages/octane/tests/register-hook.test.ts',
+			'packages/octane/tests/register-hook-bun.integration.test.mjs',
+			'packages/astro/tests/astro.e2e.test.ts',
+		]) {
+			assert.ok(combined.includes(spec), `combined heavy integration must run ${spec}`);
+			assert.doesNotMatch(browser, new RegExp(spec.replaceAll('.', '\\.')));
+		}
+		assert.match(
+			combined,
+			/name: Run eval-corpus integration tests\n\s+if: \$\{\{ !cancelled\(\) && steps\.install_heavy_node_dependencies\.outcome == 'success' \}\}/,
+		);
+		assert.match(
+			combined,
+			/name: Run Astro integration tests\n\s+if: \$\{\{ !cancelled\(\) && steps\.install_heavy_node_dependencies\.outcome == 'success' && steps\.install_heavy_node_chromium\.outcome == 'success' \}\}/,
+		);
+		assert.match(provenance, new RegExp(`^\\s+"${title.replace(/[()]/g, '\\$&')}",$`, 'm'));
+		assert.doesNotMatch(provenance, /heavy integration \((?:package-builds|eval-corpus)\)/);
+	});
+
+	test('routes the Lynx Web host smoke through the combined Chromium build step', () => {
 		const browserGlob = 'packages/rspeedy-plugin-octane/tests/browser/**/*.test.ts';
 		const browserSpec = 'packages/rspeedy-plugin-octane/tests/browser/web-host.test.ts';
 		assert.ok(jobSource('test_shard').includes(`--exclude "${browserGlob}"`));
 
-		const heavyIntegration = jobSource('heavy_integration');
-		const packageBuildStart = heavyIntegration.indexOf('- lane: package-builds');
-		const nextLane = heavyIntegration.indexOf('- lane: eval-corpus', packageBuildStart);
-		assert.notEqual(packageBuildStart, -1);
-		assert.notEqual(nextLane, -1);
-		const packageBuildLane = heavyIntegration.slice(packageBuildStart, nextLane);
-		assert.match(packageBuildLane, /chromium: true/);
-		assert.ok(packageBuildLane.includes(browserSpec));
+		const combined = jobSource('heavy_node_integration');
+		assert.match(combined, /playwright install --with-deps chromium/);
+		assert.ok(combined.includes(browserSpec));
 
 		const projects = new Map(
 			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
@@ -334,15 +564,6 @@ describe('CI workflow aggregation', () => {
 		]);
 		assert.equal(projects.get('rspeedy-plugin').test.exclude, undefined);
 		assert.deepEqual(projects.get('rspeedy-plugin-browser').test.include, [browserGlob]);
-	});
-
-	test('installs WebKit only for the cross-browser integration lane', () => {
-		const heavyIntegration = jobSource('heavy_integration');
-
-		assert.match(
-			heavyIntegration,
-			/- name: Install Playwright WebKit for cross-browser ownership coverage\n\s+if: \$\{\{ matrix\.lane == 'browser' \}\}\n\s+run: pnpm --filter octane exec playwright install --with-deps webkit/,
-		);
 	});
 
 	test('derives sharded projects generically from execution-group ownership', () => {
@@ -374,13 +595,100 @@ describe('CI workflow aggregation', () => {
 		assert.equal(projects[1].testExecution, undefined);
 	});
 
-	test('runs Three browser suites only in Chromium-capable jobs', () => {
+	test('discovers ordinary browser suites only for Chromium', () => {
+		const heavyIntegration = jobSource('heavy_integration');
+
+		assert.match(heavyIntegration, /- lane: browser\n\s+playwright_browser: chromium/);
+		assert.equal((heavyIntegration.match(/- lane: browser$/gm) ?? []).length, 1);
+		assert.equal((heavyIntegration.match(/playwright install --with-deps/g) ?? []).length, 1);
+		assert.match(heavyIntegration, /specs: discovered/);
+		assert.match(heavyIntegration, /SPECS="\$\(node scripts\/discover-heavy-browser-specs\.mjs\)"/);
+		assert.doesNotMatch(heavyIntegration, /packages\/draggable\/tests\/browser/);
+
+		const discovered = execFileSync('node', ['scripts/discover-heavy-browser-specs.mjs'], {
+			encoding: 'utf8',
+			cwd: REPO,
+		})
+			.trim()
+			.split(/\s+/);
+		for (const browserRoot of [
+			'playground/octane/tests/doom',
+			'packages/colorful/tests/browser',
+			'packages/dropzone/tests/probes/browser',
+			'packages/octane/tests/browser',
+			'packages/pdf/tests/feasibility/pdfjs.browser.test.ts',
+			'packages/vaul/tests/browser-conformance',
+		]) {
+			assert.ok(discovered.includes(browserRoot));
+		}
+		for (const browserRoot of [
+			'packages/draggable/tests/browser',
+			'packages/drei/tests/browser',
+			'packages/input-otp/tests/browser',
+			'packages/rspeedy-plugin-octane/tests/browser',
+			'packages/three/tests/browser',
+		]) {
+			assert.equal(discovered.includes(browserRoot), false);
+		}
+		const projects = new Map(
+			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
+		);
+		const shardedProjects = new Map(
+			shardedVitestConfig.test.projects.map((project) => [project.test?.name, project]),
+		);
+		for (const stalePrefix of [
+			'react-day-picker',
+			'react-draggable',
+			'react-dropzone',
+			'react-spring',
+			'react-window',
+		]) {
+			assert.equal(
+				[...projects.keys()].some(
+					(name) => name === stalePrefix || name?.startsWith(`${stalePrefix}-`),
+				),
+				false,
+				`${stalePrefix} must not remain in Octane Vitest project names`,
+			);
+		}
+		for (const browserRoot of discovered) {
+			const owners = [...projects.values()].filter((project) => {
+				const includes = project.testExecution?.include ?? project.test?.include ?? [];
+				return includes.some(
+					(pattern) =>
+						typeof pattern === 'string' &&
+						!pattern.startsWith('!') &&
+						(pattern === browserRoot || pattern.startsWith(`${browserRoot}/`)),
+				);
+			});
+			assert.equal(owners.length, 1, `${browserRoot} must have exactly one Vitest project`);
+			assert.equal(
+				owners[0].testExecution?.group,
+				'heavy-browser',
+				`${browserRoot} must be omitted from ordinary shards`,
+			);
+		}
+		assert.deepEqual(projects.get('pdf-feasibility').testExecution, {
+			group: 'heavy-browser',
+			include: ['packages/pdf/tests/feasibility/pdfjs.browser.test.ts'],
+		});
+		assert.equal(
+			shardedProjects
+				.get('pdf-feasibility')
+				.test.exclude.includes('packages/pdf/tests/feasibility/pdfjs.browser.test.ts'),
+			true,
+		);
+		assert.equal(projects.get('three-browser').testExecution.group, 'react-parity');
+		assert.equal(projects.get('three').testExecution.group, 'react-parity');
+
 		assert.match(
 			jobSource('test_shard'),
 			/--exclude "packages\/three\/tests\/browser\/\*\*\/\*\.test\.ts"/,
 		);
-		assert.match(jobSource('heavy_integration'), /packages\/three\/tests\/browser/);
-		assert.match(jobSource('heavy_integration'), /playwright install --with-deps chromium/);
+		assert.match(
+			heavyIntegration,
+			/playwright install --with-deps \$\{\{ matrix\.playwright_browser \}\}/,
+		);
 		assert.doesNotMatch(jobSource('lint_checks'), /@octanejs\/three.*playwright install/);
 		assert.doesNotMatch(jobSource('react_parity_checks'), /@octanejs\/three/);
 	});
@@ -869,6 +1177,11 @@ describe('Pull request labels', () => {
 			/github-token: \$\{\{ secrets\.DRAFT_PR_TOKEN \|\| secrets\.GITHUB_TOKEN \}\}/,
 		);
 		assert.doesNotMatch(labelWorkflow, /actions\/checkout/);
+		assert.equal(
+			(labelWorkflow.match(/^ {10}retries: 3$/gm) ?? []).length,
+			2,
+			'both GitHub API steps retry transient failures',
+		);
 	});
 });
 

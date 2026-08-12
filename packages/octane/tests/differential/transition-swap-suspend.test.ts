@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 // Differential parity for the transition REPLACE-suspend hold (React as oracle).
@@ -9,6 +9,8 @@ import { resolve } from 'node:path';
 // === react.innerHTML after each step, so it cannot be satisfied by softening.
 
 const FIXTURE = resolve(__dirname, '../_fixtures/transition-swap-suspend.tsrx');
+
+await preloadDifferentialFixture(FIXTURE);
 
 function deferred<T>() {
 	let resolve!: (v: T) => void;

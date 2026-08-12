@@ -18,7 +18,7 @@
     },
     {
       "path": "packages/tanstack-devtools/tests/parity/contracts.test.ts",
-      "disposition": "octane-only-audit-contract",
+      "disposition": "octane-only-framework-contract",
       "reason": "Authenticates the vendored upstream ledger and requires a disposition row for every pinned public export; it is not React-parity evidence."
     },
     {

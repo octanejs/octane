@@ -1,10 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "transition-group",
-  "roots": [
-    "packages/transition-group/tests/upstream",
-    "packages/transition-group/tests/ssr"
-  ],
+  "roots": ["packages/transition-group/tests/upstream", "packages/transition-group/tests/ssr"],
   "files": [
     "packages/transition-group/tests/upstream/CSSTransition.test.ts",
     "packages/transition-group/tests/upstream/ChildMapping.test.ts",

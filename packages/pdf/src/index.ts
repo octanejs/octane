@@ -1,7 +1,7 @@
 import * as pdfjs from 'pdfjs-dist';
 
-// OCTANE DIVERGENCE[react-pdf-octane-node-ref-event-types][differential:react-pdf-document-shells]
-// OCTANE DIVERGENCE[react-pdf-star-export-surface][types:react-pdf-adapted]
+// OCTANE DIVERGENCE[pdf-octane-node-ref-event-types][differential:react-pdf-document-shells]
+// OCTANE DIVERGENCE[pdf-star-export-surface][types:pdf-adapted]
 export { Document, Outline, Page, Thumbnail } from './components.tsrx';
 export { useDocumentContext, useOutlineContext, usePageContext } from './contexts.js';
 export { default as PasswordResponses } from './PasswordResponses.js';

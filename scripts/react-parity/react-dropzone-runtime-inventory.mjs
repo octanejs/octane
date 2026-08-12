@@ -6,21 +6,21 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const adaptedRoots = ['packages/react-dropzone/tests/adapted'];
+const adaptedRoots = ['packages/dropzone/tests/adapted'];
 const lanes = [
 	{
-		project: 'react-dropzone-pristine',
-		roots: ['packages/react-dropzone/upstream/canonical/src'],
-		keep: (file) => file.startsWith('packages/react-dropzone/upstream/canonical/src/'),
-		output: 'packages/react-dropzone/audit/runtime-inventories/pristine-harness.json',
+		project: 'dropzone-pristine',
+		roots: ['packages/dropzone/upstream/canonical/src'],
+		keep: (file) => file.startsWith('packages/dropzone/upstream/canonical/src/'),
+		output: 'packages/dropzone/audit/runtime-inventories/pristine-harness.json',
 	},
 	{
-		project: 'react-dropzone',
+		project: 'dropzone',
 		roots: adaptedRoots,
 		// Full-suite DOM inventory is adapted upstream cases only; Octane-only probes
 		// stay in ordinary shards and are not adapted-suite evidence.
-		keep: (file) => file.startsWith('packages/react-dropzone/tests/adapted/'),
-		output: 'packages/react-dropzone/audit/runtime-inventories/adapted-dom.json',
+		keep: (file) => file.startsWith('packages/dropzone/tests/adapted/'),
+		output: 'packages/dropzone/audit/runtime-inventories/adapted-dom.json',
 	},
 ];
 

@@ -14,7 +14,9 @@ import { tmpdir } from 'node:os';
 import { extname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import type { Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { launchBrowser, webglLaunchOptions } from '../../../../test-utils/playwright-browser.js';
 import { requireDoomProof, type DoomProofDescriptor } from './_proof.js';
 
 const stagingRoot = realpathSync(mkdtempSync(join(tmpdir(), 'octane-doom-playground-')));
@@ -240,6 +242,20 @@ async function readDoomShell(page: {
 	});
 }
 
+async function moveForward(page: Page, initialZ: number): Promise<any> {
+	await page.keyboard.down('KeyW');
+	try {
+		await expect
+			.poll(async function playerMoved() {
+				return (await readDoomSnapshot(page)).player.z;
+			})
+			.toBeLessThan(initialZ);
+		return await readDoomSnapshot(page);
+	} finally {
+		await page.keyboard.up('KeyW');
+	}
+}
+
 describe('Doom production playground evidence', () => {
 	it('builds hashed production assets and server-renders the landing state without browser globals', async () => {
 		const files = listFiles(clientRoot);
@@ -281,11 +297,7 @@ describe('Doom production playground evidence', () => {
 	});
 
 	it('plays through permissions, input, combat, rendering, retry, and repeated cleanup', async () => {
-		const { chromium } = await import('playwright');
-		const browser = await chromium.launch({
-			headless: true,
-			args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
-		});
+		const browser = await launchBrowser(webglLaunchOptions());
 		const page = await browser.newPage({ viewport: { width: 1100, height: 800 } });
 		const errors: string[] = [];
 		const failedResponses: string[] = [];
@@ -389,29 +401,28 @@ describe('Doom production playground evidence', () => {
 			expect(await page.locator('.octane-doom-stats').count()).toBeGreaterThan(0);
 
 			const initial = started.snapshot;
-			await page.keyboard.down('KeyW');
-			await page.waitForTimeout(120);
-			await page.keyboard.up('KeyW');
+			await moveForward(page, initial.player.z);
 			await page.keyboard.down('Space');
 			await expect
 				.poll(async () => {
-					const snapshot = await page.evaluate(() =>
-						(globalThis as any).__OCTANE_DOOM_PROOF__.getSnapshot(),
-					);
-					return snapshot.projectiles.some((projectile: any) => projectile.owner === 'player');
+					return page.evaluate(() => {
+						const snapshot = (globalThis as any).__OCTANE_DOOM_PROOF__.getSnapshot();
+						return {
+							projectile: snapshot.projectiles.some(
+								(projectile: any) => projectile.owner === 'player',
+							),
+							weaponFiring: snapshot.weaponFiring,
+							weaponIndicator: document.querySelector('[data-doom-weapon="firing"]') !== null,
+						};
+					});
 				})
-				.toBe(true);
+				.toEqual({ projectile: true, weaponFiring: true, weaponIndicator: true });
 			await page.keyboard.up('Space');
 			const active = await page.evaluate(() =>
 				(globalThis as any).__OCTANE_DOOM_PROOF__.getSnapshot(),
 			);
 			expect(active.player.z).toBeLessThan(initial.player.z);
 			expect(active.now).toBeGreaterThan(initial.now);
-			expect(active.weaponFiring).toBe(true);
-			expect(active.projectiles.some((projectile: any) => projectile.owner === 'player')).toBe(
-				true,
-			);
-			expect(await page.locator('[data-doom-weapon="firing"]').count()).toBe(1);
 
 			const framebuffer = await page.evaluate(async () => {
 				await new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
@@ -502,11 +513,7 @@ describe('Doom production playground evidence', () => {
 	}, 120_000);
 
 	it('pointer-lock aim', async () => {
-		const { chromium } = await import('playwright');
-		const browser = await chromium.launch({
-			headless: true,
-			args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
-		});
+		const browser = await launchBrowser(webglLaunchOptions());
 		const page = await browser.newPage({ viewport: { width: 1100, height: 800 } });
 		try {
 			await installDoomProofShims(page);
@@ -532,11 +539,7 @@ describe('Doom production playground evidence', () => {
 	}, 60_000);
 
 	it('pointer unlock behavior', async () => {
-		const { chromium } = await import('playwright');
-		const browser = await chromium.launch({
-			headless: true,
-			args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
-		});
+		const browser = await launchBrowser(webglLaunchOptions());
 		const page = await browser.newPage({ viewport: { width: 1100, height: 800 } });
 		try {
 			await installDoomProofShims(page);
@@ -553,15 +556,7 @@ describe('Doom production playground evidence', () => {
 			const unlockedShell = await readDoomShell(page);
 			expect(unlockedShell).toMatchObject({ phase: 'playing', paused: false });
 			const before = await readDoomSnapshot(page);
-			await page.keyboard.down('KeyW');
-			await page.waitForTimeout(120);
-			await page.keyboard.up('KeyW');
-			await expect
-				.poll(async function stillMoves() {
-					const after = await readDoomSnapshot(page);
-					return after.player.z < before.player.z;
-				})
-				.toBe(true);
+			await moveForward(page, before.player.z);
 		} finally {
 			await page.close();
 			await browser.close();
@@ -569,27 +564,22 @@ describe('Doom production playground evidence', () => {
 	}, 60_000);
 
 	it('browser back to landing', async function browserBackToLanding() {
-		const { chromium } = await import('playwright');
-		const browser = await chromium.launch({
-			headless: true,
-			args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
-		});
+		const browser = await launchBrowser(webglLaunchOptions());
 		const page = await browser.newPage({ viewport: { width: 1100, height: 800 } });
 		try {
 			await installDoomProofShims(page);
 			await page.goto(`${origin}/#doom`, { waitUntil: 'load' });
 			await enterDoomLevel(page);
 			const active = await readDoomSnapshot(page);
-			await page.keyboard.down('KeyW');
-			await page.waitForTimeout(120);
-			await page.keyboard.up('KeyW');
-			const moved = await readDoomSnapshot(page);
+			const moved = await moveForward(page, active.player.z);
 			expect(moved.player.z).toBeLessThan(active.player.z);
 			await page.goBack();
 			await page.waitForSelector('[data-doom-shell="landing"]');
-			expect(await page.evaluate(function proofStillMounted() {
-				return Boolean((globalThis as any).__OCTANE_DOOM_PROOF__);
-			})).toBe(true);
+			expect(
+				await page.evaluate(function proofStillMounted() {
+					return Boolean((globalThis as any).__OCTANE_DOOM_PROOF__);
+				}),
+			).toBe(true);
 			await page.click('[data-doom-start="true"]');
 			await page.waitForSelector('[data-doom-shell="playing"]');
 			const reset = await readDoomSnapshot(page);
@@ -603,11 +593,7 @@ describe('Doom production playground evidence', () => {
 	}, 60_000);
 
 	it('WebGL failure recovery', async () => {
-		const { chromium } = await import('playwright');
-		const browser = await chromium.launch({
-			headless: true,
-			args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
-		});
+		const browser = await launchBrowser(webglLaunchOptions());
 		const page = await browser.newPage({ viewport: { width: 1100, height: 800 } });
 		try {
 			await page.addInitScript(function denyWebGL() {

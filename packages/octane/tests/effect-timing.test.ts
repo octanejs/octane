@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { flushSync } from '../src/index.js';
-import { mount, nextPaint } from './_helpers';
+import { drainPassiveEffects, flushSync } from '../src/index.js';
+import { mount, nextPaint, type MountResult } from './_helpers';
 import {
 	PhaseOrder,
 	LayoutReadsDom,
@@ -79,6 +79,48 @@ describe('effect timing', () => {
 		await nextPaint();
 		expect(log).toEqual(['layout', 'passive']);
 		r.unmount();
+	});
+
+	it('eventually runs passive effects when a background tab receives no animation frame', async () => {
+		vi.useFakeTimers();
+		vi.stubGlobal('requestAnimationFrame', () => 0);
+		const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+		let rendered: MountResult | undefined;
+		const log: string[] = [];
+		try {
+			rendered = mount(PassiveDeferred, { tick: 0, log });
+			expect(log).toEqual(['layout']);
+
+			await vi.advanceTimersByTimeAsync(1_000);
+
+			expect(log).toEqual(['layout', 'passive']);
+		} finally {
+			rendered?.unmount();
+			drainPassiveEffects();
+			visibility.mockRestore();
+			vi.unstubAllGlobals();
+			vi.useRealTimers();
+		}
+	});
+
+	it('keeps visible-page passive effects deferred while waiting for the next paint', () => {
+		vi.useFakeTimers();
+		vi.stubGlobal('requestAnimationFrame', () => 0);
+		const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+		let rendered: MountResult | undefined;
+		const log: string[] = [];
+		try {
+			rendered = mount(PassiveDeferred, { tick: 0, log });
+			vi.advanceTimersByTime(50);
+
+			expect(log).toEqual(['layout']);
+		} finally {
+			rendered?.unmount();
+			drainPassiveEffects();
+			visibility.mockRestore();
+			vi.unstubAllGlobals();
+			vi.useRealTimers();
+		}
 	});
 
 	it('coalesced dependency changes leave one live passive side effect', async () => {

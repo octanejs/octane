@@ -25,7 +25,7 @@ const TYPE_PROGRAM_PATTERN = /\.tsx$/;
  * node:test adoption/packed probes, and both type-program trees.
  */
 export function discoverReactDropzoneAuthoredTests(root) {
-	const prefix = 'packages/react-dropzone';
+	const prefix = 'packages/dropzone';
 	const discovered = [];
 
 	const walk = (relativeRoot, predicate) => {
@@ -47,19 +47,19 @@ export function discoverReactDropzoneAuthoredTests(root) {
 }
 
 export function classifyReactDropzoneAuthoredPath(path) {
-	if (path.startsWith('packages/react-dropzone/tests/adapted/'))
+	if (path.startsWith('packages/dropzone/tests/adapted/'))
 		return { path, disposition: 'adapted-octane-contract' };
-	if (path.startsWith('packages/react-dropzone/tests/differential/'))
+	if (path.startsWith('packages/dropzone/tests/differential/'))
 		return { path, disposition: 'react-octane-differential' };
-	if (path === 'packages/react-dropzone/tests/pristine/upstream-runtime.test.ts')
+	if (path === 'packages/dropzone/tests/pristine/upstream-runtime.test.ts')
 		return { path, disposition: 'unmodified-upstream-suite-wrapper' };
-	if (path.startsWith('packages/react-dropzone/tests/probes/'))
+	if (path.startsWith('packages/dropzone/tests/probes/'))
 		return { path, disposition: 'octane-only-framework-contract' };
-	if (path.startsWith('packages/react-dropzone/tests/adoption/'))
+	if (path.startsWith('packages/dropzone/tests/adoption/'))
 		return { path, disposition: 'octane-only-adoption' };
-	if (path.startsWith('packages/react-dropzone/typetests/pristine/'))
+	if (path.startsWith('packages/dropzone/typetests/pristine/'))
 		return { path, disposition: 'type-evidence-pristine-copy' };
-	if (path.startsWith('packages/react-dropzone/typetests/'))
+	if (path.startsWith('packages/dropzone/typetests/'))
 		return { path, disposition: 'type-evidence-adapted' };
 	return { path, disposition: 'octane-only-package-contract' };
 }
@@ -69,7 +69,7 @@ export function buildReactDropzonePortAuthored(root) {
 }
 
 export function verifyReactDropzoneEvidence(root) {
-	const prefix = 'packages/react-dropzone';
+	const prefix = 'packages/dropzone';
 	const pristine = load(root, `${prefix}/audit/runtime-inventories/pristine-runtime.json`);
 	const classifications = load(root, `${prefix}/audit/test-classifications.json`);
 	if (pristine.collected !== 218 || pristine.executed !== 218 || pristine.skipped !== 0)

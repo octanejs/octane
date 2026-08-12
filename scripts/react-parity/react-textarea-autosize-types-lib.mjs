@@ -59,7 +59,9 @@ function verifyInventoriedFilesBelongToPrograms(root, config, inventory) {
 	const pristineProject = config.lanes?.pristine?.project;
 	const adaptedProject = config.lanes?.adapted?.project;
 	if (typeof pristineProject !== 'string' || typeof adaptedProject !== 'string') {
-		throw new Error('type-parity.json must declare lanes.pristine.project and lanes.adapted.project');
+		throw new Error(
+			'type-parity.json must declare lanes.pristine.project and lanes.adapted.project',
+		);
 	}
 	assertFilesBelongToProgram(
 		root,

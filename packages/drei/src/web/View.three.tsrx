@@ -1,7 +1,7 @@
 /** @jsxImportSource @octanejs/three/intrinsics */
 import { context as threeContext, createPortal, type RootState, type ThreeRef, useFrame, useThree } from '@octanejs/three';
-import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from '@octanejs/three/renderer';
-import { type OctaneNode, useContext } from 'octane';
+import { useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from '@octanejs/three/renderer';
+import { type OctaneNode } from 'octane';
 import * as THREE from 'three';
 
 type CanvasSize = { top: number; left: number; height: number; width: number };

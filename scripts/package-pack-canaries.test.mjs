@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
-	createPackedCommonjsConsumerManifest,
+	createPackedJavascriptConsumerManifest,
 	createPackedExampleManifest,
 	createPackedTsrxConsumerConfig,
 	createPackedTsrxConsumerManifest,
@@ -16,19 +16,22 @@ import {
 	renderPackedTsrxConsumerTypeProbe,
 } from './package-pack-canaries.mjs';
 
-describe('packed CommonJS consumer', () => {
+describe('packed JavaScript consumers', () => {
 	const archiveSpecs = {
 		'@octanejs/base-ui': 'file:/tmp/base-ui.tgz',
 		'@octanejs/floating-ui': 'file:/tmp/floating-ui.tgz',
 		'@octanejs/radix': 'file:/tmp/radix.tgz',
-		'@octanejs/react-draggable': 'file:/tmp/react-draggable.tgz',
+		'@octanejs/draggable': 'file:/tmp/react-draggable.tgz',
 		octane: 'file:/tmp/octane.tgz',
 	};
 
-	test('installs exactly the complete CommonJS dependency closure', () => {
-		assert.deepEqual(createPackedCommonjsConsumerManifest(archiveSpecs).dependencies, archiveSpecs);
+	test('installs exactly the complete JavaScript dependency closure', () => {
+		assert.deepEqual(
+			createPackedJavascriptConsumerManifest(archiveSpecs).dependencies,
+			archiveSpecs,
+		);
 		assert.throws(
-			() => createPackedCommonjsConsumerManifest({ ...archiveSpecs, octane: undefined }),
+			() => createPackedJavascriptConsumerManifest({ ...archiveSpecs, octane: undefined }),
 			/no packed archive was provided for octane/,
 		);
 	});
@@ -40,8 +43,7 @@ describe('packed CommonJS consumer', () => {
 		assert.match(source, /require\('@octanejs\/floating-ui'\)/);
 		assert.match(source, /require\('@octanejs\/base-ui'\)/);
 		assert.match(source, /require\('@octanejs\/radix'\)/);
-		assert.match(source, /require\('@octanejs\/react-draggable'\)/);
-		assert.match(source, /draggable\.default, draggable/);
+		assert.doesNotMatch(source, /require\('@octanejs\/draggable'\)/);
 		assert.match(source, /renderToString/);
 	});
 
@@ -57,8 +59,9 @@ describe('packed CommonJS consumer', () => {
 
 	test('compiles the TSRX draggable ESM entry through the Octane toolchain', () => {
 		const source = renderPackedDraggableEsmConsumerSource();
-		assert.match(source, /from '@octanejs\/react-draggable'/);
+		assert.match(source, /from '@octanejs\/draggable'/);
 		assert.match(source, /draggable\.DraggableCore/);
+		assert.doesNotMatch(source, /node:/);
 	});
 });
 
@@ -157,7 +160,7 @@ describe('packed TSRX source consumers', () => {
 		'@octanejs/floating-ui': 'file:/tmp/floating-ui.tgz',
 		'@octanejs/input-otp': 'file:/tmp/input-otp.tgz',
 		'@octanejs/radix': 'file:/tmp/radix.tgz',
-		'@octanejs/react-spring': 'file:/tmp/react-spring.tgz',
+		'@octanejs/spring': 'file:/tmp/react-spring.tgz',
 		'@octanejs/sonner': 'file:/tmp/sonner.tgz',
 		'@octanejs/syntax-highlighter': 'file:/tmp/syntax-highlighter.tgz',
 		'@octanejs/textarea-autosize': 'file:/tmp/react-textarea-autosize.tgz',
@@ -210,8 +213,8 @@ describe('packed TSRX source consumers', () => {
 		assert.match(source, /from '@octanejs\/cmdk'/);
 		assert.match(source, /from '@octanejs\/input-otp'/);
 		assert.match(source, /from '@octanejs\/sonner'/);
-		assert.match(source, /from '@octanejs\/react-spring'/);
-		assert.match(source, /from '@octanejs\/react-spring\/parallax'/);
+		assert.match(source, /from '@octanejs\/spring'/);
+		assert.match(source, /from '@octanejs\/spring\/parallax'/);
 		assert.match(source, /from '@octanejs\/syntax-highlighter'/);
 		assert.match(source, /from '@octanejs\/textarea-autosize'/);
 		assert.match(source, /from '@octanejs\/tiptap'/);

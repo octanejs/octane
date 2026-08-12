@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "669294cd71fb4fbe6f48ede7d7a2a958c117611b45b1563eb2799226c20ed018"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -56,7 +56,7 @@
         {
           "path": "packages/streamdown/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "8bdd2e47cc0fd3f02c3108ebc0d8b71ce9b4adccf481b292b68d4b36b50f63be",
+          "sha256": "7be827ca7aca0ff4a7aa8ba20d71cc021dcb9070402241387431ae59471735c6",
           "cases": [
             {
               "id": "differential:streamdown-static-markdown",
@@ -118,22 +118,22 @@
         {
           "path": "packages/streamdown/audit/test-classifications.json",
           "role": "support",
-          "sha256": "6bcaec184b396a1461ef48afc0399e6c176d1bf492290957318c86676a1b8d01"
+          "sha256": "18104fdd01f394934602244761ac0b736488a54786b5063cc9bca6e78be78464"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "1bd11001c8df3f7e413f36ab9336a42cb34b1bd11c30b9a5c6fedcf73ae6c42a"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         },
         {
           "path": "packages/streamdown/audit/upstream-suite-artifacts.json",
           "role": "support",
-          "sha256": "b1a41e384eb34659ec68c76a095553c0dadc8d3b104235d15767674f078f9e41"
+          "sha256": "d123884660d085b071ce791b60889b54c04a62f38d6e79c3b753402d55c17c09"
         }
       ]
     }

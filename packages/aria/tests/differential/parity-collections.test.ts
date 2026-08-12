@@ -7,10 +7,19 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/aria-diff-tabs.tsrx');
+const LISTBOX_FIXTURE = resolve(__dirname, '../_fixtures/aria-diff-listbox.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
+
+await Promise.all([
+	preloadDifferentialFixture(FIXTURE, CACHE),
+	preloadDifferentialFixture(LISTBOX_FIXTURE, CACHE),
+]);
 
 describe('differential: @octanejs/aria Phase-2 tabs vs real react-aria', () => {
 	// @parity-case differential:aria-default-selection-roles-aria-wiring
@@ -31,8 +40,6 @@ describe('differential: @octanejs/aria Phase-2 tabs vs real react-aria', () => {
 		d.unmount();
 	});
 });
-
-const LISTBOX_FIXTURE = resolve(__dirname, '../_fixtures/aria-diff-listbox.tsrx');
 
 describe('differential: @octanejs/aria Phase-2 listbox vs real react-aria', () => {
 	// @parity-case differential:aria-roles-labelling-mount

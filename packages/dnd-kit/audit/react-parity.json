@@ -17,24 +17,14 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/dnd-kit/src"
-      ],
-      "include": [
-        "\\.(?:ts|tsrx)$"
-      ],
+      "roots": ["packages/dnd-kit/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/dnd-kit/tests/parity"
-      ],
-      "include": [
-        "contracts\\.test\\.ts$"
-      ],
-      "exclude": [
-        "contracts\\.test\\.ts$"
-      ]
+      "roots": ["packages/dnd-kit/tests/parity"],
+      "include": ["contracts\\.test\\.ts$"],
+      "exclude": ["contracts\\.test\\.ts$"]
     }
   },
   "adaptedRuntimeSummary": {
@@ -50,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "9f9847ac3a12e546247e614fa28a2a5efa2360067bdfd3c59ac5553ddaf260af"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -66,7 +56,7 @@
         {
           "path": "packages/dnd-kit/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "4a7877584a0cd15c8f38de371aa4afe1d470268b79affb546d2fc156d7a43495",
+          "sha256": "50f5b7ffe8aa716ba8357cc0d11868596c752a8bd78c1b4f7f46c93fe7b184ce",
           "cases": [
             {
               "id": "differential:dnd-kit-programmatic-manager-lifecycle",
@@ -98,7 +88,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "packages/dnd-kit/upstream/SHA256SUMS",
@@ -123,7 +113,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "4d7867b3e26001d6d3064825c9d9c2dbe25dbb2e4e57898e3c8ea302b8d7fc0a"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     }
@@ -131,9 +121,7 @@
   "divergences": [
     {
       "id": "dnd-kit-drag-overlay-compiled-children",
-      "caseIds": [
-        "differential:dnd-kit-drag-overlay-compiled-children"
-      ],
+      "caseIds": ["differential:dnd-kit-drag-overlay-compiled-children"],
       "upstreamResult": "DragOverlay treats every function child as a render prop and invokes it with the active source.",
       "octaneResult": "DragOverlay distinguishes Octane compiled children blocks via isChildrenBlock and only invokes plain render-prop functions.",
       "rationale": "Octane compiler children blocks are functions; calling them as render props would execute the wrong arm.",
@@ -145,9 +133,7 @@
     },
     {
       "id": "dnd-kit-sortable-omit-optimistic-sorting",
-      "caseIds": [
-        "differential:dnd-kit-sortable-omit-optimistic-sorting"
-      ],
+      "caseIds": ["differential:dnd-kit-sortable-omit-optimistic-sorting"],
       "upstreamResult": "useSortable defaults include SortableKeyboardPlugin and OptimisticSortingPlugin, which reparents the host element before application state commits.",
       "octaneResult": "useSortable defaults keep SortableKeyboardPlugin but omit OptimisticSortingPlugin; explicit plugin arrays remain authoritative.",
       "rationale": "Optimistic host reparenting can split an Octane keyed item's owned DOM marker range before the consumer commits list state.",

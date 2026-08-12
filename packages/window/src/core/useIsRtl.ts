@@ -1,7 +1,7 @@
 import { useLayoutEffect, useState } from 'octane';
 import type { HTMLAttributes } from 'react';
-import { getSlot, subSlot } from '../internal';
-import { isRtl } from '../utils/isRtl';
+import { getSlot, subSlot } from '../internal.js';
+import { isRtl } from '../utils/isRtl.js';
 
 export function useIsRtl(
 	element: HTMLElement | null,

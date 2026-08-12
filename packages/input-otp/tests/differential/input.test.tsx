@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { OTPInput as ReactOTPInput, OTPInputContext as ReactContext } from 'input-otp';
 import { createElement, useContext as useReactContext, type FormEvent } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'octane';
 import { mount } from '../../../octane/tests/_helpers';
 import { UncontrolledInput } from '../conformance/_fixtures/input.tsrx';
@@ -38,7 +38,19 @@ function ReactFixture(props: {
 		createElement(ReactProjection),
 	);
 }
-afterEach(cleanup);
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => {
+	try {
+		// input-otp@1.4.2 schedules uncancelled 0/10/50ms React state syncs.
+		cleanup();
+		// Drain only the callbacks upstream failed to cancel, while the jsdom
+		// window still exists, so a busy runner cannot strand them past teardown.
+		act(() => vi.runOnlyPendingTimers());
+		expect(vi.getTimerCount()).toBe(0);
+	} finally {
+		vi.useRealTimers();
+	}
+});
 
 describe('@octanejs/input-otp differential React oracle', () => {
 	it('matches initial native input attributes and projected slots', () => {

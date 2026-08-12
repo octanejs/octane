@@ -17,21 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/three/src"
-      ],
-      "include": [
-        "\\.(?:ts|tsrx)$"
-      ],
+      "roots": ["packages/three/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/three/tests"
-      ],
-      "include": [
-        "\\.test\\.ts$"
-      ],
+      "roots": ["packages/three/tests"],
+      "include": ["\\.test\\.ts$"],
       "exclude": []
     }
   },
@@ -48,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "7197f3e0d5509ad99f0f18b45536bfb3fca68c958f9d8c11010732d7c727a324"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -173,7 +165,7 @@
         {
           "path": "packages/three/tests/catalogue-props.test.ts",
           "role": "test",
-          "sha256": "cd60e9825f00ad496b57697a98f4c723c98e698316657c71bbe373ddda4af79c",
+          "sha256": "d60291f8644e3d41727b82fb503410240cb7e4dc26b38036622602a7f4ea8146",
           "cases": [
             {
               "id": "adapted:three-pierced-reset",
@@ -219,7 +211,7 @@
         {
           "path": "packages/three/tests/dom-region.test.ts",
           "role": "test",
-          "sha256": "b3de08cf3c9dfc4521e05eb37cff138938861cf14539b8a2fc149e4267fde609",
+          "sha256": "67ada6c62aedcaa040cd445e0b9429b131f9ed50866985783f7442d599cc626f",
           "cases": [
             {
               "id": "adapted:three-dom-region",
@@ -263,7 +255,7 @@
         {
           "path": "packages/three/tests/browser/xr.test.ts",
           "role": "test",
-          "sha256": "77bb9ddbbdb8c93346ba3c88d24860ddc2d4785a138d94209e6613eca33b84b2",
+          "sha256": "418cb8018fd979e77256dc07442e9f16544845ba8bc2f3f33a04e5a4c7f4f2f7",
           "cases": [
             {
               "id": "browser:three-offscreen-lifecycle",
@@ -308,7 +300,7 @@
         {
           "path": "packages/three/typetests/public-api.test.ts",
           "role": "support",
-          "sha256": "5f9d9ea54d63c778e8ac84fa693cdb25d5699097f59b243f1f5879543009ddd5"
+          "sha256": "ae1ac4f8d73ebf110b682a6b242395717b9a544f84958ff383c26a51fafe2efe"
         },
         {
           "path": "packages/three/typetests/renderer-local.test.ts",
@@ -326,9 +318,7 @@
   "divergences": [
     {
       "id": "octane-renderer-ownership",
-      "caseIds": [
-        "adapted:three-renderer-ownership"
-      ],
+      "caseIds": ["adapted:three-renderer-ownership"],
       "upstreamResult": "R3F embeds React Reconciler for component execution and scheduling.",
       "octaneResult": "Octane owns execution, hooks, context, scheduling, Suspense, refs, and effects.",
       "rationale": "The binding targets Octane's universal renderer contract.",
@@ -340,9 +330,7 @@
     },
     {
       "id": "component-props-root-api",
-      "caseIds": [
-        "adapted:three-root-component-props"
-      ],
+      "caseIds": ["adapted:three-root-component-props"],
       "upstreamResult": "R3F roots render a React element descriptor.",
       "octaneResult": "Roots render an Octane component plus props.",
       "rationale": "Octane's root API is component-oriented.",
@@ -354,9 +342,7 @@
     },
     {
       "id": "order-based-callable-selector",
-      "caseIds": [
-        "adapted:three-store-selector"
-      ],
+      "caseIds": ["adapted:three-store-selector"],
       "upstreamResult": "React callable store selectors inherit React hook identity.",
       "octaneResult": "Dynamic callable selectors are order-based; compiler-visible hooks retain conditional identity.",
       "rationale": "Dynamic calls cannot receive compiler slots.",
@@ -368,9 +354,7 @@
     },
     {
       "id": "build-graph-named-only",
-      "caseIds": [
-        "adapted:three-build-graph"
-      ],
+      "caseIds": ["adapted:three-build-graph"],
       "upstreamResult": "R3F can publish empty or undefined graph keys.",
       "octaneResult": "buildGraph omits unnamed and array-valued material entries.",
       "rationale": "Only stable named identities are useful graph keys.",
@@ -382,9 +366,7 @@
     },
     {
       "id": "pierced-prop-reset-target",
-      "caseIds": [
-        "adapted:three-pierced-reset"
-      ],
+      "caseIds": ["adapted:three-pierced-reset"],
       "upstreamResult": "R3F 9.6.1 writes the default to a root leaf key when removing a pierced prop.",
       "octaneResult": "Octane restores the original nested target.",
       "rationale": "The upstream behavior targets the wrong object.",
@@ -411,9 +393,7 @@
     },
     {
       "id": "hidden-activity-raycast",
-      "caseIds": [
-        "adapted:three-hidden-activity-raycast"
-      ],
+      "caseIds": ["adapted:three-hidden-activity-raycast"],
       "upstreamResult": "R3F can raycast hidden retained descendants through visible ancestors.",
       "octaneResult": "Hidden Activity subtrees are excluded from recursive raycasts.",
       "rationale": "Three r172 raycasting does not honor Object3D.visible recursively.",
@@ -425,9 +405,7 @@
     },
     {
       "id": "root-scoped-portal-targets",
-      "caseIds": [
-        "adapted:three-root-scoped-portal-targets"
-      ],
+      "caseIds": ["adapted:three-root-scoped-portal-targets"],
       "upstreamResult": "R3F portal target lifetime is tied to reconciler ownership.",
       "octaneResult": "Target handles are root-scoped and cross-root placement is rejected before mutation.",
       "rationale": "Universal target ownership must be explicit.",
@@ -439,9 +417,7 @@
     },
     {
       "id": "synchronous-root-teardown",
-      "caseIds": [
-        "adapted:three-synchronous-teardown"
-      ],
+      "caseIds": ["adapted:three-synchronous-teardown"],
       "upstreamResult": "R3F defers registry teardown and callback delivery by 500ms.",
       "octaneResult": "Octane teardown and callback delivery are synchronous.",
       "rationale": "Octane commits teardown atomically.",
@@ -453,9 +429,7 @@
     },
     {
       "id": "octane-dom-region",
-      "caseIds": [
-        "adapted:three-dom-region"
-      ],
+      "caseIds": ["adapted:three-dom-region"],
       "upstreamResult": "R3F has no equivalent explicit-target low-level DOMRegion primitive.",
       "octaneResult": "Octane exposes DOMRegion without positioning, occlusion, styling, or layout semantics.",
       "rationale": "It proves the universal Three-to-DOM boundary without claiming Drei Html parity.",

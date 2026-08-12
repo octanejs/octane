@@ -88,14 +88,14 @@
       "reason": "Exercises Octane component integration and is not counted as React parity."
     },
     {
-      "path": "packages/radix/tests/production-bundle.test.ts",
-      "disposition": "octane-only-framework-contract",
-      "reason": "Checks published production-bundle tree-shaking and Separator rendering without unrelated primitives."
-    },
-    {
       "path": "packages/radix/tests/presence.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/radix/tests/production-bundle.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks published production-bundle tree-shaking and Separator rendering without unrelated primitives."
     },
     {
       "path": "packages/radix/tests/scroll-area.test.ts",
@@ -121,6 +121,16 @@
       "path": "packages/radix/tests/tooltip.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/radix/typetests/adapted/types.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
+    },
+    {
+      "path": "packages/radix/typetests/pristine/types.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
     }
   ]
 }

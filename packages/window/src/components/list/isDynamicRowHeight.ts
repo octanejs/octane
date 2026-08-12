@@ -1,4 +1,4 @@
-import type { DynamicRowHeight } from './types';
+import type { DynamicRowHeight } from './types.js';
 
 export function isDynamicRowHeight(value: unknown): value is DynamicRowHeight {
 	return (

@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "7197f3e0d5509ad99f0f18b45536bfb3fca68c958f9d8c11010732d7c727a324"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -60,53 +60,17 @@
         {
           "path": "packages/base-ui/audit/differential-runtime.json",
           "role": "support",
-          "sha256": "b8a95241a5035f8bfadd36a5c7ad522d454ffbcf134a776d22f769d96639d6a3"
+          "sha256": "ecbc083e683b7260cf19b815498ae8bee20dce742cf47536eb6a87405bf80505"
         },
         {
           "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
           "role": "support",
           "sha256": "bf3265b3fe5b5a48b2451cb8458e5e6554c42183478e3c78f91f58f2bbf03cdf"
-        }
-      ]
-    },
-    {
-      "id": "base-ui-adapted-upstream-full-suite",
-      "type": "adapted-octane",
-      "oracle": "required",
-      "environment": "workspace-node",
-      "project": "base-ui-upstream-adapted",
-      "evidenceOrigin": "upstream-suite",
-      "notes": "Runs every collected adapted Accordion, Collapsible, and Tabs identity (currently 49 selected cases) and rejects inventory drift. This is not the full pinned upstream suite.",
-      "execution": {
-        "kind": "vitest-full",
-        "inventory": "packages/base-ui/audit/adapted-runtime.json"
-      },
-      "files": [
-        {
-          "path": "packages/base-ui/audit/adapted-runtime.json",
-          "role": "support",
-          "sha256": "06208863d8150947c1a27f811003fadddc92d904c244f13c705305ab7d4ebeef"
         },
-        {
-          "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
-          "role": "support",
-          "sha256": "bf3265b3fe5b5a48b2451cb8458e5e6554c42183478e3c78f91f58f2bbf03cdf"
-        }
-      ]
-    },
-    {
-      "id": "base-ui-runtime-differential",
-      "type": "differential",
-      "oracle": "required",
-      "environment": "workspace-node",
-      "project": "base-ui-differential",
-      "evidenceOrigin": "repo-authored",
-      "notes": "Runs selected same-fixture cases against @octanejs/base-ui and the pinned real @base-ui/react package.",
-      "files": [
         {
           "path": "packages/base-ui/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "2dd6eada49b0f9cd0289013496b2c3536ba3034776d5ac9a1a5ea4ed9637df5a",
+          "sha256": "60eb88b4cc54c7bbd45b8ac365f8b5283cd5e304462efa64f0235fa6afced121",
           "cases": [
             {
               "id": "differential:base-ui-render-element",
@@ -163,13 +127,28 @@
       ]
     },
     {
-      "id": "base-ui-adapted-upstream",
+      "id": "base-ui-adapted-upstream-full-suite",
       "type": "adapted-octane",
       "oracle": "required",
       "environment": "workspace-node",
       "project": "base-ui-upstream-adapted",
-      "notes": "Runs selected transcriptions from the pinned Base UI Accordion and Collapsible suites.",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs every collected adapted Accordion, Collapsible, and Tabs identity (currently 49 selected cases) and rejects inventory drift. This is not the full pinned upstream suite.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/base-ui/audit/adapted-runtime.json"
+      },
       "files": [
+        {
+          "path": "packages/base-ui/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "44f227cee8df2ed4d681caa04ea92c86c0346cb789f326296ee820bea8908027"
+        },
+        {
+          "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
+          "role": "support",
+          "sha256": "bf3265b3fe5b5a48b2451cb8458e5e6554c42183478e3c78f91f58f2bbf03cdf"
+        },
         {
           "path": "packages/base-ui/tests/upstream/accordion.test.ts",
           "role": "test",

@@ -1,332 +1,330 @@
 {
-	"schemaVersion": 1,
-	"project": "intersection-observer-adapted",
-	"roots": [
-		"packages/intersection-observer/tests/upstream"
-	],
-	"files": [
-		"packages/intersection-observer/tests/upstream/InView.test.tsx",
-		"packages/intersection-observer/tests/upstream/observe.test.ts",
-		"packages/intersection-observer/tests/upstream/setup.test.ts",
-		"packages/intersection-observer/tests/upstream/useInView.test.tsx",
-		"packages/intersection-observer/tests/upstream/useOnInView.test.tsx"
-	],
-	"tests": [
-		{
-			"id": "runtime:7c881ddb27dee302",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "Should ensure node exists before observing and unobserving"
-		},
-		{
-			"id": "runtime:627a295b38d54034",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "Should handle initialInView"
-		},
-		{
-			"id": "runtime:70e3168dc12516e4",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "Should recreate observer when root change"
-		},
-		{
-			"id": "runtime:9b978dc05ca2eb76",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "Should recreate observer when rootMargin change"
-		},
-		{
-			"id": "runtime:07d479e12b3e889e",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "Should recreate observer when scrollMargin change"
-		},
-		{
-			"id": "runtime:4efecc9a1f4df7d2",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "Should recreate observer when threshold change"
-		},
-		{
-			"id": "runtime:c260d99c06700302",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "Should render <InView /> intersecting"
-		},
-		{
-			"id": "runtime:d5a9319f693da5dd",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "Should respect skip"
-		},
-		{
-			"id": "runtime:e52faa80a88646ab",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "Should unobserve old node"
-		},
-		{
-			"id": "runtime:693eec6de64aad16",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "Should unobserve when triggerOnce comes into view"
-		},
-		{
-			"id": "runtime:901904a2093ca476",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "Should unobserve when unmounted"
-		},
-		{
-			"id": "runtime:c13f04ba9fb1770a",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "plain children should not catch bubbling onChange event"
-		},
-		{
-			"id": "runtime:28de20c06256a9c4",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "should render as element"
-		},
-		{
-			"id": "runtime:5a907371b149731f",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "should render plain children"
-		},
-		{
-			"id": "runtime:8fbfa17254649ea3",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "should render with className"
-		},
-		{
-			"id": "runtime:87f04d520e6196ac",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "should render with fallback"
-		},
-		{
-			"id": "runtime:96c5c288913a844e",
-			"file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
-			"fullName": "should render with global fallback"
-		},
-		{
-			"id": "runtime:039a3f0c75500fe8",
-			"file": "packages/intersection-observer/tests/upstream/observe.test.ts",
-			"fullName": "should be able to use observe"
-		},
-		{
-			"id": "runtime:592404b745a4cabd",
-			"file": "packages/intersection-observer/tests/upstream/observe.test.ts",
-			"fullName": "should convert options to id"
-		},
-		{
-			"id": "runtime:5d6da605f191c8df",
-			"file": "packages/intersection-observer/tests/upstream/setup.test.ts",
-			"fullName": "should not warn if running in test env with global \"vi\""
-		},
-		{
-			"id": "runtime:13f2072a417926cf",
-			"file": "packages/intersection-observer/tests/upstream/setup.test.ts",
-			"fullName": "should warn if not running in test env"
-		},
-		{
-			"id": "runtime:b26843b2b7a7b9bf",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "inView should be false when component is unmounted"
-		},
-		{
-			"id": "runtime:dda23999136e00d6",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should create a hook"
-		},
-		{
-			"id": "runtime:c8ca64626fe7106c",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should create a hook inView"
-		},
-		{
-			"id": "runtime:fcc662f1be863c8b",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should create a hook with array threshold"
-		},
-		{
-			"id": "runtime:e7f7591c7a3b777f",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should create a hook with initialInView"
-		},
-		{
-			"id": "runtime:23ccbe87461255ad",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should create a hook with scrollMargin"
-		},
-		{
-			"id": "runtime:f5d5be169b967436",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should create a lazy hook"
-		},
-		{
-			"id": "runtime:c0bb0181b9e6cedf",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should handle defaultFallbackInView if unsupported"
-		},
-		{
-			"id": "runtime:4ded56f226061c62",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should handle fallback if unsupported"
-		},
-		{
-			"id": "runtime:d1152db0ceaf87fc",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should handle multiple hooks on the same element"
-		},
-		{
-			"id": "runtime:c5c9de49c9b793d5",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should handle ref merged"
-		},
-		{
-			"id": "runtime:c5e148aa660622fb",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should handle ref removed"
-		},
-		{
-			"id": "runtime:28a55810648ac806",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should handle thresholds missing on observer instance"
-		},
-		{
-			"id": "runtime:6270dce06f75ac6a",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should handle thresholds missing on observer instance with no threshold set"
-		},
-		{
-			"id": "runtime:1e16dec8edae88fa",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should handle trackVisibility"
-		},
-		{
-			"id": "runtime:6f9ea3436455084e",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should handle trackVisibility when unsupported"
-		},
-		{
-			"id": "runtime:c2d1a70cffd0593d",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should mock thresholds"
-		},
-		{
-			"id": "runtime:b9ad5d24761e16ac",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should not reset current state if changing skip"
-		},
-		{
-			"id": "runtime:6875ace99e20f519",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should respect skip"
-		},
-		{
-			"id": "runtime:82ecbd6bd3f50ebe",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should respect trigger once"
-		},
-		{
-			"id": "runtime:e4f97e39aa21ab77",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should restore the browser IntersectionObserver"
-		},
-		{
-			"id": "runtime:94d50d0f45e101f9",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should set intersection ratio as the largest threshold smaller than trigger"
-		},
-		{
-			"id": "runtime:ab0cc79c2803cf50",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should trigger a hook leaving view"
-		},
-		{
-			"id": "runtime:86ee55e24aecc32b",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should trigger all hooks when using triggerOnce with merged refs"
-		},
-		{
-			"id": "runtime:eeb4943370150fe1",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should trigger onChange"
-		},
-		{
-			"id": "runtime:b0943fae161db6a0",
-			"file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
-			"fullName": "should unmount the hook"
-		},
-		{
-			"id": "runtime:3797e506e5958427",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should call cleanup when element leaves view"
-		},
-		{
-			"id": "runtime:cca8cfec8d249342",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should call the callback when element comes into view"
-		},
-		{
-			"id": "runtime:e8f74703ebd4c014",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should create a hook with array threshold"
-		},
-		{
-			"id": "runtime:b190e16d21c1ae46",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should create a hook with useOnInView"
-		},
-		{
-			"id": "runtime:b521f1548eeff5e7",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should create a lazy hook with useOnInView"
-		},
-		{
-			"id": "runtime:5792c2936bce03e9",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should handle merged refs"
-		},
-		{
-			"id": "runtime:7fb7e26cda9dc659",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should handle multiple callbacks on the same element"
-		},
-		{
-			"id": "runtime:85cea9a1af3ebb06",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should handle ref changes"
-		},
-		{
-			"id": "runtime:5b6097f2eac19d1c",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should handle unmounting properly"
-		},
-		{
-			"id": "runtime:2fb19e33e2ca1c2a",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should ignore initial false intersection"
-		},
-		{
-			"id": "runtime:61eaf9c2f0d815cb",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should pass the element to the callback"
-		},
-		{
-			"id": "runtime:cacdc7556b3db7a7",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should respect skip option"
-		},
-		{
-			"id": "runtime:a7886ab4ba58c501",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should respect threshold values"
-		},
-		{
-			"id": "runtime:abe389626e1dbb60",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should respect triggerOnce option"
-		},
-		{
-			"id": "runtime:ad12df63c7d77a62",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should track thresholds when crossing multiple in a single update"
-		},
-		{
-			"id": "runtime:a5f1601f01321d47",
-			"file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
-			"fullName": "should track which threshold triggered the visibility change"
-		}
-	],
-	"snapshots": 0
+  "schemaVersion": 1,
+  "project": "intersection-observer-adapted",
+  "roots": ["packages/intersection-observer/tests/upstream"],
+  "files": [
+    "packages/intersection-observer/tests/upstream/InView.test.tsx",
+    "packages/intersection-observer/tests/upstream/observe.test.ts",
+    "packages/intersection-observer/tests/upstream/setup.test.ts",
+    "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+    "packages/intersection-observer/tests/upstream/useOnInView.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:7c881ddb27dee302",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "Should ensure node exists before observing and unobserving"
+    },
+    {
+      "id": "runtime:627a295b38d54034",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "Should handle initialInView"
+    },
+    {
+      "id": "runtime:70e3168dc12516e4",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "Should recreate observer when root change"
+    },
+    {
+      "id": "runtime:9b978dc05ca2eb76",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "Should recreate observer when rootMargin change"
+    },
+    {
+      "id": "runtime:07d479e12b3e889e",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "Should recreate observer when scrollMargin change"
+    },
+    {
+      "id": "runtime:4efecc9a1f4df7d2",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "Should recreate observer when threshold change"
+    },
+    {
+      "id": "runtime:c260d99c06700302",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "Should render <InView /> intersecting"
+    },
+    {
+      "id": "runtime:d5a9319f693da5dd",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "Should respect skip"
+    },
+    {
+      "id": "runtime:e52faa80a88646ab",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "Should unobserve old node"
+    },
+    {
+      "id": "runtime:693eec6de64aad16",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "Should unobserve when triggerOnce comes into view"
+    },
+    {
+      "id": "runtime:901904a2093ca476",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "Should unobserve when unmounted"
+    },
+    {
+      "id": "runtime:c13f04ba9fb1770a",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "plain children should not catch bubbling onChange event"
+    },
+    {
+      "id": "runtime:28de20c06256a9c4",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "should render as element"
+    },
+    {
+      "id": "runtime:5a907371b149731f",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "should render plain children"
+    },
+    {
+      "id": "runtime:8fbfa17254649ea3",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "should render with className"
+    },
+    {
+      "id": "runtime:87f04d520e6196ac",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "should render with fallback"
+    },
+    {
+      "id": "runtime:96c5c288913a844e",
+      "file": "packages/intersection-observer/tests/upstream/InView.test.tsx",
+      "fullName": "should render with global fallback"
+    },
+    {
+      "id": "runtime:039a3f0c75500fe8",
+      "file": "packages/intersection-observer/tests/upstream/observe.test.ts",
+      "fullName": "should be able to use observe"
+    },
+    {
+      "id": "runtime:592404b745a4cabd",
+      "file": "packages/intersection-observer/tests/upstream/observe.test.ts",
+      "fullName": "should convert options to id"
+    },
+    {
+      "id": "runtime:5d6da605f191c8df",
+      "file": "packages/intersection-observer/tests/upstream/setup.test.ts",
+      "fullName": "should not warn if running in test env with global \"vi\""
+    },
+    {
+      "id": "runtime:13f2072a417926cf",
+      "file": "packages/intersection-observer/tests/upstream/setup.test.ts",
+      "fullName": "should warn if not running in test env"
+    },
+    {
+      "id": "runtime:b26843b2b7a7b9bf",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "inView should be false when component is unmounted"
+    },
+    {
+      "id": "runtime:dda23999136e00d6",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should create a hook"
+    },
+    {
+      "id": "runtime:c8ca64626fe7106c",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should create a hook inView"
+    },
+    {
+      "id": "runtime:fcc662f1be863c8b",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should create a hook with array threshold"
+    },
+    {
+      "id": "runtime:e7f7591c7a3b777f",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should create a hook with initialInView"
+    },
+    {
+      "id": "runtime:23ccbe87461255ad",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should create a hook with scrollMargin"
+    },
+    {
+      "id": "runtime:f5d5be169b967436",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should create a lazy hook"
+    },
+    {
+      "id": "runtime:c0bb0181b9e6cedf",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should handle defaultFallbackInView if unsupported"
+    },
+    {
+      "id": "runtime:4ded56f226061c62",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should handle fallback if unsupported"
+    },
+    {
+      "id": "runtime:d1152db0ceaf87fc",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should handle multiple hooks on the same element"
+    },
+    {
+      "id": "runtime:c5c9de49c9b793d5",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should handle ref merged"
+    },
+    {
+      "id": "runtime:c5e148aa660622fb",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should handle ref removed"
+    },
+    {
+      "id": "runtime:28a55810648ac806",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should handle thresholds missing on observer instance"
+    },
+    {
+      "id": "runtime:6270dce06f75ac6a",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should handle thresholds missing on observer instance with no threshold set"
+    },
+    {
+      "id": "runtime:1e16dec8edae88fa",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should handle trackVisibility"
+    },
+    {
+      "id": "runtime:6f9ea3436455084e",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should handle trackVisibility when unsupported"
+    },
+    {
+      "id": "runtime:c2d1a70cffd0593d",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should mock thresholds"
+    },
+    {
+      "id": "runtime:b9ad5d24761e16ac",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should not reset current state if changing skip"
+    },
+    {
+      "id": "runtime:6875ace99e20f519",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should respect skip"
+    },
+    {
+      "id": "runtime:82ecbd6bd3f50ebe",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should respect trigger once"
+    },
+    {
+      "id": "runtime:e4f97e39aa21ab77",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should restore the browser IntersectionObserver"
+    },
+    {
+      "id": "runtime:94d50d0f45e101f9",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should set intersection ratio as the largest threshold smaller than trigger"
+    },
+    {
+      "id": "runtime:ab0cc79c2803cf50",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should trigger a hook leaving view"
+    },
+    {
+      "id": "runtime:86ee55e24aecc32b",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should trigger all hooks when using triggerOnce with merged refs"
+    },
+    {
+      "id": "runtime:eeb4943370150fe1",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should trigger onChange"
+    },
+    {
+      "id": "runtime:b0943fae161db6a0",
+      "file": "packages/intersection-observer/tests/upstream/useInView.test.tsx",
+      "fullName": "should unmount the hook"
+    },
+    {
+      "id": "runtime:3797e506e5958427",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should call cleanup when element leaves view"
+    },
+    {
+      "id": "runtime:cca8cfec8d249342",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should call the callback when element comes into view"
+    },
+    {
+      "id": "runtime:e8f74703ebd4c014",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should create a hook with array threshold"
+    },
+    {
+      "id": "runtime:b190e16d21c1ae46",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should create a hook with useOnInView"
+    },
+    {
+      "id": "runtime:b521f1548eeff5e7",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should create a lazy hook with useOnInView"
+    },
+    {
+      "id": "runtime:5792c2936bce03e9",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should handle merged refs"
+    },
+    {
+      "id": "runtime:7fb7e26cda9dc659",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should handle multiple callbacks on the same element"
+    },
+    {
+      "id": "runtime:85cea9a1af3ebb06",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should handle ref changes"
+    },
+    {
+      "id": "runtime:5b6097f2eac19d1c",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should handle unmounting properly"
+    },
+    {
+      "id": "runtime:2fb19e33e2ca1c2a",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should ignore initial false intersection"
+    },
+    {
+      "id": "runtime:61eaf9c2f0d815cb",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should pass the element to the callback"
+    },
+    {
+      "id": "runtime:cacdc7556b3db7a7",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should respect skip option"
+    },
+    {
+      "id": "runtime:a7886ab4ba58c501",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should respect threshold values"
+    },
+    {
+      "id": "runtime:abe389626e1dbb60",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should respect triggerOnce option"
+    },
+    {
+      "id": "runtime:ad12df63c7d77a62",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should track thresholds when crossing multiple in a single update"
+    },
+    {
+      "id": "runtime:a5f1601f01321d47",
+      "file": "packages/intersection-observer/tests/upstream/useOnInView.test.tsx",
+      "fullName": "should track which threshold triggered the visibility change"
+    }
+  ],
+  "snapshots": 0
 }

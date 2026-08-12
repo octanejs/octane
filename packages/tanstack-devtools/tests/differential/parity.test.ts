@@ -1,7 +1,10 @@
 import { act as reactAct } from 'react';
 import { drainPassiveEffects, flushSync as octaneFlushSync } from 'octane';
 import { describe, expect, it, vi } from 'vitest';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 import { resolve } from 'node:path';
 
 interface FakeCore {
@@ -47,6 +50,8 @@ function coreFor(container: HTMLElement): FakeCore {
 	if (!core) throw new Error('missing core for differential container');
 	return core;
 }
+
+await Promise.all([preloadDifferentialFixture(fixture, cache)]);
 
 describe('differential: @octanejs/tanstack-devtools vs @tanstack/react-devtools', function differentialSuite() {
 	// @parity-case differential:tanstack-devtools-portal-lifecycle

@@ -165,10 +165,7 @@ test('rejects an unauthorized adapted type signature change', async function rej
 	const source = await readFile(file, 'utf8');
 	await writeFile(
 		file,
-		source.replace(
-			'name: string | PluginRender;',
-			'name: string | PluginRender | number;',
-		),
+		source.replace('name: string | PluginRender;', 'name: string | PluginRender | number;'),
 	);
 	assert.throws(function run() {
 		buildTypeInventories(value.root);
@@ -184,7 +181,10 @@ test('rejects an unauthorized adapted implementation body change', async functio
 	const source = await readFile(file, 'utf8');
 	await writeFile(
 		file,
-		source.replace('devtools.mount(devToolRef.current);', 'devtools.mount(devToolRef.current); void 0;'),
+		source.replace(
+			'devtools.mount(devToolRef.current);',
+			'devtools.mount(devToolRef.current); void 0;',
+		),
 	);
 	assert.throws(function run() {
 		buildTypeInventories(value.root);

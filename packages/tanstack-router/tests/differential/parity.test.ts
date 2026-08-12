@@ -9,12 +9,17 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/router-diff.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
 
 const settle = () => new Promise((r) => setTimeout(r, 25));
+
+await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
 
 describe('differential: @octanejs/tanstack-router vs real @tanstack/react-router', () => {
 	// @parity-case differential:tanstack-router-initial

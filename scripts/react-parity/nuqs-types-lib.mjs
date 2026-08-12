@@ -71,10 +71,7 @@ export function verifyTypeProjectMembership(baseRoot, config, inventory) {
 			.sort();
 		const selectedProbes = included
 			.filter(function keepProbe(fileName) {
-				return (
-					fileName.startsWith(`${suiteRoot}/`) &&
-					fileName.endsWith('.test-d.ts')
-				);
+				return fileName.startsWith(`${suiteRoot}/`) && fileName.endsWith('.test-d.ts');
 			})
 			.sort();
 		if (JSON.stringify(selectedProbes) !== JSON.stringify(expected)) {

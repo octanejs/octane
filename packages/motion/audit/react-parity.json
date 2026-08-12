@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "4800c8e2801f0faafb4c585e62340db66d9ff29492c13ef57b5a118e4749eb67"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -72,7 +72,7 @@
         {
           "path": "scripts/react-parity/jest-full-runner.mjs",
           "role": "support",
-          "sha256": "e6b4e02afb9953e3d469a026d21e0d4dbb9244debcf352926b017144fa6efacf"
+          "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
         },
         {
           "path": "packages/motion/upstream/SHA256SUMS",
@@ -319,7 +319,7 @@
         {
           "path": "packages/motion/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "25b95fd1162b2298510741cfa9842ee259b2bd1ea8535951f28199d5657d0caa",
+          "sha256": "76d3e46e5034ce79ff7ba442dc7615ed00549bd04689504aeaa37b0035f831b1",
           "cases": [
             {
               "id": "differential:motion-render",
@@ -342,6 +342,52 @@
           "path": "packages/motion/tests/_fixtures/render-diff.tsrx",
           "role": "support",
           "sha256": "8ba1063957f73ac5383fc83ed4032a144d3f64fb6f70fb3afd58711eac0794fb"
+        }
+      ]
+    }
+  ],
+  "ordinaryEvidence": [
+    {
+      "path": "packages/motion/tests/conformance/exit.test.ts",
+      "sha256": "0b27f6d201fe78402600854568860e1e53863f22d8777e957a21c32ad9a12b17",
+      "cases": [
+        {
+          "id": "conformance:exit-cleanup-before-detach",
+          "testName": "animates a clone of the leaving element, removing it when the exit finishes",
+          "fullName": "AnimatePresence exit animations animates a clone of the leaving element, removing it when the exit finishes"
+        }
+      ]
+    },
+    {
+      "path": "packages/motion/tests/conformance/layout.test.ts",
+      "sha256": "15b62d0b32a107d9cc24d535d9caf4157e4f7fb75eecb4250f0794be5e20fc5e",
+      "cases": [
+        {
+          "id": "conformance:bounded-layout-flip",
+          "testName": "FLIPs from the old box to the new when layout changes between renders",
+          "fullName": "layout (FLIP) FLIPs from the old box to the new when layout changes between renders"
+        }
+      ]
+    },
+    {
+      "path": "packages/motion/tests/conformance/layoutId.test.ts",
+      "sha256": "ac080b2e7fb310b363eb06c35f4f6e62e060b7220354bd9581f5c8c8fd99c3ba",
+      "cases": [
+        {
+          "id": "conformance:bounded-layoutId",
+          "testName": "FLIPs a newly-mounted element from a same-id element that just unmounted",
+          "fullName": "layoutId (shared-element crossfade) FLIPs a newly-mounted element from a same-id element that just unmounted"
+        }
+      ]
+    },
+    {
+      "path": "packages/motion/tests/conformance/initial-only.test.ts",
+      "sha256": "1754773467e3cbe7cd48880f641fa59f8a7ebb0da6e0c589c8fe022a03638571",
+      "cases": [
+        {
+          "id": "conformance:initial-only-no-style-materialization",
+          "testName": "does not materialize inline styles for an initial target without animate",
+          "fullName": "initial-only style materialization does not materialize inline styles for an initial target without animate"
         }
       ]
     }

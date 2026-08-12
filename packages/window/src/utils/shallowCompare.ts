@@ -1,4 +1,4 @@
-import { assert } from './assert';
+import { assert } from './assert.js';
 
 export function shallowCompare<Type extends object>(a: Type | undefined, b: Type | undefined) {
 	if (a === b) {

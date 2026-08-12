@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import ts from 'typescript';
 
-export const TYPE_PARITY_CONFIG = 'packages/react-draggable/audit/type-parity.json';
+export const TYPE_PARITY_CONFIG = 'packages/draggable/audit/type-parity.json';
 
 function sha256(value) {
 	return createHash('sha256').update(value).digest('hex');
@@ -11,22 +11,22 @@ function sha256(value) {
 
 function packageRootFrom(rootOrPackage, options = {}) {
 	if (options.packageRoot) return resolve(options.packageRoot);
-	const candidate = resolve(rootOrPackage, 'packages/react-draggable');
+	const candidate = resolve(rootOrPackage, 'packages/draggable');
 	if (existsSync(resolve(candidate, 'audit/type-parity.json'))) return candidate;
 	return resolve(rootOrPackage);
 }
 
 function toPackageRelative(path, packageRoot, repoRoot) {
-	if (path.startsWith('packages/react-draggable/')) {
-		return path.slice('packages/react-draggable/'.length);
+	if (path.startsWith('packages/draggable/')) {
+		return path.slice('packages/draggable/'.length);
 	}
 	if (path.startsWith(packageRoot)) {
 		return path.slice(packageRoot.length + 1);
 	}
 	if (repoRoot && path.startsWith(repoRoot)) {
 		const relative = path.slice(repoRoot.length + 1);
-		if (relative.startsWith('packages/react-draggable/')) {
-			return relative.slice('packages/react-draggable/'.length);
+		if (relative.startsWith('packages/draggable/')) {
+			return relative.slice('packages/draggable/'.length);
 		}
 	}
 	return path;

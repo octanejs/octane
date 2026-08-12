@@ -17,12 +17,8 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/tanstack-devtools/src"
-      ],
-      "include": [
-        "\\.(?:ts|tsx|tsrx)$"
-      ],
+      "roots": ["packages/tanstack-devtools/src"],
+      "include": ["\\.(?:ts|tsx|tsrx)$"],
       "exclude": []
     },
     "tests": {
@@ -30,9 +26,7 @@
         "packages/tanstack-devtools/tests/differential",
         "packages/tanstack-devtools/tests/parity"
       ],
-      "include": [
-        "\\.test\\.ts$"
-      ],
+      "include": ["\\.test\\.ts$"],
       "exclude": []
     }
   },
@@ -49,7 +43,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "89660b8631a2c1e1cdcd6007dbc0524abb97a634a03882d6f8d83f11f689bb2f"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -65,7 +59,7 @@
         {
           "path": "packages/tanstack-devtools/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "b19a53a07211e8e7217271c790842bd9b591bd76af2ffb4f2f3cdf05b670ae9d",
+          "sha256": "8f3af085bee24bafb5f67b5b4f197bdef39b8071556e87fce685a86cd20c2e08",
           "cases": [
             {
               "id": "differential:tanstack-devtools-portal-lifecycle",
@@ -87,7 +81,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "packages/tanstack-devtools/upstream/SHA256SUMS",
@@ -102,7 +96,7 @@
         {
           "path": "packages/tanstack-devtools/audit/test-classifications.json",
           "role": "support",
-          "sha256": "720307629080614789a863f26dbfc90d42e57aacb4fd5481d4afa1854f7b9ded"
+          "sha256": "03811e16ad3872d28cb017be15d0a44f3eb59c4f3c073015e6cf3546d2d74504"
         },
         {
           "path": "packages/tanstack-devtools/scripts/check-upstream-ledger.mjs",
@@ -112,12 +106,12 @@
         {
           "path": "scripts/react-parity/tanstack-devtools-controls.test.mjs",
           "role": "support",
-          "sha256": "1b6ae214ec680bfd97c4747d73a55bd6e4dc49bf4fcc6af93ff1e5d7341f00ee"
+          "sha256": "ea0a000cf73587f0ae6747234e830787363f16ae7236c628ce6f72caa96d4ee9"
         },
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "810dcd9bd2482fef95b9338b55096b908041098f7f991e7ae6d1f77289cbec9d"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },
@@ -203,12 +197,12 @@
         {
           "path": "scripts/react-parity/tanstack-devtools-types-lib.mjs",
           "role": "support",
-          "sha256": "c8408a8104b2260d53d548f37e89928137fa9d8b5c95fbf6fc54df5eb23acfc7"
+          "sha256": "651c16bac94db8e76c669fc2fa3efad3376b4aaf0b371ca42961dfc477a68835"
         },
         {
           "path": "scripts/react-parity/tanstack-devtools-types-lib.test.mjs",
           "role": "support",
-          "sha256": "45bc78e0fb8406679e08a8db836d69edea95b7797fa0c4b3bea7406736c3b123"
+          "sha256": "28cac2e752560b95f44fc72232550a733b5e750de4c8a1d682edac26ac7a241d"
         },
         {
           "path": "packages/tanstack-devtools/audit/type-probes/public-api.test-d.ts",
@@ -223,22 +217,45 @@
         {
           "path": "packages/tanstack-devtools/audit/upstream-types.json",
           "role": "support",
-          "sha256": "c705d5c7869f7b77cececdca8e5a7f6e7b44c48ed9fbb26d025abf48bfc9beee"
+          "sha256": "62d90a8e165ed49292255e32270163c30721f13fcbe56c8eeb01dc4d79fe07f0"
         },
         {
           "path": "packages/tanstack-devtools/audit/adapted-types.json",
           "role": "support",
-          "sha256": "6e9ff04de2c14ebf15de6842016565aaec947cf25333fcf5b542c2f1c42bb698"
+          "sha256": "5dc34e142311bacbd95a8e4b1c4a34bb56d15bcb063a2b57f2c2e9973e38ce30"
         },
         {
           "path": "packages/tanstack-devtools/audit/upstream-probe-types.json",
           "role": "support",
-          "sha256": "73e79980716fbb4522a7adfabfb098e959eebb391d7c8937ba53d774c07da062"
+          "sha256": "ff8a3cae965397ff1515396cb608ab03c037f582a77bb4b62089a7345f2e8ff6"
         },
         {
           "path": "packages/tanstack-devtools/audit/adapted-probe-types.json",
           "role": "support",
-          "sha256": "27a3da23bcb9d30db2cfe8165c75a507d83377f2617409499d3218f2ce1b1608"
+          "sha256": "d48c2cb062acb6d1ef89427bb916b6ce0e97bd321b9fd492ec734c068c77bc9f"
+        }
+      ]
+    }
+  ],
+  "ordinaryEvidence": [
+    {
+      "path": "packages/tanstack-devtools/tests/parity/divergences.test.ts",
+      "sha256": "d6ea15922740825e91827e586e4a3f5a6d8ab7bfe572a0fafd7011742e475f59",
+      "cases": [
+        {
+          "id": "conformance:tanstack-devtools-core-version",
+          "testName": "records the framework-neutral core version drift",
+          "fullName": "@octanejs/tanstack-devtools divergence contracts records the framework-neutral core version drift"
+        },
+        {
+          "id": "conformance:tanstack-devtools-octane-type-names",
+          "testName": "records the Octane-prefixed public adapter type names",
+          "fullName": "@octanejs/tanstack-devtools divergence contracts records the Octane-prefixed public adapter type names"
+        },
+        {
+          "id": "conformance:tanstack-devtools-extra-core-reexports",
+          "testName": "records the additional framework-neutral core re-exports",
+          "fullName": "@octanejs/tanstack-devtools divergence contracts records the additional framework-neutral core re-exports"
         }
       ]
     }
@@ -246,9 +263,7 @@
   "divergences": [
     {
       "id": "core-version",
-      "caseIds": [
-        "conformance:tanstack-devtools-core-version"
-      ],
+      "caseIds": ["conformance:tanstack-devtools-core-version"],
       "upstreamResult": "The pinned React adapter publishes with @tanstack/devtools 0.12.4 (from @tanstack/react-devtools package.json).",
       "octaneResult": "The Octane package resolves @tanstack/devtools from the workspace catalog (currently 0.12.5).",
       "rationale": "The workspace catalog had advanced before this audit; silently downgrading the shared core is outside this harness PR.",
@@ -260,9 +275,7 @@
     },
     {
       "id": "octane-type-names",
-      "caseIds": [
-        "conformance:tanstack-devtools-octane-type-names"
-      ],
+      "caseIds": ["conformance:tanstack-devtools-octane-type-names"],
       "upstreamResult": "Adapter types are named TanStackDevtoolsReactPlugin and TanStackDevtoolsReactInit.",
       "octaneResult": "Adapter types are named TanStackDevtoolsOctanePlugin and TanStackDevtoolsOctaneInit.",
       "rationale": "Framework-specific public type names identify the runtime they describe.",
@@ -274,9 +287,7 @@
     },
     {
       "id": "extra-core-reexports",
-      "caseIds": [
-        "conformance:tanstack-devtools-extra-core-reexports"
-      ],
+      "caseIds": ["conformance:tanstack-devtools-extra-core-reexports"],
       "upstreamResult": "The React adapter exports only the component and React adapter types.",
       "octaneResult": "Octane additionally re-exports framework-neutral core values and types.",
       "rationale": "Existing Octane consumers use the binding as the plugin-authoring type boundary.",

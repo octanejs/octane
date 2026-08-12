@@ -1,6 +1,6 @@
 import { useState } from 'octane';
-import { animated, useReducedMotion, useSpring, useTransition } from '@octanejs/react-spring';
-import { Parallax, ParallaxLayer } from '@octanejs/react-spring/parallax';
+import { animated, useReducedMotion, useSpring, useTransition } from '@octanejs/spring';
+import { Parallax, ParallaxLayer } from '@octanejs/spring/parallax';
 
 export function ReactSpringDemo() @{
 	const [target, setTarget] = useState(24);

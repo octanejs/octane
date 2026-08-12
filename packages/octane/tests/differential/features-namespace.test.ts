@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 const FEATURES = resolve(__dirname, '../_fixtures/tsrx-features.tsrx');
 const BASIC = resolve(__dirname, '../_fixtures/basic.tsrx');
+
+await Promise.all([preloadDifferentialFixture(FEATURES), preloadDifferentialFixture(BASIC)]);
 
 // ---------------------------------------------------------------------------
 // TSRX feature surface — spread, boolean/numeric/shorthand/namespaced attrs,

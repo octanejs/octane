@@ -1,9 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "base-ui-upstream-adapted",
-  "roots": [
-    "packages/base-ui/tests/upstream"
-  ],
+  "roots": ["packages/base-ui/tests/upstream"],
   "files": [
     "packages/base-ui/tests/upstream/accordion.test.ts",
     "packages/base-ui/tests/upstream/collapsible.test.ts",

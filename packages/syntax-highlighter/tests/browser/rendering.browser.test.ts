@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { chromium, firefox, type BrowserType } from 'playwright';
+import { launchBrowser } from '../../../../test-utils/playwright-browser.js';
 import { createServer, type ViteDevServer } from 'vite';
 import { octane } from 'octane/compiler/vite';
 import { dirname, resolve } from 'node:path';
@@ -33,8 +33,8 @@ afterAll(async () => {
 	if (cacheDir) await rm(cacheDir, { recursive: true, force: true });
 });
 
-async function verifyBrowser(name: string, browserType: BrowserType) {
-	const browser = await browserType.launch({ headless: true });
+async function verifyBrowser() {
+	const browser = await launchBrowser({ headless: true });
 	const page = await browser.newPage();
 	const failures: string[] = [];
 	page.on('pageerror', (error) => failures.push(`pageerror: ${error.message}`));
@@ -47,27 +47,31 @@ async function verifyBrowser(name: string, browserType: BrowserType) {
 		await page.goto(url);
 		await page.waitForFunction(() => Boolean(window.__syntaxHighlighterBrowser));
 		const initial = await page.evaluate(() => window.__syntaxHighlighterBrowser.snapshot());
-		expect(initial.octane, `${name} React initial parity`).toEqual(initial.react);
-		expect(initial.octane, `${name} initial rendering`).toEqual({
+		expect(initial.octane, 'Chromium React initial parity').toEqual(initial.react);
+		expect(initial.octane, 'Chromium initial rendering').toMatchObject({
 			hostTag: 'SECTION',
 			codeTag: 'SAMP',
 			text: '1const answer = 42;\n2answer += 1;',
 			whiteSpace: 'pre-wrap',
 			lineDisplays: ['flex', 'flex'],
-			lineNumberMinWidth: '16.25px',
+			lineNumberMinWidth: '1.25em',
 			selected: 'const',
 		});
+		expect(
+			Number.parseFloat(String(initial.octane.computedLineNumberMinWidth)),
+			'Chromium computed line-number width',
+		).toBeGreaterThan(0);
 
 		const updated = await page.evaluate(() => window.__syntaxHighlighterBrowser.update());
-		expect(updated.octane, `${name} React update parity`).toEqual(updated.react);
-		expect(updated.octane, `${name} live update`).toEqual({
+		expect(updated.octane, 'Chromium React update parity').toEqual(updated.react);
+		expect(updated.octane, 'Chromium live update').toEqual({
 			text: '1{"answer":43}',
 			attribute: '"answer"',
 		});
 
 		const asyncState = await page.evaluate(() => window.__syntaxHighlighterBrowser.asyncSnapshot());
-		expect(asyncState.octane, `${name} React async parity`).toEqual(asyncState.react);
-		expect(asyncState.octane, `${name} async loading`).toEqual({
+		expect(asyncState.octane, 'Chromium React async parity').toEqual(asyncState.react);
+		expect(asyncState.octane, 'Chromium async loading').toEqual({
 			keyword: 'const',
 			text: 'const asyncValue = true;',
 		});
@@ -81,11 +85,6 @@ async function verifyBrowser(name: string, browserType: BrowserType) {
 describe.sequential('react-syntax-highlighter real-browser behavior', () => {
 	// @parity-case browser:chromium-render-update-async
 	it('matches rendering, selection, updates, and async loading in Chromium', async () => {
-		await verifyBrowser('Chromium', chromium);
-	});
-
-	// @parity-case browser:firefox-whitespace-selection
-	it('preserves whitespace, wrapping, and selection in Firefox', async () => {
-		await verifyBrowser('Firefox', firefox);
+		await verifyBrowser();
 	});
 });

@@ -45,6 +45,11 @@
       "path": "packages/dexie/tests/ssr/server.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks non-suspending server defaults without opening IndexedDB."
+    },
+    {
+      "path": "packages/dexie/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
     }
   ]
 }

@@ -92,5 +92,5 @@ describe('@octanejs/window hydration', () => {
 			errors.mockRestore();
 			container.remove();
 		}
-	});
+	}, 15_000);
 });

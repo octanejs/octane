@@ -2,7 +2,10 @@ import { resolve } from 'node:path';
 import { act as reactAct } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { drainPassiveEffects } from 'octane';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const fixture = resolve(__dirname, '../_fixtures/pacer-diff.tsrx');
 const cache = resolve(__dirname, '.react-cache');
@@ -30,6 +33,8 @@ afterEach(function () {
 	vi.clearAllTimers();
 	vi.useRealTimers();
 });
+
+await Promise.all([preloadDifferentialFixture(fixture, cache)]);
 
 describe('differential: @octanejs/tanstack-pacer vs @tanstack/react-pacer', () => {
 	// @parity-case differential:tanstack-pacer-scheduler-lifecycle

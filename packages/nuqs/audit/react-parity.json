@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3a182f6a9f209e25cb84876a6cbdc24a1f0cab6d3acc6e13938922a1c59ec6fd"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -56,7 +56,7 @@
         {
           "path": "packages/nuqs/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "89e0b2699184a7f8f26806c6d3bf0d3e5d238b14ea7de848b00e380e365cc191",
+          "sha256": "d329e069845ec0bf3c10a8fb04d2aba84b15553e31a65f1a492634a0e71bacd0",
           "cases": [
             {
               "id": "differential:nuqs-query-state",
@@ -83,12 +83,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "4efeb25e04ae056b4d3b39cf4f3b8e08037a79afdf9aa164c29ee4e05c6ba7e6"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },
@@ -143,7 +143,7 @@
       "environment": "workspace-node",
       "project": "nuqs-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Repo-authored adapted public-API typetests. Structural verification permits only the nuqs \u2192 @octanejs/nuqs import transformation against the pristine pair.",
+      "notes": "Repo-authored adapted public-API typetests. Structural verification permits only the nuqs → @octanejs/nuqs import transformation against the pristine pair.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",
@@ -176,6 +176,46 @@
           "path": "packages/nuqs/audit/type-parity.json",
           "role": "support",
           "sha256": "3514a7776973b1eb1ad4b9a2a160668a9f28d6394d4203fba6f459ec0d09a4ac"
+        }
+      ]
+    }
+  ],
+  "ordinaryEvidence": [
+    {
+      "path": "packages/nuqs/tests/parity/divergences.test.ts",
+      "sha256": "d98c65625978e8c79bd2e2ecf2237521e18627a344b1a3034822c1c77f28ec41",
+      "cases": [
+        {
+          "id": "conformance:nuqs-router-adapters",
+          "testName": "exports only the standalone, custom, and testing adapters",
+          "fullName": "@octanejs/nuqs documented integration divergences exports only the standalone, custom, and testing adapters"
+        },
+        {
+          "id": "conformance:nuqs-transition-type",
+          "testName": "declares TransitionStartFunction without a React type dependency",
+          "fullName": "@octanejs/nuqs documented integration divergences declares TransitionStartFunction without a React type dependency"
+        }
+      ]
+    },
+    {
+      "path": "packages/nuqs/tests/parity/rsc-cache.test.ts",
+      "sha256": "a9a4fc0ae72a0a01c2154d3e6deb396e6688b25fe6c7169f0e536a8e30903acc",
+      "cases": [
+        {
+          "id": "conformance:nuqs-rsc-cache",
+          "testName": "does NOT ship createSearchParamsCache (RSC-only, see status.json)",
+          "fullName": "server entry does NOT ship createSearchParamsCache (RSC-only, see status.json)"
+        }
+      ]
+    },
+    {
+      "path": "packages/nuqs/tests/conformance/reset-queue.test.ts",
+      "sha256": "9b10c6da93cd9c9ac53760cb7412e20fe5c85949737670a0bd3087b6f81c6daa",
+      "cases": [
+        {
+          "id": "conformance:nuqs-testing-reset",
+          "testName": "does not drop a pending debounced write when a re-render happens before it flushes",
+          "fullName": "NuqsTestingAdapter shared-queue reset does not drop a pending debounced write when a re-render happens before it flushes"
         }
       ]
     }

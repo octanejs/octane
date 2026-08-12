@@ -9,7 +9,11 @@ import * as React from 'react';
 import { act } from 'react';
 import { createRoot as reactCreateRoot } from 'react-dom/client';
 import { createRoot as octaneCreateRoot, flushSync as octaneFlushSync } from 'octane';
-import { mountDifferential, normaliseHtml } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+	normaliseHtml,
+} from '../../../octane/tests/differential/_rig.js';
 import { clearConsoleErrors, consoleErrorCalls } from '../_setup.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/cmdk-diff.tsrx');
@@ -162,6 +166,8 @@ function expectEqualIgnoringActiveDescendant(
 		normaliseHtml(strip(react.container.innerHTML)),
 	);
 }
+
+await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
 
 describe('differential: @octanejs/cmdk vs cmdk@1.1.1', function () {
 	// @parity-case differential:cmdk-filter-selection-empty

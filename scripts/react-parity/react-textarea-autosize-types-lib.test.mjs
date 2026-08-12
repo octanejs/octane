@@ -25,11 +25,9 @@ async function fixture() {
 		upstreamRoot,
 		{ recursive: true },
 	);
-	await cp(
-		new URL('../../packages/textarea-autosize/typetests', import.meta.url),
-		adaptedRoot,
-		{ recursive: true },
-	);
+	await cp(new URL('../../packages/textarea-autosize/typetests', import.meta.url), adaptedRoot, {
+		recursive: true,
+	});
 	await writeFile(
 		join(upstreamRoot, 'tsconfig.pristine.json'),
 		`${JSON.stringify({ ...SIMPLE_TSCONFIG, include: ['./public-api.test-d.ts'] }, null, 2)}\n`,
@@ -113,9 +111,7 @@ test('rejects retargeting an adapted public import', async function rejectsRetar
 	}, /change outside the permitted transformations/);
 });
 
-test('rejects inventoried probes missing from the compiler program', async function rejectsOutsideProgram(
-	t,
-) {
+test('rejects inventoried probes missing from the compiler program', async function rejectsOutsideProgram(t) {
 	const value = await fixture();
 	t.after(function cleanup() {
 		return rm(value.root, { recursive: true, force: true });

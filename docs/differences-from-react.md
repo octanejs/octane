@@ -548,6 +548,83 @@ Strings, numbers, arrays, objects, and nesting compose at every client and SSR
 apply site with byte-identical results. A nullish or `false` result removes the
 attribute; an empty string writes `class=""`.
 
+## Context: callable provider object, no Consumer
+
+`createContext` returns a context that is itself the provider component —
+React 19's `<MyContext value={…}>` form is the native shape, and
+`MyContext.Provider` is retained as an identity alias for React-18-shaped
+libraries. The render-prop `<MyContext.Consumer>` does not exist and will not
+be added: Octane's slot-keyed hooks make `use(MyContext)`/`useContext` legal
+behind any condition, which is the pattern Consumer existed to work around.
+Read the context in the child (or an inline component) instead.
+
+In development, accessing `.Consumer` logs a one-time migration diagnostic and
+still returns `undefined`, so feature probes (`MyContext.Consumer || fallback`)
+behave exactly as in production. The upstream Consumer test scenarios that
+protect observable behavior (defaults, propagation, bailout, hidden subtrees,
+suspended boundaries) are ported with `useContext`-reading components; the
+scenarios that exist only to exercise the render-prop API surface are recorded
+as non-goals in the parity ledger.
+
+## Document metadata and Float resources
+
+Hoisted `<title>`/`<meta>`/`<link>` follow React 19's model with two
+differences:
+
+- **Ownership is per compile site, not per content.** Each authored element
+  owns one head element; two components (or two renders of one component list
+  item) each rendering `<meta name="description">` produce two tags, where
+  React dedupes links by href and treats `<title>` as a singleton. An
+  element's tag updates reactively and is removed when its owning scope
+  unmounts.
+- **`<title>` accepts any children Octane can stringify** — multiple children
+  and expressions concatenate. React 19 errors on non-string title children.
+
+Metadata and resources hoist from ANY depth, matching React: an element
+nested inside a host partitions out of the body on both the client and the
+server, and a hoist inside an `@if` arm registers only while that arm renders.
+
+React Float **resources** are supported with React's semantics:
+
+- `<link rel="stylesheet" href precedence>` (no `onLoad`/`onError`) is a
+  global resource: deduped by href across the page, hoisted into
+  `document.head` with a `data-precedence` attribute, grouped by precedence in
+  first-encounter order (later same-precedence sheets append to their group),
+  and retained after unmount. First instance wins; later differing props do
+  not retarget a live sheet.
+- `<script async src>` (no children/handlers) hoists and dedupes by src, and
+  is likewise never removed.
+- `<style href precedence>` is a STYLE RESOURCE: its plain CSS ships by href
+  identity, sharing the stylesheet dedupe namespace and precedence-group
+  ordering with link resources (`data-precedence`/`data-href` mark the tags).
+  The CSS is NOT scoped — every other `<style>` in a component still belongs
+  to Octane's scoped-CSS system. Two adaptations: Octane emits one `<style>`
+  tag per resource rather than merging same-precedence rules into a single tag
+  (grouping and order are preserved), and CSS containing `</style` fails
+  closed in SSR with a development diagnostic (raw-text serialization cannot
+  escape it; the client inserts via `textContent`, which is always safe).
+- `preloadModule`/`preinitModule` join `preload`/`preinit`/`preconnect`/
+  `prefetchDNS`.
+- Classification is static: a spread-carried `precedence`/`async` keeps the
+  ordinary element path, matching the compile-time head-hoist model.
+
+Out of scope, deliberately: **suspensey commits** (React's
+suspend-until-the-stylesheet-loads behavior; Octane inserts the sheet and
+continues).
+
+Resource hints share the Float identity model: `preinit(href, {as: 'style'})`
+IS a stylesheet resource (it honors a `precedence` option, default
+`"default"`, joins the precedence groups, and dedupes against
+`<link rel="stylesheet" precedence>`), `preinit(as: 'script')` dedupes against
+`<script async src>`, and a `preload`/`preloadModule` issued after the
+matching init is a no-op (the upgrade is one-way: preload-then-init keeps both
+tags). Image preloads carrying `imageSrcSet` key on the srcset+sizes pair
+rather than the fallback href. Malformed calls (missing/invalid `as`, empty
+href) warn in development and stay no-ops. Options serialize through a lenient
+attribute pass-through (`fetchPriority`, `imageSrcSet`, `imageSizes`, `media`,
+`integrity`, … all emit their canonical attributes); unknown option keys are
+passed through as attributes rather than dropped.
+
 ## Reconciler: LIS moves, identical results
 
 The keyed reconciler minimizes DOM moves (LIS) instead of React's
@@ -590,6 +667,13 @@ Other consequences:
 - `useSyncExternalStore` skips React's commit-time getSnapshot re-read for
   unchanged values (the concurrent-interleaving window it guards doesn't exist
   here).
+- A hidden `<Activity>` subtree renders synchronously in the same pass — there
+  is no offscreen/idle lane deprioritizing hidden work. Hide/reveal semantics
+  (state preserved, effects unmounted while hidden) match React.
+- `useId` generates `:<prefix>in-<n>:` identifiers (React 19.2 uses
+  `_r_<n>_`). Both are opaque; only the format differs.
+- `version` reports Octane's own package version (`0.x`), not a React version —
+  ported code gating on `version >= '19'` must not rely on it.
 
 ## Parallel `use()`: no suspense waterfalls
 
@@ -713,6 +797,13 @@ const Chart = lazy(() =>
 );
 ```
 
+Creating a lazy wrapper does not call its loader. When an independently
+reachable sibling suspends, Octane may start the lazy module's existing loader
+early so its code loads alongside the pending work. The loader still runs only
+once per wrapper, and its resolved component and default-export getter are not
+evaluated until that component actually renders. Discovery does not cross a
+dormant deferred-hydration boundary.
+
 Nested lazy wrappers are rejected.
 
 React's Suspense and ViewTransition values are exotic element types and React
@@ -733,8 +824,22 @@ behavior.
 `@catch (error, reset)` and the JSX `<ErrorBoundary>` replace class
 error-boundary lifecycles. Catch fallbacks mount fresh nodes (like React's
 `forceUnmountCurrentAndReconcile`); deletion-phase and ref-detach errors route
-to the enclosing boundary. Uncaught errors surface through `console.error`
-rather than `onUncaughtError`.
+to the enclosing boundary.
+
+React 19's root error-callback options are supported on `createRoot` and
+`hydrateRoot`: `onCaughtError` (a boundary claimed an error from the render,
+passive-effect, or ref-attach channel), `onUncaughtError` (no boundary claimed
+it — providing the callback replaces the default report, which otherwise
+rethrows render errors out of the flush and `console.error`s effect-channel
+errors; the failed root's tree still unmounts), and `onRecoverableError`
+(hydration recovered from a structural mismatch — see the hydration section).
+Each callback receives only the error: there is no `errorInfo`/`componentStack`
+second argument, matching the documented SSR `onError` shape (owner stacks are
+not part of Octane's API). Deletion-phase teardown errors (effect cleanups and
+ref detaches thrown while a subtree unmounts) keep their existing boundary
+routing and report through the same callbacks: boundary-claimed →
+`onCaughtError`, unclaimed → `onUncaughtError` (else the default
+`console.error`).
 
 ## Refs are props
 
@@ -817,9 +922,20 @@ Suspense like Fizz, with these differences:
   during hydration.
 
 Octane leaves document and transport orchestration to the surrounding server.
-It has no Fizz bootstrap-script/module/import-map, doctype/preamble, `onHeaders`,
-or header-construction options. One `nonce` covers every inline style and script
-Octane emits rather than exposing separate script and style channels.
+It has no Fizz bootstrap-script/module/import-map options, no doctype/preamble
+*options* (streaming a `<html>`-rooted document still emits `<!DOCTYPE html>`
+automatically), and no `onHeaders` or header-construction options. One `nonce`
+covers every inline style and script Octane emits rather than exposing separate
+script and style channels. `progressiveChunkSize` does not exist — Octane
+flushes per resolution wave, not by byte thresholds — and `namespaceURI` is
+inferred from the rendered root rather than accepted as an option.
+
+React 19.2's partial pre-rendering — `resume`, `resumeToPipeableStream`,
+`resumeAndPrerender`, and the postpone/prelude protocol — is a non-goal: that
+request protocol is not part of Octane's public SSR surface. Relatedly,
+`prerender` resolves `{ html, css }` (a complete buffered document), not
+React's `{ prelude: ReadableStream }`; `prerenderToNodeStream` is planned but
+not yet implemented.
 
 A readable stream's `allReady` settles after all boundary bytes have been
 accepted under consumer backpressure, so consumers should read the stream while
@@ -831,6 +947,18 @@ React digests or React's `errorInfo` shape.
 Attribute mismatches recover to the **client** value; React keeps the server
 value. Octane warns and rebuilds a mismatched subtree in place rather than
 throwing.
+
+`hydrateRoot`'s `onRecoverableError` option fires (dev AND prod) after a
+STRUCTURAL recovery — a rebuilt subtree or a discarded stale server range —
+coalesced to one report per root per microtask burst. Octane recovers per site
+rather than client-rendering a whole boundary, so attribute-level value patches
+do not report: production React does not detect those at all, and reporting
+Octane's extra detection would make the channel incomparable.
+
+`hydrateRoot` has no `formState` option: resuming `useActionState` from an MPA
+form POST requires React's server-action state serialization, which is part of
+the RSC model Octane does not implement (the matching `useActionState`
+`permalink` argument is accepted for signature parity and ignored).
 
 Production structural validation has the same depth as React: it checks an
 adopted root's node type and tag. Tag and text mismatches still recover, but
@@ -889,12 +1017,21 @@ is a known limitation, not a supported edit.
 Octane does not implement:
 
 - class components or legacy `ReactDOM.render` roots;
-- Server Components/RSC;
+- Server Components/RSC, including `cache()`, `cacheSignal()`, and
+  `hydrateRoot`'s `formState` option;
 - `StrictMode` double-invoke;
-- `Profiler`, `SuspenseList`, `forwardRef`, `createRef`, or `cache()`.
+- `Profiler`, `SuspenseList`, `forwardRef`, or `createRef`;
+- `captureOwnerStack` and development owner-stack collection (diagnostics
+  dedupe per rendering block instead);
+- `unstable_batchedUpdates` (renders are microtask-batched by default);
+- partial pre-rendering (`resume`/`resumeAndPrerender` and the
+  postpone/prelude protocol — see SSR and streaming);
+- gesture View Transitions (`useSwipeTransition` /
+  `unstable_startGestureTransition`), deferred until React stabilizes them.
 
 `useDebugValue` is accepted as a no-op. Resource hints are supported
-(`preload`, `preinit`, `preconnect`, and `prefetchDNS`).
+(`preload`, `preinit`, `preloadModule`, `preinitModule`, `preconnect`, and
+`prefetchDNS`).
 
 React 19 custom-element listener semantics are also supported: a
 function-valued lowercase `on*` prop on a custom element attaches a real

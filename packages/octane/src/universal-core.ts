@@ -11,6 +11,7 @@
  * may change in patch releases until real Three and transported renderers
  * validate the protocol.
  */
+import { hasOwnProp } from './has-own.js';
 import {
 	__profileBeginRender,
 	__profileComponentSource,
@@ -257,6 +258,7 @@ export interface UniversalForValue {
 	readonly leafPlan?: UniversalPlan;
 	readonly leafSignature?: string;
 	readonly template?: boolean;
+	readonly componentScope?: boolean;
 }
 
 export interface UniversalTryValue {
@@ -744,6 +746,26 @@ export interface UniversalRootOptions<Container> {
 	 * the standard global `queueMicrotask` (for example Lynx PrimJS).
 	 */
 	scheduleMicrotask?: (callback: () => void) => void;
+	/**
+	 * React 19 parity, reporting only: called after a `universalTry` catch arm
+	 * claims an error from this root — a render-time throw its arm catches, or
+	 * an effect/host-callback error routed to it between renders. Mirrors the
+	 * DOM runtime's `createRoot` option: only the error is passed (no
+	 * `errorInfo`/`componentStack` second argument).
+	 */
+	onCaughtError?: (error: unknown) => void;
+	/**
+	 * React 19 parity: called for an error no boundary claims. When provided it
+	 * REPLACES the default report for this root's scheduler-owned work — a
+	 * scheduled render error stops rethrowing out of the microtask flush (or,
+	 * on a transported root, out of `flushTransport()`), and an unrouted
+	 * effect/host-callback error stops rethrowing out of the commit or passive
+	 * flush. Direct `prepare()`/`render()`/`commit()` calls still throw: the
+	 * thrown attempt is that API's documented result channel. Recovery
+	 * semantics are unchanged either way — the failed attempt is discarded and
+	 * committed content is retained exactly as without the option.
+	 */
+	onUncaughtError?: (error: unknown) => void;
 }
 
 export interface UniversalTransaction {
@@ -1372,7 +1394,8 @@ class UniversalRendererRegionOwnerBridge implements RendererRegionOwnerBridge {
 			try {
 				dispose();
 			} catch (error) {
-				if (!routeUniversalOwnerError(this.owner, error)) console.error(error);
+				if (routeUniversalOwnerError(this.owner, error)) continue;
+				if (!reportUniversalUncaughtError(this.owner.root, error)) console.error(error);
 			}
 		}
 		cell.disposing = false;
@@ -1587,7 +1610,7 @@ function assignUniversalPropSpread(
 	}
 
 	let protoAssigned = false;
-	const needsProtoGuard = hasOwnProto && !Object.prototype.hasOwnProperty.call(props, '__proto__');
+	const needsProtoGuard = hasOwnProto && !hasOwnProp.call(props, '__proto__');
 	if (needsProtoGuard) {
 		Object.defineProperty(props, '__proto__', {
 			configurable: true,
@@ -1617,7 +1640,17 @@ export function universalProps(
 	entries: readonly UniversalPropEntry[],
 	children: unknown = NO_CHILDREN,
 	canonicalizeHostClass = false,
+	compilerOwnedRecord = false,
 ): UniversalPropsValue {
+	if (compilerOwnedRecord) {
+		return {
+			$$kind: UNIVERSAL_PROPS,
+			props: Object.freeze(entries as unknown as Record<string, unknown>),
+			key: null,
+			hasKey: false,
+			hasChildren: false,
+		};
+	}
 	const props: Record<string, unknown> = {};
 	if (!canonicalizeHostClass) {
 		for (const entry of entries) {
@@ -1646,7 +1679,7 @@ export function universalProps(
 		}
 	}
 	if (children !== NO_CHILDREN) props.children = children;
-	const hasKey = Object.prototype.hasOwnProperty.call(props, 'key');
+	const hasKey = hasOwnProp.call(props, 'key');
 	const key = hasKey ? props.key : null;
 	if (hasKey) delete props.key;
 	return {
@@ -1654,7 +1687,7 @@ export function universalProps(
 		props: Object.freeze(props),
 		key,
 		hasKey,
-		hasChildren: Object.prototype.hasOwnProperty.call(props, 'children'),
+		hasChildren: hasOwnProp.call(props, 'children'),
 	};
 }
 
@@ -1720,7 +1753,20 @@ export function universalFor<T>(
 	hostComponent?: UniversalComponent<any> | true,
 	leafPlan?: UniversalPlan,
 	leafSignature?: string,
+	componentScope = false,
 ): UniversalForValue {
+	if (componentScope) {
+		return {
+			$$kind: UNIVERSAL_FOR,
+			items,
+			key,
+			render,
+			empty,
+			ownerless,
+			compact,
+			componentScope: true,
+		};
+	}
 	if (hostComponent === true) {
 		return { $$kind: UNIVERSAL_FOR, items, key, render, empty, ownerless, compact, template: true };
 	}
@@ -2239,6 +2285,7 @@ function findClaimableChildRecord(
 	identityPath: readonly unknown[],
 	key: unknown,
 ): UniversalOwnerRecord | undefined {
+	if (parent.record.children.length === 0) return undefined;
 	// Order-stable renders resolve every claim with one positional compare; the
 	// identity-path buckets exist for reorders, insertions, and removals.
 	if (parent.childOwnerBuckets === null) {
@@ -2498,13 +2545,32 @@ function ownerRange(owner: DraftOwner, children: BlueprintNode[]): BlueprintNode
 	return [{ kind: 'range', key: owner.record.rangeKey, owner: owner.record, children }];
 }
 
+function readComponentContext<T>(context: UniversalContext<T>): T {
+	return readOwnerContext(activateLazyLeafOwner(), context);
+}
+
+function componentInsertionEffect(
+	create: () => void | (() => void),
+	deps?: readonly unknown[],
+): void {
+	enqueueUniversalEffect('insertion', create, deps);
+}
+
+function componentLayoutEffect(create: () => void | (() => void), deps?: readonly unknown[]): void {
+	enqueueUniversalEffect('layout', create, deps);
+}
+
+function componentEffect(create: () => void | (() => void), deps?: readonly unknown[]): void {
+	enqueueUniversalEffect('passive', create, deps);
+}
+
 function componentContext(renderer: string): UniversalRenderContext {
 	return {
 		renderer,
-		readContext: (context) => readOwnerContext(activateLazyLeafOwner(), context),
-		insertionEffect: (create, deps) => enqueueUniversalEffect('insertion', create, deps),
-		layoutEffect: (create, deps) => enqueueUniversalEffect('layout', create, deps),
-		effect: (create, deps) => enqueueUniversalEffect('passive', create, deps),
+		readContext: readComponentContext,
+		insertionEffect: componentInsertionEffect,
+		layoutEffect: componentLayoutEffect,
+		effect: componentEffect,
 	};
 }
 
@@ -3039,6 +3105,10 @@ function materializeValue(
 			list.template === true &&
 			currentAttempt().root.driverCapabilities().templateProgramMount === true &&
 			CURRENT_OWNER?.visibility === 'visible';
+		const compilerComponentScope =
+			list.componentScope === true &&
+			currentAttempt().root.driverCapabilities().templateProgramRuns === true &&
+			CURRENT_OWNER?.visibility === 'visible';
 		if (
 			list.ownerless &&
 			list.compact &&
@@ -3179,7 +3249,7 @@ function materializeValue(
 			compilerTemplateTree && attempt.root.driverCapabilities().templateProgramRuns === true;
 		let compactTemplateList: BlueprintCompactTemplateList | null = null;
 		const lazyOwnerScope: LazyLeafOwnerScope | null =
-			compilerLeafProps || compilerTemplateTree
+			compilerLeafProps || compilerTemplateTree || compilerComponentScope
 				? {
 						attempt,
 						parent,
@@ -3188,13 +3258,62 @@ function materializeValue(
 						owner: null,
 					}
 				: null;
+		let componentScopeEnabled = compilerComponentScope;
+		if (componentScopeEnabled) {
+			const previous = parent.record.children[parent.sequentialClaimCursor];
+			if (
+				previous?.component === null &&
+				identityPathsEqual(previous.identityPath, lazyOwnerScope!.identityPath)
+			) {
+				componentScopeEnabled = false;
+			}
+		}
+		const componentPath = componentScopeEnabled
+			? [...lazyOwnerScope!.identityPath, 'output']
+			: null;
 		let index = 0;
 		for (const item of list.items) {
 			const itemIndex = index++;
 			const itemKey = list.key(item, itemIndex);
 			if (keys.has(itemKey)) throw new Error(`Duplicate universal list key ${String(itemKey)}.`);
 			keys.add(itemKey);
-			if (compilerTemplateTree) {
+			if (componentScopeEnabled) {
+				const rendered = renderLazyLeafItem(lazyOwnerScope!, list.render, item, itemIndex, itemKey);
+				const candidate = rendered as UniversalComponentValue;
+				if (
+					lazyOwnerScope!.owner === null &&
+					candidate?.$$kind === UNIVERSAL_COMPONENT_VALUE &&
+					candidate.renderer === expectedRenderer &&
+					!candidate.hasKey
+				) {
+					const keyed: UniversalComponentValue = {
+						...candidate,
+						key: itemKey,
+						hasKey: true,
+					};
+					output.push(...materializeComponentValue(keyed, expectedRenderer, componentPath!));
+					continue;
+				}
+				if (lazyOwnerScope!.owner === null) {
+					output.push(
+						...materializeScoped(parent, lazyOwnerScope!.identityPath, itemKey, () => rendered),
+					);
+					continue;
+				}
+				const itemOwner = lazyOwnerScope!.owner;
+				const previousOwner = CURRENT_OWNER;
+				const previousAttemptOwner = attempt.owner;
+				CURRENT_OWNER = itemOwner;
+				attempt.owner = itemOwner;
+				let nodes: BlueprintNode[];
+				try {
+					nodes = materializeValue(rendered, expectedRenderer, null, componentPath!);
+				} finally {
+					CURRENT_OWNER = previousOwner;
+					attempt.owner = previousAttemptOwner;
+				}
+				output.push(...ownerRange(itemOwner, nodes));
+			} else if (compilerTemplateTree) {
 				const rendered = renderLazyLeafItem(lazyOwnerScope!, list.render, item, itemIndex, itemKey);
 				if (compactTemplateEnabled) {
 					const candidate = rendered as UniversalPlanValue;
@@ -3423,6 +3542,10 @@ function materializeValue(
 			resetDraftChildren(owner);
 			owner.hasBoundaryError = true;
 			owner.boundaryError = error;
+			// The catch arm claims this render error here, in the throwing attempt
+			// itself. Replays of an already-claimed error (the hasBoundaryError
+			// branch above) do not re-report.
+			reportUniversalCaughtError(owner.record.root, error);
 			const nodes = materializeScoped(owner, [...path, 'try-arm'], 'catch', () =>
 				boundary.catch!(error, () => {
 					owner.record.hasBoundaryError = false;
@@ -3583,18 +3706,13 @@ function materializeNode(
 		propsValue = normalizePropsValue(values[node.propsSlot] as any);
 		Object.assign(props, propsValue.props);
 	}
-	const hasKey =
-		staticProps === null &&
-		(propsValue?.hasKey || Object.prototype.hasOwnProperty.call(props, 'key'));
+	const hasKey = staticProps === null && (propsValue?.hasKey || hasOwnProp.call(props, 'key'));
 	const hostKey = normalizeUniversalKey(
 		propsValue?.hasKey ? propsValue.key : hasKey ? props.key : null,
 	);
-	const ref =
-		staticProps === null && Object.prototype.hasOwnProperty.call(props, 'ref') ? props.ref : null;
+	const ref = staticProps === null && hasOwnProp.call(props, 'ref') ? props.ref : null;
 	const dynamicChildren =
-		staticProps === null && Object.prototype.hasOwnProperty.call(props, 'children')
-			? props.children
-			: undefined;
+		staticProps === null && hasOwnProp.call(props, 'children') ? props.children : undefined;
 	if (staticProps === null) {
 		delete props.ref;
 		delete props.key;
@@ -4054,9 +4172,9 @@ export function sameUniversalHostPropValue(left: unknown, right: unknown, depth 
 	}
 	let leftCount = 0;
 	for (const key in left) {
-		if (!Object.prototype.hasOwnProperty.call(left, key)) continue;
+		if (!hasOwnProp.call(left, key)) continue;
 		leftCount++;
-		if (!Object.prototype.hasOwnProperty.call(right, key)) return false;
+		if (!hasOwnProp.call(right, key)) return false;
 		if (
 			!sameUniversalHostPropValue(
 				(left as Record<string, unknown>)[key],
@@ -4069,7 +4187,7 @@ export function sameUniversalHostPropValue(left: unknown, right: unknown, depth 
 	}
 	let rightCount = 0;
 	for (const key in right) {
-		if (Object.prototype.hasOwnProperty.call(right, key)) rightCount++;
+		if (hasOwnProp.call(right, key)) rightCount++;
 	}
 	return leftCount === rightCount;
 }
@@ -4082,19 +4200,16 @@ function shallowPropsEqual(
 	if (left === right) return true;
 	let leftCount = 0;
 	for (const key in left) {
-		if (!Object.prototype.hasOwnProperty.call(left, key)) continue;
+		if (!hasOwnProp.call(left, key)) continue;
 		leftCount++;
-		if (
-			!Object.prototype.hasOwnProperty.call(right, key) ||
-			!sameUniversalHostPropValue(left[key], right[key])
-		) {
+		if (!hasOwnProp.call(right, key) || !sameUniversalHostPropValue(left[key], right[key])) {
 			return false;
 		}
 	}
 	if (rightCountHint >= 0) return leftCount === rightCountHint;
 	let rightCount = 0;
 	for (const key in right) {
-		if (Object.prototype.hasOwnProperty.call(right, key)) rightCount++;
+		if (hasOwnProp.call(right, key)) rightCount++;
 	}
 	return leftCount === rightCount;
 }
@@ -6165,10 +6280,7 @@ function universalShallowEqual(previous: unknown, next: unknown): boolean {
 	const nextKeys = Object.keys(next);
 	if (previousKeys.length !== nextKeys.length) return false;
 	for (const key of previousKeys) {
-		if (
-			!Object.prototype.hasOwnProperty.call(next, key) ||
-			!Object.is((previous as any)[key], (next as any)[key])
-		) {
+		if (!hasOwnProp.call(next, key) || !Object.is((previous as any)[key], (next as any)[key])) {
 			return false;
 		}
 	}
@@ -6282,6 +6394,61 @@ function runEffectCleanup(hook: EffectHook): void {
 	cleanup?.();
 }
 
+/**
+ * Root error-callback handlers live OFF the root's shape (mirroring the DOM
+ * runtime's Block-keyed WeakMap): registered only for roots created with at
+ * least one callback, so every other root pays a single module-null check on
+ * the (already cold) error paths and UniversalRootImpl's layout is untouched.
+ */
+interface UniversalRootErrorHandlers {
+	onCaughtError: ((error: unknown) => void) | undefined;
+	onUncaughtError: ((error: unknown) => void) | undefined;
+}
+
+let UNIVERSAL_ROOT_ERROR_HANDLERS: WeakMap<
+	UniversalRootImpl<any, any>,
+	UniversalRootErrorHandlers
+> | null = null;
+
+function registerUniversalRootErrorHandlers(
+	root: UniversalRootImpl<any, any>,
+	options: UniversalRootOptions<any>,
+): void {
+	const { onCaughtError, onUncaughtError } = options;
+	if (onCaughtError === undefined && onUncaughtError === undefined) return;
+	(UNIVERSAL_ROOT_ERROR_HANDLERS ??= new WeakMap()).set(root, { onCaughtError, onUncaughtError });
+}
+
+function universalRootErrorHandlersFor(
+	root: UniversalRootImpl<any, any>,
+): UniversalRootErrorHandlers | null {
+	if (UNIVERSAL_ROOT_ERROR_HANDLERS === null) return null;
+	return UNIVERSAL_ROOT_ERROR_HANDLERS.get(root) ?? null;
+}
+
+/** A throwing report callback must not corrupt recovery — report it and move on. */
+function invokeUniversalRootErrorHandler(handler: (error: unknown) => void, err: unknown): void {
+	try {
+		handler(err);
+	} catch (handlerErr) {
+		console.error(handlerErr);
+	}
+}
+
+/** Report a boundary-claimed error to the owning root's onCaughtError, if any. */
+function reportUniversalCaughtError(root: UniversalRootImpl<any, any>, err: unknown): void {
+	const h = universalRootErrorHandlersFor(root)?.onCaughtError;
+	if (h !== undefined) invokeUniversalRootErrorHandler(h, err);
+}
+
+/** True when the owning root's onUncaughtError consumed the report (callers skip their default). */
+function reportUniversalUncaughtError(root: UniversalRootImpl<any, any>, err: unknown): boolean {
+	const h = universalRootErrorHandlersFor(root)?.onUncaughtError;
+	if (h === undefined) return false;
+	invokeUniversalRootErrorHandler(h, err);
+	return true;
+}
+
 function routeUniversalOwnerError(owner: UniversalOwnerRecord, error: unknown): boolean {
 	for (let current = owner.parent; current !== null; current = current.parent) {
 		if (!current.isBoundary || current.disposed) continue;
@@ -6289,6 +6456,9 @@ function routeUniversalOwnerError(owner: UniversalOwnerRecord, error: unknown): 
 		current.boundaryError = error;
 		current.hasBoundaryError = true;
 		current.root.schedule();
+		// The boundary took ownership of the error episode; its catch-arm replay
+		// deliberately does not re-report, so this is the claim's single report.
+		reportUniversalCaughtError(current.root, error);
 		return true;
 	}
 	return false;
@@ -6319,7 +6489,8 @@ function runOwnedEffectCreate(hook: EffectHook): void {
 	try {
 		runEffectCreate(hook);
 	} catch (error) {
-		if (!routeUniversalOwnerError(hook.owner, error)) throw error;
+		if (routeUniversalOwnerError(hook.owner, error)) return;
+		if (!reportUniversalUncaughtError(hook.owner.root, error)) throw error;
 	}
 }
 
@@ -6327,7 +6498,8 @@ function runOwnedEffectCleanup(hook: EffectHook): void {
 	try {
 		runEffectCleanup(hook);
 	} catch (error) {
-		if (!routeUniversalOwnerError(hook.owner, error)) throw error;
+		if (routeUniversalOwnerError(hook.owner, error)) return;
+		if (!reportUniversalUncaughtError(hook.owner.root, error)) throw error;
 	}
 }
 
@@ -6335,7 +6507,9 @@ function runOwnedCommit(owner: UniversalOwnerRecord | null, work: () => void): v
 	try {
 		work();
 	} catch (error) {
-		if (owner === null || !routeUniversalOwnerError(owner, error)) throw error;
+		if (owner === null) throw error;
+		if (routeUniversalOwnerError(owner, error)) return;
+		if (!reportUniversalUncaughtError(owner.root, error)) throw error;
 	}
 }
 
@@ -6486,6 +6660,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private asyncWork: Promise<void> = Promise.resolve();
 	private asyncWorkError: unknown = NO_PENDING_PASSIVE_ERROR;
 	private nextId = 1;
+	private nextLogicalRangeId = -1;
 	private nextUniversalId = 1;
 	private nextListener = NEXT_EVENT_ROOT++ * 1_000_000;
 	private nextBatchVersion = 1;
@@ -7573,7 +7748,17 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				if (this.unmounted) return;
 				const input = this.scheduledRenderInput();
 				if (input === null) return;
-				const attempt = this.__prepareScheduled(input[0], input[1]);
+				let attempt: UniversalPreparedAttempt;
+				try {
+					attempt = this.__prepareScheduled(input[0], input[1]);
+				} catch (error) {
+					// Scheduled work has no direct caller to observe the throw — without
+					// a handler it surfaces through flushTransport()'s async-work error.
+					// A root created with onUncaughtError consumes its own report; the
+					// failed attempt is already discarded and recovery is unchanged.
+					if (!reportUniversalUncaughtError(this, error)) throw error;
+					return;
+				}
 				if (attempt.status === 'prepared') {
 					try {
 						await attempt.commitAsync();
@@ -7586,7 +7771,17 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		} else {
 			const input = this.scheduledRenderInput();
 			if (input === null) return;
-			const attempt = this.__prepareScheduled(input[0], input[1]);
+			let attempt: UniversalPreparedAttempt;
+			try {
+				attempt = this.__prepareScheduled(input[0], input[1]);
+			} catch (error) {
+				// Scheduled work has no direct caller to observe the throw — without a
+				// handler it escapes into the host's microtask channel. A root created
+				// with onUncaughtError consumes its own report; the failed attempt is
+				// already discarded and recovery is unchanged.
+				if (!reportUniversalUncaughtError(this, error)) throw error;
+				return;
+			}
 			if (attempt.status === 'prepared') attempt.commit();
 		}
 	}
@@ -7848,7 +8043,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 						const batches = new Set(replay.transitionBatches);
 						for (const batch of this.takeScheduledTransitionBatches()) batches.add(batch);
 						this.finishTransitionBatches(batches);
-						throw error;
+						// A resumed replay is scheduler-owned work like any other scheduled
+						// render — a root created with onUncaughtError consumes its report.
+						if (!reportUniversalUncaughtError(this, error)) throw error;
+						return;
 					}
 					// Commit errors have transaction-owned acceptance semantics. In
 					// particular, do not cancel unrelated blocked transitions after a
@@ -7886,7 +8084,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			const batches = new Set(replay.transitionBatches);
 			for (const batch of this.takeScheduledTransitionBatches()) batches.add(batch);
 			this.finishTransitionBatches(batches);
-			throw error;
+			// A resumed replay is scheduler-owned work like any other scheduled
+			// render — a root created with onUncaughtError consumes its report.
+			if (!reportUniversalUncaughtError(this, error)) throw error;
+			return;
 		}
 		if (attempt.status === 'prepared') attempt.commit();
 		else this.ensureScheduledTransitionWork();
@@ -9144,8 +9345,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				const hostProps = list.props[index]!;
 				if (
 					(lastBinding === null ||
-						!Object.prototype.hasOwnProperty.call(record.props, lastBinding) ||
-						!Object.prototype.hasOwnProperty.call(hostProps, lastBinding) ||
+						!hasOwnProp.call(record.props, lastBinding) ||
+						!hasOwnProp.call(hostProps, lastBinding) ||
 						Object.is(record.props[lastBinding], hostProps[lastBinding])) &&
 					shallowPropsEqual(record.props, hostProps, list.propCount)
 				) {
@@ -9448,10 +9649,18 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		scopePlacement: { parent: number | null; endAnchor: number | null } | null = null,
 	): UniversalTransactionImpl<Container, PublicInstance> {
 		let nextId = this.nextId;
+		let nextLogicalRangeId = this.nextLogicalRangeId;
 		const scoped = scopeRecord !== this.rootRecord;
 		const treeFeatures = (scoped ? scopeFeatures : this.treeFeatures) | attempt.treeFeatures;
 		const templateExcludedFeatures =
 			UNIVERSAL_TREE_PORTAL | UNIVERSAL_TREE_REGION | UNIVERSAL_TREE_HIDDEN;
+		// Owner ranges never reach the host, but interleaving their logical IDs
+		// with host IDs splits component-owned template instances into separate
+		// runs. Keep their transactional identity in a disjoint namespace only
+		// when this renderer can consume the resulting contiguous host ranges.
+		const compactLogicalRangeIds =
+			this.driver.capabilities?.templateProgramRuns === true &&
+			(treeFeatures & templateExcludedFeatures) === 0;
 		if ((treeFeatures & templateExcludedFeatures) !== 0) {
 			const expandBlueprint = (node: BlueprintNode): void => {
 				if (node.kind === 'host') expandCollapsedTemplateBlueprint(node);
@@ -9529,7 +9738,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					if (child.kind === 'range' && child.retained !== undefined) {
 						child = expandRetained(child);
 					}
-					const record = createLogicalRecord(nextId++, child);
+					const record = createLogicalRecord(
+						compactLogicalRangeIds && child.kind === 'range' ? nextLogicalRangeId-- : nextId++,
+						child,
+					);
 					reserveCollapsedTemplateIds(record, child);
 					const draft: DraftRecord = {
 						record,
@@ -9639,7 +9851,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					}
 				}
 				const isNew = record === undefined;
-				record ??= createLogicalRecord(nextId++, child);
+				record ??= createLogicalRecord(
+					compactLogicalRangeIds && child.kind === 'range' ? nextLogicalRangeId-- : nextId++,
+					child,
+				);
 				if (isNew) reserveCollapsedTemplateIds(record, child);
 				else reconcileCollapsedTemplate(record, child);
 				claimed.add(record);
@@ -11055,6 +11270,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					this.publishLocalReplay(retryThenables, retryMemos, component, props);
 				}
 				this.nextId = nextId;
+				this.nextLogicalRangeId = nextLogicalRangeId;
 				this.nextUniversalId = attempt.nextUniversalId;
 				this.nextListener = nextListener;
 				this.treeFeatures = scoped
@@ -11917,7 +12133,14 @@ export function createUniversalRoot<Container, PublicInstance>(
 			'Universal roots require options.scheduleMicrotask when the host has no global queueMicrotask.',
 		);
 	}
-	return new UniversalRootImpl(container, driver, options.transport ?? null, scheduleMicrotask);
+	const root = new UniversalRootImpl(
+		container,
+		driver,
+		options.transport ?? null,
+		scheduleMicrotask,
+	);
+	registerUniversalRootErrorHandlers(root, options);
+	return root;
 }
 
 function readGlobalMicrotaskScheduler(): ((callback: () => void) => void) | undefined {

@@ -212,6 +212,70 @@ describe('universal compiler renderer capabilities', () => {
 	});
 });
 
+describe('component-owned Lynx template rows', () => {
+	const source = `
+		function Row({ row, selected, onSelect }) @{
+			<view class={['row', selected && 'selected']}>
+				<text bindtap={() => onSelect(row.id)}>{row.label}</text>
+			</view>
+		}
+		export function Scene({ rows, selected, onSelect }) @{
+			@for (const row of rows; key row.id) {
+				<Row row={row} selected={selected === row.id} onSelect={onSelect} />
+			}
+		}
+	`;
+
+	it('preserves the real component while proving its ordinary keyed loop scope redundant', () => {
+		const args = compiledUniversalForArguments(source, { renderer: resolvedLynxRenderer });
+
+		expect(args[9]).toMatchObject({ type: 'Literal', value: true });
+		expect(args[2].body).toMatchObject({ type: 'CallExpression' });
+		expect(args[2].body.arguments[2]).toMatchObject({
+			type: 'CallExpression',
+			arguments: [
+				{
+					type: 'ObjectExpression',
+					properties: [
+						{ key: { value: 'row' } },
+						{ key: { value: 'selected' } },
+						{ key: { value: 'onSelect' } },
+					],
+				},
+				{ type: 'UnaryExpression', operator: 'void' },
+				{ type: 'Literal', value: false },
+				{ type: 'Literal', value: true },
+			],
+		});
+	});
+
+	it.each([
+		['HMR', source, { hmr: true }],
+		[
+			'an unsupported renderer',
+			source,
+			{ renderer: { ...resolvedLynxRenderer, capabilities: [] } },
+		],
+		['an explicit key', source.replace('row={row}', 'key={row.id} row={row}'), {}],
+		['a ref', source.replace('row={row}', 'ref={onSelect} row={row}'), {}],
+		['a spread', source.replace('row={row}', '{...row}'), {}],
+		['a prototype-sensitive prop', source.replace('row={row}', '__proto__={row} row={row}'), {}],
+		['a duplicate prop', source.replace('row={row}', 'row={row} row={row}'), {}],
+		[
+			'an arbitrary authored call',
+			source.replace('selected={selected === row.id}', 'selected={onSelect(row.id)}'),
+			{},
+		],
+	])('keeps the original loop owner for %s', (_label, candidate, options) => {
+		const args = compiledUniversalForArguments(candidate, {
+			renderer: resolvedLynxRenderer,
+			...options,
+		});
+
+		expect(args[9]).toBeUndefined();
+	});
+});
+
 describe('constructor-backed Three components in keyed loops', () => {
 	it.each([
 		['an aliased import', extendedThreeComponent],

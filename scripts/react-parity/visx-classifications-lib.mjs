@@ -23,9 +23,7 @@ function discoverVisxTests(root) {
 	const typetestsRoot = resolve(root, 'packages/visx/typetests');
 	const underTests = readdirSync(testsRoot, { recursive: true, withFileTypes: true })
 		.filter(function keepTestAndTypeFiles(entry) {
-			return (
-				entry.isFile() && /\.(?:test\.(?:ts|tsx|tsrx)|test-d\.ts)$/.test(entry.name)
-			);
+			return entry.isFile() && /\.(?:test\.(?:ts|tsx|tsrx)|test-d\.ts)$/.test(entry.name);
 		})
 		.map(function toPortablePath(entry) {
 			return portable(root, entry);

@@ -15,6 +15,57 @@ const TARGETS = process.env.TARGETS
 			{ name: 'octane-tsrx', url: 'http://localhost:5282/' },
 			{ name: 'react', url: 'http://localhost:5284/' },
 		];
+const LAZY_CHUNK_DELAY_MS = 35;
+
+function isLazyCodeChunk(url) {
+	return /\/assets\/LazyCodeProof-[^/]+\.js$/.test(new URL(url).pathname);
+}
+
+async function observeLazyCode(page) {
+	return page.evaluate(() => {
+		const proof = document.querySelector('.lazy-code-proof');
+		return {
+			loads: globalThis.__octaneLazyCodeLoads ?? 0,
+			startedAt: globalThis.__octaneLazyCodeStartedAt ?? null,
+			requests: performance
+				.getEntriesByType('resource')
+				.filter((entry) => /\/assets\/LazyCodeProof-[^/]+\.js$/.test(new URL(entry.name).pathname))
+				.map((entry) => ({ name: entry.name, startedAt: entry.startTime })),
+			version: proof?.getAttribute('data-lazy-code-version') ?? null,
+			sameNode: globalThis.__octaneLazyCodeInitialNode === proof,
+		};
+	});
+}
+
+function validateLazyCode(target, operation, observation, code, networkRequests) {
+	const prefix = `${target} ${operation}`;
+	if (code.loads !== 1) {
+		throw new Error(`${prefix}: expected one lazy module loader call, got ${code.loads}`);
+	}
+	if (networkRequests.length !== 1 || code.requests.length !== 1) {
+		throw new Error(
+			`${prefix}: expected one real lazy module request, got ${networkRequests.length}/${code.requests.length}`,
+		);
+	}
+	if (code.version !== (operation === 'init' ? '0' : '1')) {
+		throw new Error(`${prefix}: lazy module rendered the wrong version ${code.version}`);
+	}
+	if (operation === 'update' && code.sameNode !== true) {
+		throw new Error(`${prefix}: the loaded lazy component was remounted`);
+	}
+	if (operation === 'init') {
+		const projectSettle = observation.trace.settles.find((entry) => entry.resource === 'project');
+		const settledAt = observation.trace.startedAt + projectSettle.atMs;
+		if (code.startedAt >= settledAt || code.requests[0].startedAt >= settledAt) {
+			throw new Error(
+				`${prefix}: lazy module request started after the first project wave settled ` +
+					`(loader ${(code.startedAt - observation.trace.startedAt).toFixed(1)}ms, ` +
+					`request ${(code.requests[0].startedAt - observation.trace.startedAt).toFixed(1)}ms, ` +
+					`project ${projectSettle.atMs.toFixed(1)}ms)`,
+			);
+		}
+	}
+}
 
 const expectedText = (resource, version) =>
 	`${resource}:v${version}${resource === 'owner' ? `:owner-${version}` : ''}`;
@@ -26,17 +77,14 @@ const expectedSignature = (version) =>
 // These are one-way ceilings, not expected results: any improvement passes.
 // They keep known gaps visible without allowing them to silently worsen.
 //
-// update calls sits at 13, not the 8-call dependency floor: the deferred
-// transition commit holds the whole screen (mixed states 0), and its promoted
-// round after the dependent `owner` resolves re-creates the five warm-started
-// panel fetches instead of dep-hitting them. The app-level cache serves the
-// same promises, so no duplicate network occurs — the ceiling pins the
-// re-creation cost until the resume/warm work restores the floor
-// (docs/transition-deferred-commit-plan.md, P2).
+// Both operations stay at the eight-request creator floor. When the dependent
+// `owner` starts, the promoted transition claims its existing warm-resource
+// harvest instead of calling the five already-started creators again. The
+// complete dashboard remains held until the owner resolves (mixed states 0).
 const OBSERVATION_CEILINGS = {
 	'octane-tsrx': {
 		init: { waves: 2, calls: 8, mixedStates: 0 },
-		update: { waves: 2, calls: 13, mixedStates: 0 },
+		update: { waves: 2, calls: 8, mixedStates: 0 },
 	},
 	react: {
 		init: { mixedStates: 0 },
@@ -211,19 +259,47 @@ async function runTarget(target) {
 		for (let i = 0; i < ITER; i++) {
 			const page = await context.newPage();
 			try {
+				const lazyRequests = [];
+				if (target.name === 'octane-tsrx') {
+					page.on('request', (request) => {
+						if (isLazyCodeChunk(request.url())) lazyRequests.push(request.url());
+					});
+					await page.route(/\/assets\/LazyCodeProof-[^/]+\.js(?:\?.*)?$/, async (route) => {
+						await new Promise((resolve) => setTimeout(resolve, LAZY_CHUNK_DELAY_MS));
+						await route.continue();
+					});
+				}
 				await page.goto(target.url, { waitUntil: 'load' });
 				await page.waitForFunction(() => typeof window.__init === 'function', { timeout: 10_000 });
-				init.push(
-					validateObservation(target.name, 'init', 0, await page.evaluate(() => window.__init())),
-				);
-				update.push(
-					validateObservation(
+				if (target.name === 'octane-tsrx') {
+					const beforeMount = await observeLazyCode(page);
+					if (
+						beforeMount.loads !== 0 ||
+						beforeMount.requests.length !== 0 ||
+						lazyRequests.length !== 0
+					) {
+						throw new Error(`${target.name}: the lazy module loaded before the dashboard mounted`);
+					}
+				}
+				const initial = await page.evaluate(() => window.__init());
+				init.push(validateObservation(target.name, 'init', 0, initial));
+				if (target.name === 'octane-tsrx') {
+					validateLazyCode(target.name, 'init', initial, await observeLazyCode(page), lazyRequests);
+					await page.evaluate(() => {
+						globalThis.__octaneLazyCodeInitialNode = document.querySelector('.lazy-code-proof');
+					});
+				}
+				const updated = await page.evaluate(() => window.__update());
+				update.push(validateObservation(target.name, 'update', 1, updated));
+				if (target.name === 'octane-tsrx') {
+					validateLazyCode(
 						target.name,
 						'update',
-						1,
-						await page.evaluate(() => window.__update()),
-					),
-				);
+						updated,
+						await observeLazyCode(page),
+						lazyRequests,
+					);
+				}
 			} finally {
 				await page.close();
 			}

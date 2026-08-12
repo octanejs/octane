@@ -187,7 +187,10 @@ describe('octane/compiler/vite public options', () => {
 				{ ssr },
 			)) as { code: string };
 			expect(barrelLoad).toHaveBeenCalledTimes(1);
-			expect(consumerLoad).toHaveBeenCalledTimes(ssr ? 2 : 4);
+			// Descriptor metadata is loaded once per resolved virtual module and is
+			// retained across transforms. The client pass performs two additional
+			// loads for void-component metadata.
+			expect(consumerLoad).toHaveBeenCalledTimes(ssr ? 1 : 3);
 			for (const component of ['Alias', 'DefaultSlot', 'BarrelSlot']) {
 				const children = componentChildren(consumer.code, component);
 				expect(children, component).toBeDefined();
@@ -287,23 +290,107 @@ describe('octane/compiler/vite public options', () => {
 		expect(isChildrenBlock(result.code, componentChildren(result.code, 'Slot'))).toBe(false);
 	});
 
+	it('does not recursively load unresolved virtual component modules during dev transforms', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'serve', { ssr: true });
+		const source =
+			"import Slot from 'virtual:slot'; export function App() @{ <Slot><b>x</b></Slot> }";
+		const load = vi.fn(async () => {
+			throw new Error('a dev transform must not recursively load its unresolved dependency');
+		});
+		const result = (await (plugin.transform as any).call(
+			{
+				resolve: async () => ({ id: '\0virtual:slot' }),
+				load,
+				getModuleInfo: () => ({ meta: {} }),
+			},
+			source,
+			`${ROOT}/src/App.tsrx`,
+			{ ssr: true },
+		)) as { code: string };
+
+		expect(load).not.toHaveBeenCalled();
+		expect(isChildrenBlock(result.code, componentChildren(result.code, 'Slot'))).toBe(true);
+	});
+
 	it('classifies a direct filesystem marker when load returns a pre-transform snapshot', async () => {
 		const plugin = octane({ hmr: false });
 		configure(plugin, 'build', { ssr: true });
 		const source =
 			"import Slot from './Slot.tsrx'; export function App() @{ <Slot><b>x</b></Slot> }";
 		const slotId = `${process.cwd()}/packages/octane/tests/compiler/_fixtures/descriptor-children-direct.tsrx`;
+		const load = vi.fn(async () => ({ meta: {} }));
 		const result = (await (plugin.transform as any).call(
 			{
 				resolve: async () => ({ id: slotId }),
-				load: async () => ({ meta: {} }),
+				load,
 				getModuleInfo: () => null,
 			},
 			source,
 			`${ROOT}/src/App.tsrx`,
 			{ ssr: true },
 		)) as { code: string };
+		expect(load).not.toHaveBeenCalled();
 		expect(isChildrenBlock(result.code, componentChildren(result.code, 'Slot'))).toBe(false);
+	});
+
+	it('classifies an ordinary filesystem component without loading its Vite graph', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build', { ssr: true });
+		const source =
+			"import { Ordinary } from './descriptor-children-ordinary.ts'; " +
+			'export function App() @{ <Ordinary><b>x</b></Ordinary> }';
+		const ordinaryId = `${process.cwd()}/packages/octane/tests/compiler/_fixtures/descriptor-children-ordinary.ts`;
+		const load = vi.fn(async () => {
+			throw new Error('filesystem descriptor classification must not load the Vite graph');
+		});
+		const result = (await (plugin.transform as any).call(
+			{
+				resolve: async () => ({ id: ordinaryId }),
+				load,
+			},
+			source,
+			`${ROOT}/src/App.tsrx`,
+			{ ssr: true },
+		)) as { code: string };
+
+		expect(load).not.toHaveBeenCalled();
+		expect(isChildrenBlock(result.code, componentChildren(result.code, 'Ordinary'))).toBe(true);
+	});
+
+	it('follows only the requested export through a filesystem barrel', async () => {
+		const plugin = octane({ hmr: false });
+		configure(plugin, 'build', { ssr: true });
+		const fixtureRoot = `${process.cwd()}/packages/octane/tests/compiler/_fixtures`;
+		const barrelId = `${fixtureRoot}/descriptor-children-barrel.ts`;
+		const markedId = `${fixtureRoot}/descriptor-children-direct.tsrx`;
+		const resolve = vi.fn(async (request: string, importer: string) => {
+			if (request === './descriptor-children-barrel.ts') return { id: barrelId };
+			if (request === './descriptor-children-direct.tsrx' && importer === barrelId) {
+				return { id: markedId };
+			}
+			throw new Error(`Unexpected descriptor resolution: ${request} from ${importer}`);
+		});
+		const load = vi.fn(async () => {
+			throw new Error('filesystem descriptor classification must not load the Vite graph');
+		});
+		const source =
+			"import { Marked } from './descriptor-children-barrel.ts'; " +
+			'export function App() @{ <Marked><b>x</b></Marked> }';
+		const result = (await (plugin.transform as any).call(
+			{ resolve, load },
+			source,
+			`${ROOT}/src/App.tsrx`,
+			{ ssr: true },
+		)) as { code: string };
+
+		expect(load).not.toHaveBeenCalled();
+		expect(resolve).not.toHaveBeenCalledWith(
+			'./descriptor-children-ordinary.js',
+			barrelId,
+			expect.anything(),
+		);
+		expect(isChildrenBlock(result.code, componentChildren(result.code, 'Marked'))).toBe(false);
 	});
 
 	it('fails loudly when descriptor metadata cannot be loaded', async () => {

@@ -7,7 +7,11 @@
  */
 import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential, normaliseHtml } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+	normaliseHtml,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/base-ui-diff.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
@@ -85,6 +89,8 @@ async function stepComparingSubtree(d: any, name: string, selector: string): Pro
 	};
 	expect(pick(d.octane.container), `divergence at step "${name}"`).toBe(pick(d.react.container));
 }
+
+await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
 
 describe('differential: @octanejs/base-ui vs real Base UI on React', () => {
 	it('Separator: default (horizontal), byte-identical', async () => {

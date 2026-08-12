@@ -10,7 +10,10 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const BASIC = resolve(__dirname, '../_fixtures/basic-table-diff.tsrx');
 const SORTING = resolve(__dirname, '../_fixtures/sorting-diff.tsrx');
@@ -24,6 +27,14 @@ const CACHE = resolve(__dirname, '.react-cache');
 // Both runtimes queue follow-up state updates (e.g. pageIndex auto-reset)
 // in microtasks; give them a beat before the byte-compare.
 const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
+
+await Promise.all([
+	preloadDifferentialFixture(BASIC, CACHE),
+	preloadDifferentialFixture(SORTING, CACHE),
+	preloadDifferentialFixture(FILTER_PAGINATE, CACHE),
+	preloadDifferentialFixture(SELECTION, CACHE),
+	preloadDifferentialFixture(VIS_EXPAND, CACHE),
+]);
 
 describe('differential: @octanejs/tanstack-table vs real @tanstack/react-table', () => {
 	// @parity-case differential:tanstack-table-basic

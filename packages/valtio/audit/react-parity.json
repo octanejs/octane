@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "c2ef73cc1495517fcabcf31e4191acbca522240f79590272c6ba50fa4c4a7323"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -81,7 +81,7 @@
         {
           "path": "packages/valtio/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "05f8704272b5f20c521763ebad60e98b021503e8483e0de2448726d739f0934e",
+          "sha256": "2fbe10f2d0addfb20be18d46b20493780174c6c522e6808a4c9422a531f65f43",
           "cases": [
             {
               "id": "differential:valtio-snapshot",
@@ -113,12 +113,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "0a330bfedefd05f7983453ac04e6a47e620493937175b0fec3cc6106b74fb730"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },

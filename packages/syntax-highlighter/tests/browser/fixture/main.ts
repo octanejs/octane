@@ -89,7 +89,8 @@ function snapshotContainer(container: Element) {
 		text: code.textContent,
 		whiteSpace: getComputedStyle(code).whiteSpace,
 		lineDisplays: lines.map((line) => getComputedStyle(line).display),
-		lineNumberMinWidth: getComputedStyle(lineNumber).minWidth,
+		lineNumberMinWidth: (lineNumber as HTMLElement).style.minWidth,
+		computedLineNumberMinWidth: getComputedStyle(lineNumber).minWidth,
 		selected: selectKeyword(container),
 	};
 }

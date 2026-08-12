@@ -1,9 +1,14 @@
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/colorful-diff.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
+
+await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
 
 describe('differential: @octanejs/colorful vs react-colorful@5.8.0', () => {
 	// @parity-case differential:react-colorful-controlled

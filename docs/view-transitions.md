@@ -102,6 +102,11 @@ old/new captures. Hydration adopts the annotations untouched.
   your transition CSS with a media query.
 - One transition runs at a time; work arriving mid-animation batches into the
   next one (A→B, then B→D).
+- Gesture transitions (`useSwipeTransition` /
+  `unstable_startGestureTransition`) are not implemented — they are still
+  experimental in React and explicitly deferred until React stabilizes them.
+- Suspensey host resources (suspending a transition commit until an image or
+  stylesheet loads) are outside Octane's supported surface.
 - The full behavior matrix is pinned by the conformance ports in
   `packages/octane/tests/conformance/view-transition*.test.ts`; the
   implementation plan and its documented edge cases live in

@@ -17,23 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/remix-router/src"
-      ],
-      "include": [
-        "\\.(?:ts|tsrx)$"
-      ],
-      "exclude": [
-        "\\.d\\.ts$"
-      ]
+      "roots": ["packages/remix-router/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
     },
     "tests": {
-      "roots": [
-        "packages/remix-router/tests"
-      ],
-      "include": [
-        "\\.test\\.ts$"
-      ],
+      "roots": ["packages/remix-router/tests"],
+      "include": ["\\.test\\.ts$"],
       "exclude": []
     }
   },
@@ -50,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e8e139c7d33a948ad914236e662293864634f765f21042a11af0dd9306c3b13c"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -66,7 +56,7 @@
         {
           "path": "packages/remix-router/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "63b3a8e7a9ebbcc6ad92f360700e958d167b2c809ba7cff902a82c698616aefb",
+          "sha256": "faf9737dc94b2e62f9b8b7d7333794d1e92a288e3480ccd68abde495eee18408",
           "cases": [
             {
               "id": "differential:remix-router-nested",
@@ -80,8 +70,8 @@
             },
             {
               "id": "differential:remix-router-await",
-              "testName": "AwaitApp: fallback \u2192 resolved render-prop, byte-identical at both steps",
-              "fullName": "differential: @octanejs/remix-router vs real react-router AwaitApp: fallback \u2192 resolved render-prop, byte-identical at both steps"
+              "testName": "AwaitApp: fallback → resolved render-prop, byte-identical at both steps",
+              "fullName": "differential: @octanejs/remix-router vs real react-router AwaitApp: fallback → resolved render-prop, byte-identical at both steps"
             },
             {
               "id": "differential:remix-router-declarative",
@@ -110,8 +100,8 @@
             },
             {
               "id": "differential:remix-router-pending",
-              "testName": "PendingApp: deterministic loading state \u2192 landed page, byte-identical",
-              "fullName": "differential: @octanejs/remix-router vs real react-router PendingApp: deterministic loading state \u2192 landed page, byte-identical"
+              "testName": "PendingApp: deterministic loading state → landed page, byte-identical",
+              "fullName": "differential: @octanejs/remix-router vs real react-router PendingApp: deterministic loading state → landed page, byte-identical"
             }
           ]
         },
@@ -173,12 +163,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "a38d018c6ed4910da468eec41c9c596fa2698d0b229e5ec7db3fadda749ade17"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },
@@ -246,7 +236,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "a38d018c6ed4910da468eec41c9c596fa2698d0b229e5ec7db3fadda749ade17"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     }

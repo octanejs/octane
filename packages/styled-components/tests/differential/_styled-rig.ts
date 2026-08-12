@@ -64,6 +64,13 @@ function loadReactFixture(srcPath: string, cacheDir: string): Promise<any> {
 	return promise;
 }
 
+export function preloadStyledDifferentialFixture(
+	srcPath: string,
+	cacheDir: string,
+): Promise<[any, any]> {
+	return Promise.all([import(/* @vite-ignore */ srcPath), loadReactFixture(srcPath, cacheDir)]);
+}
+
 function readSheetCSS(sheet: { toString(): string }): string {
 	return String(sheet);
 }
@@ -243,11 +250,10 @@ export async function mountStyledDifferential(
 	initialProps: any,
 	cacheDir: string,
 ): Promise<StyledDiffPair> {
-	const octaneMod = await import(/* @vite-ignore */ srcPath);
+	const [octaneMod, reactMod] = await preloadStyledDifferentialFixture(srcPath, cacheDir);
 	const OctaneComp = octaneMod[entry];
 	if (!OctaneComp) throw new Error(`octane export "${entry}" not found in ${srcPath}`);
 
-	const reactMod = await loadReactFixture(srcPath, cacheDir);
 	const ReactComp = reactMod[entry];
 	if (!ReactComp) throw new Error(`@tsrx/react export "${entry}" not found in ${srcPath}`);
 

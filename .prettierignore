@@ -10,6 +10,17 @@ packages/shadcn/registry/
 # Vendored pinned upstream sources a port is written against (byte-exact
 # provenance; do not reformat)
 packages/*/upstream/
+# Attribution-compatible application input frozen byte-exact by its adoption test.
+packages/markdown/tests/adoption/public-app/MarkdownBlock.react.tsx
+# Adapted Markdown assertions carry independently pinned row/declaration hashes.
+packages/markdown/tests/conformance/sync.server.test.ts
+# Syntax Highlighter's generated published surface is formatted and verified by
+# its generator; running the repository formatter would make that check stale.
+packages/syntax-highlighter/src/
+
+# This adapted source intentionally mirrors the pinned upstream declaration
+# layout; its parity control treats a formatter-only rewrite as structural drift.
+packages/tanstack-devtools/src/index.ts
 # DefinitelyTyped suites are preserved byte-exact as pinned provenance.
 packages/*/upstream-types/
 # One-for-one adapted type-suite mirrors must stay structurally identical to

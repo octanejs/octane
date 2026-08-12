@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 // React is the oracle for `{cond ? A : B}` child holes where exactly ONE arm
@@ -8,6 +8,8 @@ import { resolve } from 'node:path';
 // must render identically on every toggle. The regression rendered the
 // non-JSX arm as an empty hole; a `null` consequent didn't compile at all.
 const FIXTURE = resolve(__dirname, '../_fixtures/ternary-mixed-arms.tsrx');
+
+await preloadDifferentialFixture(FIXTURE);
 
 describe('differential: ternary-mixed-arms.tsrx — one JSX arm, one value arm', () => {
 	it('MapArm: keyed `.map` array ⇄ component stays byte-identical', async () => {

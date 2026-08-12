@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "project": "react-window-adapted",
+  "project": "window-adapted",
   "roots": ["packages/window/tests/upstream"],
   "files": [
     "packages/window/tests/upstream/components/grid/Grid.test.tsx",

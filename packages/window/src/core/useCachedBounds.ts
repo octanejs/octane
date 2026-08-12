@@ -1,7 +1,7 @@
 import { useMemo } from 'octane';
-import { getSlot, subSlot } from '../internal';
-import { createCachedBounds } from './createCachedBounds';
-import type { CachedBounds, SizeFunction } from './types';
+import { getSlot, subSlot } from '../internal.js';
+import { createCachedBounds } from './createCachedBounds.js';
+import type { CachedBounds, SizeFunction } from './types.js';
 
 export function useCachedBounds<Props extends object>(
 	{

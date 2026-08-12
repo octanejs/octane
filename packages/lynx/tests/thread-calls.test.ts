@@ -2,6 +2,7 @@ import { installLynxTestingEnv, uninstallLynxTestingEnv } from '@lynx-js/testing
 import { JSDOM } from 'jsdom';
 import type { UniversalHostBatch, UniversalHostCommand } from 'octane/universal/native';
 import { afterEach, describe, expect, it } from 'vitest';
+import '../src/main-worklets.js';
 import { createLynxClientContainer } from '../src/core/client-driver.js';
 import {
 	LYNX_BACKGROUND_TO_MAIN_EVENT,

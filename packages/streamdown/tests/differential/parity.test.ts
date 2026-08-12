@@ -1,10 +1,21 @@
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { mountDifferential, normaliseHtml } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	normaliseHtml,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const fixture = resolve(import.meta.dirname, '../_fixtures/markdown-parity.tsrx');
 const featureFixture = resolve(import.meta.dirname, '../_fixtures/feature-parity.tsrx');
 const cache = resolve(import.meta.dirname, '.react-cache');
+// Streamdown's unified React oracle is expensive to transform and import, but
+// that is suite setup rather than behavior owned by the first test. Start both
+// fixture module graphs during collection and await them before any case runs.
+await Promise.all([
+	preloadDifferentialFixture(fixture, cache),
+	preloadDifferentialFixture(featureFixture, cache),
+]);
 
 function cloneElement(element: HTMLElement): HTMLElement {
 	return element.cloneNode(true) as HTMLElement;

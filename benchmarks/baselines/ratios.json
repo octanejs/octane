@@ -1441,6 +1441,14 @@
   },
   {
     "suite": "lynx-table",
+    "op": "create_commands_1k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "All 1,000 freshly inserted component-owned rows share one compiled intrinsic template, so the create commit must contain exactly one contiguous template-run command."
+  },
+  {
+    "suite": "lynx-table",
     "op": "select_commands_1k",
     "target": "octane-lynx",
     "reference": "changed-rows-model",
@@ -1502,6 +1510,14 @@
     "reference": "changed-rows-model",
     "maxRatio": 1.5,
     "note": "30 select ticks x 2 changed rows = 60 commands at the CI scale, measured exactly 1.0x the floor on 2026-08-08 (was 90000 before the fix)."
+  },
+  {
+    "suite": "lynx-table",
+    "op": "create_commands_10k",
+    "target": "octane-lynx",
+    "reference": "changed-rows-model",
+    "maxRatio": 1,
+    "note": "All 10,000 freshly inserted component-owned rows share one compiled intrinsic template, so creation must remain one contiguous template-run command rather than scaling with row count."
   },
   {
     "suite": "lynx-table",

@@ -10,7 +10,10 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/aria-diff-tree-table.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
@@ -27,6 +30,8 @@ if (typeof (globalThis as any).CSS === 'undefined') {
 if (typeof (Element.prototype as any).getAnimations !== 'function') {
 	(Element.prototype as any).getAnimations = () => [];
 }
+
+await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
 
 describe('differential: @octanejs/aria/components Tree + Table vs real react-aria-components', () => {
 	// Tree compares controlled STRUCTURE states only: chevron-driven interaction goes

@@ -1,12 +1,8 @@
 {
   "schemaVersion": 1,
-  "project": "react-day-picker-differential",
-  "roots": [
-    "packages/day-picker/tests"
-  ],
-  "files": [
-    "packages/day-picker/tests/differential/parity.test.ts"
-  ],
+  "project": "day-picker-differential",
+  "roots": ["packages/day-picker/tests"],
+  "files": ["packages/day-picker/tests/differential/parity.test.ts"],
   "tests": [
     {
       "id": "runtime:e592b899fb660cc9",

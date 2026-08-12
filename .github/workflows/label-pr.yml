@@ -30,6 +30,10 @@ jobs:
       - name: Apply the labels the pull request declares
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
+          # PR edits occasionally race a transient GitHub API 5xx. The script
+          # is idempotent, so retry reads and label writes before failing the
+          # check and asking a maintainer to rerun it manually.
+          retries: 3
           script: |
             const TYPES = ["feat", "fix", "docs", "test", "perf", "refactor", "chore", "ci"];
             const AGENT = "agent-authored";
@@ -144,6 +148,7 @@ jobs:
         if: always()
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
+          retries: 3
           # GitHub's GraphQL permission mapping requires `contents: write`
           # alongside `pull-requests: write` for this mutation, even though no
           # repository content changes. An app or PAT can still take over where

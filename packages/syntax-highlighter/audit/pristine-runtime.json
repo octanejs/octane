@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "root": "packages/syntax-highlighter/upstream",
   "tests": [
     {
       "file": "__tests__/async-syntax-highlighter.js",
@@ -257,6 +258,5 @@
       "status": "passed"
     }
   ],
-  "snapshots": 40,
-  "root": "packages/syntax-highlighter/upstream"
+  "snapshots": 40
 }

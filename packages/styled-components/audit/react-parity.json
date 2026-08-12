@@ -17,23 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/styled-components/src"
-      ],
-      "include": [
-        "\\.(?:ts|tsrx)$"
-      ],
-      "exclude": [
-        "\\.d\\.ts$"
-      ]
+      "roots": ["packages/styled-components/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
     },
     "tests": {
-      "roots": [
-        "packages/styled-components/tests"
-      ],
-      "include": [
-        "\\.test\\.ts$"
-      ],
+      "roots": ["packages/styled-components/tests"],
+      "include": ["\\.test\\.ts$"],
       "exclude": []
     }
   },
@@ -50,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "681c5a29d990eeaa9cb6439f43ff0d48857d3c304b9fd97f88ff0235183bbf6a"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -66,7 +56,7 @@
         {
           "path": "packages/styled-components/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "5a7e36b1f570a89a946ffa87777a81896f3bb00a624092eac272e0f38c843e61",
+          "sha256": "6b2731a8695a5e92a4488c169996618b2d9f59d1d9aca9c7f04462fd9662e3e1",
           "cases": [
             {
               "id": "differential:styled-components-basic",
@@ -103,7 +93,7 @@
         {
           "path": "packages/styled-components/tests/differential/_styled-rig.ts",
           "role": "support",
-          "sha256": "d47ddb6c6208785c7e2341cec9ddeda98ccc7cfe2cc6b421b6d8d0bb66607d35"
+          "sha256": "503c43be7a4efee3e8148e4d174bc2a5b084f44e95d446003727dd78f7ecabde"
         },
         {
           "path": "packages/styled-components/tests/differential/_setup.ts",
@@ -143,17 +133,17 @@
         {
           "path": "packages/styled-components/audit/test-classifications.json",
           "role": "support",
-          "sha256": "96edea336c3b9c46a38025b1c1b991dd90bde798aeb4408c613ebdb0c6804308"
+          "sha256": "5eba4f5ca390534f79748820f66f05904fe90498f3f2c73edfb014d8ba495954"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "80637d06855a8675fe8f56e1e299446e3044b8518235a46705ee9251a5834f85"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     }

@@ -14,7 +14,7 @@
     {
       "path": "packages/textarea-autosize/tests/browser/browser.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Same-process Chromium/Firefox React vs Octane pixel, callback, resize, and reset observations."
+      "oracle": "Same-process Chromium React vs Octane pixel, callback, resize, and reset observations."
     },
     {
       "path": "packages/textarea-autosize/tests/differential/parity.test.ts",

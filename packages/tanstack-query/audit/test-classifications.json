@@ -55,6 +55,11 @@
       "path": "packages/tanstack-query/tests/ssr/server.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane server rendering without a DOM; it is not compared with React SSR."
+    },
+    {
+      "path": "packages/tanstack-query/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
     }
   ]
 }

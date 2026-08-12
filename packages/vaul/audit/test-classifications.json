@@ -37,11 +37,6 @@
       "reason": "Repo-authored declaration probes for the Octane public surface; not required React-parity evidence because upstream ships no type suite and the probes lack structural one-for-one inventories/controls."
     },
     {
-      "path": "packages/vaul/tests/upstream-original.test.ts",
-      "disposition": "unmodified-upstream-suite-wrapper",
-      "oracle": "Runs the vendored vaul@1.1.2 Playwright suite unchanged against published React vaul@1.1.2 and checks passed identities against audit/pristine-runtime.json."
-    },
-    {
       "path": "scripts/react-parity/vaul-classifications-lib.test.mjs",
       "disposition": "audit-verifier",
       "reason": "Negative controls for port-authored Vaul test classification completeness."
@@ -54,7 +49,7 @@
     {
       "path": "scripts/react-parity/vaul-upstream-lib.test.mjs",
       "disposition": "audit-verifier",
-      "reason": "Negative controls for Vaul upstream SHA inventory verification."
+      "reason": "Negative controls for Vaul upstream SHA inventory verification and Chromium-only pristine harness configuration."
     }
   ]
 }

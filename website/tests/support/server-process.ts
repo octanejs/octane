@@ -8,6 +8,72 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 
+const PROCESS_OUTPUT_LIMIT = 64 * 1024;
+
+function appendProcessOutput(current: string, chunk: unknown): string {
+	const next = current + String(chunk);
+	return next.length > PROCESS_OUTPUT_LIMIT ? next.slice(-PROCESS_OUTPUT_LIMIT) : next;
+}
+
+function processDiagnostic(output: string): string {
+	return output.length === 0
+		? '\n(no process output was captured)'
+		: `\nLast process output:\n${output}`;
+}
+
+// Builds are finite processes, unlike the servers below. A child that neither
+// exits nor reports an error must still produce one terminal result for every
+// consumer of the shared ready-state file. Capturing a bounded output tail also
+// keeps the original build failure visible in CI instead of degrading it into
+// an unrelated readiness timeout.
+export function waitForChildExit(
+	child: ChildProcess,
+	description: string,
+	timeoutMs: number,
+): Promise<void> {
+	let output = '';
+	child.stdout?.on('data', (chunk) => (output = appendProcessOutput(output, chunk)));
+	child.stderr?.on('data', (chunk) => (output = appendProcessOutput(output, chunk)));
+
+	return new Promise((resolve, reject) => {
+		let settled = false;
+		const finish = (error?: Error) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timeout);
+			child.off('error', onError);
+			child.off('close', onClose);
+			error ? reject(error) : resolve();
+		};
+		const onError = (error: Error) =>
+			finish(
+				new Error(`${description} failed to start: ${error.message}${processDiagnostic(output)}`),
+			);
+		const onClose = (code: number | null, signal: NodeJS.Signals | null) => {
+			if (code === 0) finish();
+			else {
+				const result = signal ? `signal ${signal}` : `code ${code}`;
+				finish(new Error(`${description} exited with ${result}${processDiagnostic(output)}`));
+			}
+		};
+		const timeout = setTimeout(async () => {
+			if (settled) return;
+			settled = true;
+			child.off('error', onError);
+			child.off('close', onClose);
+			await stopServer(child).catch(() => {});
+			reject(
+				new Error(
+					`${description} did not finish within ${timeoutMs}ms${processDiagnostic(output)}`,
+				),
+			);
+		}, timeoutMs);
+
+		child.once('error', onError);
+		child.once('close', onClose);
+	});
+}
+
 // A fresh ephemeral port per run — NEVER a fixed one. With a fixed port, a
 // leftover server from an earlier run (or another checkout) already listening
 // there makes the spawned `--strictPort` server die instantly while the probe
@@ -96,7 +162,7 @@ export function spawnServer(
 ): ChildProcess {
 	return spawn('pnpm', args, {
 		cwd,
-		stdio: 'ignore',
+		stdio: ['ignore', 'pipe', 'pipe'],
 		detached: true,
 		env: { ...process.env, ...env },
 	});
@@ -107,17 +173,51 @@ export function spawnServer(
 // the probe loop can end up talking to some other process entirely.
 export function waitForServer(child: ChildProcess, url: string, timeoutMs: number): Promise<void> {
 	const deadline = Date.now() + timeoutMs;
+	let output = '';
+	child.stdout?.on('data', (chunk) => (output = appendProcessOutput(output, chunk)));
+	child.stderr?.on('data', (chunk) => (output = appendProcessOutput(output, chunk)));
+
 	return new Promise((resolve, reject) => {
 		let settled = false;
 		const onExit = (code: number | null) => {
+			if (settled) return;
 			settled = true;
-			reject(new Error(`server for ${url} exited with code ${code} before listening`));
+			child.off('error', onError);
+			reject(
+				new Error(
+					`server for ${url} exited with code ${code} before listening${processDiagnostic(output)}`,
+				),
+			);
+		};
+		const onError = (error: Error) => {
+			if (settled) return;
+			settled = true;
+			child.off('exit', onExit);
+			reject(
+				new Error(
+					`server for ${url} failed to start: ${error.message}${processDiagnostic(output)}`,
+				),
+			);
 		};
 		child.once('exit', onExit);
+		child.once('error', onError);
 		const probe = async () => {
 			if (settled) return;
+			const remaining = deadline - Date.now();
+			if (remaining <= 0) {
+				settled = true;
+				child.off('exit', onExit);
+				child.off('error', onError);
+				return reject(new Error(`server at ${url} never came up${processDiagnostic(output)}`));
+			}
 			try {
-				const res = await fetch(url);
+				// A cold Vite/Nitro request can wait on dependency optimization or an
+				// in-flight transform without producing a response. Bound each request
+				// so one stalled probe cannot consume the whole readiness budget and
+				// prevent the retry that observes the initialized environment.
+				const res = await fetch(url, {
+					signal: AbortSignal.timeout(Math.min(5_000, Math.max(250, Math.floor(remaining / 4)))),
+				});
 				if (res.status < 500) {
 					// An HTTP answer proves something listens on the port — not that
 					// it's OUR child: it may have died mid-fetch with its 'exit'
@@ -128,10 +228,16 @@ export function waitForServer(child: ChildProcess, url: string, timeoutMs: numbe
 					if (child.exitCode !== null || child.signalCode !== null) {
 						settled = true;
 						child.off('exit', onExit);
-						return reject(new Error(`server at ${url} answered but the spawned process is dead`));
+						child.off('error', onError);
+						return reject(
+							new Error(
+								`server at ${url} answered but the spawned process is dead${processDiagnostic(output)}`,
+							),
+						);
 					}
 					settled = true;
 					child.off('exit', onExit);
+					child.off('error', onError);
 					return resolve();
 				}
 			} catch {
@@ -140,7 +246,8 @@ export function waitForServer(child: ChildProcess, url: string, timeoutMs: numbe
 			if (Date.now() > deadline) {
 				settled = true;
 				child.off('exit', onExit);
-				return reject(new Error(`server at ${url} never came up`));
+				child.off('error', onError);
+				return reject(new Error(`server at ${url} never came up${processDiagnostic(output)}`));
 			}
 			setTimeout(probe, 250);
 		};

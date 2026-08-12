@@ -53,7 +53,6 @@ describe('Doom fixed-step model', () => {
 		expect(shot.dz).toBeCloseTo(0, 8);
 	});
 
-
 	it('retains one player projectile and enforces fire and weapon schedules', () => {
 		const first = stepGame(createGameState(), { ...idle, fire: true }, 0);
 		expect(first.projectiles.filter((shot) => shot.owner === 'player')).toHaveLength(1);

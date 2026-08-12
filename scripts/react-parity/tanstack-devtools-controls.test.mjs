@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
-import { relative, resolve, sep } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { verifyLaneCollectedTests } from './harness-lib.mjs';
+import { verifyTanstackDevtoolsTestClassifications } from './tanstack-devtools-classifications-lib.mjs';
 import { verifyTypeInventories } from './tanstack-devtools-types-lib.mjs';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
@@ -14,64 +14,8 @@ const manifest = JSON.parse(
 	),
 );
 
-const DISPOSITIONS = new Set([
-	'react-octane-differential',
-	'octane-only-divergence',
-	'octane-only-framework-contract',
-	'octane-only-audit-contract',
-]);
-
-function discoverAuthoredTests() {
-	const roots = [
-		resolve(root, 'packages/tanstack-devtools/tests'),
-		resolve(root, 'packages/tanstack-devtools/audit/type-probes'),
-		resolve(root, 'packages/tanstack-devtools/typetests'),
-		resolve(root, 'scripts/react-parity'),
-	];
-	const found = [];
-	for (const dir of roots) {
-		for (const entry of readdirSync(dir, { recursive: true, withFileTypes: true })) {
-			if (!entry.isFile()) continue;
-			const absolute = resolve(entry.parentPath ?? entry.path, entry.name);
-			const portable = relative(root, absolute).split(sep).join('/');
-			if (dir.endsWith(`${sep}react-parity`) || portable.includes('/scripts/react-parity/')) {
-				if (!/^tanstack-devtools.*\.test\.mjs$/.test(entry.name)) continue;
-			} else if (!/\.(?:test|test-d)\.(?:ts|tsx|tsrx|mjs)$/.test(entry.name)) {
-				continue;
-			}
-			if (portable.includes('/typetests/pristine/') || portable.includes('/typetests/adapted/'))
-				continue;
-			found.push(portable);
-		}
-	}
-	return found.sort();
-}
-
 test('tanstack-devtools classifies every port-authored test exactly once', () => {
-	const discovered = discoverAuthoredTests();
-	const config = JSON.parse(
-		readFileSync(
-			new URL('../../packages/tanstack-devtools/audit/test-classifications.json', import.meta.url),
-			'utf8',
-		),
-	);
-	const declared = config.tests.map((entry) => entry.path).sort();
-	assert.deepEqual(discovered, declared);
-	const divergenceIds = new Set(manifest.divergences.map((entry) => entry.id));
-	for (const entry of config.tests) {
-		assert.ok(DISPOSITIONS.has(entry.disposition), `${entry.path}: unknown disposition`);
-		if (entry.disposition.startsWith('octane-only-')) {
-			assert.ok(entry.reason, `${entry.path}: Octane-only tests require a reason`);
-			assert.equal(entry.oracle, undefined, `${entry.path}: must not claim React parity`);
-		} else {
-			assert.ok(entry.oracle, `${entry.path}: React-parity evidence requires an oracle`);
-		}
-		if (entry.disposition === 'octane-only-divergence') {
-			const ids = entry.divergenceIds ?? [entry.divergenceId].filter(Boolean);
-			assert.ok(ids.length, `${entry.path}: divergence tests require a manifest divergence id`);
-			for (const id of ids) assert.ok(divergenceIds.has(id), `${entry.path}: unknown ${id}`);
-		}
-	}
+	assert.deepEqual(verifyTanstackDevtoolsTestClassifications(root), { tests: 10 });
 });
 
 test('tanstack-devtools differential lane rejects a renamed declared case', () => {

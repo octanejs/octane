@@ -54,6 +54,8 @@ const BUILD_CASES = [
 			'/packages/lynx/src/core/transport.ts',
 			'/packages/octane/src/universal-native.ts',
 			'/packages/octane/src/universal-core.ts',
+			'/packages/lynx/src/main-worklets.ts',
+			'/packages/lynx/src/core/worklets.ts',
 		],
 		thread: 'main-thread',
 	},
@@ -114,6 +116,7 @@ class MetadataProbePlugin {
 		private readonly observed: unknown[],
 		private readonly moduleIdentifiers: string[],
 		private readonly layeredModules: { identifier: string; layer?: string | null }[],
+		private readonly retainedModuleIdentifiers: string[],
 	) {}
 
 	apply(compiler: any): void {
@@ -139,6 +142,25 @@ class MetadataProbePlugin {
 					if (metadata !== null) this.observed.push(metadata);
 				}
 			});
+			compilation.hooks.processAssets.tap(
+				{
+					name: `${this.constructor.name}:retained-modules`,
+					stage: compiler.webpack.Compilation.PROCESS_ASSETS_STAGE_REPORT,
+				},
+				() => {
+					for (const module of compilation.modules as Iterable<{
+						identifier?: () => string;
+					}>) {
+						if (
+							compilation.chunkGraph.getModuleChunksIterable(module)[Symbol.iterator]().next().done
+						) {
+							continue;
+						}
+						const identifier = module.identifier?.();
+						if (typeof identifier === 'string') this.retainedModuleIdentifiers.push(identifier);
+					}
+				},
+			);
 		});
 	}
 }
@@ -147,6 +169,7 @@ function metadataProbe(
 	observed: unknown[],
 	moduleIdentifiers: string[],
 	layeredModules: { identifier: string; layer?: string | null }[] = [],
+	retainedModuleIdentifiers: string[] = [],
 ) {
 	return {
 		name: 'octane:lynx-runtime-graph-probe',
@@ -154,7 +177,12 @@ function metadataProbe(
 			api.modifyBundlerChain((chain: any) => {
 				chain
 					.plugin('octane:lynx-runtime-graph-probe')
-					.use(MetadataProbePlugin, [observed, moduleIdentifiers, layeredModules]);
+					.use(MetadataProbePlugin, [
+						observed,
+						moduleIdentifiers,
+						layeredModules,
+						retainedModuleIdentifiers,
+					]);
 			});
 		},
 	};
@@ -208,6 +236,7 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 			const outputRoot = join(temporaryRoot, 'dist');
 			const observed: unknown[] = [];
 			const moduleIdentifiers: string[] = [];
+			const retainedModuleIdentifiers: string[] = [];
 			const rspeedy = await createRspeedy({
 				cwd: FIXTURE,
 				loadEnv: false,
@@ -226,7 +255,7 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 					splitChunks: false,
 					plugins: [
 						pluginOctane({ thread, hmr: false, dev: false }),
-						metadataProbe(observed, moduleIdentifiers),
+						metadataProbe(observed, moduleIdentifiers, [], retainedModuleIdentifiers),
 					],
 				},
 			});
@@ -245,9 +274,12 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 						`expected ${thread} graph to contain ${suffix}`,
 					).toBe(true);
 				}
+				const retainedModules = retainedModuleIdentifiers.map((identifier) =>
+					identifier.split(/[?!]/, 1)[0].replaceAll('\\', '/'),
+				);
 				for (const suffix of forbiddenModules) {
 					expect(
-						[...canonicalModules].some((identifier) => identifier.endsWith(suffix)),
+						retainedModules.some((identifier) => identifier.endsWith(suffix)),
 						`expected ${thread} graph to exclude ${suffix}`,
 					).toBe(false);
 				}
@@ -368,6 +400,8 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 				'/packages/rspeedy-plugin-octane/tests/_fixtures/application/src/App.tsrx',
 				'/packages/lynx/src/root.ts',
 				'/packages/lynx/src/main-thread.ts',
+				'/packages/lynx/src/main-worklets.ts',
+				'/packages/lynx/src/core/worklets.ts',
 			]) {
 				expect(
 					[...canonicalModules].some((identifier) => identifier.endsWith(suffix)),
@@ -421,6 +455,8 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 				'/packages/rspeedy-plugin-octane/src/main-thread-ready.js',
 				'/packages/lynx/src/first-screen.ts',
 				'/packages/lynx/src/main-renderer.ts',
+				'/packages/lynx/src/main-worklets.ts',
+				'/packages/lynx/src/core/worklets.ts',
 			]) {
 				expect(hasSuffix(mainModules, suffix), `missing ${suffix} from main thread`).toBe(true);
 			}

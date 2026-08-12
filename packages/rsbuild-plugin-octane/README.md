@@ -68,8 +68,12 @@ environments finish.
 
 `build.target` applies to both application transforms and Rspack's generated
 runtime. Use one ES level (`es2018`, `es2022`, and so on), `modules`, `false`, or
-esbuild-style browser targets such as `['chrome100', 'firefox100']`. ES levels
-and browser targets cannot be mixed in the same array.
+browser targets such as `['chrome100', 'firefox100', 'samsung24']`. Samsung
+targets use the Samsung Internet version, not its Chromium engine version; for
+example, `samsung24` corresponds to Chromium 117. The `modules` baseline also
+includes Samsung Internet 14, which corresponds to Chromium 87. ES levels and
+browser targets cannot be mixed in the same array. Transpilation changes syntax;
+applications remain responsible for any additional Web API polyfills they use.
 
 Options are declarative and cache-stable:
 

@@ -344,7 +344,7 @@ manifest.lanes = [
 		project: 'drei-pristine-playwright',
 		evidenceOrigin: 'upstream-suite',
 		notes:
-			'Runs the vendored Playwright screenshot test byte-for-byte against published React Drei.',
+			'Runs the vendored Playwright screenshot test byte-for-byte against published React Drei through the shared lockfile-backed Vite runner.',
 		execution: {
 			kind: 'playwright-full',
 			config: 'packages/drei/scripts/pristine-playwright.json',
@@ -352,6 +352,13 @@ manifest.lanes = [
 			inventory: 'packages/drei/audit/pristine-runtime.json',
 		},
 		files: [
+			{
+				path: 'scripts/react-parity/fixtures/drei/package.json',
+				role: 'support',
+				sha256: digest(
+					readFileSync(resolve(root, 'scripts/react-parity/fixtures/drei/package.json')),
+				),
+			},
 			{
 				path: 'scripts/react-parity/playwright-full-runner.mjs',
 				role: 'support',
@@ -408,6 +415,19 @@ manifest.lanes = [
 					},
 				],
 			},
+			...[
+				'packages/drei/tests/browser/e2e/index.html',
+				'packages/drei/tests/browser/e2e/main.tsrx',
+				'packages/drei/tests/browser/e2e/App.tsrx',
+				'packages/drei/tests/browser/e2e/App.three.tsrx',
+				'packages/drei/tests/browser/e2e/selected-exports.ts',
+				'packages/drei/tests/browser/e2e/selected-three-stdlib-exports.ts',
+				'packages/drei/upstream/test/e2e/snapshot.test.ts-snapshots/should-match-previous-one-1-linux.png',
+			].map((path) => ({
+				path,
+				role: 'support',
+				sha256: digest(readFileSync(resolve(root, path))),
+			})),
 			{
 				path: 'packages/drei/audit/upstream-browser.json',
 				role: 'support',

@@ -6,7 +6,10 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig';
 import type { DiffMount } from '../../../octane/tests/differential/_rig';
 
 const fixture = resolve(__dirname, '../_fixtures/differential.tsrx');
@@ -39,6 +42,8 @@ function stubRects(mount: DiffMount, ids: string[]): void {
 		vi.spyOn(byId(mount, id), 'getBoundingClientRect').mockReturnValue(rectangle);
 	}
 }
+
+await Promise.all([preloadDifferentialFixture(fixture, cache)]);
 
 describe('differential: @octanejs/dnd-kit vs @dnd-kit/react', () => {
 	// @parity-case differential:dnd-kit-programmatic-manager-lifecycle

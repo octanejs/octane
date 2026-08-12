@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'octane';
-import { useStableCallback } from '../../hooks/useStableCallback';
-import { getSlot, subSlot } from '../../internal';
-import { assert } from '../../utils/assert';
-import { DATA_ATTRIBUTE_LIST_INDEX } from './List';
-import type { DynamicRowHeight } from './types';
+import { useStableCallback } from '../../hooks/useStableCallback.js';
+import { getSlot, subSlot } from '../../internal.js';
+import { assert } from '../../utils/assert.js';
+import { DATA_ATTRIBUTE_LIST_INDEX } from './List.js';
+import type { DynamicRowHeight } from './types.js';
 
 export function useDynamicRowHeight(options: {
 	defaultRowHeight: number;

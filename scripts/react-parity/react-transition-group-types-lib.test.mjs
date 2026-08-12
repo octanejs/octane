@@ -17,13 +17,9 @@ async function fixture() {
 		upstreamRoot,
 		{ recursive: true },
 	);
-	await cp(
-		new URL('../../packages/transition-group/typetests', import.meta.url),
-		adaptedRoot,
-		{
-			recursive: true,
-		},
-	);
+	await cp(new URL('../../packages/transition-group/typetests', import.meta.url), adaptedRoot, {
+		recursive: true,
+	});
 	await rm(join(upstreamRoot, 'tsconfig.json'), { force: true });
 	await rm(join(adaptedRoot, 'tsconfig.json'), { force: true });
 	return {

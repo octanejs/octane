@@ -47,7 +47,11 @@ import {
 	applyHookDependencies,
 	isInvariantLiteral,
 } from './hook-deps.js';
-import { compileUniversal, UNIVERSAL_COMPILER_RUNTIME_IMPORTS } from './compile-universal.js';
+import {
+	compileUniversal,
+	UNIVERSAL_COMPILER_RUNTIME_IMPORTS,
+	UNIVERSAL_THREAD_RUNTIME_IMPORTS,
+} from './compile-universal.js';
 import {
 	expandDomRendererRegionsAst,
 	prepareRendererBoundaryRegions,
@@ -1450,6 +1454,7 @@ function collectOctaneBoundaryNames(astBody) {
 				(imported === 'Suspense' ||
 					imported === 'ErrorBoundary' ||
 					imported === 'Activity' ||
+					imported === 'unstable_Activity' ||
 					imported === 'Hydrate' ||
 					imported === 'ViewTransition' ||
 					imported === 'unstable_ViewTransition') &&
@@ -5489,7 +5494,8 @@ function containsAutoMemoUnsafeStructure(stmts) {
 				name === 'Suspense' ||
 				name === 'ErrorBoundary' ||
 				name === 'ViewTransition' ||
-				name === 'Activity'
+				name === 'Activity' ||
+				name === 'unstable_Activity'
 			) {
 				found = true;
 				return;
@@ -5949,6 +5955,22 @@ function isPlainHostRoot(node) {
 	);
 }
 
+/**
+ * A direct body host can adopt its enclosing control-flow range on hydration.
+ *
+ * Keep this narrower than the general single-root proof: setup statements,
+ * components, nested directives, and head-hoisted hosts cannot guarantee that
+ * the range's first child is the branch's own hydratable element.
+ */
+function canBorrowSsrHostBranchRange(statements) {
+	if (statements == null || statements.length !== 1 || !isPlainHostRoot(statements[0])) {
+		return false;
+	}
+	const host = statements[0];
+	const tag = host.id?.name ?? host.openingElement?.name?.name;
+	return tag !== 'title' && tag !== 'meta' && tag !== 'link';
+}
+
 function statementsOf(node) {
 	if (node == null) return [];
 	return node.type === 'BlockStatement' ? node.body || [] : [node];
@@ -5956,6 +5978,19 @@ function statementsOf(node) {
 
 function isIfDirective(node) {
 	return node?.type === 'IfStatement' || node?.type === 'JSXIfExpression';
+}
+
+function isSwitchDirective(node) {
+	return node?.type === 'SwitchStatement' || node?.type === 'JSXSwitchExpression';
+}
+
+function hasSwitchCaseLocalBinding(statements) {
+	return statements.some(
+		(statement) =>
+			statement.type === 'VariableDeclaration' ||
+			statement.type === 'FunctionDeclaration' ||
+			statement.type === 'ClassDeclaration',
+	);
 }
 
 /**
@@ -5998,8 +6033,9 @@ function singleRootComponentArmName(node, locals, ctx) {
 
 /**
  * Transitive definition-site single-root proof for a void `@{}` body whose
- * sole root is an `@if`/`@else` tree: every reachable arm must render exactly
- * one plain host OR one qualifying same-module component call (see
+ * sole root is an exhaustive `@if`/`@else` or `@switch` tree: every reachable
+ * arm must render exactly one plain host OR one qualifying same-module
+ * component call (see
  * singleRootComponentArmName). Returns the set of callee names the proof
  * depends on (empty when every arm is a host), or null when the shape does
  * not qualify. The caller resolves the deps with a fixed point over
@@ -6013,22 +6049,41 @@ function singleRootComponentArmName(node, locals, ctx) {
  */
 function collectSingleRootIfDeps(render, locals, ctx) {
 	const roots = normalizeChildren(render ? [render] : []).filter((n) => n.type !== 'HeadHoist');
-	if (roots.length !== 1 || !isIfDirective(roots[0])) return null;
+	if (roots.length !== 1 || (!isIfDirective(roots[0]) && !isSwitchDirective(roots[0]))) {
+		return null;
+	}
 	const deps = new Set();
-	const armOk = (arm) => {
-		if (isIfDirective(arm)) return ifOk(arm);
-		const out = statementsOf(arm).filter((s) => isJsxNode(s) || isIfDirective(s));
+	const armOk = (arm, insideSwitch = false) => {
+		if (isIfDirective(arm)) return ifOk(arm, insideSwitch);
+		if (isSwitchDirective(arm)) return switchOk(arm);
+		const statements = Array.isArray(arm) ? arm : statementsOf(arm);
+		if (insideSwitch && hasSwitchCaseLocalBinding(statements)) return false;
+		const out = statements.filter((s) => isJsxNode(s) || isIfDirective(s) || isSwitchDirective(s));
 		if (out.length !== 1) return false;
 		const sole = out[0];
-		if (isIfDirective(sole)) return ifOk(sole);
+		if (isIfDirective(sole)) return ifOk(sole, insideSwitch);
+		if (isSwitchDirective(sole)) return switchOk(sole);
 		if (isPlainHostRoot(sole)) return true;
 		const name = singleRootComponentArmName(sole, locals, ctx);
 		if (name === null) return false;
 		deps.add(name);
 		return true;
 	};
-	const ifOk = (n) => n.alternate != null && armOk(n.consequent) && armOk(n.alternate);
-	return ifOk(roots[0]) ? deps : null;
+	const ifOk = (n, insideSwitch = false) =>
+		n.alternate != null && armOk(n.consequent, insideSwitch) && armOk(n.alternate, insideSwitch);
+	const switchOk = (n) => {
+		const cases = n.cases || [];
+		let hasDefault = false;
+		for (const clause of cases) {
+			if (clause.test == null) {
+				if (hasDefault) return false;
+				hasDefault = true;
+			}
+			if (!armOk(clause.consequent || [], true)) return false;
+		}
+		return hasDefault;
+	};
+	return (isIfDirective(roots[0]) ? ifOk(roots[0]) : switchOk(roots[0])) ? deps : null;
 }
 
 /**
@@ -6044,11 +6099,11 @@ function collectSingleRootIfDeps(render, locals, ctx) {
  * anything else — including empty component output, whose slot still mints
  * its own comment pair — gets the branch pair minted around it), so we admit:
  *   - one plain host root (the element is the boundary), and
- *   - an @if with a FULL @else chain whose every arm is exactly one plain
- *     host, one component tag (safe unless it lowers to an unsafe lite slot —
- *     resolved transitively via `edges` by the componentInfo fixpoint), or a
- *     nested chain of the same shape.
- * Everything else (missing @else, @switch/@for/hole/fragment roots,
+ *   - an @if with a FULL @else chain or an @switch with a @default whose every
+ *     arm is exactly one plain host, one component tag (safe unless it lowers
+ *     to an unsafe lite slot — resolved transitively via `edges` by the
+ *     componentInfo fixpoint), or a nested exhaustive directive.
+ * Everything else (missing @else/@default, @for/hole/fragment roots,
  * multi-node arms) returns null: the call site keeps its `<!>` anchor.
  * Note every admitted shape renders at least one node in every state, which
  * is what keeps each mounted arm's boundary derivable.
@@ -6063,11 +6118,14 @@ function anchorlessRootShape(node) {
 	if (render == null) return null;
 	if (isPlainHostRoot(render)) return { edges: [] };
 	const edges = [];
-	const armOk = (arm) => {
-		const out = statementsOf(arm).filter((s) => isJsxNode(s) || isIfDirective(s));
+	const armOk = (arm, insideSwitch = false) => {
+		const statements = Array.isArray(arm) ? arm : statementsOf(arm);
+		if (insideSwitch && hasSwitchCaseLocalBinding(statements)) return false;
+		const out = statements.filter((s) => isJsxNode(s) || isIfDirective(s) || isSwitchDirective(s));
 		if (out.length !== 1) return false;
 		const n = out[0];
-		if (isIfDirective(n)) return chainOk(n);
+		if (isIfDirective(n)) return chainOk(n, insideSwitch);
+		if (isSwitchDirective(n)) return switchOk(n);
 		if (isPlainHostRoot(n)) return true;
 		if ((n.type === 'Element' || n.type === 'JSXElement') && isComponentTag(n)) {
 			const name = tagBindingName(n);
@@ -6076,9 +6134,25 @@ function anchorlessRootShape(node) {
 		}
 		return false;
 	};
-	const chainOk = (ifNode) =>
-		ifNode.alternate != null && armOk(ifNode.consequent) && armOk(ifNode.alternate);
-	return isIfDirective(render) && chainOk(render) ? { edges } : null;
+	const chainOk = (ifNode, insideSwitch = false) =>
+		ifNode.alternate != null &&
+		armOk(ifNode.consequent, insideSwitch) &&
+		armOk(ifNode.alternate, insideSwitch);
+	const switchOk = (switchNode) => {
+		let hasDefault = false;
+		for (const clause of switchNode.cases || []) {
+			if (clause.test == null) {
+				if (hasDefault) return false;
+				hasDefault = true;
+			}
+			if (!armOk(clause.consequent || [], true)) return false;
+		}
+		return hasDefault;
+	};
+	return (isIfDirective(render) && chainOk(render)) ||
+		(isSwitchDirective(render) && switchOk(render))
+		? { edges }
+		: null;
 }
 
 /**
@@ -6094,6 +6168,44 @@ function isSsrMarkerlessForItem(node) {
 	const body = node?.body?.body || [];
 	const jsxChildren = body.filter((s) => isJsxNode(s));
 	return jsxChildren.length === 1 && isPlainHostRoot(jsxChildren[0]);
+}
+
+/**
+ * A same-module, single-host component already supplies a complete SSR range.
+ *
+ * The keyed item can adopt that existing component pair instead of wrapping it
+ * again. Its component call then adopts the host through the established
+ * singleRoot path. Explicit keys, spread/children overrides, imported or
+ * dynamic callees, and additional item statements cannot use that proof.
+ */
+function canShareSsrComponentItemRange(node, ctx) {
+	const body = node?.body?.body || [];
+	if (body.length !== 1) return false;
+	const component = body[0];
+	if (
+		(component?.type !== 'Element' && component?.type !== 'JSXElement') ||
+		!isComponentTag(component)
+	) {
+		return false;
+	}
+
+	const tag = component.openingElement?.name || component.id || component.name;
+	if (
+		(tag?.type !== 'Identifier' && tag?.type !== 'JSXIdentifier') ||
+		!ctx.ssrSingleRootComponents?.has(tag.name) ||
+		(component.children || []).length !== 0
+	) {
+		return false;
+	}
+
+	const attributes = component.attributes || component.openingElement?.attributes || [];
+	return !attributes.some((attribute) => {
+		if (attribute.type === 'SpreadAttribute' || attribute.type === 'JSXSpreadAttribute') {
+			return true;
+		}
+		const name = attribute.name?.name || attribute.name;
+		return name === 'key' || name === 'children';
+	});
 }
 
 // Direct host-row mounting skips component-render bookkeeping. Keep the proof
@@ -7810,6 +7922,14 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 						__hookRuntimeModules: [...(options?.__hookRuntimeModules || []), renderer.module],
 						__runtimeImportRoutes: [
 							...(options?.__runtimeImportRoutes ?? []),
+							...(renderer.threadFunctionsModule === undefined
+								? []
+								: [
+										{
+											module: renderer.threadFunctionsModule,
+											imported: UNIVERSAL_THREAD_RUNTIME_IMPORTS,
+										},
+									]),
 							{
 								module: renderer.module,
 								imported: UNIVERSAL_COMPILER_RUNTIME_IMPORTS,
@@ -9178,6 +9298,7 @@ function compileServer(source, filename, options, analyzedAst = null) {
 			ast,
 			options?.isDescriptorChildrenImport,
 		),
+		ssrSingleRootComponents: new Set(),
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
 		// Scaffolding without a more precise authored construct maps here.
@@ -9217,6 +9338,22 @@ function compileServer(source, filename, options, analyzedAst = null) {
 		if (newBody !== null) ast = { ...ast, body: newBody };
 	}
 	ctx.moduleCssInjections = ctx.cssInjections.slice();
+	// Mirror the client's same-module shape proof without populating its richer
+	// componentInfo records on the independent server codegen path. Register all
+	// declarations before emitting any body so forward references stay eligible.
+	for (const node of ast.body) {
+		const component =
+			node.type === 'ExportDefaultDeclaration' || node.type === 'ExportNamedDeclaration'
+				? node.declaration
+				: node;
+		if (
+			component?.id &&
+			(isComponentFunction(component) || isReturnJsxFunction(component)) &&
+			singleHostComponentRoot(component)
+		) {
+			ctx.ssrSingleRootComponents.add(component.id.name);
+		}
+	}
 
 	const bodyNodes = emitServerModuleServerNodes(serverModuleInfo, ctx);
 	for (const node of ast.body) {
@@ -10017,6 +10154,33 @@ function ssrEmitNode(
 		case 'FragmentEnd':
 			ctx.runtimeNeeded.add('ssrFragmentMarker');
 			return ssrCall('ssrFragmentMarker', [b.literal(false, 'false')], ctx._moduleOrigin);
+		case 'HeadHoist': {
+			// NESTED document metadata / Float resource (React hoists from anywhere;
+			// the client partitions these out of host templates at every depth). The
+			// head write runs at this position in the html evaluation — the same
+			// conditional timing as the client's arm-scoped headBlock — and the
+			// functions return '', so the body markup gains nothing and the
+			// hydration cursor stays aligned with the client template.
+			const kind = headResourceKind(node.element);
+			if (kind !== null) {
+				const fn =
+					kind === 'stylesheet'
+						? 'ssrStylesheetResource'
+						: kind === 'style'
+							? 'ssrStyleResource'
+							: 'ssrScriptResource';
+				ctx.runtimeNeeded.add(fn);
+				return inheritOriginLoc(
+					b.call('_$' + fn, ...headResourceArgNodes(node.element, kind)),
+					node.element,
+				);
+			}
+			ctx.runtimeNeeded.add('ssrHeadEl');
+			return inheritOriginLoc(
+				b.call('_$ssrHeadEl', ...headElementArgNodes(node, 0, ctx)),
+				node.element,
+			);
+		}
 		default:
 			return ssrUnsupported(`node type ${node.type}`);
 	}
@@ -11177,11 +11341,11 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 	if (thenSub) inlinedSubs.push(thenSub.fn);
 	let elseCall = ssrHtmlTemplate([], node, ctx);
 	let elseFnName = null;
+	let elseStmts = null;
 	if (node.alternate) {
 		// An `else if` arrives as an IfStatement; wrap it so it recurses through
 		// ssrEmitNode and gets its own marker.
-		const elseStmts =
-			node.alternate.type === 'BlockStatement' ? node.alternate.body : [node.alternate];
+		elseStmts = node.alternate.type === 'BlockStatement' ? node.alternate.body : [node.alternate];
 		const elseSub = ssrCompileSub(elseStmts, ctx, '__selse', [], cssHash, parentNs, componentNs);
 		elseFnName = elseSub.fnName;
 		inlinedSubs.push(elseSub.fn);
@@ -11201,21 +11365,20 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 		thenSub ? thenSub.fnName : null,
 		elseFnName,
 	]);
-	// Nested ranges: the OUTER ssrBlock is the if-slot; the INNER one wraps the
-	// taken branch's content. The client adopts BOTH on hydration (slot = outer,
-	// branch = inner) so no comment markers are inserted — byte-for-byte, exactly
-	// like @for. The not-taken arm emits no inner range (just `''`).
+	// A guaranteed direct host in every arm can borrow the outer slot range;
+	// otherwise retain the inner branch range required by opaque/multi-node arms.
+	const borrowBranchRange =
+		canBorrowSsrHostBranchRange(thenStmts) && canBorrowSsrHostBranchRange(elseStmts);
+	const thenCall = thenSub
+		? ssrSubCall(thenSub.fnName, [b.id('undefined')], node.consequent)
+		: null;
 	const thenInner = thenSub
 		? ssrCall(
 				'ssrArm',
 				[
 					b.literal('then', '"then"'),
 					ssrThunk(
-						ssrCall(
-							'ssrBlock',
-							[ssrSubCall(thenSub.fnName, [b.id('undefined')], node.consequent)],
-							node.consequent,
-						),
+						borrowBranchRange ? thenCall : ssrCall('ssrBlock', [thenCall], node.consequent),
 						node.consequent,
 					),
 				],
@@ -11227,7 +11390,10 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 				'ssrArm',
 				[
 					b.literal('else', '"else"'),
-					ssrThunk(ssrCall('ssrBlock', [elseCall], node.alternate), node.alternate),
+					ssrThunk(
+						borrowBranchRange ? elseCall : ssrCall('ssrBlock', [elseCall], node.alternate),
+						node.alternate,
+					),
 				],
 				node.alternate,
 			)
@@ -11394,7 +11560,10 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		node.index ? [b.id('__it'), b.id('__i')] : [b.id('__it')],
 		node,
 	);
-	const itemHtml = markerlessItem ? itemCall : ssrCall('ssrBlock', [itemCall], node);
+	const itemHtml =
+		markerlessItem || canShareSsrComponentItemRange(node, ctx)
+			? itemCall
+			: ssrCall('ssrBlock', [itemCall], node);
 	const renderItem = itemNeedsIdentity
 		? ssrCall('ssrArm', [itemKey, ssrThunk(itemHtml, node)], node)
 		: itemHtml;
@@ -11469,10 +11638,14 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// rewriteHookCalls: key any `use(thenable)` in the @switch discriminant.
 	const discExpr = rewriteHookCalls(node.discriminant, ctx, name);
+	const cases = node.cases || [];
+	const borrowBranchRange =
+		cases.some((arm) => arm.test == null) &&
+		cases.every((arm) => canBorrowSsrHostBranchRange(arm.consequent));
 	const arms = [];
 	let defaultCall = ssrHtmlTemplate([], node, ctx);
 	let caseIndex = 0;
-	for (const c of node.cases || []) {
+	for (const c of cases) {
 		const sub = ssrCompileSub(
 			c.consequent || [],
 			ctx,
@@ -11487,14 +11660,14 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 		// itself starts before it, so anchor the arm on the keyword when known.
 		const armOrigin = c.keyword ?? c;
 		registerClauseOrigin(ctx, c.keyword, [sub.fnName]);
-		// Inner ssrBlock wraps the matched case's content (see ssrEmitIf) so the
-		// client adopts it as the branch range during hydration (no inserted markers).
+		// Direct-host cases can borrow the outer slot range, just like @if arms.
+		const armCall = ssrSubCall(sub.fnName, [b.id('undefined')], armOrigin);
 		const renderedArm = ssrCall(
 			'ssrArm',
 			[
 				b.literal(c.test == null ? 'default' : `case:${caseIndex}`),
 				ssrThunk(
-					ssrCall('ssrBlock', [ssrSubCall(sub.fnName, [b.id('undefined')], armOrigin)], armOrigin),
+					borrowBranchRange ? armCall : ssrCall('ssrBlock', [armCall], armOrigin),
 					armOrigin,
 				),
 			],
@@ -11988,7 +12161,9 @@ function annotateRootWithHash(node, hash, classAttrName) {
 		}
 		return working;
 	}
-	if (node.type === 'JSXStyleElement') return null;
+	// Scoped-CSS styles leave the render tree here; Float style resources stay —
+	// the HeadHoist partition (normalizeChildren) owns removing them from body DOM.
+	if (node.type === 'JSXStyleElement') return headResourceKind(node) === 'style' ? node : null;
 	let out = null;
 	for (const key of Object.keys(node)) {
 		if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata' || key === 'css') {
@@ -12109,6 +12284,9 @@ function applyCssScoping(componentNode, ctx) {
 			return;
 		}
 		if (node.type === 'JSXStyleElement') {
+			// A Float style resource ships its plain CSS by href identity — it
+			// neither contributes to the component's scope hash nor gets scoped.
+			if (headResourceKind(node) === 'style') return;
 			const sheet = (node.children || []).find((c) => c && c.type === 'StyleSheet');
 			if (sheet) {
 				styles.push({ node, sheet });
@@ -16316,6 +16494,13 @@ function requiresTemplateNormalization(
 			requiresTemplateNormalization(child, parentNs, allowHeadHoists, ctx),
 		);
 	}
+	// A Float style resource (`<style href precedence>`) must enter template
+	// normalization so the HeadHoist partition claims it; scoped-CSS styles are
+	// invisible to the value-position tree and keep returning false. Gated on
+	// allowHeadHoists like `<title>`/`<script>`: SVG has its own `<style>`.
+	if (t === 'JSXStyleElement') {
+		return parentNs !== 'svg' && allowHeadHoists && headResourceKind(node) === 'style';
+	}
 	if (t !== 'Element' && t !== 'JSXElement') return false;
 	if (isLongFormTemplateSentinel(node, parentNs, allowHeadHoists, ctx)) return true;
 
@@ -16332,6 +16517,14 @@ function requiresTemplateNormalization(
 		(tag !== 'title' || allowHeadHoists) &&
 		(tag !== 'link' || isHoistableHeadElementNode(node))
 	)
+		return true;
+	// Float SCRIPT resources normalize like hoistable metadata, so a
+	// value-position (`return <jsx>`) tree carrying `<script async src>` enters
+	// template normalization and headResourceKind can partition it (precedence
+	// links are already admitted through the hoistable-link branch above). Gate
+	// on allowHeadHoists like `<title>`: `<script>` is equally ambiguous across
+	// an opaque component boundary (SVG scripting vs a document resource).
+	if (selfNs !== 'svg' && allowHeadHoists && tag === 'script' && headResourceKind(node) !== null)
 		return true;
 
 	const childNs =
@@ -18237,6 +18430,80 @@ function isHoistableHeadElementNode(n) {
 	return true;
 }
 
+// React Float RESOURCES: `<link rel="stylesheet" href precedence>` (no
+// load/error handlers) and `<script async src>` (no children/handlers) are not
+// per-site head elements but GLOBAL, href/src-keyed resources — hoisted,
+// deduped, precedence-ordered (stylesheets), and never removed on unmount.
+// Classification is static, like the rest of the head-hoist model: a
+// spread-carried `precedence`/`async` keeps the ordinary element path.
+/** @param {any} n @returns {'stylesheet'|'script'|'style'|null} */
+function headResourceKind(n) {
+	if (n == null) return null;
+	// `<style href precedence>` is a React Float STYLE RESOURCE: plain CSS keyed
+	// by href identity, sharing the stylesheet dedupe/precedence model. Every
+	// other `<style>` stays with Octane's scoped-CSS pipeline.
+	if (n.type === 'JSXStyleElement') {
+		let hasHref = false;
+		let hasPrecedence = false;
+		for (const attr of n.openingElement?.attributes || []) {
+			if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+			const name = jsxAttrRawName(attr);
+			if (name === 'dangerouslySetInnerHTML') return null;
+			if (name === 'href') hasHref = true;
+			else if (name === 'precedence') hasPrecedence = true;
+		}
+		return hasHref && hasPrecedence ? 'style' : null;
+	}
+	if (n.type !== 'JSXElement' && n.type !== 'Element') return null;
+	const tag = jsxTagName(n) || elementTagName(n);
+	if (tag !== 'link' && tag !== 'script') return null;
+	const attrs = n.attributes || n.openingElement?.attributes || [];
+	let hasPrecedence = false;
+	let relStylesheet = false;
+	let hasHref = false;
+	let hasAsync = false;
+	let hasSrc = false;
+	for (const attr of attrs) {
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+		const name = jsxAttrRawName(attr);
+		// Handlers keep the element per-site (matching React: a load/error
+		// listener needs an owned instance); markup injection disqualifies too.
+		if (name === 'onLoad' || name === 'onError' || name === 'dangerouslySetInnerHTML') return null;
+		if (name === 'precedence') hasPrecedence = true;
+		else if (name === 'href') hasHref = true;
+		else if (name === 'async') {
+			// A statically-false `async={false}` is not an async script; any other
+			// form (bare, true, or a dynamic expression) classifies as a resource.
+			const val = attr.value;
+			const inner = val && val.type === 'JSXExpressionContainer' ? val.expression : val;
+			hasAsync = !(
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'BooleanLiteral') &&
+				inner.value === false
+			);
+		} else if (name === 'src') hasSrc = true;
+		else if (name === 'rel') {
+			const val = attr.value;
+			const inner = val && val.type === 'JSXExpressionContainer' ? val.expression : val;
+			relStylesheet =
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'StringLiteral') &&
+				inner.value === 'stylesheet';
+		}
+	}
+	if (tag === 'link') return relStylesheet && hasPrecedence && hasHref ? 'stylesheet' : null;
+	if (!hasAsync || !hasSrc) return null;
+	// An inline body (raw script text or non-whitespace children) keeps the
+	// script in its authored position — only external async scripts hoist.
+	if (typeof n.content === 'string' && n.content.trim() !== '') return null;
+	for (const child of n.children || []) {
+		if ((child.type === 'JSXText' || child.type === 'Text') && /^\s*$/.test(child.value ?? ''))
+			continue;
+		return null;
+	}
+	return 'script';
+}
+
 // Deterministic per-element key bridging the client `headBlock` (its scope-state
 // key + SSR-marker adoption) and the server `ssrHeadEl` marker. Bundlers pass a
 // canonical root-relative module id; direct compiler callers already need to
@@ -18463,10 +18730,9 @@ function rewriteOpaqueTitles(node, ctx, namespace = 'html') {
 // object-literal expression (dynamic values stay live expressions, so the
 // metadata is reactive); a `<title>`'s text becomes a string-concat expression;
 // void tags (`<meta>`/`<link>`) pass `null` for text.
-/** @param {any} node @param {number} index @param {any} ctx @returns {string} */
-function headElementArgNodes(node, index, ctx) {
-	const el = node.element;
-	const tag = jsxTagName(el);
+/** Attribute object-literal expression for a hoisted head element or resource. */
+/** @param {any} el @returns {any} */
+function headAttrsExpression(el) {
 	const attrProps = [];
 	for (const a of el.openingElement.attributes || []) {
 		if (a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute') {
@@ -18499,7 +18765,14 @@ function headElementArgNodes(node, index, ctx) {
 			attrProps.push(b.prop('init', b.literal(attrName), inner));
 		}
 	}
-	const attrsExpr = attrProps.length ? b.object(attrProps) : b.literal(null);
+	return attrProps.length ? b.object(attrProps) : b.literal(null);
+}
+
+/** @param {any} node @param {number} index @param {any} ctx @returns {string} */
+function headElementArgNodes(node, index, ctx) {
+	const el = node.element;
+	const tag = jsxTagName(el);
+	const attrsExpr = headAttrsExpression(el);
 	const textExpr = VOID_ELEMENTS.has(tag) ? b.literal(null) : headTextExpression(el);
 	return [
 		b.literal(headKey(el, index, ctx), undefined, el),
@@ -18509,16 +18782,55 @@ function headElementArgNodes(node, index, ctx) {
 	];
 }
 
+// A Float style resource ships its authored CSS verbatim-by-meaning: the parsed
+// StyleSheet re-renders WITHOUT the scoping pipeline (no analyze/prepare), so
+// selectors and rules come out unscoped. Serialization normalizes whitespace,
+// which is invisible to the resource contract (identity is the href).
+/** @param {any} el @returns {any} */
+function styleResourceCssExpression(el) {
+	const sheet = (el.children || []).find((c) => c && c.type === 'StyleSheet');
+	if (!sheet) return b.literal('');
+	const css = renderStylesheets([cloneAstNode(sheet)]);
+	return b.literal(css, JSON.stringify(css), el);
+}
+
+/** Shared resource-call argument list for the head emitters. */
+/** @param {any} el @param {'stylesheet'|'script'|'style'} kind @returns {any[]} */
+function headResourceArgNodes(el, kind) {
+	const args = [inheritOriginLoc(headAttrsExpression(el), el)];
+	if (kind === 'style') args.push(inheritOriginLoc(styleResourceCssExpression(el), el));
+	return args;
+}
+
 // Build the CLIENT `headBlock(__s, …)` statement NODES for a component's
 // hoisted head elements (one per `HeadHoist`). Returns [] when there are none.
 /** @param {any[]} headNodes @param {any} ctx @param {number} slotBase */
 function emitHeadClient(headNodes, ctx, slotBase) {
 	if (!headNodes.length) return [];
-	ctx.runtimeNeeded.add('headBlock');
 	// Each hoisted head element gets a dense scope slot (after the body's constructs);
-	// the content `key` stays as a later arg for SSR-adoption matching.
-	return headNodes.map((h, i) =>
-		inheritOriginLoc(
+	// the content `key` stays as a later arg for SSR-adoption matching. RESOURCE
+	// elements (stylesheet precedence links, style resources, async scripts) are
+	// global and scope-free: they dedupe by href/src at runtime, so their call
+	// carries only the attrs object (plus the CSS text for style resources).
+	// Their slot index is left unoccupied to keep the numbering of neighbouring
+	// headBlock slots stable regardless of classification.
+	return headNodes.map((h, i) => {
+		const kind = headResourceKind(h.element);
+		if (kind !== null) {
+			const fn =
+				kind === 'stylesheet'
+					? 'stylesheetResource'
+					: kind === 'style'
+						? 'styleResource'
+						: 'scriptResource';
+			ctx.runtimeNeeded.add(fn);
+			return inheritOriginLoc(
+				b.stmt(b.call('_$' + fn, ...headResourceArgNodes(h.element, kind))),
+				h.element ?? h,
+			);
+		}
+		ctx.runtimeNeeded.add('headBlock');
+		return inheritOriginLoc(
 			b.stmt(
 				b.call(
 					'_$headBlock',
@@ -18528,8 +18840,8 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 				),
 			),
 			h.element ?? h,
-		),
-	);
+		);
+	});
 }
 
 // Build the SERVER `ssrHeadEl(…)` statement nodes for a component's hoisted
@@ -18537,13 +18849,27 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 /** @param {any[]} headNodes @param {any} ctx @returns {any[]} */
 function emitHeadServer(headNodes, ctx) {
 	if (!headNodes.length) return [];
-	ctx.runtimeNeeded.add('ssrHeadEl');
-	return headNodes.map((head, index) =>
-		inheritOriginLoc(
+	return headNodes.map((head, index) => {
+		const kind = headResourceKind(head.element);
+		if (kind !== null) {
+			const fn =
+				kind === 'stylesheet'
+					? 'ssrStylesheetResource'
+					: kind === 'style'
+						? 'ssrStyleResource'
+						: 'ssrScriptResource';
+			ctx.runtimeNeeded.add(fn);
+			return inheritOriginLoc(
+				b.stmt(b.call('_$' + fn, ...headResourceArgNodes(head.element, kind))),
+				head.element ?? head,
+			);
+		}
+		ctx.runtimeNeeded.add('ssrHeadEl');
+		return inheritOriginLoc(
 			b.stmt(b.call('_$ssrHeadEl', ...headElementArgNodes(head, index, ctx))),
 			head.element ?? head,
-		),
-	);
+		);
+	});
 }
 
 /**
@@ -18690,7 +19016,10 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 			// body DOM). Kept in `out` as a synthetic node so planJsx / ssrCompileBody
 			// can partition it out and emit it via headBlock (client) / ssrHeadEl
 			// (server). SVG `<title>` and explicit resource-handler links stay inline.
-			if (isHoistableHeadElementNode(n) && !(inSvg && jsxTagName(n) === 'title')) {
+			if (
+				(isHoistableHeadElementNode(n) || (!inSvg && headResourceKind(n) !== null)) &&
+				!(inSvg && jsxTagName(n) === 'title')
+			) {
 				out.push({ type: 'HeadHoist', element: n });
 				continue;
 			}
@@ -18717,6 +19046,12 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
 			out.push(...normalizeChildren(n.children || [], inSvg, ctx));
 		} else if (n.type === 'JSXStyleElement') {
+			// `<style href precedence>` is a Float style resource, not scoped CSS —
+			// partition it to the head channel like precedence links.
+			if (!inSvg && headResourceKind(n) === 'style') {
+				out.push({ type: 'HeadHoist', element: n });
+				continue;
+			}
 			// Drop a `<style>` block at child position — its CSS gets registered
 			// via the @tsrx/core scoping pipeline (applyCssScoping / applyStyleMap);
 			// it contributes no DOM here.
@@ -19234,6 +19569,12 @@ function planJsx(
 	// `null` outside dev → zero work, prod output byte-identical.
 	const _prevElemLocs = ctx._elemLocs;
 	ctx._elemLocs = ctx.dev ? new Map() : null;
+	// NESTED HeadHoists lifted out of host-element children during the walk (see
+	// emitNodeHtml's element case) join this plan's head list, so client mounts
+	// match the server's any-depth hoisting. Saved/restored per plan: an @if
+	// arm's sub-plan owns its own list, keeping arm-conditional hoists scoped.
+	const _prevNestedHeads = ctx._nestedHeadHoists;
+	ctx._nestedHeadHoists = [];
 	const allNodes = normalizeChildren(jsxNodesRaw, parentNs === 'svg', ctx);
 	// Partition hoisted `<title>`/`<meta>`/eligible `<link>` out of the BODY-root set:
 	// `jsxNodes` (the body) drives single/multi-root + the template, while head
@@ -19252,6 +19593,7 @@ function planJsx(
 	// its constructs (see `headEmit` below), keeping every scope's `slots` packed.
 	if (jsxNodes.length === 0) {
 		ctx._elemLocs = _prevElemLocs;
+		ctx._nestedHeadHoists = _prevNestedHeads;
 		return {
 			hasBag: false,
 			mount: [],
@@ -20035,7 +20377,13 @@ function planJsx(
 	for (let i = 0; i < allConstructs.length; i++) allConstructs[i].slotIndex = i + slotBase;
 	// Hoisted head elements take the slots AFTER the constructs (and `plan.head` runs
 	// after `plan.after`), so the scope's `slots` array fills 0,1,…,N,N+1,… packed.
-	const headEmit = emitHeadClient(headNodes, ctx, allConstructs.length + slotBase);
+	const nestedHeadHoists = ctx._nestedHeadHoists ?? [];
+	ctx._nestedHeadHoists = _prevNestedHeads;
+	const headEmit = emitHeadClient(
+		[...headNodes, ...nestedHeadHoists],
+		ctx,
+		allConstructs.length + slotBase,
+	);
 	// Is a construct's host a real in-template element (append / insert INTO it) vs
 	// the block's own parentNode (insert BEFORE __block.endMarker so the slot's range
 	// stays inside the block)? In-template hosts are the navigated `_el…` vars and the
@@ -23043,7 +23391,22 @@ function emitElementHtml(
 		appendTemplatePart(html, escapeInlineScriptContent(authoredStaticScriptContent), 'raw');
 	}
 
-	const children = normalizeChildren(sourceChildren, childNs === 'svg', ctx);
+	let children = normalizeChildren(sourceChildren, childNs === 'svg', ctx);
+	// NESTED document metadata / Float resources are zero-DOM children: lift
+	// them to the enclosing plan's head list (mounted out-of-band by
+	// emitHeadClient — scope-owned metadata, global resources), mirroring the
+	// server's expression-position emission and keeping child indices aligned
+	// with the server markup for hydration.
+	if (ctx._nestedHeadHoists !== undefined && ctx._nestedHeadHoists !== null) {
+		let hasNestedHoist = false;
+		for (const child of children) {
+			if (child.type === 'HeadHoist') {
+				ctx._nestedHeadHoists.push(child);
+				hasNestedHoist = true;
+			}
+		}
+		if (hasNestedHoist) children = children.filter((n) => n.type !== 'HeadHoist');
+	}
 	// Special case: a single Text child (only-child text fast path).
 	if (children.length === 1 && children[0].type === 'Text') {
 		const txtChild = children[0];
@@ -23782,7 +24145,9 @@ function isActivityLongForm(node) {
 	const name = node.openingElement?.name || node.id;
 	if (!name) return false;
 	if (name.type !== 'Identifier' && name.type !== 'JSXIdentifier') return false;
-	return name.name === 'Activity';
+	// `unstable_Activity` mirrors the unstable_ViewTransition alias so React
+	// experimental-channel ports compile unchanged.
+	return name.name === 'Activity' || name.name === 'unstable_Activity';
 }
 
 // ===========================================================================

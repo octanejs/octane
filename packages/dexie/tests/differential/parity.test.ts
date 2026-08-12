@@ -1,7 +1,10 @@
 import Dexie from 'dexie';
 import { resolve } from 'node:path';
 import { describe, it } from 'vitest';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/live-query.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
@@ -9,6 +12,8 @@ const CACHE = resolve(__dirname, '.react-cache');
 async function settleIndexedDb() {
 	for (let index = 0; index < 5; index++) await new Promise((resolve) => setTimeout(resolve, 0));
 }
+
+await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
 
 describe('differential: @octanejs/dexie vs dexie-react-hooks', () => {
 	// @parity-case differential:dexie-live-query

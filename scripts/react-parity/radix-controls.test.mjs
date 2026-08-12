@@ -11,15 +11,18 @@ const manifest = JSON.parse(
 );
 
 test('radix classifies every port-authored test exactly once', () => {
-	const discovered = readdirSync(resolve(root, 'packages/radix/tests'), {
-		recursive: true,
-		withFileTypes: true,
-	})
-		.filter((entry) => entry.isFile() && /\.test\.(?:ts|tsx|tsrx)$/.test(entry.name))
-		.map((entry) =>
-			relative(root, resolve(entry.parentPath ?? entry.path, entry.name))
-				.split(sep)
-				.join('/'),
+	const discovered = ['packages/radix/tests', 'packages/radix/typetests']
+		.flatMap((relativeRoot) =>
+			readdirSync(resolve(root, relativeRoot), {
+				recursive: true,
+				withFileTypes: true,
+			})
+				.filter((entry) => entry.isFile() && /\.(?:test|test-d)\.(?:ts|tsx|tsrx)$/.test(entry.name))
+				.map((entry) =>
+					relative(root, resolve(entry.parentPath ?? entry.path, entry.name))
+						.split(sep)
+						.join('/'),
+				),
 		)
 		.sort();
 	const declared = JSON.parse(

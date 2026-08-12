@@ -17,23 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/tanstack-virtual/src"
-      ],
-      "include": [
-        "\\.ts$"
-      ],
-      "exclude": [
-        "\\.d\\.ts$"
-      ]
+      "roots": ["packages/tanstack-virtual/src"],
+      "include": ["\\.ts$"],
+      "exclude": ["\\.d\\.ts$"]
     },
     "tests": {
-      "roots": [
-        "packages/tanstack-virtual/tests/differential"
-      ],
-      "include": [
-        "parity\\.test\\.ts$"
-      ],
+      "roots": ["packages/tanstack-virtual/tests/differential"],
+      "include": ["parity\\.test\\.ts$"],
       "exclude": []
     }
   },
@@ -50,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "9bfa66384d7cd40cb59b589c777f176cc5f8dc6a3f17a865039e902402bea226"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -66,7 +56,7 @@
         {
           "path": "packages/tanstack-virtual/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "9a7522bc1831f25886271f13df6a9933bc8e181438139d9027d9815f2ce04327",
+          "sha256": "fbbd98059795df792e88a96856db3232fec66d705f76727a2e83e9023ca38cfb",
           "cases": [
             {
               "id": "differential:tanstack-virtual-basic",
@@ -144,9 +134,7 @@
   "divergences": [
     {
       "id": "nested-flushsync-degradation",
-      "caseIds": [
-        "conformance:nested-flush-sync-scroll"
-      ],
+      "caseIds": ["conformance:nested-flush-sync-scroll"],
       "upstreamResult": "Nested flushSync during a sync scroll notify re-enters React and applies the window update inside the nested flush.",
       "octaneResult": "Nested flushSync hits Octane's re-entrancy guard and degrades to a plain dispatch drained by the ambient flush; the window still updates once that flush settles.",
       "rationale": "Octane intentionally refuses nested flushSync; the adapter preserves upstream's flushSync-on-sync-scroll wiring and relies on the ambient flush to land the update.",

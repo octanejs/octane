@@ -9,7 +9,10 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const BASIC = resolve(__dirname, '../_fixtures/basic-list-diff.tsrx');
 const HORIZONTAL = resolve(__dirname, '../_fixtures/horizontal-diff.tsrx');
@@ -22,6 +25,13 @@ const CACHE = resolve(__dirname, '.react-cache');
 // Scroll notifies + isScrolling resets (10ms in fixtures) + the scrollToIndex
 // rAF reconcile all settle inside this window.
 const settle = (ms = 60) => new Promise((r) => setTimeout(r, ms));
+
+await Promise.all([
+	preloadDifferentialFixture(BASIC, CACHE),
+	preloadDifferentialFixture(HORIZONTAL, CACHE),
+	preloadDifferentialFixture(DYNAMIC, CACHE),
+	preloadDifferentialFixture(WINDOW, CACHE),
+]);
 
 describe('differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtual', () => {
 	// @parity-case differential:tanstack-virtual-basic

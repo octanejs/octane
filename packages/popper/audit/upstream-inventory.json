@@ -10,12 +10,7 @@
     "license": "MIT"
   },
   "publicSurface": {
-    "runtimeExports": [
-      "Manager",
-      "Popper",
-      "Reference",
-      "usePopper"
-    ],
+    "runtimeExports": ["Manager", "Popper", "Reference", "usePopper"],
     "typeExports": [
       "ManagerProps",
       "Modifier",
@@ -27,9 +22,7 @@
       "ReferenceProps",
       "StrictModifier"
     ],
-    "subpaths": [
-      "."
-    ]
+    "subpaths": ["."]
   },
   "artifacts": [
     {
@@ -507,9 +500,7 @@
       "evidence": "tests/upstream/Popper.test.tsx::handles changing refs gracefully",
       "adaptedStructure": {
         "title": "handles changing refs gracefully",
-        "tokens": [
-          "assert:function mountTwice("
-        ],
+        "tokens": ["assert:function mountTwice("],
         "sha256": "662f589ebd1ee5eef0d595956448b4a89a6b4455c1f0052490900d59b09dba61"
       }
     },
@@ -595,11 +586,7 @@
       "evidence": "tests/upstream/Reference.test.tsx::consumes the ManagerReferenceNodeSetterContext from Manager",
       "adaptedStructure": {
         "title": "consumes the ManagerReferenceNodeSetterContext from Manager",
-        "tokens": [
-          "assert:setReferenceNode.toHaveBeenCalled",
-          "spy:",
-          "matcher:toHaveBeenCalled:"
-        ],
+        "tokens": ["assert:setReferenceNode.toHaveBeenCalled", "spy:", "matcher:toHaveBeenCalled:"],
         "sha256": "1a2f6db8d668649cf1127efec4a5f07b1fe1477284bf9c6e125c9febc2d2ff16"
       }
     },
@@ -609,12 +596,7 @@
       "evidence": "tests/upstream/Reference.test.tsx::warns when setReferenceNode is present",
       "adaptedStructure": {
         "title": "warns when setReferenceNode is present",
-        "tokens": [
-          "assert:error.not",
-          "spy:console, 'error'",
-          "spy:",
-          "matcher:toHaveBeenCalled:"
-        ],
+        "tokens": ["assert:error.not", "spy:console, 'error'", "spy:", "matcher:toHaveBeenCalled:"],
         "sha256": "f661bdb2254454466bcb7e64507f4583d4d45b916e3daf6e47317a17c0125595"
       }
     },

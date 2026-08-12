@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "5a749378c08a639316508fea6da6dcaaffdf8039e29ccb2ee6ec244028c98ed2"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -81,7 +81,7 @@
         {
           "path": "scripts/react-parity/jest-full-runner.mjs",
           "role": "support",
-          "sha256": "e6b4e02afb9953e3d469a026d21e0d4dbb9244debcf352926b017144fa6efacf"
+          "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
         }
       ]
     },
@@ -116,7 +116,7 @@
         {
           "path": "packages/colorful/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "9ecffccea1d5a36042eec481824b142694aa14c0acc6cf5ba0009df74b645ab9",
+          "sha256": "c33e226938cc05eb4f5cb6ab8a7491fbbb6f2500f508580158a0c733be70dad1",
           "cases": [
             {
               "id": "differential:react-colorful-controlled",

@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "47137830d3f76e5a87be45044717ec5360f2f11880e3f8a8de83cb9b1d01db28"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -207,7 +207,7 @@
         {
           "path": "packages/tanstack-hotkeys/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "bc4dfc1d3a47aec6a5ba85bbeebb4441ff9818a606ad770ee59214d500fb1052",
+          "sha256": "942f0dd704c575509d510fa70c3d45d3365c035839e675236d63e85422e8454e",
           "cases": [
             {
               "id": "differential:tanstack-hotkeys-keyboard-lifecycle",
@@ -229,12 +229,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "334a31e474d42c6721720e4776975e1a25b31871675eb020dffaf3653f429bd5"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     }

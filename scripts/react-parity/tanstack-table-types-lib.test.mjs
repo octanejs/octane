@@ -49,10 +49,7 @@ test('rejects deleting an adapted assertion group', async function rejectsDelete
 	const source = await readFile(file, 'utf8');
 	await writeFile(
 		file,
-		source.replace(
-			/\n\/\/ 4\. flexRender[\s\S]*?(?=\n\/\/ 5\. createTableHookContexts)/,
-			'\n',
-		),
+		source.replace(/\n\/\/ 4\. flexRender[\s\S]*?(?=\n\/\/ 5\. createTableHookContexts)/, '\n'),
 	);
 	assert.throws(function run() {
 		buildTypeInventory(value.root, value.config);

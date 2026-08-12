@@ -28,7 +28,9 @@ export function IntersectionObserverDemo() @{
 				transition: 'background 180ms ease, color 180ms ease',
 			}}
 		>
-			<strong>{inView ? 'Target is at least 50% visible' : 'Target is outside the threshold'}</strong>
+			<strong>
+				{inView ? 'Target is at least 50% visible' : 'Target is outside the threshold'}
+			</strong>
 			<small>{`ratio: ${(entry?.intersectionRatio ?? 0).toFixed(2)}`}</small>
 		</section>
 	</div>

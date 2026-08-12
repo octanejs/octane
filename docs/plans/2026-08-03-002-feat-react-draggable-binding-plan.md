@@ -12,7 +12,7 @@ execution: code
 
 ## Goal Capsule
 
-- **Objective:** Add `@octanejs/react-draggable` as an exact, source-accounted port of `react-draggable@4.7.1`, with executable runtime, type, SSR, hydration, real-browser, provenance, and packed-consumer evidence.
+- **Objective:** Add `@octanejs/draggable` as an exact, source-accounted port of `react-draggable@4.7.1`, with executable runtime, type, SSR, hydration, real-browser, provenance, and packed-consumer evidence.
 - **Authority:** The published `react-draggable@4.7.1` npm runtime files and declarations are the consumer-contract authority. The pinned repository tag supplies source and test provenance. Every discrepancy between those artifacts must receive an explicit parity-ledger disposition before implementation evidence can pass. Octane repository guidance defines acceptable framework adaptations and proof.
 - **Execution profile:** Use one isolated binding branch and one draft PR. A cross-cutting runtime, compiler, browser-runner, or package-condition defect belongs in a separate prerequisite PR unless the change is demonstrably binding-owned.
 - **Stop conditions:** Stop rather than claim parity if license provenance is incomplete, an upstream export or test lacks a disposition, class-to-hook adaptation changes a consumer-visible contract, or required native drag behavior cannot be proven in a real browser.
@@ -24,7 +24,7 @@ execution: code
 
 ### Summary
 
-Applications that import `react-draggable` should be able to map the package to `@octanejs/react-draggable` without replacing its component API or drag semantics with a merely similar abstraction. The port targets the complete public contract of the current `4.7.1` release.
+Applications that import `react-draggable` should be able to map the package to `@octanejs/draggable` without replacing its component API or drag semantics with a merely similar abstraction. The port targets the complete public contract of the current `4.7.1` release.
 
 ### Problem Frame
 
@@ -90,7 +90,7 @@ Octane already offers DnD Kit, but DnD Kit does not implement the `react-draggab
 ### Key Technical Decisions
 
 - KTD1. **Port the current package exactly.** Target `react-draggable@4.7.1` rather than an older release or a similar drag API. (session-settled: user-directed — chosen over different-but-similar Octane alternatives: the migration list is based on exact `package.json` equivalents.) Governs R1-R14.
-- KTD2. **Keep one binding in one draft PR.** This branch owns only `@octanejs/react-draggable` and binding-local integration. (session-settled: user-directed — chosen over batching bindings or promoting green PRs automatically: the campaign requires one PR per binding and maintainer-controlled readiness.) Governs R14.
+- KTD2. **Keep one binding in one draft PR.** This branch owns only `@octanejs/draggable` and binding-local integration. (session-settled: user-directed — chosen over batching bindings or promoting green PRs automatically: the campaign requires one PR per binding and maintainer-controlled readiness.) Governs R14.
 - KTD3. **Rewrite class ownership without changing the state machine.** Re-author `Draggable` and `DraggableCore` as hook-backed Octane functions while preserving upstream mutable drag fields, current-props visibility, callback cancellation, and document-listener cleanup. A wrapper around DnD Kit would change R5-R10 and is rejected.
 - KTD4. **Treat `nodeRef` as an exact React 19 boundary.** Preserve the pinned runtime failure when no node can be resolved, keep the older-compatible optional public type, and never add `findDOMNode` or implicit element discovery. Governs R3 and R9.
 - KTD5. **Use Octane child primitives at the framework seam.** Preserve the one-child/no-wrapper DOM contract with Octane `Children.only`, `cloneElement`, and refs-as-props; retain non-drag props but replace the same drag event handlers that upstream replaces; then prove identity, classes, style, SVG attributes, and custom components against React. Composing those handlers would be a documented divergence and is rejected unless pinned React evidence contradicts the source reading. Governs R5, R9, and R11.
@@ -107,7 +107,7 @@ flowchart TB
   B --> D["Hook-backed DraggableCore native input state machine"]
   C --> D
   D --> E["Hook-backed Draggable child transform and controlled state"]
-  E --> F["@octanejs/react-draggable root package"]
+  E --> F["@octanejs/draggable root package"]
   B --> G["Pristine React and adapted Octane evidence inventories"]
   F --> H["SSR and hydration adoption"]
   F --> I["Chromium and Firefox mouse/touch/layout journeys"]
@@ -156,7 +156,7 @@ stateDiagram-v2
 - **Goal:** Establish an immutable, legally distributable, fail-closed work list before porting behavior.
 - **Requirements:** R1-R4, R12-R13; KTD1, KTD7.
 - **Dependencies:** None.
-- **Files:** `packages/react-draggable/upstream/**`, `packages/react-draggable/UPSTREAM.md`, `packages/react-draggable/LICENSE`, `packages/react-draggable/audit/**`, `packages/react-draggable/tests/audit/**`, `packages/react-draggable/package.json`.
+- **Files:** `packages/draggable/upstream/**`, `packages/draggable/UPSTREAM.md`, `packages/draggable/LICENSE`, `packages/draggable/audit/**`, `packages/draggable/tests/audit/**`, `packages/draggable/package.json`.
 - **Approach:** Vendor the tagged `lib/`, `test/`, declarations, fixtures, package metadata, and license byte-exact; record npm and Git coordinates; inventory exports, files, 204 unit/type identities, 23 browser identities, and allowed transformations; keep vendored evidence out of published files.
 - **Execution note:** Establish mutation controls before adapted source so later green tests cannot redefine the work list.
 - **Patterns to follow:** `packages/three/UPSTREAM.md`, `scripts/react-parity/`, and exact-port audit manifests present on current main.
@@ -172,7 +172,7 @@ stateDiagram-v2
 - **Goal:** Prove the highest-risk React-to-Octane boundaries before broad transcription.
 - **Requirements:** R5, R8-R11; KTD3-KTD6, KTD8; AE4.
 - **Dependencies:** U1.
-- **Files:** `packages/react-draggable/tests/feasibility/**`, `packages/react-draggable/src/internal.ts`, `vitest.config.js`.
+- **Files:** `packages/draggable/tests/feasibility/**`, `packages/draggable/src/internal.ts`, `vitest.config.js`.
 - **Approach:** Build minimal source-attributed fixtures for one-child cloning and handler replacement, ref forwarding, the per-path React 19 missing-`nodeRef` behavior, stable listener identity with live props across rerenders, owner-document native listeners, passive touch, SSR/hydration adoption, and HTML-to-SVG post-mount transform selection. Stop for an owning prerequisite if the exact observable seam is not representable.
 - **Execution note:** Treat this as a hard gate; do not compensate for an Octane ownership gap with an application-facing API change.
 - **Patterns to follow:** `packages/octane/tests/clone-children.test.ts`, `packages/octane/tests/differential/clone-children.test.ts`, binding-local ref handling in current main, and `packages/dnd-kit/tests/hydration/`.
@@ -189,7 +189,7 @@ stateDiagram-v2
 - **Goal:** Reproduce the pinned coordinate, selector, listener, touch, and callback-only core contract.
 - **Requirements:** R4, R7-R10, R12; KTD3, KTD4, KTD6-KTD7; AE3.
 - **Dependencies:** U1-U2.
-- **Files:** `packages/react-draggable/src/utils/**`, `packages/react-draggable/src/DraggableCore.tsrx`, `packages/react-draggable/tests/upstream/**`, `packages/react-draggable/tests/differential/**`, `packages/react-draggable/tests/runtime/**`.
+- **Files:** `packages/draggable/src/utils/**`, `packages/draggable/src/DraggableCore.tsrx`, `packages/draggable/tests/upstream/**`, `packages/draggable/tests/differential/**`, `packages/draggable/tests/runtime/**`.
 - **Approach:** Preserve pure utility modules with source correspondence; translate the class-owned fields and lifecycle into stable hook state; attach move/stop listeners to the node’s owner document; keep callback cancellation and touch identifier semantics exactly at upstream boundaries.
 - **Execution note:** Port upstream utility and core cases in source order and classify each failure before changing an assertion.
 - **Patterns to follow:** `packages/dnd-kit/src/` for native drag integration, `packages/floating-ui/` for manual hook-slot ownership, and binding-local native cleanup patterns.
@@ -207,7 +207,7 @@ stateDiagram-v2
 - **Goal:** Publish the exact visual component and complete public runtime/type surface over U3.
 - **Requirements:** R2-R7, R9-R12; KTD3-KTD5, KTD7-KTD8; AE1-AE2.
 - **Dependencies:** U3.
-- **Files:** `packages/react-draggable/src/Draggable.tsrx`, `packages/react-draggable/src/index.ts`, `packages/react-draggable/src/types.ts`, `packages/react-draggable/tests/upstream/**`, `packages/react-draggable/tests/differential/**`, `packages/react-draggable/tests/runtime/**`, `packages/react-draggable/typetests/**`.
+- **Files:** `packages/draggable/src/Draggable.tsrx`, `packages/draggable/src/index.ts`, `packages/draggable/src/types.ts`, `packages/draggable/tests/upstream/**`, `packages/draggable/tests/differential/**`, `packages/draggable/tests/runtime/**`, `packages/draggable/typetests/**`.
 - **Approach:** Preserve the upstream controlled/uncontrolled state transitions, grid/slack/bounds math, class transitions, HTML/SVG transforms, offsets, and one-child cloning; expose only the pinned root exports and adapt declarations only where Octane’s framework types require a documented mapping.
 - **Execution note:** Run pristine and adapted type programs alongside runtime cases so source adaptation cannot silently widen or narrow the API.
 - **Patterns to follow:** Public declaration and differential patterns in current exact bindings, plus `packages/octane/tests/differential/_rig.ts`.
@@ -224,7 +224,7 @@ stateDiagram-v2
 - **Goal:** Prove rendering and native interaction contracts that unit tests cannot establish.
 - **Requirements:** R5-R13; KTD4-KTD7; AE1-AE4.
 - **Dependencies:** U4 and the shared Firefox runner before the final completeness claim.
-- **Files:** `packages/react-draggable/tests/ssr/**`, `packages/react-draggable/tests/hydration/**`, `packages/react-draggable/tests/browser/**`, `packages/react-draggable/audit/react-parity.json`, `vitest.config.js`.
+- **Files:** `packages/draggable/tests/ssr/**`, `packages/draggable/tests/hydration/**`, `packages/draggable/tests/browser/**`, `packages/draggable/audit/react-parity.json`, `vitest.config.js`.
 - **Approach:** Register non-overlapping pristine, adapted, differential, SSR, hydration, and browser projects in the generic parity group; run paired React/Octane Chromium and Firefox journeys with real geometry, mouse/touch input, owner documents, Shadow DOM, SVG, focus, and teardown.
 - **Patterns to follow:** `docs/react-parity-testing.md`, current-main parity manifests, `packages/dnd-kit/tests/browser/`, and `packages/dnd-kit/tests/hydration/`; revalidate any draft-PR precedent only after its exact head is consumed.
 - **Test scenarios:**
@@ -241,13 +241,13 @@ stateDiagram-v2
 - **Goal:** Make the binding discoverable and consumable through every supported Octane migration and release surface.
 - **Requirements:** R1-R4, R10, R12-R14; KTD1-KTD2, KTD7; AE5.
 - **Dependencies:** U1-U5; shared CommonJS package conditions before a CommonJS completeness claim.
-- **Files:** `packages/react-draggable/package.json`, `packages/react-draggable/README.md`, `packages/react-draggable/status.json`, `.changeset/*.md`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `vitest.config.js`, `packages/octane-mcp-server/src/bridge.js`, `packages/octane-mcp-server/src/bridge.test.js`, `website/src/content/bindings.json`, `playground/octane/package.json`, `playground/octane/src/catalog.ts`, `playground/octane/src/demos/ReactDraggable.tsrx`, `scripts/check-package-packs.mjs`, generated binding/package/CLI/eval inventories.
+- **Files:** `packages/draggable/package.json`, `packages/draggable/README.md`, `packages/draggable/status.json`, `.changeset/*.md`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `vitest.config.js`, `packages/octane-mcp-server/src/bridge.js`, `packages/octane-mcp-server/src/bridge.test.js`, `website/src/content/bindings.json`, `playground/octane/package.json`, `playground/octane/src/catalog.ts`, `playground/octane/src/demos/ReactDraggable.tsrx`, `scripts/check-package-packs.mjs`, generated binding/package/CLI/eval inventories.
 - **Approach:** Publish authored source, declarations, README, UPSTREAM record, and license but exclude vendored tests/audit evidence; add exact migration mapping and a representative playground demo; generate status/catalog artifacts; validate installed tarballs outside the workspace with one Octane runtime.
 - **Execution note:** Use installed-tarball behavior as the release oracle rather than package-internal imports.
 - **Patterns to follow:** Current binding manifests, `packages/octane-mcp-server/src/bridge.js`, `scripts/check-package-packs.mjs`, and playground catalog entries.
 - **Test scenarios:**
   - Covers AE5. An outside-workspace consumer imports the default and named exports plus all public types, builds client/server bundles, executes SSR/hydration/browser smoke, and resolves no React runtime.
-  - `react-draggable` maps exactly to `@octanejs/react-draggable` through MCP and package migration data; near-name or already-bound packages are not remapped.
+  - `react-draggable` maps exactly to `@octanejs/draggable` through MCP and package migration data; near-name or already-bound packages are not remapped.
   - The packed tarball includes authored importable source, license, README, UPSTREAM record, and declarations while excluding vendored source/tests and audit fixtures.
   - Status, website, package, parity-gap, CLI, MCP, and eval inventories fail when the package or mapping is omitted and are current after synchronization.
   - The playground demo proves uncontrolled bounds/grid and controlled reset behavior in a production build and interactive browser journey.
@@ -273,7 +273,7 @@ stateDiagram-v2
 
 ## Definition of Done
 
-- `@octanejs/react-draggable` exposes the complete pinned 4.7.1 runtime and type contract with no silent export, subpath, case, or behavioral gap.
+- `@octanejs/draggable` exposes the complete pinned 4.7.1 runtime and type contract with no silent export, subpath, case, or behavioral gap.
 - Every upstream source module, test artifact/case, browser case, fixture, and type assertion has one evidence-backed disposition, and mutation controls prove the inventories fail closed.
 - Pristine React, adapted Octane, differential, SSR, hydration, Chromium, Firefox, type, and packed-consumer lanes execute successfully on the final head.
 - Real-browser evidence proves layout, selector bounds, iframe, Shadow DOM, passive touch, focus, SVG, owner-document listeners, and cleanup; no jsdom-only claim substitutes for it.

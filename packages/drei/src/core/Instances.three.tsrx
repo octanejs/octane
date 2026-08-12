@@ -257,7 +257,9 @@ export function Merged({ meshes, children, ref, ...props }: MergedProps & {
 		) as InstanceComponent & Record<string, InstanceComponent>);
 	const rendered = typeof children === 'function' && !isOctaneChildrenBlock(children)
 		? renderRecursive(render, components)
-		: children as UniversalRenderable;
+		// A compiled children block is renderer-owned even though Merged's public render-prop
+		// signature makes TypeScript retain the callable branch here.
+		: children as unknown as UniversalRenderable;
 	<group ref={ref}>{rendered}</group>
 }
 

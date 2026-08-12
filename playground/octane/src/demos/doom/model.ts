@@ -127,7 +127,9 @@ export function isBlocked(state: GameState, point: Point, includeEnemies = true)
 }
 
 export function enemyCanOccupy(state: GameState, point: Point): boolean {
-	return !cellBlocks(point, 1.5) && !near(point, BLOCKING_PROP, 1.5) && !near(point, state.player, 1.5);
+	return (
+		!cellBlocks(point, 1.5) && !near(point, BLOCKING_PROP, 1.5) && !near(point, state.player, 1.5)
+	);
 }
 
 export function hasGridLineOfSight(from: Point, to: Point): boolean {

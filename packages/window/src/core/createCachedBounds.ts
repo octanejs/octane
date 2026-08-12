@@ -1,5 +1,5 @@
-import { assert } from '../utils/assert';
-import type { Bounds, CachedBounds, SizeFunction } from './types';
+import { assert } from '../utils/assert.js';
+import type { Bounds, CachedBounds, SizeFunction } from './types.js';
 
 export function createCachedBounds<Props extends object>({
 	itemCount,

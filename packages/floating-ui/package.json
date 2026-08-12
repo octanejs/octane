@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/floating-ui",
-  "version": "0.1.33",
+  "version": "0.1.34",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -32,8 +32,6 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md",
-    "dist/cjs"
     "dist/cjs",
     "README.md"
   ],
@@ -46,9 +44,6 @@
     }
   },
   "scripts": {
-    "test": "vitest run",
-    "build:cjs": "node ../../scripts/build-package-commonjs.mjs",
-    "prepack": "pnpm build:cjs"
     "build:cjs": "node ../../scripts/build-package-commonjs.mjs",
     "prepack": "pnpm build:cjs",
     "test": "vitest run"

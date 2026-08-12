@@ -17,21 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/hook-form/src"
-      ],
-      "include": [
-        "\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
-      ],
+      "roots": ["packages/hook-form/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/hook-form/tests/upstream"
-      ],
-      "include": [
-        "\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
-      ],
+      "roots": ["packages/hook-form/tests/upstream"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     }
   },
@@ -48,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "47137830d3f76e5a87be45044717ec5360f2f11880e3f8a8de83cb9b1d01db28"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -85,7 +77,7 @@
         {
           "path": "scripts/react-parity/jest-full-runner.mjs",
           "role": "support",
-          "sha256": "e6b4e02afb9953e3d469a026d21e0d4dbb9244debcf352926b017144fa6efacf"
+          "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
         },
         {
           "path": "packages/hook-form/upstream/SHA256SUMS",
@@ -212,6 +204,18 @@
           "path": "scripts/react-parity/hook-form-runtime-inventory.mjs",
           "role": "support",
           "sha256": "26f1db54fbb820fdf5657cb9606f343e59be36e5a040a22ea5ff552a72dab86a"
+        },
+        {
+          "path": "packages/hook-form/tests/upstream/useController.test.tsx",
+          "role": "test",
+          "sha256": "bdcd1b2ff94d9b1b81f847b300c64de2e39af5978748751563755129f193c5f7",
+          "cases": [
+            {
+              "id": "adapted:controller-on-input",
+              "testName": "should return a promise-like value from field.onInput",
+              "fullName": "useController should return a promise-like value from field.onInput"
+            }
+          ]
         }
       ]
     },
@@ -241,28 +245,6 @@
       ]
     },
     {
-      "id": "hook-form-adapted-controller",
-      "type": "adapted-octane",
-      "oracle": "required",
-      "environment": "workspace-node",
-      "project": "hook-form",
-      "notes": "An exact adapted upstream file; this is not a pristine upstream run.",
-      "files": [
-        {
-          "path": "packages/hook-form/tests/upstream/useController.test.tsx",
-          "role": "test",
-          "sha256": "bdcd1b2ff94d9b1b81f847b300c64de2e39af5978748751563755129f193c5f7",
-          "cases": [
-            {
-              "id": "adapted:controller-on-input",
-              "testName": "should return a promise-like value from field.onInput",
-              "fullName": "useController should return a promise-like value from field.onInput"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "id": "hook-form-differential",
       "type": "differential",
       "oracle": "required",
@@ -274,12 +256,12 @@
         {
           "path": "packages/hook-form/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "0ab7bf75290b94b61f3434faa7971cd7686a5dc6175f7b38713253114f550f0b",
+          "sha256": "dc6ae7228b5b4d7a67617a45a4c34c2615da3fcccb9e0188c1912258ead45101",
           "cases": [
             {
               "id": "differential:register",
-              "testName": "register: typing \u2192 per-keystroke validation \u2192 submit \u2192 reset renders byte-identical",
-              "fullName": "differential: @octanejs/hook-form vs real react-hook-form register: typing \u2192 per-keystroke validation \u2192 submit \u2192 reset renders byte-identical"
+              "testName": "register: typing → per-keystroke validation → submit → reset renders byte-identical",
+              "fullName": "differential: @octanejs/hook-form vs real react-hook-form register: typing → per-keystroke validation → submit → reset renders byte-identical"
             },
             {
               "id": "differential:controller",
@@ -301,7 +283,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "packages/hook-form/tests/differential/_setup.ts",
@@ -311,7 +293,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "334a31e474d42c6721720e4776975e1a25b31871675eb020dffaf3653f429bd5"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     }
@@ -319,9 +301,7 @@
   "divergences": [
     {
       "id": "hook-form-native-input-handler",
-      "caseIds": [
-        "adapted:controller-on-input"
-      ],
+      "caseIds": ["adapted:controller-on-input"],
       "upstreamResult": "Controller exposes field.onChange for React synthetic change events.",
       "octaneResult": "Controller exposes field.onInput for Octane native input events; mode and option names retain upstream onChange spelling.",
       "rationale": "Octane observes native per-keystroke input events rather than React synthetic change events.",
@@ -333,9 +313,7 @@
     },
     {
       "id": "hook-form-native-noop-input",
-      "caseIds": [
-        "runtime:4ca89a396197cd2e"
-      ],
+      "caseIds": ["runtime:4ca89a396197cd2e"],
       "upstreamResult": "React suppresses an input event when its tracked value is unchanged.",
       "octaneResult": "Octane delivers the native input event and react-hook-form notifies its value subscribers.",
       "rationale": "Octane intentionally uses native DOM events without React's synthetic value tracker.",
@@ -363,9 +341,7 @@
     },
     {
       "id": "hook-form-duplicate-resolver-notification",
-      "caseIds": [
-        "runtime:375cd9f568ef4f2c"
-      ],
+      "caseIds": ["runtime:375cd9f568ef4f2c"],
       "upstreamResult": "React batching exposes two resolver state commits.",
       "octaneResult": "Octane exposes a third content-identical resolver state commit.",
       "rationale": "Separate Octane render passes expose notifications React automatically coalesces.",
@@ -377,9 +353,7 @@
     },
     {
       "id": "hook-form-act-flush-boundary",
-      "caseIds": [
-        "runtime:3b2b7a4e701f007a"
-      ],
+      "caseIds": ["runtime:3b2b7a4e701f007a"],
       "upstreamResult": "React act drains the in-flight validation microtask chain before returning.",
       "octaneResult": "Octane act returns before a fire-and-forget validation notification schedules its final render.",
       "rationale": "Octane act has a narrower async flush boundary than React act.",
@@ -391,9 +365,7 @@
     },
     {
       "id": "hook-form-reset-extra-render",
-      "caseIds": [
-        "runtime:9874a97bb66b95e4"
-      ],
+      "caseIds": ["runtime:9874a97bb66b95e4"],
       "upstreamResult": "React batches mount validity and reset notifications into two observed renders.",
       "octaneResult": "Octane exposes an additional intermediate render while preserving the same final state.",
       "rationale": "Octane commits notification passes that React batches.",
@@ -405,9 +377,7 @@
     },
     {
       "id": "hook-form-eager-equal-bailout",
-      "caseIds": [
-        "runtime:c01c86279535b2d5"
-      ],
+      "caseIds": ["runtime:c01c86279535b2d5"],
       "upstreamResult": "React re-enters render once before bailing out on an Object.is-equal computed watch value.",
       "octaneResult": "Octane eagerly skips the equal-value parent render.",
       "rationale": "Octane's eager bailout avoids React fiber's probe render.",

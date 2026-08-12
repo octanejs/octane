@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { verifyReactSpringTypes } from './react-spring-types-lib.mjs';
 
-const ROOT = 'packages/react-spring/upstream';
+const ROOT = 'packages/spring/upstream';
 const PER_COMMENT = /^\s*\/\/\s*Per\s+(\S+):(\d+)\s*$/;
 const ALLOWED_DISPOSITIONS = new Set([
 	'adapted',
@@ -114,7 +114,7 @@ export function verifyReactSpringUpstream(repoRoot) {
 		}
 	}
 
-	const manifestPath = join(repoRoot, 'packages/react-spring/audit/react-parity.json');
+	const manifestPath = join(repoRoot, 'packages/spring/audit/react-parity.json');
 	if (!existsSync(manifestPath)) {
 		throw new Error('react-parity manifest is missing');
 	}
@@ -139,7 +139,7 @@ export function verifyReactSpringUpstream(repoRoot) {
 	if (pristineLane === undefined) {
 		throw new Error('react-parity manifest lacks a required pristine-upstream vitest-full lane');
 	}
-	const pristineCaseInventoryPath = 'packages/react-spring/audit/pristine-runtime.json';
+	const pristineCaseInventoryPath = 'packages/spring/audit/pristine-runtime.json';
 	const pristineInventory = loadInventory(repoRoot, pristineCaseInventoryPath);
 
 	const adaptedLane = manifest.lanes.find(function findAdapted(lane) {
@@ -160,10 +160,7 @@ export function verifyReactSpringUpstream(repoRoot) {
 		}),
 	);
 
-	const dispositionsPath = join(
-		repoRoot,
-		'packages/react-spring/audit/upstream-case-dispositions.json',
-	);
+	const dispositionsPath = join(repoRoot, 'packages/spring/audit/upstream-case-dispositions.json');
 	if (!existsSync(dispositionsPath)) throw new Error('upstream case dispositions are missing');
 	const dispositionsDoc = JSON.parse(readFileSync(dispositionsPath, 'utf8'));
 	if (!Array.isArray(dispositionsDoc.cases) || dispositionsDoc.cases.length === 0) {
@@ -172,7 +169,7 @@ export function verifyReactSpringUpstream(repoRoot) {
 
 	const pristineKeys = new Set(
 		pristineInventory.tests.map(function keyOf(test) {
-			return `${test.file.replace(/^packages\/react-spring\/upstream\//, '')}\0${test.fullName}`;
+			return `${test.file.replace(/^packages\/spring\/upstream\//, '')}\0${test.fullName}`;
 		}),
 	);
 	const dispositionKeys = new Set();
@@ -240,7 +237,7 @@ export function verifyReactSpringUpstream(repoRoot) {
 				throw new Error(`reused-dependency disposition lacks evidence: ${key}`);
 			}
 			for (const evidence of entry.evidence) {
-				if (!existsSync(join(repoRoot, 'packages/react-spring', evidence))) {
+				if (!existsSync(join(repoRoot, 'packages/spring', evidence))) {
 					throw new Error(`reused-dependency evidence is missing: ${key} -> ${evidence}`);
 				}
 			}
@@ -279,7 +276,7 @@ export function verifyReactSpringUpstream(repoRoot) {
 		}
 	}
 
-	const runtimeSource = filesUnder(join(repoRoot, 'packages/react-spring/src'));
+	const runtimeSource = filesUnder(join(repoRoot, 'packages/spring/src'));
 	for (const path of runtimeSource) {
 		if (/from\s+['"](?:react|react-dom)(?:\/|['"])/.test(readFileSync(path, 'utf8'))) {
 			throw new Error(`React import leaked into published source: ${relative(repoRoot, path)}`);

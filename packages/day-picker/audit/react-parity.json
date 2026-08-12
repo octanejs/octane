@@ -16,21 +16,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/day-picker/src"
-      ],
-      "include": [
-        "\\.(?:ts|tsrx)$"
-      ],
+      "roots": ["packages/day-picker/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/day-picker/tests/differential"
-      ],
-      "include": [
-        "parity\\.test\\.ts$"
-      ],
+      "roots": ["packages/day-picker/tests/differential"],
+      "include": ["parity\\.test\\.ts$"],
       "exclude": []
     }
   },
@@ -47,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "c9b51fe65ffc7e2732b00eeeba3e54c254e83e8881ec0f574dbfab09b1982d0c"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -56,7 +48,7 @@
       "type": "differential",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "react-day-picker-differential",
+      "project": "day-picker-differential",
       "evidenceOrigin": "repo-authored",
       "notes": "Bounded React/Octane differential: Octane fixtures versus published react-day-picker 10.0.1 on real React for default calendar shape and month navigation.",
       "execution": {
@@ -67,12 +59,12 @@
         {
           "path": "packages/day-picker/audit/differential-runtime.json",
           "role": "support",
-          "sha256": "883a7b1ce707b41b7d6331546ab8b91a7f8cfe41c4954a2bfdc6106a84fae6cb"
+          "sha256": "acfe879e07673f41d5cdd1697d7c75fe40a5014331eee3477cb4fd01d7c0ed73"
         },
         {
           "path": "scripts/react-parity/react-day-picker-runtime-inventory.mjs",
           "role": "support",
-          "sha256": "979a7cbac6b828560ac52e25d60d21dff7de6af9542cefff30b3973ff61400e3"
+          "sha256": "12201e8c5b64aaf3d08ee5bf99a0cf71fd703d0d98a498aa957f4870eae27272"
         },
         {
           "path": "packages/day-picker/audit/upstream-integrity.json",

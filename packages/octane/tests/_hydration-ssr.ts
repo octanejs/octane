@@ -11,6 +11,7 @@ type HydrationBinding =
 	| 'base-ui'
 	| 'docusaurus'
 	| 'monaco-editor'
+	| 'pdf'
 	| 'rainbowkit'
 	| 'react-map-gl'
 	| 'solana-react'
@@ -93,6 +94,15 @@ function bindingAliases(binding: HydrationBinding) {
 			{
 				find: /^@monaco-editor\/loader$/,
 				replacement: resolve(repositoryRoot, 'packages/monaco-editor/tests/_mocks/loader.ts'),
+			},
+		];
+	}
+
+	if (binding === 'pdf') {
+		return [
+			{
+				find: /^@octanejs\/pdf$/,
+				replacement: resolve(source, 'index.server.ts'),
 			},
 		];
 	}

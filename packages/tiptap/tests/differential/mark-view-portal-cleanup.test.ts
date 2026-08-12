@@ -8,11 +8,16 @@
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 import { flushEffects } from '../_helpers';
 
 const customViewsFixture = resolve(__dirname, '../_fixtures/custom-views-parity.tsrx');
 const cache = resolve(__dirname, '.react-cache');
+
+await Promise.all([preloadDifferentialFixture(customViewsFixture, cache)]);
 
 describe('differential: @octanejs/tiptap vs @tiptap/react', function () {
 	// @parity-case differential:tiptap-mark-view-portal-cleanup

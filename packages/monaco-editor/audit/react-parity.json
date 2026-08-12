@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "2cf46a81301132fd789b150498ec807d1039c7dd169d45953cd65cdde051cf41"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -330,7 +330,7 @@
         {
           "path": "packages/monaco-editor/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "7346926363d8f8934b2dfac0709b11614d5904fd2ad5787525b9f702c2526484",
+          "sha256": "3d136f950c5f8f70ef3957fc47b052aa6b3483328cbe644ddad374d6a0e236c1",
           "cases": [
             {
               "id": "differential:6c933659aa",

@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { build, preview, type PreviewServer } from 'vite';
 
+import { browserName, launchBrowser } from '../../../../test-utils/playwright-browser.js';
 import { octane } from '../../../octane/src/compiler/vite.js';
+import { renderHydrationFixture } from '../../../octane/tests/_hydration-ssr.js';
 
 const testRoot = dirname(fileURLToPath(import.meta.url));
 const harnessRoot = resolve(testRoot, 'harness');
@@ -30,11 +32,28 @@ let origin = '';
 beforeAll(async () => {
 	const port = await getFreePort();
 	outputRoot = await mkdtemp(join(tmpdir(), 'octane-react-pdf-binding-'));
+	const hydration = await renderHydrationFixture(
+		'pdf',
+		'packages/pdf/tests/browser/harness/hydration.tsrx',
+		'PdfHydrationFixture',
+	);
 	await build({
 		configFile: false,
 		root: harnessRoot,
 		logLevel: 'error',
-		plugins: [octane()],
+		plugins: [
+			{
+				name: 'octane-pdf-browser-hydration-shell',
+				transformIndexHtml(source) {
+					const marker = '<!--octane-pdf-hydration-shell-->';
+					if (!source.includes(marker)) {
+						throw new Error(`Missing ${marker} in the PDF browser harness`);
+					}
+					return source.replace(marker, hydration.html);
+				},
+			},
+			octane(),
+		],
 		resolve: {
 			alias: [
 				{
@@ -64,9 +83,8 @@ afterAll(async () => {
 	if (outputRoot) await rm(outputRoot, { recursive: true, force: true });
 });
 
-async function runBindingCase(engine: 'chromium' | 'firefox') {
-	const playwright = await import('playwright');
-	const browser = await playwright[engine].launch({ headless: true });
+async function runBindingCase() {
+	const browser = await launchBrowser({ headless: true });
 	const context = await browser.newContext({ viewport: { width: 900, height: 700 } });
 	const page = await context.newPage();
 	const errors: string[] = [];
@@ -98,14 +116,17 @@ async function runBindingCase(engine: 'chromium' | 'firefox') {
 			Number(await page.locator('#binding-probe').getAttribute('data-worker-count')),
 		).toBeGreaterThan(0);
 		expect(
-			await page.locator('.react-pdf__Page .react-pdf__Page__canvas').getAttribute('width'),
+			await page
+				.locator('#binding-probe .react-pdf__Page .react-pdf__Page__canvas')
+				.first()
+				.getAttribute('width'),
 		).toBe('300');
-		expect(await page.locator('.react-pdf__Page .textLayer').first().textContent()).toContain(
-			'Octane PDF probe',
-		);
-		expect(await page.locator('.react-pdf__Page .annotationLayer a').getAttribute('href')).toBe(
-			'https://octanejs.com/',
-		);
+		expect(
+			await page.locator('#binding-probe .react-pdf__Page .textLayer').first().textContent(),
+		).toContain('Octane PDF probe');
+		expect(
+			await page.locator('#binding-probe .react-pdf__Page .annotationLayer a').getAttribute('href'),
+		).toBe('https://octanejs.com/');
 		expect(await page.locator('.react-pdf__Outline').textContent()).toContain('Probe page');
 		expect(await page.locator('.react-pdf__Thumbnail__page canvas').count()).toBe(1);
 		expect(
@@ -161,7 +182,7 @@ async function runBindingCase(engine: 'chromium' | 'firefox') {
 			.poll(() => page.locator('#binding-probe').getAttribute('data-thumbnail-click'))
 			.toBe('0:1');
 
-		const customLayer = page.locator('.react-pdf__Page .textLayer').nth(1);
+		const customLayer = page.locator('#binding-probe .react-pdf__Page .textLayer').nth(1);
 		expect(await customLayer.locator('strong').getAttribute('data-safe')).toBe('yes');
 		expect(await customLayer.locator('strong').getAttribute('onclick')).toBeNull();
 		expect(await customLayer.locator('script').count()).toBe(0);
@@ -172,11 +193,13 @@ async function runBindingCase(engine: 'chromium' | 'firefox') {
 
 		await page.click('#resize-binding');
 		await expect
-			.poll(() => page.locator('.react-pdf__Page__canvas').first().getAttribute('width'))
+			.poll(() =>
+				page.locator('#binding-probe .react-pdf__Page__canvas').first().getAttribute('width'),
+			)
 			.toBe('200');
 
 		await page.click('#unmount-binding');
-		await expect.poll(() => page.locator('.react-pdf__Document').count()).toBe(0);
+		await expect.poll(() => page.locator('#binding-probe .react-pdf__Page').count()).toBe(0);
 		await expect
 			.poll(async () =>
 				Number(await page.locator('#binding-probe').getAttribute('data-worker-terminations')),
@@ -190,8 +213,6 @@ async function runBindingCase(engine: 'chromium' | 'firefox') {
 }
 
 describe('@octanejs/pdf browser contract', () => {
-	// @parity-case browser:react-pdf-chromium
-	it('renders the binding in Chromium', () => runBindingCase('chromium'), 90_000);
-	// @parity-case browser:react-pdf-firefox
-	it('renders the binding in Firefox', () => runBindingCase('firefox'), 90_000);
+	// @parity-case browser:react-pdf-selected
+	it(`renders the binding in ${browserName}`, () => runBindingCase(), 90_000);
 });

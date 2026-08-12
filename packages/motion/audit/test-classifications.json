@@ -45,15 +45,40 @@
       "divergenceIds": ["motion-bounded-layout-flip"]
     },
     {
+      "path": "packages/motion/tests/conformance/layoutGroup.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane-owned framework integration contract outside the React parity lanes."
+    },
+    {
       "path": "packages/motion/tests/conformance/layoutId.test.ts",
       "disposition": "octane-only-divergence",
       "reason": "Documents bounded shared-element crossfade versus React's full projection tree.",
       "divergenceIds": ["motion-bounded-layoutId"]
     },
     {
+      "path": "packages/motion/tests/conformance/layoutRegistry.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane-owned framework integration contract outside the React parity lanes."
+    },
+    {
+      "path": "packages/motion/tests/conformance/lazyMotion.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane-owned framework integration contract outside the React parity lanes."
+    },
+    {
       "path": "packages/motion/tests/conformance/motionValue.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks direct MotionValue-to-style binding."
+    },
+    {
+      "path": "packages/motion/tests/conformance/reducedMotion.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane-owned framework integration contract outside the React parity lanes."
+    },
+    {
+      "path": "packages/motion/tests/conformance/reducedMotionConfig.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane-owned framework integration contract outside the React parity lanes."
     },
     {
       "path": "packages/motion/tests/conformance/render.test.ts",
@@ -126,19 +151,19 @@
       "oracle": "Runs the curated Motion useMotionValue Jest suite byte-exact against motion/react@12.42.2."
     },
     {
-      "path": "packages/motion/tests/upstream/use-motion-value.test.ts",
-      "disposition": "adapted-upstream-suite",
-      "oracle": "One-for-one Octane adaptation of the curated useMotionValue upstream cases from motion@12.42.2."
-    },
-    {
       "path": "packages/motion/typetests/adapted/types.test-d.ts",
       "disposition": "adapted-upstream-suite",
       "oracle": "Repo-authored adapted public-surface type probes against @octanejs/motion, paired one-for-one with the pristine type lane via packages/motion/typetests/assertions.md."
     },
     {
       "path": "packages/motion/typetests/pristine/types.test-d.ts",
-      "disposition": "pristine-upstream-suite",
+      "disposition": "unmodified-upstream-suite-wrapper",
       "oracle": "Repo-authored pristine public-surface type probes against motion/react@12.42.2, paired one-for-one with the adapted type lane via packages/motion/typetests/assertions.md."
+    },
+    {
+      "path": "packages/motion/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
     }
   ]
 }

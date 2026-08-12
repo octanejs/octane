@@ -15,11 +15,12 @@ const manifest = JSON.parse(
 );
 
 test('Base UI classifies every port-authored test exactly once', () => {
-	assert.deepEqual(verifyPortTestClassifications(root, 'base-ui'), { tests: 25 });
+	assert.deepEqual(verifyPortTestClassifications(root, 'base-ui'), { tests: 22 });
 });
 
 test('Base UI differential lane rejects a renamed declared case', () => {
-	const lane = manifest.lanes.find((entry) => entry.id === 'base-ui-runtime-differential');
+	const lane = manifest.lanes.find((entry) => entry.id === 'base-ui-differential-full-suite');
+	assert.ok(lane, 'Base UI differential lane must remain declared');
 	const collected = lane.files
 		.filter((file) => file.role === 'test')
 		.flatMap((file) =>

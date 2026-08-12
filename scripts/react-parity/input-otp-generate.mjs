@@ -309,7 +309,11 @@ const manifest = {
 				'React-free SSR lane.',
 				'Existing Vitest-full real Chromium lane containing all eight adapted upstream files and three port conformance cases.',
 			][index],
-			execution: { kind: 'vitest-full', inventory: inventoryPath },
+			execution: {
+				kind: 'vitest-full',
+				inventory: inventoryPath,
+				...(id === 'input-otp-browser' ? { fileParallelism: true } : {}),
+			},
 			files: [],
 		})),
 		{

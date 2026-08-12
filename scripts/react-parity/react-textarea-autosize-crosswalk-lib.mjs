@@ -209,9 +209,7 @@ export function verifyReactTextareaAutosizeCrosswalk(
 			);
 		}
 		if (!Array.isArray(entry.adaptedAssertions) || entry.adaptedAssertions.length === 0) {
-			throw new Error(
-				`${entry.adaptedFullName}: crosswalk must integrity-lock adaptedAssertions`,
-			);
+			throw new Error(`${entry.adaptedFullName}: crosswalk must integrity-lock adaptedAssertions`);
 		}
 		let source = adaptedSourcesOverride?.[entry.adaptedFile];
 		if (source === undefined) {

@@ -1,5 +1,5 @@
-import { getContrastColor } from './colors/getContrastColor';
-import { stringToColor } from './colors/stringToColor';
+import { getContrastColor } from './colors/getContrastColor.js';
+import { stringToColor } from './colors/stringToColor.js';
 
 export function debug(namespace: string, ...args: unknown[]) {
 	const backgroundColor = stringToColor(namespace);

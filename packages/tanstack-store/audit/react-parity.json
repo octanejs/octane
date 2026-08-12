@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "2f12206d595e23940425db8561b90212741437c7038c51631e00eb6ffad39aea"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -60,12 +60,12 @@
         {
           "path": "packages/tanstack-store/audit/pristine-wrapper-runtime.json",
           "role": "support",
-          "sha256": "9ab9e8f8fb87e6521c01403d652b9a2a169f83412708cc6928c59dd9bded8f6a"
+          "sha256": "ddbd6772688679ae3074cb97cccdd8ea26ce87bfcaf2c04b0c0f909a30ff0a3c"
         },
         {
           "path": "packages/tanstack-store/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "00062ee440ee8c637aeca4c521cb1dc875ca8c256234f34f755c4be46a3c3ad3"
+          "sha256": "6f548307b5ba5f11e7e6f716ab05e937678f4b0a0307d95ca0c816886918e0fd"
         },
         {
           "path": "packages/tanstack-store/tests/upstream-original.test.ts",
@@ -75,7 +75,7 @@
         {
           "path": "scripts/react-parity/tanstack-store-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "cd6455a8f3ea984d4d0adbefb270d82cb811ec5bac2f3dcf739d27c60966282d"
+          "sha256": "9e5abbff95b4d78953b1d5b270c51c222013184ecf956d725b0b47c7a7c533c5"
         },
         {
           "path": "packages/tanstack-store/scripts/run-pristine-upstream.mjs",
@@ -150,7 +150,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "db8e4a7c35caaf6d2c0f61ad034935a7eb9306af91800b815049e0774580f5fa"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },
@@ -219,7 +219,7 @@
         {
           "path": "packages/tanstack-store/audit/adapted-types.json",
           "role": "test",
-          "sha256": "7c60fde11c510f1de2218f7c150a6c2311908834522fbb25cffbaf7969a80618",
+          "sha256": "a585e36c2e6b743f3d3e5ff316fa4e61e08066dee69138e00d1fd35b596059bf",
           "cases": [
             {
               "id": "types:tanstack-store-adapted-upstream",
@@ -231,7 +231,7 @@
         {
           "path": "packages/tanstack-store/typetests/test.test-d.ts",
           "role": "support",
-          "sha256": "62a83619637b787a44a2dadfa9cbb59c1c9e9df1c1acd8844a869e583cd5b3a9"
+          "sha256": "b9b02919ea94e4874de4362d8fef93e5fe3667c21180ec1723ea105e3bb11815"
         },
         {
           "path": "packages/tanstack-store/typetests/tsconfig.adapted.json",
@@ -289,7 +289,7 @@
         {
           "path": "packages/tanstack-store/audit/adapted-types.json",
           "role": "support",
-          "sha256": "7c60fde11c510f1de2218f7c150a6c2311908834522fbb25cffbaf7969a80618"
+          "sha256": "a585e36c2e6b743f3d3e5ff316fa4e61e08066dee69138e00d1fd35b596059bf"
         }
       ]
     },
@@ -305,7 +305,7 @@
         {
           "path": "packages/tanstack-store/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "c0e5f9c50d87145f3306532144fea7ad8e4cc3b9b36385f72ecce7a45b49c575",
+          "sha256": "bbdcc235c8a13e4b2e8e10092766c9b606c4e6b2b2fca2e9e902cf6f4f39d2b3",
           "cases": [
             {
               "id": "differential:tanstack-store-public-contract",
@@ -337,12 +337,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "db8e4a7c35caaf6d2c0f61ad034935a7eb9306af91800b815049e0774580f5fa"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     }

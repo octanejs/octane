@@ -1,12 +1,8 @@
 {
   "schemaVersion": 1,
   "project": "alien-signals",
-  "roots": [
-    "packages/alien-signals/tests"
-  ],
-  "files": [
-    "packages/alien-signals/tests/upstream-adapted.test.ts"
-  ],
+  "roots": ["packages/alien-signals/tests"],
+  "files": ["packages/alien-signals/tests/upstream-adapted.test.ts"],
   "tests": [
     {
       "id": "runtime:aff2452cdc441557",

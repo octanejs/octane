@@ -165,6 +165,8 @@ try {
 		);
 
 		// Semantic floor: the wire a change of this size strictly implies.
+		// Creating component-owned rows reuses one shared intrinsic-template
+		// program, so the entire contiguous insertion is one host command.
 		// select moves one .danger class between two rows (2 updates). update10th
 		// rewrites ceil(rows/10) labels (1 text update each). A storm's floor is
 		// one commit per tick in this synchronous harness — ticks arrive in their
@@ -173,7 +175,7 @@ try {
 		// for a point-update commit rather than a modeled byte count. The row
 		// render floors count only components whose observable props changed.
 		const changed = Math.ceil(rows / 10);
-		modelOps[`create_commands_${suffix}`] = countStat(result.create.commands, iterations);
+		modelOps[`create_commands_${suffix}`] = countStat(1, iterations);
 		modelOps[`update10th_commands_${suffix}`] = countStat(changed, iterations);
 		modelOps[`update10th_item_renders_${suffix}`] = countStat(changed, iterations);
 		modelOps[`select_commands_${suffix}`] = countStat(2, iterations);

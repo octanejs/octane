@@ -6,7 +6,7 @@ import type {
 	ReactNode,
 	Ref,
 } from 'react';
-import type { TagNames } from '../../types';
+import type { TagNames } from '../../types.js';
 
 type ForbiddenKeys = 'ariaAttributes' | 'columnIndex' | 'rowIndex' | 'style';
 type ExcludeForbiddenKeys<Type> = {

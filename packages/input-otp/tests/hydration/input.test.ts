@@ -1,5 +1,5 @@
 import { drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { flushEffects } from '../../../octane/tests/_helpers';
 import { renderHydrationFixture } from '../../../octane/tests/_hydration-ssr';
@@ -12,15 +12,22 @@ function settle(): void {
 	flushSync(() => {});
 }
 
-describe('@octanejs/input-otp hydration and cleanup', () => {
-	it('adopts the server input and remains editable', async () => {
-		const server = await renderHydrationFixture(
+let serverHtml: string;
+
+beforeAll(async () => {
+	serverHtml = (
+		await renderHydrationFixture(
 			'input-otp',
 			'packages/input-otp/tests/hydration/_fixture.tsrx',
 			'HydrationInput',
-		);
+		)
+	).html;
+});
+
+describe('@octanejs/input-otp hydration and cleanup', () => {
+	it('adopts the server input and remains editable', () => {
 		const container = document.createElement('div');
-		container.innerHTML = server.html;
+		container.innerHTML = serverHtml;
 		document.body.appendChild(container);
 		const serverInput = container.querySelector('input') as HTMLInputElement;
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -39,7 +46,7 @@ describe('@octanejs/input-otp hydration and cleanup', () => {
 		container.remove();
 	});
 
-	it('removes selection listeners, disconnects observers, and clears timers on unmount', async () => {
+	it('removes selection listeners, disconnects observers, and clears timers on unmount', () => {
 		vi.useFakeTimers();
 		const originalAdd = document.addEventListener.bind(document);
 		const originalRemove = document.removeEventListener.bind(document);
@@ -64,13 +71,8 @@ describe('@octanejs/input-otp hydration and cleanup', () => {
 			unobserve() {}
 		} as unknown as typeof ResizeObserver;
 
-		const server = await renderHydrationFixture(
-			'input-otp',
-			'packages/input-otp/tests/hydration/_fixture.tsrx',
-			'HydrationInput',
-		);
 		const container = document.createElement('div');
-		container.innerHTML = server.html;
+		container.innerHTML = serverHtml;
 		document.body.appendChild(container);
 		const root = hydrateRoot(container, HydrationInput);
 		settle();

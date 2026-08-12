@@ -150,14 +150,8 @@ function stripOctaneMarkers(source) {
 
 function stripAdditiveExports(source) {
 	return source
-		.replace(
-			/\n\/\/ Re-export the framework-agnostic core surface[\s\S]*$/m,
-			'\n',
-		)
-		.replace(
-			/\nexport \{\s*PLUGIN_CONTAINER_ID[\s\S]*from '@tanstack\/devtools';\s*/m,
-			'\n',
-		)
+		.replace(/\n\/\/ Re-export the framework-agnostic core surface[\s\S]*$/m, '\n')
+		.replace(/\nexport \{\s*PLUGIN_CONTAINER_ID[\s\S]*from '@tanstack\/devtools';\s*/m, '\n')
 		.replace(/\nexport type \{\s*ClientEventBusConfig[\s\S]*from '@tanstack\/devtools';\s*/m, '\n');
 }
 
@@ -181,18 +175,9 @@ function canonicalizeAdapterSource(source, fileName) {
 			/import type\s*\{\s*JSX,\s*RenderableNode\s*\}\s*from ['"]#renderable-runtime['"];?\s*/g,
 			'',
 		)
-		.replace(
-			/import type\s*\{\s*RenderableNode\s*\}\s*from ['"]#renderable-runtime['"];?\s*/g,
-			'',
-		)
-		.replace(
-			/import type\s*\{\s*OctaneNode\s*\}\s*from ['"]#renderable-runtime['"];?\s*/g,
-			'',
-		)
-		.replace(
-			/type Renderable = \{\} \| null \| undefined;\s*/g,
-			'',
-		)
+		.replace(/import type\s*\{\s*RenderableNode\s*\}\s*from ['"]#renderable-runtime['"];?\s*/g, '')
+		.replace(/import type\s*\{\s*OctaneNode\s*\}\s*from ['"]#renderable-runtime['"];?\s*/g, '')
+		.replace(/type Renderable = \{\} \| null \| undefined;\s*/g, '')
 		.replace(/\bRenderable\b/g, 'RenderableNode')
 		.replace(
 			/React\.Dispatch<\s*React\.SetStateAction<Record<string, RenderableNode>>\s*>/g,
@@ -282,13 +267,11 @@ function rewriteImportSpecifiers(source, fileName) {
 	);
 	const replacements = [];
 	for (const statement of sourceFile.statements) {
-		if (
-			!(
-				(ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) &&
-				statement.moduleSpecifier &&
-				ts.isStringLiteral(statement.moduleSpecifier)
-			)
-		) {
+		if (!(
+			(ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) &&
+			statement.moduleSpecifier &&
+			ts.isStringLiteral(statement.moduleSpecifier)
+		)) {
 			continue;
 		}
 		const specifier = statement.moduleSpecifier.text;
@@ -310,10 +293,7 @@ function rewriteImportSpecifiers(source, fileName) {
 }
 
 function structuralAdapterSource(source, fileName) {
-	const rewritten = canonicalizeAdapterSource(
-		rewriteImportSpecifiers(source, fileName),
-		fileName,
-	);
+	const rewritten = canonicalizeAdapterSource(rewriteImportSpecifiers(source, fileName), fileName);
 	const sourceFile = ts.createSourceFile(
 		fileName,
 		rewritten,

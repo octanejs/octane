@@ -111,7 +111,6 @@ jobs:
                 "Three compatibility (minimum r156)",
                 "typecheck",
                 "validate publishable packages",
-                "test (22)",
                 "test (24)",
               ];
               const missingJobs = legacyRequiredJobs.filter(

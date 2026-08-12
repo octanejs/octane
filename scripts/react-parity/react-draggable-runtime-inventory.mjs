@@ -7,9 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const project = 'react-draggable';
-const destination = 'packages/react-draggable/audit/adapted-runtime.json';
-const upstreamRoot = 'packages/react-draggable/tests/upstream/';
+const project = 'draggable';
+const destination = 'packages/draggable/audit/adapted-runtime.json';
+const upstreamRoot = 'packages/draggable/tests/upstream/';
 const idOccurrences = new Map();
 const output = execFileSync(
 	process.execPath,
@@ -37,7 +37,7 @@ const tests = JSON.parse(output)
 const inventory = {
 	schemaVersion: 1,
 	project,
-	roots: ['packages/react-draggable/tests/upstream'],
+	roots: ['packages/draggable/tests/upstream'],
 	files: [...new Set(tests.map((test) => test.file))],
 	tests,
 };

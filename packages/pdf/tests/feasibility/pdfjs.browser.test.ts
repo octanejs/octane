@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { build, preview, type PreviewServer } from 'vite';
+import { browserName, launchBrowser } from '../../../../test-utils/playwright-browser.js';
 import { octane } from '../../../octane/src/compiler/vite.js';
 
 const testRoot = dirname(fileURLToPath(import.meta.url));
@@ -52,9 +53,8 @@ afterAll(async () => {
 	if (outputRoot) await rm(outputRoot, { recursive: true, force: true });
 });
 
-async function runBrowserCase(engine: 'chromium' | 'firefox') {
-	const playwright = await import('playwright');
-	const browser = await playwright[engine].launch({ headless: true });
+async function runBrowserCase() {
+	const browser = await launchBrowser({ headless: true });
 	const context = await browser.newContext({ viewport: { width: 900, height: 700 } });
 	const page = await context.newPage();
 	const errors: string[] = [];
@@ -81,16 +81,10 @@ async function runBrowserCase(engine: 'chromium' | 'firefox') {
 }
 
 describe('react-pdf U1 — real PDF.js browser feasibility', () => {
-	// @parity-case browser:react-pdf-feasibility-chromium
+	// @parity-case browser:react-pdf-feasibility-selected
 	it(
-		'Chromium loads a worker and renders canvas, text, annotations, outline, and cleanup',
-		() => runBrowserCase('chromium'),
-		90_000,
-	);
-	// @parity-case browser:react-pdf-feasibility-firefox
-	it(
-		'Firefox loads a worker and renders canvas, text, annotations, outline, and cleanup',
-		() => runBrowserCase('firefox'),
+		`${browserName} loads a worker and renders canvas, text, annotations, outline, and cleanup`,
+		() => runBrowserCase(),
 		90_000,
 	);
 });

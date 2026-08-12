@@ -30,6 +30,11 @@
       "path": "packages/zustand/tests/differential/setup.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks fail-closed React fixture compilation."
+    },
+    {
+      "path": "packages/zustand/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
     }
   ]
 }

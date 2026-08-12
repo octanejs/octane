@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "d7dbb38fcdb2d4a0bf5eaa386c49bf2f99dbf412f3a610dd447e4d5164f64012"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -56,7 +56,7 @@
         {
           "path": "packages/tanstack-table/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "5515b6f6eb7fec526b30f1fcd812b92e5a59cfc34d041faa4430c9bbeac006d4",
+          "sha256": "03f37b4787cd273c377074a7f225d709a0341b1ca45bdf48588f74aab5c83496",
           "cases": [
             {
               "id": "differential:tanstack-table-basic",
@@ -160,7 +160,7 @@
         {
           "path": "packages/tanstack-table/audit/pristine-types.json",
           "role": "test",
-          "sha256": "6e5230a56079f5d5e25c4366d491943b9cff784c9103dfa6f45ec8ea861ea7b5",
+          "sha256": "e87c4b10c5f3619a7734647f17c298a3cea9b7a3d63b2c512ad26edd2232f5cd",
           "cases": [
             {
               "id": "types:tanstack-table-pristine",
@@ -177,7 +177,7 @@
         {
           "path": "packages/tanstack-table/typetests/pristine/tsconfig.json",
           "role": "support",
-          "sha256": "e570ccc5a02b5b657eafdc25a73c6c15ebf61cb49ea9ceef7c474553fc52f123"
+          "sha256": "cb82e03159b832dd6a70589b26cd2a47d7361981f4b9ff8e7550692c2896b46c"
         },
         {
           "path": "packages/tanstack-table/typetests/assertions.md",
@@ -214,7 +214,7 @@
         {
           "path": "packages/tanstack-table/audit/adapted-types.json",
           "role": "test",
-          "sha256": "5a329aff48a049662cc9a61dbad3a9ae38671631da2c440d5f91afa6ed64bfa7",
+          "sha256": "cee81dff84e33d550e9b485d0af73c08825b5fe730416c748e350a0d9fd0fda0",
           "cases": [
             {
               "id": "types:tanstack-table-adapted",
@@ -231,7 +231,7 @@
         {
           "path": "packages/tanstack-table/typetests/adapted/tsconfig.json",
           "role": "support",
-          "sha256": "34b04cab6a0d24604a6d2ccc13dd88d789fb2329a4934285ec6ce157d598274b"
+          "sha256": "765b85e3b0cd62da394dee3faaf0c03438ceb783c73a4579fee7acc86d8a709d"
         },
         {
           "path": "packages/tanstack-table/typetests/assertions.md",

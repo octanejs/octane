@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, type ViteDevServer } from 'vite';
 import { octane } from '../../../octane/src/compiler/vite.js';
-import { threeRenderers } from '../../../three/src/config.ts';
+import { threeRenderers } from '../../../three/src/config.js';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const harnessRoot = resolve(testDir, 'e2e');
@@ -133,7 +133,18 @@ beforeAll(async function () {
 				},
 				{
 					find: /^@octanejs\/drei$/,
-					replacement: resolve(testDir, '../../src/index.ts'),
+					// The screenshot observes these three public components, while the
+					// type lane separately proves their root exports. Loading the raw root
+					// barrel here makes Vite compile every unrelated Drei source module
+					// before the page can start; the pristine published package is
+					// prebundled and does not pay that development-only cost.
+					replacement: resolve(testDir, 'e2e/selected-exports.ts'),
+				},
+				{
+					// three-stdlib exposes only a root barrel. Keep this focused screenshot
+					// from prebundling its full examples graph for three loader symbols.
+					find: /^three-stdlib$/,
+					replacement: resolve(testDir, 'e2e/selected-three-stdlib-exports.ts'),
 				},
 				{
 					find: /^octane$/,
@@ -177,24 +188,39 @@ describe('adapted Drei e2e screenshot (Playwright)', function () {
 				return dispatchEvent(event);
 			};
 		});
-		await page.goto(origin, { waitUntil: 'networkidle' });
-		const canvas = page.locator('canvas');
-		expect(pageError).toBe('');
-		expect(await canvas.count()).toBe(1);
-		await page.waitForFunction(function () {
-			return Boolean(
-				(globalThis as typeof globalThis & { __dreiE2eEvent?: boolean }).__dreiE2eEvent,
-			);
+		await page.route('https://raw.githack.com/pmndrs/drei-assets/**', async function (route) {
+			await route.continue({
+				url: route
+					.request()
+					.url()
+					.replace('https://raw.githack.com/', 'https://raw.githubusercontent.com/'),
+			});
 		});
-		expect((await canvas.boundingBox())?.width).toBe(300);
-		expect((await canvas.boundingBox())?.height).toBe(150);
+		try {
+			// The upstream case gates its screenshot on the scene's ready event.
+			// Waiting for network idle as well makes the adapted lane depend on the
+			// remote environment asset connection becoming idle, even though that is
+			// not part of the upstream observation boundary.
+			await page.goto(origin, { waitUntil: 'domcontentloaded' });
+			const canvas = page.locator('canvas');
+			expect(pageError).toBe('');
+			expect(await canvas.count()).toBe(1);
+			await page.waitForFunction(function () {
+				return Boolean(
+					(globalThis as typeof globalThis & { __dreiE2eEvent?: boolean }).__dreiE2eEvent,
+				);
+			});
+			expect((await canvas.boundingBox())?.width).toBe(300);
+			expect((await canvas.boundingBox())?.height).toBe(150);
 
-		const actual = await canvas.screenshot({ type: 'png' });
-		const expected = readFileSync(oraclePath);
-		const comparison = await comparePngToOracle(page, actual, expected);
-		expect(comparison.reason, JSON.stringify(comparison)).toBeUndefined();
-		expect(comparison.diffRatio, JSON.stringify(comparison)).toBeLessThanOrEqual(MAX_DIFF_RATIO);
-		expect(comparison.ok, JSON.stringify(comparison)).toBe(true);
-		await page.close();
+			const actual = await canvas.screenshot({ type: 'png' });
+			const expected = readFileSync(oraclePath);
+			const comparison = await comparePngToOracle(page, actual, expected);
+			expect(comparison.reason, JSON.stringify(comparison)).toBeUndefined();
+			expect(comparison.diffRatio, JSON.stringify(comparison)).toBeLessThanOrEqual(MAX_DIFF_RATIO);
+			expect(comparison.ok, JSON.stringify(comparison)).toBe(true);
+		} finally {
+			await page.close().catch(() => {});
+		}
 	});
 });

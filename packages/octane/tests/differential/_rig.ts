@@ -86,6 +86,20 @@ function loadReactFixture(
 	return promise;
 }
 
+/**
+ * Start both fixture imports outside an individual differential case. Heavy
+ * React oracle packages can make the first dynamic import dominate the first
+ * test's runtime, especially when the parity-wide Vitest scheduler is busy.
+ * Preloading keeps that one-time module work at the suite boundary while
+ * `mountDifferential` continues to consume the same cached module promises.
+ */
+export function preloadDifferentialFixture(
+	srcPath: string,
+	cacheDir?: string,
+): Promise<[any, any]> {
+	return Promise.all([import(/* @vite-ignore */ srcPath), loadReactFixture(srcPath, cacheDir)]);
+}
+
 function hashString(s: string): string {
 	// Cheap deterministic id — collisions across the test suite are
 	// astronomically unlikely; we're cache-keying by the fixture's source
@@ -299,14 +313,13 @@ export async function mountDifferential(
 	// resolves that package's deps (zustand, react, …). Defaults to octane's.
 	cacheDir?: string,
 ): Promise<DiffPair> {
-	// octane side — import via Vitest's normal pipeline (the
-	// octane() plugin handles compilation).
-	const octaneMod = await import(/* @vite-ignore */ srcPath);
+	// Both imports may already have been started at the suite boundary by a
+	// heavy differential fixture. Dynamic imports and loadReactFixture's map
+	// make this a cached lookup for every subsequent mount.
+	const [octaneMod, reactMod] = await preloadDifferentialFixture(srcPath, cacheDir);
 	const OctaneComp = octaneMod[octaneEntry];
 	if (!OctaneComp) throw new Error(`octane export "${octaneEntry}" not found in ${srcPath}`);
 
-	// React side — compile, write, dynamic-import.
-	const reactMod = await loadReactFixture(srcPath, cacheDir);
 	const ReactComp = reactMod[octaneEntry];
 	if (!ReactComp) throw new Error(`@tsrx/react export "${octaneEntry}" not found in ${srcPath}`);
 

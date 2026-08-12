@@ -40,7 +40,7 @@
     },
     {
       "path": "packages/drei/tests/browser/upstream-e2e.browser.test.ts",
-      "sha256": "99be2ee889bf725fd7d59be3f2eb1c2859a00c9ca0d994d56a150aebc609f4ad",
+      "sha256": "707bd9d44f4fc0ae0b11364c7a7cc8b688c4925962c8c17ea69773454910019e",
       "assertionCount": 0,
       "assertionInventorySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },

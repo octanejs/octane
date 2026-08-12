@@ -1,6 +1,6 @@
-import type { Align } from '../types';
-import { getEstimatedSize } from './getEstimatedSize';
-import type { CachedBounds, SizeFunction } from './types';
+import type { Align } from '../types.js';
+import { getEstimatedSize } from './getEstimatedSize.js';
+import type { CachedBounds, SizeFunction } from './types.js';
 
 export function getOffsetForIndex<Props extends object>({
 	align,

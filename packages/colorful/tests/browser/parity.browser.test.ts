@@ -2,7 +2,9 @@ import { createServer as createNetServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { Page } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
+import { browserName, launchBrowser } from '../../../../test-utils/playwright-browser.js';
 import { octane } from '../../../octane/src/compiler/vite.js';
 
 const browserTestRoot = dirname(fileURLToPath(import.meta.url));
@@ -47,7 +49,7 @@ afterAll(async () => {
 });
 
 async function dispatchTouch(
-	page: import('playwright').Page,
+	page: Page,
 	selector: string,
 	type: 'touchstart' | 'touchmove' | 'touchend',
 	x: number,
@@ -69,9 +71,8 @@ async function dispatchTouch(
 	);
 }
 
-async function runBrowserCase(engine: 'chromium' | 'firefox') {
-	const playwright = await import('playwright');
-	const browser = await playwright[engine].launch({ headless: true });
+async function runBrowserCase() {
+	const browser = await launchBrowser({ headless: true });
 	const page = await browser.newPage({ viewport: { width: 900, height: 900 } });
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(String(error)));
@@ -209,17 +210,10 @@ async function runBrowserCase(engine: 'chromium' | 'firefox') {
 }
 
 describe('@octanejs/colorful real-browser parity', () => {
-	// @parity-case browser:react-colorful-chromium
+	// @parity-case browser:react-colorful-selected
 	it(
-		'chromium: drives native interaction and closest-root styles',
-		() => runBrowserCase('chromium'),
-		60_000,
-	);
-
-	// @parity-case browser:react-colorful-firefox
-	it(
-		'firefox: drives native interaction and closest-root styles',
-		() => runBrowserCase('firefox'),
+		`${browserName}: drives native interaction and closest-root styles`,
+		() => runBrowserCase(),
 		60_000,
 	);
 });

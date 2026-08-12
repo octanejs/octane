@@ -13,9 +13,9 @@ const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const upstreamRoot = resolve(root, 'packages/transition-group/upstream');
 const report = join(tmpdir(), `octane-react-transition-group-pristine-${process.pid}.json`);
 const destination = resolve(root, 'packages/transition-group/audit/pristine-runtime.json');
-const jestBin = createRequire(
-	resolve(root, 'packages/transition-group/package.json'),
-).resolve('jest/bin/jest');
+const jestBin = createRequire(resolve(root, 'packages/transition-group/package.json')).resolve(
+	'jest/bin/jest',
+);
 
 export function pristineTestIdentities(result, repoRoot = root) {
 	return result.testResults
@@ -80,9 +80,7 @@ if (process.argv.includes('--write')) {
 				2,
 			)}\n`,
 		);
-		console.log(
-			`packages/transition-group/audit/pristine-runtime.json: ${tests.length} tests`,
-		);
+		console.log(`packages/transition-group/audit/pristine-runtime.json: ${tests.length} tests`);
 	} finally {
 		rmSync(report, { force: true });
 	}

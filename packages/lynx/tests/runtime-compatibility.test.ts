@@ -122,11 +122,13 @@ describe('Lynx runtime compatibility evidence', () => {
 		expect(runtimeSourceGraph(resolve(LYNX_ROOT, 'src/main-thread.ts'))).toEqual({
 			files: [
 				'src/core/environment.ts',
+				'src/core/first-screen-host.ts',
 				'src/core/first-screen.ts',
 				'src/core/host-driver.ts',
 				'src/core/host-props.ts',
 				'src/core/lifecycle-data.ts',
 				'src/core/list.ts',
+				'src/core/main-thread-worklet-feature.ts',
 				'src/core/native-events.ts',
 				'src/core/nodes-ref.ts',
 				'src/core/own-symbols.ts',
@@ -137,7 +139,6 @@ describe('Lynx runtime compatibility evidence', () => {
 				'src/core/protocol.ts',
 				'src/core/renderer-id.ts',
 				'src/core/worklets.ts',
-				'src/first-screen.ts',
 				'src/main-renderer.ts',
 				'src/main-thread.ts',
 				'src/resource.ts',

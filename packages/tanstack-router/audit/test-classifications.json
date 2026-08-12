@@ -85,6 +85,11 @@
       "path": "packages/tanstack-router/tests/ssr/ssr.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks the retained Octane adapter SSR behavior cited to TanStack Router PR #7847; it is not a React SSR oracle."
+    },
+    {
+      "path": "packages/tanstack-router/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
     }
   ]
 }

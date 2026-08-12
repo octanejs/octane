@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "tests": [
     {
-      "path": "packages/base-ui/tests/array-children-keys.test.ts",
-      "disposition": "octane-only-framework-contract",
-      "reason": "Pins Octane keyed-array reconciliation diagnostics and is not counted as React parity."
-    },
-    {
       "path": "packages/base-ui/tests/alert-dialog.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/base-ui/tests/array-children-keys.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins Octane keyed-array reconciliation diagnostics and is not counted as React parity."
     },
     {
       "path": "packages/base-ui/tests/collapsible-activity.test.ts",
@@ -68,16 +68,6 @@
       "divergenceIds": ["unported-internal-hover", "number-field-interaction-gaps"]
     },
     {
-      "path": "packages/base-ui/tests/previous-value.test.ts",
-      "disposition": "octane-only-framework-contract",
-      "reason": "Pins Octane Suspense and previous-value integration and is not counted as React parity."
-    },
-    {
-      "path": "packages/base-ui/tests/production-bundle.test.ts",
-      "disposition": "octane-only-framework-contract",
-      "reason": "Verifies Octane production bundle output and is not counted as React parity."
-    },
-    {
       "path": "packages/base-ui/tests/popover-hover.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane hover integration and is not counted as React parity."
@@ -91,6 +81,16 @@
       "path": "packages/base-ui/tests/preview-card.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/base-ui/tests/previous-value.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins Octane Suspense and previous-value integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/base-ui/tests/production-bundle.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Verifies Octane production bundle output and is not counted as React parity."
     },
     {
       "path": "packages/base-ui/tests/ssr/ssr.test.ts",
@@ -111,21 +111,6 @@
       "path": "packages/base-ui/tests/tooltip.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane component integration and is not counted as React parity."
-    },
-    {
-      "path": "packages/base-ui/tests/upstream/accordion.test.ts",
-      "disposition": "adapted-upstream-suite",
-      "oracle": "Selected cases cite the corresponding pinned Base UI Accordion suite lines."
-    },
-    {
-      "path": "packages/base-ui/tests/upstream/collapsible.test.ts",
-      "disposition": "adapted-upstream-suite",
-      "oracle": "Selected cases cite the corresponding pinned Base UI Collapsible suite lines."
-    },
-    {
-      "path": "packages/base-ui/tests/upstream/tabs.test.ts",
-      "disposition": "adapted-upstream-suite",
-      "oracle": "Selected cases cite the corresponding pinned Base UI Tabs suite lines."
     }
   ]
 }

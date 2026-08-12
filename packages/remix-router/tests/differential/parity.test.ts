@@ -11,7 +11,10 @@ import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
 import { act as reactAct } from 'react';
 import { drainPassiveEffects as octaneDrainEffects } from 'octane';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const NESTED = resolve(__dirname, '../_fixtures/nested-layouts-diff.tsrx');
 const LOADER = resolve(__dirname, '../_fixtures/loader-redirect-error-diff.tsrx');
@@ -60,6 +63,17 @@ async function waitForBoth(
 
 const textIs = (selector: string, text: string) => (mount: Mount) =>
 	mount.container.querySelector(selector)?.textContent === text;
+
+await Promise.all([
+	preloadDifferentialFixture(NESTED, CACHE),
+	preloadDifferentialFixture(LOADER, CACHE),
+	preloadDifferentialFixture(AWAIT, CACHE),
+	preloadDifferentialFixture(DECLARATIVE, CACHE),
+	preloadDifferentialFixture(NAVLINK, CACHE),
+	preloadDifferentialFixture(FORMS, CACHE),
+	preloadDifferentialFixture(GUARDS, CACHE),
+	preloadDifferentialFixture(PENDING, CACHE),
+]);
 
 describe('differential: @octanejs/remix-router vs real react-router', () => {
 	// @parity-case differential:remix-router-nested

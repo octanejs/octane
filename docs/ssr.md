@@ -438,3 +438,14 @@ These are the known gaps between Octane SSR and a full streaming SSR stack:
   arbitrary preamble insertion, bootstrap script/module lists, import-map
   construction, response headers, or `onHeaders`. Compose those concerns around
   the returned stream in the Vite plugin, adapter, or application server.
+- ~~`prerenderToNodeStream`~~ — implemented: it resolves after the
+  await-everything render completes and `prelude` streams the complete document
+  bytes (scoped-style tags, then folded html). The buffered `prerender` keeps
+  its `{ html, css }` shape.
+- **Partial pre-rendering** (`resume`, `resumeToPipeableStream`,
+  `resumeAndPrerender`, and React's postpone/prelude protocol): a documented
+  non-goal — that request protocol is not part of Octane's public SSR surface.
+- **Chunk-size and namespace options**: `progressiveChunkSize` does not exist
+  (Octane flushes per resolution wave, not by byte thresholds) and
+  `namespaceURI` is inferred from the rendered root rather than accepted as an
+  option.

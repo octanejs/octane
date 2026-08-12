@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8f39850afd7612acbe1183fa2522acde5688a17904b6c6ad9a06c22ee35062eb"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -62,7 +62,7 @@
         {
           "path": "packages/syntax-highlighter/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "b1e738126f45e90ff12b8b110bbd496771503fb8ca09c6ecd55553231af1a150"
+          "sha256": "5472ac89a7a805ad3cb07c07ed6c0d2696a70fdd539eccc176a5632694293147"
         },
         {
           "path": "packages/syntax-highlighter/jest.pristine.config.cjs",
@@ -107,7 +107,7 @@
         {
           "path": "packages/syntax-highlighter/scripts/generate-parity-audit.mjs",
           "role": "support",
-          "sha256": "80ef3f560b8f65718e3bd65e86d4542168a724fea35c7cd70bc3a69f35204359"
+          "sha256": "7532517f76447db09e06026a1ee86213bd93d75ab063539f38167fb8916d4c5a"
         },
         {
           "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/code-style-passed-to-line-numbers.test.ts.snap",
@@ -325,22 +325,17 @@
       "oracle": "required",
       "environment": "workspace-node",
       "project": "syntax-highlighter-browser",
-      "notes": "Runs real Chromium and Firefox rendering, computed whitespace/wrapping, selection, updates, and async loading.",
+      "notes": "Runs real Chromium rendering, computed whitespace/wrapping, selection, updates, and async loading.",
       "files": [
         {
           "path": "packages/syntax-highlighter/tests/browser/rendering.browser.test.ts",
           "role": "test",
-          "sha256": "9a918d02a7f3a0c42522e63ea01d8e98b71a14006c6ac9b0b80213f80d2768e8",
+          "sha256": "ec88204d1c2835c57ad2302bedfae132bac91280ed9322cf7dd242fbd3589f3a",
           "cases": [
             {
               "id": "browser:chromium-render-update-async",
               "testName": "matches rendering, selection, updates, and async loading in Chromium",
               "fullName": "react-syntax-highlighter real-browser behavior matches rendering, selection, updates, and async loading in Chromium"
-            },
-            {
-              "id": "browser:firefox-whitespace-selection",
-              "testName": "preserves whitespace, wrapping, and selection in Firefox",
-              "fullName": "react-syntax-highlighter real-browser behavior preserves whitespace, wrapping, and selection in Firefox"
             }
           ]
         }

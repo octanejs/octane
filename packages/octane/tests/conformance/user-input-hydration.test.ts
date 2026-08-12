@@ -121,6 +121,32 @@ describe('conformance: hydration must not blow away user input (ReactDOMServerIn
 			onInput: () => {},
 		}));
 
+	it('preserves composition that began before a controlled input hydrated', async () => {
+		const props = { v: 'Hello', onInput: () => {} };
+		const { html } = await ServerRT.renderToString(server.DynamicTextInput, props);
+		container.innerHTML = html;
+		const field = container.querySelector('#fi') as HTMLInputElement;
+		field.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+		field.value = 'Hello候';
+
+		const root = hydrateRoot(container, client.DynamicTextInput, props);
+		flushSync(() => {});
+		expect(container.querySelector('#fi')).toBe(field);
+		expect(field.value).toBe('Hello候');
+
+		field.value = 'Hello候補';
+		field.dispatchEvent(
+			new InputEvent('input', {
+				bubbles: true,
+				data: '補',
+				inputType: 'insertCompositionText',
+				isComposing: true,
+			}),
+		);
+		expect(field.value).toBe('Hello候補');
+		root.unmount();
+	});
+
 	it('uncontrolled range input (Per :310)', () =>
 		preserveUserInput('RangeInput', 'value', '0.5', '1'));
 

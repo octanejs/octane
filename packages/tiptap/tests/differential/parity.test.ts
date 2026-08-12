@@ -1,12 +1,18 @@
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 import { flushEffects } from '../_helpers';
 
 const fixture = resolve(__dirname, '../_fixtures/basic-editor.tsrx');
 const customViewsFixture = resolve(__dirname, '../_fixtures/custom-views-parity.tsrx');
-const customViewsAsPropFixture = resolve(__dirname, '../_fixtures/custom-views-as-prop-parity.tsrx');
+const customViewsAsPropFixture = resolve(
+	__dirname,
+	'../_fixtures/custom-views-as-prop-parity.tsrx',
+);
 const cache = resolve(__dirname, '.react-cache');
 
 async function waitForPublishedSelection(...mounts: { container: HTMLElement }[]): Promise<void> {
@@ -24,6 +30,12 @@ async function waitForPublishedSelection(...mounts: { container: HTMLElement }[]
 
 	throw new Error('node selection was not published within 10 animation frames');
 }
+
+await Promise.all([
+	preloadDifferentialFixture(fixture, cache),
+	preloadDifferentialFixture(customViewsFixture, cache),
+	preloadDifferentialFixture(customViewsAsPropFixture, cache),
+]);
 
 describe('differential: @octanejs/tiptap vs @tiptap/react', () => {
 	// @parity-case differential:tiptap-editor

@@ -6,7 +6,7 @@ import type {
 	ReactNode,
 	Ref,
 } from 'react';
-import type { TagNames } from '../../types';
+import type { TagNames } from '../../types.js';
 
 export type DynamicRowHeight = {
 	getAverageRowHeight(): number;

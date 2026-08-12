@@ -8,11 +8,19 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const CACHED = resolve(__dirname, '../_fixtures/cached-diff.tsrx');
 const ASYNC = resolve(__dirname, '../_fixtures/async-diff.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
+
+await Promise.all([
+	preloadDifferentialFixture(CACHED, CACHE),
+	preloadDifferentialFixture(ASYNC, CACHE),
+]);
 
 const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 

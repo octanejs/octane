@@ -9,6 +9,7 @@ import {
 	type UniversalHostCommand,
 } from 'octane/universal/native';
 import { afterEach, describe, expect, it } from 'vitest';
+import '../src/main-worklets.js';
 import { createLynxRoot, type LynxPublicHandle, type LynxRoot } from '../src/index.js';
 import { installLynxMainThread, type LynxMainThreadController } from '../src/main-thread.js';
 import {

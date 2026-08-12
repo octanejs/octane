@@ -34,6 +34,8 @@ export type OctaneRendererRegistryEntry =
 			capabilities?: readonly string[];
 			/** Host event prop names or prefix patterns retained as first-screen listener sentinels. */
 			firstScreenEvents?: readonly string[];
+			/** Optional cold module that owns compiler-emitted thread-function helpers. */
+			threadFunctionsModule?: string;
 			validation?: OctaneRendererValidationOptions;
 	  };
 
@@ -67,6 +69,7 @@ export interface OctaneResolvedRendererConfig {
 				readonly text: 'reject' | 'ignore' | 'host';
 				readonly capabilities: readonly string[];
 				readonly firstScreenEvents?: readonly string[];
+				readonly threadFunctionsModule?: string;
 				readonly validation?: Readonly<OctaneRendererValidationOptions>;
 			}
 		>

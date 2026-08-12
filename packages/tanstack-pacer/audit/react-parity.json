@@ -17,21 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/tanstack-pacer/src"
-      ],
-      "include": [
-        "\\.(?:ts|tsx|tsrx)$"
-      ],
+      "roots": ["packages/tanstack-pacer/src"],
+      "include": ["\\.(?:ts|tsx|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/tanstack-pacer/tests/adapted"
-      ],
-      "include": [
-        "\\.test\\.ts$"
-      ],
+      "roots": ["packages/tanstack-pacer/tests/adapted"],
+      "include": ["\\.test\\.ts$"],
       "exclude": []
     }
   },
@@ -48,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "a9b660b2f151b8a14e8e1ddfddb8046c5ba538760955012d484d0695df6ef07b"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -68,7 +60,7 @@
         {
           "path": "packages/tanstack-pacer/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "8c2bdd4b361daed0f66168ff88b4ff3613bb63e89ba57230d4409d0281a2c582"
+          "sha256": "fec329c6f3b7423e30ecd8a0fdb9b38fef484cb040b07de9dd53454300681739"
         },
         {
           "path": "packages/tanstack-pacer/tests/adapted/scheduler.test.ts",
@@ -83,7 +75,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "d0c9fd2ef7759b873f32100bf7332bb02eb511feb55e99caba75c636524417d1"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },
@@ -99,7 +91,7 @@
         {
           "path": "packages/tanstack-pacer/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "74a7494fef39f479e02c2602a18c6e7156b06b429e4c6d73c9a13aad34eb9620",
+          "sha256": "23cafac582371ee392e55b8dd2aa6932150d3334614aad5cb0b98d0c8992f623",
           "cases": [
             {
               "id": "differential:tanstack-pacer-scheduler-lifecycle",
@@ -126,7 +118,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "d7c4fe7f2a13353d3ed0f848b1182e528eaf946c32179430e3b0ff2f10254b6e"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "packages/tanstack-pacer/upstream/SHA256SUMS",
@@ -156,7 +148,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "d0c9fd2ef7759b873f32100bf7332bb02eb511feb55e99caba75c636524417d1"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },

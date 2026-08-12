@@ -2,13 +2,13 @@
 'use client';
 
 import { createElement, memo, useEffect, useImperativeHandle, useMemo, useState } from 'octane';
-import { useVirtualizer } from '../../core/useVirtualizer';
-import { useIsomorphicLayoutEffect } from '../../hooks/useIsomorphicLayoutEffect';
-import { useMemoizedObject } from '../../hooks/useMemoizedObject';
-import type { Align, TagNames } from '../../types';
-import { arePropsEqual } from '../../utils/arePropsEqual';
-import { isDynamicRowHeight as isDynamicRowHeightUtil } from './isDynamicRowHeight';
-import type { ListProps } from './types';
+import { useVirtualizer } from '../../core/useVirtualizer.js';
+import { useIsomorphicLayoutEffect } from '../../hooks/useIsomorphicLayoutEffect.js';
+import { useMemoizedObject } from '../../hooks/useMemoizedObject.js';
+import type { Align, TagNames } from '../../types.js';
+import { arePropsEqual } from '../../utils/arePropsEqual.js';
+import { isDynamicRowHeight as isDynamicRowHeightUtil } from './isDynamicRowHeight.js';
+import type { ListProps } from './types.js';
 
 export const DATA_ATTRIBUTE_LIST_INDEX = 'data-react-window-index';
 

@@ -38,7 +38,9 @@ export function verifyTanstackHotkeysTestClassifications(root) {
 		})
 		.sort();
 	if (JSON.stringify(discovered) !== JSON.stringify(declared)) {
-		throw new Error('every port-authored tanstack-hotkeys test must have exactly one classification');
+		throw new Error(
+			'every port-authored tanstack-hotkeys test must have exactly one classification',
+		);
 	}
 	for (const entry of config.tests) {
 		if (!DISPOSITIONS.has(entry.disposition))

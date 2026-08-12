@@ -1,7 +1,10 @@
 import { describe, it, vi } from 'vitest';
 import { resolve } from 'node:path';
 import { act as reactAct } from 'react';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const fixture = resolve(__dirname, '../_fixtures/differential.tsrx');
 const cache = resolve(__dirname, '.react-cache');
@@ -26,6 +29,8 @@ function dispatchZoomGestures(root: HTMLElement): void {
 	window.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 40, clientY: 50 }));
 	window.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
 }
+
+await Promise.all([preloadDifferentialFixture(fixture, cache)]);
 
 describe('@octanejs/visx React differential', () => {
 	// @parity-case differential:visx-primitives

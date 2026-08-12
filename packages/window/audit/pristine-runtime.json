@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "project": "react-window-pristine",
+  "project": "window-pristine",
   "roots": ["packages/window/upstream/lib"],
   "files": [
     "packages/window/upstream/lib/components/grid/Grid.test.tsx",

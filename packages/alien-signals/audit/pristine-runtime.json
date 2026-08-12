@@ -1,12 +1,8 @@
 {
   "schemaVersion": 1,
   "project": "alien-signals-pristine-inner",
-  "roots": [
-    "packages/alien-signals/upstream"
-  ],
-  "files": [
-    "packages/alien-signals/upstream/src/index.test.ts"
-  ],
+  "roots": ["packages/alien-signals/upstream"],
+  "files": ["packages/alien-signals/upstream/src/index.test.ts"],
   "tests": [
     {
       "id": "runtime:705813b2f8390747",

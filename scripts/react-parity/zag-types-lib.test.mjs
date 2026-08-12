@@ -43,7 +43,13 @@ test('rejects deleting an adapted assertion', async function rejectsDeletedAsser
 	});
 	const file = join(value.adaptedRoot, 'public-api.test-d.ts');
 	const source = await readFile(file, 'utf8');
-	await writeFile(file, source.replace(/\nexpectType<typeof Portal>\(Portal\);/, ''));
+	await writeFile(
+		file,
+		source.replace(
+			/\nexpectType<OctaneNode \| undefined>\(null as unknown as PortalChildren\);/,
+			'',
+		),
+	);
 	assert.throws(function run() {
 		buildTypeInventory(value.root, value.config);
 	}, /assertion groups differ/);

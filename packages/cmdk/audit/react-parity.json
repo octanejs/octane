@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "cdcfcd31fe0878d094dbfcf0a1203e7de27988cc1b6d94cd53d70b9639df48df"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -56,7 +56,7 @@
         {
           "path": "packages/cmdk/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "da4804b5a6e6343b3a31f8a6e107b0fd09f7d169d6fc947a0000f0d1d37993d4",
+          "sha256": "26db2d7ede1098fc3e8fe7db36322525c8a2308a14aa7f57c4fa6a3492abed4d",
           "cases": [
             {
               "id": "differential:cmdk-filter-selection-empty",
@@ -133,7 +133,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "packages/cmdk/upstream/SHA256SUMS",
@@ -158,7 +158,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "b18343a233f3e73b1a58ba1a4fc88621009d3df01ce6dc5583efb8d4fa397bc2"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         },
         {
           "path": "packages/cmdk/src/components/command.tsrx",

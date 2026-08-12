@@ -5,7 +5,6 @@ import { compile } from 'octane/compiler';
 import * as ClientRT from '../../src/index.js';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
-import { hydrationMarkerSummary } from './_marker-summary.js';
 
 // P3 — STRUCTURAL hydration mismatch: the server DOM's SHAPE differs from what the client
 // renders (a swapped @if/@switch branch, a changed tag, a different @for list length). The
@@ -207,36 +206,46 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
 		container.innerHTML = html;
 		const toggle = container.querySelector('#toggle')!;
-		const button = container.querySelector('#hit')!;
-		const before = hydrationMarkerSummary(toggle);
-		hydrateRoot(container, clientProd.Toggle, { on: true });
+		const button = container.querySelector('#hit') as HTMLButtonElement;
+		const root = hydrateRoot(container, clientProd.Toggle, { on: true });
 		flushSync(() => {});
 		expect(container.querySelector('#toggle')).toBe(toggle);
 		expect(container.querySelector('#hit')).toBe(button);
 		expect(button.textContent).toBe('on:0');
-		const after = hydrationMarkerSummary(toggle);
-		expect(after.logicalPairs).toBe(before.logicalPairs);
-		expect(after.physicalPairs).toBeLessThan(before.physicalPairs);
-		expect(after.countedPairs).toBe(1);
+		// A compact server range may already be minimal, so adoption cannot be
+		// identified by deleting comments; the adopted host must stay interactive.
+		flushSync(() => button.click());
+		expect(container.querySelector('#hit')).toBe(button);
+		expect(button.textContent).toBe('on:1');
+		root.render(clientProd.Toggle, { on: true });
+		flushSync(() => {});
+		expect(container.querySelector('#toggle')).toBe(toggle);
+		expect(container.querySelector('#hit')).toBe(button);
+		expect(button.textContent).toBe('on:1');
 		expect(warns()).toEqual([]);
+		root.unmount();
 	});
 
 	it('no warning + adopted hosts when the branch matches', async () => {
 		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
 		container.innerHTML = html;
 		const toggle = container.querySelector('#toggle')!;
-		const button = container.querySelector('#hit')!;
-		const before = hydrationMarkerSummary(toggle);
-		hydrateRoot(container, clientDev.Toggle, { on: true });
+		const button = container.querySelector('#hit') as HTMLButtonElement;
+		const root = hydrateRoot(container, clientDev.Toggle, { on: true });
 		flushSync(() => {});
 		expect(container.querySelector('#toggle')).toBe(toggle);
 		expect(container.querySelector('#hit')).toBe(button);
 		expect(button.textContent).toBe('on:0');
-		const after = hydrationMarkerSummary(toggle);
-		expect(after.logicalPairs).toBe(before.logicalPairs);
-		expect(after.physicalPairs).toBeLessThan(before.physicalPairs);
-		expect(after.countedPairs).toBe(1);
+		flushSync(() => button.click());
+		expect(container.querySelector('#hit')).toBe(button);
+		expect(button.textContent).toBe('on:1');
+		root.render(clientDev.Toggle, { on: true });
+		flushSync(() => {});
+		expect(container.querySelector('#toggle')).toBe(toggle);
+		expect(container.querySelector('#hit')).toBe(button);
+		expect(button.textContent).toBe('on:1');
 		expect(warns()).toEqual([]);
+		root.unmount();
 	});
 
 	it('@for list grow: server 2 items, client 3 → no crash, 3 items rendered, warns', async () => {

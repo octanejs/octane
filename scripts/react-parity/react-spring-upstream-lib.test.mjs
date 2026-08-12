@@ -7,14 +7,10 @@ import { verifyReactSpringUpstream } from './react-spring-upstream-lib.mjs';
 
 function fixture() {
 	const root = mkdtempSync(join(tmpdir(), 'react-spring-upstream-'));
-	cpSync(
-		new URL('../../packages/react-spring', import.meta.url),
-		join(root, 'packages/react-spring'),
-		{
-			recursive: true,
-		},
-	);
-	return { root, target: join(root, 'packages/react-spring/upstream') };
+	cpSync(new URL('../../packages/spring', import.meta.url), join(root, 'packages/spring'), {
+		recursive: true,
+	});
+	return { root, target: join(root, 'packages/spring/upstream') };
 }
 
 test('accepts the pinned byte-exact upstream tree with case-level evidence', () => {
@@ -53,7 +49,7 @@ test('rejects missing upstream evidence', () => {
 test('rejects a pristine identity without a case disposition', () => {
 	const { root } = fixture();
 	try {
-		const path = join(root, 'packages/react-spring/audit/upstream-case-dispositions.json');
+		const path = join(root, 'packages/spring/audit/upstream-case-dispositions.json');
 		const dispositions = JSON.parse(readFileSync(path, 'utf8'));
 		dispositions.cases = dispositions.cases.slice(1);
 		writeFileSync(path, `${JSON.stringify(dispositions, null, 2)}\n`);
@@ -66,7 +62,7 @@ test('rejects a pristine identity without a case disposition', () => {
 test('rejects adapted disposition pointing at a missing adapted identity', () => {
 	const { root } = fixture();
 	try {
-		const path = join(root, 'packages/react-spring/audit/upstream-case-dispositions.json');
+		const path = join(root, 'packages/spring/audit/upstream-case-dispositions.json');
 		const dispositions = JSON.parse(readFileSync(path, 'utf8'));
 		const adapted = dispositions.cases.find(function findAdapted(entry) {
 			return entry.disposition === 'adapted';
@@ -83,7 +79,7 @@ test('rejects adapted disposition pointing at a missing adapted identity', () =>
 test('rejects adapted evidence without Per provenance', () => {
 	const { root } = fixture();
 	try {
-		const path = join(root, 'packages/react-spring/tests/upstream/helpers.test.ts');
+		const path = join(root, 'packages/spring/tests/upstream/helpers.test.ts');
 		const sourceText = readFileSync(path, 'utf8').replaceAll(/^\s*\/\/ Per .+\n/gm, '');
 		writeFileSync(path, sourceText);
 		assert.throws(() => verifyReactSpringUpstream(root), /lacks \/\/ Per provenance/);
@@ -95,7 +91,7 @@ test('rejects adapted evidence without Per provenance', () => {
 test('rejects skipped adapted cases', () => {
 	const { root } = fixture();
 	try {
-		const path = join(root, 'packages/react-spring/tests/upstream/helpers.test.ts');
+		const path = join(root, 'packages/spring/tests/upstream/helpers.test.ts');
 		const sourceText = readFileSync(path, 'utf8').replace('it(', 'it.skip(');
 		writeFileSync(path, sourceText);
 		assert.throws(() => verifyReactSpringUpstream(root), /contains skipped cases/);
@@ -108,7 +104,7 @@ test('rejects React imports in published source', () => {
 	const { root } = fixture();
 	try {
 		writeFileSync(
-			join(root, 'packages/react-spring/src/leak.ts'),
+			join(root, 'packages/spring/src/leak.ts'),
 			"import React from 'react'\nexport const x = React\n",
 		);
 		assert.throws(() => verifyReactSpringUpstream(root), /React import leaked/);

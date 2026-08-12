@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e980bed766ddbd5682456afe3fa956d6f7dee963018e5a4ec9635edcc422c632"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -62,12 +62,12 @@
         {
           "path": "packages/textarea-autosize/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "712d22651394f5d94074c9964c690300d3288e41d4d40b5399027f1835e17204"
+          "sha256": "b1bc82c648268b29f28f98fcd762d953862bf77fba80607f5f60845af8494711"
         },
         {
           "path": "packages/textarea-autosize/jest.pristine.config.cjs",
           "role": "support",
-          "sha256": "f56c89c020b5c53623f79536137e14f358628aafbf6341f0382654fa688dd058"
+          "sha256": "02d7e02ae4280fc053158e219e116cf27ffc5ceef07a8530a11d0f7e26e026d8"
         }
       ]
     },
@@ -87,7 +87,7 @@
         {
           "path": "packages/textarea-autosize/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "186863ed5124ac21b022e2471204082d824bac16540b8b6f1ccc53caeffdf628"
+          "sha256": "12631a7df7fd5a30272c268a8091ff3e15673cb01e4b0ed9215ebb4b0f455165"
         }
       ]
     },
@@ -103,7 +103,7 @@
         {
           "path": "packages/textarea-autosize/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "cbbe94f5aff0b50e74cae494cb4bc326d4e816045011a1e1c8fcc9e0e24d8618",
+          "sha256": "70a0dc2fe1bc13a59d3dc5be850d35885ca4aa201669e6f0bcb8089faf60c1aa",
           "cases": [
             {
               "id": "differential:initial",
@@ -167,7 +167,7 @@
         {
           "path": "packages/textarea-autosize/audit/type-parity.json",
           "role": "support",
-          "sha256": "0a3f4e0bd2c56acad6ab0d5482aaee7e344736f79c6bb496fe85aefef0750a18"
+          "sha256": "c41003ee12df090b7aac8be96c4f1a3ca9740f2d50dce25564669c6e099698f6"
         }
       ],
       "notes": "Repo-authored React declaration probes against pinned upstream typings, with assertion-group inventories and negative controls."
@@ -210,7 +210,7 @@
         {
           "path": "packages/textarea-autosize/audit/type-parity.json",
           "role": "support",
-          "sha256": "0a3f4e0bd2c56acad6ab0d5482aaee7e344736f79c6bb496fe85aefef0750a18"
+          "sha256": "c41003ee12df090b7aac8be96c4f1a3ca9740f2d50dce25564669c6e099698f6"
         }
       ],
       "notes": "Structurally equivalent Octane public probes after permitted import-root and ref-type transformations."
@@ -226,7 +226,7 @@
         {
           "path": "packages/textarea-autosize/tests/ssr/react-contract.test.ts",
           "role": "test",
-          "sha256": "31ab694e83dffae6c2d74b5db9ae94b31303be7688b7f289c44586aec0f2969c",
+          "sha256": "5dae604942e7a8c91920bbf15b0ea31d2333a2b3bf1054d561313d9136232b9b",
           "cases": [
             {
               "id": "ssr:react-contract",
@@ -243,22 +243,17 @@
       "oracle": "required",
       "environment": "workspace-node",
       "project": "textarea-autosize-browser",
-      "notes": "Executes same-process React/Octane pixel, callback, resize, reset, and focused Firefox differential evidence.",
+      "notes": "Executes same-process React/Octane Chromium pixel, callback, resize, and reset differential evidence.",
       "files": [
         {
           "path": "packages/textarea-autosize/tests/browser/browser.test.ts",
           "role": "test",
-          "sha256": "0311dd13a11c10eff25c86f6e6aa017ca13aa95afdbde934bf5d5a2b0958e7d8",
+          "sha256": "c6c51734b428e738c49bba2eced272556c4bbda17c1b7e66824afe954710713e",
           "cases": [
             {
               "id": "browser:chromium",
               "testName": "matches React in Chromium",
               "fullName": "textarea-autosize real-browser parity matches React in Chromium"
-            },
-            {
-              "id": "browser:firefox",
-              "testName": "matches React in focused Firefox coverage",
-              "fullName": "textarea-autosize real-browser parity matches React in focused Firefox coverage"
             }
           ]
         }

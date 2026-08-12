@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/input-otp",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -48,7 +48,7 @@
     "@tsrx/react": "catalog:default",
     "octane": "workspace:*",
     "input-otp": "1.4.2",
-    "playwright": "1.61.1",
+    "playwright": "catalog:default",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "vite": "catalog:default",

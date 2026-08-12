@@ -23,9 +23,7 @@ test('textarea-autosize classifies every port-authored runtime/type test exactly
 	});
 });
 
-test('rejects an unclassified port-authored textarea-autosize test', async function rejectsUnclassified(
-	t,
-) {
+test('rejects an unclassified port-authored textarea-autosize test', async function rejectsUnclassified(t) {
 	const fixtureRoot = await mkdtemp(join(tmpdir(), 'textarea-classifications-'));
 	t.after(function cleanup() {
 		return rm(fixtureRoot, { recursive: true, force: true });

@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "3627c861bc34be5e913015b158b5fa0d687a1d6993b0e83e5d36f4dd3f13d835"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -50,7 +50,7 @@
       "environment": "workspace-node",
       "project": "drei-pristine-playwright",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs the vendored Playwright screenshot test byte-for-byte against published React Drei.",
+      "notes": "Runs the vendored Playwright screenshot test byte-for-byte against published React Drei through the shared lockfile-backed Vite runner.",
       "execution": {
         "kind": "playwright-full",
         "config": "packages/drei/scripts/pristine-playwright.json",
@@ -59,14 +59,19 @@
       },
       "files": [
         {
+          "path": "scripts/react-parity/fixtures/drei/package.json",
+          "role": "support",
+          "sha256": "2bf512b4d6c60919b660256f04dbaf62eeff1e7350e36aa2b1e802241c19dc5d"
+        },
+        {
           "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "236350603d5770d9a4bdc3b766d9caca5f1d164cea5941b9f2d79387628f2807"
+          "sha256": "75cb27835a432945b7eaa5730b34dc55d18c7aa190373d80743d6e917356b493"
         },
         {
           "path": "packages/drei/scripts/pristine-playwright.json",
           "role": "support",
-          "sha256": "85e6daa57a67314e19094a9a75f915cca984ee1ac790f4bdc7a4da3ddb263edd"
+          "sha256": "c1339ea9f2afde70d59be2cc37dd4792dac7b64e6cdab8b451d74fbb9bfd8ba1"
         },
         {
           "path": "packages/drei/audit/pristine-runtime.json",
@@ -96,7 +101,7 @@
         {
           "path": "packages/drei/tests/browser/upstream-e2e.browser.test.ts",
           "role": "test",
-          "sha256": "99be2ee889bf725fd7d59be3f2eb1c2859a00c9ca0d994d56a150aebc609f4ad",
+          "sha256": "707bd9d44f4fc0ae0b11364c7a7cc8b688c4925962c8c17ea69773454910019e",
           "cases": [
             {
               "id": "adapted:e2e-snapshot",
@@ -104,6 +109,41 @@
               "fullName": "adapted Drei e2e screenshot (Playwright) should match previous one"
             }
           ]
+        },
+        {
+          "path": "packages/drei/tests/browser/e2e/index.html",
+          "role": "support",
+          "sha256": "f8990c9e89d6933089c4e84215d9d44af810a0f5fdbcaae13c0fe266e802e5e0"
+        },
+        {
+          "path": "packages/drei/tests/browser/e2e/main.tsrx",
+          "role": "support",
+          "sha256": "6e52dbb75d85e4c62fab4ad227017ca23f809af629c9692648472d5da736f3eb"
+        },
+        {
+          "path": "packages/drei/tests/browser/e2e/App.tsrx",
+          "role": "support",
+          "sha256": "dd6292906a06df3ad47205a005e3a161228310028a2fbb8f8ade2911988f0f72"
+        },
+        {
+          "path": "packages/drei/tests/browser/e2e/App.three.tsrx",
+          "role": "support",
+          "sha256": "d77f1fa6aa2e8dd4fc267251f1a61195a776596d5d434bf94d2ef755918eb612"
+        },
+        {
+          "path": "packages/drei/tests/browser/e2e/selected-exports.ts",
+          "role": "support",
+          "sha256": "316939ccd9091270ef95f364dc136393fafce061c02e7ed5584d7e04e43fb7aa"
+        },
+        {
+          "path": "packages/drei/tests/browser/e2e/selected-three-stdlib-exports.ts",
+          "role": "support",
+          "sha256": "a223c2e16ce5aacf77c8c38071396a46f06f6553d1ff92b914779a1bd95737d2"
+        },
+        {
+          "path": "packages/drei/upstream/test/e2e/snapshot.test.ts-snapshots/should-match-previous-one-1-linux.png",
+          "role": "support",
+          "sha256": "16217caa801c0d1bc62ce0ca07ceae43432f592d4b4b89bdaf94fadba25c9d21"
         },
         {
           "path": "packages/drei/audit/upstream-browser.json",
@@ -133,7 +173,7 @@
         {
           "path": "packages/drei/audit/runtime-evidence.json",
           "role": "support",
-          "sha256": "bb77d8f12fa1efe0d9d304c1deebcdde67432456992bb01bb6455d92aea5b224"
+          "sha256": "1bd11616a3b8ebcb98af3095e370482e9836475b7d5b08f87ea904fd60b3a0a9"
         },
         {
           "path": "packages/drei/audit/test-classifications.json",

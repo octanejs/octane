@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**0 active pin(s) across 61 binding package(s).**
+**0 active pin(s) across 80 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -21,11 +21,14 @@ surface and evidence.
 | `@octanejs/aria` | 0 |
 | `@octanejs/base-ui` | 0 |
 | `@octanejs/cmdk` | 0 |
+| `@octanejs/colorful` | 0 |
 | `@octanejs/day-picker` | 0 |
 | `@octanejs/devtools` | 0 |
 | `@octanejs/dexie` | 0 |
 | `@octanejs/dnd-kit` | 0 |
+| `@octanejs/draggable` | 0 |
 | `@octanejs/drei` | 0 |
+| `@octanejs/dropzone` | 0 |
 | `@octanejs/electron` | 0 |
 | `@octanejs/embla-carousel` | 0 |
 | `@octanejs/floating-ui` | 0 |
@@ -33,6 +36,7 @@ surface and evidence.
 | `@octanejs/hook-form` | 0 |
 | `@octanejs/i18next` | 0 |
 | `@octanejs/inertia` | 0 |
+| `@octanejs/input-otp` | 0 |
 | `@octanejs/intersection-observer` | 0 |
 | `@octanejs/jotai` | 0 |
 | `@octanejs/lexical` | 0 |
@@ -50,7 +54,6 @@ surface and evidence.
 | `@octanejs/popper` | 0 |
 | `@octanejs/radix` | 0 |
 | `@octanejs/rainbowkit` | 0 |
-| `@octanejs/react-dropzone` | 0 |
 | `@octanejs/react-error-boundary` | 0 |
 | `@octanejs/react-map-gl` | 0 |
 | `@octanejs/recharts` | 0 |
@@ -61,10 +64,12 @@ surface and evidence.
 | `@octanejs/shadcn` | 0 |
 | `@octanejs/solana-react` | 0 |
 | `@octanejs/sonner` | 0 |
+| `@octanejs/spring` | 0 |
 | `@octanejs/streamdown` | 0 |
 | `@octanejs/styled-components` | 0 |
 | `@octanejs/stylex` | 0 |
 | `@octanejs/swr` | 0 |
+| `@octanejs/syntax-highlighter` | 0 |
 | `@octanejs/tanstack-ai` | 0 |
 | `@octanejs/tanstack-devtools` | 0 |
 | `@octanejs/tanstack-form` | 0 |
@@ -87,5 +92,6 @@ surface and evidence.
 | `@octanejs/vaul` | 0 |
 | `@octanejs/visx` | 0 |
 | `@octanejs/wagmi` | 0 |
+| `@octanejs/window` | 0 |
 | `@octanejs/zag` | 0 |
 | `@octanejs/zustand` | 0 |

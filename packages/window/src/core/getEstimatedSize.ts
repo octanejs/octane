@@ -1,5 +1,5 @@
-import type { CachedBounds, SizeFunction } from './types';
-import { assert } from '../utils/assert';
+import type { CachedBounds, SizeFunction } from './types.js';
+import { assert } from '../utils/assert.js';
 
 export function getEstimatedSize<Props extends object>({
 	cachedBounds,

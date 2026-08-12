@@ -8,12 +8,20 @@
  */
 import { describe, it, beforeAll, afterAll } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/radix-diff.tsrx');
 // React fixtures are precompiled into THIS package's cache (see differential _setup.ts)
 // so the React side resolves radix-ui from here.
 const CACHE = resolve(__dirname, '.react-cache');
+// Importing the real `radix-ui` oracle is substantially more expensive than
+// any individual case. Start it at module evaluation so the first case does
+// not own that one-time work (and cannot leave React's act queue half-open if
+// the per-test timeout expires under CI contention).
+await preloadDifferentialFixture(FIXTURE, CACHE);
 
 // Let queued `requestAnimationFrame` callbacks fire on BOTH sides before interacting.
 // Radix's Collapsible content arms a mount-time rAF that disables its "block the mount

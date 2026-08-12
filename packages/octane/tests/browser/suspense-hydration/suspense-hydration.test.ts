@@ -116,6 +116,10 @@ async function waitForFallback(): Promise<void> {
 	await page!.waitForFunction(() => window.__suspenseHydration.snapshot().fallbackCount === 1);
 }
 
+async function waitForHiddenPrimaryBlur(): Promise<void> {
+	await page!.waitForFunction(() => window.__suspenseHydration.snapshot().activeId === '');
+}
+
 async function waitForReveal(): Promise<void> {
 	await page!.waitForFunction(() => {
 		const state = window.__suspenseHydration.snapshot();
@@ -146,6 +150,7 @@ async function expectUrgentPreservation(shape: 'same' | 'swap'): Promise<void> {
 
 	await page!.evaluate(() => window.__suspenseHydration.urgent!());
 	await waitForFallback();
+	await waitForHiddenPrimaryBlur();
 	state = await snapshot();
 	expectPreservedInput(state);
 	expect(state.panelVisible).toBe(false);
@@ -303,7 +308,7 @@ describe.sequential('real-browser Suspense and async hydration evidence', () => 
 		state = await snapshot();
 		expect(state.inputSame).toBe(true);
 		expect(state.inputVisible).toBe(true);
-		// Chromium and Firefox both normalize focus to <body> before the async
+		// Chromium normalizes focus to <body> before the async
 		// reveal completes on this React baseline path.
 		expect(state.activeId).toBe('');
 		expect(state.globalFailures).toEqual([]);
@@ -371,6 +376,7 @@ describe.sequential('real-browser Suspense and async hydration evidence', () => 
 			window.__suspenseHydration.transition!();
 		});
 		await waitForFallback();
+		await waitForHiddenPrimaryBlur();
 		let state = await snapshot();
 		expectPreservedInput(state);
 		expect(state.panelVisible).toBe(false);

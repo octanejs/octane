@@ -31,13 +31,9 @@ export function verifyReactTransitionGroupTestClassifications(root) {
 		...discoverUnder(root, 'packages/transition-group/tests', function isRuntimeTest(name) {
 			return /\.test\.(?:ts|tsx|tsrx)$/.test(name);
 		}),
-		...discoverUnder(
-			root,
-			'packages/transition-group/upstream-types',
-			function isTypeProbe(name) {
-				return name.endsWith('-tests.tsx');
-			},
-		),
+		...discoverUnder(root, 'packages/transition-group/upstream-types', function isTypeProbe(name) {
+			return name.endsWith('-tests.tsx');
+		}),
 		...discoverUnder(root, 'packages/transition-group/typetests', function isTypeProbe(name) {
 			return name.endsWith('.test-d.ts') || name.endsWith('-tests.tsx');
 		}),

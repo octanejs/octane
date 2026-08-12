@@ -23,17 +23,15 @@ describe('tanstack-form repository regressions', () => {
 				},
 			});
 
-			return (
-				<>
-					<span data-testid="dynamic-form-id">{form.formId}</span>
-					<button data-testid="clear-form-id" onClick={() => setFormId(undefined)}>
-						clear
-					</button>
-					<button data-testid="rerender-form" onClick={forceRender}>
-						rerender
-					</button>
-				</>
-			);
+			return <>
+				<span data-testid="dynamic-form-id">{form.formId}</span>
+				<button data-testid="clear-form-id" onClick={() => setFormId(undefined)}>
+					clear
+				</button>
+				<button data-testid="rerender-form" onClick={forceRender}>
+					rerender
+				</button>
+			</>;
 		}
 
 		const { getByTestId } = render(<Comp />);
@@ -64,19 +62,17 @@ describe('tanstack-form repository regressions', () => {
 				},
 			});
 
-			return (
-				<>
-					<button data-testid="change-group" onClick={() => setGroupName('step2')}>
-						change
-					</button>
-					<form.FormGroup name={groupName}>
-						{(group) => {
-							observedValues.push(group.state.value.label);
-							return <span data-testid="group-label">{group.state.value.label}</span>;
-						}}
-					</form.FormGroup>
-				</>
-			);
+			return <>
+				<button data-testid="change-group" onClick={() => setGroupName('step2')}>
+					change
+				</button>
+				<form.FormGroup name={groupName}>
+					{(group) => {
+						observedValues.push(group.state.value.label);
+						return <span data-testid="group-label">{group.state.value.label}</span>;
+					}}
+				</form.FormGroup>
+			</>;
 		}
 
 		const { getByTestId } = render(<Comp />);
@@ -88,5 +84,4 @@ describe('tanstack-form repository regressions', () => {
 		expect(getByTestId('group-label')).toHaveTextContent('second');
 		expect(observedValues).not.toContain('first');
 	});
-
 });

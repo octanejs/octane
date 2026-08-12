@@ -12,7 +12,7 @@ execution: code
 
 ## Goal Capsule
 
-- **Objective:** Ship an `@octanejs/react-spring` binding for the stable React Spring 10.1.2 web and Parallax surfaces, preserving spring physics, imperative control, animated hosts, transitions, SSR, hydration, and public types without a React runtime dependency.
+- **Objective:** Ship an `@octanejs/spring` binding for the stable React Spring 10.1.2 web and Parallax surfaces, preserving spring physics, imperative control, animated hosts, transitions, SSR, hydration, and public types without a React runtime dependency.
 - **Authority:** This plan and repository guidance define the Octane package contract; React Spring tag `v10.1.2` at commit `59b1e5306402d3039120e2da464b66e10b1a1aa1` defines upstream behavior and types; current Octane public contracts override React implementation details.
 - **Execution profile:** Work in the dedicated `feat/react-spring-binding` worktree. Use one binding PR unless a characterization gate proves an Octane-core prerequisite is necessary. Every opened PR remains draft until its required checks are green and its head is current with its configured base branch.
 - **Stop conditions:** Stop and surface a blocker if the stable upstream contract requires unsupported React element behavior that cannot be adapted through public Octane APIs, if source provenance cannot be preserved, or if a proposed core change serves only this binding.
@@ -49,7 +49,7 @@ A credible port must preserve those contracts rather than substituting Motion's 
 **Upstream and package contract**
 
 - R1. The implementation targets React Spring `v10.1.2` at commit `59b1e5306402d3039120e2da464b66e10b1a1aa1` and records file-level provenance for adapted source and tests.
-- R2. The public package is `@octanejs/react-spring`, with the stable web API at the root and Parallax at `@octanejs/react-spring/parallax`.
+- R2. The public package is `@octanejs/spring`, with the stable web API at the root and Parallax at `@octanejs/spring/parallax`.
 - R3. Runtime source contains no `react`, `react-dom`, or React type dependency; `@react-spring/rafz` may remain an exact upstream runtime dependency and upstream React packages may appear only as development or differential oracles.
 - R4. The package preserves the supported runtime exports and public type contracts of `@react-spring/web@10.1.2` and `@react-spring/parallax@10.1.2` in both directions, with every omission recorded as an intentional divergence.
 
@@ -108,7 +108,7 @@ A credible port must preserve those contracts rather than substituting Motion's 
 
 ### Acceptance Examples
 
-- AE1. **Engine without React:** Given a packed consumer installs `@octanejs/react-spring`, when it imports `SpringValue`, `Controller`, `config`, and `animated`, then the program installs, typechecks, and builds without React packages in the runtime graph. Covers R1-R5, R16.
+- AE1. **Engine without React:** Given a packed consumer installs `@octanejs/spring`, when it imports `SpringValue`, `Controller`, `config`, and `animated`, then the program installs, typechecks, and builds without React packages in the runtime graph. Covers R1-R5, R16.
 - AE2. **Coherent animated host:** Given two related spring values update during the same frame, when an `animated.div` consumes both, then the visible style reflects one coherent frame and the component does not render once per property. Covers R10-R12.
 - AE3. **Imperative interruption:** Given an active async or looping spring, when the caller pauses, resumes, replaces, or cancels it through the imperative API, then promises and lifecycle callbacks settle with the same finished or cancelled result as upstream. Covers R5-R6.
 - AE4. **Keyed leave and re-entry:** Given an item begins leaving and the same key re-enters before expiration, when the transition updates, then the existing item identity is reused, stale removal is cancelled, and the new phase continues from the current spring state. Covers R8, R11-R12.
@@ -177,7 +177,7 @@ flowchart TB
   Shared --> Animated["Private animated graph + host adapter"]
   Shared --> Core["Private controllers + hooks + transitions"]
   Animated --> Core
-  Core --> Web["Public @octanejs/react-spring root"]
+  Core --> Web["Public @octanejs/spring root"]
   Animated --> Web
   Web --> Parallax["Public ./parallax subpath"]
   Web --> Playground["Central playground route"]
@@ -221,7 +221,7 @@ sequenceDiagram
 | PR | Base | Scope | Readiness and merge dependency |
 |---|---|---|---|
 | P0, conditional | Current upstream `main` | General Octane batching or dynamic-host capability proven necessary by U1 | Draft until owning core regression and required core gates are green and the branch is current with `main` |
-| P1 | Current upstream `main`, or P0 when it exists | Complete `@octanejs/react-spring` binding, Parallax subpath, playground, docs, generated metadata, and changeset | Draft until all plan verification is green, review blockers are resolved, and the branch is current with its configured base |
+| P1 | Current upstream `main`, or P0 when it exists | Complete `@octanejs/spring` binding, Parallax subpath, playground, docs, generated metadata, and changeset | Draft until all plan verification is green, review blockers are resolved, and the branch is current with its configured base |
 
 After P0 merges, rebase or update P1 onto current upstream `main` and change its base before readiness review.
 Do not preserve a stale artificial stack.
@@ -265,11 +265,11 @@ If U1 passes without a core change, P0 does not exist.
 - **Requirements:** R1-R4, R10-R12, R18; AE1, AE2, AE7, AE8; KTD1-KTD3, KTD6, KTD9-KTD10.
 - **Dependencies:** None.
 - **Files:**
-  - `packages/react-spring/UPSTREAM.md`
-  - `packages/react-spring/package.json`
-  - `packages/react-spring/tsconfig.json`
-  - `packages/react-spring/tests/conformance/prerequisite-seams.test.ts`
-  - `packages/react-spring/tests/_fixtures/animated-host.tsrx`
+  - `packages/spring/UPSTREAM.md`
+  - `packages/spring/package.json`
+  - `packages/spring/tsconfig.json`
+  - `packages/spring/tests/conformance/prerequisite-seams.test.ts`
+  - `packages/spring/tests/_fixtures/animated-host.tsrx`
   - `vitest.config.js`
   - `pnpm-workspace.yaml`
   - `pnpm-lock.yaml`
@@ -297,14 +297,14 @@ If U1 passes without a core change, P0 does not exist.
 - **Requirements:** R1, R3-R6, R9, R12; AE1, AE3; KTD1-KTD3, KTD6-KTD7.
 - **Dependencies:** U1 and P0 when U1 creates it.
 - **Files:**
-  - `packages/react-spring/src/shared/`
-  - `packages/react-spring/src/animated/`
-  - `packages/react-spring/src/core/`
-  - `packages/react-spring/src/types/`
-  - `packages/react-spring/tests/conformance/engine.test.ts`
-  - `packages/react-spring/tests/conformance/interpolation.test.ts`
-  - `packages/react-spring/tests/conformance/controller.test.ts`
-  - `packages/react-spring/tests/conformance/frame-loop.test.ts`
+  - `packages/spring/src/shared/`
+  - `packages/spring/src/animated/`
+  - `packages/spring/src/core/`
+  - `packages/spring/src/types/`
+  - `packages/spring/tests/conformance/engine.test.ts`
+  - `packages/spring/tests/conformance/interpolation.test.ts`
+  - `packages/spring/tests/conformance/controller.test.ts`
+  - `packages/spring/tests/conformance/frame-loop.test.ts`
 - **Approach:**
   1. Adapt the pinned upstream non-React logic with file-level provenance and preserve the shared → animated/core dependency direction.
   2. Replace shared React hooks with slot-safe Octane hooks while leaving pure controllers, fluids, interpolation, and frame scheduling structurally aligned with upstream.
@@ -327,14 +327,14 @@ If U1 passes without a core change, P0 does not exist.
 - **Requirements:** R4-R9, R12-R13; AE3, AE4, AE6; KTD1-KTD3, KTD5-KTD7.
 - **Dependencies:** U2.
 - **Files:**
-  - `packages/react-spring/src/core/hooks/`
-  - `packages/react-spring/src/core/components/`
-  - `packages/react-spring/src/core/SpringContext.tsrx`
-  - `packages/react-spring/src/index.ts`
-  - `packages/react-spring/tests/conformance/hooks.test.ts`
-  - `packages/react-spring/tests/conformance/transitions.test.ts`
-  - `packages/react-spring/tests/_fixtures/hooks.tsrx`
-  - `packages/react-spring/tests/_fixtures/transitions.tsrx`
+  - `packages/spring/src/core/hooks/`
+  - `packages/spring/src/core/components/`
+  - `packages/spring/src/core/SpringContext.tsrx`
+  - `packages/spring/src/index.ts`
+  - `packages/spring/tests/conformance/hooks.test.ts`
+  - `packages/spring/tests/conformance/transitions.test.ts`
+  - `packages/spring/tests/_fixtures/hooks.tsrx`
+  - `packages/spring/tests/_fixtures/transitions.tsrx`
 - **Approach:**
   1. Port hook lifecycle and dependency behavior with explicit slot ownership for plain TypeScript helpers.
   2. Re-author context and render-prop components as Octane components without class or React fragment assumptions.
@@ -359,18 +359,18 @@ If U1 passes without a core change, P0 does not exist.
 - **Requirements:** R4, R10-R13; AE1, AE2, AE6; KTD3-KTD4, KTD6-KTD7.
 - **Dependencies:** U2-U3.
 - **Files:**
-  - `packages/react-spring/src/web/AnimatedStyle.ts`
-  - `packages/react-spring/src/web/applyAnimatedValues.ts`
-  - `packages/react-spring/src/web/animated.ts`
-  - `packages/react-spring/src/web/primitives.ts`
-  - `packages/react-spring/src/web/index.ts`
-  - `packages/react-spring/tests/conformance/animated-host.test.ts`
-  - `packages/react-spring/tests/differential/web-parity.test.ts`
-  - `packages/react-spring/tests/hydration/animated-host.test.ts`
-  - `packages/react-spring/tests/_fixtures/web-host.tsrx`
-  - `packages/react-spring/typetests/public-api.test-d.tsx`
-  - `packages/react-spring/typetests/react-types-must-not-be-imported.d.ts`
-  - `packages/react-spring/typetests/tsconfig.json`
+  - `packages/spring/src/web/AnimatedStyle.ts`
+  - `packages/spring/src/web/applyAnimatedValues.ts`
+  - `packages/spring/src/web/animated.ts`
+  - `packages/spring/src/web/primitives.ts`
+  - `packages/spring/src/web/index.ts`
+  - `packages/spring/tests/conformance/animated-host.test.ts`
+  - `packages/spring/tests/differential/web-parity.test.ts`
+  - `packages/spring/tests/hydration/animated-host.test.ts`
+  - `packages/spring/tests/_fixtures/web-host.tsrx`
+  - `packages/spring/typetests/public-api.test-d.tsx`
+  - `packages/spring/typetests/react-types-must-not-be-imported.d.ts`
+  - `packages/spring/typetests/tsconfig.json`
 - **Approach:**
   1. Adapt upstream style and attribute normalization while routing host creation and refs through public Octane primitives.
   2. Observe fluid dependencies during component setup, subscribe after commit, schedule frame writes, and detach previous dependency sets on rerender or unmount.
@@ -394,17 +394,17 @@ If U1 passes without a core change, P0 does not exist.
 - **Requirements:** R4-R5, R9, R13-R14; AE3, AE5, AE6; KTD2-KTD3, KTD7.
 - **Dependencies:** U3-U4.
 - **Files:**
-  - `packages/react-spring/src/core/hooks/useScroll.ts`
-  - `packages/react-spring/src/core/hooks/useResize.ts`
-  - `packages/react-spring/src/core/hooks/useInView.tsrx`
-  - `packages/react-spring/src/shared/hooks/useReducedMotion.ts`
-  - `packages/react-spring/src/parallax/index.tsrx`
-  - `packages/react-spring/src/parallax/types.ts`
-  - `packages/react-spring/tests/conformance/browser-hooks.test.ts`
-  - `packages/react-spring/tests/conformance/parallax.test.ts`
-  - `packages/react-spring/tests/hydration/parallax.test.ts`
-  - `packages/react-spring/tests/_fixtures/parallax.tsrx`
-  - `packages/react-spring/typetests/parallax.test-d.tsx`
+  - `packages/spring/src/core/hooks/useScroll.ts`
+  - `packages/spring/src/core/hooks/useResize.ts`
+  - `packages/spring/src/core/hooks/useInView.tsrx`
+  - `packages/spring/src/shared/hooks/useReducedMotion.ts`
+  - `packages/spring/src/parallax/index.tsrx`
+  - `packages/spring/src/parallax/types.ts`
+  - `packages/spring/tests/conformance/browser-hooks.test.ts`
+  - `packages/spring/tests/conformance/parallax.test.ts`
+  - `packages/spring/tests/hydration/parallax.test.ts`
+  - `packages/spring/tests/_fixtures/parallax.tsrx`
+  - `packages/spring/typetests/parallax.test-d.tsx`
 - **Approach:**
   1. Use native browser events, media queries, `ResizeObserver`, and `IntersectionObserver` at the same consumer-visible boundaries as upstream.
   2. Re-author Parallax and layers as functional Octane components with refs-as-props and explicit parent context.
@@ -433,10 +433,10 @@ If U1 passes without a core change, P0 does not exist.
   - `playground/octane/src/demos/ReactSpring.tsrx`
   - `playground/octane/src/styles/playground.css`
   - `playground/octane/tests/react-spring.e2e.test.ts`
-  - `packages/react-spring/README.md`
-  - `packages/react-spring/status.json`
-  - `packages/react-spring/tests/conformance/exports.test.ts`
-  - `packages/react-spring/tests/pack/consumer.test.ts`
+  - `packages/spring/README.md`
+  - `packages/spring/status.json`
+  - `packages/spring/tests/conformance/exports.test.ts`
+  - `packages/spring/tests/pack/consumer.test.ts`
   - `packages/octane-mcp-server/src/bridge.js`
   - `packages/octane-mcp-server/test/bridge.test.js`
   - `package.json`

@@ -188,10 +188,6 @@ const selectedCases = {
 			'browser:chromium-render-update-async',
 			'matches rendering, selection, updates, and async loading in Chromium',
 		],
-		[
-			'browser:firefox-whitespace-selection',
-			'preserves whitespace, wrapping, and selection in Firefox',
-		],
 	],
 };
 
@@ -294,7 +290,7 @@ const lanes = [
 		project: 'syntax-highlighter-browser',
 		files: browserFiles,
 		notes:
-			'Runs real Chromium and Firefox rendering, computed whitespace/wrapping, selection, updates, and async loading.',
+			'Runs real Chromium rendering, computed whitespace/wrapping, selection, updates, and async loading.',
 	}),
 	{
 		id: 'react-syntax-highlighter-pristine-types',

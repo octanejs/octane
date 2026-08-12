@@ -22,7 +22,14 @@ const loader = resolve(repoRoot, flag('--loader'));
 const inventory = JSON.parse(readFileSync(resolve(repoRoot, flag('--inventory')), 'utf8'));
 const result = spawnSync(
 	process.execPath,
-	['--conditions', 'development', `--experimental-loader=${loader}`, '--no-warnings', file],
+	[
+		'--conditions',
+		'development',
+		`--experimental-loader=${loader}`,
+		'--no-warnings',
+		'--test-reporter=tap',
+		file,
+	],
 	{ cwd: suiteRoot, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
 );
 

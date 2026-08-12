@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "1b8de8fcb830df2c87560bce0399cc71ba573629d4987ef97ccd8609100308cc"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -181,7 +181,7 @@
         {
           "path": "packages/tiptap/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "598cae705e31aaadc6ef5206b98cd8f6c77c7fc3f8951165d7b195dc91c77023",
+          "sha256": "375525946b5dd778b68cf738d736ed227e4872884dba8b115f80a9889dff3bcd",
           "cases": [
             {
               "id": "differential:tiptap-editor",
@@ -228,7 +228,7 @@
         {
           "path": "packages/tiptap/tests/differential/mark-view-portal-cleanup.test.ts",
           "role": "test",
-          "sha256": "cca4c621739c9c41acbea8c2f403199156261e2b8ac8624f435e785979102995",
+          "sha256": "0ad96a5bdcef793e3b5800b69d196b0b3464030a34ee33e8c8ce5b063003fc34",
           "cases": [
             {
               "id": "differential:tiptap-mark-view-portal-cleanup",
@@ -256,7 +256,7 @@
         {
           "path": "packages/tiptap/audit/pristine-types.json",
           "role": "test",
-          "sha256": "cf6a8a0b1143ee83e70870ce6eec8a568b68fa58762c125aba1517aec6d17007",
+          "sha256": "734449705337d5204b75240ba1ee4237fd960bda12e4b0b0ca8e9d01746ae685",
           "cases": [
             {
               "id": "types:tiptap-pristine",
@@ -304,7 +304,7 @@
         {
           "path": "packages/tiptap/audit/adapted-types.json",
           "role": "test",
-          "sha256": "412acb14e0d94e668e12ef9d2ea78dabc0e6b248104e6e0f0e783e65b90261f9",
+          "sha256": "273985c8f29e4ac360ae971892e9c376aab8789868092da95aa6aa1f1a8218db",
           "cases": [
             {
               "id": "types:tiptap-adapted",

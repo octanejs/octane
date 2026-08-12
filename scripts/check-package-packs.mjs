@@ -21,13 +21,14 @@ import {
 	validateWorkspacePackages,
 } from './workspace-packages.mjs';
 import {
-	createPackedCommonjsConsumerManifest,
+	createPackedJavascriptConsumerManifest,
 	createPackedTsrxConsumerConfig,
 	createPackedTsrxConsumerManifest,
 	createPackedExampleManifest,
 	isWithinDirectory,
 	NATIVE_GRAPH_FORBIDDEN_MODULE,
 	PACKED_COMMONJS_CONSUMER_PACKAGES,
+	PACKED_JAVASCRIPT_CONSUMER_PACKAGES,
 	PACKED_TSRX_CONSUMER_PACKAGES,
 	renderPackedExampleWorkspace,
 	renderPackedCommonjsConsumerSource,
@@ -400,7 +401,7 @@ async function validatePackedConsumer(tempRoot, archives) {
 					'@octanejs/alien-signals': `file:${requireArchive(archives, '@octanejs/alien-signals')}`,
 					'@octanejs/apollo-client': `file:${requireArchive(archives, '@octanejs/apollo-client')}`,
 					'@octanejs/hook-form': `file:${requireArchive(archives, '@octanejs/hook-form')}`,
-					'@octanejs/react-dropzone': `file:${requireArchive(archives, '@octanejs/react-dropzone')}`,
+					'@octanejs/dropzone': `file:${requireArchive(archives, '@octanejs/dropzone')}`,
 					'@octanejs/syntax-highlighter': `file:${requireArchive(archives, '@octanejs/syntax-highlighter')}`,
 					'@octanejs/three': `file:${requireArchive(archives, '@octanejs/three')}`,
 					'@octanejs/window': `file:${requireArchive(archives, '@octanejs/window')}`,
@@ -427,7 +428,7 @@ async function validatePackedConsumer(tempRoot, archives) {
 import { ApolloProvider, useApolloClient } from '@octanejs/apollo-client/react';
 import { createComputed, createSignal, useSignalValue } from '@octanejs/alien-signals';
 import { useForm } from '@octanejs/hook-form';
-import { useDropzone } from '@octanejs/react-dropzone';
+import { useDropzone } from '@octanejs/dropzone';
 import { Light, Prism, PrismAsync } from '@octanejs/syntax-highlighter';
 import javascript from '@octanejs/syntax-highlighter/dist/esm/languages/hljs/javascript';
 import vscDarkPlus from '@octanejs/syntax-highlighter/dist/cjs/styles/prism/vsc-dark-plus';
@@ -547,8 +548,8 @@ import Dropzone, {
 	type FileRejection,
 	type FileWithPath,
 	type ValidatorResult,
-} from '@octanejs/react-dropzone';
-import dropzonePackage from '@octanejs/react-dropzone/package.json' with { type: 'json' };
+} from '@octanejs/dropzone';
+import dropzonePackage from '@octanejs/dropzone/package.json' with { type: 'json' };
 import * as syntaxApi from '@octanejs/syntax-highlighter';
 import LightAsync from '@octanejs/syntax-highlighter/dist/esm/light-async';
 import PrismLight from '@octanejs/syntax-highlighter/dist/cjs/prism-light.js';
@@ -616,8 +617,20 @@ type DropzonePublicTypeSurface = [
 type DropzonePublicTypeArity = DropzonePublicTypeSurface['length'];
 const dropzonePublicTypeArity: DropzonePublicTypeArity = 13;
 const align: Align = 'smart';
-const listProps: ListProps = { rowComponent: () => null, rowCount: 0, rowHeight: 20, rowProps: {} };
-const gridProps: GridProps = { cellComponent: () => null, cellProps: {}, columnCount: 0, columnWidth: 20, rowCount: 0, rowHeight: 20 };
+const listProps: ListProps<Record<string, never>> = {
+	rowComponent: () => null,
+	rowCount: 0,
+	rowHeight: 20,
+	rowProps: {},
+};
+const gridProps: GridProps<Record<string, never>> = {
+	cellComponent: () => null,
+	cellProps: {},
+	columnCount: 0,
+	columnWidth: 20,
+	rowCount: 0,
+	rowHeight: 20,
+};
 const rowProps: RowComponentProps | undefined = undefined;
 const cellProps: CellComponentProps | undefined = undefined;
 const dynamicHeight: DynamicRowHeight | undefined = undefined;
@@ -647,7 +660,7 @@ export function packageSurfaceProbe() {
 			ErrorCode.FileInvalidType === 'file-invalid-type' &&
 			dropzoneOptions.maxFiles === 2 &&
 			dropzonePublicTypeArity === 13 &&
-			dropzonePackage.name === '@octanejs/react-dropzone',
+			dropzonePackage.name === '@octanejs/dropzone',
 		iterable: typeof map_iterable === 'function',
 		publicApi: typeof publicApi.Canvas === 'function',
 		reactWindow:
@@ -836,15 +849,15 @@ process.stdout.write(JSON.stringify(result));`,
 			`Alien Signals binding resolved a second Octane runtime:\n  app: ${directRuntime}\n  binding: ${alienSignalsPeerRuntime}`,
 		);
 	}
-	const dropzoneEntry = consumerRequire.resolve('@octanejs/react-dropzone');
-	const dropzonePackageEntry = consumerRequire.resolve('@octanejs/react-dropzone/package.json');
+	const dropzoneEntry = consumerRequire.resolve('@octanejs/dropzone');
+	const dropzonePackageEntry = consumerRequire.resolve('@octanejs/dropzone/package.json');
 	const esmDropzoneEntries = JSON.parse(
 		execFileSync(
 			process.execPath,
 			[
 				'--input-type=module',
 				'-e',
-				`process.stdout.write(JSON.stringify({ root: import.meta.resolve('@octanejs/react-dropzone'), packageJson: import.meta.resolve('@octanejs/react-dropzone/package.json') }));`,
+				`process.stdout.write(JSON.stringify({ root: import.meta.resolve('@octanejs/dropzone'), packageJson: import.meta.resolve('@octanejs/dropzone/package.json') }));`,
 			],
 			{ cwd: consumerDirectory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] },
 		),
@@ -1120,21 +1133,21 @@ function validatePackedTsrxConsumer(tempRoot, archives) {
 	);
 }
 
-async function validatePackedCommonjsConsumer(tempRoot, archives) {
-	const consumerDirectory = path.join(tempRoot, 'external-commonjs-consumer');
+async function validatePackedJavascriptConsumer(tempRoot, archives) {
+	const consumerDirectory = path.join(tempRoot, 'external-javascript-consumer');
 	if (isWithinDirectory(REPO_ROOT, consumerDirectory)) {
-		throw new Error('packed CommonJS consumer must be created outside the workspace');
+		throw new Error('packed JavaScript consumer must be created outside the workspace');
 	}
 	mkdirSync(consumerDirectory, { recursive: true });
 	const archiveSpecs = Object.fromEntries(
-		PACKED_COMMONJS_CONSUMER_PACKAGES.map((packageName) => [
+		PACKED_JAVASCRIPT_CONSUMER_PACKAGES.map((packageName) => [
 			packageName,
 			fileArchiveSpec(archives, packageName),
 		]),
 	);
 	writeFileSync(
 		path.join(consumerDirectory, 'package.json'),
-		`${JSON.stringify(createPackedCommonjsConsumerManifest(archiveSpecs), null, 2)}\n`,
+		`${JSON.stringify(createPackedJavascriptConsumerManifest(archiveSpecs), null, 2)}\n`,
 	);
 	writeFileSync(
 		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
@@ -1231,8 +1244,10 @@ async function validatePackedCommonjsConsumer(tempRoot, archives) {
 		build: {
 			emptyOutDir: true,
 			outDir: 'dist',
-			rollupOptions: { output: { entryFileNames: 'draggable-import.mjs' } },
-			ssr: 'draggable-import.mjs',
+			rollupOptions: {
+				input: path.join(consumerDirectory, 'draggable-import.mjs'),
+				output: { entryFileNames: 'draggable-import.mjs' },
+			},
 			target: 'node22',
 		},
 	});
@@ -1246,7 +1261,7 @@ async function validatePackedCommonjsConsumer(tempRoot, archives) {
 	);
 	assertRequiredPublicValueExports('.', commonjsSurface.octane);
 	assertRequiredPublicValueExports('.', esmSurface.octane);
-	for (const packageName of ['base', 'draggable', 'floating', 'radix']) {
+	for (const packageName of ['base', 'floating', 'radix']) {
 		if (!Array.isArray(commonjsSurface[packageName]) || commonjsSurface[packageName].length === 0) {
 			throw new Error(`packed CommonJS ${packageName} surface is empty`);
 		}
@@ -1254,7 +1269,10 @@ async function validatePackedCommonjsConsumer(tempRoot, archives) {
 			throw new Error(`packed ESM ${packageName} surface is empty`);
 		}
 	}
-	for (const packageName of ['base', 'draggable', 'floating', 'octane', 'radix']) {
+	if (!Array.isArray(esmSurface.draggable) || esmSurface.draggable.length === 0) {
+		throw new Error('packed ESM draggable surface is empty');
+	}
+	for (const packageName of ['base', 'floating', 'octane', 'radix']) {
 		if (
 			JSON.stringify([...commonjsSurface[packageName]].sort()) !==
 			JSON.stringify([...esmSurface[packageName]].sort())
@@ -1266,7 +1284,7 @@ async function validatePackedCommonjsConsumer(tempRoot, archives) {
 		throw new Error('packed ESM and CommonJS SSR output differs');
 	}
 	console.log(
-		'installed packed Octane, Floating UI, Base UI, Radix, and React Draggable without React; CommonJS require and bundled ESM surfaces and SSR matched',
+		'installed packed Octane, Floating UI, Base UI, Radix, and Draggable without React; CommonJS packages selected require conditions and Draggable compiled through its ESM source entry',
 	);
 }
 
@@ -1615,8 +1633,8 @@ try {
 	if (!failures.length) {
 		const consumerValidations = [
 			{
-				label: 'external packed CommonJS consumer',
-				run: () => validatePackedCommonjsConsumer(tempRoot, packedArchives),
+				label: 'external packed JavaScript consumer',
+				run: () => validatePackedJavascriptConsumer(tempRoot, packedArchives),
 			},
 			{
 				label: 'external strict packed TSRX source consumer',

@@ -66,7 +66,7 @@ export default defineConfig({
 			'@octanejs/lucide',
 			'@octanejs/livestore',
 			'@octanejs/rainbowkit',
-			'@octanejs/react-spring',
+			'@octanejs/spring',
 			'@octanejs/tanstack-query',
 			'@octanejs/wagmi',
 		],

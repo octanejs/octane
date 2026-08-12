@@ -41,13 +41,16 @@ function Leaf(props: PathProps) @{
 }
 
 function Node(props: NodeProps) @{
-	@if (props.depth > 0) {
-		<div class="n">
-			<Node depth={props.depth - 1} path={props.path + 'L'} />
-			<Node depth={props.depth - 1} path={props.path + 'R'} />
-		</div>
-	} @else {
-		<Leaf path={props.path} />
+	@switch (props.depth > 0) {
+		@case true: {
+			<div class="n">
+				<Node depth={props.depth - 1} path={props.path + 'L'} />
+				<Node depth={props.depth - 1} path={props.path + 'R'} />
+			</div>
+		}
+		@default: {
+			<Leaf path={props.path} />
+		}
 	}
 }
 

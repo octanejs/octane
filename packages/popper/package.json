@@ -7,13 +7,6 @@
   "engines": {
     "node": ">=22.22.2"
   },
-  "octane": {
-    "hookSlots": {
-      "manual": [
-        "src"
-      ]
-    }
-  },
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"

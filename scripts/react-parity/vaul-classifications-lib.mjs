@@ -5,7 +5,6 @@ const CONFIG = 'packages/vaul/audit/test-classifications.json';
 const MANIFEST = 'packages/vaul/audit/react-parity.json';
 const VITEST_CONFIG = 'vitest.config.js';
 const DISPOSITIONS = new Set([
-	'unmodified-upstream-suite-wrapper',
 	'adapted-upstream-suite',
 	'react-octane-differential',
 	'octane-only-divergence',
@@ -53,7 +52,6 @@ function readVaulParityOwnedPaths(root) {
 		{ name: 'vaul', whollyOwned: false },
 		{ name: 'vaul-differential', whollyOwned: true },
 		{ name: 'vaul-browser', whollyOwned: true },
-		{ name: 'vaul-pristine', whollyOwned: true },
 	];
 	for (const project of projectBlocks) {
 		const marker = `name: '${project.name}'`;
@@ -97,8 +95,7 @@ function pathOwnedByParity(path, ownedPaths) {
 			path.startsWith('packages/vaul/tests/') &&
 			path.endsWith('.test.ts') &&
 			!path.includes('/tests/ssr/') &&
-			!path.includes('/tests/browser-conformance/') &&
-			path !== 'packages/vaul/tests/upstream-original.test.ts'
+			!path.includes('/tests/browser-conformance/')
 		);
 	}
 	if (ownedPaths.includes(path)) return true;

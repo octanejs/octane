@@ -2,9 +2,7 @@
   {
     "path": "src/index.test.ts",
     "sha256": "479232596a061b5226bba6061b1ae8b66698e5bde8dc342d84b27ce01c4af500",
-    "assertionGroups": [
-      "383e1574f5dd66a16780f548086d83f56c8f271fa7007bdfca8eb17c5a6680ee"
-    ],
+    "assertionGroups": ["383e1574f5dd66a16780f548086d83f56c8f271fa7007bdfca8eb17c5a6680ee"],
     "acceptedApiCalls": [
       "d097b5c2ce0bc71bff040e6ff50f8e26c94d7ff7a034b0d3b2f1eefa35b60bdd",
       "3f4ea6eb04a432dc025cfba7f733f5bbe042c6579ef615cbb1ad2f5a55c743cf",

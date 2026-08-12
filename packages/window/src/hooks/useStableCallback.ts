@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'octane';
-import { getSlot, subSlot } from '../internal';
-import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
+import { getSlot, subSlot } from '../internal.js';
+import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect.js';
 
 // Forked from useEventCallback (usehooks-ts)
 export function useStableCallback<Args extends unknown[], Return>(

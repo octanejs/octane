@@ -10,8 +10,5 @@
   "ssr": "Browser-dependent helpers remain client-only; server-safe behavior is verified per export.",
   "verified": "2026-08-02",
   "parityEvidence": "packages/drei/audit/react-parity.json",
-  "docs": [
-    "packages/drei/README.md",
-    "packages/drei/UPSTREAM.md"
-  ]
+  "docs": ["packages/drei/README.md", "packages/drei/UPSTREAM.md"]
 }

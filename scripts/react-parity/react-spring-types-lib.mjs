@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 
-export const TYPE_PARITY_CONFIG = 'packages/react-spring/audit/type-parity.json';
+export const TYPE_PARITY_CONFIG = 'packages/spring/audit/type-parity.json';
 
 function sha256(value) {
 	return createHash('sha256').update(value).digest('hex');
@@ -86,7 +86,7 @@ function assertionGroups(source, fileName) {
 
 function normalizeSpecifier(specifier) {
 	if (
-		specifier === '@octanejs/react-spring' ||
+		specifier === '@octanejs/spring' ||
 		specifier === '@react-spring/types' ||
 		specifier === '@react-spring/core' ||
 		specifier.startsWith('.')

@@ -2,7 +2,9 @@ import { createServer as createNetServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { Browser, Page } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
+import { launchBrowser } from '../../../../test-utils/playwright-browser.js';
 import { octane } from '../../../octane/src/compiler/vite.js';
 
 const harnessRoot = resolve(dirname(fileURLToPath(import.meta.url)), 'harness');
@@ -21,12 +23,11 @@ function getFreePort(): Promise<number> {
 }
 
 let viteServer: ViteDevServer;
-let browser: import('playwright').Browser;
-let page: import('playwright').Page;
+let browser: Browser;
+let page: Page;
 
 beforeAll(async () => {
-	const { chromium } = await import('playwright');
-	browser = await chromium.launch({ headless: true });
+	browser = await launchBrowser({ headless: true });
 	const port = await getFreePort();
 	viteServer = await createServer({
 		root: harnessRoot,
@@ -66,8 +67,10 @@ describe('react-day-picker real-browser evidence', () => {
 		expect(await page.locator('#selected-date').textContent()).toBe('2026-08-15');
 
 		await day('15').focus();
+		await page.locator('[data-day="2026-08-15"][data-focused]').waitFor();
 		await page.keyboard.press('ArrowRight');
-		expect(await page.evaluate(() => document.activeElement?.textContent)).toBe('16');
+		await page.locator('[data-day="2026-08-16"][data-focused]').waitFor();
+		await expect.poll(() => page.evaluate(() => document.activeElement?.textContent)).toBe('16');
 
 		await page.getByRole('button', { name: /Next Month/i }).click();
 		await page.getByText('September 2026').waitFor();

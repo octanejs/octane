@@ -44,7 +44,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "9bfa66384d7cd40cb59b589c777f176cc5f8dc6a3f17a865039e902402bea226"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -196,7 +196,7 @@
         {
           "path": "packages/visx/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "f6e41d6724d63db74ad9a08c97302c80a867ec8b09c089cd072898d5d1cb3203",
+          "sha256": "a52462fe3a4a2bdb2daf28eee60235e459196a94f91be01a121453f766814d84",
           "cases": [
             {
               "id": "differential:visx-primitives",
@@ -243,12 +243,36 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "334a31e474d42c6721720e4776975e1a25b31871675eb020dffaf3653f429bd5"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         },
         {
           "path": "packages/visx/audit/oracle-environment.json",
           "role": "support",
           "sha256": "80c1d46b25a5e7950e4ed848ccabacebd29592fa86e4784f89b56a4daaa52f42"
+        }
+      ]
+    }
+  ],
+  "ordinaryEvidence": [
+    {
+      "path": "packages/visx/tests/conformance/wordcloud-parity.test.ts",
+      "sha256": "e103a92cf87b8db7d2de6fb2aa1cb03d7804cec2bba82c2b8b42adb1c118e4dd",
+      "cases": [
+        {
+          "id": "adapted:visx-deterministic-measurement",
+          "testName": "places estimated rotated glyph rectangles within bounds without overlap",
+          "fullName": "@octanejs/visx deterministic wordcloud layout places estimated rotated glyph rectangles within bounds without overlap"
+        }
+      ]
+    },
+    {
+      "path": "packages/visx/tests/conformance/spring-parity.test.ts",
+      "sha256": "35014edb40c6fd289d0680411489e0ce6f925f2c4af4f7910142f5a74ed95e32",
+      "cases": [
+        {
+          "id": "adapted:visx-react-spring-raf",
+          "testName": "interpolates numeric spring targets on a fixed 250ms RAF timeline",
+          "fullName": "@octanejs/visx react-spring RAF interpolator interpolates numeric spring targets on a fixed 250ms RAF timeline"
         }
       ]
     }

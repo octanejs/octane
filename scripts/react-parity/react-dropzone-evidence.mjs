@@ -13,12 +13,12 @@ const hash = (path) => createHash('sha256').update(read(path)).digest('hex');
 const write = (path, value) =>
 	writeFileSync(resolve(root, path), `${JSON.stringify(value, null, 2)}\n`);
 
-const pristineTypeRoot = 'packages/react-dropzone/upstream/canonical/type-tests';
-const adaptedTypeRoot = 'packages/react-dropzone/typetests';
+const pristineTypeRoot = 'packages/dropzone/upstream/canonical/type-tests';
+const adaptedTypeRoot = 'packages/dropzone/typetests';
 const typeNames = readdirSync(resolve(root, pristineTypeRoot))
 	.filter((name) => name.endsWith('.tsx'))
 	.sort();
-write('packages/react-dropzone/audit/type-inventories/parity.json', {
+write('packages/dropzone/audit/type-inventories/parity.json', {
 	schemaVersion: 1,
 	pristine: typeNames.map((name) => ({
 		path: `${pristineTypeRoot}/${name}`,
@@ -31,16 +31,13 @@ write('packages/react-dropzone/audit/type-inventories/parity.json', {
 });
 
 const sourcePairs = [
+	['packages/dropzone/upstream/canonical/src/index.tsx', 'packages/dropzone/src/index.tsrx'],
 	[
-		'packages/react-dropzone/upstream/canonical/src/index.tsx',
-		'packages/react-dropzone/src/index.tsrx',
-	],
-	[
-		'packages/react-dropzone/upstream/canonical/src/utils/index.ts',
-		'packages/react-dropzone/src/utils/index.ts',
+		'packages/dropzone/upstream/canonical/src/utils/index.ts',
+		'packages/dropzone/src/utils/index.ts',
 	],
 ];
-write('packages/react-dropzone/audit/transformation-ledger.json', {
+write('packages/dropzone/audit/transformation-ledger.json', {
 	schemaVersion: 1,
 	pairs: sourcePairs.map(([upstream, adapted]) => ({
 		upstream,
@@ -59,13 +56,11 @@ write('packages/react-dropzone/audit/transformation-ledger.json', {
 	],
 });
 
-const adaptedInventories = [
-	json('packages/react-dropzone/audit/runtime-inventories/adapted-dom.json'),
-];
+const adaptedInventories = [json('packages/dropzone/audit/runtime-inventories/adapted-dom.json')];
 const adaptedTitles = adaptedInventories.flatMap(({ tests }) =>
 	tests.map(({ fullName }) => fullName),
 );
-const upstream = json('packages/react-dropzone/audit/runtime-inventories/pristine-runtime.json');
+const upstream = json('packages/dropzone/audit/runtime-inventories/pristine-runtime.json');
 const upstreamCounts = new Map();
 const upstreamCases = upstream.cases.map((entry) => {
 	const identity = `${entry.file}\0${entry.fullName}`;
@@ -91,7 +86,7 @@ const upstreamCases = upstream.cases.map((entry) => {
 			};
 });
 const portAuthored = buildReactDropzonePortAuthored(root);
-write('packages/react-dropzone/audit/test-classifications.json', {
+write('packages/dropzone/audit/test-classifications.json', {
 	schemaVersion: 1,
 	upstreamCases,
 	portAuthored,
@@ -101,9 +96,9 @@ execFileSync(
 	resolve(root, 'node_modules/.bin/prettier'),
 	[
 		'--write',
-		'packages/react-dropzone/audit/type-inventories/parity.json',
-		'packages/react-dropzone/audit/transformation-ledger.json',
-		'packages/react-dropzone/audit/test-classifications.json',
+		'packages/dropzone/audit/type-inventories/parity.json',
+		'packages/dropzone/audit/transformation-ledger.json',
+		'packages/dropzone/audit/test-classifications.json',
 	],
 	{ cwd: root, stdio: 'ignore' },
 );

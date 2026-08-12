@@ -1,18 +1,18 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'octane';
 import type { CSSProperties } from 'react';
-import { useIsomorphicLayoutEffect } from '../hooks/useIsomorphicLayoutEffect';
-import { useResizeObserver } from '../hooks/useResizeObserver';
-import { useStableCallback } from '../hooks/useStableCallback';
-import { getSlot, subSlot } from '../internal';
-import type { Align } from '../types';
-import { adjustScrollOffsetForRtl } from '../utils/adjustScrollOffsetForRtl';
-import { shallowCompare } from '../utils/shallowCompare';
-import { getEstimatedSize as getEstimatedSizeUtil } from './getEstimatedSize';
-import { getOffsetForIndex } from './getOffsetForIndex';
-import { getStartStopIndices as getStartStopIndicesUtil } from './getStartStopIndices';
-import type { Direction, SizeFunction } from './types';
-import { useCachedBounds } from './useCachedBounds';
-import { useItemSize } from './useItemSize';
+import { useIsomorphicLayoutEffect } from '../hooks/useIsomorphicLayoutEffect.js';
+import { useResizeObserver } from '../hooks/useResizeObserver.js';
+import { useStableCallback } from '../hooks/useStableCallback.js';
+import { getSlot, subSlot } from '../internal.js';
+import type { Align } from '../types.js';
+import { adjustScrollOffsetForRtl } from '../utils/adjustScrollOffsetForRtl.js';
+import { shallowCompare } from '../utils/shallowCompare.js';
+import { getEstimatedSize as getEstimatedSizeUtil } from './getEstimatedSize.js';
+import { getOffsetForIndex } from './getOffsetForIndex.js';
+import { getStartStopIndices as getStartStopIndicesUtil } from './getStartStopIndices.js';
+import type { Direction, SizeFunction } from './types.js';
+import { useCachedBounds } from './useCachedBounds.js';
+import { useItemSize } from './useItemSize.js';
 
 export function useVirtualizer<Props extends object>(
 	{

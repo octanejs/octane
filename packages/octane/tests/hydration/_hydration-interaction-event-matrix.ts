@@ -1,6 +1,7 @@
 import type { HydrationInteractionEvent } from 'octane/hydration';
 
-export type HydrationInteractionEventFamily = 'focus' | 'keyboard' | 'mouse' | 'pointer';
+export type HydrationInteractionEventFamily =
+	'composition' | 'focus' | 'input' | 'keyboard' | 'mouse' | 'pointer' | 'touch';
 
 export type HydrationInteractionEventCase = {
 	type: HydrationInteractionEvent;
@@ -132,6 +133,62 @@ export const HYDRATION_INTERACTION_EVENT_CASES = [
 		composed: true,
 		sequence: 15,
 	},
+	{
+		type: 'beforeinput',
+		family: 'input',
+		bubbles: true,
+		cancelable: true,
+		composed: true,
+		sequence: 16,
+	},
+	{
+		type: 'input',
+		family: 'input',
+		bubbles: true,
+		cancelable: false,
+		composed: true,
+		sequence: 17,
+	},
+	{
+		type: 'compositionstart',
+		family: 'composition',
+		bubbles: true,
+		cancelable: false,
+		composed: true,
+		sequence: 18,
+	},
+	{
+		type: 'compositionupdate',
+		family: 'composition',
+		bubbles: true,
+		cancelable: false,
+		composed: true,
+		sequence: 19,
+	},
+	{
+		type: 'compositionend',
+		family: 'composition',
+		bubbles: true,
+		cancelable: false,
+		composed: true,
+		sequence: 20,
+	},
+	{
+		type: 'touchstart',
+		family: 'touch',
+		bubbles: true,
+		cancelable: true,
+		composed: true,
+		sequence: 21,
+	},
+	{
+		type: 'touchend',
+		family: 'touch',
+		bubbles: true,
+		cancelable: true,
+		composed: true,
+		sequence: 22,
+	},
 ] as const satisfies ReadonlyArray<HydrationInteractionEventCase>;
 
 type AssertNever<T extends never> = T;
@@ -148,11 +205,28 @@ export const HYDRATION_INTERACTION_EVENT_TYPES = HYDRATION_INTERACTION_EVENT_CAS
 
 export const HYDRATION_INTERACTION_CROSS_REALM_CASES = HYDRATION_INTERACTION_EVENT_CASES.filter(
 	(testCase) =>
+		testCase.type === 'beforeinput' ||
+		testCase.type === 'compositionstart' ||
 		testCase.type === 'focusin' ||
 		testCase.type === 'keydown' ||
 		testCase.type === 'mousedown' ||
-		testCase.type === 'pointerdown',
+		testCase.type === 'pointerdown' ||
+		testCase.type === 'touchstart',
 );
+
+export function hydrationInteractionPreventsDefault(
+	testCase: HydrationInteractionEventCase,
+): boolean {
+	return (
+		testCase.bubbles &&
+		testCase.cancelable &&
+		testCase.type !== 'beforeinput' &&
+		testCase.type !== 'mousedown' &&
+		testCase.type !== 'pointerdown' &&
+		testCase.type !== 'touchend' &&
+		testCase.type !== 'touchstart'
+	);
+}
 
 type EventWindow = Window & typeof globalThis;
 
@@ -193,11 +267,23 @@ export function createHydrationInteractionEvent(
 	};
 	const sequence = testCase.sequence;
 	switch (testCase.family) {
+		case 'composition':
+			return new ownerWindow.CompositionEvent(testCase.type, {
+				...base,
+				data: `composition-${sequence}`,
+			});
 		case 'focus':
 			return new ownerWindow.FocusEvent(testCase.type, {
 				...base,
 				detail: sequence,
 				relatedTarget,
+			});
+		case 'input':
+			return new ownerWindow.InputEvent(testCase.type, {
+				...base,
+				data: `input-${sequence}`,
+				inputType: 'insertCompositionText',
+				isComposing: true,
 			});
 		case 'keyboard':
 			return new ownerWindow.KeyboardEvent(testCase.type, {
@@ -229,6 +315,50 @@ export function createHydrationInteractionEvent(
 				pointerType: 'pen',
 				isPrimary: sequence % 2 === 0,
 			});
+		case 'touch': {
+			const properties: TouchInit = {
+				identifier: 600 + sequence,
+				target: relatedTarget,
+				clientX: 300 + sequence,
+				clientY: 400 + sequence,
+				screenX: 100 + sequence,
+				screenY: 200 + sequence,
+				pageX: 500 + sequence,
+				pageY: 600 + sequence,
+			};
+			const touch =
+				typeof ownerWindow.Touch === 'function'
+					? new ownerWindow.Touch(properties)
+					: (properties as Touch);
+			const init = {
+				...base,
+				ctrlKey: sequence % 2 === 0,
+				shiftKey: sequence % 3 === 0,
+				altKey: sequence % 4 === 0,
+				metaKey: sequence % 5 === 0,
+				touches: testCase.type === 'touchend' ? [] : [touch],
+				targetTouches: testCase.type === 'touchend' ? [] : [touch],
+				changedTouches: [touch],
+			};
+			if (typeof ownerWindow.TouchEvent === 'function') {
+				return new ownerWindow.TouchEvent(testCase.type, init);
+			}
+
+			// Desktop Firefox can expose touch event names without exposing the
+			// Touch/TouchEvent constructors. A generic event still exercises capture,
+			// ordering, cancellation, and replay for that public event family.
+			const event = new ownerWindow.Event(testCase.type, base);
+			Object.defineProperties(event, {
+				ctrlKey: { value: init.ctrlKey },
+				shiftKey: { value: init.shiftKey },
+				altKey: { value: init.altKey },
+				metaKey: { value: init.metaKey },
+				touches: { value: init.touches },
+				targetTouches: { value: init.targetTouches },
+				changedTouches: { value: init.changedTouches },
+			});
+			return event;
+		}
 	}
 }
 
@@ -257,6 +387,8 @@ export type HydrationReplayRecord = {
 	button: number | null;
 	buttons: number | null;
 	key: string | null;
+	data: string | null;
+	inputType: string | null;
 	code: string | null;
 	location: number | null;
 	repeat: boolean | null;
@@ -271,6 +403,12 @@ export type HydrationReplayRecord = {
 	twist: number | null;
 	pointerType: string | null;
 	isPrimary: boolean | null;
+	touches: number | null;
+	targetTouches: number | null;
+	changedTouches: number | null;
+	touchIdentifier: number | null;
+	touchClientX: number | null;
+	touchClientY: number | null;
 };
 
 function numberProperty(event: Event, name: string): number | null {
@@ -304,6 +442,8 @@ function hydrationReplayRecord(
 ): HydrationReplayRecord {
 	const defaultPreventedBefore = event.defaultPrevented;
 	if (phase === 'target' && event.type === 'click') event.preventDefault();
+	const touchEvent = event as TouchEvent;
+	const changedTouch = touchEvent.changedTouches?.[0];
 	return {
 		phase,
 		type: event.type,
@@ -329,6 +469,8 @@ function hydrationReplayRecord(
 		button: numberProperty(event, 'button'),
 		buttons: numberProperty(event, 'buttons'),
 		key: stringProperty(event, 'key'),
+		data: stringProperty(event, 'data'),
+		inputType: stringProperty(event, 'inputType'),
 		code: stringProperty(event, 'code'),
 		location: numberProperty(event, 'location'),
 		repeat: booleanProperty(event, 'repeat'),
@@ -343,6 +485,12 @@ function hydrationReplayRecord(
 		twist: numberProperty(event, 'twist'),
 		pointerType: stringProperty(event, 'pointerType'),
 		isPrimary: booleanProperty(event, 'isPrimary'),
+		touches: touchEvent.touches?.length ?? null,
+		targetTouches: touchEvent.targetTouches?.length ?? null,
+		changedTouches: touchEvent.changedTouches?.length ?? null,
+		touchIdentifier: changedTouch?.identifier ?? null,
+		touchClientX: changedTouch?.clientX ?? null,
+		touchClientY: changedTouch?.clientY ?? null,
 	};
 }
 
@@ -383,6 +531,7 @@ export function observeHydrationReplays(
 
 export function expectedHydrationReplayMetadata(
 	testCase: HydrationInteractionEventCase,
+	options: { touchEventConstructorName?: 'Event' | 'TouchEvent' } = {},
 ): Partial<HydrationReplayRecord> {
 	const sequence = testCase.sequence;
 	const button = testCase.type === 'auxclick' ? 1 : testCase.type === 'contextmenu' ? 2 : 0;
@@ -393,11 +542,23 @@ export function expectedHydrationReplayMetadata(
 		metaKey: sequence % 5 === 0,
 	};
 	switch (testCase.family) {
+		case 'composition':
+			return {
+				constructorName: 'CompositionEvent',
+				data: `composition-${sequence}`,
+			};
 		case 'focus':
 			return {
 				constructorName: 'FocusEvent',
 				detail: sequence,
 				relatedTargetId: 'hydration-replay-related',
+			};
+		case 'input':
+			return {
+				constructorName: 'InputEvent',
+				data: `input-${sequence}`,
+				inputType: 'insertCompositionText',
+				isComposing: true,
 			};
 		case 'keyboard':
 			return {
@@ -444,6 +605,20 @@ export function expectedHydrationReplayMetadata(
 				twist: 40 + sequence,
 				pointerType: 'pen',
 				isPrimary: sequence % 2 === 0,
+				...modifiers,
+			};
+		case 'touch':
+			if (options.touchEventConstructorName === 'Event') {
+				return { constructorName: 'Event' };
+			}
+			return {
+				constructorName: 'TouchEvent',
+				touches: testCase.type === 'touchend' ? 0 : 1,
+				targetTouches: testCase.type === 'touchend' ? 0 : 1,
+				changedTouches: 1,
+				touchIdentifier: 600 + sequence,
+				touchClientX: 300 + sequence,
+				touchClientY: 400 + sequence,
 				...modifiers,
 			};
 	}

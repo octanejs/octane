@@ -1,15 +1,14 @@
 import { expect, it } from 'vitest';
-import { page, setupBrowser } from '../_browser';
+import { expectSelection, page, setupBrowser } from '../_browser';
 
 setupBrowser();
 
 it('should replace selected char if another is pressed', async () => {
 	const input = page.getByRole('textbox');
 	await input.pressSequentially('123');
+	await expectSelection(input, [3, 3]);
 	await input.press('ArrowLeft');
-	await expect
-		.poll(() => input.evaluate((node) => [node.selectionStart, node.selectionEnd]))
-		.toEqual([2, 3]);
+	await expectSelection(input, [2, 3]);
 	await input.pressSequentially('1');
 	expect(await input.inputValue()).toBe('121');
 });
@@ -17,8 +16,11 @@ it('should replace selected char if another is pressed', async () => {
 it('should replace multi-selected chars if another is pressed', async () => {
 	const input = page.getByRole('textbox');
 	await input.pressSequentially('123456');
+	await expectSelection(input, [5, 6]);
 	await input.press('Shift+ArrowLeft');
+	await expectSelection(input, [4, 6]);
 	await input.press('Shift+ArrowLeft');
+	await expectSelection(input, [3, 6]);
 	await input.pressSequentially('1');
 	expect(await input.inputValue()).toBe('1231');
 });

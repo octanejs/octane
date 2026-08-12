@@ -7,10 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
 
-const packageRoot = resolve(
-	dirname(fileURLToPath(import.meta.url)),
-	'../../packages/react-draggable',
-);
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../packages/draggable');
 const upstreamTag = join(packageRoot, 'upstream/tag');
 
 export function pristineTestIdentities(report, repoRoot = resolve(packageRoot, '../..')) {
@@ -20,8 +17,8 @@ export function pristineTestIdentities(report, repoRoot = resolve(packageRoot, '
 		const relativeFile = toPortablePath(relative(repoRoot, absoluteFile));
 		const portable = relativeFile.includes('/.pristine-upstream-')
 			? relativeFile.replace(
-					/^packages\/react-draggable\/\.pristine-upstream-[^/]+\//u,
-					'packages/react-draggable/upstream/tag/',
+					/^packages\/draggable\/\.pristine-upstream-[^/]+\//u,
+					'packages/draggable/upstream/tag/',
 				)
 			: relativeFile;
 		for (const test of suite.assertionResults ?? []) {
@@ -47,7 +44,7 @@ export function runPristineUpstreamSuite({
 		cpSync(join(upstreamTag, 'typings'), join(runRoot, 'typings'), { recursive: true });
 		writeFileSync(
 			join(runRoot, 'package.json'),
-			JSON.stringify({ name: 'react-draggable-pristine', private: true, type: 'module' }),
+			JSON.stringify({ name: 'draggable-pristine', private: true, type: 'module' }),
 		);
 		const result = spawnSync(
 			join(repoRoot, 'node_modules/.bin/vitest'),

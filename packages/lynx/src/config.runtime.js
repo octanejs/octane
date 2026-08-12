@@ -227,6 +227,7 @@ export const lynxBackgroundRenderer = {
 /** Main-thread renderer that rejects APIs owned by the background runtime. */
 export const lynxMainThreadRenderer = {
 	module: '@octanejs/lynx/main-renderer',
+	threadFunctionsModule: '@octanejs/lynx/main-worklets',
 	target: 'universal',
 	server: 'unsupported',
 	intrinsics: '@octanejs/lynx/intrinsics',

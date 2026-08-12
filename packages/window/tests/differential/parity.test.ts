@@ -1,7 +1,10 @@
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { mountDifferential } from '../../../octane/tests/differential/_rig';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig';
 
 const fixture = resolve(__dirname, '../_fixtures/virtualizers.tsrx');
 const cache = resolve(__dirname, '.react-cache');
@@ -17,6 +20,8 @@ function scroll(
 	element.scrollTop = top;
 	element.dispatchEvent(new Event('scroll', { bubbles: true }));
 }
+
+await Promise.all([preloadDifferentialFixture(fixture, cache)]);
 
 describe('differential: @octanejs/window vs react-window', () => {
 	// @parity-case differential:react-window-list

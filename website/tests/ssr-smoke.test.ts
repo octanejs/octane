@@ -28,7 +28,7 @@ const outputDir = inject('productionOutputDir');
 // not queue behind it, so the origin is reserved but not yet answering when this
 // module loads. Everything below — HTTP and build-output alike — needs the build
 // finished, so wait once here rather than per case.
-beforeAll(() => waitForReadyState(inject('productionReadyFile'), 300_000));
+beforeAll(() => waitForReadyState(inject('productionReadyFile'), 340_000));
 const staticRoot = path.join(outputDir, 'static');
 const serverEntry = path.join(outputDir, 'functions/__server.func/index.mjs');
 

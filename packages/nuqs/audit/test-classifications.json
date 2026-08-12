@@ -61,13 +61,13 @@
     },
     {
       "path": "packages/nuqs/typetests/pristine/public-api.test-d.ts",
-      "disposition": "repo-authored-pristine-types",
-      "oracle": "Repo-authored public-API typetest compiled with tsc against published nuqs@2.9.1."
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks an Octane-owned contract outside the React parity lanes."
     },
     {
       "path": "packages/nuqs/typetests/public-api.test-d.ts",
-      "disposition": "repo-authored-adapted-types",
-      "oracle": "Repo-authored adapted public-API typetest compiled with tsrx-tsc against @octanejs/nuqs."
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks an Octane-owned contract outside the React parity lanes."
     }
   ]
 }

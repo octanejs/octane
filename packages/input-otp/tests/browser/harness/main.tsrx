@@ -13,7 +13,11 @@ function Slots(_props: {}) @{
 		data-test-render-is-hovering={props.isHovering || undefined}
 	>
 		@for (const index of slotIndexes; key index) {
-			<span data-testid={`slot-${index}`} data-test-char={props.slots[index].char ?? undefined}>
+			<span
+				data-testid={`slot-${index}`}
+				data-test-char={props.slots[index].char ?? undefined}
+				data-test-is-active={props.slots[index].isActive || undefined}
+			>
 				{props.slots[index].char ?? props.slots[index].placeholderChar ?? ''}
 			</span>
 		}

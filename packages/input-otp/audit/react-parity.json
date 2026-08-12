@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e838752f33f01981b60b17fa56c2a5a97864fa768855e2c5d8a6ba136f538858"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -167,7 +167,8 @@
       "notes": "Existing Vitest-full real Chromium lane containing all eight adapted upstream files and three port conformance cases.",
       "execution": {
         "kind": "vitest-full",
-        "inventory": "packages/input-otp/audit/adapted-runtime-browser.json"
+        "inventory": "packages/input-otp/audit/adapted-runtime-browser.json",
+        "fileParallelism": true
       },
       "files": [
         {

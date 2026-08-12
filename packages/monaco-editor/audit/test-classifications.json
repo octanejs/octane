@@ -2,29 +2,9 @@
   "schemaVersion": 1,
   "tests": [
     {
-      "path": "packages/monaco-editor/tests/upstream-original.test.ts",
-      "disposition": "pristine-upstream-suite",
-      "oracle": "Spawns the six vendored @monaco-editor/react@4.7.0 RTL specs against React 19.2.7 and checks identities against audit/pristine-runtime.json."
-    },
-    {
-      "path": "packages/monaco-editor/tests/upstream/loading.test.ts",
-      "disposition": "adapted-upstream-suite",
-      "oracle": "Adapted port of upstream/src/Loading/index.spec.tsx with structural DOM assertions instead of RTL snapshots."
-    },
-    {
-      "path": "packages/monaco-editor/tests/upstream/monaco-container.test.ts",
-      "disposition": "adapted-upstream-suite",
-      "oracle": "Adapted port of upstream/src/MonacoContainer/index.spec.tsx; cites container-ref divergence."
-    },
-    {
-      "path": "packages/monaco-editor/tests/upstream/editor-shell.test.ts",
-      "disposition": "adapted-upstream-suite",
-      "oracle": "Adapted port of upstream/src/Editor/index.spec.tsx with mocked loader."
-    },
-    {
-      "path": "packages/monaco-editor/tests/upstream/diff-editor-shell.test.ts",
-      "disposition": "adapted-upstream-suite",
-      "oracle": "Adapted port of upstream/src/DiffEditor/index.spec.tsx with mocked loader."
+      "path": "packages/monaco-editor/tests/browser/editor.browser.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Real Monaco + npm workers in Chromium; not React parity evidence."
     },
     {
       "path": "packages/monaco-editor/tests/differential/parity.test.ts",
@@ -32,14 +12,19 @@
       "oracle": "Runs shared fixtures against @octanejs/monaco-editor and pinned @monaco-editor/react@4.7.0 on React 19.2.7."
     },
     {
+      "path": "packages/monaco-editor/tests/harness/negative-controls.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Unpaired control-plane checks for adapted inventory titles, divergence citations, and typetest assertion groups."
+    },
+    {
+      "path": "packages/monaco-editor/tests/hydration/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Hydration adoption contract; unpaired Octane framework evidence."
+    },
+    {
       "path": "packages/monaco-editor/tests/runtime/editor.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Lifecycle, model ownership, controlled props, and DiffEditor integration against monaco doubles; cites ownership-aware-model divergence."
-    },
-    {
-      "path": "packages/monaco-editor/tests/runtime/use-monaco.test.ts",
-      "disposition": "octane-only-framework-contract",
-      "reason": "useMonaco hook contract with mocked loader; not an adapted upstream identity."
     },
     {
       "path": "packages/monaco-editor/tests/runtime/loader-race.test.ts",
@@ -52,39 +37,29 @@
       "reason": "Runtime export smoke for the package entry; not React parity evidence."
     },
     {
+      "path": "packages/monaco-editor/tests/runtime/use-monaco.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "useMonaco hook contract with mocked loader; not an adapted upstream identity."
+    },
+    {
       "path": "packages/monaco-editor/tests/ssr/ssr.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "SSR loading shell contract; upstream ships no SSR suite."
     },
     {
-      "path": "packages/monaco-editor/tests/hydration/hydration.test.ts",
-      "disposition": "octane-only-framework-contract",
-      "reason": "Hydration adoption contract; unpaired Octane framework evidence."
-    },
-    {
-      "path": "packages/monaco-editor/tests/browser/editor.browser.test.ts",
-      "disposition": "octane-only-browser-contract",
-      "reason": "Real Monaco + npm workers in Chromium; not React parity evidence."
-    },
-    {
-      "path": "packages/monaco-editor/tests/harness/negative-controls.test.ts",
-      "disposition": "harness-negative-controls",
-      "reason": "Unpaired control-plane checks for adapted inventory titles, divergence citations, and typetest assertion groups."
-    },
-    {
-      "path": "packages/monaco-editor/typetests/pristine/types.test-d.ts",
-      "disposition": "pristine-types-suite",
-      "oracle": "Port-authored React-oracle type probes (groups 1–6); paired with typetests/adapted/types.test-d.ts through assertions.md."
+      "path": "packages/monaco-editor/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Spawns the six vendored @monaco-editor/react@4.7.0 RTL specs against React 19.2.7 and checks identities against audit/pristine-runtime.json."
     },
     {
       "path": "packages/monaco-editor/typetests/adapted/types.test-d.ts",
-      "disposition": "adapted-types-suite",
-      "oracle": "Shared groups 1–6 plus adapted-only groups 7–9; compiled with tsrx-tsc."
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks an Octane-owned contract outside the React parity lanes."
     },
     {
-      "path": "packages/monaco-editor/typetests/assertions.md",
-      "disposition": "type-parity-support",
-      "reason": "Human-readable assertion group catalog for pristine/adapted type lanes."
+      "path": "packages/monaco-editor/typetests/pristine/types.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks an Octane-owned contract outside the React parity lanes."
     }
   ]
 }

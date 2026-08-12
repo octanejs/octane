@@ -27,19 +27,14 @@
       "reason": "Checks fail-closed React fixture compilation for the parity harness itself."
     },
     {
-      "path": "packages/valtio/tests/upstream/use-hooks.test.ts",
-      "disposition": "adapted-upstream-suite",
-      "oracle": "Repo-authored adapted cases for pinned valtio@2.3.2 useSnapshot/useProxy pending one-for-one upstream-suite expansion."
-    },
-    {
       "path": "packages/valtio/typetests/pristine/public-api.test-d.ts",
-      "disposition": "repo-authored-type-evidence",
-      "oracle": "Repo-authored pristine React declaration probe for useSnapshot/useProxy against pinned valtio@2.3.2."
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks an Octane-owned contract outside the React parity lanes."
     },
     {
       "path": "packages/valtio/typetests/public-api.test-d.ts",
-      "disposition": "repo-authored-type-evidence",
-      "oracle": "Repo-authored adapted Octane declaration probe paired with the pristine public API probe."
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks an Octane-owned contract outside the React parity lanes."
     }
   ]
 }

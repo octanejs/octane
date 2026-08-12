@@ -45,31 +45,6 @@
       "path": "packages/swr/tests/unit/root-trace.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Octane-only request-state oracle; unpaired because it drives only the Octane fixture."
-    },
-    {
-      "path": "packages/swr/tests/upstream/root/root.test.ts",
-      "disposition": "adapted-upstream-suite",
-      "oracle": "Selected adapted Octane cases citing pinned SWR 2.4.2 upstream/test root identities; inventory in adapted-runtime.json."
-    },
-    {
-      "path": "packages/swr/tests/upstream/specialized/specialized.test.ts",
-      "disposition": "adapted-upstream-suite",
-      "oracle": "Selected adapted Octane cases citing pinned SWR 2.4.2 upstream/test specialized identities; inventory in adapted-runtime.json."
-    },
-    {
-      "path": "packages/swr/typetests/internal/index.ts",
-      "disposition": "octane-only-framework-contract",
-      "reason": "Compiler-executed internal export/call probe; not a structural port of the upstream type assertion suite."
-    },
-    {
-      "path": "packages/swr/typetests/root/index.tsrx",
-      "disposition": "octane-only-framework-contract",
-      "reason": "Compiler-executed root export/call probe; not a structural port of the upstream type assertion suite."
-    },
-    {
-      "path": "packages/swr/typetests/specialized/index.tsrx",
-      "disposition": "octane-only-framework-contract",
-      "reason": "Compiler-executed specialized export/call probe; not a structural port of the upstream type assertion suite."
     }
   ]
 }

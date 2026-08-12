@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'octane';
 import type { CSSProperties } from 'react';
-import { getSlot, subSlot } from '../internal';
-import { parseNumericStyleValue } from '../utils/parseNumericStyleValue';
-import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
+import { getSlot, subSlot } from '../internal.js';
+import { parseNumericStyleValue } from '../utils/parseNumericStyleValue.js';
+import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect.js';
 
 export function useResizeObserver(
 	{

@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { Browser, Locator, Page } from 'playwright';
-import { browserName, launchBrowser } from '../../../../../test-utils/playwright-browser.js';
+import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { createServer, type Plugin, type ViteDevServer } from 'vite';
 import { compile as compileToReact } from '@tsrx/react';
 import { transformSync } from 'esbuild';
@@ -110,43 +110,13 @@ async function driveAcceptedComposition(page: Page, input: Locator): Promise<voi
 	await input.evaluate(function (element: HTMLInputElement) {
 		element.select();
 	});
-	if (browserName === 'chromium') {
-		const cdp = await page.context().newCDPSession(page);
-		await cdp.send('Input.imeSetComposition', {
-			text: '候',
-			selectionStart: 1,
-			selectionEnd: 1,
-		});
-		await cdp.send('Input.insertText', { text: '候' });
-		return;
-	}
-
-	// Playwright CDP sessions are Chromium-only. Firefox uses the same
-	// constructed composition/input boundary sequence as the differential
-	// matrix so observable parity assertions stay engine-agnostic.
-	await input.evaluate(function (element: HTMLInputElement) {
-		const prototype = Object.getPrototypeOf(element);
-		const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
-		descriptor!.set!.call(element, '候');
-		element.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
-		element.dispatchEvent(
-			new InputEvent('input', {
-				bubbles: true,
-				data: '候',
-				inputType: 'insertCompositionText',
-				isComposing: true,
-			}),
-		);
-		element.dispatchEvent(new CompositionEvent('compositionupdate', { bubbles: true, data: '候' }));
-		element.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '候' }));
-		element.dispatchEvent(
-			new InputEvent('input', {
-				bubbles: true,
-				data: '候',
-				inputType: 'insertText',
-			}),
-		);
+	const cdp = await page.context().newCDPSession(page);
+	await cdp.send('Input.imeSetComposition', {
+		text: '候',
+		selectionStart: 1,
+		selectionEnd: 1,
 	});
+	await cdp.send('Input.insertText', { text: '候' });
 }
 
 describe.sequential('native checkbox and radio browser evidence', () => {
@@ -341,7 +311,7 @@ describe.sequential('native checkbox and radio browser evidence', () => {
 		]);
 		// React restores during its click-derived synthetic change dispatch. In
 		// Chromium that leaves no successful activation for native input/change
-		// post-steps to report; Octane restores only after its native change above.
+		// post-steps to report. Octane restores only after its native change above.
 	});
 
 	it('clicking the already-selected radio emits click without input or change', async () => {

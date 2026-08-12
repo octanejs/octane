@@ -2,12 +2,12 @@
 'use client';
 
 import { createElement, memo, useEffect, useImperativeHandle, useMemo, useState } from 'octane';
-import { useIsRtl } from '../../core/useIsRtl';
-import { useVirtualizer } from '../../core/useVirtualizer';
-import { useMemoizedObject } from '../../hooks/useMemoizedObject';
-import type { Align, TagNames } from '../../types';
-import { arePropsEqual } from '../../utils/arePropsEqual';
-import type { GridProps } from './types';
+import { useIsRtl } from '../../core/useIsRtl.js';
+import { useVirtualizer } from '../../core/useVirtualizer.js';
+import { useMemoizedObject } from '../../hooks/useMemoizedObject.js';
+import type { Align, TagNames } from '../../types.js';
+import { arePropsEqual } from '../../utils/arePropsEqual.js';
+import type { GridProps } from './types.js';
 
 /**
  * Renders data with many rows and columns.

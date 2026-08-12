@@ -1,5 +1,5 @@
-import type { Direction } from '../core/types';
-import { getRTLOffsetType } from './getRTLOffsetType';
+import type { Direction } from '../core/types.js';
+import { getRTLOffsetType } from './getRTLOffsetType.js';
 
 export function adjustScrollOffsetForRtl({
 	containerElement,

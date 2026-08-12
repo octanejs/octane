@@ -72,10 +72,16 @@ const EXECUTION_KEYS = new Set([
 	'root',
 	'file',
 	'loader',
+	'fileParallelism',
 ]);
 const SUITE_STATES = new Set(['present', 'absent', 'insufficient']);
 const TYPE_EVIDENCE_ORIGINS = new Set(['upstream-suite', 'repo-authored']);
-const FULL_RUNTIME_EXECUTIONS = new Set(['vitest-full', 'jest-full', 'playwright-full', 'node-full']);
+const FULL_RUNTIME_EXECUTIONS = new Set([
+	'vitest-full',
+	'jest-full',
+	'playwright-full',
+	'node-full',
+]);
 const ADAPTED_ROOT_KEYS = new Set(['source', 'tests']);
 const ADAPTED_SCAN_KEYS = new Set(['roots', 'include', 'exclude']);
 const ADAPTED_RUNTIME_SUMMARY_KEYS = new Set([
@@ -325,15 +331,13 @@ export function validateManifest(manifest) {
 			for (const key of Object.keys(lane.execution))
 				if (!EXECUTION_KEYS.has(key)) fail(`lane ${lane.id} execution has unknown key "${key}"`);
 			if (
-				![
-					'typescript',
-					'vitest-full',
-					'jest-full',
-					'playwright-full',
-					'node-full',
-				].includes(lane.execution.kind)
+				!['typescript', 'vitest-full', 'jest-full', 'playwright-full', 'node-full'].includes(
+					lane.execution.kind,
+				)
 			)
 				fail(`lane ${lane.id} execution kind is unsupported`);
+			if (lane.execution.kind !== 'vitest-full' && lane.execution.fileParallelism !== undefined)
+				fail(`lane ${lane.id} fileParallelism is only valid for Vitest full-suite execution`);
 			if (lane.execution.kind === 'typescript') {
 				if (!['tsc', 'tsgo', 'tsrx-tsc'].includes(lane.execution.compiler))
 					fail(`lane ${lane.id} execution compiler is unsupported`);
@@ -361,12 +365,16 @@ export function validateManifest(manifest) {
 					lane.execution.config !== undefined ||
 					lane.execution.root !== undefined
 				)
-					fail(`lane ${lane.id} full-suite execution only accepts an inventory`);
+					fail(
+						`lane ${lane.id} full-suite execution only accepts an inventory and fileParallelism`,
+					);
 				exactPath(lane.execution.inventory, `lane ${lane.id} execution inventory`);
-			} else if (
-				lane.execution.kind === 'jest-full' ||
-				lane.execution.kind === 'playwright-full'
-			) {
+				if (
+					lane.execution.fileParallelism !== undefined &&
+					typeof lane.execution.fileParallelism !== 'boolean'
+				)
+					fail(`lane ${lane.id} execution fileParallelism must be boolean`);
+			} else if (lane.execution.kind === 'jest-full' || lane.execution.kind === 'playwright-full') {
 				if (
 					lane.execution.compiler !== undefined ||
 					lane.execution.compilerBins !== undefined ||
@@ -515,8 +523,8 @@ export function validateManifest(manifest) {
 			);
 		}
 
-		const expectedOrigin =
-			manifest.upstreamSuites.types === 'present' ? 'upstream-suite' : 'repo-authored';
+		const typeSuiteState = manifest.upstreamSuites.types;
+		const expectedOrigin = typeSuiteState === 'present' ? 'upstream-suite' : 'repo-authored';
 		const requiredTypeEvidence = (type) =>
 			manifest.lanes.some(
 				(lane) =>
@@ -525,9 +533,14 @@ export function validateManifest(manifest) {
 					lane.available !== false &&
 					lane.evidenceOrigin === expectedOrigin,
 			);
-		if (!requiredTypeEvidence('pristine-types') || !requiredTypeEvidence('adapted-types'))
+		const hasDeclaredTypeLane = manifest.lanes.some((lane) => lane.type.endsWith('-types'));
+		const requiresTypeEvidence = typeSuiteState !== 'absent' || hasDeclaredTypeLane;
+		if (
+			requiresTypeEvidence &&
+			(!requiredTypeEvidence('pristine-types') || !requiredTypeEvidence('adapted-types'))
+		)
 			fail(
-				`verified provenance with ${manifest.upstreamSuites.types} upstream type tests requires available required pristine-types and adapted-types lanes with ${expectedOrigin} evidence`,
+				`verified provenance with ${typeSuiteState} upstream type tests requires available required pristine-types and adapted-types lanes with ${expectedOrigin} evidence${typeSuiteState === 'absent' ? ' when type lanes are declared' : ''}`,
 			);
 	}
 
@@ -597,16 +610,26 @@ export async function verifyManifestFiles(manifest, root) {
 	const absoluteRoot = resolve(root);
 	const runtimeCaseIds = new Set();
 	const adaptedRuntimeInventories = [];
+	const fullVitestInventories = [];
 	for (const lane of manifest.lanes) {
+		let fullVitestInventory;
+		if (
+			lane.oracle === 'required' &&
+			lane.available !== false &&
+			lane.execution?.kind === 'vitest-full'
+		) {
+			fullVitestInventory = JSON.parse(
+				await readFile(resolve(absoluteRoot, lane.execution.inventory), 'utf8'),
+			);
+			fullVitestInventories.push({ lane, inventory: fullVitestInventory });
+		}
 		if (
 			lane.oracle === 'required' &&
 			lane.available !== false &&
 			lane.type === 'adapted-octane' &&
 			lane.execution?.kind === 'vitest-full'
 		) {
-			const inventory = JSON.parse(
-				await readFile(resolve(absoluteRoot, lane.execution.inventory), 'utf8'),
-			);
+			const inventory = fullVitestInventory;
 			validateRuntimeInventory(inventory, lane, manifest.adaptedRoots.tests.roots);
 			adaptedRuntimeInventories.push(inventory);
 			for (const test of inventory.tests) runtimeCaseIds.add(test.id);
@@ -630,6 +653,32 @@ export async function verifyManifestFiles(manifest, root) {
 	for (const file of manifest.ordinaryEvidence ?? []) {
 		const contents = await readEvidenceFile(absoluteRoot, file);
 		assertParityCaseBindings(file.path, contents.toString('utf8'), file.cases);
+	}
+	for (const { lane: fullLane, inventory } of fullVitestInventories) {
+		const fullIdentities = new Set(inventory.tests.map((test) => `${test.file}\0${test.fullName}`));
+		for (const selectedLane of manifest.lanes) {
+			if (
+				selectedLane.id === fullLane.id ||
+				selectedLane.oracle !== 'required' ||
+				selectedLane.available === false ||
+				selectedLane.project !== fullLane.project ||
+				selectedLane.execution?.kind === 'vitest-full'
+			) {
+				continue;
+			}
+			const repeated = selectedLane.files
+				.filter((file) => file.role === 'test')
+				.flatMap((file) =>
+					(file.cases ?? [])
+						.filter((test) => fullIdentities.has(`${file.path}\0${test.fullName}`))
+						.map((test) => test.fullName),
+				);
+			if (repeated.length > 0) {
+				throw new Error(
+					`lane ${selectedLane.id} repeats ${repeated.length} test identities already executed by full-suite lane ${fullLane.id}; attach its semantic case metadata to the full-suite lane instead`,
+				);
+			}
+		}
 	}
 	const discoveredTests = await discoverAdaptedFiles(absoluteRoot, manifest.adaptedRoots.tests);
 	const inventoried = new Set();
@@ -915,7 +964,9 @@ export async function verifyManifestTestSelections(manifest, root) {
 	for (const lane of manifest.lanes.filter(
 		(candidate) =>
 			candidate.available !== false &&
-			!['typescript', 'jest-full', 'playwright-full', 'node-full'].includes(candidate.execution?.kind),
+			!['typescript', 'jest-full', 'playwright-full', 'node-full'].includes(
+				candidate.execution?.kind,
+			),
 	)) {
 		let collectedTests = testsByProject.get(lane.project);
 		if (!collectedTests) {
@@ -986,6 +1037,9 @@ export function buildLaneArgv(lane, root = process.cwd()) {
 			'run',
 			'--project',
 			lane.project,
+			...(lane.execution.fileParallelism === undefined
+				? []
+				: [lane.execution.fileParallelism ? '--fileParallelism' : '--no-file-parallelism']),
 			...inventory.files,
 			'--reporter=json',
 		];
@@ -1130,6 +1184,10 @@ export function verifyLaneRunResult(lane, stdout, root = process.cwd()) {
 
 export function requiredExecutableLanes(manifest) {
 	return manifest.lanes.filter((lane) => lane.oracle === 'required' && lane.available !== false);
+}
+
+export function isVitestLane(lane) {
+	return lane.execution === undefined || lane.execution?.kind === 'vitest-full';
 }
 
 /**

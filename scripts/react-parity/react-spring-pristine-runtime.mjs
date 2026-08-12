@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
 import { verifyReactSpringVendoredBytes } from './react-spring-upstream-lib.mjs';
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../packages/react-spring');
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../packages/spring');
 const upstreamRoot = join(packageRoot, 'upstream');
 const repoRootDefault = resolve(packageRoot, '../..');
 
@@ -20,12 +20,12 @@ export function pristineTestIdentities(report, repoRoot = repoRootDefault) {
 		const relativeFile = toPortablePath(relative(repoRoot, absoluteFile));
 		const portable = relativeFile.includes('/.pristine-upstream-')
 			? relativeFile.replace(
-					/^packages\/react-spring\/\.pristine-upstream-[^/]+\//u,
-					'packages/react-spring/upstream/',
+					/^packages\/spring\/\.pristine-upstream-[^/]+\//u,
+					'packages/spring/upstream/',
 				)
-			: relativeFile.startsWith('packages/react-spring/upstream/')
+			: relativeFile.startsWith('packages/spring/upstream/')
 				? relativeFile
-				: `packages/react-spring/upstream/${relative(upstreamRoot, absoluteFile).split('\\').join('/')}`;
+				: `packages/spring/upstream/${relative(upstreamRoot, absoluteFile).split('\\').join('/')}`;
 		for (const test of suite.assertionResults ?? []) {
 			if (test.status === 'pending' || test.status === 'todo') continue;
 			identities.push({
@@ -112,8 +112,8 @@ export function inventoryFromIdentities(identities) {
 		.sort(compareTestIdentities);
 	return {
 		schemaVersion: 1,
-		project: 'react-spring-pristine',
-		roots: ['packages/react-spring/upstream'],
+		project: 'spring-pristine',
+		roots: ['packages/spring/upstream'],
 		files: [
 			...new Set(
 				tests.map(function fileOf(test) {

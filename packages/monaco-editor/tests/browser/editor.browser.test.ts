@@ -78,7 +78,7 @@ beforeEach(async () => {
 	pageErrors = [];
 	page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
 	page.on('pageerror', (error) => pageErrors.push(String(error)));
-	await page.goto(origin, { waitUntil: 'networkidle' });
+	await page.goto(origin, { waitUntil: 'domcontentloaded' });
 	await page.locator('[data-editor-ready="true"]').waitFor({ timeout: 30_000 });
 });
 

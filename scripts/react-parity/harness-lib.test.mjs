@@ -566,6 +566,44 @@ test('normalizes Windows identity paths and resolves full-suite inventories from
 	]);
 });
 
+test('passes file parallelism through full Vitest lanes', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-workers-'));
+	await mkdir(join(root, 'audit'), { recursive: true });
+	await writeFile(
+		join(root, 'audit/inventory.json'),
+		JSON.stringify({ files: ['packages/example.test.ts'] }),
+	);
+	const lane = {
+		...manifest().lanes[0],
+		evidenceOrigin: 'upstream-suite',
+		execution: {
+			kind: 'vitest-full',
+			inventory: 'audit/inventory.json',
+			fileParallelism: true,
+		},
+	};
+	assert.deepEqual(validateManifest(manifest({ lanes: [lane] })).lanes[0], lane);
+	assert.deepEqual(buildLaneArgv(lane, root).slice(3), [
+		'--project',
+		'hook-form',
+		'--fileParallelism',
+		'packages/example.test.ts',
+		'--reporter=json',
+	]);
+	const invalidParallelism = structuredClone(lane);
+	invalidParallelism.execution.fileParallelism = 'true';
+	assert.throws(
+		() => validateManifest(manifest({ lanes: [invalidParallelism] })),
+		/fileParallelism must be boolean/,
+	);
+	const typeWithParallelism = typeLane('adapted-types');
+	typeWithParallelism.execution.fileParallelism = true;
+	assert.throws(
+		() => validateManifest(manifest({ lanes: [typeWithParallelism] })),
+		/fileParallelism is only valid for Vitest full-suite execution/,
+	);
+});
+
 test('normalizes Vitest suite separators symmetrically when a title contains greater-than', async () => {
 	const root = await mkdtemp(join(tmpdir(), 'react-parity-vitest-title-'));
 	await mkdir(join(root, 'audit'), { recursive: true });
@@ -1011,6 +1049,19 @@ test('rejects stale divergences and accepts one divergence matching multiple kno
 	assert.throws(() => validateManifest(stale), /unknown case id "missing"/);
 
 	const ordinary = manifest({
+		ordinaryEvidence: [
+			{
+				path: 'packages/example/tests/ordinary-contract.test.ts',
+				sha256: sha256('ordinary contract'),
+				cases: [
+					{
+						id: 'conformance:ordinary-contract',
+						testName: 'documents the ordinary contract',
+						fullName: 'ordinary contract documents the ordinary contract',
+					},
+				],
+			},
+		],
 		divergences: [divergence({ caseIds: ['conformance:ordinary-contract'] })],
 	});
 	assert.deepEqual(validateManifest(ordinary), ordinary);
@@ -1105,6 +1156,70 @@ test('rejects missing and tampered evidence files', async () => {
 	await mkdir(file.slice(0, file.lastIndexOf('/')), { recursive: true });
 	await writeFile(file, 'tampered');
 	await assert.rejects(() => verifyManifestFiles(value, root), /integrity mismatch/);
+});
+
+test('rejects a selected lane that repeats identities already owned by a full-suite lane', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'react-parity-overlap-'));
+	const sourcePath = 'packages/example/tests/upstream/example.test.ts';
+	const inventoryPath = 'packages/example/audit/adapted-runtime.json';
+	const source = '// @parity-case adapted:example\n' + 'test("does the thing", () => {})\n';
+	const inventory = JSON.stringify({
+		schemaVersion: 1,
+		project: 'example',
+		roots: ['packages/example/tests/upstream'],
+		files: [sourcePath],
+		tests: [
+			{
+				id: 'runtime:example',
+				file: sourcePath,
+				fullName: 'example suite does the thing',
+			},
+		],
+	});
+	await mkdir(join(root, 'packages/example/tests/upstream'), { recursive: true });
+	await mkdir(join(root, 'packages/example/audit'), { recursive: true });
+	await writeFile(join(root, sourcePath), source);
+	await writeFile(join(root, inventoryPath), inventory);
+
+	const selected = manifest().lanes[0];
+	selected.project = 'example';
+	selected.files[0] = {
+		...selected.files[0],
+		path: sourcePath,
+		sha256: sha256(source),
+	};
+	const full = {
+		...fullRuntimeLane('adapted-octane'),
+		project: 'example',
+		files: [{ path: inventoryPath, role: 'support', sha256: sha256(inventory) }],
+		execution: { kind: 'vitest-full', inventory: inventoryPath },
+	};
+	const value = manifest({
+		adaptedRoots: {
+			source: {
+				roots: ['packages/example/tests/upstream'],
+				include: ['\\.ts$'],
+				exclude: [],
+			},
+			tests: {
+				roots: ['packages/example/tests/upstream'],
+				include: ['\\.test\\.ts$'],
+				exclude: [],
+			},
+		},
+		adaptedRuntimeSummary: {
+			inventoryEntries: 1,
+			uniqueIdentities: 1,
+			duplicateEntriesWithinLanes: 0,
+			identitiesSharedAcrossLanes: 0,
+		},
+		lanes: [full, selected],
+	});
+
+	await assert.rejects(
+		() => verifyManifestFiles(validateManifest(value), root),
+		/lane adapted repeats 1 test identities already executed by full-suite lane full-adapted-octane/,
+	);
 });
 
 test('rejects unstructured, undeclared, and unlinked full-suite divergences', async () => {
@@ -1371,6 +1486,19 @@ test('conformance case ids authenticate structured divergences without a parity 
 				],
 			},
 		],
+		ordinaryEvidence: [
+			{
+				path: probePath,
+				sha256: sha256(probeSource),
+				cases: [
+					{
+						id: 'conformance:example',
+						testName: 'does the thing',
+						fullName: 'example suite does the thing',
+					},
+				],
+			},
+		],
 		divergences: [divergence({ id: 'example-divergence', caseIds: ['conformance:example'] })],
 	});
 	assert.deepEqual(validateManifest(value), value);
@@ -1381,8 +1509,10 @@ test('conformance case ids authenticate structured divergences without a parity 
 	await assert.doesNotReject(() => verifyManifestFiles(validateManifest(value), root));
 
 	await writeFile(join(root, probePath), skippedSource);
+	const skippedValue = structuredClone(value);
+	skippedValue.ordinaryEvidence[0].sha256 = sha256(skippedSource);
 	await assert.rejects(
-		() => verifyManifestFiles(validateManifest(value), root),
+		() => verifyManifestFiles(validateManifest(skippedValue), root),
 		/must immediately precede one active test/,
 	);
 });

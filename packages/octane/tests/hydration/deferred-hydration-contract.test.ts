@@ -17,6 +17,7 @@ import { loadServerFixture } from '../_server-fixture.js';
 import {
 	createHydrationInteractionEvent,
 	expectedHydrationReplayMetadata,
+	hydrationInteractionPreventsDefault,
 	HYDRATION_INTERACTION_CROSS_REALM_CASES,
 	HYDRATION_INTERACTION_EVENT_CASES,
 	HYDRATION_INTERACTION_EVENT_TYPES,
@@ -31,12 +32,18 @@ const EVENT_REPLAY_FIXTURE =
 	'packages/octane/tests/hydration/_fixtures/deferred-hydration-event-replay.tsrx';
 const eventReplayServer = loadServerFixture<typeof eventReplayClient>(EVENT_REPLAY_FIXTURE);
 
-function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+function deferred<T>(): {
+	promise: Promise<T>;
+	resolve: (value: T) => void;
+	reject: (reason: unknown) => void;
+} {
 	let resolve!: (value: T) => void;
-	const promise = new Promise<T>((complete) => {
+	let reject!: (reason: unknown) => void;
+	const promise = new Promise<T>((complete, fail) => {
 		resolve = complete;
+		reject = fail;
 	});
-	return { promise, resolve };
+	return { promise, resolve, reject };
 }
 
 describe('deferred hydration contract edges', () => {
@@ -170,8 +177,8 @@ describe('deferred hydration contract edges', () => {
 		expect(originalOutcomes).toEqual(
 			HYDRATION_INTERACTION_EVENT_CASES.map((testCase) => ({
 				type: testCase.type,
-				dispatched: !(testCase.bubbles && testCase.cancelable),
-				defaultPrevented: testCase.bubbles && testCase.cancelable,
+				dispatched: !hydrationInteractionPreventsDefault(testCase),
+				defaultPrevented: hydrationInteractionPreventsDefault(testCase),
 			})),
 		);
 
@@ -308,8 +315,14 @@ describe('deferred hydration contract edges', () => {
 							testCase.type,
 							(event) => {
 								switch (testCase.family) {
+									case 'composition':
+										targetRealmMatches.push(event instanceof foreignWindow.CompositionEvent);
+										break;
 									case 'focus':
 										targetRealmMatches.push(event instanceof foreignWindow.FocusEvent);
+										break;
+									case 'input':
+										targetRealmMatches.push(event instanceof foreignWindow.InputEvent);
 										break;
 									case 'keyboard':
 										targetRealmMatches.push(event instanceof foreignWindow.KeyboardEvent);
@@ -319,6 +332,9 @@ describe('deferred hydration contract edges', () => {
 										break;
 									case 'pointer':
 										targetRealmMatches.push(event instanceof foreignWindow.PointerEvent);
+										break;
+									case 'touch':
+										targetRealmMatches.push(event instanceof foreignWindow.TouchEvent);
 										break;
 								}
 							},
@@ -332,13 +348,10 @@ describe('deferred hydration contract edges', () => {
 			flushEffects();
 
 			const records = observation!.records.filter((record) => record.phase === 'target');
-			expect(records.map((record) => record.type)).toEqual([
-				'focusin',
-				'keydown',
-				'mousedown',
-				'pointerdown',
-			]);
-			expect(targetRealmMatches).toEqual([true, true, true, true]);
+			expect(records.map((record) => record.type)).toEqual(
+				replayCases.map((testCase) => testCase.type),
+			);
+			expect(targetRealmMatches).toEqual(replayCases.map(() => true));
 			for (let i = 0; i < replayCases.length; i++) {
 				expect(records[i]).toMatchObject({
 					type: replayCases[i].type,
@@ -389,8 +402,14 @@ describe('deferred hydration contract edges', () => {
 							testCase.type,
 							(event) => {
 								switch (testCase.family) {
+									case 'composition':
+										targetRealmMatches.push(event instanceof CompositionEvent);
+										break;
 									case 'focus':
 										targetRealmMatches.push(event instanceof FocusEvent);
+										break;
+									case 'input':
+										targetRealmMatches.push(event instanceof InputEvent);
 										break;
 									case 'keyboard':
 										targetRealmMatches.push(event instanceof KeyboardEvent);
@@ -400,6 +419,9 @@ describe('deferred hydration contract edges', () => {
 										break;
 									case 'pointer':
 										targetRealmMatches.push(event instanceof PointerEvent);
+										break;
+									case 'touch':
+										targetRealmMatches.push(event instanceof TouchEvent);
 										break;
 								}
 							},
@@ -413,13 +435,10 @@ describe('deferred hydration contract edges', () => {
 			flushEffects();
 
 			const records = observation!.records.filter((record) => record.phase === 'target');
-			expect(records.map((record) => record.type)).toEqual([
-				'focusin',
-				'keydown',
-				'mousedown',
-				'pointerdown',
-			]);
-			expect(targetRealmMatches).toEqual([true, true, true, true]);
+			expect(records.map((record) => record.type)).toEqual(
+				replayCases.map((testCase) => testCase.type),
+			);
+			expect(targetRealmMatches).toEqual(replayCases.map(() => true));
 			for (let i = 0; i < replayCases.length; i++) {
 				expect(records[i]).toMatchObject({
 					type: replayCases[i].type,
@@ -483,6 +502,66 @@ describe('deferred hydration contract edges', () => {
 
 		await act(() => button.click());
 		expect(onClick).toHaveBeenCalledOnce();
+	});
+
+	it('hydrates visible content immediately when IntersectionObserver is unavailable', async () => {
+		vi.stubGlobal('IntersectionObserver', undefined);
+		const onHydrated = vi.fn();
+		const when = visible();
+		container.innerHTML = renderToString(server.EarlyInteractionHydration, { when }).html;
+		const button = container.querySelector('#early-interaction');
+
+		root = hydrateRoot(container, client.EarlyInteractionHydration, { when, onHydrated });
+		await act(() => {});
+
+		expect(container.querySelector('#early-interaction')).toBe(button);
+		expect(onHydrated).toHaveBeenCalledOnce();
+	});
+
+	it('hydrates an already-matching media query without requiring a listener API', async () => {
+		vi.stubGlobal(
+			'matchMedia',
+			vi.fn(() => ({ matches: true })),
+		);
+		const onHydrated = vi.fn();
+		const when = media('(min-width: 1px)');
+		container.innerHTML = renderToString(server.EarlyInteractionHydration, { when }).html;
+		const button = container.querySelector('#early-interaction');
+
+		root = hydrateRoot(container, client.EarlyInteractionHydration, { when, onHydrated });
+		await act(() => {});
+
+		expect(container.querySelector('#early-interaction')).toBe(button);
+		expect(onHydrated).toHaveBeenCalledOnce();
+	});
+
+	it('observes and cleans up a legacy media query listener', async () => {
+		let listener!: () => void;
+		const mediaQuery = {
+			matches: false,
+			addListener: vi.fn((callback: () => void) => {
+				listener = callback;
+			}),
+			removeListener: vi.fn(),
+		};
+		vi.stubGlobal(
+			'matchMedia',
+			vi.fn(() => mediaQuery),
+		);
+		const onHydrated = vi.fn();
+		const when = media('(min-width: 800px)');
+		container.innerHTML = renderToString(server.EarlyInteractionHydration, { when }).html;
+
+		root = hydrateRoot(container, client.EarlyInteractionHydration, { when, onHydrated });
+		await act(() => {});
+		expect(mediaQuery.addListener).toHaveBeenCalledOnce();
+		expect(onHydrated).not.toHaveBeenCalled();
+
+		mediaQuery.matches = true;
+		await act(() => listener());
+
+		expect(onHydrated).toHaveBeenCalledOnce();
+		expect(mediaQuery.removeListener).toHaveBeenCalledWith(listener);
 	});
 
 	it('uses a current direct never strategy instead of the previously rendered condition', async () => {
@@ -812,6 +891,244 @@ describe('deferred hydration contract edges', () => {
 		expect(container.querySelector('#activation-content')?.textContent).toBe('Server reviews');
 		expect(container.querySelector('#activation-fallback')).toBeNull();
 		expect(onHydrated).toHaveBeenCalledOnce();
+	});
+
+	it('keeps the original focused server editor and its draft while activation suspends and resumes', async () => {
+		const pending = deferred<void>();
+		const onHydrated = vi.fn();
+		const when = interaction({ events: ['focusin', 'click'] });
+		const props = { when, suspend: false, promise: pending.promise, onHydrated };
+		container.innerHTML = renderToString(server.ActivationSuspendingEditorHydration, props).html;
+		const editor = container.querySelector('#activation-editor') as HTMLInputElement;
+		editor.value = 'Typed before activation';
+		editor.focus();
+		editor.setSelectionRange(6, 12);
+
+		root = hydrateRoot(container, client.ActivationSuspendingEditorHydration, {
+			...props,
+			suspend: true,
+		});
+		await act(() =>
+			editor.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })),
+		);
+
+		expect(container.querySelector('#activation-editor')).toBe(editor);
+		expect(document.activeElement).toBe(editor);
+		expect(editor.value).toBe('Typed before activation');
+		expect([editor.selectionStart, editor.selectionEnd]).toEqual([6, 12]);
+		expect(onHydrated).not.toHaveBeenCalled();
+
+		await act(() => pending.resolve());
+
+		expect(container.querySelector('#activation-editor')).toBe(editor);
+		expect(document.activeElement).toBe(editor);
+		expect(editor.value).toBe('Typed before activation');
+		expect([editor.selectionStart, editor.selectionEnd]).toEqual([6, 12]);
+		expect(onHydrated).toHaveBeenCalledOnce();
+	});
+
+	for (const nested of [false, true]) {
+		it(`preserves already-adopted SSR siblings, focused input, and effect lifecycles when a later child suspends${
+			nested ? ' beside a nested dormant boundary' : ''
+		}`, async () => {
+			const pending = deferred<void>();
+			const onLayout = vi.fn();
+			const onPassive = vi.fn();
+			const onRef = vi.fn();
+			const onHydrated = vi.fn();
+			const onNestedHydrated = vi.fn();
+			const onClick = vi.fn();
+			const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const props = {
+				when: interaction({ events: 'click' }),
+				nestedWhen: nested ? never() : undefined,
+				suspend: false,
+				promise: pending.promise,
+				className: 'server-accent',
+				onLayout,
+				onPassive,
+				onRef,
+				onHydrated,
+				onNestedHydrated,
+				onClick,
+			};
+			container.innerHTML = renderToString(server.PartiallyAdoptedSuspendingHydration, props).html;
+			const section = container.querySelector('#partial-section');
+			const before = container.querySelector('#partial-before');
+			const editor = container.querySelector('#partial-editor') as HTMLInputElement;
+			const nestedContent = container.querySelector('#partial-nested');
+			const suffix = container.querySelector('#partial-suspended-suffix');
+			const after = container.querySelector('#partial-after');
+			const outerBefore = container.querySelector('#partial-outer-before');
+			const outerAfter = container.querySelector('#partial-outer-after');
+			editor.value = 'Typed before later suspension';
+			editor.focus();
+			editor.setSelectionRange(6, 12);
+
+			try {
+				root = hydrateRoot(container, client.PartiallyAdoptedSuspendingHydration, {
+					...props,
+					suspend: true,
+				});
+				await act(() => editor.click());
+
+				expect(container.querySelector('#partial-section')).toBe(section);
+				expect(container.querySelector('#partial-before')).toBe(before);
+				expect(container.querySelector('#partial-editor')).toBe(editor);
+				expect(container.querySelector('#partial-nested')).toBe(nestedContent);
+				expect(container.querySelector('#partial-suspended-suffix')).toBe(suffix);
+				expect(container.querySelector('#partial-after')).toBe(after);
+				expect(container.querySelector('#partial-outer-before')).toBe(outerBefore);
+				expect(container.querySelector('#partial-outer-after')).toBe(outerAfter);
+				expect(container.querySelector('#partial-fallback')).toBeNull();
+				expect(document.activeElement).toBe(editor);
+				expect(editor.value).toBe('Typed before later suspension');
+				expect([editor.selectionStart, editor.selectionEnd]).toEqual([6, 12]);
+				expect(onLayout).not.toHaveBeenCalled();
+				expect(onPassive).not.toHaveBeenCalled();
+				expect(onRef).not.toHaveBeenCalled();
+				expect(onHydrated).not.toHaveBeenCalled();
+				expect(onNestedHydrated).not.toHaveBeenCalled();
+
+				await act(() => pending.resolve());
+
+				expect(diagnostic.mock.calls).toEqual([]);
+				expect(container.querySelector('#partial-section')).toBe(section);
+				expect(container.querySelector('#partial-before')).toBe(before);
+				expect(container.querySelector('#partial-editor')).toBe(editor);
+				expect(container.querySelector('#partial-nested')).toBe(nestedContent);
+				expect(container.querySelector('#partial-suspended-suffix')).toBe(suffix);
+				expect(container.querySelector('#partial-after')).toBe(after);
+				expect(container.querySelector('#partial-outer-before')).toBe(outerBefore);
+				expect(container.querySelector('#partial-outer-after')).toBe(outerAfter);
+				expect(document.activeElement).toBe(editor);
+				expect(editor.value).toBe('Typed before later suspension');
+				expect([editor.selectionStart, editor.selectionEnd]).toEqual([6, 12]);
+				expect(onLayout.mock.calls).toEqual([['mount']]);
+				expect(onPassive.mock.calls).toEqual([['mount']]);
+				expect(onRef.mock.calls).toEqual([[editor]]);
+				expect(onHydrated).toHaveBeenCalledOnce();
+				expect(onNestedHydrated).not.toHaveBeenCalled();
+				await act(() => (suffix as HTMLButtonElement).click());
+				expect(onClick).toHaveBeenCalledOnce();
+
+				await act(() => root!.unmount());
+				root = undefined;
+				expect(onLayout.mock.calls).toEqual([['mount'], ['cleanup']]);
+				expect(onPassive.mock.calls).toEqual([['mount'], ['cleanup']]);
+				expect(onRef.mock.calls).toEqual([[editor], [null]]);
+				expect(diagnostic.mock.calls).toEqual([]);
+			} finally {
+				diagnostic.mockRestore();
+			}
+		});
+	}
+
+	it('never publishes refs, effects, or subscriptions when a partially adopted suspended boundary unmounts', async () => {
+		const pending = deferred<void>();
+		const onLayout = vi.fn();
+		const onPassive = vi.fn();
+		const onRef = vi.fn();
+		const onHydrated = vi.fn();
+		const unsubscribe = vi.fn();
+		const store = {
+			subscribe: vi.fn(() => unsubscribe),
+			getSnapshot: vi.fn(() => 'server snapshot'),
+		};
+		const props = {
+			when: interaction({ events: 'click' }),
+			suspend: false,
+			promise: pending.promise,
+			className: 'server-accent',
+			store,
+			onLayout,
+			onPassive,
+			onRef,
+			onHydrated,
+		};
+		container.innerHTML = renderToString(server.PartiallyAdoptedSuspendingHydration, props).html;
+		const editor = container.querySelector('#partial-editor') as HTMLInputElement;
+		root = hydrateRoot(container, client.PartiallyAdoptedSuspendingHydration, {
+			...props,
+			suspend: true,
+		});
+		await act(() => editor.click());
+
+		expect(onRef).not.toHaveBeenCalled();
+		expect(onLayout).not.toHaveBeenCalled();
+		expect(onPassive).not.toHaveBeenCalled();
+		expect(store.subscribe).not.toHaveBeenCalled();
+		expect(onHydrated).not.toHaveBeenCalled();
+
+		await act(() => root!.unmount());
+		root = undefined;
+
+		expect(onRef).not.toHaveBeenCalled();
+		expect(onLayout).not.toHaveBeenCalled();
+		expect(onPassive).not.toHaveBeenCalled();
+		expect(store.subscribe).not.toHaveBeenCalled();
+		expect(unsubscribe).not.toHaveBeenCalled();
+		expect(onHydrated).not.toHaveBeenCalled();
+
+		await act(() => pending.resolve());
+
+		expect(onRef).not.toHaveBeenCalled();
+		expect(onLayout).not.toHaveBeenCalled();
+		expect(onPassive).not.toHaveBeenCalled();
+		expect(store.subscribe).not.toHaveBeenCalled();
+		expect(unsubscribe).not.toHaveBeenCalled();
+		expect(onHydrated).not.toHaveBeenCalled();
+		expect(container.childNodes).toHaveLength(0);
+	});
+
+	it('routes rejected partial hydration to its error boundary without publishing abandoned lifecycle work', async () => {
+		const pending = deferred<void>();
+		const onLayout = vi.fn();
+		const onPassive = vi.fn();
+		const onRef = vi.fn();
+		const onHydrated = vi.fn();
+		const unsubscribe = vi.fn();
+		const store = {
+			subscribe: vi.fn(() => unsubscribe),
+			getSnapshot: vi.fn(() => 'server snapshot'),
+		};
+		const props = {
+			when: interaction({ events: 'click' }),
+			suspend: false,
+			promise: pending.promise,
+			className: 'server-accent',
+			store,
+			onLayout,
+			onPassive,
+			onRef,
+			onHydrated,
+		};
+		container.innerHTML = renderToString(
+			server.ErrorCatchingPartiallyAdoptedSuspendingHydration,
+			props,
+		).html;
+		const editor = container.querySelector('#partial-editor') as HTMLInputElement;
+		root = hydrateRoot(container, client.ErrorCatchingPartiallyAdoptedSuspendingHydration, {
+			...props,
+			suspend: true,
+		});
+		await act(() => editor.click());
+
+		expect(onRef).not.toHaveBeenCalled();
+		expect(onLayout).not.toHaveBeenCalled();
+		expect(onPassive).not.toHaveBeenCalled();
+		expect(store.subscribe).not.toHaveBeenCalled();
+
+		await act(() => pending.reject(new Error('Deferred reviews failed')));
+
+		expect(container.querySelector('#partial-error')?.textContent).toBe('Hydration failed');
+		expect(container.querySelector('#partial-editor')).toBeNull();
+		expect(onRef).not.toHaveBeenCalled();
+		expect(onLayout).not.toHaveBeenCalled();
+		expect(onPassive).not.toHaveBeenCalled();
+		expect(store.subscribe).not.toHaveBeenCalled();
+		expect(unsubscribe).not.toHaveBeenCalled();
+		expect(onHydrated).not.toHaveBeenCalled();
 	});
 
 	it('cancels a suspended activation on never and can activate again later', async () => {

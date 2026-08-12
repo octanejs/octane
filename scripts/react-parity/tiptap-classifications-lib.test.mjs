@@ -18,7 +18,10 @@ async function fixture() {
 	});
 	await mkdir(join(root, 'packages/tiptap/audit'), { recursive: true });
 	for (const file of ['test-classifications.json', 'react-parity.json']) {
-		await cp(join(REPO, `packages/tiptap/audit/${file}`), join(root, `packages/tiptap/audit/${file}`));
+		await cp(
+			join(REPO, `packages/tiptap/audit/${file}`),
+			join(root, `packages/tiptap/audit/${file}`),
+		);
 	}
 	return root;
 }

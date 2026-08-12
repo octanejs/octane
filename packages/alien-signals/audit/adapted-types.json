@@ -2,9 +2,7 @@
   {
     "path": "upstream-typecheck.test-d.ts",
     "sha256": "6fffb3e110f4a96c680c9dc5365642b59fa7780aaf4aac50bea8996b4f06ab0e",
-    "assertionGroups": [
-      "383e1574f5dd66a16780f548086d83f56c8f271fa7007bdfca8eb17c5a6680ee"
-    ],
+    "assertionGroups": ["383e1574f5dd66a16780f548086d83f56c8f271fa7007bdfca8eb17c5a6680ee"],
     "acceptedApiCalls": [
       "d097b5c2ce0bc71bff040e6ff50f8e26c94d7ff7a034b0d3b2f1eefa35b60bdd",
       "3f4ea6eb04a432dc025cfba7f733f5bbe042c6579ef615cbb1ad2f5a55c743cf",

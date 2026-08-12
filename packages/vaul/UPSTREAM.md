@@ -25,10 +25,10 @@ whose specs live under `test/tests/` and depend on the Next.js demo app under
 `test/`. The complete tagged repository test boundary is vendored under
 `upstream/` (source, demo app, specs, `playwright.config.ts`, workspace files).
 A pristine-upstream lane (`vaul-pristine-upstream`) runs that suite unchanged
-against published React `vaul@1.1.2` via `tests/upstream-original.test.ts`.
-Adapted Vitest / real-browser lanes remain the Octane-side executable evidence
-in `audit/react-parity.json`. Port-authored test classifications live in
-`audit/test-classifications.json`.
+against published React `vaul@1.1.2` through the shared lockfile-backed
+Playwright runner. Adapted Vitest / real-browser lanes remain the Octane-side
+executable evidence in `audit/react-parity.json`. Port-authored test
+classifications live in `audit/test-classifications.json`.
 
 | Upstream artifact | Disposition |
 | --- | --- |
@@ -47,7 +47,6 @@ in `audit/react-parity.json`. Port-authored test classifications live in
 
 | File | Classification | Pairing |
 | --- | --- | --- |
-| `tests/upstream-original.test.ts` | unmodified-upstream-suite-wrapper | runs vendored Playwright suite against published `vaul@1.1.2` |
 | `tests/drawer.test.ts` | adapted upstream | cites `upstream/test/tests/base.spec.ts` open/close cases |
 | `tests/differential/react-oracle.test.ts` | React/Octane differential | same open-drawer scenario against published `vaul@1.1.2` on React and `@octanejs/vaul`; also cites `base.spec.ts:10`; owned by `vaul-differential` |
 | `tests/exports.test.ts` | Octane-only framework contract | root/`Drawer` export keys match pinned `vaul@1.1.2`; ordinary `vaul` shard only — not react-parity ownership |
@@ -61,7 +60,7 @@ in `audit/react-parity.json`. Port-authored test classifications live in
 
 | Lane id | Kind | Project | Notes |
 | --- | --- | --- | --- |
-| `vaul-pristine-upstream` | pristine-upstream | `vaul-pristine` | vendored Playwright suite vs published React Vaul |
+| `vaul-pristine-upstream` | pristine-upstream | `vaul-pristine-playwright` | vendored Playwright suite vs published React Vaul |
 | `vaul-pristine-types` | pristine-types (optional) | `vaul-pristine-types` | package-conformance `tsc` probes; not required evidence |
 | `vaul-adapted-types` | adapted-types (optional) | `vaul-types` | package-conformance `tsrx-tsc` probes; not required evidence |
 | `vaul-adapted-full-suite` | adapted-octane | `vaul` | adapted drawer inventory + structural crosswalk (`testExecution.include` mixed ownership) |

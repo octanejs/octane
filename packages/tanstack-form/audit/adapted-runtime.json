@@ -1,9 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "tanstack-form",
-  "roots": [
-    "packages/tanstack-form/tests/conformance"
-  ],
+  "roots": ["packages/tanstack-form/tests/conformance"],
   "files": [
     "packages/tanstack-form/tests/conformance/createFormHook.test.ts",
     "packages/tanstack-form/tests/conformance/useField.test.ts",

@@ -23,6 +23,7 @@ const REGISTRY_ENTRY_KEYS = new Set([
 	'server',
 	'target',
 	'text',
+	'threadFunctionsModule',
 	'validation',
 ]);
 const BOUNDARY_ENTRY_KEYS = new Set(['childRenderer', 'ownerRenderer', 'prop', 'server']);
@@ -189,6 +190,7 @@ function normalizeRegistryEntry(id, value, path) {
 	let text;
 	let capabilities;
 	let firstScreenEvents;
+	let threadFunctionsModule;
 	let validation;
 	if (typeof value === 'string') {
 		moduleId = validateModuleId(value, path);
@@ -225,6 +227,12 @@ function normalizeRegistryEntry(id, value, path) {
 		if (value.intrinsics !== undefined) {
 			intrinsics = validateModuleId(value.intrinsics, `${path}.intrinsics`);
 		}
+		if (value.threadFunctionsModule !== undefined) {
+			threadFunctionsModule = validateModuleId(
+				value.threadFunctionsModule,
+				`${path}.threadFunctionsModule`,
+			);
+		}
 
 		text = value.text ?? (target === 'dom' ? 'host' : 'reject');
 		if (text !== 'reject' && text !== 'ignore' && text !== 'host') {
@@ -250,6 +258,7 @@ function normalizeRegistryEntry(id, value, path) {
 			text !== 'host' ||
 			capabilities.length !== 0 ||
 			firstScreenEvents !== undefined ||
+			threadFunctionsModule !== undefined ||
 			validation !== undefined
 		) {
 			throw configError(
@@ -268,6 +277,7 @@ function normalizeRegistryEntry(id, value, path) {
 		text,
 		capabilities,
 		...(firstScreenEvents === undefined ? {} : { firstScreenEvents }),
+		...(threadFunctionsModule === undefined ? {} : { threadFunctionsModule }),
 		...(validation === undefined ? {} : { validation }),
 	});
 }
@@ -610,7 +620,17 @@ export function normalizeRendererConfig(input = {}) {
 		registry: entries.map(
 			([
 				id,
-				{ module, target, server, intrinsics, text, capabilities, firstScreenEvents, validation },
+				{
+					module,
+					target,
+					server,
+					intrinsics,
+					text,
+					capabilities,
+					firstScreenEvents,
+					threadFunctionsModule,
+					validation,
+				},
 			]) => [
 				id,
 				module,
@@ -620,6 +640,7 @@ export function normalizeRendererConfig(input = {}) {
 				text,
 				capabilities,
 				firstScreenEvents ?? null,
+				threadFunctionsModule ?? null,
 				validation ?? null,
 			],
 		),

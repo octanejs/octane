@@ -1,2 +1,5 @@
 .pristine-upstream-*
 .vite-cache/
+!dist/
+!dist/Page/
+!dist/Page/*.css

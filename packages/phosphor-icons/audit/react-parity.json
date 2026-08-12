@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "47137830d3f76e5a87be45044717ec5360f2f11880e3f8a8de83cb9b1d01db28"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -56,7 +56,7 @@
         {
           "path": "packages/phosphor-icons/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "87f8eebd7ffac78941b430358cd918c9534ab70bd0ea311ddfa028c21085f174",
+          "sha256": "f7fe458a90a0671f5dde0ca6d9f9efc03a5154acf7b6691d6acad01197d5b2d5",
           "cases": [
             {
               "id": "differential:camera-svg",
@@ -68,22 +68,22 @@
         {
           "path": "packages/phosphor-icons/tests/_fixtures/parity.tsrx",
           "role": "support",
-          "sha256": "0e554c695d1148e5b672e7063863295f9de34d6a035b56226c60b89c0de1d54d"
+          "sha256": "bc1ae966c15bc002cf281d3e19a02bd07337040fe790c7b0747e1496b2beb8e9"
         },
         {
           "path": "packages/phosphor-icons/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "e9e9273cf6a61879d4c7b4c2805435c359c6d988b4708aca8be01af67d40f47a"
+          "sha256": "228c105f2b3781308f964c3395cae260be91b3a1c40962480b7cd2da8e359460"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "334a31e474d42c6721720e4776975e1a25b31871675eb020dffaf3653f429bd5"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     }

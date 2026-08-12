@@ -1,5 +1,5 @@
 import { useMemo } from 'octane';
-import { getSlot, subSlot } from '../internal';
+import { getSlot, subSlot } from '../internal.js';
 
 export function useMemoizedObject<Type extends object>(
 	unstableObject: Type,

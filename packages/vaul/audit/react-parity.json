@@ -16,26 +16,17 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/vaul/src"
-      ],
-      "include": [
-        "\\.(?:ts|tsrx)$"
-      ],
+      "roots": ["packages/vaul/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/vaul/tests"
-      ],
-      "include": [
-        "\\.test\\.ts$"
-      ],
+      "roots": ["packages/vaul/tests"],
+      "include": ["\\.test\\.ts$"],
       "exclude": [
         "packages/vaul/tests/ssr/",
         "packages/vaul/tests/browser-conformance/",
-        "packages/vaul/tests/exports\\.test\\.ts$",
-        "packages/vaul/tests/upstream-original\\.test\\.ts$"
+        "packages/vaul/tests/exports\\.test\\.ts$"
       ]
     }
   },
@@ -52,7 +43,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "5a82aa7422a7daa5e3d8f887cd3201bf9e6a5c705d6efe6bb73459fb4728da1b"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -61,38 +52,35 @@
       "type": "pristine-upstream",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "vaul-pristine",
+      "project": "vaul-pristine-playwright",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs the byte-exact vendored vaul@1.1.2 Playwright suite (Next demo app + specs) against published React vaul@1.1.2 and checks every passed identity against the committed inventory.",
+      "notes": "Runs the byte-exact vendored vaul@1.1.2 Playwright specs and Next demo app through the shared lockfile-backed browser runner using the upstream Pixel and iPhone emulation profiles. The iPhone profile retains its viewport, touch, mobile, and user-agent settings but is not WebKit evidence.",
       "execution": {
-        "kind": "vitest-full",
-        "inventory": "packages/vaul/audit/pristine-wrapper-runtime.json"
+        "kind": "playwright-full",
+        "config": "packages/vaul/scripts/pristine-playwright.json",
+        "root": "packages/vaul/upstream",
+        "inventory": "packages/vaul/audit/pristine-runtime.json"
       },
       "files": [
         {
-          "path": "packages/vaul/audit/pristine-wrapper-runtime.json",
+          "path": "scripts/react-parity/fixtures/vaul/package.json",
           "role": "support",
-          "sha256": "ddef24df2b2a74eb3ebc2808bb1a3230ec7d8608d9f8aa94b71f9bd8f20a5b96"
+          "sha256": "0b4d5af6ee4ba979847c411a6fa62cc60155794cfa9dea1da765892dacc742fe"
         },
         {
           "path": "packages/vaul/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "76f890356727d99202b0bd4ffec9e9ca74234d6c28a35d499be9704da61e9eaf"
+          "sha256": "134151f49a62bdd60ab58ec4d4d7a9e8bbfeec78f16ec5f355f44187aec933b8"
         },
         {
-          "path": "packages/vaul/tests/upstream-original.test.ts",
+          "path": "packages/vaul/scripts/pristine-playwright.json",
           "role": "support",
-          "sha256": "21e31723b05cab7a8f285e49e302b820851819889e9a16dfdab3e53048145160"
+          "sha256": "5440303a4399290c27db8af637cb93c425ab8b1cc36b4d1c0e4a2bac22f7b4f9"
         },
         {
-          "path": "scripts/react-parity/vaul-pristine-runtime.mjs",
+          "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "1937462c0414c6725925858885c6cb4814286607701d4e5b39c2b942902f064e"
-        },
-        {
-          "path": "packages/vaul/scripts/run-pristine-upstream.mjs",
-          "role": "support",
-          "sha256": "3de1bf0a2eb2394f52d894908996af40fe419c122b408a7ef0a1ef6e17732d1e"
+          "sha256": "75cb27835a432945b7eaa5730b34dc55d18c7aa190373d80743d6e917356b493"
         },
         {
           "path": "packages/vaul/scripts/verify-upstream.mjs",
@@ -203,7 +191,7 @@
         {
           "path": "packages/vaul/audit/adapted-runtime-crosswalk.json",
           "role": "support",
-          "sha256": "5dab04a7552b8de7da6d9a290618ef84f7cd2ea0162a8feb3a9355dee8450287"
+          "sha256": "79aafa3a24a4e391c36a27f257883dc40ee1c0832aeeea310eae87ea171f6c8b"
         },
         {
           "path": "scripts/react-parity/vaul-runtime-inventory.mjs",
@@ -213,7 +201,7 @@
         {
           "path": "scripts/react-parity/vaul-runtime-lib.mjs",
           "role": "support",
-          "sha256": "cf7a872acb9ce5ad25cd85926dbc9ed553daefa5bb3ae521a90ab82ec30b94a3"
+          "sha256": "af996cc31b548bbf85b090e3a52015c91b98f0170bd0d10faee78daa4841e84f"
         },
         {
           "path": "packages/vaul/upstream/SHA256SUMS",
@@ -280,7 +268,7 @@
         {
           "path": "packages/vaul/audit/adapted-runtime-crosswalk.json",
           "role": "support",
-          "sha256": "5dab04a7552b8de7da6d9a290618ef84f7cd2ea0162a8feb3a9355dee8450287"
+          "sha256": "79aafa3a24a4e391c36a27f257883dc40ee1c0832aeeea310eae87ea171f6c8b"
         },
         {
           "path": "scripts/react-parity/vaul-runtime-inventory.mjs",
@@ -290,7 +278,7 @@
         {
           "path": "scripts/react-parity/vaul-runtime-lib.mjs",
           "role": "support",
-          "sha256": "cf7a872acb9ce5ad25cd85926dbc9ed553daefa5bb3ae521a90ab82ec30b94a3"
+          "sha256": "af996cc31b548bbf85b090e3a52015c91b98f0170bd0d10faee78daa4841e84f"
         },
         {
           "path": "packages/vaul/tests/browser/harness/main.tsrx",

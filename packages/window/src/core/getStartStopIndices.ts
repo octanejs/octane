@@ -1,4 +1,4 @@
-import type { CachedBounds } from './types';
+import type { CachedBounds } from './types.js';
 
 export function getStartStopIndices({
 	cachedBounds,

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { shallowCompare } from './shallowCompare';
+import { shallowCompare } from './shallowCompare.js';
 
 // Custom comparison function for React.memo()
 // It knows to compare individual style props and ignore the wrapper object.

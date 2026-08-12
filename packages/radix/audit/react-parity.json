@@ -17,22 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/radix/src"
-      ],
-      "include": [
-        "\\.ts$"
-      ],
+      "roots": ["packages/radix/src"],
+      "include": ["\\.ts$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/radix/tests/differential",
-        "packages/radix/tests/parity"
-      ],
-      "include": [
-        "\\.test\\.ts$"
-      ],
+      "roots": ["packages/radix/tests/differential", "packages/radix/tests/parity"],
+      "include": ["\\.test\\.ts$"],
       "exclude": []
     }
   },
@@ -49,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "7197f3e0d5509ad99f0f18b45536bfb3fca68c958f9d8c11010732d7c727a324"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -65,7 +56,7 @@
         {
           "path": "packages/radix/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "eca6b7710c3e3f48764e923c8f9e99239a320ac64482ffa447223aaabdedfdd6",
+          "sha256": "b623bd1cf4c56db1221ef2b6ad411df152ff7c8a3c0b0bd015e0b8bcec53ec65",
           "cases": [
             {
               "id": "differential:radix-separator",
@@ -79,8 +70,8 @@
             },
             {
               "id": "differential:radix-collapsible",
-              "testName": "Collapsible: closed \u2192 open \u2192 closed, byte-identical",
-              "fullName": "differential: @octanejs/radix vs real Radix on React Collapsible: closed \u2192 open \u2192 closed, byte-identical"
+              "testName": "Collapsible: closed → open → closed, byte-identical",
+              "fullName": "differential: @octanejs/radix vs real Radix on React Collapsible: closed → open → closed, byte-identical"
             },
             {
               "id": "differential:radix-accordion-single",
@@ -162,7 +153,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "packages/radix/upstream/SHA256SUMS",
@@ -172,7 +163,7 @@
         {
           "path": "packages/radix/audit/test-classifications.json",
           "role": "support",
-          "sha256": "fd2595b3045800bf93141f4413e39ebfb33da6eda6dd7d0baf4b27bd404ba64b"
+          "sha256": "37faf19b7f2b0a2ce8c018c312cb8781d109b479d950331bdddc9f47268b4087"
         },
         {
           "path": "packages/radix/scripts/check-upstream-ledger.mjs",
@@ -182,12 +173,12 @@
         {
           "path": "scripts/react-parity/radix-controls.test.mjs",
           "role": "support",
-          "sha256": "1d9ad6bf9ae797e65d3e40dec76d6a51dee179a8b6261ea16d10cdc931e56540"
+          "sha256": "65cec90ff245cea505255343ca7c4eaa83c62a16c1ee938877c74fa646357b60"
         },
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "5c4149679742eefb3b811fabd1a24668fed7ba65ab2a5d2a3bd8aae209a47e61"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         },
         {
           "path": "packages/radix/audit/export-crosswalk.json",
@@ -203,7 +194,7 @@
       "environment": "workspace-node",
       "project": "radix-parity-audit",
       "evidenceOrigin": "repo-authored",
-      "notes": "Repo-authored ledger/adaptation contracts for the vendored boundary and structured renderer adaptations. Not adapted upstream-suite runtime evidence and not same-fixture React/Octane differentials; kept out of testExecution.group react-parity.",
+      "notes": "Repo-authored ledger/adaptation contracts for the vendored boundary and structured renderer adaptations. Not adapted upstream-suite runtime evidence or same-fixture React/Octane differentials; executed under the shared react-parity ownership group.",
       "files": [
         {
           "path": "packages/radix/tests/parity/contracts.test.ts",
@@ -306,9 +297,7 @@
   "divergences": [
     {
       "id": "slot-descriptor-adaptation",
-      "caseIds": [
-        "adapted:radix-slot-descriptors"
-      ],
+      "caseIds": ["adapted:radix-slot-descriptors"],
       "upstreamResult": "Radix Slot and asChild accept a React element supplied as children-position JSX.",
       "octaneResult": "Octane Slot and asChild consume an element descriptor supplied at a value or prop position.",
       "rationale": "Children-position JSX compiles to an Octane render function rather than a cloneable element descriptor.",
@@ -320,9 +309,7 @@
     },
     {
       "id": "ref-as-prop",
-      "caseIds": [
-        "adapted:radix-ref-as-prop"
-      ],
+      "caseIds": ["adapted:radix-ref-as-prop"],
       "upstreamResult": "React primitive components use forwardRef wrappers.",
       "octaneResult": "Octane primitive components receive ref as an ordinary prop.",
       "rationale": "Octane does not require React forwardRef wrapper semantics.",

@@ -1,3 +1,5 @@
+import { hasOwnProp } from './has-own.js';
+
 const OCTANE_COMPONENT_FLAGS: unique symbol = Symbol.for('octane.flags.component') as any;
 
 type FlaggedComponent = {
@@ -22,7 +24,7 @@ export function markComponentFlags<T extends Function>(
 export function hasComponentFlags(component: unknown, flags: number): boolean {
 	return (
 		typeof component === 'function' &&
-		Object.hasOwn(component, OCTANE_COMPONENT_FLAGS) &&
+		hasOwnProp.call(component, OCTANE_COMPONENT_FLAGS) &&
 		((component as FlaggedComponent)[OCTANE_COMPONENT_FLAGS]! & flags) === flags
 	);
 }

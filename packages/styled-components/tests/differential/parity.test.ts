@@ -19,13 +19,23 @@
  */
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
-import { mountStyledDifferential } from './_styled-rig.js';
+import { mountStyledDifferential, preloadStyledDifferentialFixture } from './_styled-rig.js';
 
 const CACHE = resolve(__dirname, '.react-cache');
 
 function fixture(name: string): string {
 	return resolve(__dirname, `../_fixtures/${name}.tsrx`);
 }
+
+// Keep fixture pairs sequential: each styled-components runtime assigns component IDs
+// from module-global counters, so concurrent fixture evaluation can change their order.
+// The Octane and React imports within each pair still preload concurrently.
+await preloadStyledDifferentialFixture(fixture('basic-smoke'), CACHE);
+await preloadStyledDifferentialFixture(fixture('themed-card'), CACHE);
+await preloadStyledDifferentialFixture(fixture('attrs-input'), CACHE);
+await preloadStyledDifferentialFixture(fixture('as-polymorph'), CACHE);
+await preloadStyledDifferentialFixture(fixture('global-keyframes'), CACHE);
+await preloadStyledDifferentialFixture(fixture('compose'), CACHE);
 
 describe('differential: @octanejs/styled-components vs styled-components', function () {
 	// @parity-case differential:styled-components-basic

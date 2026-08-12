@@ -105,6 +105,10 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'Alien Signals',
 				Component: AlienSignalsDemo,
 				source: alienSignalsSource,
+			},
+		],
+	},
+	{
 		id: 'games',
 		label: 'Games',
 		demos: [
@@ -134,6 +138,8 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'react-markdown',
 				Component: ReactMarkdownDemo,
 				source: reactMarkdownSource,
+			},
+			{
 				id: 'react-draggable',
 				title: 'React Draggable',
 				Component: ReactDraggableDemo,
@@ -186,6 +192,8 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'React Spring',
 				Component: ReactSpringDemo,
 				source: reactSpringSource,
+			},
+			{
 				id: 'input-otp',
 				title: 'Input OTP',
 				Component: InputOTPDemo,
@@ -214,10 +222,6 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'Intersection Observer',
 				Component: IntersectionObserverDemo,
 				source: intersectionObserverSource,
-				id: 'drei',
-				title: 'Drei',
-				Component: DreiDemo,
-				source: dreiSource,
 			},
 			{
 				id: 'cmdk',
@@ -314,18 +318,26 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'React Textarea Autosize',
 				Component: ReactTextareaAutosizeDemo,
 				source: reactTextareaAutosizeSource,
+			},
+			{
 				id: 'react-syntax-highlighter',
 				title: 'React Syntax Highlighter',
 				Component: ReactSyntaxHighlighterDemo,
 				source: reactSyntaxHighlighterSource,
+			},
+			{
 				id: 'react-colorful',
 				title: 'Color picker',
 				Component: ReactColorfulDemo,
 				source: reactColorfulSource,
+			},
+			{
 				id: 'popper',
 				title: 'Popper',
 				Component: PopperDemo,
 				source: popperSource,
+			},
+			{
 				id: 'pdf',
 				title: 'React PDF',
 				Component: PdfDemo,

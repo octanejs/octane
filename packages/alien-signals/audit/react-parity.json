@@ -17,21 +17,13 @@
   },
   "adaptedRoots": {
     "source": {
-      "roots": [
-        "packages/alien-signals/src"
-      ],
-      "include": [
-        "\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"
-      ],
+      "roots": ["packages/alien-signals/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     },
     "tests": {
-      "roots": [
-        "packages/alien-signals/tests"
-      ],
-      "include": [
-        "upstream-adapted\\.test\\.ts$"
-      ],
+      "roots": ["packages/alien-signals/tests"],
+      "include": ["upstream-adapted\\.test\\.ts$"],
       "exclude": []
     }
   },
@@ -48,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "72fe2aa352eb5cfe72c719bd081222b89695facafdd1fe46b6d2ad94ae2dab68"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -68,12 +60,12 @@
         {
           "path": "packages/alien-signals/audit/pristine-wrapper-runtime.json",
           "role": "support",
-          "sha256": "0817100f90425e1f94a410a57c7a8af6963688a8fe2d7d50dc306e8c761643a2"
+          "sha256": "c0b9b567ca1c007b97833304ab21c728dfe225b29ae3564362f93948fbbfce48"
         },
         {
           "path": "packages/alien-signals/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "a982cee9399860cd85d58167f2ba8709b5bc5b55f9160e774915d8708eaf47f3"
+          "sha256": "357c847b911ac0e967f3bd2fd1fa24d04bb38827b8c49cba00f684da524ef51a"
         },
         {
           "path": "packages/alien-signals/tests/upstream-original.test.ts",
@@ -123,7 +115,7 @@
         {
           "path": "packages/alien-signals/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "82fc24dae9f73a5a5b969082877072959beea6bf3648815775f1b697ff1fba48"
+          "sha256": "7ff8ffffada071328a7741bcc12d03380a384ba42f7053f2b2276f526cfc0174"
         },
         {
           "path": "scripts/react-parity/alien-signals-runtime-inventory.mjs",
@@ -133,7 +125,7 @@
         {
           "path": "scripts/react-parity/alien-signals-runtime-lib.mjs",
           "role": "support",
-          "sha256": "6aa3053c9197c602c58b2e5541dc18c9320dec319cf84d3be4cff59a25909b7c"
+          "sha256": "add1e9bdffb4850a6836b76916b5d7f5efee7f6ad931ae09a98fa1a353761328"
         },
         {
           "path": "scripts/react-parity/alien-signals-types-lib.mjs",
@@ -143,7 +135,7 @@
         {
           "path": "packages/alien-signals/audit/runtime-transformation-ledger.json",
           "role": "support",
-          "sha256": "244e28d6bc0872773329c4e268c662c0a1cd0b2a10981e43274d4c6d4896bde8"
+          "sha256": "b670c3002599d9c302254ab209182c38e297d9124368bb14117334b20ece7d94"
         },
         {
           "path": "packages/alien-signals/audit/test-classifications.json",
@@ -179,7 +171,7 @@
         {
           "path": "packages/alien-signals/audit/pristine-types.json",
           "role": "test",
-          "sha256": "6a656f52b4d7f0061e1fe37f5c9fe416d9ac9ab99c59c65ce42ab5e1ed8abdd5",
+          "sha256": "ba1515a38124418ba57c8d0ebd8bfd902a62e0b3f6db33f812baa184a06b8550",
           "cases": [
             {
               "id": "types:alien-signals-pristine",
@@ -270,7 +262,7 @@
         {
           "path": "packages/alien-signals/audit/adapted-types.json",
           "role": "test",
-          "sha256": "0309f404189fc7d460337cc22a01e6ea784f5929f9d25490d437bdc29ac554e9",
+          "sha256": "f4aa0aaaa669e6160019641dd857e9cce8c50c8aa97e8c952adb72516965242a",
           "cases": [
             {
               "id": "types:alien-signals-adapted",
@@ -305,9 +297,7 @@
   "divergences": [
     {
       "id": "alien-signals-readable-computed",
-      "caseIds": [
-        "types:alien-signals-adapted"
-      ],
+      "caseIds": ["types:alien-signals-adapted"],
       "upstreamResult": "Pinned react-alien-signals declarations narrow useSignalValue to WritableSignal, so readable computed probes are rejected.",
       "octaneResult": "useSignalValue accepts ReadableSignal, including createComputed results, matching the documented Octane surface.",
       "rationale": "Upstream docs and runtime treat computed signals as readable; the published React declaration is narrower than that contract. Octane corrects the accept surface without weakening the read-only computed negative control.",
@@ -319,9 +309,7 @@
     },
     {
       "id": "alien-signals-use-signal-scope",
-      "caseIds": [
-        "runtime:5189801c40af28d9"
-      ],
+      "caseIds": ["runtime:5189801c40af28d9"],
       "upstreamResult": "useSignalScope starts createSignalScope during React render via useMemo and returns that stop handle; pre-commit cancellation is not modeled.",
       "octaneResult": "useSignalScope allocates a cancellation-safe controller during render, starts the scope after client commit via useEffect, and returns a stop that can cancel before commit.",
       "rationale": "Octane forbids render-phase effects. Deferring scope start to commit preserves SSR/hydration safety and makes pre-commit stop a no-op instead of racing a render-created scope.",

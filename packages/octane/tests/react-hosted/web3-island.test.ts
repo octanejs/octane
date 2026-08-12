@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { OctaneCompat } from 'octane/react';
@@ -62,6 +62,27 @@ function ReactWeb3Host(props: {
 		),
 	);
 }
+
+const web3HydrationProps = {
+	label: 'Hydrated wallet controls',
+	observationId: 'web3-hydration',
+	rejectFirstConnection: false,
+} as const;
+
+let web3ServerHtml: string;
+
+// Preparing the server HTML boots Vite and compiles the RainbowKit/Wagmi SSR
+// graph. Give that deterministic integration setup Vitest's separate hook
+// deadline; the hydration, identity, interaction, and teardown assertions below
+// retain the default 5-second test deadline.
+beforeAll(async () => {
+	web3ServerHtml = await executeHydrationFixture<string>(
+		'rainbowkit',
+		'packages/octane/tests/react-hosted/_fixtures/web3-react-server.ts',
+		'renderWeb3ReactPage',
+		{ ...web3HydrationProps, route: 'portfolio' },
+	);
+});
 
 afterEach(async () => {
 	consoleErrorSpy?.mockRestore();
@@ -181,20 +202,10 @@ describe('incremental React adoption — Wagmi and RainbowKit island', () => {
 	});
 
 	it('server-renders and hydrates the Web3 island without replacing its markup', async () => {
-		const id = observe('web3-hydration');
-		const props = {
-			label: 'Hydrated wallet controls',
-			observationId: id,
-			rejectFirstConnection: false,
-		};
-		const serverHtml = await executeHydrationFixture<string>(
-			'rainbowkit',
-			'packages/octane/tests/react-hosted/_fixtures/web3-react-server.ts',
-			'renderWeb3ReactPage',
-			{ ...props, route: 'portfolio' },
-		);
+		const id = observe(web3HydrationProps.observationId);
+		const props = web3HydrationProps;
 		const container = (hydrationContainer = document.createElement('div'));
-		container.innerHTML = serverHtml;
+		container.innerHTML = web3ServerHtml;
 		document.body.appendChild(container);
 		const serverHost = container.querySelector('[data-octane-compat]') as HTMLElement;
 		const serverConnectButton = serverHost.querySelector('.rk-connect-button');

@@ -5,6 +5,7 @@ const { dirname, resolve } = require('node:path');
 const requireFromPackage = createRequire(`${__dirname}/../package.json`);
 const reactRoot = dirname(requireFromPackage.resolve('react18/package.json'));
 const reactDomRoot = dirname(requireFromPackage.resolve('react-dom18/package.json'));
+const testingLibraryHarness = resolve(__dirname, 'upstream-testing-library.cjs');
 
 module.exports = {
 	testRegex: '-test\\.js$',
@@ -23,8 +24,9 @@ module.exports = {
 		'^react-dom/test-utils$': `${reactDomRoot}/test-utils.js`,
 		// Upstream utils re-export the full package; after jest.resetModules the
 		// non-pure entry tries to register afterAll inside beforeEach. Pure has
-		// the same render/act surface without suite-level hooks.
-		'^@testing-library/react$': requireFromPackage.resolve('@testing-library/react/pure'),
+		// the same render/act surface without suite-level hooks. The harness keeps
+		// the upstream suite's immediate-transition assertion deterministic.
+		'^@testing-library/react(?:/pure)?$': testingLibraryHarness,
 	},
 	transform: {
 		'^.+\\.jsx?$': resolve(__dirname, 'upstream-jest-transform.cjs'),

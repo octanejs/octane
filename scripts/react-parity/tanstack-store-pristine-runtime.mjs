@@ -9,7 +9,10 @@ import { fileURLToPath } from 'node:url';
 import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
 import { verifyTanstackStoreUpstream } from '../../packages/tanstack-store/scripts/verify-upstream.mjs';
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../packages/tanstack-store');
+const packageRoot = resolve(
+	dirname(fileURLToPath(import.meta.url)),
+	'../../packages/tanstack-store',
+);
 const upstreamRoot = join(packageRoot, 'upstream');
 
 export function pristineTestIdentities(report, repoRoot = resolve(packageRoot, '../..')) {

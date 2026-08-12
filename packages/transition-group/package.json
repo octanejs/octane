@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/transition-group",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "license": "BSD-3-Clause",
   "type": "module",
   "sideEffects": false,
@@ -68,6 +68,7 @@
     "dom-helpers": "^5.2.1",
     "jest": "30.4.2",
     "jest-environment-jsdom": "30.4.1",
+    "jest-environment-node": "30.4.1",
     "octane": "workspace:*",
     "prop-types": "^15.8.1",
     "react": "catalog:default",

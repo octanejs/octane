@@ -1,6 +1,6 @@
 import { useRef } from 'octane';
-import { getPublicArgument, getSlot, subSlot } from '../../internal';
-import type { GridImperativeAPI } from './types';
+import { getPublicArgument, getSlot, subSlot } from '../../internal.js';
+import type { GridImperativeAPI } from './types.js';
 
 /**
  * Convenience hook to return a properly typed ref for the Grid component.

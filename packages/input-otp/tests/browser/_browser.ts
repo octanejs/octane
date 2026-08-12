@@ -1,6 +1,7 @@
 import { createServer as createNetServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Locator } from 'playwright';
 import { afterAll, afterEach, beforeAll, beforeEach, expect } from 'vitest';
 import { createServer, type ViteDevServer } from 'vite';
 import { octane } from '../../../octane/src/compiler/vite.js';
@@ -19,6 +20,31 @@ export let page: import('playwright').Page;
 export async function goto(path: string): Promise<void> {
 	await page.goto(`${origin}${path}`, { waitUntil: 'networkidle' });
 	await page.locator('[data-ready="true"]').waitFor({ state: 'attached', timeout: 5_000 });
+}
+
+export async function expectSelection(
+	input: Locator,
+	expected: readonly [number, number],
+): Promise<void> {
+	const activeSlots =
+		expected[0] === expected[1]
+			? [expected[0]]
+			: Array.from({ length: expected[1] - expected[0] }, (_, index) => expected[0] + index);
+	await expect
+		.poll(async () => {
+			const [selection, renderedActiveSlots] = await Promise.all([
+				input.evaluate((node) => [node.selectionStart, node.selectionEnd]),
+				page
+					.locator('[data-testid^="slot-"]')
+					.evaluateAll((slots) =>
+						slots.flatMap((slot, index) =>
+							slot.getAttribute('data-test-is-active') === 'true' ? [index] : [],
+						),
+					),
+			]);
+			return [...selection, renderedActiveSlots];
+		})
+		.toEqual([...expected, activeSlots]);
 }
 
 function getFreePort(): Promise<number> {

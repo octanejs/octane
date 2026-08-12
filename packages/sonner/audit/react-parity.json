@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "47137830d3f76e5a87be45044717ec5360f2f11880e3f8a8de83cb9b1d01db28"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -51,7 +51,7 @@
       "environment": "workspace-node",
       "project": "sonner-pristine",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs the vendored Playwright suite unchanged against published sonner@2.0.7 (chromium project) via the generic playwright-full runner.",
+      "notes": "Runs the vendored Playwright suite unchanged against published sonner@2.0.7 through the shared lockfile-backed Vite runner. The demo's untested server-action import is replaced with a local stub.",
       "execution": {
         "kind": "playwright-full",
         "config": "packages/sonner/scripts/pristine-playwright.json",
@@ -60,6 +60,11 @@
       },
       "files": [
         {
+          "path": "scripts/react-parity/fixtures/sonner/package.json",
+          "role": "support",
+          "sha256": "5db693cfaef13fa4fc6191fa2d25936a97cd1abfe960a8f4f6556bfa2131c44b"
+        },
+        {
           "path": "packages/sonner/audit/pristine-runtime.json",
           "role": "support",
           "sha256": "ab64849f62fdc1a07136b600e04c204cacf3e4acbcbb45074a1ff461d3048bff"
@@ -67,12 +72,12 @@
         {
           "path": "packages/sonner/scripts/pristine-playwright.json",
           "role": "support",
-          "sha256": "77197e0b45c37c5c543612d7a48d5feb9f500e7561d6b0fceb3e9c3e94ac4724"
+          "sha256": "e36bb0a8d04e746daf2b97b7146f79caa7eccba827c91ab8756cf1e220bbd840"
         },
         {
           "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "680661aba23652cd276867bdef6a1abd89ff32772d81c20f23efe7b3e7374227"
+          "sha256": "75cb27835a432945b7eaa5730b34dc55d18c7aa190373d80743d6e917356b493"
         },
         {
           "path": "packages/sonner/upstream/playwright.config.ts",
@@ -83,6 +88,11 @@
           "path": "packages/sonner/upstream/test/tests/basic.spec.ts",
           "role": "support",
           "sha256": "76d2900a8a42c7b6b364bf5272b32537da5f1f68f9153de4b632f82cffe1e7ee"
+        },
+        {
+          "path": "packages/sonner/upstream/test/src/app/page.tsx",
+          "role": "support",
+          "sha256": "abbecf9ffbfe58d722bdd9cc9fe713114422975a0103fb00749afa531159bc4c"
         }
       ]
     },
@@ -98,7 +108,7 @@
         {
           "path": "packages/sonner/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "e336b7de15920066f95c7368c6eba7faceb8c6e75072b30b358b97843c4b9439",
+          "sha256": "beeca6185868a7b5e0ddd6ad10c5a513f791f63481b39d31da34c9d10bb5bc23",
           "cases": [
             {
               "id": "differential:sonner-toast-lifecycle",
@@ -125,12 +135,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "334a31e474d42c6721720e4776975e1a25b31871675eb020dffaf3653f429bd5"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     }
