@@ -156,11 +156,6 @@
           "sha256": "64be7b0d341b89738a049520ac591831d548500496f1f32a43fe2df027a50eaa"
         },
         {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
-        },
-        {
           "path": "packages/cmdk/src/components/command.tsrx",
           "role": "support",
           "sha256": "7e77000d7d8a854a6bcb594d60435f25c3c20bdf34966e4c89c2fe0896b31c2b"

@@ -289,11 +289,6 @@
           "path": "packages/hook-form/tests/differential/_setup.ts",
           "role": "support",
           "sha256": "6b70dcb998d5bb012dbde1410301e9a8b99924f982900cfc116cab1792e49320"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
         }
       ]
     }

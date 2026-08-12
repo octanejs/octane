@@ -2640,9 +2640,27 @@ export default defineConfig({
 					name: 'three-browser',
 					include:
 						process.env.OCTANE_THREE_COMPAT_VERSION === undefined
-							? ['packages/three/tests/browser/**/*.test.ts']
+							? ['packages/three/tests/browser/xr.test.ts']
 							: [],
 					environment: 'jsdom',
+					globalSetup: ['packages/three/tests/_react-setup.ts'],
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+					server: { deps: { inline: ['@react-three/fiber'] } },
+				},
+				plugins: [octane({ renderers: THREE_RENDERERS })],
+				resolve: { alias: THREE_ALIASES, dedupe: ['react', 'react-dom', 'three'] },
+			},
+			{
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'three-browser-integration',
+					include: [
+						'packages/three/tests/browser/bundlers.test.ts',
+						'packages/three/tests/browser/canvas.test.ts',
+					],
+					environment: 'node',
 					globalSetup: ['packages/three/tests/_react-setup.ts'],
 					globals: false,
 					testTimeout: 60_000,
@@ -4927,7 +4945,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'react-parity' },
+				// Audit checks are ordinary package tests, not required parity evidence.
 				test: {
 					name: 'embla-carousel-audit',
 					include: ['packages/embla-carousel/tests/audit/**/*.test.ts'],
@@ -5274,34 +5292,6 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'react-parity' },
-				test: {
-					name: 'drei',
-					include: ['packages/drei/tests/**/*.test.ts'],
-					exclude: [
-						...configDefaults.exclude,
-						'packages/drei/tests/config.test.ts',
-						'packages/drei/tests/crosswalk-guard.test.ts',
-						'packages/drei/tests/react-parity-guard.test.ts',
-						'packages/drei/tests/differential/**/*.test.ts',
-					],
-					environment: 'jsdom',
-					globals: false,
-					server: { deps: { inline: ['@react-three/drei', '@react-three/fiber'] } },
-				},
-				plugins: [octane({ renderers: DREI_RENDERERS })],
-				resolve: {
-					alias: [
-						...THREE_ALIASES,
-						{
-							find: /^@octanejs\/drei$/,
-							replacement: resolve(import.meta.dirname, 'packages/drei/src/index.ts'),
-						},
-					],
-					dedupe: ['react', 'react-dom', 'three'],
-				},
-			},
-			{
 				// All paired React/Octane characterization (root suite + View canary). Octane-only
 				// contracts stay in drei-guards so differential ownership stays non-overlapping.
 				testExecution: { group: 'react-parity' },
@@ -5556,7 +5546,8 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'react-parity' },
+				// This lane remains optional while its provenance is unverified, so ordinary
+				// shards must retain it until the manifest promotes it to required evidence.
 				test: {
 					name: 'tanstack-query-differential',
 					include: ['packages/tanstack-query/tests/differential/**/*.test.ts'],

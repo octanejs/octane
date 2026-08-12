@@ -109,11 +109,6 @@
           "path": "scripts/react-parity/dnd-kit-controls.test.mjs",
           "role": "support",
           "sha256": "b336789448ebc47d2c2d5b8fcd643b1f0104b8c083b1e9ee1bab3068819b80ac"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
         }
       ]
     }

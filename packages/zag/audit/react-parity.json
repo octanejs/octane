@@ -196,11 +196,6 @@
           "path": "packages/zag/tests/_helpers.ts",
           "role": "support",
           "sha256": "c31c081a87ea93dc1bd951d371059f32a38246fdee8df7cc29e59f48080b79a5"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
         }
       ]
     },

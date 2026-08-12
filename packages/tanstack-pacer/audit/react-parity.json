@@ -71,11 +71,6 @@
           "path": "packages/tanstack-pacer/tests/_fixtures/pacer.tsrx",
           "role": "support",
           "sha256": "1b74a76b44d543b3b5bf2d0ab55732e1f2c8da63add69c4db0a2972846e99403"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
         }
       ]
     },
@@ -144,11 +139,6 @@
           "path": "scripts/react-parity/tanstack-pacer-controls.test.mjs",
           "role": "support",
           "sha256": "1ac38e344273a86774d7e8d1ffd765557b793b996b9a416a70738e0156293f62"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
         }
       ]
     },
