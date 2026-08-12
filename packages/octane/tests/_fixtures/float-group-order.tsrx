@@ -84,6 +84,18 @@ export function LocalHref(props) @{
 	</>
 }
 
+// A setup-local-dependent sheet FOLLOWED by a static one: registration order is
+// group order, so the static sheet must not jump ahead of the dynamic one on
+// either side.
+export function MixedLocalStatic(props) @{
+	const dyn = '/' + props.name + '-first.css';
+	<>
+		<link rel="stylesheet" href={dyn} precedence="alpha" />
+		<link rel="stylesheet" href="/second-static.css" precedence="beta" />
+		<div class="mixed">{'M'}</div>
+	</>
+}
+
 function Exploding(props) @{
 	const boom = () => {
 		throw new Error('mount failure');

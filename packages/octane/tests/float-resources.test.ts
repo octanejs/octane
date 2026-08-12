@@ -43,6 +43,7 @@ import {
 	LateArmAfterSibling,
 	NestedTryOrder,
 	LocalHref,
+	MixedLocalStatic,
 	FailingArm,
 } from './_fixtures/float-group-order.tsrx';
 
@@ -611,6 +612,21 @@ describe('Float resources — precedence group discovery order', () => {
 		// Client control: same component, same sheet.
 		await act(() => mountInto(LocalHref, { name: 'x' }));
 		expect(sheetHrefs()).toEqual(['/x-dep.css']);
+	});
+
+	it('mixed setup-local and static resources keep source order on both sides', async () => {
+		// Registration order is group order. A static sheet declared AFTER a
+		// setup-local-dependent one must not jump ahead of it on the server —
+		// SSR and a client mount have to agree on the cascade.
+		const App = () => Server.createElement(srvOrder.MixedLocalStatic, { name: 'x' }) as any;
+		const r = await Server.renderToString(App as any);
+		const dyn = r.html.indexOf('/x-first.css');
+		const stat = r.html.indexOf('/second-static.css');
+		expect(dyn).toBeGreaterThan(-1);
+		expect(stat).toBeGreaterThan(dyn);
+
+		await act(() => mountInto(MixedLocalStatic, { name: 'x' }));
+		expect(sheetHrefs()).toEqual(['/x-first.css', '/second-static.css']);
 	});
 
 	it('an arm that fails while rendering a child keeps its already-registered sheet', async () => {

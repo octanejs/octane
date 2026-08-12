@@ -9771,9 +9771,13 @@ function ssrCompileBodyWithMapTemps(
 	// is only evaluable when the statement reads nothing the body itself
 	// declares: an attr computed from a setup local would hit its TDZ there, so
 	// those statements run right after setup instead — still ahead of the
-	// return that renders children, preserving discovery order. (A `var` inside
-	// a nested setup block escapes this scan and keeps the historical front
-	// placement; head attrs read top-level setup locals in practice.)
+	// return that renders children, preserving discovery order. Registration
+	// order IS precedence-group order, so the split must never reorder the
+	// list: only the capture-free PREFIX leads; from the first capturing
+	// statement on, everything defers together, keeping the same relative
+	// order the client produces. (A `var` inside a nested setup block escapes
+	// this scan and keeps the historical front placement; head attrs read
+	// top-level setup locals in practice.)
 	const headStatements = emitHeadServer(headNodes, ctx);
 	let frontHead = headStatements;
 	let deferredHead = [];
@@ -9783,15 +9787,17 @@ function ssrCompileBodyWithMapTemps(
 		for (const s of inlinedSubs) collectStatementBindings(s, bodyBindings);
 		if (bodyBindings.size > 0) {
 			frontHead = [];
+			let deferring = false;
 			for (const stmt of headStatements) {
-				let captures = false;
-				for (const free of collectFreeIdentifiers(stmt, [])) {
-					if (bodyBindings.has(free)) {
-						captures = true;
-						break;
+				if (!deferring) {
+					for (const free of collectFreeIdentifiers(stmt, [])) {
+						if (bodyBindings.has(free)) {
+							deferring = true;
+							break;
+						}
 					}
 				}
-				(captures ? deferredHead : frontHead).push(stmt);
+				(deferring ? deferredHead : frontHead).push(stmt);
 			}
 		}
 	}
