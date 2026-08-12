@@ -440,7 +440,12 @@ describe('CI workflow aggregation', () => {
 		const manifestExecution = reactParityCheck.indexOf(
 			"await capture('required Vitest React parity lanes'",
 		);
+		const executionContract = reactParityCheck.indexOf(
+			"await capture('Vitest React parity execution contract'",
+		);
 		assert.notEqual(manifestValidation, -1);
+		assert.ok(executionContract > manifestValidation);
+		assert.ok(manifestExecution > executionContract);
 		assert.ok(manifestExecution > manifestValidation);
 		assert.match(reactParityCheck, /if \(!validateOnly && errors\.length === 0\)/);
 		assert.match(
@@ -470,7 +475,7 @@ describe('CI workflow aggregation', () => {
 		assert.doesNotMatch(executionBranch, /verifyManifestTestSelections/);
 	});
 
-	test('registers every Vitest-backed manifest lane as react-parity owned', () => {
+	test('registers every required Vitest-backed manifest lane as react-parity owned', () => {
 		const projects = new Map(
 			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
 		);
@@ -491,12 +496,12 @@ describe('CI workflow aggregation', () => {
 				assert.ok(lane.project, `${entry.name}/${lane.id}: missing Vitest project name`);
 				const project = projects.get(lane.project);
 				assert.ok(project, `${entry.name}/${lane.id}: unknown Vitest project ${lane.project}`);
-				assert.equal(
-					project.testExecution?.group,
-					'react-parity',
-					`${entry.name}/${lane.id}: ${lane.project} must be react-parity owned`,
-				);
 				if (lane.oracle === 'required' && lane.available !== false) {
+					assert.equal(
+						project.testExecution?.group,
+						'react-parity',
+						`${entry.name}/${lane.id}: ${lane.project} must be react-parity owned`,
+					);
 					requiredVitestProjects.push(lane.project);
 				}
 			}
@@ -629,6 +634,12 @@ describe('CI workflow aggregation', () => {
 			'packages/three/tests/browser',
 		]) {
 			assert.equal(discovered.includes(browserRoot), false);
+		}
+		for (const threeIntegration of [
+			'packages/three/tests/browser/bundlers.test.ts',
+			'packages/three/tests/browser/canvas.test.ts',
+		]) {
+			assert.ok(discovered.includes(threeIntegration));
 		}
 		const projects = new Map(
 			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),

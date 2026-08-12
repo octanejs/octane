@@ -110,6 +110,88 @@ For each Vitest-backed lane:
 - package-authored conformance or framework-contract tests that are not parity
   evidence must stay outside `testExecution.include`.
 
+Only required, available lanes can claim files. Optional or unavailable lanes
+do not justify removing a file from ordinary CI. Static validation discovers
+the files selected by every `react-parity` project and requires exact set
+equality:
+
+```text
+files claimed by required available lanes = files owned by testExecution
+```
+
+A claimed-but-unowned file can run in both CI paths. An owned-but-unclaimed file
+has no parity executor and disappears from ordinary CI. Both are validation
+failures, as are a missing live project, evidence excluded by the live project,
+stale sharded output, and a duplicate `(project, file, fullName)` claimed by two
+required lanes.
+
+### Execution proof chain
+
+A config hash is not parity evidence. It proves only that the config's bytes
+have not changed, and harmless edits invalidate it without proving selection or
+execution. Do not list `vitest.config.js` as a manifest support file.
+
+The executable contract uses each source for what it can authoritatively prove:
+
+| Claim | Authority |
+| --- | --- |
+| Inputs are unchanged | hashes for tests, fixtures, setup, inventories, and upstream records |
+| The lane selects real tests | the manifest plus the live Vitest project |
+| The parity job owns exactly those files | equality with `testExecution` ownership |
+| Ordinary CI keeps the complement | the derived `vitest.ci-sharded.config.js` project |
+| The declared observations ran once and passed | the runner's exact JSON identity multiset |
+
+Passing declared observations provides the behavioral evidence. The contract
+proves only those declared cases and full-suite inventories; it does not claim
+that every possible React behavior is covered.
+
+A full-suite lane gets its file and identity sets from the committed inventory,
+while the live project remains the runner configuration source:
+
+```json
+{
+  "id": "example-adapted-full-suite",
+  "project": "example",
+  "oracle": "required",
+  "execution": {
+    "kind": "vitest-full",
+    "inventory": "packages/example/audit/adapted-runtime.json"
+  }
+}
+```
+
+Direct TypeScript, Jest, Node, and Playwright lanes retain their declared
+runners. When a direct runner replaces a Vitest wrapper, list that wrapper as
+lane evidence and give the matching live project `react-parity` ownership. The
+static contract then removes the wrapper from ordinary shards without treating
+it as another Vitest execution:
+
+```js
+{
+	testExecution: { group: 'react-parity' },
+	test: {
+		name: 'example-pristine',
+		include: ['packages/example/tests/upstream-original.test.ts'],
+	},
+}
+```
+
+```json
+{
+  "id": "example-pristine-upstream",
+  "project": "example-pristine",
+  "oracle": "required",
+  "execution": { "kind": "jest-full", "config": "...", "root": "...", "inventory": "..." },
+  "files": [
+    {
+      "path": "packages/example/tests/upstream-original.test.ts",
+      "role": "support",
+      "sha256": "..."
+    }
+  ]
+}
+```
+
 A measured `vitest-full` lane may set `execution.fileParallelism`. The
 parity-wide Vitest configuration applies that setting to the selected project
 while keeping the exact inventory under harness control. Keep the field absent
@@ -137,9 +219,11 @@ pnpm react-parity:test
 pnpm react-parity:validate
 ```
 
-`react-parity:validate` checks manifest schemas and hashes, inventories,
-generated coverage, environments, and public claims. It does not collect or
-execute Vitest, Jest, or type-test lanes.
+`react-parity:validate` checks manifest schemas and direct evidence hashes,
+inventories, generated coverage, environments, public claims, live project
+selection, exact file ownership, the derived shard view, and cross-lane
+identity uniqueness. It does not collect or execute Vitest, Jest, or type-test
+lanes.
 
 The generic React parity workers run the complete package suites on Node 24. CI
 currently requests three native Vitest file shards:
@@ -224,7 +308,7 @@ matching top-level awaited preload.
    to parity, or add `include` with only the parity-owned file patterns when the
    project is mixed.
 3. Add or update `packages/<name>/audit/react-parity.json`; do not add the
-   package to the workflow.
+   package to the workflow or hash `vitest.config.js` as support evidence.
 4. Refresh hashes and inventories with the package's parity tooling. Run
    `pnpm react-parity:lockfiles:generate` after an intentional lockfile change;
    the root `pnpm sync` command also runs this generator.

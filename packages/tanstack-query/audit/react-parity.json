@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+      "lockfileSha256": "0a3f2088ff253780087b79fb7c66031a5e8660ae1d334ad1a42b50cddffbf09a"
     }
   },
   "lanes": [
@@ -51,7 +51,7 @@
       "environment": "workspace-node",
       "project": "tanstack-query-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs exact cached query, asynchronous query, and mutation scenarios against @tanstack/react-query@5.101.3. Optional while provenance remains recorded-unverified, but still executed under the shared react-parity ownership group.",
+      "notes": "Runs exact cached query, asynchronous query, and mutation scenarios against @tanstack/react-query@5.101.3. Optional while provenance remains recorded-unverified, so ordinary Vitest shards retain this project until the lane becomes required evidence.",
       "files": [
         {
           "path": "packages/tanstack-query/tests/differential/parity.test.ts",

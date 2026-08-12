@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+      "lockfileSha256": "0a3f2088ff253780087b79fb7c66031a5e8660ae1d334ad1a42b50cddffbf09a"
     }
   },
   "lanes": [
@@ -154,11 +154,6 @@
           "path": "scripts/react-parity/cmdk-controls.test.mjs",
           "role": "support",
           "sha256": "64be7b0d341b89738a049520ac591831d548500496f1f32a43fe2df027a50eaa"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
         },
         {
           "path": "packages/cmdk/src/components/command.tsrx",

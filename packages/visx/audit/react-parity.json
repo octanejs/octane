@@ -44,7 +44,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+      "lockfileSha256": "0a3f2088ff253780087b79fb7c66031a5e8660ae1d334ad1a42b50cddffbf09a"
     }
   },
   "lanes": [
@@ -239,11 +239,6 @@
           "path": "packages/visx/tests/_fixtures/differential.tsrx",
           "role": "support",
           "sha256": "bd9d2c727852f5a0059e51575ec665471fc0f5962a9256955b3804c9bed5b0ed"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
         },
         {
           "path": "packages/visx/audit/oracle-environment.json",

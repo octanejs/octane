@@ -70,7 +70,14 @@ describe('vaul browser conformance', function vaulBrowserConformance() {
 		if (!box) throw new Error('drawer has no browser box');
 		await page.mouse.move(box.x + box.width / 2, box.y + 30);
 		await page.mouse.down();
-		await page.mouse.move(box.x + box.width / 2, box.y + 140, { steps: 4 });
+		// Pace the 110px drag across real time: velocity is measured pointer-down to
+		// release, and a machine fast enough to deliver unthrottled moves registers a
+		// flick (>2px/ms), which legitimately closes a dismissible drawer instead of
+		// snapping back.
+		for (let step = 1; step <= 5; step += 1) {
+			await page.mouse.move(box.x + box.width / 2, box.y + 30 + step * 22, { steps: 2 });
+			await page.waitForTimeout(120);
+		}
 		expect(
 			await drawer.evaluate(function isDragging(node) {
 				return node.classList.contains('vaul-dragging');

@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+      "lockfileSha256": "0a3f2088ff253780087b79fb7c66031a5e8660ae1d334ad1a42b50cddffbf09a"
     }
   },
   "lanes": [
@@ -71,11 +71,6 @@
           "path": "packages/inertia/tests/_fixtures/page-provider.tsrx",
           "role": "support",
           "sha256": "29f535ea46ee9bbdf505ecb9d712ed2181bf4f4eac651ad5ccbbd6d60f972c7f"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
         }
       ]
     },
@@ -114,11 +109,6 @@
           "path": "packages/inertia/tests/differential/_setup.ts",
           "role": "support",
           "sha256": "cac818480214c96c8f15a1fa0e2d18a4d8c16569fe7244930e5c3415adefeca9"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
         }
       ]
     },
