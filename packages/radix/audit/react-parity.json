@@ -176,11 +176,6 @@
           "sha256": "65cec90ff245cea505255343ca7c4eaa83c62a16c1ee938877c74fa646357b60"
         },
         {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "47439a7024b2fdbb515ce41b4384a8a4a774bce53cb41cf12b624a597e515fbb"
-        },
-        {
           "path": "packages/radix/audit/export-crosswalk.json",
           "role": "support",
           "sha256": "97763764b16bfe05ee9ea3558a8a2278aed8f2ad262c6938f093fe21fd2cbe57"

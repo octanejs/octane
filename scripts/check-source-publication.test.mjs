@@ -104,6 +104,60 @@ test('the validation project may not pin Node types a consumer does not install'
 	);
 });
 
+test('a validation project the typecheck chain never reaches is still checked', () => {
+	// A package the chain never names still ships source a consumer compiles.
+	const absent = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: { typecheck: 'tsgo --noEmit -p packages/octane/tsconfig.json' },
+		tsconfigs: { 'tsconfig.json': { compilerOptions: { types: ['node'] } } },
+		sources: { 'index.ts': 'export const a = 1;\n' },
+	});
+	assert.deepEqual(
+		findSourcePublicationViolations(absent.repo, absent.packages).map(({ rule, id }) => [rule, id]),
+		[[RULES.nodeTypes, 'packages/demo/tsconfig.json']],
+	);
+
+	// Nor may a package escape by running its project through a wrapper no
+	// command parser can follow.
+	const wrapped = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: { typecheck: 'pnpm --dir packages/demo typecheck' },
+		tsconfigs: { 'tsconfig.json': { compilerOptions: { types: ['node'] } } },
+		sources: { 'index.ts': 'export const a = 1;\n' },
+	});
+	writeJson(path.join(wrapped.repo, 'packages/demo/package.json'), {
+		name: '@demo/binding',
+		files: ['src'],
+		scripts: { typecheck: 'node scripts/typecheck.mjs' },
+	});
+	assert.deepEqual(
+		findSourcePublicationViolations(wrapped.repo, wrapped.packages).map(({ rule, id }) => [
+			rule,
+			id,
+		]),
+		[[RULES.nodeTypes, 'packages/demo/tsconfig.json']],
+	);
+});
+
+test('a package-root project scoped away from src is not the validation project', () => {
+	const { repo, packages } = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: {},
+		tsconfigs: {
+			// A build-script project and a consumer-shaped type test both live in the
+			// package root without ever compiling the shipped tree.
+			'tsconfig.json': { include: ['scripts', '*.config.*'], compilerOptions: { types: ['node'] } },
+			'tsconfig.consumer.json': {
+				include: ['./tests/types/'],
+				compilerOptions: { types: ['node'] },
+			},
+		},
+		sources: { 'index.ts': 'export const a = 1;\n' },
+	});
+
+	assert.deepEqual(findSourcePublicationViolations(repo, packages), []);
+});
+
 test('nested type-test projects are not treated as the validation project', () => {
 	const { repo, packages } = createRepository({
 		manifest: { files: ['src'] },
@@ -132,6 +186,48 @@ test('the validation project may not exclude source that still ships', () => {
 	);
 	// Only the file that exists in the packed tree is reported.
 	assert.match(violations[0].detail, /src\/broken\.ts$/);
+});
+
+test('a directory or glob exclude drops shipped source the same way a file name does', () => {
+	const covering = ['src', './src/', 'src/', 'src/**', 'src/**/*.tsrx', 'src/*.tsrx'];
+	for (const entry of covering) {
+		const { repo, packages } = createRepository({
+			manifest: { files: ['src'] },
+			rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
+			tsconfigs: {
+				'tsconfig.json': { include: ['src'], exclude: ['node_modules', 'dist', entry] },
+			},
+			sources: { 'index.tsrx': 'export const a = 1;\n' },
+		});
+
+		const violations = findSourcePublicationViolations(repo, packages);
+		assert.deepEqual(
+			violations.map(({ rule, id }) => [rule, id]),
+			[[RULES.excluded, 'packages/demo/tsconfig.json']],
+			`exclude ${JSON.stringify(entry)} must be reported`,
+		);
+		assert.match(
+			violations[0].detail,
+			new RegExp(`${entry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+		);
+	}
+
+	// Excludes that cover no packed file stay silent, including a glob whose
+	// extension does not match and a sibling directory named like the source one.
+	for (const entry of ['node_modules', 'dist', 'tests/**', 'src/**/*.css', 'source/**']) {
+		const { repo, packages } = createRepository({
+			manifest: { files: ['src'] },
+			rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
+			tsconfigs: { 'tsconfig.json': { include: ['src'], exclude: [entry] } },
+			sources: { 'index.tsrx': 'export const a = 1;\n' },
+		});
+
+		assert.deepEqual(
+			findSourcePublicationViolations(repo, packages),
+			[],
+			`exclude ${JSON.stringify(entry)} must not be reported`,
+		);
+	}
 });
 
 test('published JavaScript modules must ship a sibling declaration file', () => {
@@ -206,4 +302,40 @@ test('tsconfig files with comments and trailing commas are read, not skipped', (
 	assert.deepEqual(parseJsonc('{ "include": ["src/**/*.tsrx"] }'), {
 		include: ['src/**/*.tsrx'],
 	});
+});
+
+test('a wildcard final segment matches one path segment, the way tsc treats it', () => {
+	// `src/*` reaches a file directly under src, so it drops shipped source.
+	const shallow = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
+		tsconfigs: { 'tsconfig.json': { include: ['src'], exclude: ['src/*'] } },
+		sources: { 'index.tsrx': 'export const a = 1;\n' },
+	});
+	assert.deepEqual(
+		findSourcePublicationViolations(shallow.repo, shallow.packages).map(({ rule }) => rule),
+		[RULES.excluded],
+	);
+
+	// The same entry must NOT reach a nested file: `*` does not cross `/`. Only
+	// `src/**` spans directories, so the nested case stays silent here and is
+	// reported there.
+	const nested = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
+		tsconfigs: { 'tsconfig.json': { include: ['src'], exclude: ['src/*'] } },
+		sources: { 'deep/nested/index.tsrx': 'export const a = 1;\n' },
+	});
+	assert.deepEqual(findSourcePublicationViolations(nested.repo, nested.packages), []);
+
+	const spanning = createRepository({
+		manifest: { files: ['src'] },
+		rootScripts: { typecheck: 'tsrx-tsc --noEmit -p packages/demo/tsconfig.json' },
+		tsconfigs: { 'tsconfig.json': { include: ['src'], exclude: ['src/**'] } },
+		sources: { 'deep/nested/index.tsrx': 'export const a = 1;\n' },
+	});
+	assert.deepEqual(
+		findSourcePublicationViolations(spanning.repo, spanning.packages).map(({ rule }) => rule),
+		[RULES.excluded],
+	);
 });

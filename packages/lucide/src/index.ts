@@ -1,3 +1,5 @@
+/// <reference path="./lucide-icons.d.ts" />
+
 export * from './icons';
 export * as icons from './icons';
 export * from './aliases';

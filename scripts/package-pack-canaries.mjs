@@ -57,19 +57,6 @@ export function renderPackedExampleWorkspace(archiveSpecs) {
 	return `overrides:\n${overrides}\n`;
 }
 
-export const PACKED_TSRX_CONSUMER_PACKAGES = [
-	'@octanejs/cmdk',
-	'@octanejs/floating-ui',
-	'@octanejs/input-otp',
-	'@octanejs/radix',
-	'@octanejs/spring',
-	'@octanejs/sonner',
-	'@octanejs/syntax-highlighter',
-	'@octanejs/textarea-autosize',
-	'@octanejs/tiptap',
-	'octane',
-];
-
 export const PACKED_COMMONJS_CONSUMER_PACKAGES = [
 	'@octanejs/base-ui',
 	'@octanejs/floating-ui',
@@ -164,10 +151,119 @@ process.stdout.write(JSON.stringify(['default', 'DraggableCore'].filter((key) =>
 `;
 }
 
-export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions) {
-	const dependencies = {};
+export function findPackedTsrxSourceConsumerPackages(
+	packages,
+	packedFiles,
+	excludedPackages = new Set(),
+) {
+	const bindingNames = packages
+		.filter(
+			(pkg) =>
+				!pkg.private &&
+				pkg.role === 'framework binding' &&
+				!excludedPackages.has(pkg.name) &&
+				hasTsrxFile(packedFiles.get(pkg.name)),
+		)
+		.map((pkg) => pkg.name)
+		.sort();
 
-	for (const packageName of PACKED_TSRX_CONSUMER_PACKAGES) {
+	return [...bindingNames, 'octane'];
+}
+
+function hasTsrxFile(files) {
+	for (const file of files ?? []) {
+		if (file.endsWith('.tsrx')) return true;
+	}
+	return false;
+}
+
+function collectExportTargets(value, output = []) {
+	if (typeof value === 'string') {
+		output.push(value);
+	} else if (value && typeof value === 'object') {
+		for (const child of Object.values(value)) collectExportTargets(child, output);
+	}
+	return output;
+}
+
+export function findPackedTsrxSourceConsumerSpecifiers(packageName, manifest, files) {
+	if (!hasTsrxFile(files)) return [];
+
+	const exports = manifest.exports;
+	if (
+		typeof exports === 'string' ||
+		(exports && !Object.keys(exports).some((key) => key.startsWith('.')))
+	) {
+		return [packageName];
+	}
+	if (!exports || typeof exports !== 'object') return manifest.main ? [packageName] : [];
+
+	const specifiers = [];
+	for (const [subpath, target] of Object.entries(exports)) {
+		if (subpath === '.') {
+			specifiers.push(packageName);
+			continue;
+		}
+		if (!subpath.startsWith('./') || subpath.includes('*')) continue;
+		if (collectExportTargets(target).some((entry) => entry.endsWith('.tsrx'))) {
+			specifiers.push(`${packageName}/${subpath.slice(2)}`);
+		}
+	}
+	return specifiers;
+}
+
+export function findPackedWorkspaceDependencyClosure(manifests, rootPackageNames) {
+	const packageNames = new Set(rootPackageNames);
+	const pending = [...rootPackageNames];
+
+	while (pending.length > 0) {
+		const packageName = pending.pop();
+		const manifest = manifests.get(packageName);
+		for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
+			for (const dependencyName of Object.keys(manifest?.[field] ?? {})) {
+				if (!manifests.has(dependencyName) || packageNames.has(dependencyName)) continue;
+				packageNames.add(dependencyName);
+				pending.push(dependencyName);
+			}
+		}
+	}
+
+	return [...packageNames].sort();
+}
+
+export function findExternalDependencySpecs(manifests, packageNames) {
+	const dependencySpecs = new Map();
+	const fields = ['peerDependencies', 'optionalDependencies', 'dependencies'];
+
+	for (const packageName of packageNames) {
+		const manifest = manifests.get(packageName);
+		for (const [priority, field] of fields.entries()) {
+			for (const [dependencyName, spec] of Object.entries(manifest?.[field] ?? {})) {
+				if (manifests.has(dependencyName)) continue;
+				const existing = dependencySpecs.get(dependencyName);
+				if (!existing || priority > existing.priority) {
+					dependencySpecs.set(dependencyName, { priority, spec });
+				}
+			}
+		}
+	}
+
+	return Object.fromEntries(
+		[...dependencySpecs]
+			.sort(([left], [right]) => left.localeCompare(right))
+			.map(([dependencyName, { spec }]) => [dependencyName, spec]),
+	);
+}
+
+export function createPackedTsrxConsumerManifest(
+	archiveSpecs,
+	toolingVersions,
+	packageNames,
+	externalDependencies = {},
+) {
+	const dependencies = { ...externalDependencies };
+
+	for (const packageName of packageNames) {
 		const archiveSpec = archiveSpecs[packageName];
 		if (typeof archiveSpec !== 'string' || !archiveSpec.startsWith('file:')) {
 			throw new Error(`no packed archive was provided for ${packageName}`);
@@ -179,6 +275,7 @@ export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions) 
 		name: 'octane-packed-tsrx-source-consumer',
 		private: true,
 		type: 'module',
+		packageManager: toolingVersions.packageManager,
 		engines: { node: '>=22.22.2' },
 		dependencies,
 		devDependencies: {
@@ -189,13 +286,17 @@ export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions) 
 	};
 }
 
-export function createPackedTsrxConsumerConfig() {
+export function createPackedTsrxConsumerConfig({
+	consumerSourceFiles = ['src/**/*.ts', 'src/**/*.tsrx'],
+	nodeTypes = true,
+	sourcePackageNames = [],
+} = {}) {
 	return {
 		compilerOptions: {
 			allowImportingTsExtensions: true,
 			jsx: 'react-jsx',
 			jsxImportSource: 'octane',
-			lib: ['dom', 'dom.iterable', 'esnext'],
+			lib: ['dom', 'dom.iterable', 'es2024'],
 			module: 'esnext',
 			moduleResolution: 'bundler',
 			noEmit: true,
@@ -203,19 +304,61 @@ export function createPackedTsrxConsumerConfig() {
 			plugins: [{ name: '@tsrx/typescript-plugin' }],
 			skipLibCheck: false,
 			strict: true,
-			target: 'esnext',
-			types: ['node'],
+			target: 'es2024',
+			types: nodeTypes ? ['node'] : [],
 		},
 		tsrx: {
 			compiler: 'octane/compiler/volar',
 		},
-		include: ['src/**/*.ts', 'src/**/*.tsrx'],
+		// Compile the installed implementation files directly. A package import can
+		// resolve through a declaration condition and otherwise hide shipped TSRX.
+		include: [
+			...consumerSourceFiles,
+			...sourcePackageNames.map((packageName) => `node_modules/${packageName}/**/*.tsrx`),
+		],
 	};
 }
 
-export function renderPackedTsrxConsumerSource() {
+export const PACKED_TSRX_CONSUMER_PROJECTS = ['tsconfig.json', 'tsconfig.browser.json'];
+
+// These packages have deliberate API assertions in the hand-authored consumer
+// probes. Keep them installed even when source compilation is temporarily
+// deferred for one of them.
+export const PACKED_TSRX_PROBE_PACKAGES = [
+	'@octanejs/cmdk',
+	'@octanejs/input-otp',
+	'@octanejs/recharts',
+	'@octanejs/sonner',
+	'@octanejs/spring',
+	'@octanejs/syntax-highlighter',
+	'@octanejs/textarea-autosize',
+	'@octanejs/tiptap',
+	'octane',
+];
+
+export function renderPackedTsrxSourceImports(specifiers) {
+	return (
+		specifiers
+			.filter((specifier) => specifier !== 'octane')
+			.map((specifier) => `import '${specifier}';`)
+			.join('\n') + '\n'
+	);
+}
+
+export function renderPackedTsrxConsumerSource({ includeRecharts = true } = {}) {
+	const rechartsImport = includeRecharts
+		? "import { Bar, BarChart, XAxis, YAxis } from '@octanejs/recharts';\n"
+		: '';
+	const rechartsMarkup = includeRecharts
+		? `		<BarChart width={320} height={160} data={[{ name: 'Packed', value: 1 }]}>
+			<XAxis dataKey="name" />
+			<YAxis />
+			<Bar dataKey="value" fill="#8884d8" />
+		</BarChart>
+`
+		: '';
 	return `import { Command } from '@octanejs/cmdk';
-import { animated, useSpring } from '@octanejs/spring';
+${rechartsImport}import { animated, useSpring } from '@octanejs/spring';
 import { Parallax, ParallaxLayer } from '@octanejs/spring/parallax';
 import { OTPInput, REGEXP_ONLY_DIGITS } from '@octanejs/input-otp';
 import { toast, Toaster } from '@octanejs/sonner';
@@ -251,7 +394,7 @@ export function PublishedSourceConsumer() @{
 	const [springStyles] = useSpring({ from: { opacity: 0 }, to: { opacity: 1 } });
 
 	<section>
-		<animated.div style={springStyles}>Packed spring</animated.div>
+	${rechartsMarkup}		<animated.div style={springStyles}>Packed spring</animated.div>
 		<div style={{ height: 120 }}>
 			<Parallax pages={2}>
 				<ParallaxLayer offset={1} speed={0.5}>Packed Parallax</ParallaxLayer>
@@ -305,6 +448,20 @@ export function PublishedSourceConsumer() @{
 
 export function renderPackedTsrxConsumerTypeProbe() {
 	return `import { Command, type CommandProps } from '@octanejs/cmdk';
+import {
+	Bar,
+	BarChart,
+	Cell,
+	ErrorBar,
+	Layer,
+	Surface,
+	useChartWidth,
+	type BarProps,
+} from '@octanejs/recharts';
+// @ts-expect-error Brush is not supported by the Octane runtime port.
+import { Brush } from '@octanejs/recharts';
+// @ts-expect-error Treemap is not supported by the Octane runtime port.
+import { Treemap } from '@octanejs/recharts';
 import { Controller, SpringValue, type ControllerUpdate } from '@octanejs/spring';
 import type { IParallax, ParallaxProps } from '@octanejs/spring/parallax';
 import { OTPInput, type OTPInputProps } from '@octanejs/input-otp';
@@ -325,6 +482,14 @@ type IsAny<T> = 0 extends 1 & T ? true : false;
 type AssertNotAny<T> = IsAny<T> extends false ? true : never;
 
 const commandPropsArePrecise: AssertNotAny<CommandProps> = true;
+const rechartsBarPropsArePrecise: AssertNotAny<BarProps> = true;
+const rechartsBarComponentPropsArePrecise: AssertNotAny<Parameters<typeof Bar>[0]> = true;
+const rechartsChartComponentPropsArePrecise: AssertNotAny<Parameters<typeof BarChart>[0]> = true;
+const rechartsCellIsTyped: AssertNotAny<typeof Cell> = true;
+const rechartsErrorBarIsTyped: AssertNotAny<typeof ErrorBar> = true;
+const rechartsLayerIsTyped: AssertNotAny<typeof Layer> = true;
+const rechartsSurfaceIsTyped: AssertNotAny<typeof Surface> = true;
+const rechartsWidthHookIsTyped: AssertNotAny<typeof useChartWidth> = true;
 const springValueIsPrecise: AssertNotAny<SpringValue<number>> = true;
 const controllerUpdateIsPrecise: AssertNotAny<ControllerUpdate<{ x: number }>> = true;
 const parallaxPropsArePrecise: AssertNotAny<ParallaxProps> = true;
@@ -393,6 +558,14 @@ export const verifiedPublishedTypes = {
 	invalidToaster,
 	providerComponentPropsArePrecise,
 	providerPropsArePrecise,
+	rechartsBarComponentPropsArePrecise,
+	rechartsBarPropsArePrecise,
+	rechartsChartComponentPropsArePrecise,
+	rechartsCellIsTyped,
+	rechartsErrorBarIsTyped,
+	rechartsLayerIsTyped,
+	rechartsSurfaceIsTyped,
+	rechartsWidthHookIsTyped,
 	parallaxApiIsPrecise,
 	parallaxPropsArePrecise,
 	springController,

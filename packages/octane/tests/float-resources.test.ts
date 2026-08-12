@@ -38,6 +38,14 @@ import {
 	ToggleHost,
 	setSheetVisible,
 } from './_fixtures/float-resources.tsrx';
+import {
+	ParentChild,
+	LateArmAfterSibling,
+	NestedTryOrder,
+	LocalHref,
+	MixedLocalStatic,
+	FailingArm,
+} from './_fixtures/float-group-order.tsrx';
 
 function sheetHrefs(): string[] {
 	return Array.from(
@@ -425,9 +433,9 @@ describe('Float resources — streamed late boundaries', () => {
 	});
 
 	// Per ReactDOMFloat-test.js:2041 — 'will hoist resources of child boundaries
-	// emitted as part of a partial boundary to the parent boundary' (and :2350,
-	// the flushed-inline variant): the still-pending inner boundary's sheet
-	// rides the wave that reveals its parent.
+	// emitted as part of a partial boundary to the parent boundary': the
+	// still-pending inner boundary's sheet rides the wave that reveals its
+	// parent.
 	it("hoists a nested pending boundary's sheet into the outer boundary's reveal wave", async () => {
 		const outer = deferred<string>();
 		const inner = deferred<string>();
@@ -467,6 +475,55 @@ describe('Float resources — streamed late boundaries', () => {
 		activateStreamedMarkup(c);
 		// The late sheet joins the precedence groups after the shell's (new group
 		// appends after the last existing group).
+		expect(sheetHrefs()).toEqual(['/outer-late.css', '/inner-late.css']);
+		expect(c.querySelector('.outer-ready')?.textContent).toBe('one');
+		expect(c.querySelector('.inner-ready')?.textContent).toBe('two');
+	});
+
+	// Per ReactDOMFloat-test.js:2350 — 'boundary stylesheet resource dependencies
+	// hoist to a parent boundary when flushed inline': the inner boundary
+	// resolves FIRST, so when its parent reveals, the complete child flushes
+	// inline with the parent's wave and its sheet ships with that same wave.
+	it("ships an inline-flushed complete child boundary's sheet with the parent's reveal", async () => {
+		const outer = deferred<string>();
+		const inner = deferred<string>();
+		const collector = createPipeableCollector();
+		const { pipe } = Server.renderToPipeableStream(srvStream.NestedLateBoundaries, {
+			outer: outer.promise,
+			inner: inner.promise,
+		});
+		pipe(collector.destination);
+		const shell = collector.chunks.join('');
+		expect(shell.match(/\/outer-late\.css/g) || []).toHaveLength(1);
+		expect(shell).not.toContain('/inner-late.css');
+		const shellChunkCount = collector.chunks.length;
+
+		// The child resolves while its parent is still pending: it has no slot in
+		// the document yet, so neither its content nor its sheet may stream.
+		inner.resolve('two');
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		const preReveal = collector.chunks.slice(shellChunkCount).join('');
+		expect(preReveal).not.toContain('/inner-late.css');
+		expect(preReveal).not.toContain('inner-ready');
+
+		// The parent's resolution alone completes the response: the child flushes
+		// inline within the parent's reveal, carrying its sheet exactly once.
+		outer.resolve('one');
+		const html = await collector.ended;
+		const wave = collector.chunks.slice(shellChunkCount).join('');
+		expect(wave).toContain('outer-ready');
+		expect(wave).toContain('inner-ready');
+		expect(wave.match(/\/inner-late\.css/g) || []).toHaveLength(1);
+		expect(html.match(/\/inner-late\.css/g) || []).toHaveLength(1);
+
+		// Browser simulation: the inline-flushed child's sheet joins the head
+		// precedence groups after the shell's, and both contents are revealed.
+		const bodyStart = shell.indexOf('<div');
+		document.head.insertAdjacentHTML('afterbegin', shell.slice(0, bodyStart));
+		const c = streamContainer();
+		c.innerHTML = shell.slice(bodyStart);
+		c.insertAdjacentHTML('beforeend', wave);
+		activateStreamedMarkup(c);
 		expect(sheetHrefs()).toEqual(['/outer-late.css', '/inner-late.css']);
 		expect(c.querySelector('.outer-ready')?.textContent).toBe('one');
 		expect(c.querySelector('.inner-ready')?.textContent).toBe('two');
@@ -522,5 +579,116 @@ describe('Float resources — streamed late boundaries', () => {
 		expect(sheetHrefs()).toEqual(['/base.css', '/gated-x.css']);
 		expect(document.head.querySelectorAll('style[data-href="gated-tokens"]')).toHaveLength(1);
 		clientRoot.unmount();
+	});
+});
+
+// Precedence GROUP order is part of the resource contract: groups appear in
+// first-encounter order of tree DISCOVERY (what SSR serializes and React
+// produces), not in the order component bodies happen to finish executing.
+// Group order is CSS cascade order, so an inversion changes how equal-
+// specificity rules across groups resolve.
+describe('Float resources — precedence group discovery order', () => {
+	const containers: HTMLElement[] = [];
+	const roots: Array<{ unmount(): void }> = [];
+	function mountInto(body: any, props: Record<string, unknown> = {}): void {
+		const c = document.createElement('div');
+		document.body.appendChild(c);
+		containers.push(c);
+		const root = createRoot(c);
+		roots.push(root);
+		root.render(body, props);
+	}
+	afterEach(() => {
+		for (const r of roots.splice(0)) r.unmount();
+		for (const c of containers.splice(0)) c.remove();
+		document.head
+			.querySelectorAll('[data-precedence], [data-oct-res]')
+			.forEach((el) => el.remove());
+		resetFloatResourceState();
+	});
+
+	const srvOrder = loadServerFixture(
+		'packages/octane/tests/_fixtures/float-group-order.tsrx',
+	) as Record<string, any>;
+
+	it("a parent's group precedes its child component's group on a client mount", async () => {
+		await act(() => mountInto(ParentChild));
+		expect(sheetHrefs()).toEqual(['/parent-app.css', '/child-vendor.css']);
+	});
+
+	it("a suspended arm's group registers at reveal, after shell-rendered siblings", async () => {
+		const d = deferred<string>();
+		await act(() => mountInto(LateArmAfterSibling, { promise: d.promise }));
+		// While the arm is pending, the root and sibling groups exist in
+		// discovery order; the arm's group does not exist yet (the sheet is
+		// discovered when its content renders — matching React, where a
+		// suspended tree contributes no resources until it commits).
+		expect(sheetHrefs()).toEqual(['/root-one.css', '/sibling.css']);
+		await act(() => d.resolve('armed'));
+		expect(sheetHrefs()).toEqual(['/root-one.css', '/sibling.css', '/arm-three.css']);
+		expect(document.body.textContent).toContain('armed');
+	});
+
+	it('nested @try arms register their groups in discovery order across waves', async () => {
+		const mid = deferred<string>();
+		const deep = deferred<string>();
+		await act(() => mountInto(NestedTryOrder, { mid: mid.promise, deep: deep.promise }));
+		expect(sheetHrefs()).toEqual(['/outer-one.css']);
+		await act(() => mid.resolve('m'));
+		expect(sheetHrefs()).toEqual(['/outer-one.css', '/mid-two.css']);
+		await act(() => deep.resolve('d'));
+		expect(sheetHrefs()).toEqual(['/outer-one.css', '/mid-two.css', '/deep-three.css']);
+		expect(document.body.textContent).toContain('d');
+	});
+
+	it('SSR serializes nested-tree groups in the same discovery order', async () => {
+		const App = () => Server.createElement(srvOrder.ParentChild, null) as any;
+		const r = await Server.renderToString(App as any);
+		const app = r.html.indexOf('/parent-app.css');
+		const vendor = r.html.indexOf('/child-vendor.css');
+		expect(app).toBeGreaterThan(-1);
+		expect(vendor).toBeGreaterThan(app);
+	});
+
+	it('a setup-local-computed href renders on the server and matches the client', async () => {
+		// Server: the registration must not run before the local it reads is
+		// initialized.
+		const App = () => Server.createElement(srvOrder.LocalHref, { name: 'x' }) as any;
+		const r = await Server.renderToString(App as any);
+		expect(r.html.match(/\/x-dep\.css/g) || []).toHaveLength(1);
+		expect(r.html).toContain('data-precedence="app"');
+
+		// Client control: same component, same sheet.
+		await act(() => mountInto(LocalHref, { name: 'x' }));
+		expect(sheetHrefs()).toEqual(['/x-dep.css']);
+	});
+
+	it('mixed setup-local and static resources keep source order on both sides', async () => {
+		// Registration order is group order. A static sheet declared AFTER a
+		// setup-local-dependent one must not jump ahead of it on the server —
+		// SSR and a client mount have to agree on the cascade.
+		const App = () => Server.createElement(srvOrder.MixedLocalStatic, { name: 'x' }) as any;
+		const r = await Server.renderToString(App as any);
+		const dyn = r.html.indexOf('/x-first.css');
+		const stat = r.html.indexOf('/second-static.css');
+		expect(dyn).toBeGreaterThan(-1);
+		expect(stat).toBeGreaterThan(dyn);
+
+		await act(() => mountInto(MixedLocalStatic, { name: 'x' }));
+		expect(sheetHrefs()).toEqual(['/x-first.css', '/second-static.css']);
+	});
+
+	it('an arm that fails while rendering a child keeps its already-registered sheet', async () => {
+		// Resources are page-global and never removed; registration precedes
+		// child evaluation on the server too, so client and server agree that a
+		// failed arm's sheet stays.
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			await act(() => mountInto(FailingArm, { arm: true }));
+		} finally {
+			errSpy.mockRestore();
+		}
+		expect(document.body.textContent).toContain('caught');
+		expect(sheetHrefs()).toEqual(['/doomed.css']);
 	});
 });
