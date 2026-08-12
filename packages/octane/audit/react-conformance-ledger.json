@@ -18786,7 +18786,7 @@
     },
     {
       "caseId": "react-case-v1:3e6e9f228c7fd518285c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not hoist anything with an itemprop prop",
@@ -18794,7 +18794,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted executable evidence: itemProp-bearing metadata stays inside its itemScope host on client and server; hydration adopts the identical shape.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/hydration/hoist-exclusions.test.ts",
+          "testName": "client: itemProp metadata stays inside its itemScope host",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3e71029802df254f4960",
@@ -30012,7 +30019,7 @@
     },
     {
       "caseId": "react-case-v1:63965da96baf7d3bd259",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not hoist inside noscript context",
@@ -30020,7 +30027,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted executable evidence: metadata and Float resources that are direct children of <noscript> stay in authored position on client and server.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/hydration/hoist-exclusions.test.ts",
+          "testName": "client: noscript metadata/resources stay inside the noscript",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:639f8312191208061ad5",
@@ -38523,7 +38537,7 @@
     },
     {
       "caseId": "react-case-v1:81adc7a9833bcddc93d1",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "always enforces crossOrigin \"anonymous\" for font preloads",
@@ -38531,7 +38545,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted executable evidence: font preloads emit crossorigin=\"\" regardless of the caller-supplied CORS mode, on client and server.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/resource-hints.test.ts",
+          "testName": "font preloads always enforce anonymous CORS",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:81b00a84b905c54db6c6",
@@ -40092,7 +40113,7 @@
     },
     {
       "caseId": "react-case-v1:872a854b30a254b15c17",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can seed connection props for stylesheet and script resources",
@@ -40100,7 +40121,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted executable evidence: connection/integrity options seeded by a preload carry onto the preinit-initialized script/stylesheet; the server coalesces the redundant preload out of the head fold.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/resource-hints.test.ts",
+          "testName": "preload options transfer to the initialized resource",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:873d5491840baed53f59",

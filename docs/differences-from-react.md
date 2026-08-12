@@ -607,12 +607,26 @@ React Float **resources** are supported with React's semantics:
   `prefetchDNS`.
 - Classification is static: a spread-carried `precedence`/`async` keeps the
   ordinary element path, matching the compile-time head-hoist model.
+- React's hoist EXCLUSIONS apply: `itemProp`-bearing `<meta>`/`<link>` stay
+  with their `itemScope` host, and metadata/resources that are direct children
+  of `<noscript>` stay in the fallback content (one nesting level today —
+  metadata wrapped in a further host INSIDE `<noscript>` still hoists; a
+  documented bound, not a contract).
 
 Out of scope, deliberately: **suspensey commits** (React's
 suspend-until-the-stylesheet-loads behavior; Octane inserts the sheet and
 continues).
 
-Resource hints share the Float identity model: `preinit(href, {as: 'style'})`
+Resource hints share the Float identity model — including React's option
+semantics: font preloads always emit `crossorigin=""` (anonymous) regardless of
+the caller's value; connection/integrity options seeded by a `preload` carry
+onto the matching `preinit`'s real tag (and the server coalesces the redundant
+preload out of the head fold); `preconnect` identity includes the CORS mode;
+responsive image preloads (`imageSrcSet`) omit the fallback `href`; unknown
+option keys are dropped; non-string hrefs warn in development and no-op; and a
+module src is ONE executable identity across `preinitModule` and
+`<script async type="module" src>` on both the server pass and the hydrating
+client. In detail: `preinit(href, {as: 'style'})`
 IS a stylesheet resource (it honors a `precedence` option, default
 `"default"`, joins the precedence groups, and dedupes against
 `<link rel="stylesheet" precedence>`), `preinit(as: 'script')` dedupes against
@@ -620,10 +634,9 @@ IS a stylesheet resource (it honors a `precedence` option, default
 matching init is a no-op (the upgrade is one-way: preload-then-init keeps both
 tags). Image preloads carrying `imageSrcSet` key on the srcset+sizes pair
 rather than the fallback href. Malformed calls (missing/invalid `as`, empty
-href) warn in development and stay no-ops. Options serialize through a lenient
-attribute pass-through (`fetchPriority`, `imageSrcSet`, `imageSizes`, `media`,
-`integrity`, … all emit their canonical attributes); unknown option keys are
-passed through as attributes rather than dropped.
+href) warn in development and stay no-ops. Options serialize through their
+canonical attributes (`fetchPriority`, `imageSrcSet`, `imageSizes`, `media`,
+`integrity`, …); unknown option keys are dropped, matching React.
 
 ## Reconciler: LIS moves, identical results
 

@@ -10823,7 +10823,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	if (tag !== 'option') lit += '>'; // option: ssrOption assembles the tag (attrs-only here)
 	const normChildren =
 		authoredStaticScriptContent === undefined
-			? normalizeChildren(node.children || [], childNs === 'svg', ctx)
+			? normalizeChildren(node.children || [], childNs === 'svg', ctx, tag === 'noscript')
 			: [];
 	const hasNestedChildren = hasAuthoredStaticScriptBody || normChildren.length > 0;
 	const effectiveChildrenPropSources = hasNestedChildren ? [] : childrenPropSources;
@@ -16465,6 +16465,7 @@ function requiresTemplateNormalization(
 	// reconciliation can then use the actual host namespace chosen at runtime.
 	const childAllowsHeadHoists =
 		allowHeadHoists &&
+		tag !== 'noscript' &&
 		(!isComponentTag(node) || isActivityLongForm(node) || isFragmentLongForm(node, ctx));
 	return (node.children || []).some((child) =>
 		requiresTemplateNormalization(child, childNs, childAllowsHeadHoists, ctx),
@@ -18317,16 +18318,17 @@ function isHoistableHeadElementNode(n) {
 	if (n == null || (n.type !== 'JSXElement' && n.type !== 'Element')) return false;
 	const tag = jsxTagName(n) || elementTagName(n);
 	if (!HOISTABLE_HEAD_TAGS.has(tag)) return false;
-	if (tag !== 'link') return true;
 
 	// React keeps links with explicit load/error handlers in their authored DOM
-	// position, preserving resource-event propagation through logical ancestors.
+	// position (resource-event propagation through logical ancestors), and never
+	// hoists microdata: an itemProp meta/link belongs to its itemScope host.
 	// Spread keys remain unknowable here and keep the existing head-hoist path.
 	const attrs = n.attributes || n.openingElement?.attributes || [];
 	for (const attr of attrs) {
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const name = jsxAttrRawName(attr);
-		if (name === 'onLoad' || name === 'onError') return false;
+		if (name === 'itemProp' || name === 'itemprop') return false;
+		if (tag === 'link' && (name === 'onLoad' || name === 'onError')) return false;
 	}
 	return true;
 }
@@ -18350,6 +18352,7 @@ function headResourceKind(n) {
 			if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 			const name = jsxAttrRawName(attr);
 			if (name === 'dangerouslySetInnerHTML') return null;
+			if (name === 'itemProp' || name === 'itemprop') return null;
 			if (name === 'href') hasHref = true;
 			else if (name === 'precedence') hasPrecedence = true;
 		}
@@ -18796,7 +18799,7 @@ function emitHeadServer(headNodes, ctx) {
 // `inSvg`: the children being normalized sit inside an SVG-namespace subtree.
 // SVG has its own `<title>` (the accessibility tooltip element) — it must stay
 // where it is, NOT hoist to document.head (React 19 makes the same exception).
-function normalizeChildren(nodes, inSvg = false, ctx = null) {
+function normalizeChildren(nodes, inSvg = false, ctx = null, inNoscript = false) {
 	const out = [];
 	if (!nodes) return out;
 	for (const n of nodes) {
@@ -18878,10 +18881,10 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 							refVal && refVal.type === 'JSXExpressionContainer' ? refVal.expression : refVal;
 					}
 					out.push({ type: 'FragmentStart', refExpr });
-					out.push(...normalizeChildren(n.children || [], inSvg, ctx));
+					out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
 					out.push({ type: 'FragmentEnd' });
 				} else {
-					out.push(...normalizeChildren(n.children || [], inSvg, ctx));
+					out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
 				}
 				continue;
 			}
@@ -18918,6 +18921,7 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 			// can partition it out and emit it via headBlock (client) / ssrHeadEl
 			// (server). SVG `<title>` and explicit resource-handler links stay inline.
 			if (
+				!inNoscript &&
 				(isHoistableHeadElementNode(n) || (!inSvg && headResourceKind(n) !== null)) &&
 				!(inSvg && jsxTagName(n) === 'title')
 			) {
@@ -18945,11 +18949,11 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 			}
 			out.push(element);
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
-			out.push(...normalizeChildren(n.children || [], inSvg, ctx));
+			out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
 		} else if (n.type === 'JSXStyleElement') {
 			// `<style href precedence>` is a Float style resource, not scoped CSS —
 			// partition it to the head channel like precedence links.
-			if (!inSvg && headResourceKind(n) === 'style') {
+			if (!inSvg && !inNoscript && headResourceKind(n) === 'style') {
 				out.push({ type: 'HeadHoist', element: n });
 				continue;
 			}
@@ -18963,7 +18967,7 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 			// still template output, not setup JavaScript. Unwrap it before lowering
 			// so both client and server compilation route it through their construct
 			// emitters rather than asking esrap to print a TSRX-only expression.
-			out.push(...normalizeChildren([n.expression], inSvg, ctx));
+			out.push(...normalizeChildren([n.expression], inSvg, ctx, inNoscript));
 		} else if (n.type === 'JSXIfExpression') {
 			// `@if (cond) { ... } @else { ... }` — lower to the old IfStatement
 			// shape so the existing makeIfCall path picks it up. `consequent` and
@@ -19028,7 +19032,7 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 			if (body.length === 0 && render === null) continue;
 			if (body.length === 0 && render !== null) {
 				// Recurse — render is a single JSX node, treat as a sibling child.
-				out.push(...normalizeChildren([render], inSvg, ctx));
+				out.push(...normalizeChildren([render], inSvg, ctx, inNoscript));
 			} else {
 				throw new Error(
 					'`@{ … }` with setup statements is not supported at JSX child position. ' +
@@ -23292,7 +23296,7 @@ function emitElementHtml(
 		appendTemplatePart(html, escapeInlineScriptContent(authoredStaticScriptContent), 'raw');
 	}
 
-	let children = normalizeChildren(sourceChildren, childNs === 'svg', ctx);
+	let children = normalizeChildren(sourceChildren, childNs === 'svg', ctx, tag === 'noscript');
 	// NESTED document metadata / Float resources are zero-DOM children: lift
 	// them to the enclosing plan's head list (mounted out-of-band by
 	// emitHeadClient — scope-owned metadata, global resources), mirroring the
