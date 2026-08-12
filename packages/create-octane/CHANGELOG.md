@@ -1,5 +1,12 @@
 # create-octane
 
+## 0.0.8
+
+### Patch Changes
+
+- Updated dependencies [b3537b4]
+  - @octanejs/cli@0.0.8
+
 ## 0.0.7
 
 ### Patch Changes

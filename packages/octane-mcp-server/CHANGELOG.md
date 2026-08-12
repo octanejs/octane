@@ -1,5 +1,14 @@
 # @octanejs/mcp-server
 
+## 0.2.16
+
+### Patch Changes
+
+- 371d9f9: Register `@octanejs/alien-signals` in the MCP binding catalogs.
+- b3537b4: Register `@octanejs/textarea-autosize` in the CLI and MCP migration mappings.
+- 87394b4: Register `@octanejs/pdf` in the MCP binding catalogs.
+- 89a3b1d: Register `@octanejs/popper` in the MCP binding catalogs.
+
 ## 0.2.15
 
 ### Patch Changes

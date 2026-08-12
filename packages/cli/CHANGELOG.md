@@ -1,5 +1,11 @@
 # @octanejs/cli
 
+## 0.0.8
+
+### Patch Changes
+
+- b3537b4: Register `@octanejs/textarea-autosize` in the CLI and MCP migration mappings.
+
 ## 0.0.7
 
 ### Patch Changes

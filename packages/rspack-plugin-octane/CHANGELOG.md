@@ -1,5 +1,29 @@
 # @octanejs/rspack-plugin
 
+## 0.1.31
+
+### Patch Changes
+
+- 4a792e3: Allow universal renderers to route compiler-emitted thread-function helpers through an optional cold runtime module.
+
+  Lynx now uses that boundary to omit main-thread worklet registries and call bridges from applications that compile no worklets, while retaining late-chunk activation and the existing worklet-enabled behavior.
+
+- Updated dependencies [972fdd3]
+- Updated dependencies [4a792e3]
+- Updated dependencies [581b8bd]
+- Updated dependencies [24aa236]
+- Updated dependencies [9c397a2]
+- Updated dependencies [24aa236]
+- Updated dependencies [5377ef3]
+- Updated dependencies [6b65644]
+- Updated dependencies [f12a9a9]
+- Updated dependencies [972fdd3]
+- Updated dependencies [1039b7d]
+- Updated dependencies [ffadd39]
+- Updated dependencies [a03ff0f]
+- Updated dependencies [4c1ecd1]
+  - octane@0.1.36
+
 ## 0.1.30
 
 ### Patch Changes

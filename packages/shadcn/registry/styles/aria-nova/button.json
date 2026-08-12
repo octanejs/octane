@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/aria@0.0.29",
+    "@octanejs/aria@0.0.30",
     "class-variance-authority"
   ],
   "registryDependencies": [
