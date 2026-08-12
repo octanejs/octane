@@ -1013,35 +1013,6 @@ function jsonValueToNode(value) {
 	);
 }
 
-// Merge one import list: user specifiers verbatim (preserving `x as y`
-// aliases) + every generated-code helper aliased to `_$name`.
-function buildRuntimeImport(ctx, moduleName) {
-	let out = '';
-	for (const local of ctx.userRuntimeNamespaces || []) {
-		out += `import * as ${local} from '${moduleName}';\n`;
-	}
-	for (const local of ctx.userRuntimeDefaults || []) {
-		out += `import ${local} from '${moduleName}';\n`;
-	}
-	const specifiers = new Set(ctx.userRuntimeNames);
-	for (const n of ctx.runtimeNeeded) {
-		const alias =
-			n === 'hookSlots' && ctx._hookSlotsHelperName ? ctx._hookSlotsHelperName : rtAlias(n);
-		specifiers.add(`${n} as ${alias}`);
-	}
-	if (specifiers.size > 0) {
-		out += `import { ${[...specifiers].sort().join(', ')} } from '${moduleName}';\n`;
-	}
-	return out === '' ? '' : out + '\n';
-}
-
-function buildProfileRuntimeImport(ctx) {
-	const specifiers = [...ctx.profileRuntimeNeeded].map((name) => `${name} as ${rtAlias(name)}`);
-	return specifiers.length === 0
-		? ''
-		: `import { ${specifiers.sort().join(', ')} } from 'octane/profiling';\n\n`;
-}
-
 // Split a `imported as local` merge key (see buildRuntimeImportNodes) back into
 // its [imported, local] pair — plain names import under their own name.
 function importSpecifierPair(entry) {
@@ -1049,18 +1020,28 @@ function importSpecifierPair(entry) {
 	return at === -1 ? [entry, entry] : [entry.slice(0, at), entry.slice(at + 4)];
 }
 
+// Existing helpers remain on their historical public request so previously
+// compiled components and authored runtime imports retain their stable shape.
+// New compiler-only helpers use the private, renderer-specific ABI instead.
+const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set(['replaceRef', 'queueOwnRefDetach']);
+const INTERNAL_SERVER_RUNTIME_HELPERS = new Set(['ssrSpreadContent']);
+
 function runtimeImportModuleFor(ctx, fallback, imported, local) {
 	for (const route of ctx.runtimeImportRoutes ?? []) {
 		if (route.locals?.has(local) || route.imported?.has(imported)) return route.module;
 	}
+	if (local === rtAlias(imported)) {
+		if (fallback === 'octane' && INTERNAL_CLIENT_RUNTIME_HELPERS.has(imported)) {
+			return 'octane/internal/client';
+		}
+		if (fallback === 'octane/server' && INTERNAL_SERVER_RUNTIME_HELPERS.has(imported)) {
+			return 'octane/internal/server';
+		}
+	}
 	return fallback;
 }
 
-/**
- * Node form of buildRuntimeImport (client AST emit, M2): same specifiers, same
- * `imported as alias` sort order, returned as ImportDeclaration nodes. The
- * server pipeline still assembles its import strings via buildRuntimeImport.
- */
+/** Build client and server runtime imports directly as compiler-owned AST nodes. */
 function buildRuntimeImportNodes(ctx, moduleName, origin) {
 	const nodes = [];
 	for (const local of ctx.userRuntimeNamespaces || []) {
@@ -1094,7 +1075,7 @@ function buildRuntimeImportNodes(ctx, moduleName, origin) {
 	return nodes.map((node) => inheritOriginLoc(node, origin));
 }
 
-/** Node form of buildProfileRuntimeImport (client AST emit, M2). */
+/** Build the optional profiling ABI import directly as compiler-owned AST nodes. */
 function buildProfileRuntimeImportNodes(ctx, origin) {
 	const specifiers = [...ctx.profileRuntimeNeeded].map((name) => `${name} as ${rtAlias(name)}`);
 	if (specifiers.length === 0) return [];
@@ -10276,6 +10257,31 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	const firstSpreadIdx = attrs.findIndex(
 		(a) => a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute',
 	);
+	// A single spread is the only possible content writer when an otherwise
+	// empty ordinary host has no explicit children/raw-HTML attributes. Its
+	// snapshot already owns evaluation order and enumerable-key semantics, so a
+	// narrow runtime helper can read both content channels without manufacturing
+	// duplicate source pairs and fallback closures at every compiled host.
+	const useSingleSpreadContent =
+		firstSpreadIdx !== -1 &&
+		!VOID_ELEMENTS.has(tag) &&
+		tag !== 'textarea' &&
+		tag !== 'select' &&
+		tag !== 'option' &&
+		tag !== 'script' &&
+		tag !== 'style' &&
+		tag !== 'pre' &&
+		tag !== 'listing' &&
+		!(node.children || []).some(
+			(child) => child?.type === 'JSXStyleElement' && headResourceKind(child) === 'style',
+		) &&
+		!hasSemanticJsxChildren(node.children || []) &&
+		attrs.every((attr, index) => {
+			if (index === firstSpreadIdx) return true;
+			if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') return false;
+			const attrName = jsxAttrRawName(attr);
+			return attrName !== 'children' && attrName !== 'dangerouslySetInnerHTML';
+		});
 	// A spread can carry a native form control's value/default writers (plus
 	// checked for input and multiple for select). Serializing each source as a
 	// generic attribute either creates first-wins duplicates or puts state in the
@@ -10301,6 +10307,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	const spreadTemps = [];
 	const htmlSources = [];
 	const childrenPropSources = [];
+	let singleSpreadContentTemp = null;
 	const bindAttributeEvaluation = (argExpr) => {
 		const tempName = `__sp${spreadTemps.length}`;
 		spreadTemps.push({ tempName, argExpr });
@@ -10371,6 +10378,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				formControlSources.push(ssrSourcePair(b.literal(true, 'true'), tmp, attr));
 			}
 			attrSources.push(ssrSourcePair(b.literal(true, 'true'), tmp, attr));
+			if (useSingleSpreadContent) {
+				singleSpreadContentTemp = tmp;
+				continue;
+			}
 			// The spread may carry `dangerouslySetInnerHTML` — record both own-key
 			// presence and value so an explicit `undefined` overwrites an earlier writer.
 			const spreadHas = (key) =>
@@ -10831,7 +10842,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	if (tag !== 'option') lit += '>'; // option: ssrOption assembles the tag (attrs-only here)
 	const normChildren =
 		authoredStaticScriptContent === undefined
-			? normalizeChildren(node.children || [], childNs === 'svg', ctx)
+			? normalizeChildren(node.children || [], childNs === 'svg', ctx, tag === 'noscript')
 			: [];
 	const hasNestedChildren = hasAuthoredStaticScriptBody || normChildren.length > 0;
 	const effectiveChildrenPropSources = hasNestedChildren ? [] : childrenPropSources;
@@ -11004,7 +11015,11 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		parts.push(ssrCall('ssrOption', [optionValueExpr, attrsExpr, contentExpr], node));
 		return finalize();
 	}
-	if (htmlSources.length > 0) {
+	if (singleSpreadContentTemp !== null) {
+		ctx.runtimeNeeded.add('ssrSpreadContent');
+		flush();
+		parts.push(ssrCall('ssrSpreadContent', [singleSpreadContentTemp, b.id('__s')], node));
+	} else if (htmlSources.length > 0) {
 		// Raw HTML (explicit and/or spread-supplied) wins over children when present
 		// at runtime (last source wins); otherwise the children render.
 		const innerHtmlHelper = tag === 'script' ? 'ssrScriptInnerHtml' : 'ssrInnerHtml';
@@ -16536,6 +16551,7 @@ function requiresTemplateNormalization(
 	// reconciliation can then use the actual host namespace chosen at runtime.
 	const childAllowsHeadHoists =
 		allowHeadHoists &&
+		tag !== 'noscript' &&
 		(!isComponentTag(node) || isActivityLongForm(node) || isFragmentLongForm(node, ctx));
 	return (node.children || []).some((child) =>
 		requiresTemplateNormalization(child, childNs, childAllowsHeadHoists, ctx),
@@ -18416,16 +18432,17 @@ function isHoistableHeadElementNode(n) {
 	if (n == null || (n.type !== 'JSXElement' && n.type !== 'Element')) return false;
 	const tag = jsxTagName(n) || elementTagName(n);
 	if (!HOISTABLE_HEAD_TAGS.has(tag)) return false;
-	if (tag !== 'link') return true;
 
 	// React keeps links with explicit load/error handlers in their authored DOM
-	// position, preserving resource-event propagation through logical ancestors.
+	// position (resource-event propagation through logical ancestors), and never
+	// hoists microdata: an itemProp meta/link belongs to its itemScope host.
 	// Spread keys remain unknowable here and keep the existing head-hoist path.
 	const attrs = n.attributes || n.openingElement?.attributes || [];
 	for (const attr of attrs) {
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const name = jsxAttrRawName(attr);
-		if (name === 'onLoad' || name === 'onError') return false;
+		if (name === 'itemProp' || name === 'itemprop') return false;
+		if (tag === 'link' && (name === 'onLoad' || name === 'onError')) return false;
 	}
 	return true;
 }
@@ -18449,6 +18466,7 @@ function headResourceKind(n) {
 			if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 			const name = jsxAttrRawName(attr);
 			if (name === 'dangerouslySetInnerHTML') return null;
+			if (name === 'itemProp' || name === 'itemprop') return null;
 			if (name === 'href') hasHref = true;
 			else if (name === 'precedence') hasPrecedence = true;
 		}
@@ -18467,8 +18485,10 @@ function headResourceKind(n) {
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const name = jsxAttrRawName(attr);
 		// Handlers keep the element per-site (matching React: a load/error
-		// listener needs an owned instance); markup injection disqualifies too.
+		// listener needs an owned instance); markup injection disqualifies too,
+		// and microdata belongs to its itemScope host — never a resource.
 		if (name === 'onLoad' || name === 'onError' || name === 'dangerouslySetInnerHTML') return null;
+		if (name === 'itemProp' || name === 'itemprop') return null;
 		if (name === 'precedence') hasPrecedence = true;
 		else if (name === 'href') hasHref = true;
 		else if (name === 'async') {
@@ -18895,7 +18915,7 @@ function emitHeadServer(headNodes, ctx) {
 // `inSvg`: the children being normalized sit inside an SVG-namespace subtree.
 // SVG has its own `<title>` (the accessibility tooltip element) — it must stay
 // where it is, NOT hoist to document.head (React 19 makes the same exception).
-function normalizeChildren(nodes, inSvg = false, ctx = null) {
+function normalizeChildren(nodes, inSvg = false, ctx = null, inNoscript = false) {
 	const out = [];
 	if (!nodes) return out;
 	for (const n of nodes) {
@@ -18977,10 +18997,10 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 							refVal && refVal.type === 'JSXExpressionContainer' ? refVal.expression : refVal;
 					}
 					out.push({ type: 'FragmentStart', refExpr });
-					out.push(...normalizeChildren(n.children || [], inSvg, ctx));
+					out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
 					out.push({ type: 'FragmentEnd' });
 				} else {
-					out.push(...normalizeChildren(n.children || [], inSvg, ctx));
+					out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
 				}
 				continue;
 			}
@@ -19016,9 +19036,13 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 			// body DOM). Kept in `out` as a synthetic node so planJsx / ssrCompileBody
 			// can partition it out and emit it via headBlock (client) / ssrHeadEl
 			// (server). SVG `<title>` and explicit resource-handler links stay inline.
+			// The whole hoist model is HTML-scoped: inside an SVG lexical context
+			// link/meta are svg-namespace content and React keeps them inline
+			// (foreignObject children re-enter the HTML rules via childNs).
 			if (
-				(isHoistableHeadElementNode(n) || (!inSvg && headResourceKind(n) !== null)) &&
-				!(inSvg && jsxTagName(n) === 'title')
+				!inNoscript &&
+				!inSvg &&
+				(isHoistableHeadElementNode(n) || headResourceKind(n) !== null)
 			) {
 				out.push({ type: 'HeadHoist', element: n });
 				continue;
@@ -19044,11 +19068,11 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 			}
 			out.push(element);
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
-			out.push(...normalizeChildren(n.children || [], inSvg, ctx));
+			out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
 		} else if (n.type === 'JSXStyleElement') {
 			// `<style href precedence>` is a Float style resource, not scoped CSS —
 			// partition it to the head channel like precedence links.
-			if (!inSvg && headResourceKind(n) === 'style') {
+			if (!inSvg && !inNoscript && headResourceKind(n) === 'style') {
 				out.push({ type: 'HeadHoist', element: n });
 				continue;
 			}
@@ -19062,7 +19086,7 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 			// still template output, not setup JavaScript. Unwrap it before lowering
 			// so both client and server compilation route it through their construct
 			// emitters rather than asking esrap to print a TSRX-only expression.
-			out.push(...normalizeChildren([n.expression], inSvg, ctx));
+			out.push(...normalizeChildren([n.expression], inSvg, ctx, inNoscript));
 		} else if (n.type === 'JSXIfExpression') {
 			// `@if (cond) { ... } @else { ... }` — lower to the old IfStatement
 			// shape so the existing makeIfCall path picks it up. `consequent` and
@@ -19127,7 +19151,7 @@ function normalizeChildren(nodes, inSvg = false, ctx = null) {
 			if (body.length === 0 && render === null) continue;
 			if (body.length === 0 && render !== null) {
 				// Recurse — render is a single JSX node, treat as a sibling child.
-				out.push(...normalizeChildren([render], inSvg, ctx));
+				out.push(...normalizeChildren([render], inSvg, ctx, inNoscript));
 			} else {
 				throw new Error(
 					'`@{ … }` with setup statements is not supported at JSX child position. ' +
@@ -20090,7 +20114,7 @@ function planJsx(
 		if (b.kind === 'formCommit') ctx.runtimeNeeded.add('setFormControlSources');
 		if (b.kind === 'hostCommit') {
 			ctx.runtimeNeeded.add('setHostPropSources');
-			ctx.runtimeNeeded.add('queueRefDetach');
+			ctx.runtimeNeeded.add('queueOwnRefDetach');
 		}
 		// A commit-phase collector takes the element's props as one grouped call,
 		// so each source's name literal — not the shared helper — is what claims
@@ -20118,16 +20142,16 @@ function planJsx(
 		}
 		if (b.kind === 'spread') {
 			ctx.runtimeNeeded.add('setSpread');
-			ctx.runtimeNeeded.add('queueRefDetach'); // unmount-detach of a spread-supplied ref
+			ctx.runtimeNeeded.add('queueOwnRefDetach'); // unmount-detach of a spread-supplied ref
 		}
 		if (b.kind === 'ref') {
 			ctx.runtimeNeeded.add('queueRefAttach'); // deferred mount attach (commit-phase timing)
 			ctx.runtimeNeeded.add('queueRefDetach'); // deferred unmount detach (same phasing)
+			if (!b.mountOnly) ctx.runtimeNeeded.add('replaceRef'); // changed-ref commit-phase update
 		}
 		if (b.kind === 'fragmentRef') {
 			ctx.runtimeNeeded.add('mountFragmentRef');
-			ctx.runtimeNeeded.add('queueRefAttach'); // deferred update re-attach
-			ctx.runtimeNeeded.add('queueRefDetach'); // deferred update/unmount detach
+			if (!b.mountOnly) ctx.runtimeNeeded.add('replaceRef'); // changed-ref commit-phase update
 			// Fragment refs need a SECOND template-walked node for the end
 			// marker; emitBindingMount expects a single elVar so we resolve
 			// the end-marker var here and stash it on the binding for the
@@ -21574,24 +21598,11 @@ function emitBindingMount(bind, elVar, bag) {
 			// `_host$` field is re-written by updates, so the read must be live.
 			const cleanup = b.arrow(
 				[],
-				b.block([
-					b.const('_p', bagFieldNode(bag, `_host$${bind.id}`)),
-					b.if(
-						andChain([
-							b.binary('!=', b.id('_p'), nullNode()),
-							propertyIsEnumerableCall(b.id('_p'), 'ref'),
-							b.binary('!=', b.member(b.id('_p'), 'ref'), nullNode()),
-						]),
-						b.stmt(
-							b.call(
-								'_$queueRefDetach',
-								b.member(b.id('_p'), 'ref'),
-								bagFieldNode(bag, `_el$${bind.id}`),
-							),
-						),
-						null,
-					),
-				]),
+				b.call(
+					'_$queueOwnRefDetach',
+					bagFieldNode(bag, `_host$${bind.id}`),
+					bagFieldNode(bag, `_el$${bind.id}`),
+				),
 			);
 			return st(
 				b.block([
@@ -21701,24 +21712,11 @@ function emitBindingMount(bind, elVar, bag) {
 			const spLocal = local(`_sp$${bind.id}`);
 			const cleanup = b.arrow(
 				[],
-				b.block([
-					b.const('_sp', bagFieldNode(bag, `_sp$${bind.id}`)),
-					b.if(
-						andChain([
-							b.binary('!=', b.id('_sp'), nullNode()),
-							propertyIsEnumerableCall(b.call('Object', b.id('_sp')), 'ref'),
-							b.binary('!=', b.member(b.id('_sp'), 'ref'), nullNode()),
-						]),
-						b.stmt(
-							b.call(
-								'_$queueRefDetach',
-								b.member(b.id('_sp'), 'ref'),
-								bagFieldNode(bag, `_el$${bind.id}`),
-							),
-						),
-						null,
-					),
-				]),
+				b.call(
+					'_$queueOwnRefDetach',
+					bagFieldNode(bag, `_sp$${bind.id}`),
+					bagFieldNode(bag, `_el$${bind.id}`),
+				),
 			);
 			return st(
 				b.block([
@@ -22101,20 +22099,13 @@ function emitBindingUpdate(bind, bag) {
 					b.const('_r', bind.expr),
 					b.if(
 						b.binary('!==', b.id('_r'), F('_ref')),
-						b.block([
-							b.const('_old', F('_ref')),
-							b.if(
-								b.binary('!=', b.id('_old'), nullNode()),
-								b.stmt(b.call('_$queueRefDetach', b.id('_old'), F('_el'))),
-								null,
+						b.stmt(
+							b.assignment(
+								'=',
+								F('_ref'),
+								b.call('_$replaceRef', b.id('__s'), F('_ref'), b.id('_r'), F('_el')),
 							),
-							b.if(
-								b.binary('!=', b.id('_r'), nullNode()),
-								b.stmt(b.call('_$queueRefAttach', b.id('__s'), b.id('_r'), F('_el'))),
-								null,
-							),
-							b.stmt(b.assignment('=', F('_ref'), b.id('_r'))),
-						]),
+						),
 						null,
 					),
 				]),
@@ -22135,19 +22126,13 @@ function emitBindingUpdate(bind, bag) {
 					b.const('_fi', F('_fi')),
 					b.if(
 						andChain([fi(), b.binary('!==', b.id('_r'), cur())]),
-						b.block([
-							b.if(
-								b.binary('!=', cur(), nullNode()),
-								b.stmt(b.call('_$queueRefDetach', cur(), fi())),
-								null,
+						b.stmt(
+							b.assignment(
+								'=',
+								cur(),
+								b.call('_$replaceRef', b.id('__s'), cur(), b.id('_r'), fi()),
 							),
-							b.if(
-								b.binary('!=', b.id('_r'), nullNode()),
-								b.stmt(b.call('_$queueRefAttach', b.id('__s'), b.id('_r'), fi())),
-								null,
-							),
-							b.stmt(b.assignment('=', cur(), b.id('_r'))),
-						]),
+						),
 						null,
 					),
 				]),
@@ -23391,7 +23376,7 @@ function emitElementHtml(
 		appendTemplatePart(html, escapeInlineScriptContent(authoredStaticScriptContent), 'raw');
 	}
 
-	let children = normalizeChildren(sourceChildren, childNs === 'svg', ctx);
+	let children = normalizeChildren(sourceChildren, childNs === 'svg', ctx, tag === 'noscript');
 	// NESTED document metadata / Float resources are zero-DOM children: lift
 	// them to the enclosing plan's head list (mounted out-of-band by
 	// emitHeadClient — scope-owned metadata, global resources), mirroring the

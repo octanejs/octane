@@ -582,6 +582,30 @@ describe('lazy — SSR', () => {
 		expect(r.html).not.toContain('loading');
 	});
 
+	it('keeps resolved server lazy defaults live without replacing explicit null', async () => {
+		const GreetingWithDefaults = m.Greeting as typeof m.Greeting & {
+			defaultProps?: { name: string };
+		};
+		const originalDefaults = GreetingWithDefaults.defaultProps;
+		GreetingWithDefaults.defaultProps = { name: 'first default' };
+		const L = Server.lazy(() => Promise.resolve({ default: GreetingWithDefaults }));
+
+		try {
+			const first = await prerender(m.LazyHost, { comp: L, name: undefined });
+			expect(first.html).toContain('hello first default');
+
+			GreetingWithDefaults.defaultProps = { name: 'second default' };
+			const updated = await Server.renderToString(m.LazyHost, { comp: L, name: undefined });
+			expect(updated.html).toContain('hello second default');
+
+			const explicitNull = await Server.renderToString(m.LazyHost, { comp: L, name: null });
+			expect(explicitNull.html).toContain('hello null');
+		} finally {
+			if (originalDefaults === undefined) delete GreetingWithDefaults.defaultProps;
+			else GreetingWithDefaults.defaultProps = originalDefaults;
+		}
+	});
+
 	it('prerender routes a rejected load to @catch', async () => {
 		const L = Server.lazy(() => Promise.reject(new Error('chunk failed')));
 		const r = await prerender(m.LazyHost, { comp: L });

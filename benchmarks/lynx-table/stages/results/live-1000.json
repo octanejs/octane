@@ -1,0 +1,3403 @@
+{
+  "meta": {
+    "date": "2026-08-12T00:23:08.466Z",
+    "node": "v22.22.2",
+    "cpus": 32,
+    "cpuModel": "Intel(R) Xeon(R) Platinum 8336C CPU @ 2.30GHz",
+    "platform": "linux",
+    "release": "5.15.120.bsk.3-amd64",
+    "chromium": "149.0.7827.55",
+    "repetitions": 5,
+    "rows": 1000,
+    "reportable": true,
+    "loadStart": [2.07, 2.16, 1.99],
+    "loadEnd": [2.58, 2.31, 2.05],
+    "protocol": "fresh page per operation sample; control/profile order alternates AB/BA; one vue-vdom create/replace/append triplet follows each pair; no other benchmark process ran in this window"
+  },
+  "fcp": {
+    "attribution": {
+      "total": {
+        "median": 216.60009765625,
+        "min": 214.5,
+        "max": 241.300048828125,
+        "spread": 26.800048828125,
+        "n": 5
+      },
+      "stages": {
+        "mt_slice_eval": {
+          "median": 19.300048828125,
+          "min": 18.5,
+          "max": 20.10009765625,
+          "spread": 1.60009765625,
+          "n": 5,
+          "share": 0.08910452505314509
+        },
+        "plan_interpretation": {
+          "median": 17.399999856948853,
+          "min": 17.200000047683716,
+          "max": 19.09999990463257,
+          "spread": 1.8999998569488525,
+          "n": 5,
+          "share": 0.08033237309321581
+        },
+        "papi_element_creation": {
+          "median": 60.3000009059906,
+          "min": 58.00000214576721,
+          "max": 65.59999871253967,
+          "spread": 7.599996566772461,
+          "n": 5,
+          "share": 0.27839323046699765
+        },
+        "layout_flush_residual": {
+          "median": 120.6000485420227,
+          "min": 118.49999904632568,
+          "max": 137.20014786720276,
+          "spread": 18.700148820877075,
+          "n": 5,
+          "share": 0.5567866766773952
+        }
+      },
+      "ratios": {}
+    },
+    "rawControl": {
+      "median": 241.89999985694885,
+      "min": 237.70000004768372,
+      "max": 251,
+      "spread": 13.299999952316284,
+      "n": 5
+    },
+    "rawProfile": {
+      "median": 244.70000004768372,
+      "min": 240.60000014305115,
+      "max": 273.30000019073486,
+      "spread": 32.700000047683716,
+      "n": 5
+    }
+  },
+  "create": {
+    "attribution": {
+      "total": {
+        "median": 148.29999995231628,
+        "min": 142.09999990463257,
+        "max": 154.39999985694885,
+        "spread": 12.299999952316284,
+        "n": 5
+      },
+      "stages": {
+        "bg_replay": {
+          "median": 26.90000009536743,
+          "min": 26.40000009536743,
+          "max": 29.399999856948853,
+          "spread": 2.999999761581421,
+          "n": 5,
+          "share": 0.18138907689829223
+        },
+        "wire_clone_transfer": {
+          "median": 0.5999999046325684,
+          "min": 0.40000009536743164,
+          "max": 0.7000000476837158,
+          "spread": 0.2999999523162842,
+          "n": 5,
+          "share": 0.004045852358904178
+        },
+        "mt_validate": {
+          "median": 1.9000000953674316,
+          "min": 1.7000000476837158,
+          "max": 2.200000047683716,
+          "spread": 0.5,
+          "n": 5,
+          "share": 0.01281186848265913
+        },
+        "mt_expand": {
+          "median": 0,
+          "min": 0,
+          "max": 0.09999990463256836,
+          "spread": 0.09999990463256836,
+          "n": 5,
+          "share": 0
+        },
+        "mt_prepare": {
+          "median": 1.5999999046325684,
+          "min": 1.5,
+          "max": 1.7999999523162842,
+          "spread": 0.2999999523162842,
+          "n": 5,
+          "share": 0.010788940695529502
+        },
+        "papi_element_creation": {
+          "median": 61.99999976158142,
+          "min": 56.70000076293945,
+          "max": 65.8999993801117,
+          "spread": 9.199998617172241,
+          "n": 5,
+          "share": 0.4180714752630925
+        },
+        "mt_apply_other": {
+          "median": 40.999998331069946,
+          "min": 36.600000619888306,
+          "max": 44.799999713897705,
+          "spread": 8.1999990940094,
+          "n": 5,
+          "share": 0.2764666105478955
+        },
+        "mt_ack_publication": {
+          "median": 0.5000002384185791,
+          "min": 0.40000009536743164,
+          "max": 0.5999999046325684,
+          "spread": 0.19999980926513672,
+          "n": 5,
+          "share": 0.003371545775990202
+        },
+        "presentation_residual": {
+          "median": 13.199999570846558,
+          "min": 12.299999952316284,
+          "max": 15.59999966621399,
+          "spread": 3.299999713897705,
+          "n": 5,
+          "share": 0.0890087631496347
+        }
+      },
+      "ratios": {
+        "control": 1.0458392101705627,
+        "reference": 0.9297805639643654
+      }
+    },
+    "wire": {
+      "toBts": {
+        "bytes": {
+          "median": 19361,
+          "min": 19346,
+          "max": 19378,
+          "spread": 32,
+          "n": 5
+        },
+        "messages": {
+          "median": 14,
+          "min": 14,
+          "max": 14,
+          "spread": 0,
+          "n": 5
+        }
+      },
+      "toMts": {
+        "bytes": {
+          "median": 41355,
+          "min": 41309,
+          "max": 41380,
+          "spread": 71,
+          "n": 5
+        },
+        "messages": {
+          "median": 10,
+          "min": 10,
+          "max": 10,
+          "spread": 0,
+          "n": 5
+        }
+      }
+    },
+    "rawControl": {
+      "median": 141.79999995231628,
+      "min": 138,
+      "max": 143.59999990463257,
+      "spread": 5.599999904632568,
+      "n": 5
+    },
+    "rawProfile": {
+      "median": 148.29999995231628,
+      "min": 142.09999990463257,
+      "max": 154.39999985694885,
+      "spread": 12.299999952316284,
+      "n": 5
+    },
+    "vueVdom": {
+      "median": 159.5,
+      "min": 157.29999995231628,
+      "max": 166.39999985694885,
+      "spread": 9.099999904632568,
+      "n": 5
+    }
+  },
+  "replace": {
+    "attribution": {
+      "total": {
+        "median": 316.5,
+        "min": 304.2999999523163,
+        "max": 337.2000000476837,
+        "spread": 32.90000009536743,
+        "n": 5
+      },
+      "stages": {
+        "bg_replay": {
+          "median": 36.700000047683716,
+          "min": 36.200000047683716,
+          "max": 38.200000047683716,
+          "spread": 2,
+          "n": 5,
+          "share": 0.11595576634339247
+        },
+        "wire_clone_transfer": {
+          "median": 2.799999952316284,
+          "min": 2.700000047683716,
+          "max": 3.4000000953674316,
+          "spread": 0.7000000476837158,
+          "n": 5,
+          "share": 0.008846761302737075
+        },
+        "mt_validate": {
+          "median": 9.200000047683716,
+          "min": 8,
+          "max": 10.299999952316284,
+          "spread": 2.299999952316284,
+          "n": 5,
+          "share": 0.02906793064039089
+        },
+        "mt_expand": {
+          "median": 0,
+          "min": 0,
+          "max": 0,
+          "spread": 0,
+          "n": 5,
+          "share": 0
+        },
+        "mt_prepare": {
+          "median": 55.89999985694885,
+          "min": 54.09999990463257,
+          "max": 60.40000009536743,
+          "spread": 6.300000190734863,
+          "n": 5,
+          "share": 0.1766192728497594
+        },
+        "papi_element_creation": {
+          "median": 53.80000424385071,
+          "min": 48.99999809265137,
+          "max": 61.000004053115845,
+          "spread": 12.000005960464478,
+          "n": 5,
+          "share": 0.16998421562038138
+        },
+        "mt_apply_other": {
+          "median": 81.69999575614929,
+          "min": 76.59999990463257,
+          "max": 87.99999594688416,
+          "spread": 11.399996042251587,
+          "n": 5,
+          "share": 0.25813584757077185
+        },
+        "mt_ack_publication": {
+          "median": 36,
+          "min": 35.5,
+          "max": 38.09999990463257,
+          "spread": 2.5999999046325684,
+          "n": 5,
+          "share": 0.11374407582938388
+        },
+        "presentation_residual": {
+          "median": 44,
+          "min": 34.80000019073486,
+          "max": 46.60000038146973,
+          "spread": 11.800000190734863,
+          "n": 5,
+          "share": 0.13902053712480253
+        }
+      },
+      "ratios": {
+        "control": 1.0118286446555236,
+        "reference": 1.811677160352676
+      }
+    },
+    "rawControl": {
+      "median": 312.7999999523163,
+      "min": 303.2000000476837,
+      "max": 355,
+      "spread": 51.799999952316284,
+      "n": 5
+    },
+    "rawProfile": {
+      "median": 316.5,
+      "min": 304.2999999523163,
+      "max": 337.2000000476837,
+      "spread": 32.90000009536743,
+      "n": 5
+    },
+    "vueVdom": {
+      "median": 174.70000004768372,
+      "min": 173.5,
+      "max": 186,
+      "spread": 12.5,
+      "n": 5
+    },
+    "wire": {
+      "toBts": {
+        "bytes": {
+          "median": 1999041,
+          "min": 1999031,
+          "max": 1999043,
+          "spread": 12,
+          "n": 5
+        },
+        "messages": {
+          "median": 4,
+          "min": 4,
+          "max": 4,
+          "spread": 0,
+          "n": 5
+        }
+      },
+      "toMts": {
+        "bytes": {
+          "median": 376572,
+          "min": 376531,
+          "max": 376656,
+          "spread": 125,
+          "n": 5
+        },
+        "messages": {
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "spread": 0,
+          "n": 5
+        }
+      }
+    }
+  },
+  "append": {
+    "attribution": {
+      "total": {
+        "median": 197.70000004768372,
+        "min": 189.79999995231628,
+        "max": 211.30000019073486,
+        "spread": 21.50000023841858,
+        "n": 5
+      },
+      "stages": {
+        "bg_replay": {
+          "median": 28.300000190734863,
+          "min": 26.199999809265137,
+          "max": 29.200000047683716,
+          "spread": 3.000000238418579,
+          "n": 5,
+          "share": 0.14314618201269155
+        },
+        "wire_clone_transfer": {
+          "median": 0.40000009536743164,
+          "min": 0.2999999523162842,
+          "max": 0.5,
+          "spread": 0.20000004768371582,
+          "n": 5,
+          "share": 0.0020232680590336607
+        },
+        "mt_validate": {
+          "median": 1.2000000476837158,
+          "min": 1.0999999046325684,
+          "max": 1.2000000476837158,
+          "spread": 0.10000014305114746,
+          "n": 5,
+          "share": 0.00606980297113953
+        },
+        "mt_expand": {
+          "median": 0,
+          "min": 0,
+          "max": 0.09999990463256836,
+          "spread": 0.09999990463256836,
+          "n": 5,
+          "share": 0
+        },
+        "mt_prepare": {
+          "median": 16.40000009536743,
+          "min": 14.700000047683716,
+          "max": 16.799999952316284,
+          "spread": 2.0999999046325684,
+          "n": 5,
+          "share": 0.08295397112499685
+        },
+        "papi_element_creation": {
+          "median": 53.70000100135803,
+          "min": 49.69999837875366,
+          "max": 61.19999861717224,
+          "spread": 11.500000238418579,
+          "n": 5,
+          "share": 0.27162367723017705
+        },
+        "mt_apply_other": {
+          "median": 46.30000138282776,
+          "min": 41.999999046325684,
+          "max": 48.799996852874756,
+          "spread": 6.799997806549072,
+          "n": 5,
+          "share": 0.23419322899170741
+        },
+        "mt_ack_publication": {
+          "median": 31.299999952316284,
+          "min": 30.299999952316284,
+          "max": 36.200000047683716,
+          "spread": 5.900000095367432,
+          "n": 5,
+          "share": 0.1583206876315982
+        },
+        "presentation_residual": {
+          "median": 20.100000143051147,
+          "min": 18.59999990463257,
+          "max": 22.100000143051147,
+          "spread": 3.500000238418579,
+          "n": 5,
+          "share": 0.10166919645019314
+        }
+      },
+      "ratios": {
+        "control": 1.000506072391499,
+        "reference": 1.2233910883210162
+      }
+    },
+    "rawControl": {
+      "median": 197.60000014305115,
+      "min": 189.69999980926514,
+      "max": 227.89999985694885,
+      "spread": 38.200000047683716,
+      "n": 5
+    },
+    "rawProfile": {
+      "median": 197.70000004768372,
+      "min": 189.79999995231628,
+      "max": 211.30000019073486,
+      "spread": 21.50000023841858,
+      "n": 5
+    },
+    "vueVdom": {
+      "median": 161.60000014305115,
+      "min": 155.20000004768372,
+      "max": 174.70000004768372,
+      "spread": 19.5,
+      "n": 5
+    },
+    "wire": {
+      "toBts": {
+        "bytes": {
+          "median": 1713062,
+          "min": 1713061,
+          "max": 1713071,
+          "spread": 10,
+          "n": 5
+        },
+        "messages": {
+          "median": 4,
+          "min": 4,
+          "max": 4,
+          "spread": 0,
+          "n": 5
+        }
+      },
+      "toMts": {
+        "bytes": {
+          "median": 34974,
+          "min": 34883,
+          "max": 35079,
+          "spread": 196,
+          "n": 5
+        },
+        "messages": {
+          "median": 1,
+          "min": 1,
+          "max": 1,
+          "spread": 0,
+          "n": 5
+        }
+      }
+    }
+  },
+  "verdicts": [
+    {
+      "step": "#47 wire/encoding candidate",
+      "verdict": "NO-GO",
+      "reason": "clone/transfer is 0.4% of create, 0.9% of replace, and 0.2% of append; it does not clear the 10% owner gate."
+    },
+    {
+      "step": "#47 measured CPU owner",
+      "verdict": "SPLIT",
+      "reason": "PAPI creation plus remaining host apply is 69.5% of create. This is a host materialization owner, not evidence for changing the wire representation."
+    },
+    {
+      "step": "#47 acknowledgement-only candidate",
+      "verdict": "NO-GO for issue acceptance",
+      "reason": "ACK/publication is 0.3% of create, 11.4% of replace, and 15.8% of append; even a complete removal cannot meet the required 15% in all three cells or the 50% total-wire gate."
+    }
+  ],
+  "samples": {
+    "fcp": {
+      "control": [
+        {
+          "rawMs": 237.70000004768372
+        },
+        {
+          "rawMs": 241.79999995231628
+        },
+        {
+          "rawMs": 251
+        },
+        {
+          "rawMs": 241.89999985694885
+        },
+        {
+          "rawMs": 248
+        }
+      ],
+      "profile": [
+        {
+          "rawMs": 244.5,
+          "attribution": {
+            "totalMs": 216.60009765625,
+            "stages": {
+              "mt_slice_eval": 19.300048828125,
+              "plan_interpretation": 17.299999952316284,
+              "papi_element_creation": 59.40000033378601,
+              "layout_flush_residual": 120.6000485420227
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 16094,
+              "bytes": 1039233,
+              "selfcheckMs": 0,
+              "dispatchMs": 6.400000095367432,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0.20000004768371582,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 59.40000033378601,
+              "mtSliceStartEpochMs": 1786494149883.2,
+              "mtSliceEvalMs": 19.300048828125,
+              "firstScreenPlanMs": 17.299999952316284
+            }
+          }
+        },
+        {
+          "rawMs": 251.69999980926514,
+          "attribution": {
+            "totalMs": 223.5,
+            "stages": {
+              "mt_slice_eval": 20.10009765625,
+              "plan_interpretation": 17.700000047683716,
+              "papi_element_creation": 58.00000214576721,
+              "layout_flush_residual": 127.69990015029907
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 16094,
+              "bytes": 1039233,
+              "selfcheckMs": 0,
+              "dispatchMs": 6.900000333786011,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 58.00000214576721,
+              "mtSliceStartEpochMs": 1786494155228.3,
+              "mtSliceEvalMs": 20.10009765625,
+              "firstScreenPlanMs": 17.700000047683716
+            }
+          }
+        },
+        {
+          "rawMs": 273.30000019073486,
+          "attribution": {
+            "totalMs": 241.300048828125,
+            "stages": {
+              "mt_slice_eval": 19.39990234375,
+              "plan_interpretation": 19.09999990463257,
+              "papi_element_creation": 65.59999871253967,
+              "layout_flush_residual": 137.20014786720276
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 16094,
+              "bytes": 1039233,
+              "selfcheckMs": 0,
+              "dispatchMs": 6.699999809265137,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 65.59999871253967,
+              "mtSliceStartEpochMs": 1786494166599.8,
+              "mtSliceEvalMs": 19.39990234375,
+              "firstScreenPlanMs": 19.09999990463257
+            }
+          }
+        },
+        {
+          "rawMs": 244.70000004768372,
+          "attribution": {
+            "totalMs": 216.5,
+            "stages": {
+              "mt_slice_eval": 19.199951171875,
+              "plan_interpretation": 17.399999856948853,
+              "papi_element_creation": 60.79999923706055,
+              "layout_flush_residual": 119.1000497341156
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 16094,
+              "bytes": 1039233,
+              "selfcheckMs": 0,
+              "dispatchMs": 7.1000001430511475,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0.10000014305114746,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 60.79999923706055,
+              "mtSliceStartEpochMs": 1786494171932.6,
+              "mtSliceEvalMs": 19.199951171875,
+              "firstScreenPlanMs": 17.399999856948853
+            }
+          }
+        },
+        {
+          "rawMs": 240.60000014305115,
+          "attribution": {
+            "totalMs": 214.5,
+            "stages": {
+              "mt_slice_eval": 18.5,
+              "plan_interpretation": 17.200000047683716,
+              "papi_element_creation": 60.3000009059906,
+              "layout_flush_residual": 118.49999904632568
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 16094,
+              "bytes": 1039233,
+              "selfcheckMs": 0,
+              "dispatchMs": 6.799999952316284,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0.09999990463256836,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 60.3000009059906,
+              "mtSliceStartEpochMs": 1786494183263.5,
+              "mtSliceEvalMs": 18.5,
+              "firstScreenPlanMs": 17.200000047683716
+            }
+          }
+        }
+      ]
+    },
+    "create": {
+      "control": [
+        {
+          "rawMs": 139.59999990463257,
+          "wire": {
+            "toBts": {
+              "messages": 14,
+              "bytes": 19346,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 227
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 7,
+                  "bytes": 17791
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 767
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 307
+                }
+              }
+            },
+            "toMts": {
+              "messages": 10,
+              "bytes": 41265,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "dispatchJSContextOnMainThread": {
+                  "messages": 5,
+                  "bytes": 40472
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 673
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 141.79999995231628,
+          "wire": {
+            "toBts": {
+              "messages": 14,
+              "bytes": 19368,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 227
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 7,
+                  "bytes": 17791
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 774
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 322
+                }
+              }
+            },
+            "toMts": {
+              "messages": 10,
+              "bytes": 41271,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "dispatchJSContextOnMainThread": {
+                  "messages": 5,
+                  "bytes": 40473
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 678
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 141.89999985694885,
+          "wire": {
+            "toBts": {
+              "messages": 14,
+              "bytes": 19372,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 227
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 7,
+                  "bytes": 17791
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 778
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 322
+                }
+              }
+            },
+            "toMts": {
+              "messages": 10,
+              "bytes": 41320,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "dispatchJSContextOnMainThread": {
+                  "messages": 5,
+                  "bytes": 40516
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 684
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 138,
+          "wire": {
+            "toBts": {
+              "messages": 14,
+              "bytes": 19378,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 227
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 7,
+                  "bytes": 17791
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 784
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 322
+                }
+              }
+            },
+            "toMts": {
+              "messages": 10,
+              "bytes": 41394,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "dispatchJSContextOnMainThread": {
+                  "messages": 5,
+                  "bytes": 40586
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 688
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 143.59999990463257,
+          "wire": {
+            "toBts": {
+              "messages": 14,
+              "bytes": 19358,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 227
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 7,
+                  "bytes": 17791
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 779
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 307
+                }
+              }
+            },
+            "toMts": {
+              "messages": 10,
+              "bytes": 41223,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "dispatchJSContextOnMainThread": {
+                  "messages": 5,
+                  "bytes": 40415
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 688
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          }
+        }
+      ],
+      "profile": [
+        {
+          "rawMs": 148.29999995231628,
+          "wire": {
+            "toBts": {
+              "messages": 14,
+              "bytes": 19361,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 227
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 7,
+                  "bytes": 17791
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 767
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 322
+                }
+              }
+            },
+            "toMts": {
+              "messages": 10,
+              "bytes": 41380,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "dispatchJSContextOnMainThread": {
+                  "messages": 5,
+                  "bytes": 40589
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 671
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 148.29999995231628,
+            "stages": {
+              "bg_replay": 26.700000047683716,
+              "wire_clone_transfer": 0.40000009536743164,
+              "mt_validate": 1.9000000953674316,
+              "mt_expand": 0,
+              "mt_prepare": 1.700000286102295,
+              "papi_element_creation": 57.10000014305115,
+              "mt_apply_other": 44.799999713897705,
+              "mt_ack_publication": 0.5999999046325684,
+              "presentation_residual": 15.09999966621399
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 2,
+              "commands": 95,
+              "bytes": 39783,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.40000009536743164,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 26.700000047683716
+            },
+            "main": {
+              "commits": 2,
+              "pacedCommits": 0,
+              "commands": 95,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 1.9000000953674316,
+              "prepareMs": 1.700000286102295,
+              "prepareCheckMs": 0,
+              "applyMs": 101.89999985694885,
+              "ackMs": 0.5999999046325684,
+              "papiCreateMs": 57.10000014305115,
+              "mtSliceStartEpochMs": 1786494150645.8,
+              "mtSliceEvalMs": 20.699951171875,
+              "firstScreenPlanMs": 0.5,
+              "mtExpandMs": 0
+            }
+          }
+        },
+        {
+          "rawMs": 149.19999980926514,
+          "wire": {
+            "toBts": {
+              "messages": 14,
+              "bytes": 19378,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 227
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 7,
+                  "bytes": 17791
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 784
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 322
+                }
+              }
+            },
+            "toMts": {
+              "messages": 10,
+              "bytes": 41375,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "dispatchJSContextOnMainThread": {
+                  "messages": 5,
+                  "bytes": 40565
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 690
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 149.19999980926514,
+            "stages": {
+              "bg_replay": 28.799999952316284,
+              "wire_clone_transfer": 0.7000000476837158,
+              "mt_validate": 1.7000000476837158,
+              "mt_expand": 0,
+              "mt_prepare": 1.7999999523162842,
+              "papi_element_creation": 65.8999993801117,
+              "mt_apply_other": 36.600000619888306,
+              "mt_ack_publication": 0.5000002384185791,
+              "presentation_residual": 13.199999570846558
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 2,
+              "commands": 95,
+              "bytes": 39759,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.7000000476837158,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 28.799999952316284
+            },
+            "main": {
+              "commits": 2,
+              "pacedCommits": 0,
+              "commands": 95,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 1.7000000476837158,
+              "prepareMs": 1.7999999523162842,
+              "prepareCheckMs": 0,
+              "applyMs": 102.5,
+              "ackMs": 0.5000002384185791,
+              "papiCreateMs": 65.8999993801117,
+              "mtSliceStartEpochMs": 1786494155983.1,
+              "mtSliceEvalMs": 22,
+              "firstScreenPlanMs": 0.40000009536743164,
+              "mtExpandMs": 0
+            }
+          }
+        },
+        {
+          "rawMs": 142.5,
+          "wire": {
+            "toBts": {
+              "messages": 14,
+              "bytes": 19360,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 227
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 7,
+                  "bytes": 17791
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 766
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 322
+                }
+              }
+            },
+            "toMts": {
+              "messages": 10,
+              "bytes": 41355,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "dispatchJSContextOnMainThread": {
+                  "messages": 5,
+                  "bytes": 40563
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 672
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 142.5,
+            "stages": {
+              "bg_replay": 26.40000009536743,
+              "wire_clone_transfer": 0.40000009536743164,
+              "mt_validate": 2.200000047683716,
+              "mt_expand": 0,
+              "mt_prepare": 1.5999999046325684,
+              "papi_element_creation": 61.99999976158142,
+              "mt_apply_other": 37.00000023841858,
+              "mt_ack_publication": 0.5999999046325684,
+              "presentation_residual": 12.299999952316284
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 2,
+              "commands": 95,
+              "bytes": 39757,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.40000009536743164,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 26.40000009536743
+            },
+            "main": {
+              "commits": 2,
+              "pacedCommits": 0,
+              "commands": 95,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 2.200000047683716,
+              "prepareMs": 1.5999999046325684,
+              "prepareCheckMs": 0,
+              "applyMs": 99,
+              "ackMs": 0.5999999046325684,
+              "papiCreateMs": 61.99999976158142,
+              "mtSliceStartEpochMs": 1786494167358.3,
+              "mtSliceEvalMs": 19.7998046875,
+              "firstScreenPlanMs": 0.40000009536743164,
+              "mtExpandMs": 0
+            }
+          }
+        },
+        {
+          "rawMs": 154.39999985694885,
+          "wire": {
+            "toBts": {
+              "messages": 14,
+              "bytes": 19361,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 227
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 7,
+                  "bytes": 17791
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 767
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 322
+                }
+              }
+            },
+            "toMts": {
+              "messages": 10,
+              "bytes": 41309,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "dispatchJSContextOnMainThread": {
+                  "messages": 5,
+                  "bytes": 40516
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 673
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 154.39999985694885,
+            "stages": {
+              "bg_replay": 29.399999856948853,
+              "wire_clone_transfer": 0.5999999046325684,
+              "mt_validate": 2.000000238418579,
+              "mt_expand": 0,
+              "mt_prepare": 1.5999999046325684,
+              "papi_element_creation": 63.80000162124634,
+              "mt_apply_other": 40.999998331069946,
+              "mt_ack_publication": 0.40000033378601074,
+              "presentation_residual": 15.59999966621399
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 2,
+              "commands": 95,
+              "bytes": 39710,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.5999999046325684,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 29.399999856948853
+            },
+            "main": {
+              "commits": 2,
+              "pacedCommits": 0,
+              "commands": 95,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 2.000000238418579,
+              "prepareMs": 1.5999999046325684,
+              "prepareCheckMs": 0,
+              "applyMs": 104.79999995231628,
+              "ackMs": 0.40000033378601074,
+              "papiCreateMs": 63.80000162124634,
+              "mtSliceStartEpochMs": 1786494172682.5,
+              "mtSliceEvalMs": 21.800048828125,
+              "firstScreenPlanMs": 0.39999985694885254,
+              "mtExpandMs": 0
+            }
+          }
+        },
+        {
+          "rawMs": 142.09999990463257,
+          "wire": {
+            "toBts": {
+              "messages": 14,
+              "bytes": 19346,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 227
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 7,
+                  "bytes": 17791
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 765
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 309
+                }
+              }
+            },
+            "toMts": {
+              "messages": 10,
+              "bytes": 41350,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "dispatchJSContextOnMainThread": {
+                  "messages": 5,
+                  "bytes": 40559
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 671
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 142.09999990463257,
+            "stages": {
+              "bg_replay": 26.90000009536743,
+              "wire_clone_transfer": 0.6999998092651367,
+              "mt_validate": 1.8000001907348633,
+              "mt_expand": 0.09999990463256836,
+              "mt_prepare": 1.5,
+              "papi_element_creation": 56.70000076293945,
+              "mt_apply_other": 41.49999928474426,
+              "mt_ack_publication": 0.40000009536743164,
+              "presentation_residual": 12.499999761581421
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 2,
+              "commands": 95,
+              "bytes": 39753,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.6999998092651367,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 26.90000009536743
+            },
+            "main": {
+              "commits": 2,
+              "pacedCommits": 0,
+              "commands": 95,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 1.8000001907348633,
+              "prepareMs": 1.5,
+              "prepareCheckMs": 0,
+              "applyMs": 98.20000004768372,
+              "ackMs": 0.40000009536743164,
+              "papiCreateMs": 56.70000076293945,
+              "mtSliceStartEpochMs": 1786494184013.1,
+              "mtSliceEvalMs": 18.89990234375,
+              "firstScreenPlanMs": 0.39999985694885254,
+              "mtExpandMs": 0.09999990463256836
+            }
+          }
+        }
+      ],
+      "vueVdom": [
+        {
+          "rawMs": 164.09999990463257,
+          "wire": {
+            "toBts": {
+              "messages": 12,
+              "bytes": 2053,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 228
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 1,
+                  "bytes": 94
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 950
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "ret_bg-to-main_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "ret_bg-to-main_1": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "ret_bg-to-main_2": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 287
+                },
+                "ret_bg-to-main_3": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 9,
+              "bytes": 337414,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "callLepusMethod": {
+                  "messages": 4,
+                  "bytes": 336516
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 778
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 158.70000004768372,
+          "wire": {
+            "toBts": {
+              "messages": 12,
+              "bytes": 2066,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 228
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 1,
+                  "bytes": 94
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 963
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "ret_bg-to-main_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "ret_bg-to-main_1": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "ret_bg-to-main_2": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 287
+                },
+                "ret_bg-to-main_3": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 9,
+              "bytes": 337473,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "callLepusMethod": {
+                  "messages": 4,
+                  "bytes": 336564
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 789
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 166.39999985694885,
+          "wire": {
+            "toBts": {
+              "messages": 12,
+              "bytes": 2062,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 228
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 1,
+                  "bytes": 94
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 959
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "ret_bg-to-main_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "ret_bg-to-main_1": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "ret_bg-to-main_2": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 287
+                },
+                "ret_bg-to-main_3": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 9,
+              "bytes": 337352,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "callLepusMethod": {
+                  "messages": 4,
+                  "bytes": 336445
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 787
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 157.29999995231628,
+          "wire": {
+            "toBts": {
+              "messages": 12,
+              "bytes": 2056,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 228
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 1,
+                  "bytes": 94
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 953
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "ret_bg-to-main_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "ret_bg-to-main_1": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "ret_bg-to-main_2": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 287
+                },
+                "ret_bg-to-main_3": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 9,
+              "bytes": 337347,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "callLepusMethod": {
+                  "messages": 4,
+                  "bytes": 336446
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 781
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 159.5,
+          "wire": {
+            "toBts": {
+              "messages": 12,
+              "bytes": 2058,
+              "byName": {
+                "updateBTSChunkEndpoint": {
+                  "messages": 1,
+                  "bytes": 228
+                },
+                "dispatchCoreContextOnBackground": {
+                  "messages": 1,
+                  "bytes": 94
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 955
+                },
+                "postTimingFlags": {
+                  "messages": 3,
+                  "bytes": 168
+                },
+                "start": {
+                  "messages": 1,
+                  "bytes": 86
+                },
+                "ret_bg-to-main_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "ret_bg-to-main_1": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "ret_bg-to-main_2": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 287
+                },
+                "ret_bg-to-main_3": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 9,
+              "bytes": 337348,
+              "byName": {
+                "ret_main-to-bg_0": {
+                  "messages": 1,
+                  "bytes": 60
+                },
+                "callLepusMethod": {
+                  "messages": 4,
+                  "bytes": 336445
+                },
+                "dispatchLynxViewEvent": {
+                  "messages": 3,
+                  "bytes": 783
+                },
+                "ret_main-to-bg_1": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "replace": {
+      "control": [
+        {
+          "rawMs": 316.2999999523163,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1999052,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1998487
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 244
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 321
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 376262,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 376262
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 312.7999999523163,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1999046,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1998487
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 238
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 321
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 376487,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 376487
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 355,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1999043,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1998487
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 235
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 321
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 376437,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 376437
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 311.7999999523163,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1999037,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1998487
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 229
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 321
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 376507,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 376507
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 303.2000000476837,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1999052,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1998487
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 244
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 321
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 376343,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 376343
+                }
+              }
+            }
+          }
+        }
+      ],
+      "profile": [
+        {
+          "rawMs": 337.2000000476837,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1999041,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1998487
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 233
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 321
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 376572,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 376572
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 337.2000000476837,
+            "stages": {
+              "bg_replay": 37.60000014305115,
+              "wire_clone_transfer": 2.700000047683716,
+              "mt_validate": 9.200000047683716,
+              "mt_expand": 0,
+              "mt_prepare": 56.59999990463257,
+              "papi_element_creation": 61.000004053115845,
+              "mt_apply_other": 87.99999594688416,
+              "mt_ack_publication": 38.09999990463257,
+              "presentation_residual": 44
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 10001,
+              "bytes": 376460,
+              "selfcheckMs": 0,
+              "dispatchMs": 2.700000047683716,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 37.60000014305115
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 10001,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 9.200000047683716,
+              "prepareMs": 56.59999990463257,
+              "prepareCheckMs": 0,
+              "applyMs": 149,
+              "ackMs": 38.09999990463257,
+              "papiCreateMs": 61.000004053115845,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 0
+            }
+          }
+        },
+        {
+          "rawMs": 311.09999990463257,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1999031,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1998487
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 235
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 309
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 376533,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 376533
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 311.09999990463257,
+            "stages": {
+              "bg_replay": 36.200000047683716,
+              "wire_clone_transfer": 2.700000047683716,
+              "mt_validate": 10,
+              "mt_expand": 0,
+              "mt_prepare": 54.200000047683716,
+              "papi_element_creation": 53.80000424385071,
+              "mt_apply_other": 81.69999575614929,
+              "mt_ack_publication": 36.19999980926514,
+              "presentation_residual": 36.299999952316284
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 10001,
+              "bytes": 376421,
+              "selfcheckMs": 0,
+              "dispatchMs": 2.700000047683716,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 36.200000047683716
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 10001,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 10,
+              "prepareMs": 54.200000047683716,
+              "prepareCheckMs": 0,
+              "applyMs": 135.5,
+              "ackMs": 36.19999980926514,
+              "papiCreateMs": 53.80000424385071,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 0
+            }
+          }
+        },
+        {
+          "rawMs": 316.5,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1999038,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1998487
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 244
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 307
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 376531,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 376531
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 316.5,
+            "stages": {
+              "bg_replay": 36.700000047683716,
+              "wire_clone_transfer": 2.8999998569488525,
+              "mt_validate": 8,
+              "mt_expand": 0,
+              "mt_prepare": 55.89999985694885,
+              "papi_element_creation": 48.99999809265137,
+              "mt_apply_other": 81.90000176429749,
+              "mt_ack_publication": 35.5,
+              "presentation_residual": 46.60000038146973
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 10001,
+              "bytes": 376419,
+              "selfcheckMs": 0,
+              "dispatchMs": 2.8999998569488525,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 36.700000047683716
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 10001,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 8,
+              "prepareMs": 55.89999985694885,
+              "prepareCheckMs": 0,
+              "applyMs": 130.89999985694885,
+              "ackMs": 35.5,
+              "papiCreateMs": 48.99999809265137,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 0
+            }
+          }
+        },
+        {
+          "rawMs": 323.5,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1999043,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1998487
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 235
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 321
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 376656,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 376656
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 323.5,
+            "stages": {
+              "bg_replay": 38.200000047683716,
+              "wire_clone_transfer": 3.4000000953674316,
+              "mt_validate": 8.200000047683716,
+              "mt_expand": 0,
+              "mt_prepare": 60.40000009536743,
+              "papi_element_creation": 52.79999923706055,
+              "mt_apply_other": 80.30000066757202,
+              "mt_ack_publication": 36,
+              "presentation_residual": 44.19999980926514
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 10001,
+              "bytes": 376544,
+              "selfcheckMs": 0,
+              "dispatchMs": 3.4000000953674316,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 38.200000047683716
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 10001,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 8.200000047683716,
+              "prepareMs": 60.40000009536743,
+              "prepareCheckMs": 0,
+              "applyMs": 133.09999990463257,
+              "ackMs": 36,
+              "papiCreateMs": 52.79999923706055,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 0
+            }
+          }
+        },
+        {
+          "rawMs": 304.2999999523163,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1999043,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1998487
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 235
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 321
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 376587,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 376587
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 304.2999999523163,
+            "stages": {
+              "bg_replay": 36.299999952316284,
+              "wire_clone_transfer": 2.799999952316284,
+              "mt_validate": 10.299999952316284,
+              "mt_expand": 0,
+              "mt_prepare": 54.09999990463257,
+              "papi_element_creation": 53.90000009536743,
+              "mt_apply_other": 76.59999990463257,
+              "mt_ack_publication": 35.5,
+              "presentation_residual": 34.80000019073486
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 10001,
+              "bytes": 376475,
+              "selfcheckMs": 0,
+              "dispatchMs": 2.799999952316284,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 36.299999952316284
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 10001,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 10.299999952316284,
+              "prepareMs": 54.09999990463257,
+              "prepareCheckMs": 0,
+              "applyMs": 130.5,
+              "ackMs": 35.5,
+              "papiCreateMs": 53.90000009536743,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 0
+            }
+          }
+        }
+      ],
+      "vueVdom": [
+        {
+          "rawMs": 173.79999995231628,
+          "wire": {
+            "toBts": {
+              "messages": 2,
+              "bytes": 346,
+              "byName": {
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 286
+                },
+                "ret_bg-to-main_4": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 356775,
+              "byName": {
+                "callLepusMethod": {
+                  "messages": 1,
+                  "bytes": 356775
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 173.5,
+          "wire": {
+            "toBts": {
+              "messages": 2,
+              "bytes": 346,
+              "byName": {
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 286
+                },
+                "ret_bg-to-main_4": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 356936,
+              "byName": {
+                "callLepusMethod": {
+                  "messages": 1,
+                  "bytes": 356936
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 179.20000004768372,
+          "wire": {
+            "toBts": {
+              "messages": 2,
+              "bytes": 346,
+              "byName": {
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 286
+                },
+                "ret_bg-to-main_4": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 356826,
+              "byName": {
+                "callLepusMethod": {
+                  "messages": 1,
+                  "bytes": 356826
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 186,
+          "wire": {
+            "toBts": {
+              "messages": 2,
+              "bytes": 346,
+              "byName": {
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 286
+                },
+                "ret_bg-to-main_4": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 356622,
+              "byName": {
+                "callLepusMethod": {
+                  "messages": 1,
+                  "bytes": 356622
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 174.70000004768372,
+          "wire": {
+            "toBts": {
+              "messages": 2,
+              "bytes": 334,
+              "byName": {
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 274
+                },
+                "ret_bg-to-main_4": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 356947,
+              "byName": {
+                "callLepusMethod": {
+                  "messages": 1,
+                  "bytes": 356947
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "append": {
+      "control": [
+        {
+          "rawMs": 201,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1713062,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1712503
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 235
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 324
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 34820,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 34820
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 227.89999985694885,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1713062,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1712503
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 235
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 324
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 35099,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 35099
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 195,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1713062,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1712503
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 235
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 324
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 35062,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 35062
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 197.60000014305115,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1713062,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1712503
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 235
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 324
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 34937,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 34937
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 189.69999980926514,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1713048,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1712503
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 235
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 310
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 34824,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 34824
+                }
+              }
+            }
+          }
+        }
+      ],
+      "profile": [
+        {
+          "rawMs": 192.40000009536743,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1713061,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1712503
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 234
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 324
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 34993,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 34993
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 192.40000009536743,
+            "stages": {
+              "bg_replay": 28.300000190734863,
+              "wire_clone_transfer": 0.39999985694885254,
+              "mt_validate": 1.0999999046325684,
+              "mt_expand": 0.09999990463256836,
+              "mt_prepare": 16.40000009536743,
+              "papi_element_creation": 53.70000100135803,
+              "mt_apply_other": 41.999999046325684,
+              "mt_ack_publication": 31.299999952316284,
+              "presentation_residual": 19.100000143051147
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 1,
+              "bytes": 34881,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.39999985694885254,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 28.300000190734863
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 1,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 1.0999999046325684,
+              "prepareMs": 16.40000009536743,
+              "prepareCheckMs": 0,
+              "applyMs": 95.70000004768372,
+              "ackMs": 31.299999952316284,
+              "papiCreateMs": 53.70000100135803,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 0.09999990463256836
+            }
+          }
+        },
+        {
+          "rawMs": 201.09999990463257,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1713071,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1712503
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 244
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 324
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 34974,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 34974
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 201.09999990463257,
+            "stages": {
+              "bg_replay": 29.200000047683716,
+              "wire_clone_transfer": 0.5,
+              "mt_validate": 1.2000000476837158,
+              "mt_expand": 0,
+              "mt_prepare": 16,
+              "papi_element_creation": 53.6000030040741,
+              "mt_apply_other": 48.799996852874756,
+              "mt_ack_publication": 30.800000190734863,
+              "presentation_residual": 20.99999976158142
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 1,
+              "bytes": 34862,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.5,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 29.200000047683716
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 1,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 1.2000000476837158,
+              "prepareMs": 16,
+              "prepareCheckMs": 0,
+              "applyMs": 102.39999985694885,
+              "ackMs": 30.800000190734863,
+              "papiCreateMs": 53.6000030040741,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 0
+            }
+          }
+        },
+        {
+          "rawMs": 211.30000019073486,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1713062,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1712503
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 235
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 324
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 34883,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 34883
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 211.30000019073486,
+            "stages": {
+              "bg_replay": 27.299999952316284,
+              "wire_clone_transfer": 0.40000009536743164,
+              "mt_validate": 1.0999999046325684,
+              "mt_expand": 0.09999990463256836,
+              "mt_prepare": 16.600000143051147,
+              "papi_element_creation": 61.19999861717224,
+              "mt_apply_other": 46.30000138282776,
+              "mt_ack_publication": 36.200000047683716,
+              "presentation_residual": 22.100000143051147
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 1,
+              "bytes": 34771,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.40000009536743164,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 27.299999952316284
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 1,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 1.0999999046325684,
+              "prepareMs": 16.600000143051147,
+              "prepareCheckMs": 0,
+              "applyMs": 107.5,
+              "ackMs": 36.200000047683716,
+              "papiCreateMs": 61.19999861717224,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 0.09999990463256836
+            }
+          }
+        },
+        {
+          "rawMs": 197.70000004768372,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1713066,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1712503
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 239
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 324
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 35079,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 35079
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 197.70000004768372,
+            "stages": {
+              "bg_replay": 28.799999952316284,
+              "wire_clone_transfer": 0.2999999523162842,
+              "mt_validate": 1.2000000476837158,
+              "mt_expand": 0,
+              "mt_prepare": 16.799999952316284,
+              "papi_element_creation": 54.20000243186951,
+              "mt_apply_other": 44.39999771118164,
+              "mt_ack_publication": 31.899999856948853,
+              "presentation_residual": 20.100000143051147
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 1,
+              "bytes": 34967,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.2999999523162842,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 28.799999952316284
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 1,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 1.2000000476837158,
+              "prepareMs": 16.799999952316284,
+              "prepareCheckMs": 0,
+              "applyMs": 98.60000014305115,
+              "ackMs": 31.899999856948853,
+              "papiCreateMs": 54.20000243186951,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 0
+            }
+          }
+        },
+        {
+          "rawMs": 189.79999995231628,
+          "wire": {
+            "toBts": {
+              "messages": 4,
+              "bytes": 1713062,
+              "byName": {
+                "dispatchCoreContextOnBackground": {
+                  "messages": 2,
+                  "bytes": 1712503
+                },
+                "markTiming": {
+                  "messages": 1,
+                  "bytes": 235
+                },
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 324
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 34964,
+              "byName": {
+                "dispatchJSContextOnMainThread": {
+                  "messages": 1,
+                  "bytes": 34964
+                }
+              }
+            }
+          },
+          "attribution": {
+            "totalMs": 189.79999995231628,
+            "stages": {
+              "bg_replay": 26.199999809265137,
+              "wire_clone_transfer": 0.40000009536743164,
+              "mt_validate": 1.2000000476837158,
+              "mt_expand": 0,
+              "mt_prepare": 14.700000047683716,
+              "papi_element_creation": 49.69999837875366,
+              "mt_apply_other": 48.70000171661377,
+              "mt_ack_publication": 30.299999952316284,
+              "presentation_residual": 18.59999990463257
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 1,
+              "bytes": 34852,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.40000009536743164,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "templateRuns": 1,
+              "templateInstances": 1000,
+              "templateValues": 3000,
+              "bgReplayMs": 26.199999809265137
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 1,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 1.2000000476837158,
+              "prepareMs": 14.700000047683716,
+              "prepareCheckMs": 0,
+              "applyMs": 98.40000009536743,
+              "ackMs": 30.299999952316284,
+              "papiCreateMs": 49.69999837875366,
+              "mtSliceStartEpochMs": 0,
+              "mtSliceEvalMs": 0,
+              "firstScreenPlanMs": 0,
+              "mtExpandMs": 0
+            }
+          }
+        }
+      ],
+      "vueVdom": [
+        {
+          "rawMs": 155.20000004768372,
+          "wire": {
+            "toBts": {
+              "messages": 2,
+              "bytes": 336,
+              "byName": {
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 276
+                },
+                "ret_bg-to-main_4": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 343099,
+              "byName": {
+                "callLepusMethod": {
+                  "messages": 1,
+                  "bytes": 343099
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 157.29999995231628,
+          "wire": {
+            "toBts": {
+              "messages": 2,
+              "bytes": 348,
+              "byName": {
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 288
+                },
+                "ret_bg-to-main_4": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 343161,
+              "byName": {
+                "callLepusMethod": {
+                  "messages": 1,
+                  "bytes": 343161
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 161.60000014305115,
+          "wire": {
+            "toBts": {
+              "messages": 2,
+              "bytes": 348,
+              "byName": {
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 288
+                },
+                "ret_bg-to-main_4": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 343314,
+              "byName": {
+                "callLepusMethod": {
+                  "messages": 1,
+                  "bytes": 343314
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 163.20000004768372,
+          "wire": {
+            "toBts": {
+              "messages": 2,
+              "bytes": 348,
+              "byName": {
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 288
+                },
+                "ret_bg-to-main_4": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 343142,
+              "byName": {
+                "callLepusMethod": {
+                  "messages": 1,
+                  "bytes": 343142
+                }
+              }
+            }
+          }
+        },
+        {
+          "rawMs": 174.70000004768372,
+          "wire": {
+            "toBts": {
+              "messages": 2,
+              "bytes": 348,
+              "byName": {
+                "publicComponentEvent": {
+                  "messages": 1,
+                  "bytes": 288
+                },
+                "ret_bg-to-main_4": {
+                  "messages": 1,
+                  "bytes": 60
+                }
+              }
+            },
+            "toMts": {
+              "messages": 1,
+              "bytes": 343166,
+              "byName": {
+                "callLepusMethod": {
+                  "messages": 1,
+                  "bytes": 343166
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -130,6 +130,47 @@ export function App() @{
 		expect(diagnostics(component('<input onChange={() => {}} disabled="disabled" />'))).toEqual([]);
 	});
 
+	it('recognizes native readonly spelling on text-entry inputs and textareas', () => {
+		for (const tag of ['input', 'textarea']) {
+			for (const attribute of ['readonly', 'readonly={true}', 'readonly="readonly"']) {
+				expect(
+					diagnostics(component(`<${tag} onChange={() => {}} ${attribute} />`)),
+					`${tag} ${attribute}`,
+				).toEqual([]);
+			}
+
+			for (const attribute of ['readonly={false}', 'readonly=""', 'readonly={0}']) {
+				expect(
+					diagnostics(component(`<${tag} onChange={() => {}} ${attribute} />`)),
+					`${tag} ${attribute}`,
+				).toHaveLength(1);
+			}
+
+			expect(
+				diagnostics(component(`<${tag} onChange={() => {}} readonly={props.readOnly} />`)),
+				`${tag} dynamic readonly`,
+			).toEqual([]);
+		}
+	});
+
+	it('uses the final authored readonly attribute across native and React spellings', () => {
+		const cases = [
+			{ attributes: 'readOnly={false} readonly', warnings: 0 },
+			{ attributes: 'readonly readOnly={false}', warnings: 1 },
+			{ attributes: 'readOnly readonly={false}', warnings: 1 },
+			{ attributes: 'readonly={false} readOnly', warnings: 0 },
+			{ attributes: 'readOnly={false} readonly={props.readOnly}', warnings: 0 },
+			{ attributes: 'readonly={props.readOnly} readOnly={false}', warnings: 1 },
+		];
+
+		for (const { attributes, warnings } of cases) {
+			expect(
+				diagnostics(component(`<input onChange={() => {}} ${attributes} />`)),
+				attributes,
+			).toHaveLength(warnings);
+		}
+	});
+
 	it('defers dynamic and spread-owned decisions instead of issuing false static warnings', () => {
 		expect(
 			diagnostics(`

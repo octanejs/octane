@@ -3053,6 +3053,55 @@ export function Scene() @{
 		second.root.unmount();
 	});
 
+	it('applies live lazy defaults without replacing null or mutating supplied props', async () => {
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'lazy-defaults',
+			bindings: [
+				['label', 0],
+				['nullable', 1],
+				['extra', 2],
+			],
+		});
+		const Loaded = defineUniversalComponent(
+			'object',
+			(props: { label?: string; nullable?: string | null; extra?: string; revision: number }) =>
+				universalValue(plan, [props.label, props.nullable, props.extra]),
+		);
+		const component = Loaded as typeof Loaded & {
+			defaultProps: { label: string; nullable: string; extra: string };
+		};
+		component.defaultProps = { label: 'first', nullable: 'unused', extra: 'first extra' };
+		const Lazy = UniversalRuntime.lazy(() => Promise.resolve({ default: component }));
+		const Parent = defineUniversalComponent('object', (props: any) =>
+			UniversalRuntime.universalComponent('object', Lazy, props),
+		);
+		const first = Object.freeze({ label: undefined, nullable: null, revision: 0 });
+		const { container, root } = objectRoot();
+
+		expect(root.render(Parent, first).status).toBe('suspended');
+		await Promise.resolve();
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(container.children[0].props).toMatchObject({
+			label: 'first',
+			nullable: null,
+			extra: 'first extra',
+		});
+		expect(first).toEqual({ label: undefined, nullable: null, revision: 0 });
+
+		component.defaultProps = { label: 'second', nullable: 'still unused', extra: 'second extra' };
+		const second = Object.freeze({ label: undefined, nullable: null, revision: 1 });
+		root.render(Parent, second);
+		expect(container.children[0].props).toMatchObject({
+			label: 'second',
+			nullable: null,
+			extra: 'second extra',
+		});
+		expect(second).toEqual({ label: undefined, nullable: null, revision: 1 });
+		root.unmount();
+	});
+
 	it('composes memo comparators with resolved universal lazy components', async () => {
 		const loadedPlan = universalPlan('object', {
 			kind: 'host',

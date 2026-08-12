@@ -95,6 +95,26 @@ export const DRIVER_CLIENT_JS = `(() => {
     return r ? hasClass(r, 'danger') : false;
   };
 
+  // -- semantic checksum ----------------------------------------------------
+  const hashText = (seed, text) => {
+    let hash = seed >>> 0;
+    for (let i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619) >>> 0;
+    }
+    return hash;
+  };
+  x.tableOracle = () => {
+    const current = rowEls();
+    let checksum = 2166136261;
+    for (const row of current) {
+      const id = cellOf(row, 'col-id')?.textContent ?? '';
+      const label = cellOf(row, 'col-label')?.textContent ?? '';
+      checksum = hashText(checksum, id + '\\u0000' + label + '\\u0000' + classOf(row));
+    }
+    return { rows: current.length, checksum };
+  };
+
   // -- click geometry --------------------------------------------------------
   x.buttonRect = (label) => {
     for (const el of findByClass('btn-text')) {
@@ -119,6 +139,7 @@ export const DRIVER_CLIENT_JS = `(() => {
       case 'rowCount': return x.rowCount() === spec.value;
       case 'labelAt': return x.labelAt(spec.index) === spec.equals;
       case 'dangerAt': return x.dangerAt(spec.index);
+      case 'checksumNot': return x.tableOracle().checksum !== spec.value;
       case 'contentAtLeast': return x.contentCount() >= spec.value;
       default: throw new Error('unknown predicate ' + spec.type);
     }
@@ -170,19 +191,23 @@ export const DRIVER_CLIENT_JS = `(() => {
       const t0 = x.viewAttachTime ?? performance.now();
       const deadline = performance.now() + timeoutMs;
       let fcp = null;
+      let fcpEpoch = null;
       let lastCount = -1;
       let lastChange = performance.now();
       const tick = () => {
         const now = performance.now();
         const c = x.contentCount();
-        if (fcp == null && c >= minContent) { fcp = now - t0; }
+        if (fcp == null && c >= minContent) {
+          fcp = now - t0;
+          fcpEpoch = performance.timeOrigin + now;
+        }
         if (c !== lastCount) { lastCount = c; lastChange = now; }
         if (fcp != null && now - lastChange >= idleMs) {
-          resolve({ fcp, settled: lastChange - t0, finalCount: c, dnf: false });
+          resolve({ fcp, fcpEpoch, settled: lastChange - t0, finalCount: c, dnf: false });
           return;
         }
         if (now > deadline) {
-          resolve({ fcp, settled: null, finalCount: c, dnf: true });
+          resolve({ fcp, fcpEpoch, settled: null, finalCount: c, dnf: true });
           return;
         }
         requestAnimationFrame(tick);
@@ -192,15 +217,73 @@ export const DRIVER_CLIENT_JS = `(() => {
   };
 })()`;
 
+// Page-side MessagePort accounting. It observes the same Web Core RPC boundary
+// as the shared cross-framework runner and records only JSON-equivalent bytes;
+// no payload is cloned, retained, or rewritten by the probe.
+export const WIRE_INSTRUMENT_JS = `(() => {
+  const stats = {
+    // Web Core direction names: page/main-thread-script -> background thread,
+    // then background thread -> page/main-thread-script.
+    toBts: { messages: 0, bytes: 0, byName: {} },
+    toMts: { messages: 0, bytes: 0, byName: {} },
+  };
+  const encoder = new TextEncoder();
+  const sizeOf = (data) => {
+    try {
+      const json = JSON.stringify(data, (_key, value) => {
+        if (value instanceof ArrayBuffer) return { $arrayBuffer: value.byteLength };
+        if (ArrayBuffer.isView(value)) return { $arrayBufferView: value.byteLength };
+        if (typeof value === 'function') return '$function';
+        return value;
+      });
+      return json ? encoder.encode(json).length : 0;
+    } catch {
+      return -1;
+    }
+  };
+  const record = (side, data) => {
+    const bytes = sizeOf(data);
+    const name = data && typeof data === 'object' && 'name' in data ? String(data.name) : '$raw';
+    side.messages++;
+    if (bytes > 0) side.bytes += bytes;
+    const endpoint = side.byName[name] ?? (side.byName[name] = { messages: 0, bytes: 0 });
+    endpoint.messages++;
+    if (bytes > 0) endpoint.bytes += bytes;
+  };
+  globalThis.__OCTANE_STAGE_WIRE__ = () => structuredClone(stats);
+  const postMessage = MessagePort.prototype.postMessage;
+  MessagePort.prototype.postMessage = function (data, ...rest) {
+    record(stats.toBts, data);
+    return postMessage.call(this, data, ...rest);
+  };
+  const descriptor = Object.getOwnPropertyDescriptor(MessagePort.prototype, 'onmessage');
+  if (descriptor?.get && descriptor.set) {
+    Object.defineProperty(MessagePort.prototype, 'onmessage', {
+      configurable: descriptor.configurable,
+      enumerable: descriptor.enumerable,
+      get() { return descriptor.get.call(this); },
+      set(listener) {
+        if (typeof listener !== 'function') return descriptor.set.call(this, listener);
+        return descriptor.set.call(this, function (event) {
+          record(stats.toMts, event.data);
+          return listener.call(this, event);
+        });
+      },
+    });
+  }
+})()`;
+
 /** Build the bench host HTML that loads web-core and installs the driver. */
 export function makeBenchHtml({
 	clientJs = '/webcore/static/js/client.js',
 	clientCss = '/webcore/static/css/client.css',
+	instrumentJs = '',
 } = {}) {
 	return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
+  <script>${instrumentJs}</script>
   <script type="module" src="${clientJs}"></script>
   <link rel="stylesheet" href="${clientCss}">
   <style>html,body{margin:0;padding:0}</style>
@@ -245,6 +328,32 @@ export const NEUTRALIZE_LYNX_PROFILE = `(() => {
 export async function applyNeutralize(page) {
 	await page.addInitScript(NEUTRALIZE_LYNX_PROFILE);
 	page.on('worker', (w) => w.evaluate(NEUTRALIZE_LYNX_PROFILE).catch(() => {}));
+}
+
+export const OBSERVE_LYNX_MT_SLICE_LOAD = `(() => {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
+  if (!descriptor?.get || !descriptor?.set) return;
+  Object.defineProperty(HTMLScriptElement.prototype, 'src', {
+    configurable: descriptor.configurable,
+    enumerable: descriptor.enumerable,
+    get: descriptor.get,
+    set(value) {
+      if (
+        globalThis.location?.href === 'about:srcdoc'
+        && typeof value === 'string'
+        && value.startsWith('blob:')
+        && globalThis.__OCTANE_LYNX_MT_SLICE_LOAD_START_EPOCH__ === undefined
+      ) {
+        globalThis.__OCTANE_LYNX_MT_SLICE_LOAD_START_EPOCH__ =
+          performance.timeOrigin + performance.now();
+      }
+      return descriptor.set.call(this, value);
+    },
+  });
+})()`;
+
+export async function applyStageClock(page) {
+	await page.addInitScript(OBSERVE_LYNX_MT_SLICE_LOAD);
 }
 
 /** min/max/mean/median/std/ci95 over a numeric array (nulls/NaN dropped). */

@@ -643,7 +643,10 @@ const SUITES = [
 		cwd: 'lynx-bundle-size',
 		servers: [],
 		iter: { normal: 1, quick: 1 },
-		runs: [{ script: 'run.mjs', args: () => [] }],
+		runs: [
+			{ script: 'run.mjs', args: () => [] },
+			{ script: 'inventory.mjs', args: () => [] },
+		],
 	},
 	{
 		// Compiled-output size (Node-only, seconds-fast): compiles a fixed

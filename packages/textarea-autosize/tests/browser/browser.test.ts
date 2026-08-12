@@ -23,9 +23,12 @@ beforeAll(async () => {
 		plugins: [octane({ requireDirective: true }), react()],
 		resolve: {
 			dedupe: ['react', 'react-dom'],
-			alias: {
-				octane: new URL('../../../octane/src/index.ts', import.meta.url).pathname,
-			},
+			alias: [
+				{
+					find: /^octane$/,
+					replacement: new URL('../../../octane/src/index.ts', import.meta.url).pathname,
+				},
+			],
 		},
 		server: { host: '127.0.0.1', port: 0 },
 	});

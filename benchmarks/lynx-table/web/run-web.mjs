@@ -163,6 +163,12 @@ class Driver {
 
 async function loadCell(browser, cell) {
 	const page = await browser.newPage();
+	if (process.env.LYNX_BENCH_DEBUG) {
+		page.on('console', (message) =>
+			console.log(`[console:${message.type()}]`, message.text().slice(0, 400)),
+		);
+		page.on('pageerror', (error) => console.log('[pageerror]', String(error).slice(0, 600)));
+	}
 	await applyNeutralize(page);
 	await page.goto(`http://127.0.0.1:${PORT}/bench.html`, { waitUntil: 'load' });
 	await page.evaluate(
@@ -173,6 +179,7 @@ async function loadCell(browser, cell) {
 		timeout: 60_000,
 		polling: 16,
 	});
+	if (process.env.LYNX_BENCH_DEBUG) console.log('[debug] mounted', cell.id, Date.now());
 	return page;
 }
 
@@ -256,6 +263,7 @@ async function main() {
 						const sample = await runRep(browser, cell, rows);
 						for (const [op, ms] of Object.entries(sample)) (samples[op] ??= []).push(ms);
 					} catch (error) {
+						if (process.env.LYNX_BENCH_DEBUG) console.log('[debug] rep error:', String(error));
 						if (!String(error).includes('timeout')) throw error;
 						dnf.rep = (dnf.rep ?? 0) + 1;
 					}

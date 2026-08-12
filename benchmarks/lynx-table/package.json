@@ -7,7 +7,9 @@
   "scripts": {
     "bench": "node run.mjs",
     "bench:web": "node web/run-web.mjs",
-    "build:app": "node scripts/build-app.mjs"
+    "bench:stages": "node stages/run.mjs",
+    "build:app": "node scripts/build-app.mjs",
+    "test:stages": "node --test stages/*.test.mjs"
   },
   "dependencies": {
     "@lynx-js/web-core": "0.22.2",
