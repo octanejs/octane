@@ -6,6 +6,7 @@
     "moduleResolution": "NodeNext",
     "target": "ES2022",
     "skipLibCheck": true,
+    "types": ["node"],
     "customConditions": ["react-server"]
   },
   "files": ["react-server.ts"]
