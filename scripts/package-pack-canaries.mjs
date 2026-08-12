@@ -59,11 +59,9 @@ export function renderPackedExampleWorkspace(archiveSpecs) {
 
 export const PACKED_TSRX_CONSUMER_PACKAGES = [
 	'@octanejs/cmdk',
-	'@octanejs/colorful',
 	'@octanejs/floating-ui',
 	'@octanejs/input-otp',
 	'@octanejs/radix',
-	'@octanejs/react-error-boundary',
 	'@octanejs/spring',
 	'@octanejs/sonner',
 	'@octanejs/syntax-highlighter',
@@ -71,32 +69,6 @@ export const PACKED_TSRX_CONSUMER_PACKAGES = [
 	'@octanejs/tiptap',
 	'octane',
 ];
-
-/**
- * The packed bindings that must also compile in an application with no
- * `@types/node` installed — which is every browser application `octane init`
- * scaffolds, since the tsconfig it writes has no `types` field.
- *
- * Source-published bindings become part of the consumer's TypeScript program,
- * so a `process.env.NODE_ENV` read in shipped source is the consumer's error,
- * not ours. `@octanejs/cmdk` and `@octanejs/tiptap` still ship those reads and
- * are deliberately absent (issue #721); add a binding here once its published
- * source no longer depends on Node globals.
- */
-export const PACKED_TSRX_NODE_FREE_CONSUMER_PACKAGES = [
-	'@octanejs/colorful',
-	'@octanejs/floating-ui',
-	'@octanejs/input-otp',
-	'@octanejs/react-error-boundary',
-	'@octanejs/sonner',
-	'@octanejs/spring',
-	'@octanejs/syntax-highlighter',
-	'@octanejs/textarea-autosize',
-	'octane',
-];
-
-/** Sources the no-`@types/node` lane compiles, relative to the consumer root. */
-export const PACKED_TSRX_NODE_FREE_SOURCE_DIRECTORY = 'src/node-free';
 
 export const PACKED_COMMONJS_CONSUMER_PACKAGES = [
 	'@octanejs/base-ui',
@@ -217,21 +189,7 @@ export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions) 
 	};
 }
 
-/**
- * The strict consumer project. With `nodeTypes: false` it becomes the project a
- * scaffolded browser application actually has: no `@types/node` in the program,
- * so any Node global a packed binding reads from its published source is an
- * error here exactly as it is in the user's editor and build.
- *
- * `types: []` rather than an omitted `types` field, because the consumer
- * installs `@types/node` for its own tooling; omitting the field would pull it
- * back into the program and hide the failure this lane exists to find.
- *
- * `skipLibCheck` follows the scaffolded tsconfig here: third-party declaration
- * files may legitimately mention Node, and this lane is about the raw `.ts` and
- * `.tsrx` we publish, which stays fully checked either way.
- */
-export function createPackedTsrxConsumerConfig({ nodeTypes = true } = {}) {
+export function createPackedTsrxConsumerConfig() {
 	return {
 		compilerOptions: {
 			allowImportingTsExtensions: true,
@@ -243,20 +201,15 @@ export function createPackedTsrxConsumerConfig({ nodeTypes = true } = {}) {
 			noEmit: true,
 			noErrorTruncation: true,
 			plugins: [{ name: '@tsrx/typescript-plugin' }],
-			skipLibCheck: nodeTypes ? false : true,
+			skipLibCheck: false,
 			strict: true,
 			target: 'esnext',
-			types: nodeTypes ? ['node'] : [],
+			types: ['node'],
 		},
 		tsrx: {
 			compiler: 'octane/compiler/volar',
 		},
-		include: nodeTypes
-			? ['src/**/*.ts', 'src/**/*.tsrx']
-			: [
-					`${PACKED_TSRX_NODE_FREE_SOURCE_DIRECTORY}/**/*.ts`,
-					`${PACKED_TSRX_NODE_FREE_SOURCE_DIRECTORY}/**/*.tsrx`,
-				],
+		include: ['src/**/*.ts', 'src/**/*.tsrx'],
 	};
 }
 
@@ -346,43 +299,6 @@ export function PublishedSourceConsumer() @{
 			<Tiptap.Content data-editor-host="provided-editor" />
 		</Tiptap>
 	</section>
-}
-`;
-}
-
-/**
- * The application half of the no-`@types/node` lane. Every import here pulls a
- * packed binding's published `.tsrx`/`.ts` into a program that has no Node
- * globals, which is what a browser application compiles.
- */
-export function renderPackedTsrxNodeFreeConsumerSource() {
-	return `import { HexColorPicker } from '@octanejs/colorful';
-import { useFloating } from '@octanejs/floating-ui';
-import { OTPInput, REGEXP_ONLY_DIGITS } from '@octanejs/input-otp';
-import { ErrorBoundary } from '@octanejs/react-error-boundary';
-import { Toaster } from '@octanejs/sonner';
-import { animated, useSpring } from '@octanejs/spring';
-import { Light } from '@octanejs/syntax-highlighter';
-import TextareaAutosize from '@octanejs/textarea-autosize';
-import { useState } from 'octane';
-
-export function NodeFreeConsumer() @{
-	const [color, setColor] = useState('#abcdef');
-	const [springStyles] = useSpring({ from: { opacity: 0 }, to: { opacity: 1 } });
-	const floating = useFloating({ placement: 'bottom' });
-
-	<ErrorBoundary fallback={<span>Recovered</span>}>
-		<animated.div ref={floating.refs.setReference} style={springStyles}>
-			{color as string}
-		</animated.div>
-		<HexColorPicker color={color as string} onChange={setColor} />
-		<OTPInput maxLength={6} pattern={REGEXP_ONLY_DIGITS} aria-label="Verification code">
-			<span>Verification slots</span>
-		</OTPInput>
-		<TextareaAutosize minRows={2} maxRows={6} defaultValue="No Node globals" />
-		<Light language="javascript">{'const nodeFree = true;'}</Light>
-		<Toaster position="bottom-right" />
-	</ErrorBoundary>
 }
 `;
 }
