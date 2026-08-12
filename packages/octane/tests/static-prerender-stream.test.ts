@@ -46,9 +46,10 @@ describe('octane/static — prerenderToNodeStream', () => {
 	});
 
 	it('prelude bytes equal the buffered prerender css + html (scoped styles first)', async () => {
-		const srv = loadServerFixture(
-			'packages/octane/tests/_fixtures/float-resources.tsrx',
-		) as Record<string, any>;
+		const srv = loadServerFixture('packages/octane/tests/_fixtures/float-resources.tsrx') as Record<
+			string,
+			any
+		>;
 		const buffered = await prerender(srv.ScopedControl, {});
 		expect(buffered.css).not.toBe(''); // the fixture carries scoped CSS
 		const { prelude } = await prerenderToNodeStream(srv.ScopedControl, {});
