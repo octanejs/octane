@@ -49,21 +49,30 @@ function controlAnimationFrames() {
 	});
 	vi.stubGlobal('cancelAnimationFrame', (handle: number) => pending.delete(handle));
 
-	return {
-		async flush() {
-			for (let frame = 0; frame < 100; frame++) {
-				await nextPaint();
-				const callbacks = Array.from(pending.values());
-				pending.clear();
-				if (callbacks.length === 0) return;
-				frameTime = Math.max(frameTime, performance.now()) + 16;
-				for (const callback of callbacks) callback(frameTime);
-			}
-			throw new Error('chart animation did not settle within 100 controlled frames');
-		},
-		restore() {
+	async function flush() {
+		for (let frame = 0; frame < 100; frame++) {
+			await nextPaint();
+			const callbacks = Array.from(pending.values());
 			pending.clear();
-			vi.unstubAllGlobals();
+			if (callbacks.length === 0) return;
+			frameTime = Math.max(frameTime, performance.now()) + 16;
+			for (const callback of callbacks) callback(frameTime);
+		}
+		throw new Error('chart animation did not settle within 100 controlled frames');
+	}
+
+	return {
+		flush,
+		async restore() {
+			try {
+				// Redux Toolkit can batch one final store notification during chart
+				// unmount. Let that queued frame cancel its fallback timer before the
+				// animation-frame globals disappear.
+				await flush();
+			} finally {
+				pending.clear();
+				vi.unstubAllGlobals();
+			}
 		},
 	};
 }
@@ -258,8 +267,11 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 			expect(starts).toEqual(['start']);
 			expect(ends).toEqual(['end']);
 		} finally {
-			result?.unmount();
-			animationFrames.restore();
+			try {
+				result?.unmount();
+			} finally {
+				await animationFrames.restore();
+			}
 		}
 	});
 
@@ -292,8 +304,11 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 				result.container.querySelector('.recharts-funnel-trapezoid path')?.getAttribute('fill'),
 			).toBe('#82ca9d');
 		} finally {
-			result?.unmount();
-			animationFrames.restore();
+			try {
+				result?.unmount();
+			} finally {
+				await animationFrames.restore();
+			}
 		}
 	});
 
@@ -349,8 +364,11 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 			expect(starts).toHaveLength(6);
 			expect(ends).toHaveLength(6);
 		} finally {
-			result?.unmount();
-			animationFrames.restore();
+			try {
+				result?.unmount();
+			} finally {
+				await animationFrames.restore();
+			}
 		}
 	});
 
