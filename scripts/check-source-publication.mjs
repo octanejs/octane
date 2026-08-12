@@ -18,6 +18,13 @@
  *   - Publishing a `.js` module with no sibling `.d.ts`. The consumer gets
  *     `any` (or an error under `noImplicitAny`) for our public API.
  *
+ * Only the first rule is about what the root typecheck chain runs, so only it is
+ * driven by parsing that chain. The other two tsconfig rules are about the file
+ * a consumer's compile is measured against, which exists whether or not the
+ * chain happens to name it, so they are driven by walking the workspace: a
+ * package that validates through a package script, through a wrapper the chain
+ * parser cannot read, or that the chain never reaches at all is still checked.
+ *
  * Everything already broken is enumerated in SOURCE_PUBLICATION_DEBT below, so
  * this gate is green today and refuses anything new.
  */
@@ -61,9 +68,17 @@ export const SOURCE_PUBLICATION_DEBT = {
 	// These validation projects still hand shipped source the Node globals a
 	// browser application does not have. Dropping `types: ["node"]` is the fix;
 	// where shipped source genuinely reads `process`, the source is the defect.
+	//
+	// Twelve of these (alien-signals, colorful, day-picker, draggable, drei,
+	// livestore, popper, shadcn, spring, transition-group, vaul, window) were
+	// invisible while this rule read the root typecheck chain instead of the
+	// workspace: each validates through a package script or a wrapper the chain
+	// parser cannot follow, or the chain never names it. They are the same defect
+	// under the same issue, not a new class.
 	[RULES.nodeTypes]: [
 		'packages/adapter-cloudflare/tsconfig.typecheck.json',
 		'packages/adapter-vercel/tsconfig.typecheck.json',
+		'packages/alien-signals/tsconfig.json',
 		'packages/animejs/tsconfig.json',
 		'packages/apollo-client/tsconfig.json',
 		'packages/app-core/tsconfig.typecheck.json',
@@ -72,11 +87,15 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/base-ui/tsconfig.json',
 		'packages/cli/tsconfig.typecheck.json',
 		'packages/cmdk/tsconfig.json',
+		'packages/colorful/tsconfig.json',
 		'packages/create-octane/tsconfig.typecheck.json',
+		'packages/day-picker/tsconfig.json',
 		'packages/devtools/tsconfig.json',
 		'packages/dexie/tsconfig.json',
 		'packages/dnd-kit/tsconfig.json',
 		'packages/docusaurus/tsconfig.json',
+		'packages/draggable/tsconfig.json',
+		'packages/drei/tsconfig.json',
 		'packages/dropzone/tsconfig.json',
 		'packages/electron/tsconfig.json',
 		'packages/embla-carousel/tsconfig.json',
@@ -87,6 +106,7 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/inertia/tsconfig.json',
 		'packages/jotai/tsconfig.json',
 		'packages/lexical/tsconfig.json',
+		'packages/livestore/tsconfig.json',
 		'packages/lucide/tsconfig.json',
 		'packages/mantine-hooks/tsconfig.json',
 		'packages/markdown/tsconfig.json',
@@ -96,6 +116,7 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/nuqs/tsconfig.json',
 		'packages/pdf/tsconfig.json',
 		'packages/phosphor-icons/tsconfig.json',
+		'packages/popper/tsconfig.json',
 		'packages/radix/tsconfig.json',
 		'packages/rainbowkit/tsconfig.json',
 		'packages/react-error-boundary/tsconfig.json',
@@ -108,8 +129,10 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/rspack-plugin-octane/tsconfig.typecheck.json',
 		'packages/rxjs/tsconfig.json',
 		'packages/seo/tsconfig.json',
+		'packages/shadcn/tsconfig.json',
 		'packages/solana-react/tsconfig.json',
 		'packages/sonner/tsconfig.json',
+		'packages/spring/tsconfig.json',
 		'packages/styled-components/tsconfig.json',
 		'packages/stylex/tsconfig.json',
 		'packages/tanstack-ai/tsconfig.json',
@@ -129,10 +152,13 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/textarea-autosize/tsconfig.json',
 		'packages/three/tsconfig.json',
 		'packages/tiptap/tsconfig.json',
+		'packages/transition-group/tsconfig.json',
 		'packages/valtio/tsconfig.json',
+		'packages/vaul/tsconfig.json',
 		'packages/visx/tsconfig.json',
 		'packages/vite-plugin-octane/tsconfig.typecheck.json',
 		'packages/wagmi/tsconfig.json',
+		'packages/window/tsconfig.json',
 		'packages/zag/tsconfig.json',
 		'packages/zustand/tsconfig.json',
 	],
@@ -166,6 +192,7 @@ const CHECKERS = new Set(['tsgo', 'tsrx-tsc', 'tsc']);
 const TSRX_CHECKER = 'tsrx-tsc';
 const JAVASCRIPT_MODULE = /\.[cm]?js$/;
 const TEST_MODULE = /\.(?:test|spec)\.[cm]?js$/;
+const TSCONFIG_FILE = /^tsconfig(?:\..+)?\.json$/;
 
 /** tsconfig files are JSON with comments; several in this repository use them. */
 export function parseJsonc(text) {
@@ -277,12 +304,70 @@ function shipsSource(pkg) {
 }
 
 /**
- * A package's validation projects are the ones that sit in the package root.
- * Nested projects (typetests and friends) check adapted suites rather than the
- * shipped tree.
+ * `files`, `include`, and `exclude` entries are globs, not file names, and
+ * TypeScript matches them against a path prefix: `src`, `src/**`, and
+ * `src/**\/*.tsrx` all reach `src/index.tsrx`. Translate one entry into a
+ * predicate over project-relative POSIX paths so a directory or glob entry is
+ * recognized the same way `tsc` recognizes it, rather than only an entry that
+ * spells a shipped file out in full.
  */
-function isValidationProject(project, pkg) {
-	return path.dirname(project) === pkg.directory;
+function createSpecMatcher(spec) {
+	const normalized = toPosix(spec).replace(/^\.\//, '').replace(/\/+$/, '');
+	if (!normalized) return () => false;
+	const source = normalized
+		.split('/')
+		.map((segment, index, segments) => {
+			// `**` spans any number of directories, including none.
+			if (segment === '**') return index === segments.length - 1 ? '.*' : '(?:[^/]*/)*';
+			const escaped = segment
+				.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+				.replace(/\*/g, '[^/]*')
+				.replace(/\?/g, '[^/]');
+			return index === segments.length - 1 ? escaped : `${escaped}/`;
+		})
+		.join('');
+	// The trailing `($|/)` is what makes a bare directory cover its contents.
+	const pattern = new RegExp(`^${source}(?:$|/)`);
+	return (file) => pattern.test(file);
+}
+
+/**
+ * A package's validation projects are the tsconfig files that sit in the
+ * package root and whose program reaches the shipped tree. Nested projects
+ * (typetests and friends) check adapted suites rather than shipped source, and
+ * a root project scoped to tests or build scripts is not validating the package
+ * either.
+ *
+ * `exclude` deliberately takes no part in this decision: a project that drops
+ * packed source out of its program is still the project that was meant to check
+ * it, and reporting that is exactly what RULES.excluded is for.
+ */
+function coversShippedSource(config, sourceFiles) {
+	const specs = [
+		...(Array.isArray(config.files) ? config.files : []),
+		...(Array.isArray(config.include) ? config.include : []),
+	];
+	// Neither field means every supported file under the project directory.
+	if (!specs.length) return true;
+	const matchers = specs.map(createSpecMatcher);
+	return sourceFiles.some((file) => matchers.some((matches) => matches(`src/${file}`)));
+}
+
+/**
+ * Every tsconfig in the package root, whether or not the root typecheck chain
+ * names it. Chain-discovered root projects are unioned in so a project the
+ * chain runs under some other name is never dropped.
+ */
+function collectPackageRootProjects(pkg, chainProjects) {
+	const found = new Set(
+		readdirSync(pkg.directory, { withFileTypes: true })
+			.filter((entry) => entry.isFile() && TSCONFIG_FILE.test(entry.name))
+			.map((entry) => path.join(pkg.directory, entry.name)),
+	);
+	for (const project of chainProjects) {
+		if (path.dirname(project) === pkg.directory && existsSync(project)) found.add(project);
+	}
+	return [...found].sort();
 }
 
 /**
@@ -312,21 +397,28 @@ export function findSourcePublicationViolations(
 			(project) => project.startsWith(`${pkg.directory}${path.sep}`) && existsSync(project),
 		);
 
+		// The tsgo rule is about what the chain actually runs, so it stays keyed to
+		// the chain.
 		for (const project of packageProjects.sort()) {
-			const id = toPosix(path.relative(repo, project));
 			const checkers = projects.get(project);
 			if (publishesTsrx && !checkers.has(TSRX_CHECKER) && !isPinnedUpstreamProject(project, pkg)) {
 				violations.push({
 					rule: RULES.tsgo,
-					id,
+					id: toPosix(path.relative(repo, project)),
 					detail: `${pkg.name} ships .tsrx, but this project runs ${[...checkers].join(
 						', ',
 					)}, which ignores .tsrx files and exits 0`,
 				});
 			}
-			if (!isValidationProject(project, pkg)) continue;
+		}
 
+		// The tsconfig rules are about the project a consumer's compile is measured
+		// against, which exists whether or not the chain reaches it.
+		for (const project of collectPackageRootProjects(pkg, projects.keys())) {
 			const config = readJson(project);
+			if (!coversShippedSource(config, sourceFiles)) continue;
+			const id = toPosix(path.relative(repo, project));
+
 			const types = config.compilerOptions?.types;
 			if (Array.isArray(types) && types.includes('node')) {
 				violations.push({
@@ -339,9 +431,9 @@ export function findSourcePublicationViolations(
 			}
 
 			const excluded = (config.exclude ?? [])
-				.map((entry) => toPosix(entry).replace(/^\.\//, ''))
-				.filter((entry) => entry.startsWith('src/'))
-				.filter((entry) => sourceFileSet.has(entry.slice('src/'.length)));
+				.map((entry) => ({ entry, matches: createSpecMatcher(entry) }))
+				.filter(({ matches }) => sourceFiles.some((file) => matches(`src/${file}`)))
+				.map(({ entry }) => entry);
 			if (excluded.length) {
 				violations.push({
 					rule: RULES.excluded,
