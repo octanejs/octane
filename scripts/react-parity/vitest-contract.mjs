@@ -264,6 +264,16 @@ export async function validateVitestContracts({
 				}
 			}
 		}
+
+		for (const file of owned) {
+			for (const candidate of shardedProjects) {
+				if (projectSelects(candidate, file)) {
+					errors.push(
+						`project ${name} testExecution owns ${file}, but sharded project ${candidate.test?.name ?? '<unnamed>'} still selects it`,
+					);
+				}
+			}
+		}
 	}
 
 	for (const [name, claims] of claimsByProject) {

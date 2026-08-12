@@ -199,6 +199,20 @@ test('rejects stale sharded output and leaked repository-only metadata', async (
 	await assert.rejects(() => validateVitestContracts(leaked), /retains testExecution metadata/);
 });
 
+test('rejects an owned file selected by a different ordinary sharded project', async (t) => {
+	const model = await fixture(t);
+	model.baseProjects.push({
+		test: { name: 'overlap', include: ['packages/full/**/*.test.ts'] },
+	});
+	model.shardedProjects.push({
+		test: { name: 'overlap', include: ['packages/full/**/*.test.ts'] },
+	});
+	await assert.rejects(
+		() => validateVitestContracts(model),
+		/project full testExecution owns packages\/full\/parity\.test\.ts, but sharded project overlap still selects it/,
+	);
+});
+
 test('rejects duplicate project names before building ownership', async (t) => {
 	const model = await fixture(t);
 	model.baseProjects.push(structuredClone(model.baseProjects[0]));
