@@ -163,12 +163,13 @@ function attributeExpression(attribute) {
 	);
 }
 
-function lastAttribute(attributes, name) {
+function lastAttribute(attributes, name, alias) {
 	for (let index = attributes.length - 1; index >= 0; index--) {
 		const attribute = attributes[index];
 		if (
 			(attribute.type === 'Attribute' || attribute.type === 'JSXAttribute') &&
-			attributeName(attribute) === name
+			(attributeName(attribute) === name ||
+				(alias !== undefined && attributeName(attribute) === alias))
 		) {
 			return attribute;
 		}
@@ -331,7 +332,7 @@ function classifyHost(node, scope, namespace, source, filename, diagnostics, cla
 		return;
 	}
 
-	const readOnly = htmlBooleanState(lastAttribute(attributes, 'readOnly'));
+	const readOnly = htmlBooleanState(lastAttribute(attributes, 'readOnly', 'readonly'));
 	const disabled = htmlBooleanState(lastAttribute(attributes, 'disabled'));
 	const suppression = booleanIntent(lastAttribute(attributes, 'suppressNativeChangeWarning'));
 	if (readOnly === 'true' || disabled === 'true' || suppression === 'true') {
