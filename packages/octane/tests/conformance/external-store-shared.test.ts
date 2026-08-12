@@ -50,6 +50,25 @@ describe('Shared useSyncExternalStore behavior', () => {
 		root.unmount();
 	});
 
+	// Per useSyncExternalStoreNative-test.js:105 'native version'. React's native
+	// shim build resolves the client code path even under a Node environment, so
+	// a mount with a getServerSnapshot argument still renders the CLIENT
+	// snapshot. Octane does not ship the compatibility packages; the same
+	// observable holds for its built-in useSyncExternalStore: a client-only
+	// mount reads getSnapshot, never getServerSnapshot, and is live-subscribed
+	// to store updates.
+	it('client-only mount reads getSnapshot even when getServerSnapshot is provided', () => {
+		const store = { ...createExternalStore('client'), getServerState: () => 'server' };
+		const root = mount(HydrationStoreReader, { store, hostRef: null });
+		flushEffects();
+		expect(root.find('#hydrated-store').textContent).toBe('client');
+		expect(store.getSubscriberCount()).toBe(1);
+
+		flushStoreUpdate(() => store.set('updated'));
+		expect(root.find('#hydrated-store').textContent).toBe('updated');
+		root.unmount();
+	});
+
 	// Per useSyncExternalStoreShared-test.js:152 (stable and canary).
 	it('skips re-rendering if nothing changes', () => {
 		const store = createExternalStore('Initial');

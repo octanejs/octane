@@ -10404,7 +10404,7 @@
     },
     {
       "caseId": "react-case-v1:21f48ce03c86c4141d81",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "avoids flushing hoistables from completed boundaries nested inside fallbacks",
@@ -10412,7 +10412,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "suppresses hoistables from completed boundaries nested inside fallbacks",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:220f34992afea7e1967e",
@@ -23727,7 +23734,7 @@
     },
     {
       "caseId": "react-case-v1:4dfe9d8122d32d2bdb30",
-      "status": "planned",
+      "status": "covered",
       "risk": "medium",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreNative-test.js",
       "title": "native version",
@@ -23735,7 +23742,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "External-store compatibility packages",
-      "rationale": "The standalone compatibility packages are not shipped by Octane, but their observable subscription, snapshot, and notification semantics are actionable through Octane's useSyncExternalStore API."
+      "rationale": "The standalone compatibility packages are not shipped by Octane, but their observable subscription, snapshot, and notification semantics are actionable through Octane's useSyncExternalStore API.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "client-only mount reads getSnapshot even when getServerSnapshot is provided",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:4e159d01bb84f9bbf9c4",
@@ -44546,7 +44560,7 @@
     },
     {
       "caseId": "react-case-v1:94d8460706a840b15be3",
-      "status": "planned",
+      "status": "covered",
       "risk": "medium",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreShimServer-test.js",
       "title": "basic server render",
@@ -44554,7 +44568,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "External-store compatibility packages",
-      "rationale": "The standalone compatibility packages are not shipped by Octane, but their observable subscription, snapshot, and notification semantics are actionable through Octane's useSyncExternalStore API."
+      "rationale": "The standalone compatibility packages are not shipped by Octane, but their observable subscription, snapshot, and notification semantics are actionable through Octane's useSyncExternalStore API.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/external-store-shared.test.ts",
+          "testName": "basic server hydration",
+          "modes": ["client", "server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:94d956e975498ec54e39",
@@ -60661,7 +60682,7 @@
     },
     {
       "caseId": "react-case-v1:cac76a87900e7134c737",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMUseId-test.js",
       "title": "identifierPrefix option",
@@ -60669,7 +60690,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/useid-determinism.test.ts",
+          "testName": "starts hydrated useId sequences from each server-rendered root",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/useid-determinism.test.ts",
+          "testName": "composes identifierPrefix with the automatic client-root namespace",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:cac90fe5de6a0a66cdfd",
@@ -70338,7 +70371,7 @@
     },
     {
       "caseId": "react-case-v1:ea9ec574c18651aadb7b",
-      "status": "planned",
+      "status": "covered",
       "risk": "medium",
       "sourceFile": "packages/use-sync-external-store/src/__tests__/useSyncExternalStoreNative-test.js",
       "title": "Using isEqual to bailout",
@@ -70346,7 +70379,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "External-store compatibility packages",
-      "rationale": "The standalone compatibility packages are not shipped by Octane, but their observable subscription, snapshot, and notification semantics are actionable through Octane's useSyncExternalStore API."
+      "rationale": "The standalone compatibility packages are not shipped by Octane, but their observable subscription, snapshot, and notification semantics are actionable through Octane's useSyncExternalStore API.",
+      "evidence": [
+        {
+          "file": "packages/redux/tests/conformance/external-store-shared.test.ts",
+          "testName": "Using isEqual to bailout",
+          "modes": ["client"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:eaa56aabc70ce6944c94",
@@ -73013,7 +73053,7 @@
     },
     {
       "caseId": "react-case-v1:f29d95a69c2aed14e46d",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "prioritizes ordering for certain hoistables over others when rendering on the server",
@@ -73021,7 +73061,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "serializes charset then viewport ahead of other hoistables on the server",
+          "modes": ["server-string", "server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:f2a5b9b5135e4e7d8c71",

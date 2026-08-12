@@ -15,6 +15,7 @@ import {
 	resetFloatResourceState,
 } from '../../src/index.js';
 import * as Server from 'octane/server';
+import { collectPipeableStream } from '../_server-stream.js';
 import { loadServerFixture } from '../_server-fixture.js';
 import { mount } from '../_helpers.js';
 import {
@@ -366,5 +367,44 @@ describe('Float evidence (slice 3) — style-resource nonce and hoistable lifecy
 
 		m.unmount();
 		expect(title.isConnected).toBe(false);
+	});
+
+	// Per ReactDOMFloat-test.js:9085 — 'prioritizes ordering for certain
+	// hoistables over others when rendering on the server': charset first,
+	// viewport second, everything else in discovery order. Browsers only honor
+	// a charset within the first 1024 bytes without re-parsing.
+	it('serializes charset then viewport ahead of other hoistables on the server', async () => {
+		const App = () => Server.createElement(srv.PriorityHead, null) as any;
+		const r = await Server.renderToString(App as any);
+		// HTML attribute names are case-insensitive; compare lowercased so the
+		// contract is the ORDER, not the attribute-name casing.
+		const head = r.html.slice(0, r.html.indexOf('<main')).toLowerCase();
+		const charset = head.indexOf('charset="utf-8"');
+		const viewport = head.indexOf('name="viewport"');
+		const alternate = head.indexOf('rel="alternate"');
+		const bar = head.indexOf('name="bar"');
+		const title = head.indexOf('<title');
+		const preconnect = head.indexOf('rel="preconnect"');
+		for (const idx of [charset, viewport, alternate, bar, title, preconnect]) {
+			expect(idx).toBeGreaterThan(-1);
+		}
+		// charset first, viewport second…
+		expect(charset).toBeLessThan(viewport);
+		expect(viewport).toBeLessThan(alternate);
+		// …everything else keeps discovery order.
+		expect(alternate).toBeLessThan(bar);
+		expect(bar).toBeLessThan(title);
+		expect(title).toBeLessThan(preconnect);
+
+		// The streamed shell folds the same priority order.
+		const { html, errors } = await collectPipeableStream(App as any);
+		expect(errors).toEqual([]);
+		const streamHead = html.slice(0, html.indexOf('<main')).toLowerCase();
+		const streamCharset = streamHead.indexOf('charset="utf-8"');
+		expect(streamCharset).toBeGreaterThan(-1);
+		expect(streamCharset).toBeLessThan(streamHead.indexOf('name="viewport"'));
+		expect(streamHead.indexOf('name="viewport"')).toBeLessThan(
+			streamHead.indexOf('rel="alternate"'),
+		);
 	});
 });
