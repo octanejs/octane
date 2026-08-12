@@ -5488,6 +5488,7 @@ interface Ambient {
 	markers: boolean;
 	permanentStaticHydrateDepth: number;
 	head: HeadBuffer | null;
+	fallbackHoistDepth: number;
 	susp: SuspendedList | null;
 	res: ResolvedMap | null;
 	serial: unknown[] | null;
@@ -5515,6 +5516,7 @@ function saveAmbient(): Ambient {
 		markers: MARKERS,
 		permanentStaticHydrateDepth: PERMANENT_STATIC_HYDRATE_DEPTH,
 		head: HEAD,
+		fallbackHoistDepth: FALLBACK_HOIST_DEPTH,
 		susp: SUSPENDED,
 		res: RESOLVED,
 		serial: SERIAL,
@@ -5543,6 +5545,7 @@ function restoreAmbient(a: Ambient): void {
 	MARKERS = a.markers;
 	PERMANENT_STATIC_HYDRATE_DEPTH = a.permanentStaticHydrateDepth;
 	HEAD = a.head;
+	FALLBACK_HOIST_DEPTH = a.fallbackHoistDepth;
 	SUSPENDED = a.susp;
 	RESOLVED = a.res;
 	SERIAL = a.serial;
