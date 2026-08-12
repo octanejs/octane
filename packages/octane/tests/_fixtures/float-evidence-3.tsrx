@@ -124,3 +124,17 @@ export function TitleUpdate(props: { text: string; foo: string }) @{
 		<main class="fe3-title-host">{'t' as string}</main>
 	</>
 }
+
+// Head content authored in deliberately unprioritized order: charset last,
+// viewport second-to-last, ordinary metadata first.
+export function PriorityHead() @{
+	<>
+		<link rel="alternate" href="/fe3-feed.xml" />
+		<meta name="bar" content="b" />
+		<title>a title</title>
+		<link rel="preconnect" href="/fe3-bar" />
+		<meta name="viewport" content="width=device-width" />
+		<meta charSet="utf-8" />
+		<main class="fe3-priority-host">{'p' as string}</main>
+	</>
+}

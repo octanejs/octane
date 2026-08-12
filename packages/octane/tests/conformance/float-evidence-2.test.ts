@@ -157,6 +157,36 @@ describe('Float evidence — streamed SSR discovery and flush identity', () => {
 		expect(head).not.toContain('/fallback-author');
 	});
 
+	// Per ReactDOMFloat-test.js:5431 — 'avoids flushing hoistables from completed
+	// boundaries nested inside fallbacks': fallback suppression is TRANSITIVE. A
+	// resolved boundary rendered inside a pending boundary's fallback is still
+	// fallback territory — its markup shows, its hoistables never reach the head
+	// (the fallback is discarded at reveal, but a streamed head line would be
+	// permanent).
+	it('suppresses hoistables from completed boundaries nested inside fallbacks', async () => {
+		const outer = deferred<string>();
+		const collector = createPipeableCollector();
+		Server.renderToPipeableStream(srv.NestedFallbackMetaBoundary, {
+			promise: outer.promise,
+			inner: Promise.resolve('np'),
+		}).pipe(collector.destination);
+		await settleMacrotasks();
+		const shell = collector.chunks.join('');
+		const shellHead = shell.slice(0, shell.indexOf('<div class="nfm-host"'));
+		// The fallback's nested boundary resolved and its markup shows (inline or
+		// via its reveal carrier, where attribute quotes arrive JSON-escaped)…
+		expect(shell).toMatch(/class=\\?"nested-primary\\?">np/);
+		// …but its metadata is fallback content: never in the head. The (still
+		// suspended) primary content's metadata is.
+		expect(shellHead).toContain('primary-meta');
+		expect(shellHead).not.toContain('nested-primary-meta');
+		outer.resolve('ready');
+		const html = await collector.ended;
+		const head = html.slice(0, html.indexOf('<div class="nfm-host"'));
+		expect(head).toContain('primary-meta');
+		expect(head).not.toContain('nested-primary-meta');
+	});
+
 	// Per ReactDOMFloat-test.js:5496
 	it('flushes nothing before the shell; a pre-suspension preinit folds into the shell', async () => {
 		const gate = deferred<string>();
