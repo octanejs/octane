@@ -6,6 +6,7 @@ import {
 	createPackedExampleManifest,
 	createPackedTsrxConsumerConfig,
 	createPackedTsrxConsumerManifest,
+	findPackedTsrxSourceConsumerPackages,
 	isForbiddenNativeGraphModule,
 	isWithinDirectory,
 	renderPackedExampleWorkspace,
@@ -13,6 +14,7 @@ import {
 	renderPackedDraggableEsmConsumerSource,
 	renderPackedEsmConsumerSource,
 	renderPackedTsrxConsumerSource,
+	renderPackedTsrxSourceImports,
 	renderPackedTsrxConsumerTypeProbe,
 } from './package-pack-canaries.mjs';
 
@@ -169,6 +171,7 @@ describe('packed TSRX source consumers', () => {
 	};
 	const toolingVersions = {
 		nodeTypes: '24.13.3',
+		packageManager: 'pnpm@11.15.1',
 		tsrxTypeScriptPlugin: '0.3.116',
 		typescript: '5.9.3',
 	};
@@ -183,6 +186,7 @@ describe('packed TSRX source consumers', () => {
 			typescript: '5.9.3',
 		});
 		assert.equal(manifest.private, true);
+		assert.equal(manifest.packageManager, 'pnpm@11.15.1');
 	});
 
 	test('rejects a published binding omitted from the packed archive set', () => {
@@ -195,7 +199,7 @@ describe('packed TSRX source consumers', () => {
 	});
 
 	test('typechecks TSRX with the Octane language plugin and full strict diagnostics', () => {
-		const config = createPackedTsrxConsumerConfig();
+		const config = createPackedTsrxConsumerConfig({ nodeTypes: true });
 
 		assert.equal(config.compilerOptions.strict, true);
 		assert.equal(config.compilerOptions.skipLibCheck, false);
@@ -205,6 +209,46 @@ describe('packed TSRX source consumers', () => {
 		assert.deepEqual(config.tsrx, { compiler: 'octane/compiler/volar' });
 		assert.deepEqual(config.include, ['src/**/*.ts', 'src/**/*.tsrx']);
 		assert.equal(config.compilerOptions.paths, undefined);
+	});
+
+	test('also models browser consumers without Node ambient types', () => {
+		const config = createPackedTsrxConsumerConfig({ nodeTypes: false });
+
+		assert.deepEqual(config.compilerOptions.types, []);
+		assert.equal(config.compilerOptions.strict, true);
+		assert.equal(config.compilerOptions.skipLibCheck, false);
+		assert.deepEqual(config.tsrx, { compiler: 'octane/compiler/volar' });
+	});
+
+	test('discovers every published framework binding containing TSRX', () => {
+		const packages = [
+			{ name: '@octanejs/plain', private: false, role: 'framework binding' },
+			{ name: '@octanejs/source', private: false, role: 'framework binding' },
+			{ name: '@octanejs/private', private: true, role: 'framework binding' },
+			{ name: '@octanejs/integration', private: false, role: 'framework integration' },
+		];
+		const packedFiles = new Map([
+			['@octanejs/plain', new Set(['src/index.ts'])],
+			['@octanejs/source', new Set(['src/index.ts', 'src/Component.tsrx'])],
+			['@octanejs/private', new Set(['src/Component.tsrx'])],
+			['@octanejs/integration', new Set(['src/Component.tsrx'])],
+		]);
+
+		assert.deepEqual(findPackedTsrxSourceConsumerPackages(packages, packedFiles), [
+			'@octanejs/source',
+			'octane',
+		]);
+		assert.deepEqual(
+			findPackedTsrxSourceConsumerPackages(packages, packedFiles, new Set(['@octanejs/source'])),
+			['octane'],
+		);
+	});
+
+	test('imports each discovered package root through its published type entry', () => {
+		assert.equal(
+			renderPackedTsrxSourceImports(['@octanejs/jotai', '@octanejs/redux']),
+			"import '@octanejs/jotai';\nimport '@octanejs/redux';\n",
+		);
 	});
 
 	test('exercises the published bindings from a real local TSRX component', () => {

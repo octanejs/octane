@@ -164,10 +164,33 @@ process.stdout.write(JSON.stringify(['default', 'DraggableCore'].filter((key) =>
 `;
 }
 
-export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions) {
+export function findPackedTsrxSourceConsumerPackages(
+	packages,
+	packedFiles,
+	excludedPackages = new Set(),
+) {
+	const bindingNames = packages
+		.filter(
+			(pkg) =>
+				!pkg.private &&
+				pkg.role === 'framework binding' &&
+				!excludedPackages.has(pkg.name) &&
+				[...(packedFiles.get(pkg.name) ?? [])].some((file) => file.endsWith('.tsrx')),
+		)
+		.map((pkg) => pkg.name)
+		.sort();
+
+	return [...bindingNames, 'octane'];
+}
+
+export function createPackedTsrxConsumerManifest(
+	archiveSpecs,
+	toolingVersions,
+	packageNames = PACKED_TSRX_CONSUMER_PACKAGES,
+) {
 	const dependencies = {};
 
-	for (const packageName of PACKED_TSRX_CONSUMER_PACKAGES) {
+	for (const packageName of packageNames) {
 		const archiveSpec = archiveSpecs[packageName];
 		if (typeof archiveSpec !== 'string' || !archiveSpec.startsWith('file:')) {
 			throw new Error(`no packed archive was provided for ${packageName}`);
@@ -179,6 +202,7 @@ export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions) 
 		name: 'octane-packed-tsrx-source-consumer',
 		private: true,
 		type: 'module',
+		packageManager: toolingVersions.packageManager,
 		engines: { node: '>=22.22.2' },
 		dependencies,
 		devDependencies: {
@@ -189,7 +213,7 @@ export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions) 
 	};
 }
 
-export function createPackedTsrxConsumerConfig() {
+export function createPackedTsrxConsumerConfig({ nodeTypes = true } = {}) {
 	return {
 		compilerOptions: {
 			allowImportingTsExtensions: true,
@@ -204,13 +228,22 @@ export function createPackedTsrxConsumerConfig() {
 			skipLibCheck: false,
 			strict: true,
 			target: 'esnext',
-			types: ['node'],
+			types: nodeTypes ? ['node'] : [],
 		},
 		tsrx: {
 			compiler: 'octane/compiler/volar',
 		},
 		include: ['src/**/*.ts', 'src/**/*.tsrx'],
 	};
+}
+
+export function renderPackedTsrxSourceImports(packageNames) {
+	return (
+		packageNames
+			.filter((packageName) => packageName !== 'octane')
+			.map((packageName) => `import '${packageName}';`)
+			.join('\n') + '\n'
+	);
 }
 
 export function renderPackedTsrxConsumerSource() {
