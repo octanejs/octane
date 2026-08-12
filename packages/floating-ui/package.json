@@ -32,8 +32,8 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md",
-    "dist/cjs"
+    "dist/cjs",
+    "README.md"
   ],
   "exports": {
     ".": {
@@ -44,9 +44,9 @@
     }
   },
   "scripts": {
-    "test": "vitest run",
     "build:cjs": "node ../../scripts/build-package-commonjs.mjs",
-    "prepack": "pnpm build:cjs"
+    "prepack": "pnpm build:cjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@floating-ui/dom": "catalog:default",

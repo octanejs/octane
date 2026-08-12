@@ -1,7 +1,7 @@
 import { describe, expectTypeOf, it } from 'vitest';
 import { toolDefinition } from '@tanstack/ai';
 
-import { useChat } from '../src/index';
+import { useAudioRecorder, useChat } from '../src/index';
 import type { DeepPartial, UseChatOptions, UseChatReturn } from '../src/index';
 
 type Person = { name: string; age: number; email: string };
@@ -47,6 +47,19 @@ type StandardJSONSchemaLike<Input, Output = Input> = {
 };
 
 type PersonSchema = StandardSchemaLike<Person, Person>;
+
+describe('useAudioRecorder() overloads', () => {
+	it('preserves default and transformed recording output types', () => {
+		const defaultRecorder = useAudioRecorder();
+		expectTypeOf(defaultRecorder.recording).toEqualTypeOf<
+			import('@tanstack/ai-client').AudioRecording | null
+		>();
+
+		const transformedRecorder = useAudioRecorder({ onComplete: (recording) => recording.base64 });
+		expectTypeOf(transformedRecorder.recording).toEqualTypeOf<string | null>();
+		expectTypeOf(transformedRecorder.stop).returns.toEqualTypeOf<Promise<string>>();
+	});
+});
 
 describe('useChat() return type', () => {
 	describe('with outputSchema', () => {

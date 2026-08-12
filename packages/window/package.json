@@ -1,0 +1,68 @@
+{
+  "name": "@octanejs/window",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "Exact react-window 2.3.0 binding for Octane: virtualized List and Grid components, dynamic row measurement, imperative scrolling, SSR, and hydration.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/window"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "adapted:generate": "node tests/generate-adapted-tests.mjs",
+    "test": "pnpm upstream:verify && pnpm test:audit && node ../../scripts/react-parity/harness.mjs run-required --manifest packages/window/audit/react-parity.json",
+    "upstream:verify": "node tests/audit/verify-upstream.mjs",
+    "test:audit": "node --test tests/audit/*.test.mjs",
+    "test:types:pristine": "tsc --noEmit -p typetests/tsconfig.pristine.json",
+    "test:types:adapted": "tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@types/react": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "16.3.2",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-window": "2.3.0",
+    "vitest": "catalog:default"
+  }
+}

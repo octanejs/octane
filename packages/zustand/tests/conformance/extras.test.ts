@@ -1,14 +1,14 @@
 /**
  * Conformance for the surface beyond the core binding: `useShallow` (`/shallow`),
- * middleware (`/middleware`), store-swap re-subscription, and the unstable-selector
- * divergence from React. Driven by the review of the port (find → verify).
+ * middleware (`/middleware`), and store-swap re-subscription. The unstable-selector
+ * divergence lives in `unstable-selectors.test.ts` (ordinary shards).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createStore } from '@octanejs/zustand';
 import { subscribeWithSelector } from '@octanejs/zustand/middleware';
 import { shallow } from '@octanejs/zustand/shallow';
 import { mount, nextPaint } from '../_helpers';
-import { useObj, RawObject, ShallowObject } from '../_fixtures/shallow.tsrx';
+import { useObj, ShallowObject } from '../_fixtures/shallow.tsrx';
 import { useCombined, CombinedView } from '../_fixtures/middleware.tsrx';
 import { Reader } from '../_fixtures/stores.tsrx';
 
@@ -40,23 +40,6 @@ describe('useShallow (object-slice selection)', () => {
 	it('shallow comparator is the verbatim zustand one', () => {
 		expect(shallow({ a: 1, b: 2 }, { a: 1, b: 2 })).toBe(true);
 		expect(shallow({ a: 1 }, { a: 2 })).toBe(false);
-	});
-});
-
-describe('unstable selector — divergence from React', () => {
-	it('a fresh-object selector does NOT infinite-loop (octane settles; React would loop + warn)', async () => {
-		let renders = 0;
-		const r = mount(RawObject, { onRender: () => renders++ });
-		await nextPaint();
-		// React's useSyncExternalStore would loop forever + console.error
-		// "The result of getSnapshot should be cached". Octane renders a BOUNDED
-		// number of times and settles — no loop, no crash.
-		expect(renders).toBeLessThan(10);
-		expect(r.find('#a').textContent).toBe('0');
-		useObj.getState().bumpB();
-		await nextPaint();
-		expect(r.find('#a').textContent).toBe('0');
-		r.unmount();
 	});
 });
 

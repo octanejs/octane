@@ -15,7 +15,7 @@ export function DOMRegionScene(props) @{
 				@switch (item) {
 					@case 'region': {
 						@if (props.show) {
-							<DOMRegion target={props.target}>
+							<DOMRegion target={props.target} containerRef={props.containerRef}>
 								<DOMCounter
 									label={props.label}
 									buttonRef={props.buttonRef}

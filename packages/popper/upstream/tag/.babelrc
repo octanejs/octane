@@ -1,0 +1,19 @@
+{
+  "presets": [
+    ["@babel/env", { "modules": false, "loose": true }],
+    "@babel/flow",
+    "@babel/react"
+  ],
+  "env": {
+    "esm": {
+      "ignore": ["**/*.test.js", "**/__mocks__/**"]
+    },
+    "cjs": {
+      "plugins": [["@babel/transform-modules-commonjs"]],
+      "ignore": ["**/*.test.js", "**/__mocks__/**"]
+    },
+    "test": {
+      "plugins": ["@babel/transform-modules-commonjs"]
+    }
+  }
+}

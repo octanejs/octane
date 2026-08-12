@@ -21,6 +21,7 @@ export interface UseSortableInput<T extends Data = Data> extends Omit<
 	target?: RefOrValue<Element>;
 }
 
+// OCTANE DIVERGENCE[dnd-kit-sortable-omit-optimistic-sorting][differential:dnd-kit-sortable-omit-optimistic-sorting]
 // The DOM core's other default sortable plugin optimistically reparents only
 // the referenced host Element. Octane keyed items can own a wider marker range,
 // so that move splits the framework-owned range before application state has

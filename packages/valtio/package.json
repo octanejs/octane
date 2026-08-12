@@ -41,7 +41,7 @@
     "./vanilla/utils": "./src/vanilla/utils.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project valtio"
+    "test": "vitest run --root ../.. --project valtio && vitest run --root ../.. --project valtio-differential"
   },
   "dependencies": {
     "proxy-compare": "catalog:default",
@@ -51,7 +51,11 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
     "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
     "vitest": "catalog:default"
   }
 }

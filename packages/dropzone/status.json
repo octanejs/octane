@@ -1,0 +1,12 @@
+{
+  "upstream": { "package": "react-dropzone", "version": "20.0.0" },
+  "surface": "Exact mapped port of the react-dropzone 20.0.0 root runtime and type namespace at canonical commit 01fc05c5996bf615caf812627f7491375e647c7d. The binding preserves the default Dropzone component, useDropzone, ErrorCode, all public types, root package conditions, and ./package.json export. Runtime coverage executes 218 pristine canonical React cases plus 109 adapted, differential, SSR, hydration, browser, and evidence cases.",
+  "divergences": [
+    "Consumers import from @octanejs/dropzone and author TSRX instead of importing react-dropzone and authoring React JSX; option names and observable file-acquisition behavior remain mapped to the pinned upstream contract.",
+    "The package points its types/import/require conditions at authored Octane source under repository policy; packed-consumer checks prove equivalent ESM, CommonJS, TypeScript, package-json, and public-namespace resolution without React runtime leakage."
+  ],
+  "ssr": "Supported and tested — server rendering and hydration preserve the hidden input and getter-provided root contract without browser-global access during render.",
+  "verified": "2026-08-02",
+  "parityEvidence": "packages/dropzone/audit/react-parity.json",
+  "docs": ["docs/plans/2026-08-02-001-feat-react-dropzone-binding-plan.md"]
+}

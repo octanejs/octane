@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 const ATTRS_EVENTS = resolve(__dirname, '../_fixtures/attrs-events.tsrx');
@@ -8,6 +8,15 @@ const CONTROL = resolve(__dirname, '../_fixtures/control.tsrx');
 const FOR = resolve(__dirname, '../_fixtures/for.tsrx');
 const FRAGMENTS = resolve(__dirname, '../_fixtures/fragments.tsrx');
 const BASIC = resolve(__dirname, '../_fixtures/basic.tsrx');
+
+await Promise.all([
+	preloadDifferentialFixture(ATTRS_EVENTS),
+	preloadDifferentialFixture(HOOKS),
+	preloadDifferentialFixture(CONTROL),
+	preloadDifferentialFixture(FOR),
+	preloadDifferentialFixture(FRAGMENTS),
+	preloadDifferentialFixture(BASIC),
+]);
 
 describe('differential: attrs-events.tsrx — click → state update → re-render', () => {
 	it('Clicker: button onClick → useState setter → text updates', async () => {

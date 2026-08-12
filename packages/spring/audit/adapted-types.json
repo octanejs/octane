@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "types:adapted-octane",
+      "testName": "adapted Octane type suite",
+      "fullName": "adapted Octane type suite"
+    }
+  ]
+}

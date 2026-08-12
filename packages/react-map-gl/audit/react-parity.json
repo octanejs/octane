@@ -43,7 +43,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "47137830d3f76e5a87be45044717ec5360f2f11880e3f8a8de83cb9b1d01db28"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -135,7 +135,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "d655cda963da8e255cf0b519a00b34ca8f0604f7e6631c447f6585b4a93c51a7"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },
@@ -227,7 +227,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "d655cda963da8e255cf0b519a00b34ca8f0604f7e6631c447f6585b4a93c51a7"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },
@@ -429,7 +429,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "d655cda963da8e255cf0b519a00b34ca8f0604f7e6631c447f6585b4a93c51a7"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     },
@@ -527,7 +527,7 @@
         {
           "path": "packages/react-map-gl/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "2a60bf2dca6c3a5a49b592a073461cc72fd4bf53e0647ae4040166d9f04136a5",
+          "sha256": "2b23b967ca83fa2bc314bf973730e7e65913c1491550b9bb93b056432609f0a4",
           "cases": [
             {
               "id": "differential:1",
@@ -604,7 +604,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "d655cda963da8e255cf0b519a00b34ca8f0604f7e6631c447f6585b4a93c51a7"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     }

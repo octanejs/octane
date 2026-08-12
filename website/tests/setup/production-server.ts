@@ -54,6 +54,7 @@ import {
 	reserveFreePort,
 	spawnServer,
 	stopServer,
+	waitForChildExit,
 	waitForServer,
 	writeReadyState,
 } from '../support/server-process.ts';
@@ -75,6 +76,11 @@ declare module 'vitest' {
 const WEBSITE = fileURLToPath(new URL('../..', import.meta.url));
 const OUTPUT_DIR = join(WEBSITE, '.vercel/output');
 const PRODUCTION_ENV = { NODE_ENV: 'production', NITRO_PRESET: 'vercel' };
+// The consolidated binding graph pushes the cold Vercel build beyond four
+// minutes on GitHub's shared runners while it is still emitting chunks. This
+// is one shared build (not a retry or a second wait), so retain a finite guard
+// with enough headroom for the observed successful phase.
+const BUILD_TIMEOUT_MS = 300_000;
 
 let server: ChildProcess | undefined;
 let build: ChildProcess | undefined;
@@ -83,20 +89,15 @@ let readyFile: string | undefined;
 let tearingDown = false;
 
 function buildWebsite(): Promise<void> {
-	return new Promise((resolve, reject) => {
-		// Captured module-side so teardown can kill a build still in flight — the
-		// run can be cancelled while this is the only thing still working.
-		build = spawn('pnpm', ['exec', 'vite', 'build', '--configLoader', 'runner'], {
-			cwd: WEBSITE,
-			stdio: 'ignore',
-			detached: true,
-			env: { ...process.env, ...PRODUCTION_ENV },
-		});
-		build.once('error', reject);
-		build.once('exit', (code) =>
-			code === 0 ? resolve() : reject(new Error(`vite build exited with code ${code}`)),
-		);
+	// Captured module-side so teardown can kill a build still in flight — the
+	// run can be cancelled while this is the only thing still working.
+	build = spawn('pnpm', ['exec', 'vite', 'build', '--configLoader', 'runner'], {
+		cwd: WEBSITE,
+		stdio: ['ignore', 'pipe', 'pipe'],
+		detached: true,
+		env: { ...process.env, ...PRODUCTION_ENV },
 	});
+	return waitForChildExit(build, 'website vite build', BUILD_TIMEOUT_MS);
 }
 
 export async function setup(project: TestProject): Promise<void> {

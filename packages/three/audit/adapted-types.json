@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    "packages/three/typetests/loader-api.test.ts",
+    "packages/three/typetests/public-api.test.ts",
+    "packages/three/typetests/renderer-local.test.ts",
+    "packages/three/typetests/subpath-api.test.ts"
+  ],
+  "assertionGroups": [
+    "loader and graph declarations",
+    "public runtime and component declarations",
+    "renderer-local intrinsic declarations",
+    "package subpath declarations"
+  ]
+}

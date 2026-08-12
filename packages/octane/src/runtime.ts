@@ -6848,6 +6848,14 @@ export function markChildrenBlock<T>(fn: T): T {
 }
 
 /**
+ * Marks a component binding whose authored JSX children must remain inspectable
+ * element descriptors. The compiler consumes the call; runtime identity is unchanged.
+ */
+export function descriptorChildren<T>(component: T): T {
+	return component;
+}
+
+/**
  * True when `value` is a compiler-generated children-block — a component's element/text children
  * that `.tsrx` lowered to a render function — as opposed to a user render-prop function or any other
  * value. Lets a binding with a function-as-child API tell `<C>{(x) => …}</C>` (call it) apart from

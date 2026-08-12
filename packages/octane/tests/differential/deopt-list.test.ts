@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 // The de-opt path with React as the byte-for-byte oracle: the SAME `.tsrx` runs
@@ -7,6 +7,8 @@ import { resolve } from 'node:path';
 // element on the Octane side and to React.createElement on the React side, so a
 // pass proves Octane's runtime array-child reconciliation matches React's.
 const DEOPT = resolve(__dirname, '../_fixtures/deopt-list.tsrx');
+
+await preloadDifferentialFixture(DEOPT);
 
 describe('differential: deopt-list.tsrx — array of host descriptors vs React', () => {
 	it('DeoptList: renders a keyed array of <li> identically', async () => {

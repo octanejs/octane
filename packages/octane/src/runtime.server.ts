@@ -5085,6 +5085,11 @@ export function markChildrenBlock<T>(fn: T): T {
 	return fn;
 }
 
+/** Server twin of the compiler-visible descriptor-children marker. */
+export function descriptorChildren<T>(component: T): T {
+	return component;
+}
+
 /**
  * True when `value` is a compiler-generated children-block (element/text
  * children lowered to a render function) — as opposed to a user render-prop

@@ -5,17 +5,13 @@
  * verbatim; the octane-specific guarantee under test is COMMIT TIMING — every
  * dispatch's state updates and effects are committed before fireEvent returns
  * (RTL gets this from wrapping dispatch in React act()).
+ *
+ * Native-event divergence cases that authenticate React remapping differences
+ * live in `events-native-parity.test.ts` as ordinary framework-contract coverage.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@octanejs/testing-library';
-import {
-	Counter,
-	EffectfulCounter,
-	InputEcho,
-	EventLog,
-	CheckableEventLog,
-	HoverTarget,
-} from './_fixtures/counter.tsrx';
+import { Counter, EffectfulCounter, InputEcho } from './_fixtures/counter.tsrx';
 
 afterEach(cleanup);
 
@@ -50,45 +46,5 @@ describe('fireEvent + state updates', () => {
 		const { getByLabelText, getByTestId } = render(InputEcho);
 		fireEvent.input(getByLabelText('name'), { target: { value: 'octane' } });
 		expect(getByTestId('echo').textContent).toBe('octane');
-	});
-});
-
-describe('native event semantics (intentional divergence from React)', () => {
-	// Per events.js:207 ("onChange works") — with the OCTANE meaning: onChange
-	// is the native `change` event, so fireEvent.change fires it…
-	it('fireEvent.change fires the native change handler', () => {
-		const log = vi.fn();
-		const { getByLabelText } = render(EventLog, { props: { log } });
-		fireEvent.change(getByLabelText('field'), { target: { value: 'abc' } });
-		expect(log.mock.calls).toEqual([['change']]);
-	});
-
-	// …and — unlike React, where onChange handlers run off native `input` —
-	// fireEvent.input does NOT reach onChange. Pins the divergence the README
-	// documents: port React tests by firing the event the handler really means.
-	it('fireEvent.input does NOT trigger onChange (no synthetic remap)', () => {
-		const log = vi.fn();
-		const { getByLabelText } = render(EventLog, { props: { log } });
-		fireEvent.input(getByLabelText('field'), { target: { value: 'abc' } });
-		expect(log.mock.calls).toEqual([['input']]);
-	});
-
-	it('fireEvent.change on a checkbox is an explicit change dispatch, not click activation', () => {
-		const log = vi.fn();
-		const { getByLabelText } = render(CheckableEventLog, { props: { log } });
-		const checkbox = getByLabelText('enabled') as HTMLInputElement;
-		fireEvent.change(checkbox, { target: { checked: true } });
-		expect(checkbox.checked).toBe(true);
-		expect(log.mock.calls).toEqual([['change']]);
-	});
-
-	// RTL double-dispatches mouseEnter as mouseover to feed React's plugin
-	// system; octane's onMouseEnter receives the REAL mouseenter (non-bubbling
-	// events are capture-delegated), so the single dispatch is enough.
-	it('fireEvent.mouseEnter triggers onMouseEnter without a mouseover remap', () => {
-		const log = vi.fn();
-		const { getByTestId } = render(HoverTarget, { props: { log } });
-		fireEvent.mouseEnter(getByTestId('hover'));
-		expect(log.mock.calls).toEqual([['enter']]);
 	});
 });

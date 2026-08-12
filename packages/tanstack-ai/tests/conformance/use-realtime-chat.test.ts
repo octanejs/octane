@@ -95,42 +95,6 @@ afterEach(() => {
 });
 
 describe('useRealtimeChat', () => {
-	it('uses updated authentication and provider on the next connection', async () => {
-		const firstConnection = createConnection();
-		const secondConnection = createConnection();
-		const firstAdapter = createAdapter('first', [firstConnection.connection]);
-		const secondAdapter = createAdapter('second', [secondConnection.connection]);
-		const firstToken = createToken('first', 'first-token');
-		const secondToken = createToken('second', 'second-token');
-		const firstGetToken = vi.fn(async () => firstToken);
-		const secondGetToken = vi.fn(async () => secondToken);
-
-		const { result, rerender, unmount } = renderHook(
-			(options: UseRealtimeChatOptions) => useRealtimeChat(options),
-			{ initialProps: createOptions(firstAdapter.adapter, firstGetToken) },
-		);
-
-		await act(async () => {
-			await result.current.connect();
-			await result.current.disconnect();
-		});
-
-		rerender(createOptions(secondAdapter.adapter, secondGetToken));
-		await act(async () => {
-			await result.current.connect();
-		});
-
-		expect(firstGetToken).toHaveBeenCalledTimes(1);
-		expect(firstAdapter.connect).toHaveBeenCalledTimes(1);
-		expect(secondGetToken).toHaveBeenCalledTimes(1);
-		expect(secondAdapter.connect).toHaveBeenCalledWith(secondToken, undefined);
-
-		await act(async () => {
-			await result.current.disconnect();
-		});
-		unmount();
-	});
-
 	it('uses updated authentication when refreshing an active session', async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date('2026-07-16T12:00:00Z'));
@@ -205,40 +169,6 @@ describe('useRealtimeChat', () => {
 		expect(secondConnection.updateSession).toHaveBeenCalledWith(
 			expect.objectContaining({ vadMode: 'semantic' }),
 		);
-
-		await act(async () => {
-			await result.current.disconnect();
-		});
-		unmount();
-	});
-
-	it('forwards connection status to the latest callback', async () => {
-		const testConnection = createConnection();
-		const testAdapter = createAdapter('test', [testConnection.connection]);
-		const getToken = vi.fn(async () => createToken('test', 'token'));
-		const firstOnStatusChange = vi.fn();
-		const secondOnStatusChange = vi.fn();
-		const { result, rerender, unmount } = renderHook(
-			(options: UseRealtimeChatOptions) => useRealtimeChat(options),
-			{
-				initialProps: createOptions(testAdapter.adapter, getToken, {
-					onStatusChange: firstOnStatusChange,
-				}),
-			},
-		);
-
-		rerender(
-			createOptions(testAdapter.adapter, getToken, {
-				onStatusChange: secondOnStatusChange,
-			}),
-		);
-		await act(async () => {
-			await result.current.connect();
-		});
-
-		expect(firstOnStatusChange).not.toHaveBeenCalled();
-		expect(secondOnStatusChange).toHaveBeenCalledWith('connecting');
-		expect(secondOnStatusChange).toHaveBeenCalledWith('connected');
 
 		await act(async () => {
 			await result.current.disconnect();

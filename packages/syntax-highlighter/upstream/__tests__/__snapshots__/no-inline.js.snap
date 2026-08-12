@@ -1,0 +1,302 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SyntaxHighlighter component renders correctly without inline styles when useInlineStyles=false 1`] = `
+<pre
+  className="hljs"
+  style={Object {}}
+>
+  <code
+    className="language-javascript"
+    style={
+      Object {
+        "whiteSpace": "pre",
+      }
+    }
+  >
+    <span
+      className="hljs-keyword"
+    >
+      const
+    </span>
+    <span
+      className=""
+    >
+       woah = 
+    </span>
+    <span
+      className="hljs-function hljs-params"
+    >
+      fun
+    </span>
+    <span
+      className="hljs-function"
+    >
+       =&gt;
+    </span>
+    <span
+      className=""
+    >
+       fun + 
+    </span>
+    <span
+      className="hljs-number"
+    >
+      1
+    </span>
+    <span
+      className=""
+    >
+      ;
+
+    </span>
+    <span
+      className=""
+    >
+      
+    </span>
+    <span
+      className="hljs-keyword"
+    >
+      const
+    </span>
+    <span
+      className=""
+    >
+       dude = woah(
+    </span>
+    <span
+      className="hljs-number"
+    >
+      2
+    </span>
+    <span
+      className=""
+    >
+      ) + 
+    </span>
+    <span
+      className="hljs-number"
+    >
+      3
+    </span>
+    <span
+      className=""
+    >
+      ;
+
+    </span>
+    <span
+      className=""
+    >
+      
+    </span>
+    <span
+      className="hljs-function hljs-keyword"
+    >
+      function
+    </span>
+    <span
+      className="hljs-function"
+    >
+       
+    </span>
+    <span
+      className="hljs-function hljs-title"
+    >
+      thisIsAFunction
+    </span>
+    <span
+      className="hljs-function"
+    >
+      (
+    </span>
+    <span
+      className="hljs-function"
+    >
+      ) 
+    </span>
+    <span
+      className=""
+    >
+      {
+
+    </span>
+    <span
+      className=""
+    >
+        
+    </span>
+    <span
+      className="hljs-keyword"
+    >
+      return
+    </span>
+    <span
+      className=""
+    >
+       [
+    </span>
+    <span
+      className="hljs-number"
+    >
+      1
+    </span>
+    <span
+      className=""
+    >
+      ,
+    </span>
+    <span
+      className="hljs-number"
+    >
+      2
+    </span>
+    <span
+      className=""
+    >
+      ,
+    </span>
+    <span
+      className="hljs-number"
+    >
+      3
+    </span>
+    <span
+      className=""
+    >
+      ].map(
+    </span>
+    <span
+      className="hljs-function hljs-params"
+    >
+      n
+    </span>
+    <span
+      className="hljs-function"
+    >
+       =&gt;
+    </span>
+    <span
+      className=""
+    >
+       n + 
+    </span>
+    <span
+      className="hljs-number"
+    >
+      1
+    </span>
+    <span
+      className=""
+    >
+      ).filter(n !== 
+    </span>
+    <span
+      className="hljs-number"
+    >
+      3
+    </span>
+    <span
+      className=""
+    >
+      );
+
+    </span>
+    }
+
+    <span
+      className=""
+    >
+      
+    </span>
+    <span
+      className="hljs-built_in"
+    >
+      console
+    </span>
+    <span
+      className=""
+    >
+      .log(
+    </span>
+    <span
+      className="hljs-string"
+    >
+      'making up fake code is really hard'
+    </span>
+    <span
+      className=""
+    >
+      );
+
+    </span>
+    
+
+    <span
+      className=""
+    >
+      
+    </span>
+    <span
+      className="hljs-function hljs-keyword"
+    >
+      function
+    </span>
+    <span
+      className="hljs-function"
+    >
+       
+    </span>
+    <span
+      className="hljs-function hljs-title"
+    >
+      itIs
+    </span>
+    <span
+      className="hljs-function"
+    >
+      (
+    </span>
+    <span
+      className="hljs-function"
+    >
+      ) 
+    </span>
+    <span
+      className=""
+    >
+      {
+
+    </span>
+    <span
+      className=""
+    >
+        
+    </span>
+    <span
+      className="hljs-keyword"
+    >
+      return
+    </span>
+    <span
+      className=""
+    >
+       
+    </span>
+    <span
+      className="hljs-string"
+    >
+      'no seriously really it is'
+    </span>
+    <span
+      className=""
+    >
+      ;
+
+    </span>
+    }
+
+    
+  </code>
+</pre>
+`;

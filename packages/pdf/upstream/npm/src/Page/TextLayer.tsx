@@ -1,0 +1,353 @@
+'use client';
+
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import clsx from 'clsx';
+import makeCancellable from 'make-cancellable-promise';
+import * as pdfjs from 'pdfjs-dist';
+import invariant from 'tiny-invariant';
+import warning from 'warning';
+
+import usePageContext from '../shared/hooks/usePageContext.js';
+import useResolver from '../shared/hooks/useResolver.js';
+
+import { cancelRunningTask, isAbortException } from '../shared/utils.js';
+
+import type { TextContent, TextItem, TextMarkedContent } from 'pdfjs-dist/types/src/display/api.js';
+
+function isTextItem(item: TextItem | TextMarkedContent): item is TextItem {
+  return 'str' in item;
+}
+
+const BLOCKED_CUSTOM_TEXT_TAGS = new Set([
+  'base',
+  'embed',
+  'iframe',
+  'link',
+  'meta',
+  'object',
+  'script',
+  'style',
+  'template',
+]);
+
+const URL_ATTRIBUTES = new Set(['action', 'formaction', 'href', 'poster', 'src', 'xlink:href']);
+
+function isDangerousUrl(value: string): boolean {
+  let normalizedValue = '';
+
+  for (const char of value) {
+    const charCode = char.charCodeAt(0);
+
+    if (charCode <= 32 || charCode === 127) {
+      continue;
+    }
+
+    normalizedValue += char.toLowerCase();
+  }
+
+  return normalizedValue.startsWith('javascript:') || normalizedValue.startsWith('vbscript:');
+}
+
+function isElementNode(node: Node): node is Element {
+  return node.nodeType === Node.ELEMENT_NODE;
+}
+
+function isHtmlElement(node: Node): node is HTMLElement {
+  return isElementNode(node) && node instanceof HTMLElement;
+}
+
+function isBlockedCustomTextElement(node: Node): boolean {
+  return isHtmlElement(node) && BLOCKED_CUSTOM_TEXT_TAGS.has(node.tagName.toLowerCase());
+}
+
+function sanitizeCustomHtmlElement(element: HTMLElement): HTMLElement {
+  const sanitizedElement = document.createElement(element.tagName.toLowerCase());
+
+  Array.from(element.attributes).forEach((attribute) => {
+    const attributeName = attribute.name.toLowerCase();
+
+    if (attributeName.startsWith('on') || attributeName === 'srcdoc') {
+      return;
+    }
+
+    if (URL_ATTRIBUTES.has(attributeName) && isDangerousUrl(attribute.value)) {
+      return;
+    }
+
+    sanitizedElement.setAttribute(attribute.name, attribute.value);
+  });
+
+  Array.from(element.childNodes).forEach((child) => {
+    sanitizedElement.append(sanitizeCustomTextNode(child));
+  });
+
+  return sanitizedElement;
+}
+
+function sanitizeCustomTextNode(node: ChildNode): Node {
+  if (isHtmlElement(node) && !isBlockedCustomTextElement(node)) {
+    return sanitizeCustomHtmlElement(node);
+  }
+
+  return document.createTextNode(node.textContent ?? '');
+}
+
+function renderSafeCustomText(target: Element, content: string): void {
+  const template = document.createElement('template');
+  template.innerHTML = content;
+
+  const sanitizedFragment = document.createDocumentFragment();
+
+  Array.from(template.content.childNodes).forEach((child) => {
+    sanitizedFragment.append(sanitizeCustomTextNode(child));
+  });
+
+  target.replaceChildren(sanitizedFragment);
+}
+
+export default function TextLayer(): React.ReactElement {
+  const pageContext = usePageContext();
+
+  invariant(pageContext, 'Unable to find Page context.');
+
+  const {
+    customTextRenderer,
+    onGetTextError,
+    onGetTextSuccess,
+    onRenderTextLayerError,
+    onRenderTextLayerSuccess,
+    page,
+    pageIndex,
+    pageNumber,
+    rotate,
+    scale,
+  } = pageContext;
+
+  invariant(page, 'Attempted to load page text content, but no page was specified.');
+
+  const [textContentState, textContentDispatch] = useResolver<TextContent>();
+  const { value: textContent, error: textContentError } = textContentState;
+  const layerElement = useRef<HTMLDivElement>(null);
+
+  warning(
+    Number.parseInt(
+      window.getComputedStyle(document.body).getPropertyValue('--react-pdf-text-layer'),
+      10,
+    ) === 1,
+    'TextLayer styles not found. Read more: https://github.com/wojtekmaj/react-pdf#support-for-text-layer',
+  );
+
+  /**
+   * Called when a page text content is read successfully
+   */
+  function onLoadSuccess() {
+    if (!textContent) {
+      // Impossible, but TypeScript doesn't know that
+      return;
+    }
+
+    if (onGetTextSuccess) {
+      onGetTextSuccess(textContent);
+    }
+  }
+
+  /**
+   * Called when a page text content failed to read successfully
+   */
+  function onLoadError() {
+    if (!textContentError) {
+      // Impossible, but TypeScript doesn't know that
+      return;
+    }
+
+    warning(false, textContentError.toString());
+
+    if (onGetTextError) {
+      onGetTextError(textContentError);
+    }
+  }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: useEffect intentionally triggered on page change
+  useEffect(
+    function resetTextContent() {
+      textContentDispatch({ type: 'RESET' });
+    },
+    [page, textContentDispatch],
+  );
+
+  useEffect(
+    function loadTextContent() {
+      if (!page) {
+        return;
+      }
+
+      const cancellable = makeCancellable(page.getTextContent());
+      const runningTask = cancellable;
+
+      cancellable.promise
+        .then((nextTextContent) => {
+          textContentDispatch({ type: 'RESOLVE', value: nextTextContent });
+        })
+        .catch((error) => {
+          textContentDispatch({ type: 'REJECT', error });
+        });
+
+      return () => cancelRunningTask(runningTask);
+    },
+    [page, textContentDispatch],
+  );
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Omitted callbacks so they are not called every time they change
+  useEffect(() => {
+    if (textContent === undefined) {
+      return;
+    }
+
+    if (textContent === false) {
+      onLoadError();
+      return;
+    }
+
+    onLoadSuccess();
+  }, [textContent]);
+
+  /**
+   * Called when a text layer is rendered successfully
+   */
+  const onRenderSuccess = useCallback(() => {
+    if (onRenderTextLayerSuccess) {
+      onRenderTextLayerSuccess();
+    }
+  }, [onRenderTextLayerSuccess]);
+
+  /**
+   * Called when a text layer failed to render successfully
+   */
+  const onRenderError = useCallback(
+    (error: Error) => {
+      if (isAbortException(error)) {
+        return;
+      }
+
+      warning(false, error.toString());
+
+      if (onRenderTextLayerError) {
+        onRenderTextLayerError(error);
+      }
+    },
+    [onRenderTextLayerError],
+  );
+
+  function onMouseDown() {
+    const layer = layerElement.current;
+
+    if (!layer) {
+      return;
+    }
+
+    layer.classList.add('selecting');
+  }
+
+  function onMouseUp() {
+    const layer = layerElement.current;
+
+    if (!layer) {
+      return;
+    }
+
+    layer.classList.remove('selecting');
+  }
+
+  const viewport = useMemo(
+    () => page.getViewport({ scale, rotation: rotate }),
+    [page, rotate, scale],
+  );
+
+  useLayoutEffect(
+    function renderTextLayer() {
+      if (!page || !textContent) {
+        return;
+      }
+
+      const { current: layer } = layerElement;
+
+      if (!layer) {
+        return;
+      }
+
+      layer.innerHTML = '';
+
+      const textContentSource = page.streamTextContent({ includeMarkedContent: true });
+
+      const parameters = {
+        container: layer,
+        textContentSource,
+        viewport,
+      };
+
+      const cancellable = new pdfjs.TextLayer(parameters);
+      const runningTask = cancellable;
+
+      cancellable
+        .render()
+        .then(() => {
+          const end = document.createElement('div');
+          end.className = 'endOfContent';
+          layer.append(end);
+
+          const layerChildren = layer.querySelectorAll('[role="presentation"]');
+
+          if (customTextRenderer) {
+            let index = 0;
+            textContent.items.forEach((item, itemIndex) => {
+              if (!isTextItem(item)) {
+                return;
+              }
+
+              const child = layerChildren[index];
+
+              if (!child) {
+                return;
+              }
+
+              const content = customTextRenderer({
+                pageIndex,
+                pageNumber,
+                itemIndex,
+                ...item,
+              });
+
+              renderSafeCustomText(child, content);
+              index += item.str && item.hasEOL ? 2 : 1;
+            });
+          }
+
+          // Intentional immediate callback
+          onRenderSuccess();
+        })
+        .catch(onRenderError);
+
+      return () => cancelRunningTask(runningTask);
+    },
+    [
+      customTextRenderer,
+      onRenderError,
+      onRenderSuccess,
+      page,
+      pageIndex,
+      pageNumber,
+      textContent,
+      viewport,
+    ],
+  );
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: False positive caused by non interactive wrapper listening for bubbling events
+    <div
+      className={clsx('react-pdf__Page__textContent', 'textLayer')}
+      onMouseUp={onMouseUp}
+      onMouseDown={onMouseDown}
+      ref={layerElement}
+    />
+  );
+}

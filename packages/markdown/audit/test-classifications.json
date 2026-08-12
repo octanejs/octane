@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/markdown/audit/type-probes/public-api.test-d.ts",
+      "disposition": "paired-repo-authored-react-type-oracle",
+      "oracle": "Repo-authored pristine React declaration/type-oracle probes against pinned react-markdown 10.1.0, paired with packages/markdown/typetests/public-api.test-d.ts (pristine type lane)."
+    },
+    {
+      "path": "packages/markdown/tests/adoption/consumer.server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Frozen adoption-corpus SSR execution for the Octane binding; not React-parity ownership."
+    },
+    {
+      "path": "packages/markdown/tests/adoption/consumer.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Frozen adoption-corpus client execution for the Octane binding; not React-parity ownership."
+    },
+    {
+      "path": "packages/markdown/tests/async/markdown-async.local.server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Local Octane-only async helpers outside the one-for-one adapted-upstream identity set."
+    },
+    {
+      "path": "packages/markdown/tests/async/markdown-async.server.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted MarkdownAsync identities from pinned react-markdown 10.1.0 test.jsx with upstream citations; sync-render divergence is recorded in the parity manifest."
+    },
+    {
+      "path": "packages/markdown/tests/audit/crosswalk.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Validates the adapted-case crosswalk integrity ledger; not used as React behavioral evidence."
+    },
+    {
+      "path": "packages/markdown/tests/conformance/public-types.local.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only public source constraint outside the one-for-one adapted-upstream identity set."
+    },
+    {
+      "path": "packages/markdown/tests/conformance/public-types.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted public-API identity from pinned react-markdown 10.1.0 test.jsx with upstream citations."
+    },
+    {
+      "path": "packages/markdown/tests/conformance/sync.local.server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Local Octane-only sync helpers outside the one-for-one adapted-upstream identity set."
+    },
+    {
+      "path": "packages/markdown/tests/conformance/sync.server.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted synchronous Markdown identities from pinned react-markdown 10.1.0 test.jsx with upstream citations."
+    },
+    {
+      "path": "packages/markdown/tests/differential/processor.local.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Local Octane-only processor helpers outside the one-for-one adapted-upstream identity set."
+    },
+    {
+      "path": "packages/markdown/tests/differential/processor.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted processor/filter identities from pinned react-markdown 10.1.0 test.jsx with upstream citations."
+    },
+    {
+      "path": "packages/markdown/tests/differential/url-transform.local.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Local Octane-only URL helpers outside the one-for-one adapted-upstream identity set."
+    },
+    {
+      "path": "packages/markdown/tests/differential/url-transform.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted URL-transform identities from pinned react-markdown 10.1.0 test.jsx with upstream citations."
+    },
+    {
+      "path": "packages/markdown/tests/hooks/markdown-hooks.local.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Local Octane-only MarkdownHooks helpers outside the one-for-one adapted-upstream identity set."
+    },
+    {
+      "path": "packages/markdown/tests/hooks/markdown-hooks.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted MarkdownHooks identities from pinned react-markdown 10.1.0 test.jsx with upstream citations."
+    },
+    {
+      "path": "packages/markdown/tests/hydration/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane hydration adoption/update contract; not React-parity ownership."
+    },
+    {
+      "path": "packages/markdown/tests/parity/differential.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the same Markdown and URL fixtures through pinned react-markdown 10.1.0 and @octanejs/markdown."
+    },
+    {
+      "path": "packages/markdown/tests/probes/async-component.server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Architecture probe for awaitable mapped components through Octane prerender; not React-parity ownership."
+    },
+    {
+      "path": "packages/markdown/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane SSR/server rendering contract for the binding; not React-parity ownership."
+    },
+    {
+      "path": "packages/markdown/tests/validation.local.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Local Octane-only validation helpers outside the one-for-one adapted-upstream identity set."
+    },
+    {
+      "path": "packages/markdown/tests/validation.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted validation/error identities from pinned react-markdown 10.1.0 test.jsx with upstream citations."
+    },
+    {
+      "path": "packages/markdown/typetests/public-api.test-d.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted Octane public type probes paired with audit/type-probes/public-api.test-d.ts after permitted transformations."
+    }
+  ]
+}

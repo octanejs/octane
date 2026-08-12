@@ -3,7 +3,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { Browser, Page } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
+import { launchBrowser } from '../../../../test-utils/playwright-browser.js';
 
 import { octane } from '../../../octane/src/compiler/vite.js';
 
@@ -25,22 +27,13 @@ function getFreePort(): Promise<number> {
 }
 
 let viteServer: ViteDevServer;
-let browser: import('playwright').Browser;
-let page: import('playwright').Page;
+let browser: Browser;
+let page: Page;
 let origin = '';
 let pageErrors: string[] = [];
 
 beforeAll(async () => {
-	try {
-		const { chromium } = await import('playwright');
-		browser = await chromium.launch({ headless: true });
-	} catch (error) {
-		throw new Error(
-			'[@octanejs/tiptap browser] Chromium is required ' +
-				'(run `pnpm exec playwright install chromium`): ' +
-				(error instanceof Error ? error.message.split('\n')[0] : String(error)),
-		);
-	}
+	browser = await launchBrowser({ headless: true });
 
 	const port = await getFreePort();
 	viteServer = await createServer({

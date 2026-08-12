@@ -1,0 +1,257 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SyntaxHighlighter renders jsx highlighted text 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        "import React from "react";
+import uniquePropHOC from "./lib/unique-prop-hoc";
+
+class Expire extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { component: props.children }
+    }
+    componentDidMount() {
+        setTimeout(() => {
+            this.setState({
+                component: null
+            });
+        }, this.props.time || this.props.seconds * 1000);
+    }
+    render() {
+        return this.state.component;
+    }
+}",
+      ],
+      "props": {
+        "className": "language-jsx",
+        "style": {
+          "background": "none",
+          "color": "black",
+          "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+          "fontSize": "1em",
+          "hyphens": "none",
+          "lineHeight": "1.5",
+          "tabSize": "4",
+          "textAlign": "left",
+          "textShadow": "0 1px white",
+          "whiteSpace": "pre",
+          "wordBreak": "normal",
+          "wordSpacing": "normal",
+          "wordWrap": "normal",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(245, 242, 240)",
+      "color": "black",
+      "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+      "fontSize": "1em",
+      "hyphens": "none",
+      "lineHeight": "1.5",
+      "margin": "0.5em 0px",
+      "overflow": "auto",
+      "padding": "1em",
+      "tabSize": "4",
+      "textAlign": "left",
+      "textShadow": "0 1px white",
+      "whiteSpace": "pre",
+      "wordBreak": "normal",
+      "wordSpacing": "normal",
+      "wordWrap": "normal",
+    },
+  },
+  "type": "pre",
+}
+`;
+
+exports[`SyntaxHighlighter should just render text if syntax is not registered 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        "print('hello')",
+      ],
+      "props": {
+        "className": "language-text",
+        "style": {
+          "background": "none",
+          "color": "black",
+          "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+          "fontSize": "1em",
+          "hyphens": "none",
+          "lineHeight": "1.5",
+          "tabSize": "4",
+          "textAlign": "left",
+          "textShadow": "0 1px white",
+          "whiteSpace": "pre",
+          "wordBreak": "normal",
+          "wordSpacing": "normal",
+          "wordWrap": "normal",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(245, 242, 240)",
+      "color": "black",
+      "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+      "fontSize": "1em",
+      "hyphens": "none",
+      "lineHeight": "1.5",
+      "margin": "0.5em 0px",
+      "overflow": "auto",
+      "padding": "1em",
+      "tabSize": "4",
+      "textAlign": "left",
+      "textShadow": "0 1px white",
+      "whiteSpace": "pre",
+      "wordBreak": "normal",
+      "wordSpacing": "normal",
+      "wordWrap": "normal",
+    },
+  },
+  "type": "pre",
+}
+`;
+
+exports[`When the code split is loaded - SyntaxHighlighter renders python highlighted text after async loading python 1`] = `
+{
+  "children": [
+    {
+      "children": [
+        {
+          "children": [
+            "
+",
+          ],
+          "props": {},
+          "type": "span",
+        },
+        "             # Import the modules
+",
+        "import sys
+",
+        "import random
+",
+        "
+",
+        "ans = True
+",
+        "
+",
+        "while ans:
+",
+        "    question = raw_input("Ask the magic 8 ball a question: (press enter to quit) ")
+",
+        "
+",
+        "    answers = random.randint(1,8)
+",
+        "
+",
+        "    if question == "":
+",
+        "        sys.exit()
+",
+        "
+",
+        "    elif answers == 1:
+",
+        "        print "It is certain"
+",
+        "
+",
+        "    elif answers == 2:
+",
+        "        print "Outlook good"
+",
+        "
+",
+        "    elif answers == 3:
+",
+        "        print "You may rely on it"
+",
+        "
+",
+        "    elif answers == 4:
+",
+        "        print "Ask again later"
+",
+        "
+",
+        "    elif answers == 5:
+",
+        "        print "Concentrate and ask again"
+",
+        "
+",
+        "    elif answers == 6:
+",
+        "        print "Reply hazy, try again"
+",
+        "
+",
+        "    elif answers == 7:
+",
+        "        print "My reply is no"
+",
+        "
+",
+        "    elif answers == 8:
+",
+        "        print "My sources say no"
+",
+        "             ",
+      ],
+      "props": {
+        "className": "language-python",
+        "style": {
+          "background": "none",
+          "color": "black",
+          "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+          "fontSize": "1em",
+          "hyphens": "none",
+          "lineHeight": "1.5",
+          "tabSize": "4",
+          "textAlign": "left",
+          "textShadow": "0 1px white",
+          "whiteSpace": "pre",
+          "wordBreak": "normal",
+          "wordSpacing": "normal",
+          "wordWrap": "normal",
+        },
+      },
+      "type": "code",
+    },
+  ],
+  "props": {
+    "style": {
+      "background": "rgb(245, 242, 240)",
+      "color": "black",
+      "fontFamily": "Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace",
+      "fontSize": "1em",
+      "hyphens": "none",
+      "lineHeight": "1.5",
+      "margin": "0.5em 0px",
+      "overflow": "auto",
+      "padding": "1em",
+      "tabSize": "4",
+      "textAlign": "left",
+      "textShadow": "0 1px white",
+      "whiteSpace": "pre",
+      "wordBreak": "normal",
+      "wordSpacing": "normal",
+      "wordWrap": "normal",
+    },
+  },
+  "type": "pre",
+}
+`;

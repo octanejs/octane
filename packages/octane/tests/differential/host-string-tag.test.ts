@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 // Differential pin for JSX tags that resolve to a HOST tag STRING at runtime
@@ -9,6 +9,8 @@ import { resolve } from 'node:path';
 // match byte-for-byte across mount, in-place updates, and tag flips.
 
 const FIXTURE = resolve(__dirname, '../_fixtures/host-string-tag-diff.tsrx');
+
+await preloadDifferentialFixture(FIXTURE);
 
 describe('differential: host-string-tag-diff.tsrx', () => {
 	it('TagSwitcher: mount, update in place, flip tag, update again', async () => {

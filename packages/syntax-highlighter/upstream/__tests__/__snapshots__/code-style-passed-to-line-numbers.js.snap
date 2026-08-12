@@ -1,0 +1,360 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SyntaxHighlighter component passes along code style to non-inline line numbers element 1`] = `
+<pre
+  style={
+    Object {
+      "background": "#F0F0F0",
+      "color": "#444",
+      "display": "block",
+      "overflowX": "auto",
+      "padding": "0.5em",
+    }
+  }
+>
+  <code
+    style={
+      Object {
+        "color": "blue",
+        "whiteSpace": "pre",
+      }
+    }
+  >
+    <code
+      style={
+        Object {
+          "color": "blue",
+          "float": "left",
+          "paddingRight": "10px",
+        }
+      }
+    >
+      <span
+        className="react-syntax-highlighter-line-number"
+        style={Object {}}
+      >
+        1
+
+      </span>
+      <span
+        className="react-syntax-highlighter-line-number"
+        style={Object {}}
+      >
+        2
+
+      </span>
+      <span
+        className="react-syntax-highlighter-line-number"
+        style={Object {}}
+      >
+        3
+
+      </span>
+      <span
+        className="react-syntax-highlighter-line-number"
+        style={Object {}}
+      >
+        4
+
+      </span>
+      <span
+        className="react-syntax-highlighter-line-number"
+        style={Object {}}
+      >
+        5
+
+      </span>
+      <span
+        className="react-syntax-highlighter-line-number"
+        style={Object {}}
+      >
+        6
+
+      </span>
+      <span
+        className="react-syntax-highlighter-line-number"
+        style={Object {}}
+      >
+        7
+
+      </span>
+      <span
+        className="react-syntax-highlighter-line-number"
+        style={Object {}}
+      >
+        8
+
+      </span>
+      <span
+        className="react-syntax-highlighter-line-number"
+        style={Object {}}
+      >
+        9
+
+      </span>
+      <span
+        className="react-syntax-highlighter-line-number"
+        style={Object {}}
+      >
+        10
+
+      </span>
+    </code>
+    <span
+      style={
+        Object {
+          "fontWeight": "bold",
+        }
+      }
+    >
+      const
+    </span>
+    <span
+      style={Object {}}
+    >
+       woah = 
+    </span>
+    <span
+      className="hljs-function"
+      style={
+        Object {
+          "fontWeight": "bold",
+        }
+      }
+    >
+      fun
+    </span>
+    <span
+      className="hljs-function"
+      style={Object {}}
+    >
+       =&gt; 
+    </span>
+    <span
+      className="hljs-function"
+      style={
+        Object {
+          "fontWeight": "bold",
+        }
+      }
+    >
+      fun
+    </span>
+    <span
+      className="hljs-function"
+      style={Object {}}
+    >
+       + 1;
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+
+    </span>
+    <span
+      style={Object {}}
+    >
+      
+    </span>
+    <span
+      style={
+        Object {
+          "fontWeight": "bold",
+        }
+      }
+    >
+      const
+    </span>
+    <span
+      style={Object {}}
+    >
+       dude = woah(
+    </span>
+    <span
+      style={
+        Object {
+          "color": "#880000",
+        }
+      }
+    >
+      2
+    </span>
+    <span
+      style={Object {}}
+    >
+      ) + 
+    </span>
+    <span
+      style={
+        Object {
+          "color": "#880000",
+        }
+      }
+    >
+      3
+    </span>
+    <span
+      style={Object {}}
+    >
+      ;
+
+    </span>
+    function thisIsAFunction() {
+
+    <span
+      style={Object {}}
+    >
+        
+    </span>
+    <span
+      style={
+        Object {
+          "fontWeight": "bold",
+        }
+      }
+    >
+      return
+    </span>
+    <span
+      style={Object {}}
+    >
+       [
+    </span>
+    <span
+      style={
+        Object {
+          "color": "#880000",
+        }
+      }
+    >
+      1
+    </span>
+    <span
+      style={Object {}}
+    >
+      ,
+    </span>
+    <span
+      style={
+        Object {
+          "color": "#880000",
+        }
+      }
+    >
+      2
+    </span>
+    <span
+      style={Object {}}
+    >
+      ,
+    </span>
+    <span
+      style={
+        Object {
+          "color": "#880000",
+        }
+      }
+    >
+      3
+    </span>
+    <span
+      style={Object {}}
+    >
+      ].map(n =&gt; n + 
+    </span>
+    <span
+      style={
+        Object {
+          "color": "#880000",
+        }
+      }
+    >
+      1
+    </span>
+    <span
+      style={Object {}}
+    >
+      ).filter(n !== 
+    </span>
+    <span
+      style={
+        Object {
+          "color": "#880000",
+        }
+      }
+    >
+      3
+    </span>
+    <span
+      style={Object {}}
+    >
+      );
+
+    </span>
+    }
+
+    <span
+      style={Object {}}
+    >
+      console.log(
+    </span>
+    <span
+      style={
+        Object {
+          "color": "#880000",
+        }
+      }
+    >
+      'making up fake code is really hard'
+    </span>
+    <span
+      style={Object {}}
+    >
+      );
+
+    </span>
+    
+
+    function itIs() {
+
+    <span
+      style={Object {}}
+    >
+        
+    </span>
+    <span
+      style={
+        Object {
+          "fontWeight": "bold",
+        }
+      }
+    >
+      return
+    </span>
+    <span
+      style={Object {}}
+    >
+       
+    </span>
+    <span
+      style={
+        Object {
+          "color": "#880000",
+        }
+      }
+    >
+      'no seriously really it is'
+    </span>
+    <span
+      style={Object {}}
+    >
+      ;
+
+    </span>
+    }
+
+    
+  </code>
+</pre>
+`;

@@ -1,7 +1,8 @@
 import { useSelector } from '@octanejs/tanstack-store';
 
-// React type aliases used by upstream signatures (`React.Dispatch<React.SetStateAction<T>>`).
-// Octane's `useState` setter is structurally identical.
+// Local aliases for upstream React.Dispatch / React.SetStateAction spellings.
+// Octane's useState setter is structurally identical; accept/reject evidence lives
+// in typetests/octane-only outside required React-parity ownership.
 export type SetStateAction<S> = S | ((prev: S) => S);
 export type Dispatch<A> = (value: A) => void;
 

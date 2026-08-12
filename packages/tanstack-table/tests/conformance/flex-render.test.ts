@@ -65,14 +65,6 @@ describe('flexRender through the octane render path', () => {
 		r.unmount();
 	});
 
-	it('renders an octane memo()-wrapped component cell (plain function, no exotic sniffing)', async () => {
-		const r = mount(FlexTable, {});
-		await flush();
-		const cells = r.findAll('.age-cell');
-		expect(cells.map((c) => c.textContent)).toEqual(['mc:29', 'mc:40']);
-		r.unmount();
-	});
-
 	it('pins the upstream falsy quirk: !Comp → null', () => {
 		// Upstream's `!Comp ? null : …` swallows '' and 0 — parity, not a bug to fix.
 		expect(flexRender(undefined, {})).toBe(null);

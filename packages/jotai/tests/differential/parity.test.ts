@@ -10,7 +10,10 @@
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
 import { act as reactAct } from 'react';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const COUNTER = resolve(__dirname, '../_fixtures/counter-diff.tsrx');
 const PROVIDERS = resolve(__dirname, '../_fixtures/providers-diff.tsrx');
@@ -51,6 +54,13 @@ async function waitForSelectorText(
 			`  react: ${pair.react.container.innerHTML}`,
 	);
 }
+
+await Promise.all([
+	preloadDifferentialFixture(COUNTER, CACHE),
+	preloadDifferentialFixture(PROVIDERS, CACHE),
+	preloadDifferentialFixture(SPLIT, CACHE),
+	preloadDifferentialFixture(ASYNC, CACHE),
+]);
 
 describe('differential: @octanejs/jotai vs real jotai on React', function () {
 	// @parity-case differential:jotai-counter

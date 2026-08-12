@@ -2,14 +2,16 @@
  * Port of dexie-react-hooks@4.4.0 QUnit/Karma integration suite
  * (libs/dexie-react-hooks/test/index.ts) onto @octanejs/dexie.
  *
- * Runs in real Chromium via Playwright (real IndexedDB) — not jsdom/fake-indexeddb.
+ * Runs in a real browser via Playwright (real IndexedDB) — not jsdom/fake-indexeddb.
  */
 import { createServer as createNetServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { Browser, Page } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
 import { octane } from '../../../octane/src/compiler/vite.js';
+import { launchBrowser } from '../../../../test-utils/playwright-browser.js';
 
 const harnessRoot = resolve(dirname(fileURLToPath(import.meta.url)), 'harness');
 const packageSrc = resolve(dirname(fileURLToPath(import.meta.url)), '../../src/index.ts');
@@ -32,9 +34,8 @@ function compactText(value: string | null | undefined) {
 
 let viteServer: ViteDevServer;
 let origin = '';
-let chromium: typeof import('playwright').chromium;
-let browser: import('playwright').Browser;
-let page: import('playwright').Page;
+let browser: Browser;
+let page: Page;
 
 async function waitTilEqual(
 	read: () => Promise<string | null | undefined>,
@@ -77,16 +78,7 @@ async function dexieCall<T>(method: string, ...args: unknown[]): Promise<T> {
 }
 
 beforeAll(async () => {
-	try {
-		({ chromium } = await import('playwright'));
-		browser = await chromium.launch({ headless: true });
-	} catch (error) {
-		throw new Error(
-			'[@octanejs/dexie browser] Chromium is required ' +
-				'(run `pnpm exec playwright install chromium`): ' +
-				(error instanceof Error ? error.message.split('\n')[0] : String(error)),
-		);
-	}
+	browser = await launchBrowser({ headless: true });
 
 	const port = await getFreePort();
 	viteServer = await createServer({
@@ -160,6 +152,7 @@ async function currentHasItem(id: number) {
 
 describe('upstream dexie-react-hooks integration scenarios (Playwright)', () => {
 	// Per dexie-react-hooks test/index.ts: List component is reacting to changes
+	// @parity-case browser:dexie-list-reactivity
 	it('List component is reacting to changes', async () => {
 		await waitTilEqual(listText, '', 'The list should be empty');
 
@@ -181,6 +174,7 @@ describe('upstream dexie-react-hooks integration scenarios (Playwright)', () => 
 	});
 
 	// Per dexie-react-hooks test/index.ts: ItemLoaderComponent is reacting to changes
+	// @parity-case browser:dexie-item-reactivity
 	it('ItemLoaderComponent is reacting to changes', async () => {
 		await waitTilEqual(
 			currentNotFoundText,
@@ -211,6 +205,7 @@ describe('upstream dexie-react-hooks integration scenarios (Playwright)', () => 
 	});
 
 	// Per dexie-react-hooks test/index.ts: Clicking next button will update the currently viewed item
+	// @parity-case browser:dexie-item-navigation
 	it('Clicking next button will update the currently viewed item', async () => {
 		await dexieCall('bulkPut', [
 			{ id: 1, name: 'Hello' },
@@ -239,6 +234,7 @@ describe('upstream dexie-react-hooks integration scenarios (Playwright)', () => 
 	});
 
 	// Per dexie-react-hooks test/index.ts: Selecting invalid key trigger the err-boundrary
+	// @parity-case browser:dexie-error-boundary
 	it('Selecting invalid key triggers the error boundary', async () => {
 		await dexieCall('bulkPut', [
 			{ id: 1, name: 'Hello' },

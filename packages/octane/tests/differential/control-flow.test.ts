@@ -1,5 +1,5 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 const EARLY_RETURN = resolve(__dirname, '../_fixtures/early-return.tsrx');
@@ -7,6 +7,14 @@ const CONTINUE = resolve(__dirname, '../_fixtures/continue.tsrx');
 const NESTED = resolve(__dirname, '../_fixtures/nested.tsrx');
 const HOOKS = resolve(__dirname, '../_fixtures/hooks.tsrx');
 const FOR = resolve(__dirname, '../_fixtures/for.tsrx');
+
+await Promise.all([
+	preloadDifferentialFixture(EARLY_RETURN),
+	preloadDifferentialFixture(CONTINUE),
+	preloadDifferentialFixture(NESTED),
+	preloadDifferentialFixture(HOOKS),
+	preloadDifferentialFixture(FOR),
+]);
 
 describe('differential: early-return.tsrx — @if-gated JSX', () => {
 	it('Maybe: gate renders content when condition false', async () => {

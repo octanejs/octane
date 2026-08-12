@@ -35,6 +35,12 @@ export function App() @{
 
 The public entry points mirror `@dnd-kit/react@0.5.0`:
 
+Parity evidence is intentionally `recorded-unverified`: the canonical adapter
+source is pinned and vendored, but upstream contains no React-adapter test suite
+at this release and the current differential covers one programmatic manager-action
+drag lifecycle (not keyboard-sensor parity).
+See [`UPSTREAM.md`](./UPSTREAM.md) for the exact boundary and open browser gaps.
+
 - `@octanejs/dnd-kit`
 - `@octanejs/dnd-kit/hooks`
 - `@octanejs/dnd-kit/sortable`

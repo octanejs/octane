@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "preserve",
+    "strict": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "react-draggable": ["../lib/cjs.ts"]
+    }
+  },
+  "files": [
+    "test.tsx"
+  ]
+}

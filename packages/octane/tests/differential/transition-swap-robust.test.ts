@@ -1,8 +1,10 @@
 import { describe, it } from 'vitest';
-import { mountDifferential } from './_rig.js';
+import { mountDifferential, preloadDifferentialFixture } from './_rig.js';
 import { resolve } from 'node:path';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/transition-swap-robust.tsrx');
+
+await preloadDifferentialFixture(FIXTURE);
 function deferred<T>() {
 	let resolve!: (v: T) => void;
 	const promise = new Promise<T>((res) => (resolve = res));

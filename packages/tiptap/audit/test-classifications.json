@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/tiptap/tests/browser/editor.browser.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks real Chromium integration and geometry; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tiptap/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs exact editor and custom-view lifecycle scenarios against @tiptap/react@3.28.0."
+    },
+    {
+      "path": "packages/tiptap/tests/hydration/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane hydration adoption and live editor/custom-view activation."
+    },
+    {
+      "path": "packages/tiptap/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane server rendering without a DOM; it is not compared with React SSR."
+    },
+    {
+      "path": "packages/tiptap/tests/unit/client-boundary.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks package client directives; it is not React behavioral evidence."
+    },
+    {
+      "path": "packages/tiptap/tests/unit/components.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks EditorContent reuse and EditorProvider slot teardown; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tiptap/tests/unit/custom-views.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks renderer/node/mark lifecycle and context wiring as Octane framework contracts outside the upstream suite."
+    },
+    {
+      "path": "packages/tiptap/tests/unit/editor-consumer.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins EditorConsumer render-prop context adaptation as an Octane framework contract."
+    },
+    {
+      "path": "packages/tiptap/tests/unit/editor.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks adapted editor hook lifecycle; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tiptap/tests/unit/fixture-compiler.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks fail-closed React fixture compilation for the parity harness itself."
+    },
+    {
+      "path": "packages/tiptap/tests/differential/mark-view-portal-cleanup.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Compares destroy-driven mark-view portal teardown against @tiptap/react@3.28.0, which retains the React tree after ProseMirror detaches the host."
+    },
+    {
+      "path": "packages/tiptap/tests/unit/menus.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks automatic menu plugin-key isolation; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/tiptap/tests/unit/native-external-store.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins the React-free subscription dependency surface as an Octane framework contract."
+    },
+    {
+      "path": "packages/tiptap/tests/unit/native-menu-events.test.ts",
+      "disposition": "octane-only-divergence",
+      "divergenceId": "tiptap-native-menu-events",
+      "reason": "Extra conformance around native menu callbacks; the required adapted upstream case authenticates the divergence."
+    },
+    {
+      "path": "packages/tiptap/tests/unit/node-view-as-prop.test.ts",
+      "disposition": "octane-only-divergence",
+      "divergenceId": "tiptap-node-view-as-prop",
+      "reason": "Extra conformance for consumed as props; the required differential case authenticates the divergence."
+    },
+    {
+      "path": "packages/tiptap/tests/unit/public-surface.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks public export-name parity with @tiptap/react; it is not a framework divergence case."
+    },
+    {
+      "path": "packages/tiptap/tests/unit/stage4-lifecycle.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks advanced Octane renderer and menu lifecycle races."
+    },
+    {
+      "path": "packages/tiptap/typetests/adapted/types.test-d.ts",
+      "disposition": "react-parity-type-probe",
+      "oracle": "One-for-one adapted Octane declaration probes against @octanejs/tiptap with tsrx-tsc."
+    },
+    {
+      "path": "packages/tiptap/typetests/menus-api.test-d.ts",
+      "disposition": "octane-only-type-probe",
+      "reason": "Octane-only menus public-API declaration contract outside the React-parity type lane."
+    },
+    {
+      "path": "packages/tiptap/typetests/pristine/types.test-d.ts",
+      "disposition": "react-parity-type-probe",
+      "oracle": "Port-authored React declaration probes against @tiptap/react@3.28.0 with tsc."
+    },
+    {
+      "path": "packages/tiptap/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-probe",
+      "reason": "Octane-only root public-API declaration contract outside the React-parity type lane."
+    }
+  ]
+}

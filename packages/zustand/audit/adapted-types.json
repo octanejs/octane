@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "files": ["packages/zustand/typetests/public-api.test-d.ts"],
+  "assertionGroups": [
+    "create and UseBoundStore inference",
+    "selector result inference",
+    "traditional equality inference"
+  ]
+}

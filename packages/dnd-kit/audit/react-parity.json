@@ -1,0 +1,147 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/clauderic/dnd-kit.git",
+    "version": "0.5.0",
+    "commit": "cc98bdd52c06e55221e8cf77aaa0c2ec0f55b86f",
+    "sourceRoot": "packages/react/src",
+    "testRoot": "packages/react",
+    "license": "MIT",
+    "integrity": "sha256:33ce0c6b148117ab4568669492cd8187e8d04f3d1125cd26c598d9110a14e75e",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/dnd-kit/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/dnd-kit/tests/parity"],
+      "include": ["contracts\\.test\\.ts$"],
+      "exclude": ["contracts\\.test\\.ts$"]
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+    }
+  },
+  "lanes": [
+    {
+      "id": "dnd-kit-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs one identical authored programmatic manager-action drag lifecycle against @dnd-kit/react 0.5.0 and @octanejs/dnd-kit (sensors=[], manager.actions start/move/stop), plus behavioral differential cases that observe DragOverlay static-children handling and useSortable default plugin divergence (OptimisticSortingPlugin). Bounded jsdom evidence, not browser-complete or keyboard-sensor parity.",
+      "files": [
+        {
+          "path": "packages/dnd-kit/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "50f5b7ffe8aa716ba8357cc0d11868596c752a8bd78c1b4f7f46c93fe7b184ce",
+          "cases": [
+            {
+              "id": "differential:dnd-kit-programmatic-manager-lifecycle",
+              "testName": "matches mount, pickup, movement, overlay, and drop output",
+              "fullName": "differential: @octanejs/dnd-kit vs @dnd-kit/react matches mount, pickup, movement, overlay, and drop output"
+            },
+            {
+              "id": "differential:dnd-kit-drag-overlay-compiled-children",
+              "testName": "keeps static DragOverlay children equivalent across adapters",
+              "fullName": "differential: @octanejs/dnd-kit vs @dnd-kit/react keeps static DragOverlay children equivalent across adapters"
+            },
+            {
+              "id": "differential:dnd-kit-sortable-omit-optimistic-sorting",
+              "testName": "omits OptimisticSortingPlugin from Octane sortable defaults",
+              "fullName": "differential: @octanejs/dnd-kit vs @dnd-kit/react omits OptimisticSortingPlugin from Octane sortable defaults"
+            }
+          ]
+        },
+        {
+          "path": "packages/dnd-kit/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "d982970ac68712f7ac3ce51ac133b22bee4879dafde32902adb7bffbe1bfca88"
+        },
+        {
+          "path": "packages/dnd-kit/tests/_fixtures/differential.tsrx",
+          "role": "support",
+          "sha256": "9beb4f248e0733255db2a3ab5bb87c54c1806483823d6cb4c69c3039749710e2"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
+        },
+        {
+          "path": "packages/dnd-kit/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "cea0d1ab363c6fd22ec54aa731e1b7845c6ce093d9119aecfb4281e49511b30e"
+        },
+        {
+          "path": "packages/dnd-kit/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "011bbc6121612fb797e166a4fc8d3f01999ccfb29c1e39b6f52459ec6d82431a"
+        },
+        {
+          "path": "packages/dnd-kit/scripts/check-upstream-ledger.mjs",
+          "role": "support",
+          "sha256": "d60b3af0adbf5484dc068cd49ce65b31131ad7a0c53de25b5e2a37568cba549b"
+        },
+        {
+          "path": "scripts/react-parity/dnd-kit-controls.test.mjs",
+          "role": "support",
+          "sha256": "b336789448ebc47d2c2d5b8fcd643b1f0104b8c083b1e9ee1bab3068819b80ac"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "dnd-kit-drag-overlay-compiled-children",
+      "caseIds": ["differential:dnd-kit-drag-overlay-compiled-children"],
+      "upstreamResult": "DragOverlay treats every function child as a render prop and invokes it with the active source.",
+      "octaneResult": "DragOverlay distinguishes Octane compiled children blocks via isChildrenBlock and only invokes plain render-prop functions.",
+      "rationale": "Octane compiler children blocks are functions; calling them as render props would execute the wrong arm.",
+      "classification": "compiler-model",
+      "consumerImpact": "Ordinary typed JSX children and render props remain equivalent; bare Function children that are compiled blocks render as children rather than render props.",
+      "migrationGuidance": "Pass a plain (source) => node render prop when dynamic overlay content is required; keep static overlay children as elements or values.",
+      "owner": "@octanejs/dnd-kit",
+      "reviewCondition": "Review if Octane stops representing compiled children as functions or adds a React-compatible children channel."
+    },
+    {
+      "id": "dnd-kit-sortable-omit-optimistic-sorting",
+      "caseIds": ["differential:dnd-kit-sortable-omit-optimistic-sorting"],
+      "upstreamResult": "useSortable defaults include SortableKeyboardPlugin and OptimisticSortingPlugin, which reparents the host element before application state commits.",
+      "octaneResult": "useSortable defaults keep SortableKeyboardPlugin but omit OptimisticSortingPlugin; explicit plugin arrays remain authoritative.",
+      "rationale": "Optimistic host reparenting can split an Octane keyed item's owned DOM marker range before the consumer commits list state.",
+      "classification": "reconciler-model",
+      "consumerImpact": "Default sortable moves wait for consumer state updates instead of optimistically moving the host element.",
+      "migrationGuidance": "Update list state from drag events so Octane performs the keyed move; pass an explicit plugins array if OptimisticSortingPlugin is required.",
+      "owner": "@octanejs/dnd-kit",
+      "reviewCondition": "Review if Octane gains a safe optimistic DOM move for keyed ranges or if upstream stops defaulting OptimisticSortingPlugin."
+    }
+  ]
+}

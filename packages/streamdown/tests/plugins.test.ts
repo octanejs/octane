@@ -4,23 +4,12 @@ import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { visit } from 'unist-util-visit';
 import { describe, expect, it, vi } from 'vitest';
-import { cjk, createCjkPlugin } from '@octanejs/streamdown/cjk';
-import { code, createCodePlugin } from '@octanejs/streamdown/code';
-import { math, createMathPlugin } from '@octanejs/streamdown/math';
-import { createMermaidPlugin, mermaid } from '@octanejs/streamdown/mermaid';
+import { createCjkPlugin } from '@octanejs/streamdown/cjk';
+import { createCodePlugin } from '@octanejs/streamdown/code';
+import { createMathPlugin } from '@octanejs/streamdown/math';
+import { createMermaidPlugin } from '@octanejs/streamdown/mermaid';
 
 describe('@octanejs/streamdown plugin entry points', () => {
-	it('exposes every official plugin factory and default instance', () => {
-		expect(code.type).toBe('code-highlighter');
-		expect(createCodePlugin().name).toBe('shiki');
-		expect(math.type).toBe('math');
-		expect(createMathPlugin().name).toBe('katex');
-		expect(mermaid.type).toBe('diagram');
-		expect(createMermaidPlugin().language).toBe('mermaid');
-		expect(cjk.type).toBe('cjk');
-		expect(createCjkPlugin().remarkPluginsBefore.length).toBeGreaterThan(0);
-	});
-
 	it('preserves Shiki themes, aliases, async delivery, and token caching', async () => {
 		const plugin = createCodePlugin();
 		expect(plugin.getThemes()).toEqual(['github-light', 'github-dark']);

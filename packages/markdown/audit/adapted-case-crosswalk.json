@@ -1,0 +1,2151 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "upstreamId": "test.jsx:37:should expose the public api",
+      "upstreamTitle": "should expose the public api",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "exposes the public api",
+        "kind": "line",
+        "blockSha256": "0c0db0312ba6dde2acbc5a6015336ba46921924955f9e81a2fcb4648bdeaec96",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:2231a5c628c11bf1",
+        "ownershipSha256": "84fbf1a8105ac50ca5fea39f1f31f5e3d82935b8ce4e1be8606f6dba47d35375"
+      },
+      "adapted": [
+        {
+          "id": "runtime:2231a5c628c11bf1",
+          "file": "packages/markdown/tests/conformance/public-types.test.ts",
+          "fullName": "exposes the public api",
+          "sourceSha256": "8abb0289ee08c3a9c0c18e4afd8f76cc000d399d2c49ecc9507c00b429af0f80"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:48:should work",
+      "upstreamTitle": "should work",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the pristine default renderer for %j",
+        "kind": "parameter-row",
+        "rowIndex": 0,
+        "blockSha256": "dcd3b0d1016628c014cf28e9dfbd7083c86aee6e8b293afab3be21394166295c",
+        "templateSha256": "37f2948ddbbb4ef220d5938463c5bb905d7eb0f42b379f78d82327618d173a2b",
+        "callbackSha256": "88e3a2242da4941098c2a32ef81808a503a7c4b0a88d281dc7f786f779be3c41"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:80ad097e9505bd13",
+        "ownershipSha256": "179df074c0f33c1ef006341af466a9ee20bd2ed134f789e7fe150b9d19ed7749"
+      },
+      "adapted": [
+        {
+          "id": "runtime:80ad097e9505bd13",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the pristine default renderer for \"# heading\\n\\nA [safe](https://example.com) link.\"",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:52:should throw w/ `source`",
+      "upstreamTitle": "should throw w/ `source`",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "rejects removed prop %s",
+        "kind": "parameter-row",
+        "rowIndex": 1,
+        "blockSha256": "2bb62a8dc0e4e0e6a85046a39bebf5ca158cf7741b6dfed22ebf257ad23797be",
+        "templateSha256": "6da9b767264af3d3acbfbb4bac0a10fa4b920ff2dda137510d9af1eccc6b3940",
+        "callbackSha256": "5fefd2d2aa8f5facba3c66778e2ada94f7384c76d8d605d6229f467cdd6e0418"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:8779e0fd7d1a74f1",
+        "ownershipSha256": "2d22d6a26b1fb7f858a9dc4d639fd680bba6304b916cb18bba31ee6079f9a1b1"
+      },
+      "adapted": [
+        {
+          "id": "runtime:8779e0fd7d1a74f1",
+          "file": "packages/markdown/tests/validation.test.ts",
+          "fullName": "rejects removed prop source",
+          "sourceSha256": "888ee515dab2a28ec5f2efc274d8c1835cb06c50b890ba488d44cce452d645eb"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:59:should throw w/ non-string children (number)",
+      "upstreamTitle": "should throw w/ non-string children (number)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "rejects non-string children with the pinned message",
+        "kind": "line",
+        "blockSha256": "c02811fc456f54142fc95af48b88d8f1b272274c58873f827b9b0b7245831e61",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:a13dd7c191c61d10",
+        "ownershipSha256": "73570e069f2f9a39b3ee0fd2cf7e2a0275c90244bea9a36f500507778056fb51"
+      },
+      "adapted": [
+        {
+          "id": "runtime:a13dd7c191c61d10",
+          "file": "packages/markdown/tests/validation.test.ts",
+          "fullName": "rejects non-string children with the pinned message",
+          "sourceSha256": "888ee515dab2a28ec5f2efc274d8c1835cb06c50b890ba488d44cce452d645eb"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:66:should throw w/ non-string children (boolean)",
+      "upstreamTitle": "should throw w/ non-string children (boolean)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "rejects boolean true children with the exact pinned diagnostic",
+        "kind": "block",
+        "blockSha256": "bc6e256d846194e757b551f52d99117f4f3407fe887451f9855d8df202836096"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:735d65624e002d3f",
+        "ownershipSha256": "d64bb0c2b88442ca370da71b172e3f974873b773bead1b7ad46443e52fd5a652"
+      },
+      "adapted": [
+        {
+          "id": "runtime:735d65624e002d3f",
+          "file": "packages/markdown/tests/validation.test.ts",
+          "fullName": "rejects boolean true children with the exact pinned diagnostic",
+          "sourceSha256": "888ee515dab2a28ec5f2efc274d8c1835cb06c50b890ba488d44cce452d645eb"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:73:should support `null` as children",
+      "upstreamTitle": "should support `null` as children",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "accepts pinned empty child %j",
+        "kind": "parameter-row",
+        "rowIndex": 0,
+        "blockSha256": "e1fd4ad5af54f3bd2471c0a8d2712a944edc895c6cff4c78b7a2b8fb7caeb456",
+        "templateSha256": "18824b49aab8308c1d692ef0ab8c7a2acc0df567d0f948ed85024b92d7054d20",
+        "callbackSha256": "6f1f081284ba82971e913d2bc85643195614cc873eb39c72ffbc72b62ab87a23"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:b1c3662bc6c1423f",
+        "ownershipSha256": "8fb78d7b54c37b9135b8fbf9139c08a92e13ff536daf6e70dcf8cfb3917f277d"
+      },
+      "adapted": [
+        {
+          "id": "runtime:b1c3662bc6c1423f",
+          "file": "packages/markdown/tests/validation.test.ts",
+          "fullName": "accepts pinned empty child null",
+          "sourceSha256": "888ee515dab2a28ec5f2efc274d8c1835cb06c50b890ba488d44cce452d645eb"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:77:should support `undefined` as children",
+      "upstreamTitle": "should support `undefined` as children",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "accepts pinned empty child %j",
+        "kind": "parameter-row",
+        "rowIndex": 1,
+        "blockSha256": "24fa0d62795f5d37650f9330ec914237473412151db2f2b923b88f29e5adb86c",
+        "templateSha256": "18824b49aab8308c1d692ef0ab8c7a2acc0df567d0f948ed85024b92d7054d20",
+        "callbackSha256": "6f1f081284ba82971e913d2bc85643195614cc873eb39c72ffbc72b62ab87a23"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:19f582b6a620fd87",
+        "ownershipSha256": "e30f9c43deb4897bfcb12d8c67352681c17f0a57df5b5da08619b2b77a18d595"
+      },
+      "adapted": [
+        {
+          "id": "runtime:19f582b6a620fd87",
+          "file": "packages/markdown/tests/validation.test.ts",
+          "fullName": "accepts pinned empty child undefined",
+          "sourceSha256": "888ee515dab2a28ec5f2efc274d8c1835cb06c50b890ba488d44cce452d645eb"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:81:should warn w/ `allowDangerousHtml`",
+      "upstreamTitle": "should warn w/ `allowDangerousHtml`",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "rejects removed prop %s",
+        "kind": "parameter-row",
+        "rowIndex": 0,
+        "blockSha256": "0b53a0fb0107aa9570e146fcb523e2630f69d8ce0b7be00c5e0267ea27e7964c",
+        "templateSha256": "6da9b767264af3d3acbfbb4bac0a10fa4b920ff2dda137510d9af1eccc6b3940",
+        "callbackSha256": "5fefd2d2aa8f5facba3c66778e2ada94f7384c76d8d605d6229f467cdd6e0418"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:4ff5ea1b07c23b52",
+        "ownershipSha256": "2aeea5082ad42c0f2e7e8d00f9199080803b1e6b334431f83075a4fd77f24985"
+      },
+      "adapted": [
+        {
+          "id": "runtime:4ff5ea1b07c23b52",
+          "file": "packages/markdown/tests/validation.test.ts",
+          "fullName": "rejects removed prop allowDangerousHtml",
+          "sourceSha256": "888ee515dab2a28ec5f2efc274d8c1835cb06c50b890ba488d44cce452d645eb"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:88:should support a block quote",
+      "upstreamTitle": "should support a block quote",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 0,
+        "blockSha256": "6ee130c86d91710a758029b7efc5fa8fa1e00ce2b6030520e96ffa97558ebb5f",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:c76f9edda6d2663a",
+        "ownershipSha256": "e58750dc919fc9585eda427cf278f9df5765309f2b227999860f1c91d3c757f0"
+      },
+      "adapted": [
+        {
+          "id": "runtime:c76f9edda6d2663a",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: block quote",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:95:should support a break",
+      "upstreamTitle": "should support a break",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 1,
+        "blockSha256": "434192ebb8301eefea3367d52758133aa611931980d6e489536b76c51a3f8649",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:fda08a631f66e79c",
+        "ownershipSha256": "5dcb4780ccdaad13a37983898af695a0b9709da953169fc2bf3387f88ced4b01"
+      },
+      "adapted": [
+        {
+          "id": "runtime:fda08a631f66e79c",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: break",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:102:should support a code (block, flow; indented)",
+      "upstreamTitle": "should support a code (block, flow; indented)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 2,
+        "blockSha256": "ce2e1d45422d29ddee2741668636dcf6eb29761b3e4338f57631059886876c4d",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:350755b03d39b7a5",
+        "ownershipSha256": "f741860dafdcb9f935e34b4d1070f347904474d6b718ea4ed7739cef71360e96"
+      },
+      "adapted": [
+        {
+          "id": "runtime:350755b03d39b7a5",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: indented code",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:109:should support a code (block, flow; fenced)",
+      "upstreamTitle": "should support a code (block, flow; fenced)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 3,
+        "blockSha256": "2162c46798bad9e617fcf4adc37df54358c43ea2088f5c378222900fa6c1b0c5",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:9dffe4adcbd7b913",
+        "ownershipSha256": "287eacde24821f646079ee3b8daa7fe301c67d93afce16122f4ba978210004f9"
+      },
+      "adapted": [
+        {
+          "id": "runtime:9dffe4adcbd7b913",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: fenced code",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:116:should support a delete (GFM)",
+      "upstreamTitle": "should support a delete (GFM)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 4,
+        "blockSha256": "c5a7a4a6bc8bcb4879bf03bcf7369580b69437eadf325854d54718b8c06c98b2",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:ffdab05f55602d2e",
+        "ownershipSha256": "a92000138941946cb0cd21439be60c9219e1e027f279a9f48f299a84b54d659d"
+      },
+      "adapted": [
+        {
+          "id": "runtime:ffdab05f55602d2e",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: delete",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:125:should support an emphasis",
+      "upstreamTitle": "should support an emphasis",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 5,
+        "blockSha256": "e3e5986a0163211687c29f199d1f38c1017b14984874eb735fdb41e4fdcf7bd4",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:23142d606f952ca3",
+        "ownershipSha256": "1aa6e453955d8729c869b5d906768dd0c869c6fec4af74223398ef2f54bc23db"
+      },
+      "adapted": [
+        {
+          "id": "runtime:23142d606f952ca3",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: emphasis",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:132:should support a footnote (GFM)",
+      "upstreamTitle": "should support a footnote (GFM)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 6,
+        "blockSha256": "232dcd240f3c23af42c91c675b8599c95c8caecf32445b9efa96ba59457284e8",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:d268522b954e33eb",
+        "ownershipSha256": "1fde4ad36f6b4121987a6e0ca181b91cedaa200652681ff8b986580c90200cfb"
+      },
+      "adapted": [
+        {
+          "id": "runtime:d268522b954e33eb",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: footnote",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:141:should support a heading",
+      "upstreamTitle": "should support a heading",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 7,
+        "blockSha256": "0f9f6506298e3049a6d8514d8ff1e3ab7eff877fabcbe86912117d00eb8e2d59",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:c05219c550cc01a8",
+        "ownershipSha256": "e7708a7755aa818ac0e066531133ee7767c302637a666adfbe5d8102826b0ca5"
+      },
+      "adapted": [
+        {
+          "id": "runtime:c05219c550cc01a8",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: heading",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:148:should support an html (default)",
+      "upstreamTitle": "should support an html (default)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 8,
+        "blockSha256": "120fb1c5f5d6164cbd869c4c745919b51c4d5885c089ce5429b50a9815b21a98",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:74b2f0d69fac7967",
+        "ownershipSha256": "4775c75fef565b5d3547cc1f5c35ea7a1d0276875563db5a418434702d08aea2"
+      },
+      "adapted": [
+        {
+          "id": "runtime:74b2f0d69fac7967",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: raw HTML",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:155:should support an html (w/ `rehype-raw`)",
+      "upstreamTitle": "should support an html (w/ `rehype-raw`)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine rehype-raw behavior",
+        "kind": "line",
+        "blockSha256": "a5d508c28d8b2a71576cbeb56ce257b30567cd35d35dc7935089e7908222209c",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:8d26728e41461df1",
+        "ownershipSha256": "98d5a0fcbab9b750c26a97a12be471837cd9b8c8a72819060250cd6f6e60ee91"
+      },
+      "adapted": [
+        {
+          "id": "runtime:8d26728e41461df1",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine rehype-raw behavior",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:164:should support an image",
+      "upstreamTitle": "should support an image",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 9,
+        "blockSha256": "1e01d11e23e75f738813ce3985cd55ccdbdb50165b58e3f7fce0452f42ccb6d8",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:8755b9482d7749e5",
+        "ownershipSha256": "3bcddecd1f76b5f525acb7d07be06645f692092663533c6e8d870c956394f8a9"
+      },
+      "adapted": [
+        {
+          "id": "runtime:8755b9482d7749e5",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: image",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:172:should support an image w/ a title",
+      "upstreamTitle": "should support an image w/ a title",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 10,
+        "blockSha256": "b081363388c5f7a563d134fb5242f292f440fc90cb747d0fa79fcf82b015cc44",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:8ecc0d7a1af7bdbb",
+        "ownershipSha256": "a826f15313e9bc0586c87d02fd4db7d15d747880fdc21e76097ad262cd0a235f"
+      },
+      "adapted": [
+        {
+          "id": "runtime:8ecc0d7a1af7bdbb",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: image title",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:180:should support an image reference / definition",
+      "upstreamTitle": "should support an image reference / definition",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 11,
+        "blockSha256": "ff33e3451566f20f85afcadef05a75d3d120a5fcd14fca6266618c4aa074a20d",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:9514e2af773d245b",
+        "ownershipSha256": "ba748ce7e5a0186dc0503cb7eb71ed6c852a6ad1b2c92943952aa870d8c24bff"
+      },
+      "adapted": [
+        {
+          "id": "runtime:9514e2af773d245b",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: image reference",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:188:should support code (text, inline)",
+      "upstreamTitle": "should support code (text, inline)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 12,
+        "blockSha256": "9ce9b3ee8455448772acff56ef06a657dd81b80a9396674058e942c61d49f352",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:e86573c8e6fd3343",
+        "ownershipSha256": "fbcea7a6e6d03398688a17e96571f167fe19ccb8bc0c2a8a71510c0a795b1fa0"
+      },
+      "adapted": [
+        {
+          "id": "runtime:e86573c8e6fd3343",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: inline code",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:195:should support a link",
+      "upstreamTitle": "should support a link",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 13,
+        "blockSha256": "f2181aff13ee8919d1d2ed9bde137992081ceaab45c50ad6a7ee5e905eecacc7",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:8c4c62ab4ded7a4c",
+        "ownershipSha256": "b373b4cc0d69873c4c786396c7e33a13e211e11587a338671363bcb446940071"
+      },
+      "adapted": [
+        {
+          "id": "runtime:8c4c62ab4ded7a4c",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: link",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:202:should support a link w/ a title",
+      "upstreamTitle": "should support a link w/ a title",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 14,
+        "blockSha256": "b1c63b9f64bc4bd2c423b53ed292c3a4989b218c14e5a8bf8ad69c9fa191297b",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:9aced0afaf1b15d3",
+        "ownershipSha256": "67b98f443d5d36c4d7b7cb501bd7660888490a83e641fd8c330817d751b4cec0"
+      },
+      "adapted": [
+        {
+          "id": "runtime:9aced0afaf1b15d3",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: link title",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:209:should support a link reference / definition",
+      "upstreamTitle": "should support a link reference / definition",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 15,
+        "blockSha256": "d87d82937b29c4b03d95b4fb9bee25f0ba48465e452ccb0b0f380aa0ad23a511",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:81d22d0302a4a7d8",
+        "ownershipSha256": "d282139ea7eb8f4e0fd0ec9fe9ca2d867a68844e8c35cb5ae739cab3c894e1bb"
+      },
+      "adapted": [
+        {
+          "id": "runtime:81d22d0302a4a7d8",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: link reference",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:216:should support prototype poluting identifiers",
+      "upstreamTitle": "should support prototype poluting identifiers",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 16,
+        "blockSha256": "25ae27bcd09ad4214f59ae72ed36d58d80be91fc8b4724d8bad1417bc0307310",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:d16585730bc6c3c1",
+        "ownershipSha256": "e07006dbec498d286f6a1379ba56b72e7345c25eafcee8c12f834d93ee254130"
+      },
+      "adapted": [
+        {
+          "id": "runtime:d16585730bc6c3c1",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: prototype-polluting definitions",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:229:should support duplicate definitions",
+      "upstreamTitle": "should support duplicate definitions",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 17,
+        "blockSha256": "870733943bedac584fc496e2ab90cc404754a262e81d51c9c177f5b20f010f17",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:3b13229f80706c5a",
+        "ownershipSha256": "7aaf44cd208c4b21ccee763a0e6aab0e142e9baa0cd67d7e40510143ba335005"
+      },
+      "adapted": [
+        {
+          "id": "runtime:3b13229f80706c5a",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: duplicate definitions",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:236:should support a list (unordered) / list item",
+      "upstreamTitle": "should support a list (unordered) / list item",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 18,
+        "blockSha256": "6fe6dd6ff18bcb08070ec11305bf2757883e603a23ddd648a0e79ba0a127806b",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:f44811bf82ae83fc",
+        "ownershipSha256": "5ba42f0ac9aefbe0b0c9af97af4374ea329dcd917527453c8d04e02f259ae5ec"
+      },
+      "adapted": [
+        {
+          "id": "runtime:f44811bf82ae83fc",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: unordered list",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:243:should support a list (ordered) / list item",
+      "upstreamTitle": "should support a list (ordered) / list item",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 19,
+        "blockSha256": "c96a16d8a4ed5a0b10a21ece47bfa06d98deb09dfa3886fbc30cabfc25475408",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:3ce2f0a54ffc8da8",
+        "ownershipSha256": "fb0c2588256b7889df47e7e9b2b77606f8c083c44efef4790f53611a7b4a8862"
+      },
+      "adapted": [
+        {
+          "id": "runtime:3ce2f0a54ffc8da8",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: ordered list",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:250:should support a paragraph",
+      "upstreamTitle": "should support a paragraph",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 20,
+        "blockSha256": "1f7926239a049500f7fa31c9096ad5febb50ce4c9c35156983d6ba890d68b85f",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:13a58f6de832010e",
+        "ownershipSha256": "aac55215133fa8133a8c3b7b399b3363899e17f04523737a37f23365862762e4"
+      },
+      "adapted": [
+        {
+          "id": "runtime:13a58f6de832010e",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: paragraph",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:254:should support a strong",
+      "upstreamTitle": "should support a strong",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 21,
+        "blockSha256": "189dbc201096d1d03e60e505b83fc2d68001a3510548bad963b198e714a161c5",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:dc7585a83a4630f8",
+        "ownershipSha256": "3df34052fe262462253bf23c19ce8ccb96d242b0cb8e5bfe9bc8d969a3c6318e"
+      },
+      "adapted": [
+        {
+          "id": "runtime:dc7585a83a4630f8",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: strong",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:261:should support a table (GFM)",
+      "upstreamTitle": "should support a table (GFM)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 22,
+        "blockSha256": "bbaaed3d602926e8e87e8358d89e3f2fb1157206b1edd6a46d59d0e89457dcf5",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:33bbf99f135484b9",
+        "ownershipSha256": "4446aad2c55aa15703483c6754d0baac6cfea3934a6892c2bacf9a371d0e6c0d"
+      },
+      "adapted": [
+        {
+          "id": "runtime:33bbf99f135484b9",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: table",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:273:should support a table (GFM; w/ align)",
+      "upstreamTitle": "should support a table (GFM; w/ align)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 23,
+        "blockSha256": "57cb738b315d3124633ed334609b341d0173add8992626c0d1974eb277ab918a",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:075cebbb4595dcc2",
+        "ownershipSha256": "8e78bf5dcf8782bc48b71b655cda67ade70c6c503282751512322e9d6d8af87d"
+      },
+      "adapted": [
+        {
+          "id": "runtime:075cebbb4595dcc2",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: aligned table",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:285:should support a thematic break",
+      "upstreamTitle": "should support a thematic break",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 24,
+        "blockSha256": "bd815d30f4d9fb92e4fcfc38de9c56cec7fe5eb492887e27a6e45f6342f0bb87",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:d5fa63c66da1f7a8",
+        "ownershipSha256": "532616be1130c27785ccd81a01f84fdeeb08f3a98c869a7c07d4c5ee4082a676"
+      },
+      "adapted": [
+        {
+          "id": "runtime:d5fa63c66da1f7a8",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: thematic break",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:289:should support ab absolute path",
+      "upstreamTitle": "should support ab absolute path",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 25,
+        "blockSha256": "a5ff8c6d53d7a241c8ad862d28f6664c45f2e530fd38ed5957da0cac40ab7818",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:de770f51640d0b6a",
+        "ownershipSha256": "dc0e2392b624756777eeea7bfcde7188b09314382e5f8f7986b01053da5cccae"
+      },
+      "adapted": [
+        {
+          "id": "runtime:de770f51640d0b6a",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: absolute path",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:296:should support an absolute URL",
+      "upstreamTitle": "should support an absolute URL",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 26,
+        "blockSha256": "3d26b7e4d7a9375209ab7c59c1e86e6579100ea8c38acd26011af82eaef848cd",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:4f748bebdecac4bb",
+        "ownershipSha256": "5b3bf8fde839d455879d89a936c97b6f701fc3b5c32ae39878868d65ea3312c5"
+      },
+      "adapted": [
+        {
+          "id": "runtime:4f748bebdecac4bb",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: absolute URL",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:303:should support a URL w/ uppercase protocol",
+      "upstreamTitle": "should support a URL w/ uppercase protocol",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 27,
+        "blockSha256": "552533ac963f55121c04d549c7728184d8b8da428f954bf08ac1a11bdd9c5177",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:da07a60a137fb1fc",
+        "ownershipSha256": "3d6a1ccd8a22db1e572b591e97e02afe526b904a95536591c354919ec8342188"
+      },
+      "adapted": [
+        {
+          "id": "runtime:da07a60a137fb1fc",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: uppercase protocol",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:310:should make a `javascript:` URL safe",
+      "upstreamTitle": "should make a `javascript:` URL safe",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 28,
+        "blockSha256": "21a267823102121ceee0a5a0739cd27c2f086b8b6c0306ea369afe1d71570d30",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:1f3f3af0e8dc1d89",
+        "ownershipSha256": "b228bf8063b968f661a8688e144448044da8da8719738880eb3ee857b8578d25"
+      },
+      "adapted": [
+        {
+          "id": "runtime:1f3f3af0e8dc1d89",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: javascript URL",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:317:should make a `vbscript:` URL safe",
+      "upstreamTitle": "should make a `vbscript:` URL safe",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 29,
+        "blockSha256": "d121a8be4a7ada892e819440a7ca462d0bc604126a0c2fe15d4f30c2e2699855",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:e69335a396904873",
+        "ownershipSha256": "e8cd6544d0d8544ff9960e4836638b8450cf2b37d2d4c103d58ded736f25c6a3"
+      },
+      "adapted": [
+        {
+          "id": "runtime:e69335a396904873",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: vbscript URL",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:324:should make a `VBSCRIPT:` URL safe",
+      "upstreamTitle": "should make a `VBSCRIPT:` URL safe",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 30,
+        "blockSha256": "6a67883b1a5adb72c324028a826c9b609692c0cb402c6a79c727e1e09ec8a264",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:1f402419ebb612a1",
+        "ownershipSha256": "913c96054744385e996e9827576288b015d12636e82239be4dfc183ec9f8ccc6"
+      },
+      "adapted": [
+        {
+          "id": "runtime:1f402419ebb612a1",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: uppercase vbscript URL",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:331:should make a `file:` URL safe",
+      "upstreamTitle": "should make a `file:` URL safe",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 31,
+        "blockSha256": "99a10f42818c58d079fdb5577a4755fc1cb85d3af64cda874af1514ea9cbfbb8",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:6b59ecd4f27dc431",
+        "ownershipSha256": "236391a844d5188d2e9ccc0ac9ca2b53a4cd812133e9bc8c3e3c5f629032810b"
+      },
+      "adapted": [
+        {
+          "id": "runtime:6b59ecd4f27dc431",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: file URL",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:338:should allow an empty URL",
+      "upstreamTitle": "should allow an empty URL",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 32,
+        "blockSha256": "82e3678392932cc9a676c6bdf9ca278a3bd5b80763ba8a62e32997e6b92c9587",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:9df2d57fba958503",
+        "ownershipSha256": "7b3f7b68554027f5d0589d253777d89f0de37249364eb1e6e3947d8c1be8801c"
+      },
+      "adapted": [
+        {
+          "id": "runtime:9df2d57fba958503",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: empty URL",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:345:should support search (`?`) in a URL",
+      "upstreamTitle": "should support search (`?`) in a URL",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 33,
+        "blockSha256": "7a2d21b6bd727494d96f55a1524304d37710c59a124c0d683db6380329b768a7",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:a419f6e2896c811a",
+        "ownershipSha256": "944819dfc0188833c0c586405b14448d28181f6c9adcaeef878db3d574e3b681"
+      },
+      "adapted": [
+        {
+          "id": "runtime:a419f6e2896c811a",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: query URL",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:352:should support hash (`&`) in a URL",
+      "upstreamTitle": "should support hash (`&`) in a URL",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 34,
+        "blockSha256": "072cd08f08c2537be542cf0e08d573bef3ebc32c5964d38d7f96fc96f244015b",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:22a65c6e20016f12",
+        "ownershipSha256": "46dbb4b606dc62fa3e34e7d3fdaf5f8cf8e0451900612d9ee07c6f647497ebe6"
+      },
+      "adapted": [
+        {
+          "id": "runtime:22a65c6e20016f12",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: ampersand URL",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:359:should support hash (`#`) in a URL",
+      "upstreamTitle": "should support hash (`#`) in a URL",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine sync identity: %s",
+        "kind": "parameter-row",
+        "rowIndex": 35,
+        "blockSha256": "2c9214039798ca3acb6df343fbb719328181a127450a5288b32c8a86c28a852a",
+        "templateSha256": "3c9af482f8cd631efa4ffb5729dba7dcaa0d6302dff39fb900870cdd9a227898",
+        "callbackSha256": "7531e387da3e3fb88c09e2c4cdb44396437dc3795c431adbc02c6eda60ed7535"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:eb40eb0ad2d33e9b",
+        "ownershipSha256": "7f800f698abb1f93fba33af3a3974bf32f544da7e89cc657f5217194ffea3ff8"
+      },
+      "adapted": [
+        {
+          "id": "runtime:eb40eb0ad2d33e9b",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine sync identity: hash URL",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:366:should support `urlTransform` (`href` on `a`)",
+      "upstreamTitle": "should support `urlTransform` (`href` on `a`)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream href urlTransform public-render fixture",
+        "kind": "line",
+        "blockSha256": "8979389e271f2ca256f26b5148b120f93017ac3d4a853fb1ef623fbf52448e82",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:f4990c8644147140",
+        "ownershipSha256": "7c207b927ea9ff9804e4107ba40f613553691cb53841a93bbb3e33c2af47f5b9"
+      },
+      "adapted": [
+        {
+          "id": "runtime:f4990c8644147140",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream href urlTransform public-render fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:383:should support `urlTransform` w/ empty URLs",
+      "upstreamTitle": "should support `urlTransform` w/ empty URLs",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "the pinned URL oracle",
+        "kind": "line",
+        "blockSha256": "d003bc0696ac1a163b3da7f9bcfff7b475e8f4414f40401845440dc03e91e8ba",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:d6729efe7ef6939b",
+        "ownershipSha256": "e7adaaf3d560d236df963bb83f5715e59fb74d9425658a3b2b97ac13e8f5f685"
+      },
+      "adapted": [
+        {
+          "id": "runtime:d6729efe7ef6939b",
+          "file": "packages/markdown/tests/differential/url-transform.test.ts",
+          "fullName": "the pinned URL oracle transforms \"\" to \"\"",
+          "sourceSha256": "ba54f3394d093e567ca10b1031af27d2e8e9cb59e141e8c6a42dc72ac06205dd"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:400:should support `urlTransform` (`src` on `img`)",
+      "upstreamTitle": "should support `urlTransform` (`src` on `img`)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream image src urlTransform returning null fixture",
+        "kind": "line",
+        "blockSha256": "8d82d1219cbb3f15ac22bb252f0dce16ebed3febb12495de7e2618e4f3ead560",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:c198e9c92fbdc90d",
+        "ownershipSha256": "a8df2eb6ada108b26347706eadb3f9cdd42867d569eabf2b3bfa82ee8594fb85"
+      },
+      "adapted": [
+        {
+          "id": "runtime:c198e9c92fbdc90d",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream image src urlTransform returning null fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:417:should support `skipHtml`",
+      "upstreamTitle": "should support `skipHtml`",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pinned raw handling and filtering order",
+        "kind": "line",
+        "blockSha256": "3037fe73537a633ca9f2875daecec318742ed104791a92f9737f7bc867fd1446",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:ac2e0bde9fc0938f",
+        "ownershipSha256": "3606b5fc3971927844b36f776954a6b2970f0e29a779f9239e7435e80bff2302"
+      },
+      "adapted": [
+        {
+          "id": "runtime:ac2e0bde9fc0938f",
+          "file": "packages/markdown/tests/differential/processor.test.ts",
+          "fullName": "matches pinned raw handling and filtering order",
+          "sourceSha256": "ffb156a541f08d9aca0a71bd82253be718beedc1085ee534d835c7d0b0e9c763"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:424:should support `allowedElements` (drop unlisted nodes)",
+      "upstreamTitle": "should support `allowedElements` (drop unlisted nodes)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream allowedElements drop fixture",
+        "kind": "block",
+        "blockSha256": "87ff7c476617b30dd453694bab6b0c3f6f1bb97def4d1e8182e18b05c3881ae1"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:202c547e6a229e44",
+        "ownershipSha256": "77ee1085c377f743b3a56fa72f129db95ad3a8ac6a5f25e118b93f45de9c1b1f"
+      },
+      "adapted": [
+        {
+          "id": "runtime:202c547e6a229e44",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream allowedElements drop fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:439:should support `allowedElements` as a function",
+      "upstreamTitle": "should support `allowedElements` as a function",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "passes exact element index and parent to allowElement",
+        "kind": "line",
+        "blockSha256": "6174138586775999534bddbe354e80a89876a1923abfab993e33b8b05ec160e3",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:48b3e44d58d84922",
+        "ownershipSha256": "f26d22819641d18654796d966e1717f4c541445dd7a77fa5068e096bb52ef33f"
+      },
+      "adapted": [
+        {
+          "id": "runtime:48b3e44d58d84922",
+          "file": "packages/markdown/tests/differential/processor.test.ts",
+          "fullName": "passes exact element index and parent to allowElement",
+          "sourceSha256": "ffb156a541f08d9aca0a71bd82253be718beedc1085ee534d835c7d0b0e9c763"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:452:should support `disallowedElements`",
+      "upstreamTitle": "should support `disallowedElements`",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream disallowedElements fixture without unwrap",
+        "kind": "line",
+        "blockSha256": "fd04d95e8f3d01423db6c7c5993b49e64eaa786cecc1b3930045e5214872d8cf",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:6f3309cb93e54861",
+        "ownershipSha256": "c85344516cee9e274309b28e1c020bea638fdf92988f6c50131ce69a801943d0"
+      },
+      "adapted": [
+        {
+          "id": "runtime:6f3309cb93e54861",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream disallowedElements fixture without unwrap",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:461:should fail for both `allowedElements` and `disallowedElements`",
+      "upstreamTitle": "should fail for both `allowedElements` and `disallowedElements`",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "rejects combined element lists with the pinned message",
+        "kind": "line",
+        "blockSha256": "a0602928249f6d605d3f3ba27f5ea6c43a2d77bd4e657def63d04e8a7c980467",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:7c25b30cda512624",
+        "ownershipSha256": "c0c457bba8f98359faa37db70301630555df2e16199231e508f5b2287213f339"
+      },
+      "adapted": [
+        {
+          "id": "runtime:7c25b30cda512624",
+          "file": "packages/markdown/tests/validation.test.ts",
+          "fullName": "rejects combined element lists with the pinned message",
+          "sourceSha256": "888ee515dab2a28ec5f2efc274d8c1835cb06c50b890ba488d44cce452d645eb"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:476:should support `unwrapDisallowed` w/ `allowedElements`",
+      "upstreamTitle": "should support `unwrapDisallowed` w/ `allowedElements`",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream unwrapDisallowed with allowedElements fixture",
+        "kind": "block",
+        "blockSha256": "3f9c8e3c94671c550cd2e57e78b709a2abe5eb41b4747f13a65c87fb056ffa40"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:5c52f098cf7221b0",
+        "ownershipSha256": "f8be98d17992134f3386d69178f9d8c9f91feca04ec7e46ba55037893de0c995"
+      },
+      "adapted": [
+        {
+          "id": "runtime:5c52f098cf7221b0",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream unwrapDisallowed with allowedElements fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:492:should support `unwrapDisallowed` w/ `disallowedElements`",
+      "upstreamTitle": "should support `unwrapDisallowed` w/ `disallowedElements`",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "publicly renders exact unwrapDisallowed with disallowedElements fixture",
+        "kind": "line",
+        "blockSha256": "9d6b6962cdb530fe94f5cb2c16adee251e1c4fea89a70e7dd1bc798ea8434765",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:42f3fc3159557e3f",
+        "ownershipSha256": "ea0c1d4c9bcc80c24367b519ad92e2a5c41ac4cf37595d654ffcd078b2269d09"
+      },
+      "adapted": [
+        {
+          "id": "runtime:42f3fc3159557e3f",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection publicly renders exact unwrapDisallowed with disallowedElements fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:508:should support `remarkRehypeOptions`",
+      "upstreamTitle": "should support `remarkRehypeOptions`",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream remarkRehypeOptions clobberPrefix footnote output",
+        "kind": "line",
+        "blockSha256": "9448c1e314cf41172f09f463cb729516ec4d88bbbeb229a67058c6bc13e919f4",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:b59351c44a63dc6e",
+        "ownershipSha256": "bbe5060ba211766d396399e55060eeebf5c6ff03acc03028ff7316dc4814ad8c"
+      },
+      "adapted": [
+        {
+          "id": "runtime:b59351c44a63dc6e",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream remarkRehypeOptions clobberPrefix footnote output",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:521:should support `components`",
+      "upstreamTitle": "should support `components`",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "supports intrinsic remapping, null components, and fragments",
+        "kind": "line",
+        "blockSha256": "fa0bb21b6f06a5b08fc7c1ca1865f9e042d05ce68cdc57543a0cb8aac7336aeb",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:d1f7123bee28af78",
+        "ownershipSha256": "e9f479eec5de5c826b1d877581f62cc0c4a308b5dc5695944ee216ef07f4fc5d"
+      },
+      "adapted": [
+        {
+          "id": "runtime:d1f7123bee28af78",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection supports intrinsic remapping, null components, and fragments",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:528:should support `components` as functions",
+      "upstreamTitle": "should support `components` as functions",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "passes complete intrinsic props and node while keeping key special",
+        "kind": "line",
+        "blockSha256": "db88e565449edad32d373a28952fb665786a906ff79de6de97ead595a72d2e03",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:c615b439c7406a36",
+        "ownershipSha256": "5cf8312a6212ee6e57f48394822f19bfbc3c676fb92456fd016d5e58580f12a6"
+      },
+      "adapted": [
+        {
+          "id": "runtime:c615b439c7406a36",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection passes complete intrinsic props and node while keeping key special",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:546:should fail on an invalid component",
+      "upstreamTitle": "should fail on an invalid component",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "preserves sibling projection and rejects invalid mappings",
+        "kind": "line",
+        "blockSha256": "501310638e999935787d57fba4e6e4e27cdc97d4808e1aeeb443923ffaa4f90b",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:1b9af13c540adae3",
+        "ownershipSha256": "b7b045ff2fee7e63d813037c4d4b0717160077bee94fadba8198857e0886b375"
+      },
+      "adapted": [
+        {
+          "id": "runtime:1b9af13c540adae3",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection preserves sibling projection and rejects invalid mappings",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:578:should support `components` (headings)",
+      "upstreamTitle": "should support `components` (headings)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the upstream components (%s) fixture, output, node tags, and call count",
+        "kind": "parameter-row",
+        "rowIndex": 0,
+        "blockSha256": "b3ebf177144a292c3759b1256cf8425c4ddae8b5ba1d19482e94f5fccaf52da6",
+        "templateSha256": "1964caaadd4fe2c83f6cbac5268c6e9763698ed8901679d5faad1feaceafd75d",
+        "callbackSha256": "9c911885b370b916ad794a734780844acd1d11b3babf6ef038a1a0f96cc139bb"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:cb92118075fd3d0f",
+        "ownershipSha256": "579f913a28276d6635a922b226085c54ba98cf9c2ec0043abd938101e961681c"
+      },
+      "adapted": [
+        {
+          "id": "runtime:cb92118075fd3d0f",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the upstream components (headings) fixture, output, node tags, and call count",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:605:should support `components` (code)",
+      "upstreamTitle": "should support `components` (code)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the upstream components (%s) fixture, output, node tags, and call count",
+        "kind": "parameter-row",
+        "rowIndex": 1,
+        "blockSha256": "4937798725327ddcf3421ef4ccd11e00f939366bf0e55bf8c533b256f71fafca",
+        "templateSha256": "1964caaadd4fe2c83f6cbac5268c6e9763698ed8901679d5faad1feaceafd75d",
+        "callbackSha256": "9c911885b370b916ad794a734780844acd1d11b3babf6ef038a1a0f96cc139bb"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:83935a483c65c7bd",
+        "ownershipSha256": "07b8180e34a71d39fd58778b2306ed772ec74f5861faab32d017d87a8130bad0"
+      },
+      "adapted": [
+        {
+          "id": "runtime:83935a483c65c7bd",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the upstream components (code) fixture, output, node tags, and call count",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:628:should support `components` (li)",
+      "upstreamTitle": "should support `components` (li)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the upstream components (%s) fixture, output, node tags, and call count",
+        "kind": "parameter-row",
+        "rowIndex": 2,
+        "blockSha256": "380fdc5c7134ef6655ec8e1b2fb592fcd3cb6c12ce04c17d35655f12e9930731",
+        "templateSha256": "1964caaadd4fe2c83f6cbac5268c6e9763698ed8901679d5faad1feaceafd75d",
+        "callbackSha256": "9c911885b370b916ad794a734780844acd1d11b3babf6ef038a1a0f96cc139bb"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:caa00aaeea4c2811",
+        "ownershipSha256": "63d654b0adceba79438be03f176812d06e6cb54d0182f9a4dec1b7301d497354"
+      },
+      "adapted": [
+        {
+          "id": "runtime:caa00aaeea4c2811",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the upstream components (li) fixture, output, node tags, and call count",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:653:should support `components` (ol)",
+      "upstreamTitle": "should support `components` (ol)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the upstream components (%s) fixture, output, node tags, and call count",
+        "kind": "parameter-row",
+        "rowIndex": 3,
+        "blockSha256": "f29f1419a87ce8f1929ce3ac7043076dca60a4c2424883125c5b01eb93c694c7",
+        "templateSha256": "1964caaadd4fe2c83f6cbac5268c6e9763698ed8901679d5faad1feaceafd75d",
+        "callbackSha256": "9c911885b370b916ad794a734780844acd1d11b3babf6ef038a1a0f96cc139bb"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:5035d9e00f86f5eb",
+        "ownershipSha256": "ee227d5c31c90ad0b88a36e7abd77a28c5155b0d407399fe3e26e7b731e59c01"
+      },
+      "adapted": [
+        {
+          "id": "runtime:5035d9e00f86f5eb",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the upstream components (ol) fixture, output, node tags, and call count",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:677:should support `components` (ul)",
+      "upstreamTitle": "should support `components` (ul)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the upstream components (%s) fixture, output, node tags, and call count",
+        "kind": "parameter-row",
+        "rowIndex": 4,
+        "blockSha256": "6c72beee7a2e9dd9373d8bb6c7a78495fb52bbe5859f55522a5ab1228d7087cb",
+        "templateSha256": "1964caaadd4fe2c83f6cbac5268c6e9763698ed8901679d5faad1feaceafd75d",
+        "callbackSha256": "9c911885b370b916ad794a734780844acd1d11b3babf6ef038a1a0f96cc139bb"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:946a9470ea394053",
+        "ownershipSha256": "fca435f1dc579d1d7b1ee44d7e137ce6b0a14553100dfe62f51ecb629ce31b24"
+      },
+      "adapted": [
+        {
+          "id": "runtime:946a9470ea394053",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the upstream components (ul) fixture, output, node tags, and call count",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:701:should support `components` (tr)",
+      "upstreamTitle": "should support `components` (tr)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the upstream components (%s) fixture, output, node tags, and call count",
+        "kind": "parameter-row",
+        "rowIndex": 5,
+        "blockSha256": "0a48ab678a7bffef7a34fe23b96cbe540adccd8048c40aaac6e3de4af3ef6b21",
+        "templateSha256": "1964caaadd4fe2c83f6cbac5268c6e9763698ed8901679d5faad1feaceafd75d",
+        "callbackSha256": "9c911885b370b916ad794a734780844acd1d11b3babf6ef038a1a0f96cc139bb"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:f4ff2dda2a1069f2",
+        "ownershipSha256": "ccf916d51ef8100a5fcb2bbaf8d47ae1a0b5d67ddd8bb463720b38f7ced601d3"
+      },
+      "adapted": [
+        {
+          "id": "runtime:f4ff2dda2a1069f2",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the upstream components (tr) fixture, output, node tags, and call count",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:726:should support `components` (td, th)",
+      "upstreamTitle": "should support `components` (td, th)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the upstream components (%s) fixture, output, node tags, and call count",
+        "kind": "parameter-row",
+        "rowIndex": 6,
+        "blockSha256": "054c1ebc7fc2111089f5fa7d10db80c545abb6994b916d492bff165691e77f3a",
+        "templateSha256": "1964caaadd4fe2c83f6cbac5268c6e9763698ed8901679d5faad1feaceafd75d",
+        "callbackSha256": "9c911885b370b916ad794a734780844acd1d11b3babf6ef038a1a0f96cc139bb"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:38ce59d23bf6b11b",
+        "ownershipSha256": "f109039e3c61036d5411c9168bc7cf468b619b5dc6deb95fe5c17df36a90b9c9"
+      },
+      "adapted": [
+        {
+          "id": "runtime:38ce59d23bf6b11b",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the upstream components (td and th) fixture, output, node tags, and call count",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:760:should pass `node` to components",
+      "upstreamTitle": "should pass `node` to components",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "passes the complete upstream HAST node including child and source positions",
+        "kind": "block",
+        "blockSha256": "316bcfb9c396f4611efb1af6a27d495e63b94c9c1ea0d623acd3509a72224460"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:b4c0bd03a48148ed",
+        "ownershipSha256": "22c9b341a0c9a47a8e73f0a94a6289a72ea764425d8d401037a9344dff49ec8c"
+      },
+      "adapted": [
+        {
+          "id": "runtime:b4c0bd03a48148ed",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection passes the complete upstream HAST node including child and source positions",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:800:should support plugins (`remark-gfm`)",
+      "upstreamTitle": "should support plugins (`remark-gfm`)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream remark-gfm single-tilde fixture",
+        "kind": "line",
+        "blockSha256": "a6351c09f95f46e87e826ca6fc4efc93ad5d0f8c3bbba7e5784f1f9053eb5dd3",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:f54a19bc82c821b5",
+        "ownershipSha256": "50e2fbc4fb27eb49b424a82fc7c2ee2a9a99e280634a1b477969ce7a6f1944ee"
+      },
+      "adapted": [
+        {
+          "id": "runtime:f54a19bc82c821b5",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream remark-gfm single-tilde fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:809:should support plugins (`remark-toc`)",
+      "upstreamTitle": "should support plugins (`remark-toc`)",
+      "requiredTokens": ["remarkToc", "# a\\n## Contents\\n## b\\n### c\\n## d", "href=\"#c\""],
+      "declarationEvidence": {
+        "declaration": "matches pristine remark-toc output for the upstream fixture",
+        "kind": "block",
+        "blockSha256": "4a8a3a2a30527768ae59ddc72824382ab5d367e3900f3ccfb5ea699c6e6680cb"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:998f6b5c266febc7",
+        "ownershipSha256": "f509ed22011cfc2ee9175fbfab866c77b2f14238551a121294e579a3bb9ce779"
+      },
+      "adapted": [
+        {
+          "id": "runtime:998f6b5c266febc7",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches pristine remark-toc output for the upstream fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:833:should support aria properties",
+      "upstreamTitle": "should support aria properties",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream plugin-created %s property fixture",
+        "kind": "parameter-row",
+        "rowIndex": 0,
+        "blockSha256": "90cb366690695ac17bb89d9f5d1f8ad6dde1392f7f0b1d9ab35dfdc49b103db6",
+        "templateSha256": "5688cd9257614bb325a0e51d328c0a03f92d5aac2d3ac58014465dd022b64611",
+        "callbackSha256": "8ac7ffd25fba3f0510f4881970de80a7e2dacdbcfd1beb97771f1561a0151462"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:183884b6703af082",
+        "ownershipSha256": "c993213532ab6db851486f5a82b8402dd3155d42f23d5239c3d0de6241dc7e64"
+      },
+      "adapted": [
+        {
+          "id": "runtime:183884b6703af082",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream plugin-created ARIA property fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:855:should support data properties",
+      "upstreamTitle": "should support data properties",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream plugin-created %s property fixture",
+        "kind": "parameter-row",
+        "rowIndex": 1,
+        "blockSha256": "5d8c435518ccb7587fee6a7f1ced16825fc68cf20b9d9f699794e55f979a6c88",
+        "templateSha256": "5688cd9257614bb325a0e51d328c0a03f92d5aac2d3ac58014465dd022b64611",
+        "callbackSha256": "8ac7ffd25fba3f0510f4881970de80a7e2dacdbcfd1beb97771f1561a0151462"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:830309bb6cb06dd1",
+        "ownershipSha256": "7490213f68265f329fedd42988a76090a577304d57413f36a3c6a5a724962a9c"
+      },
+      "adapted": [
+        {
+          "id": "runtime:830309bb6cb06dd1",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream plugin-created data property fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:877:should support comma separated properties",
+      "upstreamTitle": "should support comma separated properties",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream plugin-created %s property fixture",
+        "kind": "parameter-row",
+        "rowIndex": 2,
+        "blockSha256": "a758ccddf2347aa21dbb1583c93cf315fcb6d279f5b2d523beaecc9205ca72d5",
+        "templateSha256": "5688cd9257614bb325a0e51d328c0a03f92d5aac2d3ac58014465dd022b64611",
+        "callbackSha256": "8ac7ffd25fba3f0510f4881970de80a7e2dacdbcfd1beb97771f1561a0151462"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:da492fb4b8ffb3bc",
+        "ownershipSha256": "cd845316074391b5aad72ab11467c3d574281d8fe8fe0d6d126e4971e6b840eb"
+      },
+      "adapted": [
+        {
+          "id": "runtime:da492fb4b8ffb3bc",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream plugin-created comma-separated property fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:899:should support `style` properties",
+      "upstreamTitle": "should support `style` properties",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream plugin-created %s property fixture",
+        "kind": "parameter-row",
+        "rowIndex": 3,
+        "blockSha256": "23eb60d5d8ec354b0d082b53d7f4f589350eefbb0ed01b112c1ff4dca9e07b5f",
+        "templateSha256": "5688cd9257614bb325a0e51d328c0a03f92d5aac2d3ac58014465dd022b64611",
+        "callbackSha256": "8ac7ffd25fba3f0510f4881970de80a7e2dacdbcfd1beb97771f1561a0151462"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:8887cf75e475e297",
+        "ownershipSha256": "500f2bdddaa3db21d8e6d8c02fa2e9fa9ca8760b8a20e31b1ee082a337681ea3"
+      },
+      "adapted": [
+        {
+          "id": "runtime:8887cf75e475e297",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream plugin-created style property fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:921:should support `style` properties w/ vendor prefixes",
+      "upstreamTitle": "should support `style` properties w/ vendor prefixes",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream plugin-created %s property fixture",
+        "kind": "parameter-row",
+        "rowIndex": 4,
+        "blockSha256": "2db3c33459ce7eeab91e301ddd417daa7817a85894579f8ee0b56bb3bf0c8cb3",
+        "templateSha256": "5688cd9257614bb325a0e51d328c0a03f92d5aac2d3ac58014465dd022b64611",
+        "callbackSha256": "8ac7ffd25fba3f0510f4881970de80a7e2dacdbcfd1beb97771f1561a0151462"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:68f4dfc058569fd4",
+        "ownershipSha256": "d845376893827c59b8cf18aad9e1dc4006b78f15c00768ecb368a9adbb723e17"
+      },
+      "adapted": [
+        {
+          "id": "runtime:68f4dfc058569fd4",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream plugin-created vendor-prefixed style property fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:948:should support broken `style` properties",
+      "upstreamTitle": "should support broken `style` properties",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream plugin-created %s property fixture",
+        "kind": "parameter-row",
+        "rowIndex": 5,
+        "blockSha256": "27c044e70865d88b1918a60bf29301e5479be24d1e11d13d9a36fd1bf4a7fc2b",
+        "templateSha256": "5688cd9257614bb325a0e51d328c0a03f92d5aac2d3ac58014465dd022b64611",
+        "callbackSha256": "8ac7ffd25fba3f0510f4881970de80a7e2dacdbcfd1beb97771f1561a0151462"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:b4ba8cfd67005dff",
+        "ownershipSha256": "0be8b68d2d6a4b30d1ec5aa65abe20ead37bbc8f7a18eeded9103ff645a5719e"
+      },
+      "adapted": [
+        {
+          "id": "runtime:b4ba8cfd67005dff",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream plugin-created broken style property fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:970:should support SVG elements",
+      "upstreamTitle": "should support SVG elements",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream SVG projection fixture",
+        "kind": "block",
+        "blockSha256": "7ccab0869b255181ea0afa42f8b80e7bf22cf3180dde9c03fe9cbbfd5e0ab95a"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:83d41db47e423751",
+        "ownershipSha256": "8690ddc99a3b17079b21e28328082dfea4bdbd9420770101dd067bb8ef2e591d"
+      },
+      "adapted": [
+        {
+          "id": "runtime:83d41db47e423751",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream SVG projection fixture",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:1015:should support comments (ignore them)",
+      "upstreamTitle": "should support comments (ignore them)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "ignores the exact upstream root comment while preserving the paragraph",
+        "kind": "block",
+        "blockSha256": "36a1279069e0dfbf5dfbc2614d8e04c9ff4861b5e36668fd0d6a6fd160dc60e9"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:178ae640205b1263",
+        "ownershipSha256": "9c60521ad36caeba1252e75c78e1a4cbbc087fc1391c97010f026c8100bda5a1"
+      },
+      "adapted": [
+        {
+          "id": "runtime:178ae640205b1263",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection ignores the exact upstream root comment while preserving the paragraph",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:1034:should support table cells w/ style",
+      "upstreamTitle": "should support table cells w/ style",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream GFM aligned table cell with merged plugin style",
+        "kind": "line",
+        "blockSha256": "f8cea038f67a621baaa4e611d3c68036c653fd1da20b38076b14f5ea9b7627e7",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:2a9a770162c4ce1b",
+        "ownershipSha256": "4515b2b1385bf075335ed53296ea0296aecc7a4f4c354ca32743096a11ba0f33"
+      },
+      "adapted": [
+        {
+          "id": "runtime:2a9a770162c4ce1b",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream GFM aligned table cell with merged plugin style",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:1061:should not fail on a plugin replacing `root`",
+      "upstreamTitle": "should not fail on a plugin replacing `root`",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the exact upstream root-replaced-by-comment empty output",
+        "kind": "block",
+        "blockSha256": "05c614c7666751280ed9c4800bb6e83f4c21311179fe08495b14385089b99cfb"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:7924c6922df92c37",
+        "ownershipSha256": "65ff7056eeb8c622c5a103977cfbc7f498b3beeccb2bd422be957fae3304e8d7"
+      },
+      "adapted": [
+        {
+          "id": "runtime:7924c6922df92c37",
+          "file": "packages/markdown/tests/conformance/sync.server.test.ts",
+          "fullName": "synchronous public projection matches the exact upstream root-replaced-by-comment empty output",
+          "sourceSha256": "94d6e7f21bbbca915fe878a4cad2583249dcf7a6c16dcd0554204c0771c16884"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:1080:should support `MarkdownAsync` (1)",
+      "upstreamTitle": "should support `MarkdownAsync` (1)",
+      "requiredTokens": [
+        "renderToStaticMarkup",
+        "suspended while responding to synchronous input",
+        "children: 'a'"
+      ],
+      "declarationEvidence": {
+        "declaration": "documents the synchronous-render framework divergence with the upstream fixture",
+        "kind": "block",
+        "blockSha256": "25a9e925fc6ef854473496cc1ec6003db6befb682a23ff1045a1153d4f5051cb"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:0c41907154f06242",
+        "ownershipSha256": "747fb4439327b6c5618b1d36d66eb5835c07d194c9e523b8a9da80f3fd1291f4"
+      },
+      "adapted": [
+        {
+          "id": "runtime:0c41907154f06242",
+          "file": "packages/markdown/tests/async/markdown-async.server.test.ts",
+          "fullName": "MarkdownAsync documents the synchronous-render framework divergence with the upstream fixture",
+          "sourceSha256": "e9058ddf2f168cf99d86a7318e0d04615572f9d3743325bd179b9b806086e386"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:1086:should support `MarkdownAsync` (2)",
+      "upstreamTitle": "should support `MarkdownAsync` (2)",
+      "requiredTokens": ["renderToPipeableStream", "children: 'a'", "toBe('<p>a</p>')"],
+      "declarationEvidence": {
+        "declaration": "matches the upstream pipeable-stream output fixture",
+        "kind": "block",
+        "blockSha256": "5d411344a816e85afe0183490d9dca60fb806b7cd47acd0f22bad9afdb3f95e8"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:838a21678ae087c9",
+        "ownershipSha256": "5541edc8764c4182a5427b715154c2a25977971f88a1806a7cde305a07492108"
+      },
+      "adapted": [
+        {
+          "id": "runtime:838a21678ae087c9",
+          "file": "packages/markdown/tests/async/markdown-async.server.test.ts",
+          "fullName": "MarkdownAsync matches the upstream pipeable-stream output fixture",
+          "sourceSha256": "e9058ddf2f168cf99d86a7318e0d04615572f9d3743325bd179b9b806086e386"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:1099:should support async plugins w/ `MarkdownAsync` (`rehype-starry-night`)",
+      "upstreamTitle": "should support async plugins w/ `MarkdownAsync` (`rehype-starry-night`)",
+      "requiredTokens": ["rehypeStarryNight", "console.log(3.14)", "class=\"pl-en\""],
+      "declarationEvidence": {
+        "declaration": "matches exact starry-night highlighted HTML for the upstream fixture",
+        "kind": "block",
+        "blockSha256": "e0db38e90bef54893b922daac1c5c3520740fcefdb517db49dd7a1d07eeeb953"
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:67cdbd818a4d4de8",
+        "ownershipSha256": "daa3b94cded084da3ec8a4693c9c45d90000e2b4030eb795adef44b911ec8ccc"
+      },
+      "adapted": [
+        {
+          "id": "runtime:67cdbd818a4d4de8",
+          "file": "packages/markdown/tests/async/markdown-async.server.test.ts",
+          "fullName": "MarkdownAsync matches exact starry-night highlighted HTML for the upstream fixture",
+          "sourceSha256": "e9058ddf2f168cf99d86a7318e0d04615572f9d3743325bd179b9b806086e386"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:1124:should support `MarkdownHooks`",
+      "upstreamTitle": "should support `MarkdownHooks`",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches the pinned no-fallback initial empty DOM and resolved paragraph",
+        "kind": "line",
+        "blockSha256": "e9e381a19b3536a5bb6422746f501c85b3795c1a7679f59260d51be43432bace",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:7937ba2c07116393",
+        "ownershipSha256": "d79880ce4264a7c21f25d8405345008b625210d31ef4a57e79e6095e6e178cd7"
+      },
+      "adapted": [
+        {
+          "id": "runtime:7937ba2c07116393",
+          "file": "packages/markdown/tests/hooks/markdown-hooks.test.ts",
+          "fullName": "MarkdownHooks lifecycle matches the pinned no-fallback initial empty DOM and resolved paragraph",
+          "sourceSha256": "1586dd39e1723e754362b08bdb176e48a722d306b8a73a61a42bf13448f00a5c"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:1141:should support async plugins w/ `MarkdownHooks` (`rehype-starry-night`)",
+      "upstreamTitle": "should support async plugins w/ `MarkdownHooks` (`rehype-starry-night`)",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches exact async MarkdownHooks starry-night JavaScript highlighted HTML",
+        "kind": "line",
+        "blockSha256": "34e028b2f7b54d29bb4a7eb593899e28cac40e27901cd8298d4e02942a8453e1",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:81cb174cb7e7e18c",
+        "ownershipSha256": "4584f9ed561df5a719a2e16c4a5949414d1ca6ca1a1b4b284c354751c14dfffb"
+      },
+      "adapted": [
+        {
+          "id": "runtime:81cb174cb7e7e18c",
+          "file": "packages/markdown/tests/hooks/markdown-hooks.test.ts",
+          "fullName": "MarkdownHooks lifecycle matches exact async MarkdownHooks starry-night JavaScript highlighted HTML",
+          "sourceSha256": "1586dd39e1723e754362b08bdb176e48a722d306b8a73a61a42bf13448f00a5c"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:1167:should support `fallback`",
+      "upstreamTitle": "should support `fallback`",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "matches pristine fallback and async resolution",
+        "kind": "line",
+        "blockSha256": "5a6d9c74ad1051359a95f4e516ddba8a70fcd025b952f78535ec77ff6c718c64",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:015127dfde5d789b",
+        "ownershipSha256": "142e730b992a5d838d889ef0302a0afc61f29e3e2898c4285d5678f6ae83dfcf"
+      },
+      "adapted": [
+        {
+          "id": "runtime:015127dfde5d789b",
+          "file": "packages/markdown/tests/hooks/markdown-hooks.test.ts",
+          "fullName": "MarkdownHooks lifecycle matches pristine fallback and async resolution",
+          "sourceSha256": "1586dd39e1723e754362b08bdb176e48a722d306b8a73a61a42bf13448f00a5c"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:1188:should support plugins that error",
+      "upstreamTitle": "should support plugins that error",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "surfaces async errors through rendering",
+        "kind": "line",
+        "blockSha256": "889282652760c65df8e7d45a78e4b8f9d43c176dc5dc203268f56d9cbce162ea",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:5e37d78e456ae96a",
+        "ownershipSha256": "ae2c6e0b3617adc8127cd925c0bd4af505ace4dbefb91f1a4ad96114189a189b"
+      },
+      "adapted": [
+        {
+          "id": "runtime:5e37d78e456ae96a",
+          "file": "packages/markdown/tests/hooks/markdown-hooks.test.ts",
+          "fullName": "MarkdownHooks lifecycle surfaces async errors through rendering",
+          "sourceSha256": "1586dd39e1723e754362b08bdb176e48a722d306b8a73a61a42bf13448f00a5c"
+        }
+      ]
+    },
+    {
+      "upstreamId": "test.jsx:1211:should support rerenders",
+      "upstreamTitle": "should support rerenders",
+      "requiredTokens": [],
+      "declarationEvidence": {
+        "declaration": "rerenders a to b, resolves both async runs, and commits only b",
+        "kind": "line",
+        "blockSha256": "1ac930eff37f54cffb8b3d74ac0beab9ef7667f3ef48592c8c49b037acf22886",
+        "templateSha256": null,
+        "callbackSha256": null,
+        "rowIndex": null
+      },
+      "identityEvidence": {
+        "runtimeId": "runtime:294cc3f959a538cd",
+        "ownershipSha256": "e2e9e380e04e0d9617387de1e0d07733961c503e528b1ce26005ec258d5fb486"
+      },
+      "adapted": [
+        {
+          "id": "runtime:294cc3f959a538cd",
+          "file": "packages/markdown/tests/hooks/markdown-hooks.test.ts",
+          "fullName": "MarkdownHooks lifecycle rerenders a to b, resolves both async runs, and commits only b",
+          "sourceSha256": "1586dd39e1723e754362b08bdb176e48a722d306b8a73a61a42bf13448f00a5c"
+        }
+      ]
+    }
+  ]
+}

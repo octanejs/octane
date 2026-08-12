@@ -1,0 +1,498 @@
+{
+  "schemaVersion": 1,
+  "project": "base-ui-differential",
+  "roots": ["packages/base-ui/tests/differential"],
+  "files": ["packages/base-ui/tests/differential/parity.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:f8ae4ec16456ee3c",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React AlertDialog.Viewport: open (Dialog's viewport reached through the AlertDialog namespace)"
+    },
+    {
+      "id": "runtime:ae5b98598974c472",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React AlertDialog: open modal (role=alertdialog, Dialog parts reused) renders byte-identically"
+    },
+    {
+      "id": "runtime:be00b886d710ed39",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Avatar: fallback only (no image)"
+    },
+    {
+      "id": "runtime:9a2578868b8cff68",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Avatar: image + fallback (image inert under jsdom → fallback shows, img unmounted)"
+    },
+    {
+      "id": "runtime:de47b1ec0e7f66d9",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Button: disabled (native disabled attribute)"
+    },
+    {
+      "id": "runtime:05358ff64e2c2edd",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Button: disabled non-native render target (aria-disabled, no attribute)"
+    },
+    {
+      "id": "runtime:10c91778253e57d0",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Button: focusableWhenDisabled (aria-disabled + stays a tab stop)"
+    },
+    {
+      "id": "runtime:f7775e08699dee33",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Button: native button (type=button from useButton)"
+    },
+    {
+      "id": "runtime:e672302472a30325",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Button: nativeButton={false} render target (role + tabindex on the span)"
+    },
+    {
+      "id": "runtime:8b7db0316b1c3eea",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React CSPProvider: renders no DOM of its own and passes children through"
+    },
+    {
+      "id": "runtime:937b1292cf5a1420",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Checkbox: disabled (native disabled input + data-disabled; click is a no-op)"
+    },
+    {
+      "id": "runtime:b41cf4dd172b1128",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Checkbox: indeterminate (aria-checked=\"mixed\" + data-indeterminate)"
+    },
+    {
+      "id": "runtime:3a44149f1650e3d6",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Checkbox: uncontrolled default-checked (aria-checked true, data-checked, indicator)"
+    },
+    {
+      "id": "runtime:8d48937def90b216",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Checkbox: uncontrolled — click ticks + mounts the Indicator"
+    },
+    {
+      "id": "runtime:22a173e50bcaee3b",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React CheckboxGroup: parent (select-all) is indeterminate when some children are ticked"
+    },
+    {
+      "id": "runtime:ef99c44ae0c1cc65",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React CheckboxGroup: shared value — child derives checked; click updates the group"
+    },
+    {
+      "id": "runtime:c9637eb84620755e",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React ContextMenu: closed Root+Trigger"
+    },
+    {
+      "id": "runtime:603329e1b3ac9f10",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React ContextMenu: open (modal focus manager, fixed positioning, Menu parts via the namespace)"
+    },
+    {
+      "id": "runtime:e019f72d6dd3202d",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Dialog.Viewport: closed (unmounted with the rest of the portal subtree)"
+    },
+    {
+      "id": "runtime:6d6389f4cbb1d9eb",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Dialog.Viewport: open (role=presentation container wrapping the popup)"
+    },
+    {
+      "id": "runtime:42332a547976f728",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Dialog: closed Root+Trigger renders the trigger byte-identically (Store foundation)"
+    },
+    {
+      "id": "runtime:781cc3ca1828998c",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Dialog: open modal (Portal/Backdrop/Popup/Title/Description/Close) renders byte-identically"
+    },
+    {
+      "id": "runtime:773db5a12602a97f",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React DirectionProvider: provides the configured direction to descendants"
+    },
+    {
+      "id": "runtime:b752eb407cb5abf3",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React DirectionProvider: the nearest provider wins when nested"
+    },
+    {
+      "id": "runtime:4a14584d5ecc6195",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React DirectionProvider: useDirection defaults to ltr with no provider"
+    },
+    {
+      "id": "runtime:4a00823373285796",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Field: disabled (data-disabled propagates to parts)"
+    },
+    {
+      "id": "runtime:a6271c7e34b69c97",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Field: label/control/description id association (for/aria-labelledby/aria-describedby)"
+    },
+    {
+      "id": "runtime:53287734cfcdec9a",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Fieldset: basic (legend→root aria-labelledby wiring via layout effect)"
+    },
+    {
+      "id": "runtime:24004e061860f02d",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Fieldset: disabled (disabled attr + data-disabled on root, inherited on legend)"
+    },
+    {
+      "id": "runtime:dc0e37b7667f07ef",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Fieldset: explicit legend id wins, still wired to aria-labelledby"
+    },
+    {
+      "id": "runtime:d7d29575b86a4266",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Fieldset: legend render-prop (renders <section>, keeps id wiring)"
+    },
+    {
+      "id": "runtime:a4a096d24da31085",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Form: wraps a Field (form novalidate + FormContext)"
+    },
+    {
+      "id": "runtime:74edae338a22edac",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Input: standalone (Field.Control with the inert default context)"
+    },
+    {
+      "id": "runtime:8533c919d3430307",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: OPEN submenu subtree (nested placement, data-nested, aria wiring, nested items)"
+    },
+    {
+      "id": "runtime:f50b51ba5ef38168",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: closed Root+Trigger renders the trigger byte-identically"
+    },
+    {
+      "id": "runtime:8fb6735aa8c8f39b",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: open modal dropdown (Portal/backdrop/Positioner/Popup) renders byte-identically"
+    },
+    {
+      "id": "runtime:27190ca8c6560593",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: open non-modal dropdown (no internal backdrop) renders byte-identically"
+    },
+    {
+      "id": "runtime:829c4ce730b8524b",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: open with LinkItem, Arrow and Backdrop"
+    },
+    {
+      "id": "runtime:f021f08c439aaa5b",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: open with a Viewport wrapping the items"
+    },
+    {
+      "id": "runtime:e048fb9a18e98b9d",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: open with a closed submenu (SubmenuTrigger is both a parent item and a trigger)"
+    },
+    {
+      "id": "runtime:f4f015f5ef29d638",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: open with a disabled root renders byte-identically"
+    },
+    {
+      "id": "runtime:9a18108c4b333269",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: open with a radio group (group label wiring + selected indicator)"
+    },
+    {
+      "id": "runtime:f5d569bf4eebfbdf",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: open with checkbox items (checked/unchecked + transition-mounted indicator)"
+    },
+    {
+      "id": "runtime:ba872daa71f85b93",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: open with explicit side/align/sideOffset renders byte-identically"
+    },
+    {
+      "id": "runtime:ab6a711421f92f8e",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: open with items, a disabled item, Separator and Group/GroupLabel"
+    },
+    {
+      "id": "runtime:587311b0eef9dbf1",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: selecting a different radio item matches Base UI (indicator moves)"
+    },
+    {
+      "id": "runtime:bb1922c5a6e2f101",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menu: toggling a checkbox item matches Base UI, including the immediate indicator unmount"
+    },
+    {
+      "id": "runtime:c7114ac6840b9cb3",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menubar: closed (composite root of menuitem triggers)"
+    },
+    {
+      "id": "runtime:d9a13bf5f62d31a2",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menubar: vertical, non-modal, disabled (state attributes + orientation)"
+    },
+    {
+      "id": "runtime:37245690e1a5bd38",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Menubar: with one menu open (bar-cutout backdrop, orientation-driven side)"
+    },
+    {
+      "id": "runtime:74bf49f20f57ce42",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Meter: basic (value→percent, aria-value*, indicator width%, value text)"
+    },
+    {
+      "id": "runtime:909cb3481ac88d95",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Meter: custom min/max (percentage is position within the range)"
+    },
+    {
+      "id": "runtime:9f6e999337529ca4",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Meter: explicit Intl format (value text + aria-valuetext)"
+    },
+    {
+      "id": "runtime:8fbb7cb96a4f02cd",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React NumberField: Root/Group/Input/steppers render the formatted value byte-identically"
+    },
+    {
+      "id": "runtime:ed810a66f145ed0c",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React NumberField: at max boundary the Increment button is disabled"
+    },
+    {
+      "id": "runtime:df96d05005288f6f",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Popover.Viewport: open (current-content container inside the popup)"
+    },
+    {
+      "id": "runtime:e35b14a152d22050",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Popover: closed Root+Trigger renders the trigger byte-identically"
+    },
+    {
+      "id": "runtime:2c25f50a4c63084c",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Popover: open anchored (Portal/Backdrop/Positioner/Popup/Arrow/Title/Description/Close) renders byte-identically"
+    },
+    {
+      "id": "runtime:0eeafb927cbcbcb7",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React PreviewCard.Viewport: open (current-content container inside the popup)"
+    },
+    {
+      "id": "runtime:3f52e8c9a7d8e990",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React PreviewCard: closed (link trigger only, popup subtree unmounted)"
+    },
+    {
+      "id": "runtime:a8306cd8fd464002",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React PreviewCard: open (portal + backdrop + anchored positioner + popup + arrow)"
+    },
+    {
+      "id": "runtime:ca66eee5d07856ca",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Progress: basic (status→data-progressing on every part, aria-valuenow, width%)"
+    },
+    {
+      "id": "runtime:c0afc1cfe099bd05",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Progress: complete (value === max → data-complete)"
+    },
+    {
+      "id": "runtime:ca22e775b07f3117",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Progress: indeterminate (value null → data-indeterminate, no aria-valuenow, empty fill)"
+    },
+    {
+      "id": "runtime:51cbac6e5ef2f5ec",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React RadioGroup: composite roving focus + value → aria-checked; click moves selection"
+    },
+    {
+      "id": "runtime:b8ad3f7659e224cd",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React RadioGroup: disabled group (aria-disabled + every radio disabled)"
+    },
+    {
+      "id": "runtime:ae458936d4dfbfe8",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Separator: className as function of state"
+    },
+    {
+      "id": "runtime:ab3af18391ef9f52",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Separator: default (horizontal), byte-identical"
+    },
+    {
+      "id": "runtime:99e91ed4f4e0573d",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Separator: render-prop element form (clones onto <hr>, className concatenates)"
+    },
+    {
+      "id": "runtime:db4b66a4df92e413",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Separator: render-prop function form (merged props + state)"
+    },
+    {
+      "id": "runtime:ac41d0dbef3af78e",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Separator: vertical (state → data-orientation)"
+    },
+    {
+      "id": "runtime:0d1fdfece8ec2509",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Slider: ArrowUp on the thumb steps the value (aria-valuenow + indicator % + output re-render)"
+    },
+    {
+      "id": "runtime:63c087af64601b35",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Slider: Root/Value/Control/Track/Indicator/Thumb render the value byte-identically"
+    },
+    {
+      "id": "runtime:8539f0cd565fd76f",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Slider: range ArrowRight steps only the pressed (first) thumb"
+    },
+    {
+      "id": "runtime:8d397d392ff446ea",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Slider: range slider renders two thumbs + sorted values byte-identically"
+    },
+    {
+      "id": "runtime:028b9f02ae31028e",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Switch: disabled (native disabled input + data-disabled; click is a no-op)"
+    },
+    {
+      "id": "runtime:3f9a6758186c34d4",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Switch: uncontrolled default-checked (aria-checked starts true; click unchecks)"
+    },
+    {
+      "id": "runtime:85239f448e885056",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Switch: uncontrolled — click toggles aria-checked + data-checked (native input adaptation)"
+    },
+    {
+      "id": "runtime:535c00d86d7083ee",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Toast: adding a toast renders it byte-identically"
+    },
+    {
+      "id": "runtime:40a6e939f158cf77",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Toast: empty viewport (live region resting state)"
+    },
+    {
+      "id": "runtime:2b4b38807f088d29",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Toast: high priority renders alertdialog + the hidden alert live region"
+    },
+    {
+      "id": "runtime:b62283ebff8865be",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Toast: limit marks older toasts limited rather than removing them"
+    },
+    {
+      "id": "runtime:f96f85dacb308d47",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Toggle: controlled (pressed prop owns state; click does not change DOM)"
+    },
+    {
+      "id": "runtime:4c5b4699d5a31a78",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Toggle: disabled (native disabled attr; click is a no-op)"
+    },
+    {
+      "id": "runtime:69fb93232c47d9a7",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Toggle: uncontrolled defaultPressed (aria-pressed starts true)"
+    },
+    {
+      "id": "runtime:2db51255df49b941",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Toggle: uncontrolled — click toggles aria-pressed (button type + tabindex)"
+    },
+    {
+      "id": "runtime:ee4d3054fe82eacc",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React ToggleGroup: disabled group (data-disabled + every button disabled)"
+    },
+    {
+      "id": "runtime:ba87bed7cf8b690c",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React ToggleGroup: multiple-select (data-multiple, two items pressed)"
+    },
+    {
+      "id": "runtime:deb70ebdf07273d5",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React ToggleGroup: single-select (composite roving tabindex + value → aria-pressed)"
+    },
+    {
+      "id": "runtime:2b3b25307a2e1278",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Tooltip.Provider: shares a delay group without rendering DOM"
+    },
+    {
+      "id": "runtime:9f633e08bcb7f110",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Tooltip.Viewport: open (current-content container inside the popup)"
+    },
+    {
+      "id": "runtime:be5e99dab0f09e65",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Tooltip: closed (trigger only, popup subtree unmounted)"
+    },
+    {
+      "id": "runtime:956ba68a21002abf",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Tooltip: disabled trigger (data-trigger-disabled, no trigger identifier)"
+    },
+    {
+      "id": "runtime:4bc828ba725cb645",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React Tooltip: open (portal + anchored positioner + popup + arrow)"
+    },
+    {
+      "id": "runtime:8a1d4cd5af0d94c4",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React useMediaQuery: reports the live matchMedia snapshot"
+    },
+    {
+      "id": "runtime:690ecace74e14e4b",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React useMediaQuery: the live snapshot overrides defaultMatches"
+    },
+    {
+      "id": "runtime:7754414330382804",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React useRender: basic custom element with state → data-*"
+    },
+    {
+      "id": "runtime:403f8cae2b314b66",
+      "file": "packages/base-ui/tests/differential/parity.test.ts",
+      "fullName": "differential: @octanejs/base-ui vs real Base UI on React useRender: render-prop function form"
+    }
+  ]
+}

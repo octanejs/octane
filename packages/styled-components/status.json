@@ -12,5 +12,20 @@
     "Interpolation-position styled components are recognized by an octane brand symbol rather than React's forward-ref `$$typeof` (octane styled components are plain functions)."
   ],
   "ssr": "Supported and tested: zero-config collection into `RenderResult.css` via octane's `injectStyle` channel (styled rules, keyframes, and globals, with content-derived immutable chunk ids that make streaming dedup sound), repeat-render and dynamic-global request isolation through a stateless server output backend, hydration adoption of server chunks (removed after adoption, no duplicate rules), and the `ServerStyleSheet` compat surface.",
-  "verified": "2026-07-18"
+  "verified": "2026-08-02",
+  "provenance": {
+    "repository": "https://github.com/styled-components/styled-components",
+    "commit": "e0663410f631e0ce82681947edf03bfabd6aef9c",
+    "integrity": "sha256:cfc845f944613860155a65afb548b0ac0d234af56ac332e14f99ed150ab38549",
+    "verification": "recorded-unverified"
+  },
+  "parityHarness": {
+    "manifest": "audit/react-parity.json",
+    "requiredLanes": 1,
+    "differentialCases": 6,
+    "documentedDivergences": 0
+  },
+  "notes": [
+    "Bounded React parity records the pinned repository runtime and type suites as present, runs six exact same-fixture differential scenarios under the react-parity job, and keeps factory/SSR/distribution/type-contract adaptations as ordinary package tests until pristine and one-for-one adapted lanes land."
+  ]
 }

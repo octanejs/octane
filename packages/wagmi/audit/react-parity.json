@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "47137830d3f76e5a87be45044717ec5360f2f11880e3f8a8de83cb9b1d01db28"
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
     }
   },
   "lanes": [
@@ -56,12 +56,12 @@
         {
           "path": "packages/wagmi/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "4ac2119a5bb0cd3fd10a2b0fa7c0fe0a6fd4cfc48f07d2bc1a5eb8332210416c",
+          "sha256": "c9b91865ead368826052814de7ee8eb95c6489027228f8af6a1fc317e6c8f9c1",
           "cases": [
             {
               "id": "differential:wagmi-connection",
-              "testName": "connection: disconnected \u2192 connected renders byte-identical",
-              "fullName": "differential: @octanejs/wagmi vs real wagmi connection: disconnected \u2192 connected renders byte-identical"
+              "testName": "connection: disconnected → connected renders byte-identical",
+              "fullName": "differential: @octanejs/wagmi vs real wagmi connection: disconnected → connected renders byte-identical"
             }
           ]
         },
@@ -78,12 +78,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "7a2814f3a7c262033c70e8e82919a7eedd51ab2ebad7b9aaf1ee35559a0cf40b"
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "d655cda963da8e255cf0b519a00b34ca8f0604f7e6631c447f6585b4a93c51a7"
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
         }
       ]
     }

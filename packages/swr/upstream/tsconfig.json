@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "esModuleInterop": true,
+    "jsx": "react",
+    "lib": ["esnext", "dom"],
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "strictBindCallApply": true,
+    "outDir": "./dist",
+    "rootDir": "./",
+    "strict": true,
+    "target": "ES2018",
+    "noEmitOnError": true,
+    "incremental": true
+  },
+  "include": ["./src/**/*", "env.d.ts", "eslint.config.mjs", "jest.config.js"],
+  "exclude": ["./**/dist", "examples"],
+  "watchOptions": {
+    "watchFile": "useFsEvents",
+    "watchDirectory": "useFsEvents",
+    "fallbackPolling": "dynamicPriority"
+  }
+}

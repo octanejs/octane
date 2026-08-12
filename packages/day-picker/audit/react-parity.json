@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/gpbl/react-day-picker.git",
+    "version": "10.0.1",
+    "commit": "6d3929d655779d178638d8f80171597a579468e8",
+    "sourceRoot": "src",
+    "testRoot": "src",
+    "license": "MIT",
+    "integrity": "sha256:bfb5146c055aa4b017bde0ff5e76d9a90e5496b6d03c4df7659d98eb14c450af",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/day-picker/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/day-picker/tests/differential"],
+      "include": ["parity\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+    }
+  },
+  "lanes": [
+    {
+      "id": "react-day-picker-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "day-picker-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Bounded React/Octane differential: Octane fixtures versus published react-day-picker 10.0.1 on real React for default calendar shape and month navigation.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/day-picker/audit/differential-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/day-picker/audit/differential-runtime.json",
+          "role": "support",
+          "sha256": "acfe879e07673f41d5cdd1697d7c75fe40a5014331eee3477cb4fd01d7c0ed73"
+        },
+        {
+          "path": "scripts/react-parity/react-day-picker-runtime-inventory.mjs",
+          "role": "support",
+          "sha256": "12201e8c5b64aaf3d08ee5bf99a0cf71fd703d0d98a498aa957f4870eae27272"
+        },
+        {
+          "path": "packages/day-picker/audit/upstream-integrity.json",
+          "role": "support",
+          "sha256": "89f6591d65ac0c3d42838b2c8c4e531eab7faa005e3978188eac99d9a3f6b263"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

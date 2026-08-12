@@ -87,7 +87,7 @@ export function useRealtimeChat(
     // `undefined` for absent values.
     const initial = optionsRef.current
     clientRef.current = new RealtimeClient({
-      // OCTANE DIVERGENCE: upstream captures the first transport callbacks.
+      // Octane divergence note: Upstream captures the first transport callbacks.
       // Ref-backed delegates keep the client stable while reconnects and token
       // refreshes observe the latest render's authentication and adapter.
       getToken: () => optionsRef.current.getToken(),
@@ -125,7 +125,7 @@ export function useRealtimeChat(
       }),
       onStatusChange: (newStatus) => {
         setStatus(newStatus)
-        // OCTANE DIVERGENCE: upstream declares this callback but does not
+        // Octane divergence note: Upstream declares this callback but does not
         // forward status changes beyond its own hook state.
         optionsRef.current.onStatusChange?.(newStatus)
       },

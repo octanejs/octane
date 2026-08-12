@@ -45,7 +45,7 @@
   },
   "scripts": {
     "test": "vitest run --project tanstack-pacer",
-    "typecheck": "tsrx-tsc --noEmit"
+    "typecheck": "tsrx-tsc --noEmit && tsrx-tsc --noEmit -p typetests/octane-only/tsconfig.json"
   },
   "dependencies": {
     "@tanstack/pacer": "0.21.1"
@@ -56,7 +56,15 @@
   },
   "devDependencies": {
     "@octanejs/tanstack-store": "workspace:*",
+    "@tanstack/react-pacer": "0.22.1",
+    "@tanstack/react-store": "0.11.0",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:tanstack-pacer-react-oracle",
+    "@types/react-dom": "catalog:tanstack-pacer-react-oracle",
+    "esbuild": "catalog:default",
     "octane": "workspace:*",
+    "react": "catalog:tanstack-pacer-react-oracle",
+    "react-dom": "catalog:tanstack-pacer-react-oracle",
     "vitest": "catalog:default"
   }
 }

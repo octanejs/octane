@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
-	createPackedCommonjsConsumerManifest,
+	createPackedJavascriptConsumerManifest,
 	createPackedExampleManifest,
 	createPackedTsrxConsumerConfig,
 	createPackedTsrxConsumerManifest,
@@ -10,38 +10,44 @@ import {
 	isWithinDirectory,
 	renderPackedExampleWorkspace,
 	renderPackedCommonjsConsumerSource,
+	renderPackedDraggableEsmConsumerSource,
 	renderPackedEsmConsumerSource,
 	renderPackedTsrxConsumerSource,
 	renderPackedTsrxConsumerTypeProbe,
 } from './package-pack-canaries.mjs';
 
-describe('packed CommonJS consumer', () => {
+describe('packed JavaScript consumers', () => {
 	const archiveSpecs = {
 		'@octanejs/base-ui': 'file:/tmp/base-ui.tgz',
 		'@octanejs/floating-ui': 'file:/tmp/floating-ui.tgz',
 		'@octanejs/radix': 'file:/tmp/radix.tgz',
+		'@octanejs/draggable': 'file:/tmp/react-draggable.tgz',
 		octane: 'file:/tmp/octane.tgz',
 	};
 
-	test('installs exactly the complete CommonJS dependency closure', () => {
-		assert.deepEqual(createPackedCommonjsConsumerManifest(archiveSpecs).dependencies, archiveSpecs);
+	test('installs exactly the complete JavaScript dependency closure', () => {
+		assert.deepEqual(
+			createPackedJavascriptConsumerManifest(archiveSpecs).dependencies,
+			archiveSpecs,
+		);
 		assert.throws(
-			() => createPackedCommonjsConsumerManifest({ ...archiveSpecs, octane: undefined }),
+			() => createPackedJavascriptConsumerManifest({ ...archiveSpecs, octane: undefined }),
 			/no packed archive was provided for octane/,
 		);
 	});
 
-	test('requires all four packages and executes Octane SSR', () => {
+	test('requires every CommonJS package and executes Octane SSR', () => {
 		const source = renderPackedCommonjsConsumerSource();
 		assert.match(source, /require\('octane'\)/);
 		assert.match(source, /require\('octane\/server'\)/);
 		assert.match(source, /require\('@octanejs\/floating-ui'\)/);
 		assert.match(source, /require\('@octanejs\/base-ui'\)/);
 		assert.match(source, /require\('@octanejs\/radix'\)/);
+		assert.doesNotMatch(source, /require\('@octanejs\/draggable'\)/);
 		assert.match(source, /renderToString/);
 	});
 
-	test('imports the same four-package graph for the ESM parity probe', () => {
+	test('imports the same package graph for the ESM parity probe', () => {
 		const source = renderPackedEsmConsumerSource();
 		assert.match(source, /from 'octane'/);
 		assert.match(source, /from 'octane\/server'/);
@@ -49,6 +55,13 @@ describe('packed CommonJS consumer', () => {
 		assert.match(source, /from '@octanejs\/base-ui'/);
 		assert.match(source, /from '@octanejs\/radix'/);
 		assert.match(source, /renderToString/);
+	});
+
+	test('compiles the TSRX draggable ESM entry through the Octane toolchain', () => {
+		const source = renderPackedDraggableEsmConsumerSource();
+		assert.match(source, /from '@octanejs\/draggable'/);
+		assert.match(source, /draggable\.DraggableCore/);
+		assert.doesNotMatch(source, /node:/);
 	});
 });
 
@@ -145,8 +158,12 @@ describe('packed TSRX source consumers', () => {
 	const archiveSpecs = {
 		'@octanejs/cmdk': 'file:/tmp/cmdk.tgz',
 		'@octanejs/floating-ui': 'file:/tmp/floating-ui.tgz',
+		'@octanejs/input-otp': 'file:/tmp/input-otp.tgz',
 		'@octanejs/radix': 'file:/tmp/radix.tgz',
+		'@octanejs/spring': 'file:/tmp/react-spring.tgz',
 		'@octanejs/sonner': 'file:/tmp/sonner.tgz',
+		'@octanejs/syntax-highlighter': 'file:/tmp/syntax-highlighter.tgz',
+		'@octanejs/textarea-autosize': 'file:/tmp/react-textarea-autosize.tgz',
 		'@octanejs/tiptap': 'file:/tmp/tiptap.tgz',
 		octane: 'file:/tmp/octane.tgz',
 	};
@@ -190,14 +207,24 @@ describe('packed TSRX source consumers', () => {
 		assert.equal(config.compilerOptions.paths, undefined);
 	});
 
-	test('exercises all three published bindings from a real local TSRX component', () => {
+	test('exercises the published bindings from a real local TSRX component', () => {
 		const source = renderPackedTsrxConsumerSource();
 
 		assert.match(source, /from '@octanejs\/cmdk'/);
+		assert.match(source, /from '@octanejs\/input-otp'/);
 		assert.match(source, /from '@octanejs\/sonner'/);
+		assert.match(source, /from '@octanejs\/spring'/);
+		assert.match(source, /from '@octanejs\/spring\/parallax'/);
+		assert.match(source, /from '@octanejs\/syntax-highlighter'/);
+		assert.match(source, /from '@octanejs\/textarea-autosize'/);
 		assert.match(source, /from '@octanejs\/tiptap'/);
 		assert.match(source, /<Command\b/);
+		assert.match(source, /<OTPInput\b/);
 		assert.match(source, /<Toaster\b/);
+		assert.match(source, /<animated\.div\b/);
+		assert.match(source, /<Parallax\b/);
+		assert.match(source, /<Light\b/);
+		assert.match(source, /<TextareaAutosize\b/);
 		assert.match(source, /<EditorProvider\b/);
 		assert.match(source, /<Tiptap\b/);
 	});
@@ -207,10 +234,15 @@ describe('packed TSRX source consumers', () => {
 
 		assert.match(source, /type IsAny<T>/);
 		assert.match(source, /AssertNotAny<CommandProps>/);
+		assert.match(source, /AssertNotAny<OTPInputProps>/);
 		assert.match(source, /AssertNotAny<Parameters<typeof Command>\[0\]>/);
 		assert.match(source, /AssertNotAny<ToasterProps>/);
 		assert.match(source, /AssertNotAny<Parameters<typeof Toaster>\[0\]>/);
 		assert.match(source, /AssertNotAny<EditorContentProps>/);
+		assert.match(source, /AssertNotAny<SpringValue<number>>/);
+		assert.match(source, /AssertNotAny<ParallaxProps>/);
+		assert.match(source, /AssertNotAny<SyntaxHighlighterProps>/);
+		assert.match(source, /AssertNotAny<TextareaAutosizeProps>/);
 		assert.match(source, /AssertNotAny<Parameters<typeof EditorContent>\[0\]>/);
 		assert.match(source, /--consumer-offset/);
 		assert.match(source, /@ts-expect-error/g);

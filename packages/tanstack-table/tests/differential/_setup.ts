@@ -17,8 +17,9 @@
 import { compile as compileToReact } from '@tsrx/react';
 import { transformSync as esbuildTransformSync } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname, basename } from 'node:path';
+import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compileFixture } from './fixture-compiler';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -27,49 +28,6 @@ const FIXTURE_DIR = join(__dirname, '../_fixtures');
 // THIS package's deps (@tanstack/react-table, react, react-dom). The differential
 // tests pass this same dir to octane's `mountDifferential(..., cacheDir)`.
 const CACHE_DIR = join(__dirname, '.react-cache');
-
-// Must match the hash in octane's `_rig.ts`/`_setup.ts` so the slug+hash file
-// names line up — the rig keys cache lookups by `hashString(srcPath)`.
-function hashString(s: string): string {
-	let h = 5381;
-	for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-	return Math.abs(h).toString(36);
-}
-
-function compileOne(srcPath: string): void {
-	const source = readFileSync(srcPath, 'utf8');
-	let compiled;
-	try {
-		compiled = compileToReact(source, srcPath);
-	} catch {
-		return;
-	}
-	if (compiled.errors && compiled.errors.length > 0) return;
-	let transformed;
-	try {
-		transformed = esbuildTransformSync(compiled.code, {
-			loader: 'tsx',
-			jsx: 'automatic',
-			jsxImportSource: 'react',
-			target: 'esnext',
-			format: 'esm',
-			sourcefile: srcPath,
-		});
-	} catch {
-		return;
-	}
-	// `@octanejs/tanstack-table` (and any subpath) → the matching real
-	// react-table specifier; `octane` → react.
-	let rewritten = transformed.code
-		.replace(
-			/from\s+["']@octanejs\/tanstack-table(\/[^"']*)?["']/g,
-			(_m, sub) => `from "@tanstack/react-table${sub || ''}"`,
-		)
-		.replace(/from\s+["']octane["']/g, 'from "react"');
-	const slug = basename(srcPath).replace(/\.tsrx$/, '');
-	const outFile = join(CACHE_DIR, `${slug}-${hashString(srcPath)}.js`);
-	writeFileSync(outFile, rewritten);
-}
 
 export async function setup(): Promise<void> {
 	if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
@@ -83,7 +41,14 @@ export async function setup(): Promise<void> {
 		}
 		return out;
 	};
-	for (const file of walk(FIXTURE_DIR)) compileOne(file);
+	for (const file of walk(FIXTURE_DIR)) {
+		compileFixture(file, CACHE_DIR, {
+			readFile: readFileSync,
+			compile: compileToReact,
+			transform: esbuildTransformSync,
+			writeFile: writeFileSync,
+		});
+	}
 }
 
 export async function teardown(): Promise<void> {

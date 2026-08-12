@@ -1,3 +1,5 @@
+// OCTANE DIVERGENCE[visx-native-zoom-gestures][differential:visx-native-gestures]:
+// Zoom attaches native wheel/pointer/touch listeners rather than @use-gesture/react at runtime.
 import { useState, useRef, useCallback, useEffect } from 'octane';
 import type { ReactElement } from 'react';
 import { localPoint } from '@octanejs/visx/event';

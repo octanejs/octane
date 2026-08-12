@@ -1,0 +1,717 @@
+// @ts-nocheck -- React-compatible DOM props cross Octane's stricter event boundary here.
+import { useCallback, useEffect, useMemo, useRef, useState } from 'octane';
+import type { ChangeEvent, FocusEvent, KeyboardEvent, MouseEvent } from 'react';
+import type { CalendarDay } from './classes/CalendarDay.js';
+import { DateLib, defaultLocale } from './classes/DateLib.js';
+import { createGetModifiers } from './helpers/createGetModifiers.js';
+import { getClassNamesForModifiers } from './helpers/getClassNamesForModifiers.js';
+import { getComponents } from './helpers/getComponents.js';
+import { getDataAttributes } from './helpers/getDataAttributes.js';
+import { getDefaultClassNames } from './helpers/getDefaultClassNames.js';
+import { getInitialMonth } from './helpers/getInitialMonth.js';
+import { getFormatters } from './helpers/getFormatters.js';
+import { getLabels } from './helpers/getLabels.js';
+import { getMonthOptions } from './helpers/getMonthOptions.js';
+import { getNavMonths } from './helpers/getNavMonth.js';
+import { getStyleForModifiers } from './helpers/getStyleForModifiers.js';
+import { getWeekdays } from './helpers/getWeekdays.js';
+import { getYearOptions } from './helpers/getYearOptions.js';
+import { createNoonOverrides } from './noonDateLib.js';
+import type {
+	DayPickerProps,
+	Modifiers,
+	MoveFocusBy,
+	MoveFocusDir,
+	SelectedValue,
+	SelectHandler,
+} from './types/index.js';
+import { DayFlag, SelectionState, UI } from './UI.js';
+import { useAnimation } from './useAnimation.js';
+import { useCalendar } from './useCalendar.js';
+import { type DayPickerContext, dayPickerContext } from './useDayPicker.js';
+import { useFocus } from './useFocus.js';
+import { useSelection } from './useSelection.js';
+import { convertMatchersToTimeZone } from './utils/convertMatchersToTimeZone.js';
+import { rangeIncludesDate } from './utils/rangeIncludesDate.js';
+import { toTimeZone } from './utils/toTimeZone.js';
+import { isDateRange } from './utils/typeguards.js';
+
+const noDateSelected = () => false;
+
+/**
+ * Renders the DayPicker calendar component.
+ *
+ * @param initialProps - The props for the DayPicker component.
+ * @returns The rendered DayPicker component.
+ * @group DayPicker
+ * @see https://daypicker.dev
+ */
+export function DayPicker(initialProps: DayPickerProps) @{
+	let props = initialProps;
+	const timeZone = props.timeZone;
+
+	if (timeZone) {
+		props = {
+			...initialProps,
+			timeZone,
+		};
+		if (props.today) {
+			props.today = toTimeZone(props.today, timeZone);
+		}
+		if (props.month) {
+			props.month = toTimeZone(props.month, timeZone);
+		}
+		if (props.defaultMonth) {
+			props.defaultMonth = toTimeZone(props.defaultMonth, timeZone);
+		}
+		if (props.startMonth) {
+			props.startMonth = toTimeZone(props.startMonth, timeZone);
+		}
+		if (props.endMonth) {
+			props.endMonth = toTimeZone(props.endMonth, timeZone);
+		}
+		if (props.mode === 'single' && props.selected) {
+			props.selected = toTimeZone(props.selected, timeZone);
+		} else if (props.mode === 'multiple' && props.selected) {
+			props.selected = props.selected?.map((date) => toTimeZone(date, timeZone));
+		} else if (props.mode === 'range' && props.selected) {
+			props.selected = {
+				from: props.selected.from ? toTimeZone(props.selected.from, timeZone) : props.selected.from,
+				to: props.selected.to ? toTimeZone(props.selected.to, timeZone) : props.selected.to,
+			};
+		}
+		if (props.disabled !== undefined) {
+			props.disabled = convertMatchersToTimeZone(props.disabled, timeZone);
+		}
+		if (props.hidden !== undefined) {
+			props.hidden = convertMatchersToTimeZone(props.hidden, timeZone);
+		}
+		if (props.modifiers) {
+			const nextModifiers: NonNullable<typeof props.modifiers> = {};
+			Object.keys(props.modifiers).forEach((key) => {
+				nextModifiers[key] = convertMatchersToTimeZone(props.modifiers?.[key], timeZone);
+			});
+			props.modifiers = nextModifiers;
+		}
+	}
+	const { components, formatters, labels, dateLib, locale, classNames } = useMemo(() => {
+		const locale = { ...defaultLocale, ...props.locale };
+		const weekStartsOn = props.broadcastCalendar ? 1 : props.weekStartsOn;
+
+		const noonOverrides =
+			props.noonSafe && props.timeZone
+				? createNoonOverrides(props.timeZone, {
+						weekStartsOn,
+						locale,
+					})
+				: undefined;
+		const overrides =
+			props.dateLib && noonOverrides
+				? { ...noonOverrides, ...props.dateLib }
+				: props.dateLib ?? noonOverrides;
+
+		const dateLib = new DateLib({
+			locale,
+			weekStartsOn,
+			firstWeekContainsDate: props.firstWeekContainsDate,
+			useAdditionalWeekYearTokens: props.useAdditionalWeekYearTokens,
+			useAdditionalDayOfYearTokens: props.useAdditionalDayOfYearTokens,
+			timeZone: props.timeZone,
+			numerals: props.numerals,
+		}, overrides);
+
+		return {
+			dateLib,
+			components: getComponents(props.components),
+			formatters: getFormatters(props.formatters),
+			labels: getLabels(props.labels, dateLib.options),
+			locale,
+			classNames: { ...getDefaultClassNames(), ...props.classNames },
+		};
+	}, [
+		props.locale,
+		props.broadcastCalendar,
+		props.weekStartsOn,
+		props.firstWeekContainsDate,
+		props.useAdditionalWeekYearTokens,
+		props.useAdditionalDayOfYearTokens,
+		props.timeZone,
+		props.numerals,
+		props.dateLib,
+		props.noonSafe,
+		props.components,
+		props.formatters,
+		props.labels,
+		props.classNames,
+	]);
+
+	if (!props.today) {
+		props = { ...props, today: dateLib.today() };
+	}
+
+	// Keep uncontrolled navigation in the compiled component scope. Plain `.ts`
+	// custom hooks share their enclosing slot path, while this state cell receives
+	// a compiler-owned call-site slot and therefore schedules the DayPicker block
+	// directly when navigation changes the visible month.
+	const monthIsControlled = initialProps.month !== undefined;
+	const [uncontrolledMonth, setUncontrolledMonth] = useState(() => {
+		const [navStart, navEnd] = getNavMonths(props, dateLib);
+		return getInitialMonth(props, navStart, navEnd, dateLib);
+	});
+	const previousTimeZone = useRef(props.timeZone);
+	useEffect(() => {
+		if (previousTimeZone.current === props.timeZone) return;
+		previousTimeZone.current = props.timeZone;
+		if (monthIsControlled) return;
+		const [navStart, navEnd] = getNavMonths(props, dateLib);
+		setUncontrolledMonth(
+			getInitialMonth({ ...props, month: undefined }, navStart, navEnd, dateLib),
+		);
+	}, [props.timeZone]);
+
+	const {
+		captionLayout,
+		mode,
+		navLayout,
+		numberOfMonths = 1,
+		onDayBlur,
+		onDayClick,
+		onDayFocus,
+		onDayKeyDown,
+		onDayMouseEnter,
+		onDayMouseLeave,
+		onNextClick,
+		onPrevClick,
+		showWeekNumber,
+		styles,
+	} = props;
+
+	const {
+		formatCaption,
+		formatDay,
+		formatMonthDropdown,
+		formatWeekNumber,
+		formatWeekNumberHeader,
+		formatWeekdayName,
+		formatYearDropdown,
+	} = formatters;
+
+	const calendar = useCalendar(props, dateLib, monthIsControlled ? undefined : uncontrolledMonth, (
+		month,
+	) => {
+		setUncontrolledMonth(month);
+		props.onMonthChange?.(month);
+	});
+
+	const { days, months, navStart, navEnd, previousMonth, nextMonth, goToMonth } = calendar;
+
+	const getModifiers = createGetModifiers(days, props, navStart, navEnd, dateLib);
+
+	const { isSelected, select, selected: selectedValue } = useSelection(props, dateLib) ?? {};
+	const isDateSelected = isSelected ?? noDateSelected;
+
+	const { blur, focused, isFocusTarget, moveFocus, setFocused } = useFocus(
+		props,
+		calendar,
+		getModifiers,
+		isDateSelected,
+		dateLib,
+	);
+
+	const {
+		labelDayButton,
+		labelGridcell,
+		labelGrid,
+		labelMonthDropdown,
+		labelNav,
+		labelPrevious,
+		labelNext,
+		labelWeekday,
+		labelWeekNumber,
+		labelWeekNumberHeader,
+		labelYearDropdown,
+	} = labels;
+
+	const weekdays = useMemo(
+		() => getWeekdays(dateLib, props.ISOWeek, props.broadcastCalendar, props.today),
+		[dateLib, props.ISOWeek, props.broadcastCalendar, props.today],
+	);
+
+	const isInteractive = mode !== undefined || onDayClick !== undefined;
+
+	const handlePreviousClick = useCallback(() => {
+		if (!previousMonth) return;
+		goToMonth(previousMonth);
+		onPrevClick?.(previousMonth);
+	}, [previousMonth, goToMonth, onPrevClick]);
+
+	const handleNextClick = useCallback(() => {
+		if (!nextMonth) return;
+		goToMonth(nextMonth);
+		onNextClick?.(nextMonth);
+	}, [goToMonth, nextMonth, onNextClick]);
+
+	const handleDayClick = useCallback(
+		(day: CalendarDay, m: Modifiers) => (e: MouseEvent) => {
+			e.preventDefault();
+			e.stopPropagation();
+			setFocused(day);
+			if (m.disabled) {
+				return;
+			}
+			select?.(day.date, m, e);
+			onDayClick?.(day.date, m, e);
+		},
+		[select, onDayClick, setFocused],
+	);
+
+	const handleDayFocus = useCallback(
+		(day: CalendarDay, m: Modifiers) => (e: FocusEvent) => {
+			setFocused(day);
+			onDayFocus?.(day.date, m, e);
+		},
+		[onDayFocus, setFocused],
+	);
+
+	const handleDayBlur = useCallback(
+		(day: CalendarDay, m: Modifiers) => (e: FocusEvent) => {
+			blur();
+			onDayBlur?.(day.date, m, e);
+		},
+		[blur, onDayBlur],
+	);
+
+	const handleDayKeyDown = useCallback(
+		(day: CalendarDay, modifiers: Modifiers) => (e: KeyboardEvent) => {
+			const keyMap: Record<string, [MoveFocusBy, MoveFocusDir]> = {
+				ArrowLeft: [e.shiftKey ? 'month' : 'day', props.dir === 'rtl' ? 'after' : 'before'],
+				ArrowRight: [e.shiftKey ? 'month' : 'day', props.dir === 'rtl' ? 'before' : 'after'],
+				ArrowDown: [e.shiftKey ? 'year' : 'week', 'after'],
+				ArrowUp: [e.shiftKey ? 'year' : 'week', 'before'],
+				PageUp: [e.shiftKey ? 'year' : 'month', 'before'],
+				PageDown: [e.shiftKey ? 'year' : 'month', 'after'],
+				Home: ['startOfWeek', 'before'],
+				End: ['endOfWeek', 'after'],
+			};
+			if (keyMap[e.key]) {
+				e.preventDefault();
+				e.stopPropagation();
+				const [moveBy, moveDir] = keyMap[e.key];
+				moveFocus(moveBy, moveDir);
+			}
+			onDayKeyDown?.(day.date, modifiers, e);
+		},
+		[moveFocus, onDayKeyDown, props.dir],
+	);
+
+	const handleDayMouseEnter = useCallback(
+		(day: CalendarDay, modifiers: Modifiers) => (e: MouseEvent) => {
+			onDayMouseEnter?.(day.date, modifiers, e);
+		},
+		[onDayMouseEnter],
+	);
+
+	const handleDayMouseLeave = useCallback(
+		(day: CalendarDay, modifiers: Modifiers) => (e: MouseEvent) => {
+			onDayMouseLeave?.(day.date, modifiers, e);
+		},
+		[onDayMouseLeave],
+	);
+
+	const handleMonthChange = useCallback(
+		(date: Date, monthOffset: number) => (e: ChangeEvent<HTMLSelectElement>) => {
+			const selectedMonth = Number(e.target.value);
+			const month = dateLib.setMonth(dateLib.startOfMonth(date), selectedMonth);
+			goToMonth(dateLib.addMonths(month, -monthOffset));
+		},
+		[dateLib, goToMonth],
+	);
+
+	const handleYearChange = useCallback(
+		(date: Date, monthOffset: number) => (e: ChangeEvent<HTMLSelectElement>) => {
+			const selectedYear = Number(e.target.value);
+			const month = dateLib.setYear(dateLib.startOfMonth(date), selectedYear);
+			goToMonth(dateLib.addMonths(month, -monthOffset));
+		},
+		[dateLib, goToMonth],
+	);
+
+	const { className, style } = useMemo(
+		() => ({
+			className: [classNames[UI.Root], props.className].filter(Boolean).join(' '),
+			style: { ...styles?.[UI.Root], ...props.style },
+		}),
+		[classNames, props.className, props.style, styles],
+	);
+
+	const dataAttributes = getDataAttributes(props);
+
+	const getDropdownStyle = (dropdown: UI.MonthsDropdown | UI.YearsDropdown) => {
+		const dropdownStyle = styles?.[UI.Dropdown];
+		const specificDropdownStyle = styles?.[dropdown];
+
+		if (!dropdownStyle && !specificDropdownStyle) {
+			return undefined;
+		}
+
+		return {
+			...dropdownStyle,
+			...specificDropdownStyle,
+		};
+	};
+
+	const rootElRef = useRef<HTMLDivElement | null>(null);
+	useAnimation(rootElRef, Boolean(props.animate), {
+		classNames,
+		months,
+		focused,
+		dateLib,
+	});
+
+	const contextValue: DayPickerContext<DayPickerProps> = {
+		dayPickerProps: props,
+		selected: selectedValue as SelectedValue<DayPickerProps>,
+		select: select as SelectHandler<DayPickerProps>,
+		isSelected,
+		months,
+		nextMonth,
+		previousMonth,
+		goToMonth,
+		getModifiers,
+		components,
+		classNames,
+		styles,
+		labels,
+		formatters,
+	};
+
+	<dayPickerContext.Provider value={contextValue}>
+		<components.Root
+			rootRef={props.animate ? rootElRef : undefined}
+			className={className}
+			style={style}
+			dir={props.dir}
+			id={props.id}
+			lang={props.lang ?? locale.code}
+			nonce={props.nonce}
+			title={props.title}
+			role={props.role}
+			aria-label={props['aria-label']}
+			aria-labelledby={props['aria-labelledby']}
+			{...dataAttributes}
+		>
+			<components.Months className={classNames[UI.Months]} style={styles?.[UI.Months]}>
+				{!props.hideNavigation && !navLayout &&
+					<components.Nav
+						data-animated-nav={props.animate ? 'true' : undefined}
+						className={classNames[UI.Nav]}
+						style={styles?.[UI.Nav]}
+						aria-label={labelNav()}
+						onPreviousClick={handlePreviousClick}
+						onNextClick={handleNextClick}
+						previousMonth={previousMonth}
+						nextMonth={nextMonth}
+					/>}
+				{months.map((calendarMonth, displayIndex) => {
+					const monthOffset = props.reverseMonths ? months.length - 1 - displayIndex : displayIndex;
+
+					return <components.Month
+						data-animated-month={props.animate ? 'true' : undefined}
+						className={classNames[UI.Month]}
+						style={styles?.[UI.Month]}
+						// biome-ignore lint/suspicious/noArrayIndexKey: breaks animation
+						key={displayIndex}
+						displayIndex={displayIndex}
+						calendarMonth={calendarMonth}
+					>
+						{navLayout === 'around' && !props.hideNavigation && displayIndex === 0 &&
+							<components.PreviousMonthButton
+								type="button"
+								className={classNames[UI.PreviousMonthButton]}
+								style={styles?.[UI.PreviousMonthButton]}
+								tabIndex={previousMonth ? undefined : -1}
+								aria-disabled={previousMonth ? undefined : true}
+								aria-label={labelPrevious(previousMonth)}
+								onClick={handlePreviousClick}
+								data-animated-button={props.animate ? 'true' : undefined}
+							>
+								<components.Chevron
+									disabled={previousMonth ? undefined : true}
+									className={classNames[UI.Chevron]}
+									style={styles?.[UI.Chevron]}
+									orientation={props.dir === 'rtl' ? 'right' : 'left'}
+								/>
+							</components.PreviousMonthButton>}
+						<components.MonthCaption
+							data-animated-caption={props.animate ? 'true' : undefined}
+							className={classNames[UI.MonthCaption]}
+							style={styles?.[UI.MonthCaption]}
+							calendarMonth={calendarMonth}
+							displayIndex={displayIndex}
+						>
+							{captionLayout?.startsWith('dropdown')
+								? <components.DropdownNav
+										className={classNames[UI.Dropdowns]}
+										style={styles?.[UI.Dropdowns]}
+									>
+										{(() => {
+											const monthControl =
+												captionLayout === 'dropdown' || captionLayout === 'dropdown-months'
+													? <components.MonthsDropdown
+															key="month"
+															className={classNames[UI.MonthsDropdown]}
+															aria-label={labelMonthDropdown()}
+															disabled={Boolean(props.disableNavigation)}
+															onChange={handleMonthChange(calendarMonth.date, monthOffset)}
+															options={getMonthOptions(
+																calendarMonth.date,
+																navStart,
+																navEnd,
+																formatters,
+																dateLib,
+															)}
+															style={getDropdownStyle(UI.MonthsDropdown)}
+															value={dateLib.getMonth(calendarMonth.date)}
+														/>
+													: <span key="month">{formatMonthDropdown(
+															calendarMonth.date,
+															dateLib,
+														)}</span>;
+
+											const yearControl =
+												captionLayout === 'dropdown' || captionLayout === 'dropdown-years'
+													? <components.YearsDropdown
+															key="year"
+															className={classNames[UI.YearsDropdown]}
+															aria-label={labelYearDropdown(dateLib.options)}
+															disabled={Boolean(props.disableNavigation)}
+															onChange={handleYearChange(calendarMonth.date, monthOffset)}
+															options={getYearOptions(
+																navStart,
+																navEnd,
+																formatters,
+																dateLib,
+																Boolean(props.reverseYears),
+															)}
+															style={getDropdownStyle(UI.YearsDropdown)}
+															value={dateLib.getYear(calendarMonth.date)}
+														/>
+													: <span key="year">{formatYearDropdown(
+															calendarMonth.date,
+															dateLib,
+														)}</span>;
+
+											const controls =
+												dateLib.getMonthYearOrder() === 'year-first'
+													? [yearControl, monthControl]
+													: [monthControl, yearControl];
+
+											return controls;
+										})()}
+										<span
+											role="status"
+											aria-live="polite"
+											style={{
+												border: 0,
+												clip: 'rect(0 0 0 0)',
+												height: '1px',
+												margin: '-1px',
+												overflow: 'hidden',
+												padding: 0,
+												position: 'absolute',
+												width: '1px',
+												whiteSpace: 'nowrap',
+												wordWrap: 'normal',
+											}}
+										>{formatCaption(calendarMonth.date, dateLib.options, dateLib)}</span>
+									</components.DropdownNav>
+								: <components.CaptionLabel
+										className={classNames[UI.CaptionLabel]}
+										style={styles?.[UI.CaptionLabel]}
+										role="status"
+										aria-live="polite"
+									>{formatCaption(
+										calendarMonth.date,
+										dateLib.options,
+										dateLib,
+									)}</components.CaptionLabel>}
+						</components.MonthCaption>
+						{navLayout === 'around' && !props.hideNavigation &&
+							displayIndex === numberOfMonths - 1 &&
+							<components.NextMonthButton
+								type="button"
+								className={classNames[UI.NextMonthButton]}
+								style={styles?.[UI.NextMonthButton]}
+								tabIndex={nextMonth ? undefined : -1}
+								aria-disabled={nextMonth ? undefined : true}
+								aria-label={labelNext(nextMonth)}
+								onClick={handleNextClick}
+								data-animated-button={props.animate ? 'true' : undefined}
+							>
+								<components.Chevron
+									disabled={nextMonth ? undefined : true}
+									className={classNames[UI.Chevron]}
+									style={styles?.[UI.Chevron]}
+									orientation={props.dir === 'rtl' ? 'left' : 'right'}
+								/>
+							</components.NextMonthButton>}
+						{displayIndex === numberOfMonths - 1 && navLayout === 'after' &&
+							!props.hideNavigation &&
+							<components.Nav
+								data-animated-nav={props.animate ? 'true' : undefined}
+								className={classNames[UI.Nav]}
+								style={styles?.[UI.Nav]}
+								aria-label={labelNav()}
+								onPreviousClick={handlePreviousClick}
+								onNextClick={handleNextClick}
+								previousMonth={previousMonth}
+								nextMonth={nextMonth}
+							/>}
+
+						<components.MonthGrid
+							role="grid"
+							aria-multiselectable={mode === 'multiple' || mode === 'range'}
+							aria-label={labelGrid(calendarMonth.date, dateLib.options, dateLib) || undefined}
+							className={classNames[UI.MonthGrid]}
+							style={styles?.[UI.MonthGrid]}
+						>
+							{!props.hideWeekdays &&
+								<components.Weekdays
+									data-animated-weekdays={props.animate ? 'true' : undefined}
+									className={classNames[UI.Weekdays]}
+									style={styles?.[UI.Weekdays]}
+								>
+									{showWeekNumber &&
+										<components.WeekNumberHeader
+											aria-label={labelWeekNumberHeader(dateLib.options)}
+											className={classNames[UI.WeekNumberHeader]}
+											style={styles?.[UI.WeekNumberHeader]}
+											scope="col"
+										>{formatWeekNumberHeader()}</components.WeekNumberHeader>}
+									{weekdays.map(
+										(weekday) =>
+											<components.Weekday
+												aria-label={labelWeekday(weekday, dateLib.options, dateLib)}
+												className={classNames[UI.Weekday]}
+												key={String(weekday)}
+												style={styles?.[UI.Weekday]}
+												scope="col"
+											>{formatWeekdayName(weekday, dateLib.options, dateLib)}</components.Weekday>,
+									)}
+								</components.Weekdays>}
+							<components.Weeks
+								data-animated-weeks={props.animate ? 'true' : undefined}
+								className={classNames[UI.Weeks]}
+								style={styles?.[UI.Weeks]}
+							>{calendarMonth.weeks.map((week) => {
+								return <components.Week
+									className={classNames[UI.Week]}
+									key={week.weekNumber}
+									style={styles?.[UI.Week]}
+									week={week}
+								>
+									{showWeekNumber &&
+										<components.WeekNumber
+											week={week}
+											style={styles?.[UI.WeekNumber]}
+											aria-label={labelWeekNumber(week.weekNumber, {
+												locale,
+											})}
+											className={classNames[UI.WeekNumber]}
+											scope="row"
+											role="rowheader"
+										>{formatWeekNumber(week.weekNumber, dateLib)}</components.WeekNumber>}
+									{week.days.map((day: CalendarDay) => {
+										const { date } = day;
+										const modifiers = getModifiers(day);
+
+										modifiers[DayFlag.focused] = !modifiers.hidden &&
+											Boolean(focused?.isEqualTo(day));
+
+										modifiers[SelectionState.selected] = isSelected?.(date) || modifiers.selected;
+
+										if (isDateRange(selectedValue)) {
+											// add range modifiers
+											const { from, to } = selectedValue;
+											modifiers[SelectionState.range_start] = Boolean(
+												from && to && dateLib.isSameDay(date, from),
+											);
+											modifiers[SelectionState.range_end] = Boolean(
+												from && to && dateLib.isSameDay(date, to),
+											);
+											modifiers[SelectionState.range_middle] = rangeIncludesDate(
+												selectedValue,
+												date,
+												true,
+												dateLib,
+											);
+										}
+
+										const style = getStyleForModifiers(modifiers, styles, props.modifiersStyles);
+
+										const className = getClassNamesForModifiers(
+											modifiers,
+											classNames,
+											props.modifiersClassNames,
+										);
+
+										const ariaLabel =
+											!isInteractive && !modifiers.hidden
+												? labelGridcell(date, modifiers, dateLib.options, dateLib)
+												: undefined;
+
+										return <components.Day
+											key={`${day.isoDate}_${day.displayMonthId}`}
+											day={day}
+											modifiers={modifiers}
+											className={className.join(' ')}
+											style={style}
+											role="gridcell"
+											aria-selected={modifiers.selected || undefined}
+											aria-label={ariaLabel}
+											data-day={day.isoDate}
+											data-month={day.outside ? day.dateMonthId : undefined}
+											data-selected={modifiers.selected || undefined}
+											data-disabled={modifiers.disabled || undefined}
+											data-hidden={modifiers.hidden || undefined}
+											data-outside={day.outside || undefined}
+											data-focused={modifiers.focused || undefined}
+											data-today={modifiers.today || undefined}
+										>
+											{!modifiers.hidden && isInteractive
+												? <components.DayButton
+														className={classNames[UI.DayButton]}
+														style={styles?.[UI.DayButton]}
+														type="button"
+														day={day}
+														modifiers={modifiers}
+														disabled={!modifiers.focused && modifiers.disabled || undefined}
+														aria-disabled={modifiers.focused && modifiers.disabled || undefined}
+														tabIndex={isFocusTarget(day) ? 0 : -1}
+														aria-label={labelDayButton(date, modifiers, dateLib.options, dateLib)}
+														onClick={handleDayClick(day, modifiers)}
+														onBlur={handleDayBlur(day, modifiers)}
+														onFocus={handleDayFocus(day, modifiers)}
+														onKeyDown={handleDayKeyDown(day, modifiers)}
+														onMouseEnter={handleDayMouseEnter(day, modifiers)}
+														onMouseLeave={handleDayMouseLeave(day, modifiers)}
+													>{formatDay(date, dateLib.options, dateLib)}</components.DayButton>
+												: !modifiers.hidden && formatDay(day.date, dateLib.options, dateLib)}
+										</components.Day>;
+									})}
+								</components.Week>;
+							})}</components.Weeks>
+						</components.MonthGrid>
+					</components.Month>;
+				})}
+			</components.Months>
+			{props.footer &&
+				<components.Footer
+					className={classNames[UI.Footer]}
+					style={styles?.[UI.Footer]}
+					role="status"
+					aria-live="polite"
+				>{props.footer}</components.Footer>}
+		</components.Root>
+	</dayPickerContext.Provider>
+}

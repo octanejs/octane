@@ -26,7 +26,11 @@ import { describe, it, beforeAll, afterAll } from 'vitest';
 import { resolve } from 'node:path';
 import { act as reactAct } from 'react';
 import { drainPassiveEffects as octaneDrainEffects } from 'octane';
-import { mountDifferential, type DiffMount } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+	type DiffMount,
+} from '../../../octane/tests/differential/_rig.js';
 
 const fixture = (name: string): string =>
 	resolve(__dirname, `../_fixtures/shadcn-diff/${name}.tsrx`);
@@ -113,6 +117,14 @@ const portalItem = (m: DiffMount, triggerId: string, itemId: string): HTMLElemen
 const clickEl = (el: HTMLElement): void => {
 	el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 };
+
+await Promise.all([
+	preloadDifferentialFixture(fixture('badge'), CACHE),
+	preloadDifferentialFixture(fixture('button'), CACHE),
+	preloadDifferentialFixture(fixture('tabs'), CACHE),
+	preloadDifferentialFixture(fixture('dialog'), CACHE),
+	preloadDifferentialFixture(fixture('dropdown-menu'), CACHE),
+]);
 
 describe('differential: @octanejs/shadcn vs curated shadcn references on React', () => {
 	// @parity-case differential:shadcn-badge-runtime

@@ -8,7 +8,7 @@
     "Unstable selectors (a new reference every render) settle after a bounded number of re-renders instead of hitting React's `useSyncExternalStore` warning loop \u2014 still prefer `useShallow`."
   ],
   "ssr": "No SSR-specific surface; no dedicated SSR tests.",
-  "verified": "2026-07-20",
+  "verified": "2026-08-02",
   "notes": [
     "2026-07-20: `UseBoundStore` type export added (was module-local; upstream zustand/react exports it \u2014 gap found by the tanstack-com port)."
   ]

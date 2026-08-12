@@ -3,7 +3,7 @@
 // - React.isValidElement/Fragment/Children → octane's parity helpers over element
 //   DESCRIPTORS (value-position JSX). Descriptors carry .type/.props/.key like React
 //   elements, so the walk itself is verbatim.
-// - OCTANE DIVERGENCE: literal static JSX children are a compiled children BLOCK (a
+// - Octane integration guard: a compiled children block (a
 //   render function), which cannot be statically walked — the hooks-tier builder
 //   supports dynamic collections (`items` + render function) and descriptor arrays,
 //   and rejects children blocks with a descriptive error. The RAC tier does not have

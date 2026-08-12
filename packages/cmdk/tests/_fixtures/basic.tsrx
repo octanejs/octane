@@ -261,6 +261,7 @@ export function AsyncItemsMenu(props: { items: string[] }) @{
 // force-mounted item (which registers separately), and a group.
 export function RemovableMenu(props: { show: boolean; kind: 'item' | 'force' | 'group' }) @{
 	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
 		<Command.List>
 			@if (props.show && props.kind === 'item') {
 				<Command.Item value="Apple">Apple</Command.Item>

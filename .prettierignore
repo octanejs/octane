@@ -10,10 +10,26 @@ packages/shadcn/registry/
 # Vendored pinned upstream sources a port is written against (byte-exact
 # provenance; do not reformat)
 packages/*/upstream/
+# Attribution-compatible application input frozen byte-exact by its adoption test.
+packages/markdown/tests/adoption/public-app/MarkdownBlock.react.tsx
+# Adapted Markdown assertions carry independently pinned row/declaration hashes.
+packages/markdown/tests/conformance/sync.server.test.ts
+# Syntax Highlighter's generated published surface is formatted and verified by
+# its generator; running the repository formatter would make that check stale.
+packages/syntax-highlighter/src/
+
+# This adapted source intentionally mirrors the pinned upstream declaration
+# layout; its parity control treats a formatter-only rewrite as structural drift.
+packages/tanstack-devtools/src/index.ts
+# DefinitelyTyped suites are preserved byte-exact as pinned provenance.
+packages/*/upstream-types/
 # One-for-one adapted type-suite mirrors must stay structurally identical to
 # the vendored upstream typetests after permitted import rewrites only.
 packages/solana-react/typetests/__typetests__/
 packages/solana-react/typetests/query/__typetests__/
+# popper adapted typings mirrors stay printer-identical to upstream.
+packages/popper/typetests/main-test.tsx
+packages/popper/typetests/svg-test.tsx
 packages/shadcn/tests/differential/upstream/
 # The framework-neutral half of @vis.gl/react-mapbox is reused byte-for-byte, so
 # an upstream bump stays a clean diff against packages/react-map-gl/upstream/.
@@ -60,6 +76,10 @@ benchmarks/tanstack-start/octane/src/routeTree.gen.ts
 # The current TSRX Prettier parser cannot safely round-trip several valid
 # upstream React-shaped TypeScript/JSX constructs used by the Visx port.
 packages/visx/**/*.tsrx
+
+# Drei preserves React-shaped callback expressions and Octane component bodies
+# that the current TSRX Prettier parser cannot round-trip without syntax errors.
+packages/drei/**/*.tsrx
 
 # Generated bench datasets (written by benchmarks/news/gen.mjs)
 benchmarks/news/*/src/data.js
@@ -119,5 +139,14 @@ packages/tanstack-ai/tests/_fixtures/*.tsrx
 packages/tanstack-devtools/src/*.tsrx
 packages/tanstack-devtools/src/*.tsrx.d.ts
 packages/tanstack-devtools/tests/_fixtures/*.tsrx
+
+# Byte-exact evidence pinned from input-otp; formatting would invalidate provenance.
+packages/input-otp/upstream/
+
+# SWR's source-near root hook preserves deeply nested generic callbacks from the
+# pinned source. The TSRX Prettier parser is not idempotent for this module.
+packages/swr/src/index/use-swr.tsrx
+packages/swr/src/infinite/infinite.tsrx
+packages/swr/src/mutation/mutation.tsrx
 dist-redact
 .content-collections

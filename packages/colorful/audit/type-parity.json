@@ -1,0 +1,296 @@
+{
+  "schemaVersion": 1,
+  "upstreamRoot": "packages/colorful/audit/type-probes",
+  "adaptedRoot": "packages/colorful/typetests",
+  "inventories": {
+    "upstream": "packages/colorful/audit/pristine-types.json",
+    "adapted": "packages/colorful/audit/adapted-types.json"
+  },
+  "programRoots": {
+    "upstream": "packages/colorful/upstream/tag/src",
+    "adapted": "packages/colorful/src"
+  },
+  "programInventories": {
+    "upstream": "packages/colorful/audit/pristine-program-types.json",
+    "adapted": "packages/colorful/audit/adapted-program-types.json"
+  },
+  "lanes": {
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/colorful/typetests/tsconfig.pristine.json",
+      "probeProject": "packages/colorful/audit/type-probes/tsconfig.pristine.json",
+      "sourcePolicy": "upstream check-types compiler program membership is parsed from typetests/tsconfig.pristine.json; public probes are a separate required probe program"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/colorful/typetests/tsconfig.adapted.json",
+      "probeProject": "packages/colorful/typetests/tsconfig.adapted.json",
+      "sourcePolicy": "adapted compiler program membership is parsed from typetests/tsconfig.adapted.json under packages/colorful/src; probe membership is the adapted public-api.test.ts entry in that same project"
+    }
+  },
+  "fileDispositions": [
+    {
+      "path": "components/HexAlphaColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/HexAlphaColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/HexColorInput.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/HexColorInput.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/HexColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/HexColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/HslColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/HslColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/HslStringColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/HslStringColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/HslaColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/HslaColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/HslaStringColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/HslaStringColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/HsvColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/HsvColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/HsvStringColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/HsvStringColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/HsvaColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/HsvaColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/HsvaStringColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/HsvaStringColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/RgbColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/RgbColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/RgbStringColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/RgbStringColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/RgbaColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/RgbaColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/RgbaStringColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/RgbaStringColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/common/Alpha.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/common/Alpha.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/common/AlphaColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/common/AlphaColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/common/ColorInput.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/common/ColorInput.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/common/ColorPicker.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/common/ColorPicker.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/common/Hue.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/common/Hue.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/common/Interactive.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/common/Interactive.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/common/Pointer.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/common/Pointer.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "components/common/Saturation.tsx",
+      "disposition": "adapted",
+      "adaptedPath": "components/common/Saturation.tsrx",
+      "rationale": "Component module re-authored as .tsrx with Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "css/styles.css.d.ts",
+      "disposition": "pristine-only",
+      "rationale": "CSS-module declaration selected by the pristine compiler program; Octane ships css/styles.ts string export consumed by useStyleSheet instead.",
+      "adaptedEvidence": ["css/styles.ts"]
+    },
+    {
+      "path": "hooks/useColorManipulation.ts",
+      "disposition": "adapted",
+      "adaptedPath": "hooks/useColorManipulation.tsrx",
+      "rationale": "Hook module re-authored as .tsrx against Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "hooks/useEventCallback.ts",
+      "disposition": "adapted",
+      "adaptedPath": "hooks/useEventCallback.tsrx",
+      "rationale": "Hook module re-authored as .tsrx against Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "hooks/useIsomorphicLayoutEffect.ts",
+      "disposition": "pristine-only",
+      "rationale": "SSR-safe React layout-effect shim; Octane useStyleSheet calls useLayoutEffect directly, so no adapted module remains.",
+      "adaptedEvidence": ["hooks/useStyleSheet.tsrx"]
+    },
+    {
+      "path": "hooks/useStyleSheet.ts",
+      "disposition": "adapted",
+      "adaptedPath": "hooks/useStyleSheet.tsrx",
+      "rationale": "Hook module re-authored as .tsrx against Octane hooks while preserving the upstream path layout."
+    },
+    {
+      "path": "index.ts",
+      "disposition": "adapted",
+      "adaptedPath": "index.ts",
+      "rationale": "Source-correspondent module at the mirrored upstream path in the Octane binding tree."
+    },
+    {
+      "path": "types.ts",
+      "disposition": "adapted",
+      "adaptedPath": "types.ts",
+      "rationale": "Public color/model types adapted; host attribute bases use Octane intrinsics (recorded event-model divergence)."
+    },
+    {
+      "path": "utils/clamp.ts",
+      "disposition": "adapted",
+      "adaptedPath": "utils/clamp.ts",
+      "rationale": "Source-correspondent module at the mirrored upstream path in the Octane binding tree."
+    },
+    {
+      "path": "utils/compare.ts",
+      "disposition": "adapted",
+      "adaptedPath": "utils/compare.ts",
+      "rationale": "Source-correspondent module at the mirrored upstream path in the Octane binding tree."
+    },
+    {
+      "path": "utils/convert.ts",
+      "disposition": "adapted",
+      "adaptedPath": "utils/convert.ts",
+      "rationale": "Source-correspondent module at the mirrored upstream path in the Octane binding tree."
+    },
+    {
+      "path": "utils/format.ts",
+      "disposition": "adapted",
+      "adaptedPath": "utils/format.ts",
+      "rationale": "Source-correspondent module at the mirrored upstream path in the Octane binding tree."
+    },
+    {
+      "path": "utils/nonce.ts",
+      "disposition": "adapted",
+      "adaptedPath": "utils/nonce.ts",
+      "rationale": "Source-correspondent module at the mirrored upstream path in the Octane binding tree."
+    },
+    {
+      "path": "utils/round.ts",
+      "disposition": "adapted",
+      "adaptedPath": "utils/round.ts",
+      "rationale": "Source-correspondent module at the mirrored upstream path in the Octane binding tree."
+    },
+    {
+      "path": "utils/validate.ts",
+      "disposition": "adapted",
+      "adaptedPath": "utils/validate.ts",
+      "rationale": "Source-correspondent module at the mirrored upstream path in the Octane binding tree."
+    }
+  ],
+  "permittedTransformations": [
+    {
+      "kind": "formatting",
+      "rule": "TypeScript printer output must remain structurally identical"
+    },
+    {
+      "kind": "import-root",
+      "rule": "React probes import react-colorful; Octane probes import @octanejs/colorful"
+    },
+    {
+      "kind": "extension",
+      "rule": "Upstream .tsx components and .ts hooks map to .tsrx counterparts in the adapted program"
+    },
+    {
+      "kind": "css-module",
+      "rule": "Upstream styles.css.d.ts is pristine-only; Octane uses css/styles.ts string export evidence"
+    },
+    {
+      "kind": "host-event-type",
+      "rule": "Paired FormEvent vs InputEvent proofs normalize to HostInputEvent for structural compare while remaining distinct at each lane"
+    },
+    {
+      "kind": "negative-control",
+      "rule": "Matching @ts-expect-error controls must reject the same invalid call shapes on both sides"
+    }
+  ],
+  "divergences": [
+    {
+      "id": "react-colorful-native-event-attributes",
+      "classification": "event-model",
+      "upstreamResult": "HexColorInput residual host onInput is typed as React.FormEventHandler<HTMLInputElement> (synthetic FormEvent).",
+      "octaneResult": "HexColorInput residual host onInput is typed with Octane native InputEvent attributes.",
+      "rationale": "Octane has no synthetic event layer; public color onChange callbacks remain strings while residual host handlers use native DOM event types.",
+      "evidence": [
+        "packages/colorful/audit/type-probes/host-input-event.ts",
+        "packages/colorful/typetests/host-input-event.ts",
+        "packages/colorful/audit/type-probes/public-api.test.ts",
+        "packages/colorful/typetests/public-api.test.ts"
+      ]
+    }
+  ]
+}

@@ -10,7 +10,10 @@
  */
 import { describe, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/aria-diff-rac-collections.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
@@ -28,7 +31,10 @@ if (typeof (Element.prototype as any).getAnimations !== 'function') {
 	(Element.prototype as any).getAnimations = () => [];
 }
 
+await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
+
 describe('differential: @octanejs/aria/components Phase-5 collections vs real react-aria-components', () => {
+	// @parity-case differential:aria-rac-listbox
 	it('ListBox: dynamic items, click selection, keyed reverse, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'ListBoxSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -43,6 +49,7 @@ describe('differential: @octanejs/aria/components Phase-5 collections vs real re
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-tabs-default-selection-click-switch
 	it('Tabs: default selection + click switch, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'TabsSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -53,6 +60,7 @@ describe('differential: @octanejs/aria/components Phase-5 collections vs real re
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-taggroup-multiple-selection-toggling
 	it('TagGroup: multiple-selection toggling, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'TagGroupSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -67,6 +75,7 @@ describe('differential: @octanejs/aria/components Phase-5 collections vs real re
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-gridlist-row-selection
 	it('GridList: row selection, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'GridListSpec', undefined, CACHE);
 		await d.step('mount', () => {});
@@ -77,12 +86,14 @@ describe('differential: @octanejs/aria/components Phase-5 collections vs real re
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-breadcrumbs-structure-aria-current
 	it('Breadcrumbs: structure + aria-current, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'BreadcrumbsSpec', undefined, CACHE);
 		await d.step('mount', () => {});
 		d.unmount();
 	});
 
+	// @parity-case differential:aria-combobox-typing-updates-in-container-combobox-wiring
 	it('ComboBox: typing updates in-container combobox wiring, byte-identical', async () => {
 		const d = await mountDifferential(FIXTURE, 'ComboBoxSpec', undefined, CACHE);
 		await d.step('mount', () => {});

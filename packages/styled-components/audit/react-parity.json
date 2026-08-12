@@ -1,0 +1,152 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/styled-components/styled-components.git",
+    "version": "styled-components@6.4.3",
+    "commit": "e0663410f631e0ce82681947edf03bfabd6aef9c",
+    "sourceRoot": "packages/styled-components/src",
+    "testRoot": "packages/styled-components/src/test",
+    "license": "MIT",
+    "integrity": "sha256:cfc845f944613860155a65afb548b0ac0d234af56ac332e14f99ed150ab38549",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/styled-components/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/styled-components/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "6dd4286c3a24caaa4a44ba6caf156030c4a49c946c473e3ee4c2a982712f85fc"
+    }
+  },
+  "lanes": [
+    {
+      "id": "styled-components-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "styled-components-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs six exact same-fixture React/Octane cases against styled-components 6.4.3 with per-engine StyleSheet isolation, asserting container HTML and stylesheet output after every step. Factory, SSR, distribution, createGlobalStyle-only, and type-contract Octane adaptations remain ordinary package tests outside parity evidence.",
+      "files": [
+        {
+          "path": "packages/styled-components/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "6b2731a8695a5e92a4488c169996618b2d9f59d1d9aca9c7f04462fd9662e3e1",
+          "cases": [
+            {
+              "id": "differential:styled-components-basic",
+              "testName": "basic styling with a transient-prop toggle",
+              "fullName": "differential: @octanejs/styled-components vs styled-components basic styling with a transient-prop toggle"
+            },
+            {
+              "id": "differential:styled-components-theming",
+              "testName": "nested theme providers with a function theme and a theme toggle",
+              "fullName": "differential: @octanejs/styled-components vs styled-components nested theme providers with a function theme and a theme toggle"
+            },
+            {
+              "id": "differential:styled-components-attrs",
+              "testName": "attrs resolution and shouldForwardProp filtering",
+              "fullName": "differential: @octanejs/styled-components vs styled-components attrs resolution and shouldForwardProp filtering"
+            },
+            {
+              "id": "differential:styled-components-polymorphism",
+              "testName": "state-driven `as` polymorphism",
+              "fullName": "differential: @octanejs/styled-components vs styled-components state-driven `as` polymorphism"
+            },
+            {
+              "id": "differential:styled-components-global-keyframes",
+              "testName": "keyframes with a dynamic letter-spacing prop",
+              "fullName": "differential: @octanejs/styled-components vs styled-components keyframes with a dynamic letter-spacing prop"
+            },
+            {
+              "id": "differential:styled-components-composition",
+              "testName": "styled(Styled) folding with a component selector",
+              "fullName": "differential: @octanejs/styled-components vs styled-components styled(Styled) folding with a component selector"
+            }
+          ]
+        },
+        {
+          "path": "packages/styled-components/tests/differential/_styled-rig.ts",
+          "role": "support",
+          "sha256": "503c43be7a4efee3e8148e4d174bc2a5b084f44e95d446003727dd78f7ecabde"
+        },
+        {
+          "path": "packages/styled-components/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "e939eafcf56ffb6649b72a1f2efd2fa29897ab56d9445b43ae92acdae139e78b"
+        },
+        {
+          "path": "packages/styled-components/tests/_fixtures/basic-smoke.tsrx",
+          "role": "support",
+          "sha256": "5067809fb722225c4b6c340279f1a0a2d72879fc82f0f7d56818a70d5091e164"
+        },
+        {
+          "path": "packages/styled-components/tests/_fixtures/themed-card.tsrx",
+          "role": "support",
+          "sha256": "5d4f302e89a36cfc7e3e17fff9f64c8c5661ef05a4750d3764e83a5ac5a9c3a4"
+        },
+        {
+          "path": "packages/styled-components/tests/_fixtures/attrs-input.tsrx",
+          "role": "support",
+          "sha256": "21fcfec8804079391542b7792463bf23846f9d68f2e040d5bb6aa0a27cef59b5"
+        },
+        {
+          "path": "packages/styled-components/tests/_fixtures/as-polymorph.tsrx",
+          "role": "support",
+          "sha256": "e564107a75958b7ca983d5a9fbbfb5e314ed6076b3713cd28faffd8cefd0d1ee"
+        },
+        {
+          "path": "packages/styled-components/tests/_fixtures/global-keyframes.tsrx",
+          "role": "support",
+          "sha256": "9a84a2efa65ca348554eb774760ac1db4748929d13c88f4aa372e40eb7ea975d"
+        },
+        {
+          "path": "packages/styled-components/tests/_fixtures/compose.tsrx",
+          "role": "support",
+          "sha256": "0d271e4010701ddad53ddb2c144cc54896dcb1028e10ddcb6cedadd899316f1b"
+        },
+        {
+          "path": "packages/styled-components/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "5eba4f5ca390534f79748820f66f05904fe90498f3f2c73edfb014d8ba495954"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "f297c236efb31baa8dfa4e6c25038b451087efe5cb1d7c47f7c204d00e6fc652"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}
