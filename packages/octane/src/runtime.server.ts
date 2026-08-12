@@ -47,6 +47,7 @@ import {
 	STREAM_SEED_ATTR,
 	STREAM_SCRIPT_ATTR,
 	STREAM_SEED_COMMENT,
+	STREAM_RESOURCE_ATTR,
 	POSITIVE_NUMERIC_ATTR_PROPS,
 	BOOLEAN_ATTR_PROPS,
 	MUST_USE_PROPERTY_PROPS,
@@ -198,12 +199,14 @@ interface HeadBuffer {
 	/** Resource-hint + Float-resource dedupe keys emitted during this pass. */
 	hints: Set<string>;
 	/**
-	 * React Float stylesheet resources, grouped by precedence: precedence →
-	 * concatenated `<link>` html. Map insertion order IS group order
-	 * (first-encounter), and groups fold after `html` at capture time. Null
-	 * until the first stylesheet resource so ordinary passes pay nothing.
+	 * React Float sheet-family resources (stylesheet links + style resources),
+	 * one entry per resource: href identity → its precedence and rendered tag.
+	 * Map insertion order IS emit order, so the precedence groups fold in
+	 * first-encounter group order at capture time, and the streaming renderer
+	 * can diff INDIVIDUAL resources across waves to ship late discoveries.
+	 * Null until the first sheet resource so ordinary passes pay nothing.
 	 */
-	sheets: Map<string, string> | null;
+	sheets: Map<string, { precedence: string; html: string }> | null;
 	/**
 	 * Hint tags keyed for COALESCING: a preinit deletes the now-redundant
 	 * preload entry before the fold (React folds preload → initialized
@@ -220,7 +223,14 @@ interface HeadBuffer {
 function headHtmlWithSheets(buf: HeadBuffer): string {
 	let out = buf.html;
 	if (buf.hintHtml !== null) for (const tag of buf.hintHtml.values()) out += tag;
-	if (buf.sheets !== null) for (const group of buf.sheets.values()) out += group;
+	if (buf.sheets !== null && buf.sheets.size > 0) {
+		// Group by precedence in first-encounter group order: the per-resource map
+		// keeps emit order, so the first resource of each precedence opens its group.
+		const groups = new Map<string, string>();
+		for (const entry of buf.sheets.values())
+			groups.set(entry.precedence, (groups.get(entry.precedence) ?? '') + entry.html);
+		for (const group of groups.values()) out += group;
+	}
 	return out;
 }
 let HEAD: HeadBuffer | null = null;
@@ -2955,7 +2965,7 @@ function rewindComponentReplayState(
 			// second rewind from the same snapshot restores identically).
 			const sheets = (snapshot.head.sheets ??= new Map());
 			sheets.clear();
-			for (const [precedence, group] of snapshot.headSheets) sheets.set(precedence, group);
+			for (const [href, entry] of snapshot.headSheets) sheets.set(href, entry);
 		}
 		if (snapshot.headHintHtml === null) snapshot.head.hintHtml = null;
 		else {
@@ -5421,6 +5431,9 @@ interface FullPassResult {
 	/** Per-hash scoped stylesheets from this pass — the streaming renderer diffs
 	 *  these against what it already flushed to emit late boundaries' styles. */
 	cssEntries: Map<string, string>;
+	/** Per-resource Float sheet tags from this pass (see HeadBuffer.sheets) —
+	 *  diffed the same way so late-discovered resources ride the wave chunks. */
+	sheets: Map<string, { precedence: string; html: string }> | null;
 }
 
 // Snapshot / install / restore the module globals around ONE synchronous pass
@@ -5615,6 +5628,7 @@ function runFullFramedPass(
 		rootSuspended,
 		vtCandidates,
 		cssEntries: cssMap,
+		sheets: headBuf.sheets,
 	};
 }
 
@@ -6344,9 +6358,14 @@ export function renderToStaticMarkup(
 //     each resolution wave costs one full pass (reusing `prerender`'s cache +
 //     discovery engine), buying per-boundary delivery: a boundary streams at
 //     its own resolve time, not at the round's slowest sibling.
-//   - Head elements hoisted from INSIDE a streamed boundary don't ship in the
-//     stream (the shell's head already flushed); the client re-creates them on
-//     hydration via headBlock.
+//   - Head ELEMENTS and hints hoisted from INSIDE a streamed boundary don't
+//     ship in the stream (the shell's head already flushed); the client
+//     re-creates them on hydration via headBlock / the hint emitters. Float
+//     SHEET resources are the exception: each wave diffs `pass.sheets` against
+//     what is already on the wire and ships new tags in a hidden carrier that
+//     the inline `$OCTRH` hoists into document.head — without it, late-styled
+//     content would FOUC until hydration and a no-JS consumer would never
+//     receive the CSS at all.
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface StreamBoundary {
@@ -6647,7 +6666,7 @@ export function ssrTry(
 					else {
 						const sheets = (head.sheets ??= new Map());
 						sheets.clear();
-						for (const [precedence, group] of headSheets) sheets.set(precedence, group);
+						for (const [href, entry] of headSheets) sheets.set(href, entry);
 					}
 					if (headHintHtml === null) head.hintHtml = null;
 					else {
@@ -6869,6 +6888,25 @@ function streamRuntimeJs(): string {
 		STREAM_BOUNDARY_ATTR +
 		"=\"'+id+'\"]');" +
 		'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}};' +
+		// $OCTRH(id): hoist a wave carrier's Float sheet tags into document.head.
+		// With a live client runtime (window.$OCTFR, installed once client Float
+		// resource state exists) each tag is handed over so ONE authority keeps
+		// deduping and ordering; otherwise insert directly under the client's
+		// precedence policy — append to the tag's group, open a new group after
+		// the last existing one, else append to head.
+		'window.$OCTRH=function(id){' +
+		"var c=d.querySelector('[" +
+		STREAM_RESOURCE_ATTR +
+		"=\"'+id+'\"]');" +
+		'if(!c)return;var n;' +
+		'while((n=c.firstElementChild)){c.removeChild(n);' +
+		'if(window.$OCTFR){window.$OCTFR(n);continue;}' +
+		'var p=n.getAttribute("data-precedence"),' +
+		'g=d.head.querySelectorAll("link[data-precedence],style[data-precedence]"),' +
+		't=g.length?g[g.length-1]:null,x=null;' +
+		'for(var i=0;i<g.length;i++)if(g[i].getAttribute("data-precedence")===p)x=g[i];' +
+		'if(x)x.after(n);else if(t)t.after(n);else d.head.appendChild(n);}' +
+		'c.remove();};' +
 		'})();');
 }
 
@@ -6941,7 +6979,8 @@ export interface StreamOptions extends RenderOptions {
 	 * the default `'fold'`, where the metadata rides the shell.
 	 *
 	 * Only the shell's metadata: head elements hoisted from inside a Suspense
-	 * boundary that streams later are re-created client-side on hydration (see
+	 * boundary that streams later are re-created client-side on hydration,
+	 * while late-discovered Float sheet resources ride the stream itself (see
 	 * docs/ssr.md).
 	 */
 	onHeadReady?: (head: string) => void;
@@ -7064,6 +7103,30 @@ function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 		'>$OCTRC(' +
 		JSON.stringify(b.id).replace(/</g, '\\u003c') +
 		hasNamespaceCarrier +
+		')</script>'
+	);
+}
+
+/**
+ * Float sheet resources discovered after the shell flushed: the REAL tags ride
+ * the wave inside a hidden carrier — a consumer without JS still gets working
+ * CSS, since stylesheet links and style tags apply from body — and the inline
+ * `$OCTRH` call hoists them into document.head with the client's precedence
+ * grouping, ahead of the wave's segment reveals so revealed content is styled.
+ */
+function floatResourceChunk(tags: string, carrierId: string, nonceAttr: string): string {
+	return (
+		'<div hidden ' +
+		STREAM_RESOURCE_ATTR +
+		'="' +
+		escapeAttr(carrierId) +
+		'">' +
+		tags +
+		'</div><script ' +
+		STREAM_SCRIPT_ATTR +
+		nonceAttr +
+		'>$OCTRH(' +
+		JSON.stringify(carrierId).replace(/</g, '\\u003c') +
 		')</script>'
 	);
 }
@@ -7191,6 +7254,9 @@ async function runStream(
 		});
 
 	const emittedCss = new Set<string>();
+	/** Float sheet hrefs already on the wire (shell head fold or a wave carrier). */
+	const flushedSheets = new Set<string>();
+	let resourceChunkSeq = 0;
 	const flushedSegments = new Set<string>();
 	const observedDone = new Set<string>();
 	const reachableDoneSegments = (): StreamBoundary[] => {
@@ -7287,6 +7353,10 @@ async function runStream(
 	reportRecoverableBoundaryErrors();
 	// SHELL: styles first (so painted fallbacks are styled), hoisted head, body,
 	// the shell-scope seed script, then the swap runtime iff anything is pending.
+	// Every Float sheet the shell pass collected rides the shell head fold
+	// (or onHeadReady under the separate head channel) — record it so wave
+	// diffs never re-ship one.
+	if (pass.sheets !== null) for (const key of pass.sheets.keys()) flushedSheets.add(key);
 	let leadingStyles = '';
 	for (const [hash, sheet] of pass.cssEntries) {
 		emittedCss.add(hash);
@@ -7419,6 +7489,27 @@ async function runStream(
 					'>' +
 					escapeEntireInlineStyleContent(sheet) +
 					'</style>';
+			}
+			// Float sheet resources this pass discovered that are not on the wire
+			// yet — a suspended arm registers its sheets before its use() throws, so
+			// a still-pending child boundary's sheet ships with its PARENT's reveal
+			// wave (React hoists partial-boundary resources the same way) and CSS
+			// fetches start as early as possible. Resources are page-global and
+			// retained by contract, so shipping ahead of the reveal is safe.
+			if (pass.sheets !== null) {
+				let resourceTags = '';
+				for (const [key, entry] of pass.sheets) {
+					if (flushedSheets.has(key)) continue;
+					flushedSheets.add(key);
+					resourceTags += entry.html;
+				}
+				if (resourceTags !== '') {
+					chunk += floatResourceChunk(
+						resourceTags,
+						stream.token + '-r' + resourceChunkSeq++,
+						nonceAttr,
+					);
+				}
 			}
 			let madeProgress = false;
 			for (const boundary of stream.boundaries.values()) {
@@ -8206,7 +8297,7 @@ export function ssrStylesheetResource(attrs: Record<string, unknown> | null): st
 		resourceAttrs(attrs, 'link') +
 		'>';
 	const sheets = (HEAD.sheets ??= new Map());
-	sheets.set(precedence, (sheets.get(precedence) ?? '') + tag);
+	sheets.set(href, { precedence, html: tag });
 	return '';
 }
 
@@ -8245,7 +8336,7 @@ export function ssrStyleResource(attrs: Record<string, unknown> | null, css: str
 		css +
 		'</style>';
 	const sheets = (HEAD.sheets ??= new Map());
-	sheets.set(precedence, (sheets.get(precedence) ?? '') + tag);
+	sheets.set(href, { precedence, html: tag });
 	return '';
 }
 

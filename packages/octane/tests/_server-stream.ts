@@ -175,4 +175,5 @@ export function resetStreamRuntimeGlobals(): void {
 	delete (window as any).$OCTS;
 	delete (window as any).$OCTRC;
 	delete (window as any).$OCTRX;
+	delete (window as any).$OCTRH;
 }
