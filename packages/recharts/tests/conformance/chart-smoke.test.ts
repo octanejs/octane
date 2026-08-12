@@ -38,11 +38,34 @@ async function settle() {
 	}
 }
 
-async function restoreAnimationFrameGlobals() {
-	// Unmounting charts can enqueue one final store notification. Keep the
-	// animation-frame globals alive until that callback has had a timer turn.
-	await new Promise((resolve) => setTimeout(resolve, 0));
-	vi.unstubAllGlobals();
+function controlAnimationFrames() {
+	let frameTime = performance.now();
+	let nextHandle = 1;
+	const pending = new Map<number, FrameRequestCallback>();
+	vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+		const handle = nextHandle++;
+		pending.set(handle, callback);
+		return handle;
+	});
+	vi.stubGlobal('cancelAnimationFrame', (handle: number) => pending.delete(handle));
+
+	return {
+		async flush() {
+			for (let frame = 0; frame < 100; frame++) {
+				await nextPaint();
+				const callbacks = Array.from(pending.values());
+				pending.clear();
+				if (callbacks.length === 0) return;
+				frameTime = Math.max(frameTime, performance.now()) + 16;
+				for (const callback of callbacks) callback(frameTime);
+			}
+			throw new Error('chart animation did not settle within 100 controlled frames');
+		},
+		restore() {
+			pending.clear();
+			vi.unstubAllGlobals();
+		},
+	};
 }
 
 describe('Phase 1 chart pipeline (octane side)', () => {
@@ -222,33 +245,26 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 	});
 
 	it('forwards Scatter animation lifecycle callbacks', async () => {
-		let frameTime = performance.now();
-		vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
-			setTimeout(() => callback((frameTime += 16)), 0),
-		);
-		vi.stubGlobal('cancelAnimationFrame', (handle: number) => clearTimeout(handle));
+		const animationFrames = controlAnimationFrames();
 		const starts: string[] = [];
 		const ends: string[] = [];
+		let result: ReturnType<typeof mount> | undefined;
 		try {
-			const result = mount(ScatterAnimationCallbacksApp, {
+			result = mount(ScatterAnimationCallbacksApp, {
 				onAnimationStart: () => starts.push('start'),
 				onAnimationEnd: () => ends.push('end'),
 			});
-			await settle();
+			await animationFrames.flush();
 			expect(starts).toEqual(['start']);
 			expect(ends).toEqual(['end']);
-			result.unmount();
 		} finally {
-			await restoreAnimationFrameGlobals();
+			result?.unmount();
+			animationFrames.restore();
 		}
 	});
 
 	it('does not restart Funnel animation for equivalent props but propagates presentation changes', async () => {
-		let frameTime = performance.now();
-		vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
-			setTimeout(() => callback((frameTime += 16)), 0),
-		);
-		vi.stubGlobal('cancelAnimationFrame', (handle: number) => clearTimeout(handle));
+		const animationFrames = controlAnimationFrames();
 		const starts: string[] = [];
 		const ends: string[] = [];
 		const props = {
@@ -256,27 +272,28 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 			onAnimationStart: () => starts.push('start'),
 			onAnimationEnd: () => ends.push('end'),
 		};
+		let result: ReturnType<typeof mount> | undefined;
 		try {
-			const result = mount(FunnelAnimationStabilityApp, props);
-			await settle();
+			result = mount(FunnelAnimationStabilityApp, props);
+			await animationFrames.flush();
 			expect(starts).toEqual(['start']);
 			expect(ends).toEqual(['end']);
 
 			result.update(FunnelAnimationStabilityApp, { ...props });
-			await settle();
+			await animationFrames.flush();
 			expect(starts).toEqual(['start']);
 			expect(ends).toEqual(['end']);
 
 			result.update(FunnelAnimationStabilityApp, { ...props, fill: '#82ca9d' });
-			await settle();
+			await animationFrames.flush();
 			expect(starts).toEqual(['start', 'start']);
 			expect(ends).toEqual(['end', 'end']);
 			expect(
 				result.container.querySelector('.recharts-funnel-trapezoid path')?.getAttribute('fill'),
 			).toBe('#82ca9d');
-			result.unmount();
 		} finally {
-			await restoreAnimationFrameGlobals();
+			result?.unmount();
+			animationFrames.restore();
 		}
 	});
 
@@ -307,11 +324,7 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 	});
 
 	it('restarts polar animations only when their geometry changes', async () => {
-		let frameTime = performance.now();
-		vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
-			setTimeout(() => callback((frameTime += 16)), 0),
-		);
-		vi.stubGlobal('cancelAnimationFrame', (handle: number) => clearTimeout(handle));
+		const animationFrames = controlAnimationFrames();
 		const starts: string[] = [];
 		const ends: string[] = [];
 		const props = {
@@ -319,24 +332,25 @@ describe('Phase 1 chart pipeline (octane side)', () => {
 			onAnimationStart: () => starts.push('start'),
 			onAnimationEnd: () => ends.push('end'),
 		};
+		let result: ReturnType<typeof mount> | undefined;
 		try {
-			const result = mount(PolarAnimationStabilityApp, props);
-			await settle();
+			result = mount(PolarAnimationStabilityApp, props);
+			await animationFrames.flush();
 			expect(starts).toHaveLength(3);
 			expect(ends).toHaveLength(3);
 
 			result.update(PolarAnimationStabilityApp, { ...props });
-			await settle();
+			await animationFrames.flush();
 			expect(starts).toHaveLength(3);
 			expect(ends).toHaveLength(3);
 
 			result.update(PolarAnimationStabilityApp, { ...props, changed: true });
-			await settle();
+			await animationFrames.flush();
 			expect(starts).toHaveLength(6);
 			expect(ends).toHaveLength(6);
-			result.unmount();
 		} finally {
-			await restoreAnimationFrameGlobals();
+			result?.unmount();
+			animationFrames.restore();
 		}
 	});
 
