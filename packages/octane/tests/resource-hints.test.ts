@@ -287,6 +287,23 @@ describe('resource hints — server', () => {
 		expect(r.html).not.toContain('href="/sr.png"');
 	});
 
+	it('SSR preloads no-op across BOTH executable script forms', async () => {
+		const App = () => {
+			// Module init first: a classic script preload for the same src is dead bytes.
+			Server.preinitModule('/xga.mjs');
+			Server.preload('/xga.mjs', { as: 'script' });
+			// Classic init first: a modulepreload for the same src is dead bytes.
+			Server.preinit('/xgb.js', { as: 'script' });
+			Server.preloadModule('/xgb.js');
+			return Server.createElement('div', null, 'x') as any;
+		};
+		const r = await Server.renderToString(App as any);
+		expect(r.html).not.toContain('rel="preload"');
+		expect(r.html).not.toContain('rel="modulepreload"');
+		expect(r.html.match(/src="\/xga\.mjs"/g) || []).toHaveLength(1);
+		expect(r.html.match(/src="\/xgb\.js"/g) || []).toHaveLength(1);
+	});
+
 	it('module hints fold into head output and share the client dedupe key', async () => {
 		const App = () => {
 			Server.preloadModule('/entry.mjs');

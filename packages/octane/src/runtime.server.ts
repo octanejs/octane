@@ -8094,7 +8094,10 @@ export function preload(href: string, options: { as: string } & Record<string, u
 	// coalesced away when the preinit lands (see the hintHtml delete there).
 	if (HEAD !== null) {
 		if (as === 'style' && HEAD.hints.has('sheet:' + value)) return;
-		if (as === 'script' && HEAD.hints.has('script:' + value)) return;
+		// One executable per src across BOTH script forms (classic and module),
+		// matching the client's unified identity set.
+		if (as === 'script' && (HEAD.hints.has('script:' + value) || HEAD.hints.has('module:' + value)))
+			return;
 		if (as === 'style' || as === 'script') {
 			let subset: Record<string, unknown> | null = null;
 			for (const k of ['crossOrigin', 'integrity', 'nonce', 'fetchPriority', 'referrerPolicy']) {
@@ -8306,8 +8309,10 @@ export function ssrScriptResource(attrs: Record<string, unknown> | null): string
 export function preloadModule(href: string, options?: Record<string, unknown>): void {
 	const value = coerceHintHref(href);
 	if (value === null) return;
-	// A module that preinitModule already executed in this pass needs no preload.
-	if (HEAD !== null && HEAD.hints.has('module:' + value)) return;
+	// A module that preinitModule OR a classic Float script already executes in
+	// this pass needs no preload — one executable identity per src.
+	if (HEAD !== null && (HEAD.hints.has('module:' + value) || HEAD.hints.has('script:' + value)))
+		return;
 	const key = 'modulepreload:' + value;
 	const safeHref = sanitizeURL(value);
 	emitHeadHint(
