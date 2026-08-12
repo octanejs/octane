@@ -109,6 +109,10 @@ const packedTsrxSourceExceptions = new Map([
 		'@octanejs/livestore',
 		'LiveStore 0.4 declarations require the exact Effect peer graph from the workspace lockfile',
 	],
+	[
+		'@octanejs/recharts',
+		'extensionless relative imports do not yet resolve to sibling TSRX modules in tsrx-tsc',
+	],
 	['@octanejs/visx', 'React SVG and event prop types are not yet Octane-native'],
 ]);
 const inventoryErrors = validateWorkspacePackages(packages);
