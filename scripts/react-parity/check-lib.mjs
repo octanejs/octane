@@ -21,7 +21,7 @@ export function buildParityVitestArgv(configPath, shardValue = '1/1') {
 		'run',
 		'--config',
 		configPath,
-		'--reporter=json',
+		'--reporter=./scripts/react-parity/vitest-json-reporter.mjs',
 		'--reporter=./scripts/react-parity/vitest-unhandled-reporter.mjs',
 		...(shard.total === 1 ? [] : [`--shard=${shard.value}`]),
 	];

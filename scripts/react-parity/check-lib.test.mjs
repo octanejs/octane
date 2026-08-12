@@ -14,6 +14,7 @@ import {
 	runRequiredNonVitestBindingManifest,
 	runRequiredVitestLanes,
 } from './check-lib.mjs';
+import ReactParityJsonReporter, { ensureStackContainsMessage } from './vitest-json-reporter.mjs';
 import ReactParityUnhandledReporter from './vitest-unhandled-reporter.mjs';
 
 const options = (relativeFiles, runManifest, concurrency = 2) => ({
@@ -59,7 +60,7 @@ test('builds the parity-wide Vitest command', () => {
 		'run',
 		'--config',
 		'vitest.react-parity.config.js',
-		'--reporter=json',
+		'--reporter=./scripts/react-parity/vitest-json-reporter.mjs',
 		'--reporter=./scripts/react-parity/vitest-unhandled-reporter.mjs',
 	]);
 	assert.deepEqual(buildParityVitestArgv('vitest.react-parity.config.js', '2/3'), [
@@ -67,7 +68,7 @@ test('builds the parity-wide Vitest command', () => {
 		'run',
 		'--config',
 		'vitest.react-parity.config.js',
-		'--reporter=json',
+		'--reporter=./scripts/react-parity/vitest-json-reporter.mjs',
 		'--reporter=./scripts/react-parity/vitest-unhandled-reporter.mjs',
 		'--shard=2/3',
 	]);
@@ -88,6 +89,76 @@ test('prints runner-level Vitest errors that the JSON reporter omits', () => {
 	assert.deepEqual(messages, [
 		'Vitest reported 1 unhandled error(s):',
 		'Error: worker failed\n    at worker.js:1:1',
+	]);
+});
+
+test('rebuilds timeout placeholder stacks around the real failure message', () => {
+	const error = {
+		name: 'Error',
+		message: 'Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value.',
+		stack: 'Error: STACK_TRACE_ERROR\n    at /repo/packages/example/example.test.ts:3:1',
+	};
+	ensureStackContainsMessage(error);
+	assert.equal(
+		error.stack,
+		'Error: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value.\n    at /repo/packages/example/example.test.ts:3:1',
+	);
+
+	const assertionStack = 'AssertionError: expected 1 to be 2\n    at example.test.ts:9:2';
+	const untouched = {
+		name: 'AssertionError',
+		message: 'expected 1 to be 2',
+		stack: assertionStack,
+	};
+	ensureStackContainsMessage(untouched);
+	assert.equal(untouched.stack, assertionStack);
+
+	const headerless = { name: 'Error', message: 'worker died', stack: '    at pool.ts:1:1' };
+	ensureStackContainsMessage(headerless);
+	assert.equal(headerless.stack, 'Error: worker died\n    at pool.ts:1:1');
+});
+
+test('serializes the real timeout message through the JSON reporter', async () => {
+	const fileTask = {
+		type: 'suite',
+		filepath: '/repo/packages/example/example.test.ts',
+		name: 'example.test.ts',
+		mode: 'run',
+		result: { state: 'fail' },
+		tasks: [],
+	};
+	fileTask.tasks.push({
+		type: 'test',
+		name: 'works',
+		mode: 'run',
+		file: fileTask,
+		result: {
+			state: 'fail',
+			startTime: 0,
+			duration: 1,
+			errors: [
+				{
+					name: 'Error',
+					message: 'Test timed out in 5000ms.',
+					stack: 'Error: STACK_TRACE_ERROR\n    at /repo/packages/example/example.test.ts:3:1',
+				},
+			],
+		},
+		meta: {},
+	});
+	const logs = [];
+	const reporter = new ReactParityJsonReporter();
+	reporter.onInit({
+		config: { passWithNoTests: true },
+		snapshot: { summary: {} },
+		logger: { log: (message) => logs.push(message), warn: () => {} },
+	});
+	await reporter.onTestRunEnd([{ task: fileTask }]);
+	assert.equal(logs.length, 1);
+	const [assertion] = JSON.parse(logs[0]).testResults[0].assertionResults;
+	assert.equal(assertion.status, 'failed');
+	assert.deepEqual(assertion.failureMessages, [
+		'Error: Test timed out in 5000ms.\n    at /repo/packages/example/example.test.ts:3:1',
 	]);
 });
 

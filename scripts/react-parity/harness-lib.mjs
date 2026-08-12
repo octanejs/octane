@@ -1041,7 +1041,7 @@ export function buildLaneArgv(lane, root = process.cwd()) {
 				? []
 				: [lane.execution.fileParallelism ? '--fileParallelism' : '--no-file-parallelism']),
 			...inventory.files,
-			'--reporter=json',
+			'--reporter=./scripts/react-parity/vitest-json-reporter.mjs',
 		];
 	}
 	if (lane.execution?.kind === 'jest-full') {
@@ -1093,7 +1093,7 @@ export function buildLaneArgv(lane, root = process.cwd()) {
 			.filter((file) => file.role === 'test')
 			.map((file) => file.path)
 			.sort(),
-		'--reporter=json',
+		'--reporter=./scripts/react-parity/vitest-json-reporter.mjs',
 	];
 }
 

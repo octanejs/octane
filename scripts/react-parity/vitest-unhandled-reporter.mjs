@@ -1,4 +1,7 @@
+import { ensureStackContainsMessage } from './vitest-json-reporter.mjs';
+
 function formatUnhandledError(error) {
+	ensureStackContainsMessage(error);
 	if (typeof error?.stack === 'string') return error.stack;
 	if (typeof error?.message === 'string') return error.message;
 	if (typeof error === 'string') return error;
