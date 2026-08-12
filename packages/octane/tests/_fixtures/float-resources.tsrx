@@ -119,6 +119,14 @@ export function ReturnSheet() {
 	</>;
 }
 
+// A Float MODULE script — one executable identity with preinitModule.
+export function ModuleScript() @{
+	<>
+		<script async type="module" src="/shared-mod.mjs" />
+		<div class="ms">{'MS' as string}</div>
+	</>
+}
+
 let toggleSheet: ((on: boolean) => void) | null = null;
 export function setSheetVisible(on: boolean): void {
 	toggleSheet!(on);

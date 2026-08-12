@@ -12,8 +12,10 @@ import { act, createRoot, resetFloatResourceState } from '../src/index.js';
 import * as Server from 'octane/server';
 import { loadServerFixture } from './_server-fixture.js';
 import { collectPipeableStream } from './_server-stream.js';
+import { preinitModule } from '../src/index.js';
 import {
 	SheetA,
+	ModuleScript,
 	SheetADuplicate,
 	SheetHigh,
 	SheetLate,
@@ -270,6 +272,47 @@ describe('Float resources — SSR + hydration dedupe', () => {
 		} finally {
 			errSpy.mockRestore();
 		}
+	});
+
+	it('module scripts share ONE identity across SSR and client paths', async () => {
+		// (a) SSR preinitModule → client Float discovery adopts, no duplicate.
+		const AppA = () => {
+			Server.preinitModule('/shared-mod.mjs');
+			return Server.createElement('div', null, 'x') as any;
+		};
+		const rA = await Server.renderToString(AppA as any);
+		document.head.insertAdjacentHTML('afterbegin', rA.html.slice(0, rA.html.indexOf('<div')));
+		const c = document.createElement('div');
+		document.body.appendChild(c);
+		const root = createRoot(c);
+		await act(() => root.render(ModuleScript, {}));
+		expect(document.head.querySelectorAll('script[src="/shared-mod.mjs"]')).toHaveLength(1);
+		root.unmount();
+		c.remove();
+		document.head.querySelectorAll('[data-oct-hint], [data-oct-res]').forEach((el) => el.remove());
+		resetFloatResourceState();
+
+		// (b) SSR Float module script → client preinitModule adopts, no duplicate.
+		const srvMod = srv.ModuleScript;
+		const AppB = () => Server.createElement('div', null, Server.createElement(srvMod, null)) as any;
+		const rB = await Server.renderToString(AppB as any);
+		document.head.insertAdjacentHTML('afterbegin', rB.html.slice(0, rB.html.indexOf('<div')));
+		preinitModule('/shared-mod.mjs');
+		expect(document.head.querySelectorAll('script[src="/shared-mod.mjs"]')).toHaveLength(1);
+	});
+
+	it('one SSR pass never emits two executables for one module src', async () => {
+		const App = () => {
+			Server.preinitModule('/pass-mod.mjs');
+			return Server.createElement('div', null, Server.createElement(srv.ModuleScript, null)) as any;
+		};
+		void App;
+		const App2 = () => {
+			Server.preinitModule('/shared-mod.mjs');
+			return Server.createElement('div', null, Server.createElement(srv.ModuleScript, null)) as any;
+		};
+		const r = await Server.renderToString(App2 as any);
+		expect(r.html.match(/src="\/shared-mod\.mjs"/g) || []).toHaveLength(1);
 	});
 
 	it('a hydrating client call dedupes against SSR-emitted resources', async () => {

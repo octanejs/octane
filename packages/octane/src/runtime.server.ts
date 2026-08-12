@@ -197,15 +197,23 @@ interface HeadBuffer {
 	 * until the first stylesheet resource so ordinary passes pay nothing.
 	 */
 	sheets: Map<string, string> | null;
+	/**
+	 * Hint tags keyed for COALESCING: a preinit deletes the now-redundant
+	 * preload entry before the fold (React folds preload → initialized
+	 * resource on the server). Null until the first hint.
+	 */
+	hintHtml: Map<string, string> | null;
+	/** Preload-seeded connection/integrity options for the matching preinit. */
+	preloadXfer: Map<string, Record<string, unknown>> | null;
 	/** Precomputed caller root namespace, unaffected by streamed useId subspaces. */
 	rootSuffix: string;
 }
 
-/** Fold order: hoisted head elements + hints first, then grouped stylesheets. */
+/** Fold order: hoisted head elements, then hints, then grouped stylesheets. */
 function headHtmlWithSheets(buf: HeadBuffer): string {
-	if (buf.sheets === null) return buf.html;
 	let out = buf.html;
-	for (const group of buf.sheets.values()) out += group;
+	if (buf.hintHtml !== null) for (const tag of buf.hintHtml.values()) out += tag;
+	if (buf.sheets !== null) for (const group of buf.sheets.values()) out += group;
 	return out;
 }
 let HEAD: HeadBuffer | null = null;
@@ -2874,6 +2882,8 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		headLength: head !== null ? head.html.length : 0,
 		headHints: head === null ? null : new Set(head.hints),
 		headSheets: head === null || head.sheets === null ? null : new Map(head.sheets),
+		headHintHtml: head === null || head.hintHtml === null ? null : new Map(head.hintHtml),
+		headXfer: head === null || head.preloadXfer === null ? null : new Map(head.preloadXfer),
 		serial,
 		serialLength: serial !== null ? serial.length : 0,
 		susp,
@@ -2944,6 +2954,18 @@ function rewindComponentReplayState(
 			const sheets = (snapshot.head.sheets ??= new Map());
 			sheets.clear();
 			for (const [precedence, group] of snapshot.headSheets) sheets.set(precedence, group);
+		}
+		if (snapshot.headHintHtml === null) snapshot.head.hintHtml = null;
+		else {
+			const hintHtml = (snapshot.head.hintHtml ??= new Map());
+			hintHtml.clear();
+			for (const [k, v] of snapshot.headHintHtml) hintHtml.set(k, v);
+		}
+		if (snapshot.headXfer === null) snapshot.head.preloadXfer = null;
+		else {
+			const xfer = (snapshot.head.preloadXfer ??= new Map());
+			xfer.clear();
+			for (const [k, v] of snapshot.headXfer) xfer.set(k, v);
 		}
 	}
 	if (snapshot.serial !== null) snapshot.serial.length = snapshot.serialLength;
@@ -5563,6 +5585,8 @@ function runFullFramedPass(
 		html: '',
 		hints: new Set(),
 		sheets: null,
+		hintHtml: null,
+		preloadXfer: null,
 		rootSuffix: markers ? headOwnershipSuffix(identifierPrefix) : '',
 	} as HeadBuffer);
 	const suspended = (SUSPENDED = [] as SuspendedList);
@@ -5660,6 +5684,8 @@ function runDiscoveryRound(
 		html: '',
 		hints: new Set(),
 		sheets: null,
+		hintHtml: null,
+		preloadXfer: null,
 		rootSuffix: headOwnershipSuffix(identifierPrefix),
 	};
 	const suspended = (SUSPENDED = [] as SuspendedList);
@@ -6627,6 +6653,9 @@ export function ssrTry(
 			const headHtml = head?.html;
 			const headHints = head === null ? null : new Set(head.hints);
 			const headSheets = head === null || head.sheets === null ? null : new Map(head.sheets);
+			const headHintHtml = head === null || head.hintHtml === null ? null : new Map(head.hintHtml);
+			const headXfer =
+				head === null || head.preloadXfer === null ? null : new Map(head.preloadXfer);
 			const vtTrySeq = VT_SSR_TRY_SEQ;
 			const vtHasCandidates = VT_SSR_HAS_CANDIDATES;
 			const vtStack = VT_SSR_STACK.map((candidate) => ({
@@ -6657,6 +6686,18 @@ export function ssrTry(
 						const sheets = (head.sheets ??= new Map());
 						sheets.clear();
 						for (const [precedence, group] of headSheets) sheets.set(precedence, group);
+					}
+					if (headHintHtml === null) head.hintHtml = null;
+					else {
+						const hintHtml = (head.hintHtml ??= new Map());
+						hintHtml.clear();
+						for (const [k, v] of headHintHtml) hintHtml.set(k, v);
+					}
+					if (headXfer === null) head.preloadXfer = null;
+					else {
+						const xfer = (head.preloadXfer ??= new Map());
+						xfer.clear();
+						for (const [k, v] of headXfer) xfer.set(k, v);
 					}
 				}
 				VT_SSR_TRY_SEQ = vtTrySeq;
@@ -7976,8 +8017,22 @@ function emitHeadHint(key: string, html: string): void {
 	if (HEAD === null) return;
 	if (HEAD.hints.has(key)) return;
 	HEAD.hints.add(key);
-	HEAD.html += html;
+	(HEAD.hintHtml ??= new Map()).set(key, html);
 }
+
+/** The option keys React recognizes on resource hints; everything else drops. */
+const KNOWN_HINT_OPTIONS = new Set([
+	'as',
+	'crossOrigin',
+	'integrity',
+	'nonce',
+	'type',
+	'fetchPriority',
+	'referrerPolicy',
+	'imageSrcSet',
+	'imageSizes',
+	'media',
+]);
 
 function hintAttrs(
 	opts: Record<string, unknown> | undefined,
@@ -7987,6 +8042,7 @@ function hintAttrs(
 	let out = '';
 	if (opts == null) return out;
 	for (const k in opts) {
+		if (!KNOWN_HINT_OPTIONS.has(k)) continue;
 		if (skipAs && k === 'as') continue;
 		const v = (opts as any)[k];
 		if (v == null || v === false) continue;
@@ -8002,9 +8058,11 @@ function hintAttrs(
 }
 
 function coerceHintHref(href: unknown): string | null {
-	if (!href) return null;
-	const value = typeof href === 'string' ? href : String(href);
-	return value === '' ? null : value;
+	if (typeof href !== 'string' || href === '') {
+		warnHintUsage('resource hints require a non-empty string href; the call was ignored.');
+		return null;
+	}
+	return href;
 }
 
 /** React DOM `preload(href, {as, …})`. */
@@ -8027,11 +8085,27 @@ export function preload(href: string, options: { as: string } & Record<string, u
 		return;
 	}
 	const as = options.as;
+	// Fonts must be fetched anonymously to be reusable by CSS — enforced
+	// regardless of the caller's crossOrigin, matching React and the client.
+	if (as === 'font') options = { ...options, crossOrigin: '' };
 	// Mirror the client's one-way upgrade: once the matching resource is live in
-	// this pass (Float resource or preinit), the preload adds nothing.
+	// this pass (Float resource or preinit), the preload adds nothing. A preload
+	// that comes FIRST seeds connection/integrity options for the preinit and is
+	// coalesced away when the preinit lands (see the hintHtml delete there).
 	if (HEAD !== null) {
 		if (as === 'style' && HEAD.hints.has('sheet:' + value)) return;
-		if (as === 'script' && HEAD.hints.has('script:' + value)) return;
+		// One executable per src across BOTH script forms (classic and module),
+		// matching the client's unified identity set.
+		if (as === 'script' && (HEAD.hints.has('script:' + value) || HEAD.hints.has('module:' + value)))
+			return;
+		if (as === 'style' || as === 'script') {
+			let subset: Record<string, unknown> | null = null;
+			for (const k of ['crossOrigin', 'integrity', 'nonce', 'fetchPriority', 'referrerPolicy']) {
+				const v = (options as any)[k];
+				if (v != null) (subset ??= {})[k] = v;
+			}
+			if (subset !== null) (HEAD.preloadXfer ??= new Map()).set(as + ':' + value, subset);
+		}
 	}
 	const imageSrcSet = as === 'image' ? options.imageSrcSet : undefined;
 	const key =
@@ -8039,11 +8113,11 @@ export function preload(href: string, options: { as: string } & Record<string, u
 			? 'preload:image:' + imageSrcSet + '::' + String(options.imageSizes ?? '')
 			: 'preload:' + as + ':' + value;
 	const safeHref = sanitizeURL(value);
+	const omitHref = typeof imageSrcSet === 'string' && imageSrcSet !== '';
 	emitHeadHint(
 		key,
-		'<link rel="preload" href="' +
-			escapeAttr(safeHref) +
-			'"' +
+		'<link rel="preload"' +
+			(omitHref ? '' : ' href="' + escapeAttr(safeHref) + '"') +
 			hintAttrs(options, false, 'link') +
 			' data-oct-hint="' +
 			escapeAttr(key) +
@@ -8073,15 +8147,28 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 		);
 		return;
 	}
+	let seeded: Record<string, unknown> | null = null;
+	if (HEAD !== null) {
+		const xfer = HEAD.preloadXfer?.get(as + ':' + value);
+		if (xfer !== undefined) {
+			seeded = xfer;
+			HEAD.preloadXfer!.delete(as + ':' + value);
+		}
+		// Coalesce the now-redundant preload out of the fold (React folds
+		// preload → initialized resource on the server).
+		HEAD.hintHtml?.delete('preload:' + as + ':' + value);
+		HEAD.hints.delete('preload:' + as + ':' + value);
+	}
 	if (as === 'style') {
 		ssrStylesheetResource({
+			...seeded,
 			...options,
 			as: undefined,
 			href: value,
 			precedence: (options as any).precedence ?? 'default',
 		});
 	} else {
-		ssrScriptResource({ ...options, as: undefined, href: undefined, src: value });
+		ssrScriptResource({ ...seeded, ...options, as: undefined, href: undefined, src: value });
 	}
 }
 
@@ -8089,7 +8176,9 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 export function preconnect(href: string, options?: { crossOrigin?: string }): void {
 	const value = coerceHintHref(href);
 	if (value === null) return;
-	const key = 'preconnect:' + value;
+	const corsMode =
+		(options as any)?.crossOrigin == null ? '<none>' : String((options as any).crossOrigin);
+	const key = 'preconnect:' + corsMode + ':' + value;
 	const safeHref = sanitizeURL(value);
 	emitHeadHint(
 		key,
@@ -8204,7 +8293,8 @@ export function ssrScriptResource(attrs: Record<string, unknown> | null): string
 	const src = attrs.src;
 	if (typeof src !== 'string' || src === '') return '';
 	const key = 'script:' + src;
-	if (HEAD.hints.has(key)) return '';
+	// One executable per src per pass, across the classic and module forms.
+	if (HEAD.hints.has(key) || HEAD.hints.has('module:' + src)) return '';
 	HEAD.hints.add(key);
 	HEAD.html +=
 		'<script src="' +
@@ -8219,8 +8309,10 @@ export function ssrScriptResource(attrs: Record<string, unknown> | null): string
 export function preloadModule(href: string, options?: Record<string, unknown>): void {
 	const value = coerceHintHref(href);
 	if (value === null) return;
-	// A module that preinitModule already executed in this pass needs no preload.
-	if (HEAD !== null && HEAD.hints.has('module:' + value)) return;
+	// A module that preinitModule OR a classic Float script already executes in
+	// this pass needs no preload — one executable identity per src.
+	if (HEAD !== null && (HEAD.hints.has('module:' + value) || HEAD.hints.has('script:' + value)))
+		return;
 	const key = 'modulepreload:' + value;
 	const safeHref = sanitizeURL(value);
 	emitHeadHint(
@@ -8246,6 +8338,7 @@ export function preinitModule(
 	const value = coerceHintHref(href);
 	if (value === null) return;
 	if ((options?.as ?? 'script') !== 'script') return;
+	if (HEAD !== null && HEAD.hints.has('script:' + value)) return;
 	const key = 'module:' + value;
 	const safeHref = sanitizeURL(value);
 	emitHeadHint(

@@ -312,15 +312,22 @@ describe('conformance: ReactDOMServerIntegrationUntrustedURL', () => {
 			ServerRT.prefetchDNS(serverPrefetchDNS.value as any);
 			return '<main>coercion hints</main>';
 		};
-		const coercingHints = ServerRT.renderToString(CoercingHintPage as any).html;
-		expect(serverPreload.calls()).toBe(1);
-		expect(serverPreinit.calls()).toBe(1);
-		expect(serverPreconnect.calls()).toBe(1);
-		expect(serverPrefetchDNS.calls()).toBe(1);
-		expect(coercingHints).toContain('href="https://safe.example/server-preload"');
-		expect(coercingHints).toContain('href="https://safe.example/server-preinit"');
-		expect(coercingHints).toContain('href="https://safe.example/server-preconnect"');
-		expect(coercingHints).toContain('href="https://safe.example/server-prefetch-dns"');
+		// Non-string hrefs never coerce: React (and now Octane) warns in dev and
+		// no-ops, so a mutating toString can never smuggle a URL past the write.
+		const coercionWarn = vi.spyOn(console, 'error').mockImplementation(() => {});
+		let coercingHints: string;
+		try {
+			coercingHints = ServerRT.renderToString(CoercingHintPage as any).html;
+			expect(coercionWarn.mock.calls.some((call) => String(call[0]).includes('href'))).toBe(true);
+		} finally {
+			coercionWarn.mockRestore();
+		}
+		expect(serverPreload.calls()).toBe(0);
+		expect(serverPreinit.calls()).toBe(0);
+		expect(serverPreconnect.calls()).toBe(0);
+		expect(serverPrefetchDNS.calls()).toBe(0);
+		expect(coercingHints).not.toContain('https://safe.example/server-');
+		expect(coercingHints).not.toContain(UNSAFE_URL);
 		const OptionHintPage = () => {
 			ServerRT.preload('https://safe.example/option-hint', {
 				as: 'image',
@@ -328,9 +335,12 @@ describe('conformance: ReactDOMServerIntegrationUntrustedURL', () => {
 			});
 			return '<main>option hint</main>';
 		};
-		expect(ServerRT.renderToString(OptionHintPage as any).html).toContain(
-			`src="${EXPECTED_SAFE_URL}"`,
-		);
+		// `src` is not a recognized hint option: it drops entirely (React parity),
+		// which retires the unsafe-URL-through-option channel outright.
+		const optionHintHtml = ServerRT.renderToString(OptionHintPage as any).html;
+		expect(optionHintHtml).toContain('href="https://safe.example/option-hint"');
+		expect(optionHintHtml).not.toContain('src=');
+		expect(optionHintHtml).not.toContain(UNSAFE_URL);
 
 		const clientPreload = changingHref('https://safe.example/client-preload');
 		const clientPreinit = changingHref('https://safe.example/client-preinit');
@@ -355,27 +365,21 @@ describe('conformance: ReactDOMServerIntegrationUntrustedURL', () => {
 			).filter((element) => element.getAttribute('href')?.includes('https://safe.example/client-')),
 		];
 		try {
-			expect(clientPreload.calls()).toBe(1);
-			expect(clientPreinit.calls()).toBe(1);
-			expect(clientPreconnect.calls()).toBe(1);
-			expect(clientPrefetchDNS.calls()).toBe(1);
+			expect(clientPreload.calls()).toBe(0);
+			expect(clientPreinit.calls()).toBe(0);
+			expect(clientPreconnect.calls()).toBe(0);
+			expect(clientPrefetchDNS.calls()).toBe(0);
 			expect(
 				coercionClientHints
 					.map((element) => element.getAttribute('href'))
 					.filter((href) => !href?.includes('option-hint'))
 					.sort(),
-			).toEqual(
-				[
-					'https://safe.example/client-preconnect',
-					'https://safe.example/client-prefetch-dns',
-					'https://safe.example/client-preinit',
-					'https://safe.example/client-preload',
-				].sort(),
-			);
+			).toEqual([]);
 			const optionHint = coercionClientHints.find((element) =>
 				element.getAttribute('href')?.includes('option-hint'),
 			);
-			expect(optionHint?.getAttribute('src')).toBe(EXPECTED_SAFE_URL);
+			expect(optionHint).not.toBeUndefined();
+			expect(optionHint!.hasAttribute('src')).toBe(false);
 		} finally {
 			for (const element of coercionClientHints) element.remove();
 		}

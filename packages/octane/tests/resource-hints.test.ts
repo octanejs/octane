@@ -28,7 +28,8 @@ describe('resource hints — client', () => {
 		const links = document.head.querySelectorAll('link[rel="preload"][href="/font.woff2"]');
 		expect(links).toHaveLength(1);
 		expect(links[0].getAttribute('as')).toBe('font');
-		expect(links[0].getAttribute('crossorigin')).toBe('anonymous');
+		// Fonts always fetch anonymously: crossorigin="" regardless of the caller.
+		expect(links[0].getAttribute('crossorigin')).toBe('');
 	});
 
 	it('preinit as style/script inserts stylesheet link / async script', () => {
@@ -144,6 +145,66 @@ describe('resource hints — client', () => {
 		}
 	});
 
+	it('font preloads always enforce anonymous CORS', () => {
+		preload('/f.woff2', { as: 'font', crossOrigin: 'use-credentials' });
+		const l = document.head.querySelector('link[rel="preload"][href="/f.woff2"]')!;
+		expect(l.getAttribute('crossorigin')).toBe('');
+	});
+
+	it('preload options transfer to the initialized resource', () => {
+		preload('/xfer.js', { as: 'script', crossOrigin: 'use-credentials', integrity: 'sha-test' });
+		preinit('/xfer.js', { as: 'script' });
+		const s = document.head.querySelector('script[src="/xfer.js"]')!;
+		expect(s.getAttribute('crossorigin')).toBe('use-credentials');
+		expect(s.getAttribute('integrity')).toBe('sha-test');
+		preload('/xfer.css', { as: 'style', crossOrigin: 'anonymous' });
+		preinit('/xfer.css', { as: 'style' });
+		const link = document.head.querySelector('link[rel="stylesheet"][href="/xfer.css"]')!;
+		expect(link.getAttribute('crossorigin')).toBe('anonymous');
+	});
+
+	it('preconnect identity includes the CORS mode', () => {
+		preconnect('https://x.example');
+		preconnect('https://x.example', { crossOrigin: 'anonymous' });
+		preconnect('https://x.example', { crossOrigin: 'use-credentials' });
+		// An omitted crossOrigin (no CORS) and crossOrigin: '' (anonymous) are
+		// distinct browser connection modes — four identities in total.
+		preconnect('https://x.example', { crossOrigin: '' });
+		expect(
+			document.head.querySelectorAll('link[rel="preconnect"][href="https://x.example"]'),
+		).toHaveLength(4);
+		preconnect('https://x.example', { crossOrigin: 'anonymous' }); // deduped
+		preconnect('https://x.example'); // deduped
+		expect(
+			document.head.querySelectorAll('link[rel="preconnect"][href="https://x.example"]'),
+		).toHaveLength(4);
+	});
+
+	it('responsive image preloads omit the fallback href', () => {
+		preload('/r.png', { as: 'image', imageSrcSet: '/r@2x.png 2x', imageSizes: '100vw' });
+		const l = document.head.querySelector('link[rel="preload"][as="image"]')!;
+		expect(l.hasAttribute('href')).toBe(false);
+		expect(l.getAttribute('imagesrcset')).toBe('/r@2x.png 2x');
+		expect(l.getAttribute('imagesizes')).toBe('100vw');
+	});
+
+	it('unknown option keys are dropped; non-string hrefs dev-warn and no-op', () => {
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			preload('/known.css', { as: 'style', madeUp: 'x' } as any);
+			const l = document.head.querySelector('link[rel="preload"][href="/known.css"]')!;
+			expect(l.hasAttribute('madeup')).toBe(false);
+			preload({ toString: () => '/coerced.css' } as any, { as: 'style' });
+			expect(document.head.querySelector('link[href="/coerced.css"]')).toBeNull();
+			preloadModule(123 as any);
+			expect(document.head.querySelector('link[rel="modulepreload"]')).toBeNull();
+			const warns = errSpy.mock.calls.map((c) => String(c[0]));
+			expect(warns.some((m) => m.includes('href'))).toBe(true);
+		} finally {
+			errSpy.mockRestore();
+		}
+	});
+
 	it('preconnect and prefetchDNS insert their links once', () => {
 		preconnect('https://cdn.example.com');
 		preconnect('https://cdn.example.com');
@@ -203,6 +264,44 @@ describe('resource hints — server', () => {
 		expect(r.html.match(/\/srv\.css/g) || []).toHaveLength(1);
 		expect(r.html).toContain('src="/srv.js"');
 		expect(r.html.match(/imagesrcset/g) || []).toHaveLength(1);
+	});
+
+	it('SSR mirrors font CORS, option transfer with preload coalescing, and CORS-keyed preconnect', async () => {
+		const App = () => {
+			Server.preload('/sf.woff2', { as: 'font', crossOrigin: 'use-credentials' });
+			Server.preload('/sx.js', { as: 'script', integrity: 'sha-s' });
+			Server.preinit('/sx.js', { as: 'script' });
+			Server.preconnect('https://sx.example');
+			Server.preconnect('https://sx.example', { crossOrigin: 'anonymous' });
+			Server.preload('/sr.png', { as: 'image', imageSrcSet: '/sr@2x.png 2x' });
+			return Server.createElement('div', null, 'x') as any;
+		};
+		const r = await Server.renderToString(App as any);
+		expect(r.html).toMatch(/\/sf\.woff2[^>]*crossorigin=""/);
+		// The script preload coalesced into the initialized script (with integrity).
+		expect(r.html.match(/rel="preload" href="\/sx\.js"/g) || []).toHaveLength(0);
+		expect(r.html).toMatch(/<script src="\/sx\.js"[^>]*integrity="sha-s"/);
+		expect(r.html.match(/rel="preconnect" href="https:\/\/sx\.example"/g) || []).toHaveLength(2);
+		// Responsive image preload: srcset carried, fallback href omitted.
+		expect(r.html).toContain('imagesrcset="/sr@2x.png 2x"');
+		expect(r.html).not.toContain('href="/sr.png"');
+	});
+
+	it('SSR preloads no-op across BOTH executable script forms', async () => {
+		const App = () => {
+			// Module init first: a classic script preload for the same src is dead bytes.
+			Server.preinitModule('/xga.mjs');
+			Server.preload('/xga.mjs', { as: 'script' });
+			// Classic init first: a modulepreload for the same src is dead bytes.
+			Server.preinit('/xgb.js', { as: 'script' });
+			Server.preloadModule('/xgb.js');
+			return Server.createElement('div', null, 'x') as any;
+		};
+		const r = await Server.renderToString(App as any);
+		expect(r.html).not.toContain('rel="preload"');
+		expect(r.html).not.toContain('rel="modulepreload"');
+		expect(r.html.match(/src="\/xga\.mjs"/g) || []).toHaveLength(1);
+		expect(r.html.match(/src="\/xgb\.js"/g) || []).toHaveLength(1);
 	});
 
 	it('module hints fold into head output and share the client dedupe key', async () => {

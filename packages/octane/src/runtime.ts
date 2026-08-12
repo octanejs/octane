@@ -27664,9 +27664,66 @@ function warnHintUsage(message: string): void {
 	if (process.env.NODE_ENV !== 'production') console.error(message);
 }
 
+/**
+ * Connection/integrity options seeded by preload for the matching preinit —
+ * React carries these onto the initialized resource. Keyed `as:href`; the
+ * preinit's own options win on collision. Test-only reset rides
+ * resetFloatResourceState.
+ */
+let _preloadTransfer: Map<string, Record<string, unknown>> | null = null;
+
+const TRANSFER_OPTION_KEYS = [
+	'crossOrigin',
+	'integrity',
+	'nonce',
+	'fetchPriority',
+	'referrerPolicy',
+] as const;
+
+function stashPreloadTransfer(kind: string, href: string, options: Record<string, unknown>): void {
+	let subset: Record<string, unknown> | null = null;
+	for (const k of TRANSFER_OPTION_KEYS) {
+		const v = options[k];
+		if (v != null) (subset ??= {})[k] = v;
+	}
+	if (subset !== null) (_preloadTransfer ??= new Map()).set(kind + ':' + href, subset);
+}
+
+function takePreloadTransfer(kind: string, href: string): Record<string, unknown> | null {
+	if (_preloadTransfer === null) return null;
+	const key = kind + ':' + href;
+	const found = _preloadTransfer.get(key);
+	if (found === undefined) return null;
+	_preloadTransfer.delete(key);
+	return found;
+}
+
+function guardHintHref(fn: string, href: unknown): string | null {
+	if (typeof href !== 'string' || href === '') {
+		warnHintUsage(fn + '() requires a non-empty string href; the call was ignored.');
+		return null;
+	}
+	return href;
+}
+
+/** The option keys React recognizes on resource hints; everything else drops. */
+const KNOWN_HINT_OPTIONS = new Set([
+	'as',
+	'crossOrigin',
+	'integrity',
+	'nonce',
+	'type',
+	'fetchPriority',
+	'referrerPolicy',
+	'imageSrcSet',
+	'imageSizes',
+	'media',
+]);
+
 function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined): void {
 	if (opts == null) return;
 	for (const k in opts) {
+		if (!KNOWN_HINT_OPTIONS.has(k)) continue;
 		const v = (opts as any)[k];
 		if (v == null || v === false) continue;
 		const name = k === 'crossOrigin' ? 'crossorigin' : k.toLowerCase();
@@ -27677,10 +27734,8 @@ function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined):
 
 /** React DOM `preload(href, {as, …})` — `<link rel="preload">`. */
 export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
-	if (!href) {
-		warnHintUsage('preload() requires a non-empty string href; the call was ignored.');
-		return;
-	}
+	const guarded = guardHintHref('preload', href);
+	if (guarded === null) return;
 	if (!options?.as || typeof options.as !== 'string') {
 		warnHintUsage(
 			'preload() requires a string `as` option (e.g. "style", "script", "font", "image"); ' +
@@ -27689,7 +27744,13 @@ export function preload(href: string, options: { as: string } & Record<string, u
 		return;
 	}
 	const as = options.as;
-	const rawHref = typeof href === 'string' ? href : String(href);
+	const rawHref = guarded;
+	// Fonts must be fetched anonymously to be reusable by CSS — React enforces
+	// crossorigin="" regardless of the caller's value; so does Octane.
+	if (as === 'font') options = { ...options, crossOrigin: '' };
+	// Connection/integrity options seed the matching future preinit (React's
+	// resource map carries them onto the initialized resource).
+	if (as === 'style' || as === 'script') stashPreloadTransfer(as, rawHref, options);
 	// After the matching resource is already live (a Float resource or preinit),
 	// a preload adds nothing — React's resource map has the same one-way
 	// upgrade: preload-then-init keeps both tags, init-then-preload no-ops.
@@ -27703,10 +27764,13 @@ export function preload(href: string, options: { as: string } & Record<string, u
 			? 'preload:image:' + imageSrcSet + '::' + String(options.imageSizes ?? '')
 			: 'preload:' + as + ':' + rawHref;
 	const safeHref = sanitizeURL(rawHref);
+	const omitHref = typeof imageSrcSet === 'string' && imageSrcSet !== '';
 	insertHeadHint(key, () => {
 		const l = document.createElement('link');
 		l.rel = 'preload';
-		l.href = safeHref;
+		// A responsive image preload matches on imagesrcset/imagesizes; the
+		// fallback href would double-fetch, so React (and Octane) omit it.
+		if (!omitHref) l.href = safeHref;
 		applyHintAttrs(l, options);
 		return l;
 	});
@@ -27721,10 +27785,8 @@ export function preload(href: string, options: { as: string } & Record<string, u
  * dedupes against `<script async src>`.
  */
 export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
-	if (!href) {
-		warnHintUsage('preinit() requires a non-empty string href; the call was ignored.');
-		return;
-	}
+	const guarded = guardHintHref('preinit', href);
+	if (guarded === null) return;
 	const as = options?.as;
 	if (as !== 'style' && as !== 'script') {
 		warnHintUsage(
@@ -27734,25 +27796,29 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 		);
 		return;
 	}
-	const rawHref = typeof href === 'string' ? href : String(href);
+	const rawHref = guarded;
+	const seeded = takePreloadTransfer(as, rawHref);
 	if (as === 'style') {
 		stylesheetResource({
+			...seeded,
 			...options,
 			as: undefined,
 			href: rawHref,
 			precedence: (options as any).precedence ?? 'default',
 		});
 	} else {
-		scriptResource({ ...options, as: undefined, href: undefined, src: rawHref });
+		scriptResource({ ...seeded, ...options, as: undefined, href: undefined, src: rawHref });
 	}
 }
 
 /** React DOM `preconnect(href, {crossOrigin?})` — `<link rel="preconnect">`. */
 export function preconnect(href: string, options?: { crossOrigin?: string }): void {
-	if (!href) return;
-	const rawHref = typeof href === 'string' ? href : String(href);
+	const rawHref = guardHintHref('preconnect', href);
+	if (rawHref === null) return;
 	const safeHref = sanitizeURL(rawHref);
-	insertHeadHint('preconnect:' + rawHref, () => {
+	const corsMode =
+		(options as any)?.crossOrigin == null ? '<none>' : String((options as any).crossOrigin);
+	insertHeadHint('preconnect:' + corsMode + ':' + rawHref, () => {
 		const l = document.createElement('link');
 		l.rel = 'preconnect';
 		l.href = safeHref;
@@ -27763,8 +27829,8 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 
 /** React DOM `prefetchDNS(href)` — `<link rel="dns-prefetch">`. */
 export function prefetchDNS(href: string): void {
-	if (!href) return;
-	const rawHref = typeof href === 'string' ? href : String(href);
+	const rawHref = guardHintHref('prefetchDNS', href);
+	if (rawHref === null) return;
 	const safeHref = sanitizeURL(rawHref);
 	insertHeadHint('dns-prefetch:' + rawHref, () => {
 		const l = document.createElement('link');
@@ -27780,10 +27846,10 @@ export function prefetchDNS(href: string): void {
  * options apply as attributes through the shared lenient pass-through.
  */
 export function preloadModule(href: string, options?: Record<string, unknown>): void {
-	if (!href) return;
-	const rawHref = typeof href === 'string' ? href : String(href);
-	// A module that preinitModule already executed needs no preload.
-	if (hasHeadHint('module:' + rawHref)) return;
+	const rawHref = guardHintHref('preloadModule', href);
+	if (rawHref === null) return;
+	// A module that preinitModule or a Float script already executes needs no preload.
+	if (hasHeadHint('module:' + rawHref) || resourceState().scripts.has(rawHref)) return;
 	const safeHref = sanitizeURL(rawHref);
 	insertHeadHint('modulepreload:' + rawHref, () => {
 		const l = document.createElement('link');
@@ -27803,9 +27869,13 @@ export function preinitModule(
 	href: string,
 	options?: { as?: string } & Record<string, unknown>,
 ): void {
-	if (!href) return;
+	const rawHref = guardHintHref('preinitModule', href);
+	if (rawHref === null) return;
 	if ((options?.as ?? 'script') !== 'script') return;
-	const rawHref = typeof href === 'string' ? href : String(href);
+	// One executable per src: a live Float script (SSR-seeded or client-
+	// discovered) already satisfies this init.
+	const state = resourceState();
+	if (state.scripts.has(rawHref)) return;
 	const safeHref = sanitizeURL(rawHref);
 	insertHeadHint('module:' + rawHref, () => {
 		const s = document.createElement('script');
@@ -27815,6 +27885,7 @@ export function preinitModule(
 		applyHintAttrs(s, options ? { ...options, as: undefined } : undefined);
 		return s;
 	});
+	state.scripts.add(rawHref);
 }
 
 // ---------------------------------------------------------------------------
@@ -27863,9 +27934,14 @@ function resourceState(): ResourceState {
 			state.tails.set(el.getAttribute('data-precedence') as string, el);
 			state.lastTail = el;
 		}
-		const scripts = document.querySelectorAll('script[data-oct-res]');
+		// One executable identity per src: classic Float scripts (data-oct-res)
+		// AND preinitModule scripts (data-oct-hint "module:…") share the set.
+		const scripts = document.querySelectorAll('script[data-oct-res], script[data-oct-hint]');
 		for (let i = 0; i < scripts.length; i++) {
-			const src = scripts[i].getAttribute('src');
+			const el = scripts[i];
+			const hint = el.getAttribute('data-oct-hint');
+			if (hint !== null && !hint.startsWith('module:')) continue;
+			const src = el.getAttribute('src');
 			if (src !== null) state.scripts.add(src);
 		}
 	}
@@ -27960,6 +28036,7 @@ export function styleResource(attrs: Record<string, unknown> | null, css: string
  */
 export function resetFloatResourceState(): void {
 	_resourceState = null;
+	_preloadTransfer = null;
 }
 
 /** Compiler target for `<script async src>` resources (React Float). */
