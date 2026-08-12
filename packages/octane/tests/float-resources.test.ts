@@ -425,9 +425,9 @@ describe('Float resources — streamed late boundaries', () => {
 	});
 
 	// Per ReactDOMFloat-test.js:2041 — 'will hoist resources of child boundaries
-	// emitted as part of a partial boundary to the parent boundary' (and :2350,
-	// the flushed-inline variant): the still-pending inner boundary's sheet
-	// rides the wave that reveals its parent.
+	// emitted as part of a partial boundary to the parent boundary': the
+	// still-pending inner boundary's sheet rides the wave that reveals its
+	// parent.
 	it("hoists a nested pending boundary's sheet into the outer boundary's reveal wave", async () => {
 		const outer = deferred<string>();
 		const inner = deferred<string>();
@@ -467,6 +467,55 @@ describe('Float resources — streamed late boundaries', () => {
 		activateStreamedMarkup(c);
 		// The late sheet joins the precedence groups after the shell's (new group
 		// appends after the last existing group).
+		expect(sheetHrefs()).toEqual(['/outer-late.css', '/inner-late.css']);
+		expect(c.querySelector('.outer-ready')?.textContent).toBe('one');
+		expect(c.querySelector('.inner-ready')?.textContent).toBe('two');
+	});
+
+	// Per ReactDOMFloat-test.js:2350 — 'boundary stylesheet resource dependencies
+	// hoist to a parent boundary when flushed inline': the inner boundary
+	// resolves FIRST, so when its parent reveals, the complete child flushes
+	// inline with the parent's wave and its sheet ships with that same wave.
+	it("ships an inline-flushed complete child boundary's sheet with the parent's reveal", async () => {
+		const outer = deferred<string>();
+		const inner = deferred<string>();
+		const collector = createPipeableCollector();
+		const { pipe } = Server.renderToPipeableStream(srvStream.NestedLateBoundaries, {
+			outer: outer.promise,
+			inner: inner.promise,
+		});
+		pipe(collector.destination);
+		const shell = collector.chunks.join('');
+		expect(shell.match(/\/outer-late\.css/g) || []).toHaveLength(1);
+		expect(shell).not.toContain('/inner-late.css');
+		const shellChunkCount = collector.chunks.length;
+
+		// The child resolves while its parent is still pending: it has no slot in
+		// the document yet, so neither its content nor its sheet may stream.
+		inner.resolve('two');
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		const preReveal = collector.chunks.slice(shellChunkCount).join('');
+		expect(preReveal).not.toContain('/inner-late.css');
+		expect(preReveal).not.toContain('inner-ready');
+
+		// The parent's resolution alone completes the response: the child flushes
+		// inline within the parent's reveal, carrying its sheet exactly once.
+		outer.resolve('one');
+		const html = await collector.ended;
+		const wave = collector.chunks.slice(shellChunkCount).join('');
+		expect(wave).toContain('outer-ready');
+		expect(wave).toContain('inner-ready');
+		expect(wave.match(/\/inner-late\.css/g) || []).toHaveLength(1);
+		expect(html.match(/\/inner-late\.css/g) || []).toHaveLength(1);
+
+		// Browser simulation: the inline-flushed child's sheet joins the head
+		// precedence groups after the shell's, and both contents are revealed.
+		const bodyStart = shell.indexOf('<div');
+		document.head.insertAdjacentHTML('afterbegin', shell.slice(0, bodyStart));
+		const c = streamContainer();
+		c.innerHTML = shell.slice(bodyStart);
+		c.insertAdjacentHTML('beforeend', wave);
+		activateStreamedMarkup(c);
 		expect(sheetHrefs()).toEqual(['/outer-late.css', '/inner-late.css']);
 		expect(c.querySelector('.outer-ready')?.textContent).toBe('one');
 		expect(c.querySelector('.inner-ready')?.textContent).toBe('two');
