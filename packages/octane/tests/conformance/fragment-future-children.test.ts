@@ -517,4 +517,33 @@ describe('FragmentInstance — changing ref expression (update path)', () => {
 		r.unmount();
 		expect(log).toEqual(['a:attach', 'a:null', 'b:attach', 'b:null']);
 	});
+
+	it('keeps one fragment instance while replacement callbacks clean up before reattachment', () => {
+		const log: string[] = [];
+		const fragments: FragmentInstance[] = [];
+		const observe = (name: string) => (fragment: FragmentInstance | null) => {
+			if (fragment !== null) {
+				fragments.push(fragment);
+				log.push(`${name}:attach`);
+			}
+			return () => log.push(`${name}:cleanup`);
+		};
+		const first = observe('first');
+		const second = observe('second');
+		const root = mount(FragmentRefUpdate, { pick: first });
+
+		root.update(FragmentRefUpdate, { pick: first });
+		expect(log).toEqual(['first:attach']);
+		root.update(FragmentRefUpdate, { pick: second });
+		expect(log).toEqual(['first:attach', 'first:cleanup', 'second:attach']);
+		expect(fragments[1]).toBe(fragments[0]);
+
+		root.update(FragmentRefUpdate, { pick: null });
+		expect(log.at(-1)).toBe('second:cleanup');
+		root.update(FragmentRefUpdate, { pick: first });
+		expect(fragments[2]).toBe(fragments[0]);
+		expect(log.at(-1)).toBe('first:attach');
+		root.unmount();
+		expect(log.at(-1)).toBe('first:cleanup');
+	});
 });

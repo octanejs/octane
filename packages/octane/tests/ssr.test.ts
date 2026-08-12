@@ -20,15 +20,19 @@ const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 // bodies that import from 'octane/server'; we eval them with that same
 // runtime module injected, then call renderToString() and snapshot { html, css }.
 
-function evalServer(source: string, file: string): Record<string, any> {
-	let { code } = compile(source, file, { mode: 'server' });
+function evalServer(
+	source: string,
+	file: string,
+	options: Record<string, unknown> = {},
+): Record<string, any> {
+	let { code } = compile(source, file, { ...options, mode: 'server' });
 	// Bind the server-runtime import to the live module, and capture exports.
 	code = code.replace(
 		/import\s+\*\s+as\s+(\w+)\s+from\s+['"]octane\/server['"];?/g,
 		'const $1 = __rt;',
 	);
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/(?:server|internal\/server)['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
@@ -137,7 +141,227 @@ describe('SSR Phase 1 — ssr fixture (style / spread / innerHTML / components /
 	});
 });
 
+describe.each([
+	{ name: 'development', dev: true },
+	{ name: 'production', dev: false },
+])('SSR single-spread host content in $name compilation', ({ dev }) => {
+	const mod = evalServer(
+		`
+			export function Spread(props) @{
+				<div {...props.attrs} />
+			}
+			export function Ordered(props) @{
+				<section
+					data-before={props.read('before')}
+					{...props.attrs}
+					data-after={props.read('after')}
+				/>
+			}
+			export function SpreadFloatStyle(props) @{
+				<div {...props.attrs}>
+					<style href="spread-inline-tokens" precedence="default">
+						.spread-tokens { color: teal; }
+					</style>
+				</div>
+			}
+		`,
+		`single-spread-host-${dev ? 'development' : 'production'}.tsrx`,
+		{ dev, hmr: false },
+	);
+
+	it('renders spread children as escaped text or ordinary child elements', () => {
+		expect(RT.renderToString(mod.Spread, { attrs: { children: '<safe>' } }).html).toBe(
+			'<div>&lt;safe&gt;</div>',
+		);
+		expect(RT.renderToString(mod.Spread, { attrs: { children: 0 } }).html).toBe('<div>0</div>');
+		const element = RT.createElement('strong', { id: 'spread-child' }, 'rich');
+		const html = RT.renderToString(mod.Spread, { attrs: { children: element } }).html;
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		expect(container.querySelector('#spread-child')?.textContent).toBe('rich');
+	});
+
+	it('hoists a nested Float style resource from an otherwise empty spread host', () => {
+		const { html } = RT.renderToString(mod.SpreadFloatStyle, {
+			attrs: { id: 'spread-float-host' },
+		});
+		expect(html).toContain('data-href="spread-inline-tokens"');
+		expect(html).toContain('data-precedence="default"');
+		expect(html).toContain('.spread-tokens');
+		expect(html).toContain('color: teal');
+		expect(html).toContain('<div id="spread-float-host"></div>');
+		expect(html.indexOf('<style')).toBeLessThan(html.indexOf('<div'));
+	});
+
+	it('renders raw spread HTML and rejects conflicting or malformed content', () => {
+		expect(
+			RT.renderToString(mod.Spread, {
+				attrs: { children: undefined, dangerouslySetInnerHTML: { __html: '<b>raw</b>' } },
+			}).html,
+		).toBe('<div><b>raw</b></div>');
+		expect(
+			RT.renderToString(mod.Spread, {
+				attrs: { children: 'fallback', dangerouslySetInnerHTML: undefined },
+			}).html,
+		).toBe('<div>fallback</div>');
+		expect(
+			RT.renderToString(mod.Spread, {
+				attrs: { dangerouslySetInnerHTML: { __html: null } },
+			}).html,
+		).toBe('<div></div>');
+		expect(() =>
+			RT.renderToString(mod.Spread, {
+				attrs: { children: '', dangerouslySetInnerHTML: { __html: '<b>raw</b>' } },
+			}),
+		).toThrow();
+		expect(() =>
+			RT.renderToString(mod.Spread, { attrs: { dangerouslySetInnerHTML: {} } }),
+		).toThrow();
+	});
+
+	it('ignores inherited and non-enumerable spread content properties', () => {
+		const attrs = Object.create({
+			children: 'inherited',
+			dangerouslySetInnerHTML: { __html: '<b>inherited</b>' },
+		}) as Record<string, unknown>;
+		Object.defineProperty(attrs, 'children', { value: 'hidden', enumerable: false });
+		Object.defineProperty(attrs, 'title', { value: 'visible', enumerable: true });
+		expect(RT.renderToString(mod.Spread, { attrs }).html).toBe('<div title="visible"></div>');
+		expect(RT.renderToString(mod.Spread, { attrs: null }).html).toBe('<div></div>');
+	});
+
+	it('snapshots string and symbol getters exactly once in authored prop order', () => {
+		const observed: string[] = [];
+		const attrs = {} as Record<PropertyKey, unknown>;
+		for (const [key, value] of [
+			['title', 'spread title'],
+			['children', '<escaped child>'],
+		] as const) {
+			Object.defineProperty(attrs, key, {
+				enumerable: true,
+				get() {
+					observed.push(`spread:${key}`);
+					return value;
+				},
+			});
+		}
+		Object.defineProperty(attrs, Symbol('ignored'), {
+			enumerable: true,
+			get() {
+				observed.push('spread:symbol');
+				return 'ignored';
+			},
+		});
+		const html = RT.renderToString(mod.Ordered, {
+			attrs,
+			read(key: string) {
+				observed.push(`direct:${key}`);
+				return key;
+			},
+		}).html;
+		expect(observed).toEqual([
+			'direct:before',
+			'spread:title',
+			'spread:children',
+			'spread:symbol',
+			'direct:after',
+		]);
+		expect(html).toBe(
+			'<section data-before="before" title="spread title" data-after="after">&lt;escaped child&gt;</section>',
+		);
+	});
+
+	it('serializes attributes before reading a spread raw-HTML getter', () => {
+		const observed: string[] = [];
+		const markup = {
+			get __html() {
+				observed.push('read:html');
+				return '<strong>raw content</strong>';
+			},
+		};
+		const attrs = {
+			get title() {
+				observed.push('spread:title');
+				return {
+					toString() {
+						observed.push('serialize:title');
+						return 'visible title';
+					},
+				};
+			},
+			get dangerouslySetInnerHTML() {
+				observed.push('spread:html');
+				return markup;
+			},
+			get children() {
+				observed.push('spread:children');
+				return null;
+			},
+		};
+		const html = RT.renderToString(mod.Ordered, {
+			attrs,
+			read(key: string) {
+				observed.push(`direct:${key}`);
+				return key;
+			},
+		}).html;
+		expect(observed).toEqual([
+			'direct:before',
+			'spread:title',
+			'spread:html',
+			'spread:children',
+			'direct:after',
+			'serialize:title',
+			'read:html',
+		]);
+		expect(html).toBe(
+			'<section data-before="before" title="visible title" data-after="after"><strong>raw content</strong></section>',
+		);
+	});
+});
+
 describe('SSR Phase 1 — semantics', () => {
+	it('compares server memo dependencies with Object.is across render-phase retries', () => {
+		const memo = evalServer(
+			`
+				import { useMemo, useState } from 'octane';
+				export function Memo(props) @{
+					const [updated, setUpdated] = useState(false);
+					const dependency = updated ? props.second : props.first;
+					const label = useMemo(() => props.compute(dependency), [dependency]);
+					if (!updated) setUpdated(true);
+					<output>{label as string}</output>
+				}
+			`,
+			'server-memo-dependency-equality.tsrx',
+		);
+		const signedZeroValues: number[] = [];
+		expect(
+			RT.renderToString(memo.Memo, {
+				first: -0,
+				second: 0,
+				compute(value: number) {
+					signedZeroValues.push(value);
+					return Object.is(value, -0) ? 'negative zero' : 'positive zero';
+				},
+			}).html,
+		).toBe('<output>positive zero</output>');
+		expect(signedZeroValues.map((value) => Object.is(value, -0))).toEqual([true, false]);
+
+		const nanValues: number[] = [];
+		expect(
+			RT.renderToString(memo.Memo, {
+				first: Number.NaN,
+				second: Number.NaN,
+				compute(value: number) {
+					nanValues.push(value);
+					return `stable ${nanValues.length}`;
+				},
+			}).html,
+		).toBe('<output>stable 1</output>');
+		expect(nanValues).toHaveLength(1);
+	});
+
 	it('escapes dynamic text and attribute values', async () => {
 		const out = await RT.renderToString(basic.Greet, { name: '<script>"x"' });
 		expect(out.html).toContain('&lt;script&gt;');

@@ -46,6 +46,13 @@ import {
 import { hasOwnProp } from './has-own.js';
 import { headOwnershipKey } from './head-ownership.js';
 import {
+	applyElementDefaultProps,
+	childElementKey,
+	childrenIterator,
+	escapeMappedElementKey,
+	resolveLazyDefaultProps as lazyResolvedProps,
+} from './shared-value-helpers.js';
+import {
 	__profileBail,
 	__profileBeginRender,
 	__profileComponentSource,
@@ -3744,6 +3751,29 @@ export function queueRefDetach(ref: any, el: Element | FragmentInstance | null):
 	// throwing detach at drain time routes there — React's safelyDetachRef →
 	// captureCommitPhaseError (ReactErrorBoundaries:2782).
 	refDetachQueue.push(ref, el, TEARDOWN_HANDLER, TEARDOWN_BLOCK);
+}
+
+/** Replace a changed element/fragment ref without disturbing commit-phase ordering. */
+export function replaceRef(
+	scope: Scope,
+	previous: any,
+	next: any,
+	target: Element | FragmentInstance,
+): any {
+	if (previous != null) queueRefDetach(previous, target);
+	if (next != null) queueRefAttach(scope, next, target);
+	return next;
+}
+
+/** Detach only an own enumerable ref from the latest committed host/spread props. */
+export function queueOwnRefDetach(value: any, target: Element): void {
+	if (
+		value != null &&
+		Object.prototype.propertyIsEnumerable.call(Object(value), 'ref') &&
+		value.ref != null
+	) {
+		queueRefDetach(value.ref, target);
+	}
 }
 
 interface RefDetachSuppression {
@@ -9494,19 +9524,6 @@ export function puPub(slot: HookSlot, value: any, ...deps: any[]): any {
 // ---------------------------------------------------------------------------
 
 const LAZY_COMPONENT = Symbol.for('octane.lazy');
-
-function lazyResolvedProps(comp: ComponentBody<any>, props: any): any {
-	const defaults = (comp as any).defaultProps;
-	if (defaults == null || typeof defaults !== 'object') return props;
-	let resolved = props;
-	for (const key of Object.keys(defaults)) {
-		if (props == null || props[key] === undefined) {
-			if (resolved === props) resolved = props == null ? {} : { ...props };
-			resolved[key] = defaults[key];
-		}
-	}
-	return resolved;
-}
 
 /**
  * Resolve a lazy module payload to its component. Accepts React's canonical
@@ -15979,14 +15996,6 @@ function copyElementConfig(config: any): any {
 	return props;
 }
 
-function applyElementDefaultProps(type: any, props: any): void {
-	const defaults = type?.defaultProps;
-	if (defaults == null) return;
-	for (const name in defaults) {
-		if (props[name] === undefined) props[name] = defaults[name];
-	}
-}
-
 function finalizeElementDescriptor<P>(descriptor: ElementDescriptor<P>): ElementDescriptor<P> {
 	if (process.env.NODE_ENV !== 'production') {
 		Object.freeze(descriptor.props);
@@ -16285,30 +16294,6 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 	// `key` is a real (non-null) string here, so presence is already implied.
 	if (ELEMENTS_MISSING_LIST_KEY.has(element)) ELEMENTS_MISSING_LIST_KEY.add(descriptor);
 	return finalizeElementDescriptor(descriptor);
-}
-
-function escapeElementKey(key: string): string {
-	return '$' + key.replace(/[=:]/g, (match) => (match === '=' ? '=0' : '=2'));
-}
-
-function escapeMappedElementKey(key: string): string {
-	return key.replace(/\/+/g, '$&/');
-}
-
-function childElementKey(child: any, index: number): string {
-	return child != null && typeof child === 'object' && child.key != null
-		? escapeElementKey('' + child.key)
-		: index.toString(36);
-}
-
-function childrenIterator(children: any): (() => Iterator<any>) | null {
-	// React's getIteratorFn deliberately accepts objects only. Functions are
-	// ignored children even when userland attaches Symbol.iterator to one.
-	if (children == null || typeof children !== 'object') return null;
-	const iterator =
-		(typeof Symbol === 'function' && (children as any)[Symbol.iterator]) ||
-		(children as any)['@@iterator'];
-	return typeof iterator === 'function' ? iterator : null;
 }
 
 function resolveChildrenThenable(thenable: TrackedThenable): any {

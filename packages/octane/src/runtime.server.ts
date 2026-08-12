@@ -62,6 +62,13 @@ import {
 import { hasOwnProp } from './has-own.js';
 import { headOwnershipSuffix } from './head-ownership.js';
 import type { HydrateProps, HydrationStrategy } from './hydration/types.js';
+import {
+	applyElementDefaultProps,
+	childElementKey,
+	childrenIterator,
+	escapeMappedElementKey,
+	resolveLazyDefaultProps as lazyResolvedProps,
+} from './shared-value-helpers.js';
 
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
 // hyphenated style keys stay byte-equal across the two runtimes).
@@ -539,14 +546,6 @@ function copyElementConfig(config: any): any {
 	return props;
 }
 
-function applyElementDefaultProps(type: any, props: any): void {
-	const defaults = type?.defaultProps;
-	if (defaults == null) return;
-	for (const name in defaults) {
-		if (props[name] === undefined) props[name] = defaults[name];
-	}
-}
-
 function finalizeElementDescriptor(descriptor: ElementDescriptor): ElementDescriptor {
 	if (process.env.NODE_ENV !== 'production') {
 		Object.freeze(descriptor.props);
@@ -921,28 +920,6 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 		Object.defineProperty(descriptor, 'children', { configurable: true, enumerable: true, get });
 	}
 	return finalizeElementDescriptor(descriptor);
-}
-
-function escapeElementKey(key: string): string {
-	return '$' + key.replace(/[=:]/g, (match) => (match === '=' ? '=0' : '=2'));
-}
-
-function escapeMappedElementKey(key: string): string {
-	return key.replace(/\/+/g, '$&/');
-}
-
-function childElementKey(child: any, index: number): string {
-	return child != null && typeof child === 'object' && child.key != null
-		? escapeElementKey('' + child.key)
-		: index.toString(36);
-}
-
-function childrenIterator(children: any): (() => Iterator<any>) | null {
-	if (children == null || typeof children !== 'object') return null;
-	const iterator =
-		(typeof Symbol === 'function' && (children as any)[Symbol.iterator]) ||
-		(children as any)['@@iterator'];
-	return typeof iterator === 'function' ? iterator : null;
 }
 
 function iterableChildArray(value: any): any[] | null {
@@ -2388,6 +2365,31 @@ export function ssrChildrenSources(
 	return child[0] ? ssrChildText(child[1], scope) : renderFallback();
 }
 
+/**
+ * Resolve the content of an otherwise empty ordinary host with one JSX spread.
+ * The compiler has already snapshotted every enumerable own getter in authored
+ * order, so direct reads here neither repeat those getters nor see inherited
+ * properties. Keeping this narrow avoids source-pair arrays and fallback
+ * closures while retaining React's raw-HTML validation and child-slot behavior.
+ */
+export function ssrSpreadContent(
+	snapshot: Record<string, unknown> | null,
+	scope: SSRScope,
+): string {
+	if (snapshot === null) return '';
+	const html = snapshot.dangerouslySetInnerHTML;
+	const child = snapshot.children;
+	if (html != null) {
+		if (typeof html !== 'object' || !('__html' in html)) {
+			throw new Error(formatServerError(6));
+		}
+		if (child != null) throw new Error(formatServerError(5));
+		const value = (html as { __html?: unknown }).__html;
+		return value == null ? '' : String(value);
+	}
+	return child === undefined ? '' : ssrChildText(child, scope);
+}
+
 /** Validate runtime spread/direct content props before closing a void host. */
 export function ssrVoidContent(
 	tag: string,
@@ -3567,22 +3569,16 @@ function vtSsrResolve(props: VtSsrProps, kind: 'enter' | 'exit' | 'update' | 'sh
 	return v.default != null ? v.default : 'auto';
 }
 
-/**
- * Inject `vt-*` attributes into the FIRST element open-tag of an HTML
- * fragment, skipping block/comment markers and streaming `<template>`
- * placeholders (the annotation belongs on the visible fallback root that
- * follows). Attributes already present (an inner boundary annotated first —
- * innermost owns vt-update) are left alone.
- */
-function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
+/** Skip comment markers and streaming placeholders to locate the visible root. */
+function vtSsrFirstVisibleOpenTag(html: string): number {
 	const n = html.length;
 	let i = 0;
 	while (i < n) {
 		const lt = html.indexOf('<', i);
-		if (lt === -1) return html;
+		if (lt === -1) return -1;
 		if (html.startsWith('<!--', lt)) {
 			const close = html.indexOf('-->', lt + 4);
-			if (close === -1) return html;
+			if (close === -1) return -1;
 			i = close + 3;
 			continue;
 		}
@@ -3594,36 +3590,53 @@ function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
 		}
 		let e = lt + 1;
 		while (e < n && /[a-zA-Z0-9-]/.test(html[e])) e++;
-		const tag = html.slice(lt + 1, e).toLowerCase();
-		// End of the open tag — quote-aware ('>' may appear inside attr values).
-		let j = e;
-		let q = '';
-		while (j < n) {
-			const ch = html[j];
-			if (q !== '') {
-				if (ch === q) q = '';
-			} else if (ch === '"' || ch === "'") q = ch;
-			else if (ch === '>') break;
-			j++;
-		}
-		if (j >= n) return html;
-		if (tag === 'template') {
+		if (e - lt === 9 && html.slice(lt + 1, e).toLowerCase() === 'template') {
+			const j = vtSsrOpenTagEnd(html, e);
+			if (j === -1) return -1;
 			const close = html.indexOf('</template>', j);
 			i = close === -1 ? j + 1 : close + 11;
 			continue;
 		}
-		const open = html.slice(lt, j);
-		let inject = '';
-		for (let k = 0; k < attrs.length; k++) {
-			if (open.indexOf(attrs[k][0] + '="') === -1) {
-				inject += ' ' + attrs[k][0] + '="' + escapeAttr(attrs[k][1]) + '"';
-			}
-		}
-		if (inject === '') return html;
-		const at = html[j - 1] === '/' ? j - 1 : j;
-		return html.slice(0, at) + inject + html.slice(at);
+		return lt;
 	}
-	return html;
+	return -1;
+}
+
+/** Find an opening tag's actual terminator without allocating scan state. */
+function vtSsrOpenTagEnd(html: string, from: number): number {
+	let quote = 0;
+	for (let index = from; index < html.length; index++) {
+		const code = html.charCodeAt(index);
+		if (quote !== 0) {
+			if (code === quote) quote = 0;
+		} else if (code === 34 || code === 39) {
+			quote = code;
+		} else if (code === 62) {
+			return index;
+		}
+	}
+	return -1;
+}
+
+/**
+ * Inject `vt-*` attributes into the first visible element's opening tag.
+ * An inner boundary owns attributes it has already placed on the same root.
+ */
+function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
+	const start = vtSsrFirstVisibleOpenTag(html);
+	if (start === -1) return html;
+	const end = vtSsrOpenTagEnd(html, start + 1);
+	if (end === -1) return html;
+	const open = html.slice(start, end);
+	let inject = '';
+	for (let index = 0; index < attrs.length; index++) {
+		if (open.indexOf(attrs[index][0] + '="') === -1) {
+			inject += ' ' + attrs[index][0] + '="' + escapeAttr(attrs[index][1]) + '"';
+		}
+	}
+	if (inject === '') return html;
+	const insertion = html[end - 1] === '/' ? end - 1 : end;
+	return html.slice(0, insertion) + inject + html.slice(insertion);
 }
 
 /**
@@ -3634,47 +3647,15 @@ function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
  * claims nothing — that is exactly React's "top of the arm only" rule.
  */
 function vtSsrClaimArm(html: string, kind: 'enter' | 'exit'): string {
-	const n = html.length;
-	let i = 0;
-	while (i < n) {
-		const lt = html.indexOf('<', i);
-		if (lt === -1) return html;
-		if (html.startsWith('<!--', lt)) {
-			const close = html.indexOf('-->', lt + 4);
-			if (close === -1) return html;
-			i = close + 3;
-			continue;
-		}
-		const c = html.charCodeAt(lt + 1);
-		if (!((c >= 65 && c <= 90) || (c >= 97 && c <= 122))) {
-			i = lt + 1;
-			continue;
-		}
-		let e = lt + 1;
-		while (e < n && /[a-zA-Z0-9-]/.test(html[e])) e++;
-		const tag = html.slice(lt + 1, e).toLowerCase();
-		let j = e;
-		let q = '';
-		while (j < n) {
-			const ch = html[j];
-			if (q !== '') {
-				if (ch === q) q = '';
-			} else if (ch === '"' || ch === "'") q = ch;
-			else if (ch === '>') break;
-			j++;
-		}
-		if (j >= n) return html;
-		if (tag === 'template') {
-			const close = html.indexOf('</template>', j);
-			i = close === -1 ? j + 1 : close + 11;
-			continue;
-		}
-		const marker = ' vt-' + kind + '-x="';
-		const at = html.slice(lt, j).indexOf(marker);
-		if (at === -1) return html;
-		return html.slice(0, lt + at) + ' vt-' + kind + '="' + html.slice(lt + at + marker.length);
-	}
-	return html;
+	const start = vtSsrFirstVisibleOpenTag(html);
+	if (start === -1) return html;
+	const end = vtSsrOpenTagEnd(html, start + 1);
+	if (end === -1) return html;
+	const marker = ' vt-' + kind + '-x="';
+	const offset = html.slice(start, end).indexOf(marker);
+	if (offset === -1) return html;
+	const insertion = start + offset;
+	return html.slice(0, insertion) + ' vt-' + kind + '="' + html.slice(insertion + marker.length);
 }
 
 /** Strip residual (unclaimed) arm candidates before emission. */
@@ -4257,7 +4238,7 @@ export function use<T>(
 // ---------------------------------------------------------------------------
 
 // Element-wise Object.is — the client useMemo's deps contract.
-function puDepsEqual(a: unknown[], b: unknown[]): boolean {
+function serverDepsEqual(a: readonly unknown[], b: readonly unknown[]): boolean {
 	if (a.length !== b.length) return false;
 	for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
 	return true;
@@ -4295,7 +4276,7 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot
 	}
 	const key = prefix + '|' + base + '#' + n;
 	const hit = res.pu.created.get(key);
-	if (hit !== undefined && puDepsEqual(hit.deps, deps)) return hit.value as T;
+	if (hit !== undefined && serverDepsEqual(hit.deps, deps)) return hit.value as T;
 	// Warm adoption: a parent's warm walk may have prefetched this creation
 	// (keyed by the shared slot symbol). Deps must match — a drift between the
 	// warm-time and render-time props is a clean miss (the orphaned entry dies
@@ -4305,7 +4286,7 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot
 		const wlist = res.pu.warm.get(siteKey);
 		if (wlist !== undefined) {
 			for (let i = 0; i < wlist.length; i++) {
-				if (puDepsEqual(wlist[i].deps, deps)) {
+				if (serverDepsEqual(wlist[i].deps, deps)) {
 					if (!wlist[i].available) continue;
 					wlist[i].available = false;
 					const value = wlist[i].value;
@@ -4484,7 +4465,7 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 	if (list !== undefined) {
 		for (let i = 0; i < list.length; i++) {
 			const entry = list[i];
-			if (!puDepsEqual(entry.deps, deps) || CURRENT_PU_WARM_CLAIMS?.has(entry)) continue;
+			if (!serverDepsEqual(entry.deps, deps) || CURRENT_PU_WARM_CLAIMS?.has(entry)) continue;
 			CURRENT_PU_WARM_CLAIMS?.add(entry);
 			return entry.value; // this concrete occurrence already ran or warmed
 		}
@@ -4498,7 +4479,7 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 	for (const created of res.pu.created.values()) {
 		if (
 			created.site === slot &&
-			puDepsEqual(created.deps, deps) &&
+			serverDepsEqual(created.deps, deps) &&
 			!CURRENT_PU_WARM_CLAIMS?.has(created)
 		) {
 			activeCreation = created;
@@ -4573,19 +4554,6 @@ export function warmChild(comp: any, props: any): void {
 // has to be unique per lazy() call — not per frame like use()'s data keys.
 let LAZY_ID = 0;
 const LAZY_COMPONENT = Symbol.for('octane.lazy');
-
-function lazyResolvedProps(comp: ServerComponent, props: any): any {
-	const defaults = (comp as any).defaultProps;
-	if (defaults == null || typeof defaults !== 'object') return props;
-	let resolved = props;
-	for (const key of Object.keys(defaults)) {
-		if (props == null || props[key] === undefined) {
-			if (resolved === props) resolved = props == null ? {} : { ...props };
-			resolved[key] = defaults[key];
-		}
-	}
-	return resolved;
-}
 
 function resolveLazyModule(mod: any): ServerComponent {
 	let comp = mod;
@@ -4906,12 +4874,6 @@ export const useLayoutEffect = useEffect;
 export const useInsertionEffect = useEffect;
 export function useImperativeHandle(): void {}
 
-function serverHookDepsEqual(a: readonly unknown[], b: readonly unknown[]): boolean {
-	if (a.length !== b.length) return false;
-	for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
-	return true;
-}
-
 export function useMemo<T>(compute: () => T, deps?: readonly unknown[] | null, slot?: symbol): T;
 export function useMemo<T>(
 	compute: () => T,
@@ -4930,7 +4892,7 @@ export function useMemo<T>(
 	if (rec === undefined) {
 		rec = { value: compute(), deps: deps.slice() };
 		position.list[position.index] = rec;
-	} else if (!serverHookDepsEqual(rec.deps, deps)) {
+	} else if (!serverDepsEqual(rec.deps, deps)) {
 		rec.value = compute();
 		rec.deps = deps.slice();
 	}

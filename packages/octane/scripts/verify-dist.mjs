@@ -316,6 +316,8 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'warmMemo',
 		'withSlot',
 	],
+	'./internal/client': ['queueOwnRefDetach', 'replaceRef'],
+	'./internal/server': ['ssrSpreadContent'],
 	'./static': ['prerender'],
 	'./testing': ['clampJsdomScrollTop'],
 	'./constants': [

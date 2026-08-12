@@ -1013,35 +1013,6 @@ function jsonValueToNode(value) {
 	);
 }
 
-// Merge one import list: user specifiers verbatim (preserving `x as y`
-// aliases) + every generated-code helper aliased to `_$name`.
-function buildRuntimeImport(ctx, moduleName) {
-	let out = '';
-	for (const local of ctx.userRuntimeNamespaces || []) {
-		out += `import * as ${local} from '${moduleName}';\n`;
-	}
-	for (const local of ctx.userRuntimeDefaults || []) {
-		out += `import ${local} from '${moduleName}';\n`;
-	}
-	const specifiers = new Set(ctx.userRuntimeNames);
-	for (const n of ctx.runtimeNeeded) {
-		const alias =
-			n === 'hookSlots' && ctx._hookSlotsHelperName ? ctx._hookSlotsHelperName : rtAlias(n);
-		specifiers.add(`${n} as ${alias}`);
-	}
-	if (specifiers.size > 0) {
-		out += `import { ${[...specifiers].sort().join(', ')} } from '${moduleName}';\n`;
-	}
-	return out === '' ? '' : out + '\n';
-}
-
-function buildProfileRuntimeImport(ctx) {
-	const specifiers = [...ctx.profileRuntimeNeeded].map((name) => `${name} as ${rtAlias(name)}`);
-	return specifiers.length === 0
-		? ''
-		: `import { ${specifiers.sort().join(', ')} } from 'octane/profiling';\n\n`;
-}
-
 // Split a `imported as local` merge key (see buildRuntimeImportNodes) back into
 // its [imported, local] pair — plain names import under their own name.
 function importSpecifierPair(entry) {
@@ -1049,18 +1020,28 @@ function importSpecifierPair(entry) {
 	return at === -1 ? [entry, entry] : [entry.slice(0, at), entry.slice(at + 4)];
 }
 
+// Existing helpers remain on their historical public request so previously
+// compiled components and authored runtime imports retain their stable shape.
+// New compiler-only helpers use the private, renderer-specific ABI instead.
+const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set(['replaceRef', 'queueOwnRefDetach']);
+const INTERNAL_SERVER_RUNTIME_HELPERS = new Set(['ssrSpreadContent']);
+
 function runtimeImportModuleFor(ctx, fallback, imported, local) {
 	for (const route of ctx.runtimeImportRoutes ?? []) {
 		if (route.locals?.has(local) || route.imported?.has(imported)) return route.module;
 	}
+	if (local === rtAlias(imported)) {
+		if (fallback === 'octane' && INTERNAL_CLIENT_RUNTIME_HELPERS.has(imported)) {
+			return 'octane/internal/client';
+		}
+		if (fallback === 'octane/server' && INTERNAL_SERVER_RUNTIME_HELPERS.has(imported)) {
+			return 'octane/internal/server';
+		}
+	}
 	return fallback;
 }
 
-/**
- * Node form of buildRuntimeImport (client AST emit, M2): same specifiers, same
- * `imported as alias` sort order, returned as ImportDeclaration nodes. The
- * server pipeline still assembles its import strings via buildRuntimeImport.
- */
+/** Build client and server runtime imports directly as compiler-owned AST nodes. */
 function buildRuntimeImportNodes(ctx, moduleName, origin) {
 	const nodes = [];
 	for (const local of ctx.userRuntimeNamespaces || []) {
@@ -1094,7 +1075,7 @@ function buildRuntimeImportNodes(ctx, moduleName, origin) {
 	return nodes.map((node) => inheritOriginLoc(node, origin));
 }
 
-/** Node form of buildProfileRuntimeImport (client AST emit, M2). */
+/** Build the optional profiling ABI import directly as compiler-owned AST nodes. */
 function buildProfileRuntimeImportNodes(ctx, origin) {
 	const specifiers = [...ctx.profileRuntimeNeeded].map((name) => `${name} as ${rtAlias(name)}`);
 	if (specifiers.length === 0) return [];
@@ -10276,6 +10257,31 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	const firstSpreadIdx = attrs.findIndex(
 		(a) => a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute',
 	);
+	// A single spread is the only possible content writer when an otherwise
+	// empty ordinary host has no explicit children/raw-HTML attributes. Its
+	// snapshot already owns evaluation order and enumerable-key semantics, so a
+	// narrow runtime helper can read both content channels without manufacturing
+	// duplicate source pairs and fallback closures at every compiled host.
+	const useSingleSpreadContent =
+		firstSpreadIdx !== -1 &&
+		!VOID_ELEMENTS.has(tag) &&
+		tag !== 'textarea' &&
+		tag !== 'select' &&
+		tag !== 'option' &&
+		tag !== 'script' &&
+		tag !== 'style' &&
+		tag !== 'pre' &&
+		tag !== 'listing' &&
+		!(node.children || []).some(
+			(child) => child?.type === 'JSXStyleElement' && headResourceKind(child) === 'style',
+		) &&
+		!hasSemanticJsxChildren(node.children || []) &&
+		attrs.every((attr, index) => {
+			if (index === firstSpreadIdx) return true;
+			if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') return false;
+			const attrName = jsxAttrRawName(attr);
+			return attrName !== 'children' && attrName !== 'dangerouslySetInnerHTML';
+		});
 	// A spread can carry a native form control's value/default writers (plus
 	// checked for input and multiple for select). Serializing each source as a
 	// generic attribute either creates first-wins duplicates or puts state in the
@@ -10301,6 +10307,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	const spreadTemps = [];
 	const htmlSources = [];
 	const childrenPropSources = [];
+	let singleSpreadContentTemp = null;
 	const bindAttributeEvaluation = (argExpr) => {
 		const tempName = `__sp${spreadTemps.length}`;
 		spreadTemps.push({ tempName, argExpr });
@@ -10371,6 +10378,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				formControlSources.push(ssrSourcePair(b.literal(true, 'true'), tmp, attr));
 			}
 			attrSources.push(ssrSourcePair(b.literal(true, 'true'), tmp, attr));
+			if (useSingleSpreadContent) {
+				singleSpreadContentTemp = tmp;
+				continue;
+			}
 			// The spread may carry `dangerouslySetInnerHTML` — record both own-key
 			// presence and value so an explicit `undefined` overwrites an earlier writer.
 			const spreadHas = (key) =>
@@ -11004,7 +11015,11 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		parts.push(ssrCall('ssrOption', [optionValueExpr, attrsExpr, contentExpr], node));
 		return finalize();
 	}
-	if (htmlSources.length > 0) {
+	if (singleSpreadContentTemp !== null) {
+		ctx.runtimeNeeded.add('ssrSpreadContent');
+		flush();
+		parts.push(ssrCall('ssrSpreadContent', [singleSpreadContentTemp, b.id('__s')], node));
+	} else if (htmlSources.length > 0) {
 		// Raw HTML (explicit and/or spread-supplied) wins over children when present
 		// at runtime (last source wins); otherwise the children render.
 		const innerHtmlHelper = tag === 'script' ? 'ssrScriptInnerHtml' : 'ssrInnerHtml';
@@ -20096,7 +20111,7 @@ function planJsx(
 		if (b.kind === 'formCommit') ctx.runtimeNeeded.add('setFormControlSources');
 		if (b.kind === 'hostCommit') {
 			ctx.runtimeNeeded.add('setHostPropSources');
-			ctx.runtimeNeeded.add('queueRefDetach');
+			ctx.runtimeNeeded.add('queueOwnRefDetach');
 		}
 		// A commit-phase collector takes the element's props as one grouped call,
 		// so each source's name literal — not the shared helper — is what claims
@@ -20124,16 +20139,16 @@ function planJsx(
 		}
 		if (b.kind === 'spread') {
 			ctx.runtimeNeeded.add('setSpread');
-			ctx.runtimeNeeded.add('queueRefDetach'); // unmount-detach of a spread-supplied ref
+			ctx.runtimeNeeded.add('queueOwnRefDetach'); // unmount-detach of a spread-supplied ref
 		}
 		if (b.kind === 'ref') {
 			ctx.runtimeNeeded.add('queueRefAttach'); // deferred mount attach (commit-phase timing)
 			ctx.runtimeNeeded.add('queueRefDetach'); // deferred unmount detach (same phasing)
+			if (!b.mountOnly) ctx.runtimeNeeded.add('replaceRef'); // changed-ref commit-phase update
 		}
 		if (b.kind === 'fragmentRef') {
 			ctx.runtimeNeeded.add('mountFragmentRef');
-			ctx.runtimeNeeded.add('queueRefAttach'); // deferred update re-attach
-			ctx.runtimeNeeded.add('queueRefDetach'); // deferred update/unmount detach
+			if (!b.mountOnly) ctx.runtimeNeeded.add('replaceRef'); // changed-ref commit-phase update
 			// Fragment refs need a SECOND template-walked node for the end
 			// marker; emitBindingMount expects a single elVar so we resolve
 			// the end-marker var here and stash it on the binding for the
@@ -21580,24 +21595,11 @@ function emitBindingMount(bind, elVar, bag) {
 			// `_host$` field is re-written by updates, so the read must be live.
 			const cleanup = b.arrow(
 				[],
-				b.block([
-					b.const('_p', bagFieldNode(bag, `_host$${bind.id}`)),
-					b.if(
-						andChain([
-							b.binary('!=', b.id('_p'), nullNode()),
-							propertyIsEnumerableCall(b.id('_p'), 'ref'),
-							b.binary('!=', b.member(b.id('_p'), 'ref'), nullNode()),
-						]),
-						b.stmt(
-							b.call(
-								'_$queueRefDetach',
-								b.member(b.id('_p'), 'ref'),
-								bagFieldNode(bag, `_el$${bind.id}`),
-							),
-						),
-						null,
-					),
-				]),
+				b.call(
+					'_$queueOwnRefDetach',
+					bagFieldNode(bag, `_host$${bind.id}`),
+					bagFieldNode(bag, `_el$${bind.id}`),
+				),
 			);
 			return st(
 				b.block([
@@ -21707,24 +21709,11 @@ function emitBindingMount(bind, elVar, bag) {
 			const spLocal = local(`_sp$${bind.id}`);
 			const cleanup = b.arrow(
 				[],
-				b.block([
-					b.const('_sp', bagFieldNode(bag, `_sp$${bind.id}`)),
-					b.if(
-						andChain([
-							b.binary('!=', b.id('_sp'), nullNode()),
-							propertyIsEnumerableCall(b.call('Object', b.id('_sp')), 'ref'),
-							b.binary('!=', b.member(b.id('_sp'), 'ref'), nullNode()),
-						]),
-						b.stmt(
-							b.call(
-								'_$queueRefDetach',
-								b.member(b.id('_sp'), 'ref'),
-								bagFieldNode(bag, `_el$${bind.id}`),
-							),
-						),
-						null,
-					),
-				]),
+				b.call(
+					'_$queueOwnRefDetach',
+					bagFieldNode(bag, `_sp$${bind.id}`),
+					bagFieldNode(bag, `_el$${bind.id}`),
+				),
 			);
 			return st(
 				b.block([
@@ -22107,20 +22096,13 @@ function emitBindingUpdate(bind, bag) {
 					b.const('_r', bind.expr),
 					b.if(
 						b.binary('!==', b.id('_r'), F('_ref')),
-						b.block([
-							b.const('_old', F('_ref')),
-							b.if(
-								b.binary('!=', b.id('_old'), nullNode()),
-								b.stmt(b.call('_$queueRefDetach', b.id('_old'), F('_el'))),
-								null,
+						b.stmt(
+							b.assignment(
+								'=',
+								F('_ref'),
+								b.call('_$replaceRef', b.id('__s'), F('_ref'), b.id('_r'), F('_el')),
 							),
-							b.if(
-								b.binary('!=', b.id('_r'), nullNode()),
-								b.stmt(b.call('_$queueRefAttach', b.id('__s'), b.id('_r'), F('_el'))),
-								null,
-							),
-							b.stmt(b.assignment('=', F('_ref'), b.id('_r'))),
-						]),
+						),
 						null,
 					),
 				]),
@@ -22141,19 +22123,13 @@ function emitBindingUpdate(bind, bag) {
 					b.const('_fi', F('_fi')),
 					b.if(
 						andChain([fi(), b.binary('!==', b.id('_r'), cur())]),
-						b.block([
-							b.if(
-								b.binary('!=', cur(), nullNode()),
-								b.stmt(b.call('_$queueRefDetach', cur(), fi())),
-								null,
+						b.stmt(
+							b.assignment(
+								'=',
+								cur(),
+								b.call('_$replaceRef', b.id('__s'), cur(), b.id('_r'), fi()),
 							),
-							b.if(
-								b.binary('!=', b.id('_r'), nullNode()),
-								b.stmt(b.call('_$queueRefAttach', b.id('__s'), b.id('_r'), fi())),
-								null,
-							),
-							b.stmt(b.assignment('=', cur(), b.id('_r'))),
-						]),
+						),
 						null,
 					),
 				]),

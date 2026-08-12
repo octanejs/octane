@@ -67,4 +67,43 @@ describe('callback ref identity change (React 19 detach-before-attach)', () => {
 		r.unmount();
 		expect(log).toEqual(['A:attach', 'A:cleanup']);
 	});
+
+	it('preserves array/object refs when their callbacks are replaced, removed, and restored', () => {
+		const log: string[] = [];
+		const firstObject: { current: Element | null } = { current: null };
+		const secondObject: { current: Element | null } = { current: null };
+		const first = (element: Element | null) => {
+			if (element !== null) log.push('first:attach');
+			return () => log.push('first:cleanup');
+		};
+		const second = (element: Element | null) => {
+			if (element !== null) log.push('second:attach');
+			return () => log.push('second:cleanup');
+		};
+		const firstRefs = [firstObject, first];
+		const secondRefs = [secondObject, second];
+		const root = mount(IdentityRef, { pick: firstRefs });
+		const host = root.find('#host');
+
+		expect(firstObject.current).toBe(host);
+		expect(log).toEqual(['first:attach']);
+		root.update(IdentityRef, { pick: firstRefs });
+		expect(log).toEqual(['first:attach']);
+
+		root.update(IdentityRef, { pick: secondRefs });
+		expect(firstObject.current).toBeNull();
+		expect(secondObject.current).toBe(host);
+		expect(log).toEqual(['first:attach', 'first:cleanup', 'second:attach']);
+
+		root.update(IdentityRef, { pick: null });
+		expect(secondObject.current).toBeNull();
+		expect(log).toEqual(['first:attach', 'first:cleanup', 'second:attach', 'second:cleanup']);
+
+		root.update(IdentityRef, { pick: firstRefs });
+		expect(firstObject.current).toBe(host);
+		expect(log.at(-1)).toBe('first:attach');
+		root.unmount();
+		expect(firstObject.current).toBeNull();
+		expect(log.at(-1)).toBe('first:cleanup');
+	});
 });

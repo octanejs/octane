@@ -248,7 +248,7 @@
         {
           "path": "packages/textarea-autosize/tests/browser/browser.test.ts",
           "role": "test",
-          "sha256": "c6c51734b428e738c49bba2eced272556c4bbda17c1b7e66824afe954710713e",
+          "sha256": "84cacc5b5f04f60b64eb2f25b11a3070a73b4d312cd15a4566f19f90635f9900",
           "cases": [
             {
               "id": "browser:chromium",

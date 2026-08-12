@@ -38,6 +38,8 @@
     "./behavior": "./src/behavior-root.ts",
     "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
+    "./internal/client": "./src/internal/client.ts",
+    "./internal/server": "./src/internal/server.ts",
     "./static": "./src/static/index.ts",
     "./testing": "./src/testing.ts",
     "./constants": "./src/constants.ts",
@@ -101,6 +103,16 @@
         "import": "./dist/server/index.js",
         "require": "./dist/cjs/server/index.cjs",
         "default": "./dist/server/index.js"
+      },
+      "./internal/client": {
+        "types": "./dist/internal/client.d.ts",
+        "import": "./dist/internal/client.js",
+        "default": "./dist/internal/client.js"
+      },
+      "./internal/server": {
+        "types": "./dist/internal/server.d.ts",
+        "import": "./dist/internal/server.js",
+        "default": "./dist/internal/server.js"
       },
       "./static": {
         "types": "./dist/static/index.d.ts",

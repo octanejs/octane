@@ -38,7 +38,7 @@ function serverModule(fixture: string, file: string): Record<string, any> {
 function devClientModule(fixture: string, file: string): Record<string, any> {
 	let { code } = compile(readFileSync(fixture, 'utf8'), file, { mode: 'client', dev: true });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/internal\/client)?['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

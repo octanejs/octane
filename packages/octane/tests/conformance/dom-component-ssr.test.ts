@@ -13,7 +13,7 @@ import { createElement } from '../../src/index.js';
 function evalServer(source: string, file: string): Record<string, any> {
 	let { code } = compile(source, file, { mode: 'server' });
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/(?:internal\/)?server['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');

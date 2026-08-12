@@ -187,7 +187,8 @@ const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/clsx-class.
 const PROD_COMPILE = process.env.OCTANE_TEST_COMPILE_MODE === 'prod';
 
 function evalModule(mode: 'server' | 'client', rt: unknown): Record<string, any> {
-	const src = mode === 'server' ? 'octane/server' : 'octane';
+	const src =
+		mode === 'server' ? 'octane/(?:server|internal/server)' : 'octane(?:/internal/client)?';
 	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'clsx-class.tsrx', {
 		mode,
 		dev: mode === 'client' && !PROD_COMPILE,

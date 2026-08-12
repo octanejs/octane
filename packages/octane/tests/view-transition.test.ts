@@ -104,6 +104,33 @@ describe('ViewTransition server output', () => {
 		expect(html).not.toContain('vt-exit=');
 	});
 
+	it('annotates and claims the first visible element past quoted tag delimiters', () => {
+		const mod = evalServer(
+			`
+				import { ViewTransition } from 'octane';
+				export function App(props) @{
+					@try {
+						<ViewTransition name="quoted" enter="arrive" update="steady">
+							<x-quoted-root id="quoted-root" title={props.title} />
+						</ViewTransition>
+					} @pending {
+						<i>{'waiting'}</i>
+					}
+				}
+			`,
+			'quoted-view-transition.tsrx',
+		);
+		const title = 'before > after "quoted"';
+		const { html } = ServerRuntime.renderToString(mod.App, { title });
+		const root = document.createElement('div');
+		root.innerHTML = html;
+		const element = root.querySelector('#quoted-root')!;
+		expect(element.getAttribute('title')).toBe(title);
+		expect(element.getAttribute('vt-name')).toBe('quoted');
+		expect(element.getAttribute('vt-update')).toBe('steady');
+		expect(element.getAttribute('vt-enter')).toBe('arrive');
+	});
+
 	it('isolates nested buffered renders from an enclosing ViewTransition candidate', () => {
 		const { html } = ServerRuntime.renderToString(ambient.NestedInsideViewTransition, {
 			run: () => ServerRuntime.renderToString(ambient.Nested),
