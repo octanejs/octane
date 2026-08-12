@@ -7,6 +7,7 @@ import {
 	createPackedTsrxConsumerConfig,
 	createPackedTsrxConsumerManifest,
 	findPackedTsrxSourceConsumerPackages,
+	findPackedTsrxSourceConsumerSpecifiers,
 	isForbiddenNativeGraphModule,
 	isWithinDirectory,
 	renderPackedExampleWorkspace,
@@ -16,6 +17,7 @@ import {
 	renderPackedTsrxConsumerSource,
 	renderPackedTsrxSourceImports,
 	renderPackedTsrxConsumerTypeProbe,
+	PACKED_TSRX_CONSUMER_PROJECTS,
 } from './package-pack-canaries.mjs';
 
 describe('packed JavaScript consumers', () => {
@@ -178,7 +180,11 @@ describe('packed TSRX source consumers', () => {
 	};
 
 	test('installs the real packed bindings and the pinned consumer TSRX tooling', () => {
-		const manifest = createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions);
+		const manifest = createPackedTsrxConsumerManifest(
+			archiveSpecs,
+			toolingVersions,
+			Object.keys(archiveSpecs),
+		);
 
 		assert.deepEqual(manifest.dependencies, archiveSpecs);
 		assert.deepEqual(manifest.devDependencies, {
@@ -194,7 +200,12 @@ describe('packed TSRX source consumers', () => {
 		const { '@octanejs/tiptap': _missingTiptap, ...incompleteArchives } = archiveSpecs;
 
 		assert.throws(
-			() => createPackedTsrxConsumerManifest(incompleteArchives, toolingVersions),
+			() =>
+				createPackedTsrxConsumerManifest(
+					incompleteArchives,
+					toolingVersions,
+					Object.keys(archiveSpecs),
+				),
 			/no packed archive was provided for @octanejs\/tiptap/,
 		);
 	});
@@ -208,7 +219,11 @@ describe('packed TSRX source consumers', () => {
 		assert.equal(config.compilerOptions.jsxImportSource, 'octane');
 		assert.deepEqual(config.compilerOptions.plugins, [{ name: '@tsrx/typescript-plugin' }]);
 		assert.deepEqual(config.tsrx, { compiler: 'octane/compiler/volar' });
-		assert.deepEqual(config.include, ['src/**/*.ts', 'src/**/*.tsrx']);
+		assert.deepEqual(config.include, [
+			'src/**/*.ts',
+			'src/**/*.tsrx',
+			'node_modules/@octanejs/**/*.tsrx',
+		]);
 		assert.equal(config.compilerOptions.paths, undefined);
 	});
 
@@ -219,6 +234,10 @@ describe('packed TSRX source consumers', () => {
 		assert.equal(config.compilerOptions.strict, true);
 		assert.equal(config.compilerOptions.skipLibCheck, false);
 		assert.deepEqual(config.tsrx, { compiler: 'octane/compiler/volar' });
+	});
+
+	test('executes both Node and browser ambient typecheck projects', () => {
+		assert.deepEqual(PACKED_TSRX_CONSUMER_PROJECTS, ['tsconfig.json', 'tsconfig.browser.json']);
 	});
 
 	test('discovers every published framework binding containing TSRX', () => {
@@ -249,6 +268,23 @@ describe('packed TSRX source consumers', () => {
 		assert.equal(
 			renderPackedTsrxSourceImports(['@octanejs/jotai', '@octanejs/redux']),
 			"import '@octanejs/jotai';\nimport '@octanejs/redux';\n",
+		);
+	});
+
+	test('discovers rootless public TSRX subpaths from the packed manifest', () => {
+		assert.deepEqual(
+			findPackedTsrxSourceConsumerSpecifiers(
+				'@octanejs/components',
+				{
+					exports: {
+						'./Button': './src/Button.tsrx',
+						'./theme.css': './src/theme.css',
+						'./package.json': './package.json',
+					},
+				},
+				new Set(['src/Button.tsrx', 'src/theme.css']),
+			),
+			['@octanejs/components/Button'],
 		);
 	});
 

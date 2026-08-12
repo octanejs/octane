@@ -1,13 +1,13 @@
 // Port of RTK Query's ApiProvider. It owns an isolated Toolkit store and uses
 // @octanejs/redux's Provider; query hooks can also use a caller-supplied context.
 import { useContext, useEffect, useState } from 'octane';
-import type { Context } from 'octane';
+import type { Context, OctaneNode } from 'octane';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider, ReactReduxContext, type ReactReduxContextValue } from '@octanejs/redux';
 import { setupListeners, type Api } from '@reduxjs/toolkit/query';
 
 export function ApiProvider(props: {
-	children?: unknown;
+	children?: OctaneNode;
 	api: Api<any, {}, any, any>;
 	setupListeners?: Parameters<typeof setupListeners>[1] | false;
 	context?: Context<ReactReduxContextValue | null>;

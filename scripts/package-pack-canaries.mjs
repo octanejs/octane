@@ -57,20 +57,6 @@ export function renderPackedExampleWorkspace(archiveSpecs) {
 	return `overrides:\n${overrides}\n`;
 }
 
-export const PACKED_TSRX_CONSUMER_PACKAGES = [
-	'@octanejs/cmdk',
-	'@octanejs/floating-ui',
-	'@octanejs/input-otp',
-	'@octanejs/radix',
-	'@octanejs/recharts',
-	'@octanejs/spring',
-	'@octanejs/sonner',
-	'@octanejs/syntax-highlighter',
-	'@octanejs/textarea-autosize',
-	'@octanejs/tiptap',
-	'octane',
-];
-
 export const PACKED_COMMONJS_CONSUMER_PACKAGES = [
 	'@octanejs/base-ui',
 	'@octanejs/floating-ui',
@@ -176,7 +162,7 @@ export function findPackedTsrxSourceConsumerPackages(
 				!pkg.private &&
 				pkg.role === 'framework binding' &&
 				!excludedPackages.has(pkg.name) &&
-				[...(packedFiles.get(pkg.name) ?? [])].some((file) => file.endsWith('.tsrx')),
+				hasTsrxFile(packedFiles.get(pkg.name)),
 		)
 		.map((pkg) => pkg.name)
 		.sort();
@@ -184,11 +170,49 @@ export function findPackedTsrxSourceConsumerPackages(
 	return [...bindingNames, 'octane'];
 }
 
-export function createPackedTsrxConsumerManifest(
-	archiveSpecs,
-	toolingVersions,
-	packageNames = PACKED_TSRX_CONSUMER_PACKAGES,
-) {
+function hasTsrxFile(files) {
+	for (const file of files ?? []) {
+		if (file.endsWith('.tsrx')) return true;
+	}
+	return false;
+}
+
+function collectExportTargets(value, output = []) {
+	if (typeof value === 'string') {
+		output.push(value);
+	} else if (value && typeof value === 'object') {
+		for (const child of Object.values(value)) collectExportTargets(child, output);
+	}
+	return output;
+}
+
+export function findPackedTsrxSourceConsumerSpecifiers(packageName, manifest, files) {
+	if (!hasTsrxFile(files)) return [];
+
+	const exports = manifest.exports;
+	if (
+		typeof exports === 'string' ||
+		(exports && !Object.keys(exports).some((key) => key.startsWith('.')))
+	) {
+		return [packageName];
+	}
+	if (!exports || typeof exports !== 'object') return manifest.main ? [packageName] : [];
+
+	const specifiers = [];
+	for (const [subpath, target] of Object.entries(exports)) {
+		if (subpath === '.') {
+			specifiers.push(packageName);
+			continue;
+		}
+		if (!subpath.startsWith('./') || subpath.includes('*')) continue;
+		if (collectExportTargets(target).some((entry) => entry.endsWith('.tsrx'))) {
+			specifiers.push(`${packageName}/${subpath.slice(2)}`);
+		}
+	}
+	return specifiers;
+}
+
+export function createPackedTsrxConsumerManifest(archiveSpecs, toolingVersions, packageNames) {
 	const dependencies = {};
 
 	for (const packageName of packageNames) {
@@ -234,15 +258,19 @@ export function createPackedTsrxConsumerConfig({ nodeTypes = true } = {}) {
 		tsrx: {
 			compiler: 'octane/compiler/volar',
 		},
-		include: ['src/**/*.ts', 'src/**/*.tsrx'],
+		// Compile the installed implementation files directly. A package import can
+		// resolve through a declaration condition and otherwise hide shipped TSRX.
+		include: ['src/**/*.ts', 'src/**/*.tsrx', 'node_modules/@octanejs/**/*.tsrx'],
 	};
 }
 
-export function renderPackedTsrxSourceImports(packageNames) {
+export const PACKED_TSRX_CONSUMER_PROJECTS = ['tsconfig.json', 'tsconfig.browser.json'];
+
+export function renderPackedTsrxSourceImports(specifiers) {
 	return (
-		packageNames
-			.filter((packageName) => packageName !== 'octane')
-			.map((packageName) => `import '${packageName}';`)
+		specifiers
+			.filter((specifier) => specifier !== 'octane')
+			.map((specifier) => `import '${specifier}';`)
 			.join('\n') + '\n'
 	);
 }

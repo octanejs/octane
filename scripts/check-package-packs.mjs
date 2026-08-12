@@ -27,10 +27,11 @@ import {
 	createPackedExampleManifest,
 	isWithinDirectory,
 	findPackedTsrxSourceConsumerPackages,
+	findPackedTsrxSourceConsumerSpecifiers,
 	NATIVE_GRAPH_FORBIDDEN_MODULE,
 	PACKED_COMMONJS_CONSUMER_PACKAGES,
 	PACKED_JAVASCRIPT_CONSUMER_PACKAGES,
-	PACKED_TSRX_CONSUMER_PACKAGES,
+	PACKED_TSRX_CONSUMER_PROJECTS,
 	renderPackedExampleWorkspace,
 	renderPackedCommonjsConsumerSource,
 	renderPackedDraggableEsmConsumerSource,
@@ -100,10 +101,13 @@ const packedExampleCanaries = [
 		packages: ['octane', '@octanejs/vite-plugin', '@octanejs/app-core', '@octanejs/seo'],
 	},
 ];
-// Visx still exposes upstream React SVG/event prop types throughout its 257
-// authored TSRX modules. Keep the debt explicit while every new source binding
-// is enrolled automatically; issue #721 owns removing this final exception.
+// Keep known upstream type-graph debt explicit while every new source binding
+// is enrolled automatically. Issue #721 owns removing these exceptions.
 const packedTsrxSourceExceptions = new Map([
+	[
+		'@octanejs/livestore',
+		'LiveStore 0.4 declarations require the exact Effect peer graph from the workspace lockfile',
+	],
 	['@octanejs/visx', 'React SVG and event prop types are not yet Octane-native'],
 ]);
 const inventoryErrors = validateWorkspacePackages(packages);
@@ -953,12 +957,13 @@ process.stdout.write(JSON.stringify(result));`,
 		},
 	);
 	const { threeRenderers } = await import(pathToFileURL(threeConfigBundle).href);
-	execFileSync('pnpm', ['exec', 'tsrx-tsc', '--noEmit', '-p', 'tsconfig.json'], {
+	const tsrxTsc = path.join(consumerDirectory, 'node_modules', '.bin', 'tsrx-tsc');
+	execFileSync(tsrxTsc, ['--noEmit', '-p', 'tsconfig.json'], {
 		cwd: consumerDirectory,
 		encoding: 'utf8',
 		stdio: ['ignore', 'pipe', 'pipe'],
 	});
-	execFileSync('pnpm', ['exec', 'tsrx-tsc', '--noEmit', '-p', 'tsconfig.nodenext.json'], {
+	execFileSync(tsrxTsc, ['--noEmit', '-p', 'tsconfig.nodenext.json'], {
 		cwd: consumerDirectory,
 		encoding: 'utf8',
 		stdio: ['ignore', 'pipe', 'pipe'],
@@ -1049,7 +1054,7 @@ process.stdout.write(output, () => process.exit(0));
  * workspace project or plain tsc cannot exercise the TSRX implementation files
  * that become part of a strict external consumer's TypeScript program.
  */
-function validatePackedTsrxConsumer(tempRoot, archives, packedFiles) {
+function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManifests) {
 	const consumerDirectory = path.join(tempRoot, 'external-tsrx-source-consumer');
 	if (isWithinDirectory(REPO_ROOT, consumerDirectory)) {
 		throw new Error('packed TSRX source consumer must be created outside the workspace');
@@ -1062,11 +1067,26 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles) {
 		packedFiles,
 		new Set(packedTsrxSourceExceptions.keys()),
 	);
+	const sourceConsumerSpecifiers = new Map(
+		sourceConsumerPackages
+			.filter((packageName) => packageName !== 'octane')
+			.map((packageName) => {
+				const specifiers = findPackedTsrxSourceConsumerSpecifiers(
+					packageName,
+					packedManifests.get(packageName),
+					packedFiles.get(packageName),
+				);
+				if (specifiers.length === 0) {
+					throw new Error(
+						`${packageName} contains published TSRX but has no importable public entry`,
+					);
+				}
+				return [packageName, specifiers];
+			}),
+	);
+	const validatedPackages = [...sourceConsumerSpecifiers.keys(), 'octane'];
 	const archiveSpecs = Object.fromEntries(
-		sourceConsumerPackages.map((packageName) => [
-			packageName,
-			fileArchiveSpec(archives, packageName),
-		]),
+		validatedPackages.map((packageName) => [packageName, fileArchiveSpec(archives, packageName)]),
 	);
 	const manifest = createPackedTsrxConsumerManifest(
 		archiveSpecs,
@@ -1076,7 +1096,7 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles) {
 			tsrxTypeScriptPlugin: tsrxTypeScriptPluginVersion,
 			typescript: typescriptVersion,
 		},
-		sourceConsumerPackages,
+		validatedPackages,
 	);
 
 	writeFileSync(
@@ -1105,7 +1125,7 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles) {
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'published-source-imports.ts'),
-		renderPackedTsrxSourceImports(sourceConsumerPackages),
+		renderPackedTsrxSourceImports([...sourceConsumerSpecifiers.values()].flat()),
 	);
 
 	execFileSync(
@@ -1126,8 +1146,9 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles) {
 
 	const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
 	const directRuntime = realpathSync(consumerRequire.resolve('octane'));
-	for (const packageName of sourceConsumerPackages) {
-		const entry = realpathSync(consumerRequire.resolve(packageName));
+	for (const packageName of validatedPackages) {
+		const publicSpecifier = sourceConsumerSpecifiers.get(packageName)?.[0] ?? packageName;
+		const entry = realpathSync(consumerRequire.resolve(publicSpecifier));
 		if (isWithinDirectory(REPO_ROOT, entry)) {
 			throw new Error(`${packageName} resolved back into the workspace: ${entry}`);
 		}
@@ -1148,21 +1169,18 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles) {
 		}
 	}
 
-	execFileSync('pnpm', ['exec', 'tsrx-tsc', '--noEmit', '-p', 'tsconfig.json'], {
-		cwd: consumerDirectory,
-		encoding: 'utf8',
-		stdio: ['ignore', 'pipe', 'pipe'],
-		timeout: 120_000,
-	});
-	execFileSync('pnpm', ['exec', 'tsrx-tsc', '--noEmit', '-p', 'tsconfig.browser.json'], {
-		cwd: consumerDirectory,
-		encoding: 'utf8',
-		stdio: ['ignore', 'pipe', 'pipe'],
-		timeout: 120_000,
-	});
+	const tsrxTsc = path.join(consumerDirectory, 'node_modules', '.bin', 'tsrx-tsc');
+	for (const project of PACKED_TSRX_CONSUMER_PROJECTS) {
+		execFileSync(tsrxTsc, ['--noEmit', '-p', project], {
+			cwd: consumerDirectory,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+			timeout: 120_000,
+		});
+	}
 
 	console.log(
-		`strict tsrx-tsc validated ${sourceConsumerPackages.length - 1} packed TSRX bindings with and without Node ambient types using the installed Octane Volar compiler`,
+		`strict tsrx-tsc validated ${validatedPackages.length - 1} packed TSRX bindings with and without Node ambient types using the installed Octane Volar compiler`,
 	);
 	for (const [packageName, reason] of packedTsrxSourceExceptions) {
 		console.warn(`deferred strict packed TSRX validation for ${packageName}: ${reason}`);
@@ -1623,6 +1641,7 @@ const tempRoot = mkdtempSync(path.join(os.tmpdir(), 'octane-pack-check-'));
 const failures = [];
 const packedArchives = new Map();
 const packedFiles = new Map();
+const packedManifests = new Map();
 let rawTsrxFiles = 0;
 
 try {
@@ -1642,6 +1661,7 @@ try {
 			const archive = path.join(outputDirectory, archiveFiles[0]);
 			packedArchives.set(pkg.name, archive);
 			const manifest = JSON.parse(tarOutput(['-xOf', archive, 'package/package.json']));
+			packedManifests.set(pkg.name, manifest);
 			const files = new Set(
 				tarOutput(['-tzf', archive])
 					.split('\n')
@@ -1671,12 +1691,13 @@ try {
 	if (!failures.length) {
 		const consumerValidations = [
 			{
-				label: 'external packed JavaScript consumer',
-				run: () => validatePackedJavascriptConsumer(tempRoot, packedArchives),
+				label: 'external strict packed TSRX source consumer',
+				run: () =>
+					validatePackedTsrxConsumer(tempRoot, packedArchives, packedFiles, packedManifests),
 			},
 			{
-				label: 'external strict packed TSRX source consumer',
-				run: () => validatePackedTsrxConsumer(tempRoot, packedArchives, packedFiles),
+				label: 'external packed JavaScript consumer',
+				run: () => validatePackedJavascriptConsumer(tempRoot, packedArchives),
 			},
 			{
 				label: 'external packed consumer',
