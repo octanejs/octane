@@ -3,11 +3,17 @@
 // subscription in a layout effect (subscribes to the store, re-notifies nested
 // subs if the state moved between render and effect), and supports the
 // `context` prop for library-owned stores (recharts-style custom contexts).
-import { useMemo, useLayoutEffect } from 'octane';
-import { ReactReduxContext } from './Context.ts';
-import { createSubscription } from './utils/Subscription.ts';
+import { useMemo, useLayoutEffect, type OctaneNode } from 'octane';
+import type { Action, Store, UnknownAction } from 'redux';
+import { ReactReduxContext, type ReactReduxContextInstance } from './Context';
+import { createSubscription } from './utils/Subscription';
 
-export function Provider(props) @{
+export function Provider<A extends Action<string> = UnknownAction, S = unknown>(props: {
+	store: Store<S, A>;
+	children?: OctaneNode;
+	context?: ReactReduxContextInstance | null;
+	serverState?: S;
+}) @{
 	const { store, context, serverState, children } = props;
 
 	const contextValue = useMemo(() => {
