@@ -19036,10 +19036,13 @@ function normalizeChildren(nodes, inSvg = false, ctx = null, inNoscript = false)
 			// body DOM). Kept in `out` as a synthetic node so planJsx / ssrCompileBody
 			// can partition it out and emit it via headBlock (client) / ssrHeadEl
 			// (server). SVG `<title>` and explicit resource-handler links stay inline.
+			// The whole hoist model is HTML-scoped: inside an SVG lexical context
+			// link/meta are svg-namespace content and React keeps them inline
+			// (foreignObject children re-enter the HTML rules via childNs).
 			if (
 				!inNoscript &&
-				(isHoistableHeadElementNode(n) || (!inSvg && headResourceKind(n) !== null)) &&
-				!(inSvg && jsxTagName(n) === 'title')
+				!inSvg &&
+				(isHoistableHeadElementNode(n) || headResourceKind(n) !== null)
 			) {
 				out.push({ type: 'HeadHoist', element: n });
 				continue;

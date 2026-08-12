@@ -28,3 +28,13 @@ export function MicrodataResources() @{
 		<span class="mdr-body">{'mdr' as string}</span>
 	</section>
 }
+
+// SVG lexical scope: link/meta are svg-namespace content there — React keeps
+// them inline (only foreignObject switches back to the HTML hoisting rules).
+export function SvgScoped() @{
+	<svg id="svg-host" viewBox="0 0 10 10">
+		<link rel="stylesheet" href="/svg-scoped.css" precedence="default" />
+		<meta name="svg-meta" content="inline" />
+		<circle cx="5" cy="5" r="4" />
+	</svg>
+}

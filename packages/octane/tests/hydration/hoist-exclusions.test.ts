@@ -8,7 +8,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createRoot, hydrateRoot, flushSync, resetFloatResourceState } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { loadServerFixture } from '../_server-fixture.js';
-import { Microdata, MicrodataResources, NoscriptMeta } from './_fixtures/hoist-exclusions.tsrx';
+import {
+	Microdata,
+	MicrodataResources,
+	NoscriptMeta,
+	SvgScoped,
+} from './_fixtures/hoist-exclusions.tsrx';
 
 const srv = loadServerFixture(
 	'packages/octane/tests/hydration/_fixtures/hoist-exclusions.tsrx',
@@ -82,6 +87,31 @@ describe('document-metadata hoist exclusions (itemProp + noscript)', () => {
 		const hostHtml = r.html.slice(hostStart);
 		expect(hostHtml).toContain('/mdr.css');
 		expect(hostHtml).toContain('/mdr.js');
+	});
+
+	// Per ReactDOMFloat-test.js:7797/:9301 — resources and metadata inside an
+	// SVG lexical scope stay inline (svg-namespace content, not document head).
+	it('client + server: SVG-scoped link/meta stay inline, never resources', async () => {
+		const root = createRoot(container);
+		root.render(SvgScoped, {});
+		flushSync(() => {});
+		const svg = container.querySelector('#svg-host')!;
+		expect(svg.querySelector('link')).not.toBeNull();
+		// <meta> sits on the HTML parser's foreign-content BREAKOUT list, so
+		// template cloning cannot keep it inside <svg> on pure client mounts (a
+		// documented bound of the template model); the contract pinned here is
+		// that svg-scoped metadata never becomes document metadata.
+		expect(document.head.querySelector('link[href="/svg-scoped.css"]')).toBeNull();
+		expect(document.head.querySelector('meta[name="svg-meta"]')).toBeNull();
+		root.unmount();
+
+		const r = await ServerRT.renderToString(srv.SvgScoped, {});
+		const svgStart = r.html.indexOf('<svg');
+		expect(r.html.slice(0, svgStart)).not.toContain('/svg-scoped.css');
+		expect(r.html.slice(0, svgStart)).not.toContain('svg-meta');
+		const svgHtml = r.html.slice(svgStart);
+		expect(svgHtml).toContain('/svg-scoped.css');
+		expect(svgHtml).toContain('svg-meta');
 	});
 
 	// Per ReactDOMFloat-test.js — 'does not hoist inside noscript context'

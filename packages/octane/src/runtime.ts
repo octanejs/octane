@@ -27856,7 +27856,14 @@ export function preinitModule(
 ): void {
 	const rawHref = guardHintHref('preinitModule', href);
 	if (rawHref === null) return;
-	if ((options?.as ?? 'script') !== 'script') return;
+	if ((options?.as ?? 'script') !== 'script') {
+		warnHintUsage(
+			'preinitModule() supports only as: "script" (got ' +
+				JSON.stringify(options?.as) +
+				'); the call was ignored. Use preloadModule() for other module destinations.',
+		);
+		return;
+	}
 	// One executable per src: a live Float script (SSR-seeded or client-
 	// discovered) already satisfies this init.
 	const state = resourceState();

@@ -608,10 +608,15 @@ React Float **resources** are supported with React's semantics:
 - Classification is static: a spread-carried `precedence`/`async` keeps the
   ordinary element path, matching the compile-time head-hoist model.
 - React's hoist EXCLUSIONS apply: `itemProp`-bearing `<meta>`/`<link>` stay
-  with their `itemScope` host, and metadata/resources that are direct children
+  with their `itemScope` host; metadata/resources that are direct children
   of `<noscript>` stay in the fallback content (one nesting level today —
   metadata wrapped in a further host INSIDE `<noscript>` still hoists; a
-  documented bound, not a contract).
+  documented bound, not a contract); and nothing hoists from an SVG lexical
+  scope (`foreignObject` children re-enter the HTML rules). One template-model
+  bound: `<meta>` inside `<svg>` on a pure client mount is relocated by the
+  HTML parser's foreign-content breakout rules — it still never becomes
+  document metadata, but it cannot be kept inside the `<svg>` the way React's
+  imperative element construction keeps it. SSR serializes it inline correctly.
 
 Out of scope, deliberately: **suspensey commits** (React's
 suspend-until-the-stylesheet-loads behavior; Octane inserts the sheet and

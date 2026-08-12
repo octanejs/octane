@@ -249,15 +249,15 @@
     },
     {
       "caseId": "react-case-v1:00a78bfb4d2abbbdc096",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "warns if you render <meta> tag with itemProp outside <body> or <head>",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "The warning fires for <meta itemProp> rendered as a child of <html> under createRoot(document) \u2014 a whole-document scenario; Octane's itemProp hoist exclusion itself is evidenced in hydration/hoist-exclusions.test.ts."
     },
     {
       "caseId": "react-case-v1:00b914b50cd9fa6856d3",
@@ -345,15 +345,15 @@
     },
     {
       "caseId": "react-case-v1:00fbbe739f56cbdca44a",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "delays \"forwards\" SuspenseList rows until the css of previous rows have completed",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "SuspenseList is documented not-implemented by design, and the row-reveal gating on css load is suspensey semantics that are also out of scope."
     },
     {
       "caseId": "react-case-v1:010ca2e32e6a1537da5c",
@@ -1224,15 +1224,15 @@
     },
     {
       "caseId": "react-case-v1:03561dbbc985d8f85eda",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "emits an implicit <head> element to hold resources when none is rendered but an <html> is rendered",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Asserts exact Fizz chunk bytes for an implicit <head> in a whole-document stream, gated on external-runtime and blocking-render flags \u2014 whole-document rendering plus Fizz bootstrap options, both standing non-goals."
     },
     {
       "caseId": "react-case-v1:0364edc9f939a8a65f45",
@@ -1945,15 +1945,15 @@
     },
     {
       "caseId": "react-case-v1:05ad704d75ea2ec31ea4",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can promote images to high priority when at least one instance specifies a high fetchPriority",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Image fetchPriority promotion across rendered <img> instances only exists inside Fizz's img-preload queue, which Octane does not implement."
     },
     {
       "caseId": "react-case-v1:05ba4e9e4f2802d6745c",
@@ -5340,15 +5340,15 @@
     },
     {
       "caseId": "react-case-v1:10aa421752894cf2d9d8",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can render a title before a singleton even if that singleton clears its contents",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "A title rendered before an <html> singleton whose mount clears its contents \u2014 whole-document/singleton semantics Octane does not have (roots require an Element)."
     },
     {
       "caseId": "react-case-v1:10ae6c6dfc0d105e997f",
@@ -5873,15 +5873,15 @@
     },
     {
       "caseId": "react-case-v1:1306a9a698aa563b8c5d",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "retains styles even when a new html, head, and/body mount",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Requires hydrateRoot(document, <html>\u2026) with fresh <html>/<head>/<body> singleton mounts; Octane roots require an Element and whole-document/singleton rendering is a standing non-goal. Resource retention itself is evidenced (float-resources 'resources persist after unmount\u2026')."
     },
     {
       "caseId": "react-case-v1:1306ba5d1db00f86fe12",
@@ -7080,7 +7080,7 @@
     },
     {
       "caseId": "react-case-v1:1750377497ae9baf46e4",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "creates a stylesheet resource in the ownerDocument when ReactDOM.preinit(..., {as: \"style\" }) is called outside of render on the client",
@@ -7088,7 +7088,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted to an element-rooted container (Octane roots require an Element; whole-document roots are a standing non-goal): a preinit issued outside render, from an effect, still targets document.head and joins the precedence groups.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "preinit(as style) from an effect inserts the stylesheet into document.head",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:1755b9dc63d932c1fb22",
@@ -7431,7 +7438,7 @@
     },
     {
       "caseId": "react-case-v1:18ce05d1cdc2efff5314",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "warns if you provide invalid arguments",
@@ -7439,7 +7446,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "preloadModule's invalid-href triggers (undefined, empty, non-string) dev-warn and no-op with adapted messages; invalid option SHAPES (boolean options, boolean as) are handled leniently in Octane \u2014 the tag still inserts and no diagnostic fires \u2014 so the options-shape warnings remain a diagnostics gap noted for the ledger.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "module hints dev-warn on invalid hrefs and stay no-ops",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "valid hrefs still insert",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:18d5508d7c654e2e2e66",
@@ -9177,7 +9196,7 @@
     },
     {
       "caseId": "react-case-v1:1e7caf23a7a35460d845",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "hoists late stylesheets the correct precedence",
@@ -9185,7 +9204,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted: statically-declared stylesheets inside boundaries still PENDING at shell time flush with the shell head in normalized precedence groups (preinit preset group included) and later segment reveals add no duplicate tags; the load-gated client reveal half is suspensey (non-goal), and dynamically-discovered late resources are a confirmed gap (see defer cases).",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-1.test.ts",
+          "testName": "streaming folds pending-boundary stylesheets into the shell head precedence groups",
+          "modes": ["production-compile", "server-stream"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:1e7d7749554c1f75e705",
@@ -11062,7 +11088,7 @@
     },
     {
       "caseId": "react-case-v1:2460591809287aa8d139",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "supports fetchPriority",
@@ -11070,7 +11096,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "fetchpriority serializes on preload links, preinit stylesheets, and preinit scripts on both client and server; one test covers the duplicate-titled upstream cases at :6172 (preload) and :6930 (preinit), which the inventory pinned to one line.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "supports fetchPriority on preload and preinit, client and server",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:248be3b5b978eca1d7a0",
@@ -11673,7 +11706,7 @@
     },
     {
       "caseId": "react-case-v1:26a9727e648ecf87fa3b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "escapes hrefs when selecting matching elements in the document when rendering Resources",
@@ -11681,7 +11714,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Quote/backslash hrefs dedupe by exact attribute value (Octane keys resources in Sets rather than interpolating hrefs into querySelector) and SSR serializes the escaped attribute exactly once.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "matches rendered stylesheet resources whose hrefs contain selector metacharacters",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:26c0d74ae4d1acb7b9f7",
@@ -12972,7 +13012,7 @@
     },
     {
       "caseId": "react-case-v1:2b21c741e8c797d4c02f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "should handle referrerPolicy on image preload",
@@ -12980,11 +13020,18 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "referrerpolicy serializes on responsive image preloads (with the fallback href omitted) through both the client DOM insert and the server head fold.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "serializes referrerPolicy on image preloads on the client and the server",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2b28be342e90e29eed37",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "creates a script module resources",
@@ -12992,7 +13039,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Ports the deltas (explicit as: script, integrity option) \u2014 the plain/crossOrigin/invalid-as arms are already pinned by resource-hints.test.ts ('preinitModule inserts one deduped async module script; non-script destinations no-op' and 'module hints fold into head output and share the client dedupe key'). React-exact warning text is not asserted (Octane's malformed-hint diagnostics use its own wording).",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "creates script module resources with explicit `as` and `integrity` options",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2b33a86654d699866ce3",
@@ -13118,15 +13172,15 @@
     },
     {
       "caseId": "react-case-v1:2b8c2dd5d9bde68daad1",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "still outlines a boundary with a suspensey image inside a ViewTransition when flushing the shell",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Canary-only (facebook/react@b740af25:9933): boundary OUTLINING driven by a suspensey image inside a ViewTransition is Fizz suspend-until-loaded machinery; suspensey commits are a documented Octane non-goal."
     },
     {
       "caseId": "react-case-v1:2bc3b688c85829336e35",
@@ -14500,19 +14554,19 @@
     },
     {
       "caseId": "react-case-v1:31094af873320f767a52",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can send style insertion implementation independent of boundary commpletion instruction implementation",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Pins the independence of Fizz's style-insertion vs boundary-completion instruction implementations (renderer-internal streaming protocol) with a load-gated reveal; Octane's stream protocol has no such split and suspensey reveals are out of scope."
     },
     {
       "caseId": "react-case-v1:310b8c5bae5d185cc3e5",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "accepts an `integrity` option for `as: \"style\"`",
@@ -14520,7 +14574,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "preinit(as: style) integrity lands on the precedence-marked stylesheet link on both sides.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "accepts an `integrity` option for as: \"style\"",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:310dcb8ce861307e6320",
@@ -15243,7 +15304,7 @@
     },
     {
       "caseId": "react-case-v1:33096a25bc8fbe929397",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "supports fetchPriority",
@@ -15251,7 +15312,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Duplicate-titled 'supports fetchPriority' entry (see react-case-v1:2460591809287aa8d139); the single ported test covers both the preload (:6172) and preinit (:6930) upstream variants.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "supports fetchPriority on preload and preinit, client and server",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:330abddefc633d58d84d",
@@ -16726,15 +16794,15 @@
     },
     {
       "caseId": "react-case-v1:37963147cdbe19bdf083",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "warns if you render a <title> tag with itemProp outside <body> or <head>",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Same whole-document scenario as react-case-v1:00a78bfb4d2abbbdc096, for <title itemProp>."
     },
     {
       "caseId": "react-case-v1:379c5027c3ffc10302ed",
@@ -17135,7 +17203,7 @@
     },
     {
       "caseId": "react-case-v1:390d5e656eec6583357b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "creates a script resource when ReactDOM.preinit(..., {as: \"script\" }) is called outside of render on the client",
@@ -17143,7 +17211,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "preinit from a useEffect (outside render) inserts the deduped async script into document.head; whole-document container replaced by an element root per Octane's root contract.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "creates a script resource when preinit(as: \"script\") runs outside render, in an effect",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3912e5568d0b006b0c1a",
@@ -17243,7 +17318,7 @@
     },
     {
       "caseId": "react-case-v1:393fa48c2668d926efcd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not preload nomodule scripts",
@@ -17251,7 +17326,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "The async nomodule script is still a hoisted resource carrying nomodule/data attributes, the sync form stays an ordinary in-place element, and no preload/modulepreload is emitted on either path.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-1.test.ts",
+          "testName": "server: nomodule scripts hoist (async) or stay in place (sync) without preloads",
+          "modes": ["client", "server-string", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-1.test.ts",
+          "testName": "client: nomodule scripts hoist (async) or stay in place (sync) without preloads",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:393ff8e2e3635e811478",
@@ -17675,7 +17762,7 @@
     },
     {
       "caseId": "react-case-v1:3a363ca15c414aac909b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "supports nonce",
@@ -17683,7 +17770,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "nonce serializes on preload links through the client insert and the server head fold; Octane has no container-scoped hoisting, so the upstream's container-rooted SSR placement nuance does not apply.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "supports nonce on preload, client and server",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3a38796719cb655d2ef3",
@@ -18060,15 +18154,15 @@
     },
     {
       "caseId": "react-case-v1:3b805bf8caa2cd528bad",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can suspend commits on more than one root for the same resource at the same time",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Suspending commits on multiple roots for one loading resource is suspensey commit machinery, documented out of scope."
     },
     {
       "caseId": "react-case-v1:3b8d91cf517609852355",
@@ -18505,7 +18599,7 @@
     },
     {
       "caseId": "react-case-v1:3d70fb8b1964d3d89323",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "preloads scripts as modules",
@@ -18513,7 +18607,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "modulepreload creation, href dedupe, crossOrigin/integrity carriage, and non-default `as` (serviceworker) are pinned client and server; adaptation not asserted: Octane serializes as=\"script\" when the default destination is passed explicitly where React omits the attribute (functionally identical destination).",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "preloads scripts as modules with cors, integrity, and non-default destinations",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3d7170532ba17f2582fa",
@@ -18743,15 +18844,15 @@
     },
     {
       "caseId": "react-case-v1:3e54cbd6e5b3ef4fea8b",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "supports rendering hoistables outside of <html> scope",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Renders hoistables as siblings OF the <html> element itself; whole-document rendering (an <html>-rooted client tree in `document`) is a standing non-goal \u2014 Octane roots require an Element."
     },
     {
       "caseId": "react-case-v1:3e560d91993c90c0224f",
@@ -19237,7 +19338,7 @@
     },
     {
       "caseId": "react-case-v1:3f7a77563bfd61f450bb",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can hoist title tags on the client",
@@ -19245,7 +19346,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Client mount hoists the title into document.head (body stays clean), updates it in place, and removes it on unmount.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/svg-title-hoist.test.ts",
+          "testName": "preserves head hoisting when an opaque component chooses HTML",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3f7fe4c97a6aed9b1856",
@@ -20583,7 +20691,7 @@
     },
     {
       "caseId": "react-case-v1:4436593d1f5656ef4452",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "encodes attributes consistently whether resources are flushed in shell or in late boundaries",
@@ -20591,7 +20699,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted: Octane's two live emit paths (SSR head fold and client insert) serialize options through canonical lowercase attributes with identical values, escape quoted data-* values, and never leak authoring-side names; the upstream shell-vs-late-boundary comparison has no second path yet (same late-resource gap as the defer cases).",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-1.test.ts",
+          "testName": "server and client emit paths encode resource attributes identically",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:44439323b5d66455f641",
@@ -20655,7 +20770,12 @@
       "evidence": [
         {
           "file": "packages/octane/tests/static-prerender-stream.test.ts",
-          "testName": "resolves only after every use(thenable) settles; prelude carries the full document",
+          "testName": "resolves only after every use(thenable) settles",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/static-prerender-stream.test.ts",
+          "testName": "prelude carries the full document",
           "modes": ["client", "production-compile"]
         }
       ]
@@ -21822,15 +21942,15 @@
     },
     {
       "caseId": "react-case-v1:487174bc24da09b71fb2",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can render resources before singletons",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Renders <html>/<head>/<body> singletons through createRoot(document); whole-document rendering is a standing non-goal (Octane roots require an Element)."
     },
     {
       "caseId": "react-case-v1:4874a86869389130fd19",
@@ -23504,15 +23624,15 @@
     },
     {
       "caseId": "react-case-v1:4d8b0c38bc33607b00c4",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "omits preloads for images inside noscript tags",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Vacuous: 'omits preloads for images inside noscript' only constrains the rendered-<img> preload emission feature Octane does not implement; the noscript hoist exclusion itself is evidenced in tests/hydration/hoist-exclusions.test.ts."
     },
     {
       "caseId": "react-case-v1:4d9e6fdf126f0e3ce144",
@@ -23813,7 +23933,7 @@
     },
     {
       "caseId": "react-case-v1:4efdb0c6e62fbfda83ac",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can hoist link (non-stylesheet) tags on the client",
@@ -23821,7 +23941,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "The PlainLink control pins the client contract for non-stylesheet links: hoisted into document.head on mount, removed on unmount.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "resources persist after unmount",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "per-site links (no precedence) are removed",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:4f0c5269b5f45f2adf9e",
@@ -24184,19 +24316,19 @@
     },
     {
       "caseId": "react-case-v1:507b6b1070a49113c192",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "warns if you render a <style> tag with itemProp outside <body> or <head>",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Same whole-document scenario as react-case-v1:00a78bfb4d2abbbdc096, for <style itemProp>."
     },
     {
       "caseId": "react-case-v1:50833c45034144adb0e7",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "retains styles even after the last referring Resource unmounts",
@@ -24204,7 +24336,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "The last referring component unmounts (via @if arm flip) and the stylesheet resource stays in document.head.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "resources persist after unmount",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "per-site links (no precedence) are removed",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:508da804f9321b29912c",
@@ -24323,15 +24467,15 @@
     },
     {
       "caseId": "react-case-v1:50f8261c6066395dbab0",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can hoist styles flushed early even when no other style dependencies are flushed on completion",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Same Fizz early-flush/hoist-on-reveal choreography; covered by the documented streamed-boundary head divergence (client re-creation on hydration)."
     },
     {
       "caseId": "react-case-v1:50fc9bcb2a25e7292757",
@@ -24536,15 +24680,15 @@
     },
     {
       "caseId": "react-case-v1:5194dd5060e69e68d6a5",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can avoid inserting a late stylesheet if it already rendered on the client",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Document-root hydration whose observable is a load-gated suspensey reveal skipping an already-inserted sheet; the durable non-suspensey half (a hydrating client dedupes against SSR-emitted resources) is already evidenced by float-resources.test.ts 'a hydrating client call dedupes against SSR-emitted resources'."
     },
     {
       "caseId": "react-case-v1:51a465b344f54da722b7",
@@ -25741,7 +25885,7 @@
     },
     {
       "caseId": "react-case-v1:55934c33833df996dd04",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not create stylesheet resources when inside an <svg> context",
@@ -25749,7 +25893,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted executable evidence: SVG-scoped link/meta stay inline on client and server (hoist partition is HTML-scoped; foreignObject re-enters).",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/hydration/hoist-exclusions.test.ts",
+          "testName": "client + server: SVG-scoped link/meta stay inline, never resources",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:559536f25e2b5142c631",
@@ -25886,7 +26037,7 @@
     },
     {
       "caseId": "react-case-v1:56501a2dc01d9068f364",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can hoist title tags on the server and hydrate them on the client",
@@ -25894,7 +26045,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "SSR folds the title into the head output; hydration adopts the server title without duplication and unmount removes it.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "adopts the server head and single-root body, then removes owned nodes on unmount",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:566c044a1c0ff156be86",
@@ -26223,7 +26381,7 @@
     },
     {
       "caseId": "react-case-v1:57afb7841116e6645ca8",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not flush hoistables for fallbacks",
@@ -26231,7 +26389,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "While the pending fallback is showing, fallback-authored <meta>/<link> never reach the streamed head fold and the primary content's metadata does; covers the upstream inline-fallback shapes \u2014 the nested-completed-boundary shape is case 21f48ce0 (deferred with a finding).",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "does not flush fallback-authored hoistables into the head",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:57b0eb1d6cb14bc93bd8",
@@ -26266,15 +26431,15 @@
     },
     {
       "caseId": "react-case-v1:57e1083c14de250e9799",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "preloads up to 10 suspensey images as high priority when fetchPriority is not specified",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Exercises Fizz's 10-slot high-priority image preload queue, part of the rendered-<img> preload transport machinery Octane does not implement."
     },
     {
       "caseId": "react-case-v1:57ecff0e6cfa5dd041e3",
@@ -26690,15 +26855,15 @@
     },
     {
       "caseId": "react-case-v1:59483c9d3692cd2442fa",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can hydrate resources and components in the head and body even if a browser or 3rd party script injects extra html nodes",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "hydrateRoot(document) whole-document stress test; Octane's tolerance of foreign injected nodes during head adoption is separately evidenced (hydration/head-hydrate.test.ts 'skips an interposed foreign element and adopts the intended head element')."
     },
     {
       "caseId": "react-case-v1:59620db8acc96c43bbaf",
@@ -27293,7 +27458,7 @@
     },
     {
       "caseId": "react-case-v1:5ad3bd7f54fc7ed78ae2",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "creates a preload resource when called",
@@ -27301,7 +27466,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Preloads issued from render, useInsertionEffect, useLayoutEffect, and useEffect all insert; font preloads carry type and enforced crossorigin=\"\"; the SSR head fold with dedupe was already evidenced by resource-hints.test.ts 'render-time hints fold into the head output, deduped'.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "preload works from render, insertion, layout, and passive effects",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "font preloads carry type and anonymous CORS",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5ad679ad5ccddfc9be1e",
@@ -28431,15 +28608,15 @@
     },
     {
       "caseId": "react-case-v1:5ed8587fd5804bb6b890",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "assumes stylesheets that load in the shell loaded already",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Assuming shell-flushed stylesheets already loaded is suspensey load-state accounting, documented out of scope."
     },
     {
       "caseId": "react-case-v1:5edca3d12788408476e6",
@@ -28529,7 +28706,7 @@
     },
     {
       "caseId": "react-case-v1:5f384617669800aaca1f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can hoist meta tags on the server and hydrate them on the client",
@@ -28537,7 +28714,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Plus nested-head 'hydration adopts the nested-metadata host without mismatch warnings' and head-hydrate 'adopts the server head and single-root body, then removes owned nodes on unmount' (meta adoption + unmount removal).",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/hydration/nested-head.test.ts",
+          "testName": "server-renders nested metadata into the head channel, not the host body",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5f4263829b4fa089e54a",
@@ -28675,7 +28859,7 @@
     },
     {
       "caseId": "react-case-v1:5f8d8627dcd5611cd75c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "will not flush a preload for a new rendered Stylesheet Resource if one was already flushed",
@@ -28683,7 +28867,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Streamed render: a shell preload plus a stylesheet resource discovered inside a suspended boundary yield exactly one preload and one stylesheet tag for the href; Octane's per-round pass even ships both in the shell head.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "never flushes a second preload when a rendered stylesheet resource follows a preload",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5f9891786af2bc264fe2",
@@ -28711,7 +28902,7 @@
     },
     {
       "caseId": "react-case-v1:5fa712dd333b53e8a7af",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can update title tags",
@@ -28719,7 +28910,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Re-rendering updates the SAME hoisted head title element's text and data attribute (identity preserved); unmount removes it. Extends the text-only update already evidenced in svg-title-hoist.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "updates hoisted title text and attributes in place",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5fa7331d11e95da89dcf",
@@ -28963,7 +29161,7 @@
     },
     {
       "caseId": "react-case-v1:6020dc34c135975771ab",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can hydrate non Resources in head when Resources are also inserted there",
@@ -28971,7 +29169,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted off the <html> container onto Octane's metadata hoist: hoisted title/meta adopt (same nodes, no duplicates) while stylesheet/script resources dedupe against the SSR head, no mismatch warnings, and unmount removes metadata but retains resources.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-1.test.ts",
+          "testName": "hydration adopts hoisted non-resource head elements alongside inserted resources",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:6027b5440854c4972b0d",
@@ -29030,7 +29235,7 @@
     },
     {
       "caseId": "react-case-v1:605940bee5daa10a0569",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "treats link rel stylesheet elements as a stylesheet resource when it includes a precedence when client rendering",
@@ -29038,7 +29243,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Client rendering creates the data-precedence link in document.head and leaves no trace in the body; the upstream load-event choreography is suspensey-commit machinery (documented out of scope).",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "a precedence stylesheet hoists to head and dedupes by href across components",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:60598e13a18ff6ad01fa",
@@ -29636,15 +29848,15 @@
     },
     {
       "caseId": "react-case-v1:62941a5417d62021fddc",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "Does not preload lazy images",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Vacuous without the rendered-<img> preload feature: Octane emits no image preloads for rendered <img> at all, lazy or otherwise."
     },
     {
       "caseId": "react-case-v1:6299d7fd55b4576a669d",
@@ -30647,15 +30859,15 @@
     },
     {
       "caseId": "react-case-v1:65e602d01af93444daf2",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not wait for stylesheets of completed fallbacks",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "The observable is reveal gating on stylesheet LOAD state for completed-vs-pending fallbacks \u2014 suspensey stylesheet semantics that are documented out of scope (Octane inserts the sheet and continues)."
     },
     {
       "caseId": "react-case-v1:6601243ae89e03a46e27",
@@ -31523,15 +31735,15 @@
     },
     {
       "caseId": "react-case-v1:692ac4cb1b79b8f8769b",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can interrupt a suspended commit with a new update",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Interrupting a suspended (load-blocked) commit with a new update is suspensey commit machinery, documented out of scope."
     },
     {
       "caseId": "react-case-v1:692ffed6347306b9faaf",
@@ -31803,7 +32015,7 @@
     },
     {
       "caseId": "react-case-v1:69df4b879e0039f0c6af",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not hoist inside an <svg> context",
@@ -31811,7 +32023,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Adapted executable evidence: nothing hoists from an SVG lexical scope on client or server (foreignObject re-enters the HTML rules); the <meta>-in-svg client-mount parser bound is documented in differences-from-react.md.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/hydration/hoist-exclusions.test.ts",
+          "testName": "client + server: SVG-scoped link/meta stay inline, never resources",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:69e2490e5dbadc9899c4",
@@ -32368,15 +32587,15 @@
     },
     {
       "caseId": "react-case-v1:6bca0e56c295fbb1ae89",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can delay commit until css resources load",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Delaying commit until css resources load is the suspensey commit contract, documented out of scope (Octane inserts the sheet and continues)."
     },
     {
       "caseId": "react-case-v1:6bdfc01329e81fb0f2da",
@@ -32967,15 +33186,15 @@
     },
     {
       "caseId": "react-case-v1:6e2f56e15928caf22279",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can interrupt a suspended commit with a new transition",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Interrupting a suspended (load-blocked) commit with a new transition is suspensey commit machinery, documented out of scope."
     },
     {
       "caseId": "react-case-v1:6e34762e4736dd5d7fb9",
@@ -32991,7 +33210,7 @@
     },
     {
       "caseId": "react-case-v1:6e3ec2966822a7cff252",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "supports fetchPriority",
@@ -32999,7 +33218,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Duplicate-titled 'supports fetchPriority' entry (see react-case-v1:2460591809287aa8d139); the single ported test covers both the preload (:6172) and preinit (:6930) upstream variants.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "supports fetchPriority on preload and preinit, client and server",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:6e47747f42a0e0955c17",
@@ -33087,7 +33313,7 @@
     },
     {
       "caseId": "react-case-v1:6e8377a7553ed45e0994",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "normalizes stylesheet resource precedence for all boundaries inlined as part of the shell flush",
@@ -33095,7 +33321,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Resources from nested non-suspended boundaries inlined in one pass fold into the head in first-encounter group order with within-group discovery order, deduped, leaving no inline trace in the body.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-1.test.ts",
+          "testName": "SSR normalizes precedence across nested boundaries inlined in one pass",
+          "modes": ["server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:6eabfdec2ac3a2ae1e1c",
@@ -33377,15 +33610,15 @@
     },
     {
       "caseId": "react-case-v1:6fd34f474262c2be574f",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "stylesheets block render, with a really long timeout",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Stylesheets blocking render behind a long suspensey timeout is suspend-until-loaded machinery, documented out of scope."
     },
     {
       "caseId": "react-case-v1:6fdc2c56111b73cf316d",
@@ -33761,15 +33994,15 @@
     },
     {
       "caseId": "react-case-v1:70fd1ee9621e7dc82517",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "will assume stylesheets already in the document have loaded if it cannot confirm it is not yet loaded",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Assuming unverifiable pre-existing stylesheets have loaded is suspensey load-state accounting, documented out of scope."
     },
     {
       "caseId": "react-case-v1:710ee02437f54eca682d",
@@ -33976,7 +34209,7 @@
     },
     {
       "caseId": "react-case-v1:71b4c0dd785f46b18953",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not create script resources when inside an <svg> context",
@@ -33984,7 +34217,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "An async script inside <svg><path> stays in its authored SVG position; the same script inside <foreignObject> becomes a head resource \u2014 client and SSR agree.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "does not create script resources inside an <svg> context",
+          "modes": ["client", "server-string", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "<foreignObject> re-enables hoisting",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:71b57e3ca32f2cca9d10",
@@ -34442,7 +34687,7 @@
     },
     {
       "caseId": "react-case-v1:735508160a9eb6b2f0dd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "creates a stylesheet resource when ReactDOM.preinit(..., {as: \"style\" }) is called",
@@ -34450,7 +34695,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Render-position preinit creates one precedence-grouped stylesheet deduped across components; the suspended-boundary server behavior is pinned by the :4040 port in the same file, and the SSR shell preinit stylesheet was already evidenced by resource-hints.test.ts 'SSR mirrors the unified identity and image keying'.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "preinit(as style) during render creates one deduped stylesheet resource",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:73576a2fff28d8907d12",
@@ -34569,7 +34821,7 @@
     },
     {
       "caseId": "react-case-v1:73bbf38c530e37a96935",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "creates a dns-prefetch resource when called",
@@ -34577,7 +34829,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "dns-prefetch creation, dedupe, and SSR-to-client identity are pinned; React's prefetchDNS second-argument dev warnings have no Octane counterpart (extra arguments are ignored silently) \u2014 diagnostics remainder only.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/resource-hints.test.ts",
+          "testName": "preconnect and prefetchDNS insert their links once",
+          "modes": ["client", "server-string", "production-compile", "hydrate-match"]
+        },
+        {
+          "file": "packages/octane/tests/resource-hints.test.ts",
+          "testName": "a client call for an SSR-emitted hint is a no-op (shared dedupe key)",
+          "modes": ["client", "server-string", "production-compile", "hydrate-match"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:73c5b1202a2895382916",
@@ -34593,7 +34857,7 @@
     },
     {
       "caseId": "react-case-v1:73d8c2c7608e6a92c9c7",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "warns if you do not pass in a valid href argument or options argument",
@@ -34601,7 +34865,24 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "preload's malformed-argument trigger set (missing/empty href, missing as) dev-warns and no-ops with adapted Octane-branded messages \u2014 message-exactness is not Octane's diagnostics contract. Note: the inventory pinned both duplicate-title cases to line 6137; this entry is matched to the preload variant.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/resource-hints.test.ts",
+          "testName": "dev-warns on malformed options and stays a no-op",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/resource-hints.test.ts",
+          "testName": "unknown option keys are dropped",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/resource-hints.test.ts",
+          "testName": "non-string hrefs dev-warn and no-op",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:73dbbab4f2c3b2e242b6",
@@ -36238,15 +36519,15 @@
     },
     {
       "caseId": "react-case-v1:7a46543a23402eb1c581",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "suspends a transition on a stylesheet whose preload has not loaded yet",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Canary-only (b740af25:3726): suspending a transition until a stylesheet's preload loads is the suspensey commit contract, documented out of scope."
     },
     {
       "caseId": "react-case-v1:7a4e271b71b6cd81641f",
@@ -36574,15 +36855,15 @@
     },
     {
       "caseId": "react-case-v1:7b89aafd64f72bb8f6bd",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can delay commit until css resources error",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Delaying commit until css resources ERROR is suspensey commit machinery (upstream itself skips this test as crashing)."
     },
     {
       "caseId": "react-case-v1:7b94e58083fdc6d80440",
@@ -37494,7 +37775,7 @@
     },
     {
       "caseId": "react-case-v1:7e8405ab791760c81647",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "warns if you provide invalid arguments",
@@ -37502,7 +37783,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Matched to the preinitModule twin at upstream line 7113: invalid hrefs dev-warn and no-op; a non-script destination fails closed as a silent no-op in Octane (React warns) \u2014 the docs promise a dev warning for invalid `as` generally, so the silent fail-closed is flagged as a doc-vs-implementation nit for the parent.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "module hints dev-warn on invalid hrefs and stay no-ops",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "valid hrefs still insert",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7e8660f6ebb8e46a9103",
@@ -37575,7 +37868,7 @@
     },
     {
       "caseId": "react-case-v1:7ecdbfd918ba196388bc",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can acquire a resource after releasing it in the same commit",
@@ -37583,7 +37876,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "An @if flip releases and re-acquires the same script src in one commit: one head script, same element identity, and the re-acquiring site's differing prop (data-new) is not applied \u2014 first instance wins.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-1.test.ts",
+          "testName": "re-acquiring a released script resource in one commit keeps the first instance",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7ee065f3d4ec2d992bcf",
@@ -37644,15 +37944,15 @@
     },
     {
       "caseId": "react-case-v1:7ef742dc44fbc7b3f6ca",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not reinsert already inserted stylesheets during a delayed commit",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "The observable is reinsert-avoidance during a suspensey DELAYED commit; the non-suspensey dedupe half (SSR-inserted sheets adopted, not reinserted, by a hydrating client) is already evidenced by float-resources.test.ts."
     },
     {
       "caseId": "react-case-v1:7f0501ae9b908d4a748e",
@@ -37680,7 +37980,7 @@
     },
     {
       "caseId": "react-case-v1:7f1084e92402ad431889",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not create script resources when inside a <noscript> context",
@@ -37688,7 +37988,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "An async script inside <noscript> stays in the fallback content on client render and in SSR output; no head resource is created.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "does not create script resources inside a <noscript> context",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7f1401c39fe25aa2ffb0",
@@ -37922,7 +38229,7 @@
     },
     {
       "caseId": "react-case-v1:7fbb839fc5c2d6a15db4",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "will not flush a preload for a new preinitialized Stylesheet Resource if one was already flushed",
@@ -37930,7 +38237,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Documented divergence asserted with an OCTANE DIVERGENCE note: Fizz demotes a post-shell preinit to a preload; Octane's per-round pass discovers the preinit before the shell flushes and coalesces the redundant preload into the real resource \u2014 the shared contract (one fetch initiator per href) is pinned.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "a preinitialized stylesheet inside a suspended boundary keeps one initiator per href",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7fc4956c7537857b98b2",
@@ -40859,15 +41173,15 @@
     },
     {
       "caseId": "react-case-v1:898a6c78d76ad9bea102",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "preloads from rendered images properly use srcSet and sizes",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Asserts srcSet/sizes keying of preloads EMITTED FOR RENDERED IMAGES \u2014 the emission feature Octane does not implement; the preload() srcset keying itself is evidenced separately (case 4148 port and resource-hints.test.ts)."
     },
     {
       "caseId": "react-case-v1:898fbdb9f634138849c5",
@@ -42564,15 +42878,15 @@
     },
     {
       "caseId": "react-case-v1:8f041739af78043fd7e0",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "delays \"together\" SuspenseList rows until the css of previous rows have completed",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "SuspenseList is documented not-implemented by design, and the row-reveal gating on css load is suspensey semantics that are also out of scope."
     },
     {
       "caseId": "react-case-v1:8f05d2324a5fc8e82066",
@@ -43707,7 +44021,7 @@
     },
     {
       "caseId": "react-case-v1:92ed49a5e826f3b8cbd8",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "accepts an `integrity` option for `as: \"script\"`",
@@ -43715,7 +44029,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "preinit integrity is serialized onto the script resource tag client-side and in the SSR head fold.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "accepts an `integrity` option for as: \"script\"",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:93034c490d699a1bc890",
@@ -44743,7 +45064,12 @@
       "evidence": [
         {
           "file": "packages/octane/tests/float-resources.test.ts",
-          "testName": "SSR folds style resources into precedence groups; hydration seeds from data-href",
+          "testName": "SSR folds style resources into precedence groups",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "hydration seeds from data-href",
           "modes": ["client", "production-compile"]
         }
       ]
@@ -46521,15 +46847,15 @@
     },
     {
       "caseId": "react-case-v1:9ddca26e37245ce5d7ba",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "outlines a boundary with suspensey CSS when flushing a streamed completion",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Canary-only (b740af25:9831): outlining a boundary with suspensey CSS in a streamed completion is Fizz suspend-until-loaded machinery, documented out of scope."
     },
     {
       "caseId": "react-case-v1:9df07b5e18063b31e6f0",
@@ -46619,7 +46945,7 @@
     },
     {
       "caseId": "react-case-v1:9e4ec11310d225ae2412",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can hoist meta tags on the client",
@@ -46627,7 +46953,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Client mount hoists the meta into document.head, leaves the body clean, and removes it with its owning scope.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/hydration/nested-head.test.ts",
+          "testName": "client-only render mounts nested metadata into document.head, owned and removable",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9e514a22fc637d9f7b87",
@@ -47847,7 +48180,7 @@
     },
     {
       "caseId": "react-case-v1:a24dadfddb7019db4e87",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can hoist link (non-stylesheet) tags on the server and hydrate them on the client",
@@ -47855,7 +48188,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "A rel=\"author\" link folds into the SSR head, is adopted by identity on hydration (no duplicate), and is removed on unmount.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "hoists non-stylesheet link tags on the server and hydrates them on the client",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a250da8032a69b4d3fda",
@@ -47950,15 +48290,15 @@
     },
     {
       "caseId": "react-case-v1:a29109225af74596ee01",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "retains styles in head through head remounts",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Exercises <head key> singleton remounts inside a whole-document root; Octane has no <html>/<head>/<body> singleton rendering (roots require an Element)."
     },
     {
       "caseId": "react-case-v1:a29c04f283a5a0d4289c",
@@ -48452,15 +48792,15 @@
     },
     {
       "caseId": "react-case-v1:a44c1e1931d9ab7609c2",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "will put a Suspense boundary into fallback if it contains a stylesheet not loaded during a sync update",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Forcing a Suspense fallback because a sync update contains a not-yet-loaded stylesheet is suspensey commit machinery, documented out of scope."
     },
     {
       "caseId": "react-case-v1:a45e97c8bd15c56186d8",
@@ -48599,15 +48939,15 @@
     },
     {
       "caseId": "react-case-v1:a4aeece06c3f9b00ce0c",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can emit styles early when a partial boundary flushes",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Asserts Fizz partial-flush choreography (style emitted early with media=\"not all\" then flipped on reveal); Octane's documented streaming model ships no head content in boundary segments and flushes per resolution wave."
     },
     {
       "caseId": "react-case-v1:a4c0a41427f47efd07c5",
@@ -49030,7 +49370,7 @@
     },
     {
       "caseId": "react-case-v1:a63a07dadd99821dcb58",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "should preload only once even if you discover a stylesheet, script, or moduleScript late",
@@ -49038,7 +49378,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "The durable contract \u2014 one preload per identity and one executable/stylesheet per src across the preload/render forms with late boundary discovery \u2014 is asserted; Fizz's boundary-flush queue ordering (scripts-then-preloads into the body) is transport detail outside Octane's wave-based flush model.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "preloads only once per identity when stylesheets, scripts, and module scripts render late",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a64cc53796ea86ead279",
@@ -49054,7 +49401,7 @@
     },
     {
       "caseId": "react-case-v1:a660f46c1ab7b47709da",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "preloads multiple non-script modules with the same as type",
@@ -49062,7 +49409,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Canary-only (b740af25:6596), body fetched from the pinned commit: two serviceworker modulepreloads with distinct hrefs emit two <link rel=modulepreload as=serviceworker>, deduped per href, on both the client and the server fold.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-1.test.ts",
+          "testName": "client: preloadModule keys per href, carrying a non-script as type",
+          "modes": ["client", "server-string", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-1.test.ts",
+          "testName": "server: preloadModule folds one modulepreload per href with the as type",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a67eccb2b0562f3fe25f",
@@ -49508,15 +49867,15 @@
     },
     {
       "caseId": "react-case-v1:a806984682df39c1ec2c",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "warns if you render a <link> tag with itemProp outside <body> or <head>",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Same whole-document scenario as react-case-v1:00a78bfb4d2abbbdc096, for <link itemProp>."
     },
     {
       "caseId": "react-case-v1:a808dac25c951f7c6611",
@@ -49754,15 +50113,15 @@
     },
     {
       "caseId": "react-case-v1:a88d13d476986489c8b3",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "warns if you render resource-like elements above <head> or <body>",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Every scenario renders resource-like tags as direct children of <html> under createRoot(document); the diagnostic only exists for whole-document rendering, a standing non-goal."
     },
     {
       "caseId": "react-case-v1:a8944432b7e1877b9566",
@@ -50661,7 +51020,7 @@
     },
     {
       "caseId": "react-case-v1:ac0d3ea85db3648443d3",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "treats link rel stylesheet elements as a stylesheet resource when it includes a precedence when server rendering",
@@ -50669,7 +51028,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Also 'streamed shells carry deduped resources in the flushed head' \u2014 a precedence link server-renders as a head-folded stylesheet resource with data-precedence.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "SSR folds deduped, precedence-grouped resources into the head output",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ac100dedc6f49cc079d9",
@@ -51312,7 +51678,12 @@
       "evidence": [
         {
           "file": "packages/octane/tests/float-resources.test.ts",
-          "testName": "groups order by first encounter; later same-precedence sheets append to their group",
+          "testName": "groups order by first encounter",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "later same-precedence sheets append to their group",
           "modes": ["client", "production-compile"]
         }
       ]
@@ -51887,7 +52258,7 @@
     },
     {
       "caseId": "react-case-v1:b01cd31c349de6ab7ac6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "should handle media on image preload",
@@ -51895,7 +52266,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "media serializes on responsive image preloads through both the client DOM insert and the server head fold.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "serializes media on image preloads on the client and the server",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b0287a52a3890f2214a7",
@@ -52412,7 +52790,7 @@
     },
     {
       "caseId": "react-case-v1:b20111ef435ccabd4c27",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "creates a script resource when ReactDOM.preinit(..., {as: \"script\" }) is called",
@@ -52420,7 +52798,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Render-position preinit(as script) creates one async head script deduped by src and retained after unmount; the suspended-boundary server behavior is pinned by the :4040 port, and the SSR script preinit was already evidenced by resource-hints.test.ts 'SSR mirrors the unified identity and image keying'.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "preinit(as script) during render creates one deduped async script that persists past unmount",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b20b9a02b714cc5de429",
@@ -54328,15 +54713,15 @@
     },
     {
       "caseId": "react-case-v1:b85b93d1f628d154ea5a",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can emit preloads for non-lazy images that are rendered",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Fizz's rendered-<img> preload scanning and its high/regular-priority flush queues are server transport machinery Octane's wave-based SSR deliberately does not implement (like the bootstrap/onHeaders options); there is no Octane observable to port."
     },
     {
       "caseId": "react-case-v1:b86964df590e3f95a04d",
@@ -55439,15 +55824,15 @@
     },
     {
       "caseId": "react-case-v1:bc24550d3644241a1522",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "creates a stylesheet resource in the ownerDocument when ReactDOM.preinit(..., {as: \"style\" }) is called in shadowRoot",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "ShadowRoot render containers are outside Octane's supported container surface (roots and portal targets require an Element); the underlying observable \u2014 preinit targets document.head regardless of where the calling component renders \u2014 is pinned by the render/effect preinit ports."
     },
     {
       "caseId": "react-case-v1:bc3d071ef8633105f661",
@@ -56600,15 +56985,15 @@
     },
     {
       "caseId": "react-case-v1:bfcfdcaf85e3c7fcbce6",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "warns if you render a <script> tag with itemProp outside <body> or <head>",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Same whole-document scenario as react-case-v1:00a78bfb4d2abbbdc096, for <script itemProp>."
     },
     {
       "caseId": "react-case-v1:bfe4eca9d0a7977ef351",
@@ -57799,7 +58184,12 @@
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/dom-component-attributes.test.ts",
-          "testName": "aliases `acceptCharset` \u2192 `accept-charset`; native spelling also works",
+          "testName": "aliases `acceptCharset` \u2192 `accept-charset`",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/dom-component-attributes.test.ts",
+          "testName": "native spelling also works",
           "modes": ["client", "production-compile"]
         }
       ]
@@ -57818,7 +58208,12 @@
       "evidence": [
         {
           "file": "packages/octane/tests/float-resources.test.ts",
-          "testName": "groups order by first encounter; later same-precedence sheets append to their group",
+          "testName": "groups order by first encounter",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "later same-precedence sheets append to their group",
           "modes": ["client", "production-compile"]
         }
       ]
@@ -58145,15 +58540,15 @@
     },
     {
       "caseId": "react-case-v1:c4a07d2841ed44336a3e",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "loading a stylesheet as part of an error boundary UI, during initial render",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "The case's observable is the suspensey commit (hydration blocks until the error-UI stylesheet loads before revealing the error screen); suspend-until-loaded is documented out of scope \u2014 Octane inserts the sheet and continues \u2014 and the scenario also renders/hydrates the whole document."
     },
     {
       "caseId": "react-case-v1:c4aafb27eca33189e857",
@@ -58267,15 +58662,15 @@
     },
     {
       "caseId": "react-case-v1:c4f221bc778ca4dc3df3",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "client renders a boundary if a style Resource dependency fails to load",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Client-rendering a boundary because its stylesheet dependency ERRORED is suspensey CSS reveal semantics (load/error-driven commit), documented out of scope; jsdom also cannot observe real resource load failures."
     },
     {
       "caseId": "react-case-v1:c4f60e0ea1162e05f264",
@@ -58559,7 +58954,7 @@
     },
     {
       "caseId": "react-case-v1:c5b905eb4877d2fac35d",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "treats async scripts without onLoad or onError as Resources",
@@ -58567,7 +58962,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Handler-free async script hoists to head and persists after unmount; async+onLoad, plain, and defer scripts stay per-site in the body and unmount with their tree, on both client and SSR.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "treats only handler-free external async scripts as resources",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c5b9b0c7ba78a4457f6a",
@@ -58595,15 +58997,15 @@
     },
     {
       "caseId": "react-case-v1:c5d4a0f392ee15bfbb2c",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "will assume wait for loading stylesheets to load before continuing",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Waiting for loading stylesheets before continuing a commit is suspensey commit machinery, documented out of scope."
     },
     {
       "caseId": "react-case-v1:c5d73920bd423f15fbec",
@@ -58947,7 +59349,7 @@
     },
     {
       "caseId": "react-case-v1:c6deee4d1840389b472f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "accepts a `nonce` option for `as: \"script\"`",
@@ -58955,7 +59357,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Render-time preinit nonce lands as the nonce attribute on the script resource on both the client insert and the SSR head fold. Octane has one RenderOptions.nonce channel, so the per-call option is the ported observable.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "accepts a `nonce` option for as: \"script\"",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c6eda3eaeaaabef1105a",
@@ -59111,7 +59520,7 @@
     },
     {
       "caseId": "react-case-v1:c74e0a4223f3015f1f21",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "supports fetchPriority",
@@ -59119,7 +59528,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Duplicate-titled 'supports fetchPriority' entry (see react-case-v1:2460591809287aa8d139); the single ported test covers both the preload (:6172) and preinit (:6930) upstream variants.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "supports fetchPriority on preload and preinit, client and server",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c75fc76336e1a6b66f8d",
@@ -61605,7 +62021,7 @@
     },
     {
       "caseId": "react-case-v1:cf6ccb4cc765ab7e25bd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "uses imageSrcSet and imageSizes when keying image preloads",
@@ -61613,7 +62029,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Full upstream keying matrix on the client (srcset-only vs srcset+sizes distinct keys, sizes-without-srcset ignored, non-image `as` keys on href); the SSR mirror of the keying was already evidenced by resource-hints.test.ts 'SSR mirrors the unified identity and image keying'.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "keys image preloads on imageSrcSet+imageSizes, falling back to href",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "non-image preloads key on href",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:cf6e5e8c6cd00c6715c5",
@@ -62110,7 +62538,7 @@
     },
     {
       "caseId": "react-case-v1:d1053f923ae157910da0",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "inserts text separators following text when followed by an element that is converted to a resource and thus removed from the html inline",
@@ -62118,7 +62546,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Sibling dynamic texts each followed by a resource-elided stylesheet keep their text integrity through SSR and hydrate mismatch-free; the elided sheets hoist into first-encounter precedence groups.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-1.test.ts",
+          "testName": "sibling texts survive SSR resource elision and hydrate without mismatch",
+          "modes": ["server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:d10cb85e4873c31358ae",
@@ -62286,7 +62721,7 @@
     },
     {
       "caseId": "react-case-v1:d1a15a1c009c189be69b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "creates a preconnect resource when called",
@@ -62294,7 +62729,24 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "CORS-keyed preconnect identity, dedupe, and SSR mirror are pinned; adaptations noted: Octane keys '' and 'anonymous' as distinct modes where React collapses both to crossorigin=\"\", and a boolean crossOrigin is keyed leniently instead of warned (React-exact warning absent).",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/resource-hints.test.ts",
+          "testName": "preconnect identity includes the CORS mode",
+          "modes": ["client", "server-string", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/resource-hints.test.ts",
+          "testName": "preconnect and prefetchDNS insert their links once",
+          "modes": ["client", "server-string", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/resource-hints.test.ts",
+          "testName": "SSR mirrors font CORS, option transfer with preload coalescing, and CORS-keyed preconnect",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:d1a9b86f560e88240c47",
@@ -63109,15 +63561,15 @@
     },
     {
       "caseId": "react-case-v1:d45904defeda5855a264",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "omits preloads when an <img> is inside a <picture>",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Vacuous: 'omits preloads for <img> inside <picture>' only constrains the rendered-<img> preload emission feature Octane does not implement."
     },
     {
       "caseId": "react-case-v1:d45a2f60d20299e487e4",
@@ -63982,15 +64434,15 @@
     },
     {
       "caseId": "react-case-v1:d6f92dea08677c644480",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "inserts preloads in render phase eagerly",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Render-phase preload insertion exists to warm React's suspensey stylesheet loading; Octane has no client preload staging for resources (suspensey commits out of scope) and, empirically, a render that throws to an error boundary before commit inserts nothing."
     },
     {
       "caseId": "react-case-v1:d710902c30a5aff81277",
@@ -64006,15 +64458,15 @@
     },
     {
       "caseId": "react-case-v1:d7123882c86fff75a163",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can insert style resources as part of a boundary reveal",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Documented streaming divergence: head/resource content hoisted inside a streamed boundary does not ship in the stream (the shell's head already flushed); the hydrating client re-creates the style resource via styleResource (docs/differences-from-react.md 'Streaming' bullet; runtime.server.ts streaming scope note)."
     },
     {
       "caseId": "react-case-v1:d713b8e63c46e8d6bbf8",
@@ -64768,7 +65220,7 @@
     },
     {
       "caseId": "react-case-v1:d954cd20d1ee7faf1e72",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "supports nonce",
@@ -64776,7 +65228,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Duplicate-titled 'supports nonce' entry; covered by the same ported test as react-case-v1:3a363ca15c414aac909b.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "supports nonce on preload, client and server",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:d95e7c8898f71d670af1",
@@ -65106,15 +65565,15 @@
     },
     {
       "caseId": "react-case-v1:dabc2dcfc98a5e3a5c96",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "will not block displaying a Suspense boundary on a stylesheet with media that does not match",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "The observable is suspensey-commit load gating (boundary reveal blocked/unblocked by stylesheet load events per media matching); Octane documents suspend-until-loaded as out of scope and never blocks a reveal on stylesheet load."
     },
     {
       "caseId": "react-case-v1:dacaf5f4d2997e506a9a",
@@ -65734,7 +66193,7 @@
     },
     {
       "caseId": "react-case-v1:dc6f240107c6d488213c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not create stylesheet resources when inside a <noscript> context",
@@ -65742,7 +66201,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "The fixture's noscript link carries precedence=\"default\" (the stylesheet-resource form); sibling tests 'server: noscript metadata/resources serialize inside the noscript' and 'hydration adopts the noscript host without mismatch warnings' cover the other modes.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/hydration/hoist-exclusions.test.ts",
+          "testName": "client: noscript metadata/resources stay inside the noscript",
+          "modes": ["client", "server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:dc78f8556416989896fc",
@@ -66695,7 +67161,7 @@
     },
     {
       "caseId": "react-case-v1:dfaf921494ba7afbd29a",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "warns if you do not pass in a valid href argument or options argument",
@@ -66703,7 +67169,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "All five upstream preinit triggers (undefined href, empty href, null options, missing as, invalid as) produce an adapted dev diagnostic and stay no-ops. Note: the inventory pinned both duplicate-title cases to line 6137; this entry is matched to the preinit variant at upstream line 6733.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "preinit dev-warns and no-ops on invalid href or options",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:dfb8a74ef8412077b217",
@@ -66895,7 +67368,7 @@
     },
     {
       "caseId": "react-case-v1:e0c6d17cc90d6be183ff",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "should never flush hoistables before the preamble",
@@ -66903,7 +67376,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Zero bytes flush while the root is suspended, and the preinit issued before the suspension serializes ahead of the shell content once it flushes \u2014 the preamble-ordering observable without React's whole-document preamble machinery.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "flushes nothing before the shell",
+          "modes": ["server-stream", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "a pre-suspension preinit folds into the shell",
+          "modes": ["server-stream", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e0c9c42a74c8193ce8f8",
@@ -68653,15 +69138,15 @@
     },
     {
       "caseId": "react-case-v1:e66f3e9d6b1594d9d505",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not suspend a transition on a stylesheet whose preload has already loaded",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Canary-only (b740af25:3677): not suspending a transition because the stylesheet's preload already loaded is suspensey load-state accounting, documented out of scope."
     },
     {
       "caseId": "react-case-v1:e66fbfb3f5ff0381a91c",
@@ -69544,7 +70029,7 @@
     },
     {
       "caseId": "react-case-v1:e9811fb4266b85d5f926",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "escapes hrefs when selecting matching elements in the document when using preload and preinit",
@@ -69552,7 +70037,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Client preload/preinit with selector-syntax hrefs neither throw nor cross-match SSR-emitted tags; repeats of SSR hrefs (including a newline href) are value-matched no-ops.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "matches preload and preinit calls whose hrefs contain selector metacharacters",
+          "modes": ["client", "server-string", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e982c305f1effa667066",
@@ -70888,15 +71380,15 @@
     },
     {
       "caseId": "react-case-v1:ee1cd601a7420b0dc676",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can support styles inside portals to an element in shadowRoots",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Same page-global model: stylesheets rendered through portals into elements inside shadow roots would insert into document.head, not the containing ShadowRoot; no HoistableRoot scoping exists."
     },
     {
       "caseId": "react-case-v1:ee293028fbb851f59369",
@@ -71552,15 +72044,15 @@
     },
     {
       "caseId": "react-case-v1:efc2b80a458953ccb84b",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can support styles inside portals to a shadowRoot",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Octane Float resources are page-global and always insert into document.head \u2014 there is no per-HoistableRoot (shadow-root) resource scoping, and Octane portal targets must be Elements (a ShadowRoot is not), so a portal to a shadowRoot cannot even be constructed. Proposed as a divergence to document alongside the page-global resource contract."
     },
     {
       "caseId": "react-case-v1:efc53b3090c304fa5aac",
@@ -71648,15 +72140,15 @@
     },
     {
       "caseId": "react-case-v1:effa68b9ed23320683d3",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "should not preload images that have a data URIs for src or srcSet",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Vacuous: 'does not preload data-URI images' only constrains the rendered-<img> preload emission feature Octane does not implement."
     },
     {
       "caseId": "react-case-v1:f0003af90822fd942db3",
@@ -71672,15 +72164,15 @@
     },
     {
       "caseId": "react-case-v1:f01d6d81f9b553a519f1",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "dedupes if the external runtime is explicitly loaded using preinit",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Exercises unstable_externalRuntimeSrc dedupe; the Fizz external runtime is a standing non-goal."
     },
     {
       "caseId": "react-case-v1:f0206f3a1e912edc3c69",
@@ -72002,15 +72494,15 @@
     },
     {
       "caseId": "react-case-v1:f135627acfbcb79d6e5b",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "does not outline a boundary with suspensey CSS when flushing the shell",
       "baselines": ["canary"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Canary-only (b740af25:9775): the outline-vs-inline decision for suspensey CSS at shell flush is Fizz suspend-until-loaded machinery, documented out of scope."
     },
     {
       "caseId": "react-case-v1:f136c67f48070633da15",
@@ -72998,7 +73490,7 @@
     },
     {
       "caseId": "react-case-v1:f4cdbc269065737169a9",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "treats link rel stylesheet elements as a stylesheet resource when it includes a precedence when hydrating",
@@ -73006,7 +73498,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "SSR-emitted stylesheet resource is adopted (not duplicated) by the hydrating client render of the same component.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/float-resources.test.ts",
+          "testName": "a hydrating client call dedupes against SSR-emitted resources",
+          "modes": ["server-string", "hydrate-match"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:f504b1aa6080b87da7d2",
@@ -74318,7 +74817,7 @@
     },
     {
       "caseId": "react-case-v1:f9945153572927525bb0",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can emit styles with nonce",
@@ -74326,7 +74825,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "The durable subset: an authored nonce prop rides the emitted style-resource tag on client and SSR. Upstream's merged single style tag per precedence is a documented divergence (one tag per resource) and its {nonce:{style}} channel option does not exist (one RenderOptions.nonce).",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-3.test.ts",
+          "testName": "emits style resources with a nonce",
+          "modes": ["client", "server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:f995c5588c3af365b456",
@@ -75097,15 +75603,15 @@
     },
     {
       "caseId": "react-case-v1:fc6d200113122f528e5e",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "can hydrate hoistable tags inside late suspense boundaries",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Documented streaming divergence: head elements hoisted inside streamed boundaries are re-created on the client during hydration rather than adopted/hydrated in place (docs/differences-from-react.md 'Streaming'); the case additionally requires a whole-document hydrateRoot(document, \u2026) harness."
     },
     {
       "caseId": "react-case-v1:fc6e3fc6106c02eb05d4",
@@ -75128,7 +75634,7 @@
     },
     {
       "caseId": "react-case-v1:fcae4f90b1b560984913",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "will not insert a preload if the underlying resource already exists in the Document",
@@ -75136,7 +75642,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "SSR head (stylesheet resource, async script resource, font preload) lands in the document; client preload calls for all three identities are no-ops.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
+          "testName": "does not insert a preload when the underlying resource already exists in the document",
+          "modes": ["client", "hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:fcb2ce3bc074798afdf7",
