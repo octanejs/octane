@@ -10,8 +10,9 @@ conformance tests across three suites plus links into the existing Float/hint
 suites), 54 are documented non-goals/divergences with per-case rationale
 (suspensey commits, whole-document containers, Fizz bootstrap/external-runtime
 protocol, `<img>`-preload scanning, SuspenseList, shadow-root scoping,
-streamed-boundary head content), and 7 stay planned against two newly-filed
-engine gaps and three warning-message families.
+streamed-boundary head content), and 8 stay planned against two newly-filed
+engine gaps, three warning-message families, and server-side hoistable
+prioritization ordering.
 
 Fixes: the document-metadata hoist partition is now HTML-scoped — nothing
 hoists from an SVG lexical context (a precedence link inside `<svg>` no longer
