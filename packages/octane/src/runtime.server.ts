@@ -62,6 +62,12 @@ import {
 } from './constants.js';
 import { hasOwnProp } from './has-own.js';
 import { headOwnershipSuffix } from './head-ownership.js';
+import {
+	ariaAttributeWarning,
+	isAriaAttributeName,
+	isUnknownAriaAttribute,
+	unknownAriaAttributeWarning,
+} from './aria-diagnostics.js';
 import type { HydrateProps, HydrationStrategy } from './hydration/types.js';
 import {
 	applyElementDefaultProps,
@@ -73,7 +79,7 @@ import {
 
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
 // hyphenated style keys stay byte-equal across the two runtimes).
-import { normalizeClass, styleName } from './css.js';
+import { devWarnStyleCoercion, devWarnStyleProperty, normalizeClass, styleName } from './css.js';
 import {
 	invalidHtmlNestingWithAncestor,
 	invalidHtmlNestingWithParent,
@@ -1389,6 +1395,9 @@ function ssrHostElement(
 		const isCtlTag =
 			semanticTag === 'input' || semanticTag === 'textarea' || semanticTag === 'select';
 		if (props != null) {
+			if (process.env.NODE_ENV !== 'production') {
+				devValidateSsrAriaProps(props, semanticTag, namespace);
+			}
 			for (const k in props) {
 				const val = props[k];
 				// `dangerouslySetInnerHTML` is element CONTENT, not an attribute — capture
@@ -1832,6 +1841,37 @@ function devWarnSsrAttributeOnce(name: string, message: string): void {
 	console.error(message);
 }
 
+function devValidateSsrAriaProps(
+	props: Record<string, unknown> | Iterable<string>,
+	tag: string | undefined,
+	namespace: AttributeNamespace,
+): void {
+	if (
+		SSR_NESTING_WARNINGS === null ||
+		tag === undefined ||
+		(resolveAttributeNamespace(namespace) === 'html' && tag.indexOf('-') !== -1)
+	) {
+		return;
+	}
+	const names = Symbol.iterator in props ? props : Object.keys(props);
+	let unknown: string[] | undefined;
+	for (const name of names) {
+		if (!isAriaAttributeName(name)) continue;
+		const warning = ariaAttributeWarning(name, tag);
+		if (warning === null) continue;
+		if (!isUnknownAriaAttribute(name)) {
+			devWarnSsrAttributeOnce(name, warning);
+			continue;
+		}
+		if (DEV_SSR_ATTRIBUTE_WARNINGS?.has(name)) continue;
+		(DEV_SSR_ATTRIBUTE_WARNINGS ??= new Set()).add(name);
+		(unknown ??= []).push(name);
+	}
+	if (unknown !== undefined) {
+		console.error(unknownAriaAttributeWarning(unknown, tag));
+	}
+}
+
 /**
  * A dynamic attribute: ` name="value"`, ` name` for `true`, or '' to omit.
  * `tag` and `namespace` (when the emit site knows them) gate the tag-sensitive
@@ -1847,6 +1887,15 @@ export function ssrAttr(
 ): string {
 	namespace = resolveAttributeNamespace(namespace);
 	const isCustomTag = namespace === 'html' && tag !== undefined && tag.indexOf('-') !== -1;
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		!isCustomTag &&
+		tag !== undefined &&
+		isAriaAttributeName(name)
+	) {
+		const warning = ariaAttributeWarning(name, tag);
+		if (warning !== null) devWarnSsrAttributeOnce(name, warning);
+	}
 	// React-parity aliases (ATTRIBUTE_ALIASES, constants.ts): `htmlFor` → `for`,
 	// `strokeWidth` → `stroke-width`, `xlinkHref` → `xlink:href`, … — serialize
 	// the attribute the browser actually parses, byte-matching the client's
@@ -2032,7 +2081,18 @@ function styleObjectToCss(obj: Record<string, unknown>): string {
 		// must not emit the literal string "true").
 		if (val == null || typeof val === 'boolean') continue;
 		// React parity: numeric values get `px` (except 0 / unitless / custom props).
-		const serialized = cssStyleValue(k, val);
+		let serialized: string;
+		if (process.env.NODE_ENV !== 'production' && SSR_NESTING_WARNINGS !== null) {
+			devWarnStyleProperty(k, val, true);
+			try {
+				serialized = cssStyleValue(k, val);
+			} catch (error) {
+				devWarnStyleCoercion(k, val);
+				throw error;
+			}
+		} else {
+			serialized = cssStyleValue(k, val);
+		}
 		// An empty result would serialize as `color:;`, which the client never
 		// produces: setProperty with an empty value removes the declaration. Emitting
 		// it would make the server markup unhydratable.
@@ -2194,6 +2254,13 @@ export function ssrAttrs(
 
 	let out = '';
 	const ordered = [...resolved.values()].sort((a, b) => a[2] - b[2]);
+	if (process.env.NODE_ENV !== 'production') {
+		devValidateSsrAriaProps(
+			ordered.map(([name]) => name),
+			tag,
+			namespace,
+		);
+	}
 	for (const [name, value] of ordered) {
 		out += ssrAttrEntry(name, value, tag, namespace);
 	}
@@ -2256,6 +2323,9 @@ export function ssrSpread(
 ): string {
 	namespace = resolveAttributeNamespace(namespace);
 	if (obj == null) return '';
+	if (process.env.NODE_ENV !== 'production') {
+		devValidateSsrAriaProps(Object(obj) as Record<string, unknown>, tag, namespace);
+	}
 	let out = '';
 	for (const k of Object.keys(Object(obj))) {
 		// When direct and spread class writers coexist, the compiler emits one
@@ -8201,7 +8271,21 @@ export function preload(href: string, options: { as: string } & Record<string, u
 	// that comes FIRST seeds connection/integrity options for the preinit and is
 	// coalesced away when the preinit lands (see the hintHtml delete there).
 	if (HEAD !== null) {
-		if (as === 'style' && HEAD.hints.has('sheet:' + value)) return;
+		if (as === 'style' && HEAD.hints.has('sheet:' + value)) {
+			const existing = HEAD.sheets?.get(value);
+			if (existing === undefined || !existing.html.startsWith('<style')) return;
+			// Inline CSS cannot consume an external stylesheet preload. Compiler
+			// discovery may register the style ahead of its component's setup, but
+			// the two distinct resources must both survive regardless of that order.
+			if (process.env.NODE_ENV !== 'production' && HEAD.hints.has('dev-inline-style:' + value)) {
+				console.error(
+					'A <style> resource with href "' +
+						value +
+						'" follows a stylesheet preload for the same href. ' +
+						'Inline styles cannot consume a stylesheet preload; remove the preload or use a stylesheet link.',
+				);
+			}
+		}
 		// One executable per src across BOTH script forms (classic and module),
 		// matching the client's unified identity set.
 		if (as === 'script' && (HEAD.hints.has('script:' + value) || HEAD.hints.has('module:' + value)))
@@ -8335,7 +8419,28 @@ function resourceAttrs(attrs: Record<string, unknown>, tag: 'link' | 'script'): 
  * Dedupes by href across the pass; groups by precedence in first-encounter
  * order (the HeadBuffer.sheets Map), folded after the ordinary head content.
  */
-export function ssrStylesheetResource(attrs: Record<string, unknown> | null): string {
+export function ssrStylesheetResource(
+	attrs: Record<string, unknown> | null,
+	invalidReason?: string,
+): string {
+	if (process.env.NODE_ENV !== 'production' && invalidReason !== undefined) {
+		let conflict: string;
+		if (invalidReason === 'missing-href') {
+			conflict = 'requires a non-empty string `href`';
+		} else if (invalidReason === 'empty-href') {
+			conflict = 'has an empty `href`; a stylesheet resource requires a non-empty string `href`';
+		} else {
+			const props =
+				invalidReason === 'onLoad+onError' ? '`onLoad` and `onError`' : '`' + invalidReason + '`';
+			conflict = 'also has ' + props + ', which requires an independently managed stylesheet';
+		}
+		console.error(
+			'A <link rel="stylesheet"> with `precedence` ' +
+				conflict +
+				'. It will not be hoisted or deduplicated; remove the conflicting prop or `precedence`.',
+		);
+		return '';
+	}
 	if (HEAD === null || attrs == null) return '';
 	const href = attrs.href;
 	if (typeof href !== 'string' || href === '') return '';
@@ -8363,10 +8468,22 @@ export function ssrStylesheetResource(attrs: Record<string, unknown> | null): st
  * not decode inside style raw text), so content that could close the tag fails
  * closed with a dev diagnostic instead of truncating the document.
  */
-export function ssrStyleResource(attrs: Record<string, unknown> | null, css: string): string {
+export function ssrStyleResource(
+	attrs: Record<string, unknown> | null,
+	css: string,
+	development?: boolean,
+): string {
 	if (HEAD === null || attrs == null) return '';
 	const href = attrs.href;
 	if (typeof href !== 'string' || href === '') return '';
+	if (process.env.NODE_ENV !== 'production' && development === true && /\s/.test(href)) {
+		console.error(
+			'A <style> resource href must not contain whitespace because it identifies the style ' +
+				'during hydration; received "' +
+				href +
+				'".',
+		);
+	}
 	if (/<\/style/i.test(css)) {
 		if (process.env.NODE_ENV !== 'production') {
 			console.error(
@@ -8378,6 +8495,17 @@ export function ssrStyleResource(attrs: Record<string, unknown> | null, css: str
 	}
 	const key = 'sheet:' + href;
 	if (HEAD.hints.has(key)) return '';
+	if (process.env.NODE_ENV !== 'production' && development === true) {
+		if (HEAD.hints.has('preload:style:' + href)) {
+			console.error(
+				'A <style> resource with href "' +
+					href +
+					'" follows a stylesheet preload for the same href. ' +
+					'Inline styles cannot consume a stylesheet preload; remove the preload or use a stylesheet link.',
+			);
+		}
+		HEAD.hints.add('dev-inline-style:' + href);
+	}
 	HEAD.hints.add(key);
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
 	const tag =

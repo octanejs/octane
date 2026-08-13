@@ -46,6 +46,12 @@ import {
 import { hasOwnProp } from './has-own.js';
 import { headOwnershipKey } from './head-ownership.js';
 import {
+	ariaAttributeWarning,
+	isAriaAttributeName,
+	isUnknownAriaAttribute,
+	unknownAriaAttributeWarning,
+} from './aria-diagnostics.js';
+import {
 	applyElementDefaultProps,
 	childElementKey,
 	childrenIterator,
@@ -10597,7 +10603,7 @@ class HydrationCapability {
 		// while still detecting reordered, missing, added, and empty styles.
 		const expectedStyle = document.createElement('div').style;
 		if (staticCss !== undefined) expectedStyle.cssText = staticCss;
-		applyStyleValue(expectedStyle, value, undefined);
+		applyStyleValue(el, expectedStyle, value, undefined);
 		const expected = expectedStyle.cssText;
 		const expectsStyleAttribute = expected !== '';
 		if (before === expected && hadStyleAttribute === expectsStyleAttribute) return true;
@@ -12102,6 +12108,15 @@ function attrNamespace(name: string): string | null {
 }
 
 export function setAttribute(el: Element, name: string, value: any): void {
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		(el as any).__oct_loc !== undefined &&
+		isAriaAttributeName(name) &&
+		!isHtmlCustomElement(el)
+	) {
+		const warning = ariaAttributeWarning(name, el.localName);
+		if (warning !== null) devWarnAttributeOnce(el, name, warning);
+	}
 	// React-style `dangerouslySetInnerHTML={{__html}}` is a PROPERTY write, not an
 	// attribute. The compiler's fast path sets `el.innerHTML` directly, but when the
 	// element also carries a spread (`<div {...props} dangerouslySetInnerHTML={x}/>`,
@@ -12311,6 +12326,26 @@ function devWarnAttributeOnce(_el: Element, name: string, message: string): void
 	console.error(message);
 }
 
+function devValidateAriaProps(el: Element, props: Record<string, unknown>): void {
+	if ((el as any).__oct_loc === undefined || isHtmlCustomElement(el)) return;
+	let unknown: string[] | undefined;
+	for (const name of Object.keys(props)) {
+		if (!isAriaAttributeName(name)) continue;
+		const warning = ariaAttributeWarning(name, el.localName);
+		if (warning === null) continue;
+		if (!isUnknownAriaAttribute(name)) {
+			devWarnAttributeOnce(el, name, warning);
+			continue;
+		}
+		if (DEV_ATTRIBUTE_WARNINGS?.has(name)) continue;
+		(DEV_ATTRIBUTE_WARNINGS ??= new Set()).add(name);
+		(unknown ??= []).push(name);
+	}
+	if (unknown !== undefined) {
+		console.error(unknownAriaAttributeWarning(unknown, el.localName));
+	}
+}
+
 /**
  * Compiler-only fast path for a statically named `data-*` attribute whose
  * expression is proven to be a string at authoring time. Runtime values still
@@ -12377,6 +12412,14 @@ export function setBooleanAttribute(el: Element, name: string, value: unknown): 
  * attribute path.
  */
 export function setAriaAttribute(el: Element, name: string, value: unknown): void {
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		(el as any).__oct_loc !== undefined &&
+		!isHtmlCustomElement(el)
+	) {
+		const warning = ariaAttributeWarning(name, el.localName);
+		if (warning !== null) devWarnAttributeOnce(el, name, warning);
+	}
 	const next = value == null ? null : String(value);
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
@@ -12534,7 +12577,7 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 // clsx-style `class`/`className` composition — shared with the SSR serializer
 // via css.ts so client and server compose byte-equal class strings (hydration
 // parity). Re-exported here because it is part of the semi-public surface.
-import { normalizeClass, styleName } from './css.js';
+import { devWarnStyleCoercion, devWarnStyleProperty, normalizeClass, styleName } from './css.js';
 export { normalizeClass };
 
 export function setClassName(el: Element, value: unknown): void {
@@ -12610,7 +12653,7 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 	// The whole style attribute, not the individual declarations applyStyleValue
 	// is about to touch: restoring the attribute text restores every one of them.
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
-	applyStyleValue(style, value, prev);
+	applyStyleValue(el, style, value, prev);
 }
 
 /**
@@ -12638,10 +12681,15 @@ export function setStyleProperty(
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
 	const style = (el as HTMLElement).style;
 	if (remove) style.removeProperty(styleName(name));
-	else applyStyleProperty(style, name, value);
+	else applyStyleProperty(el, style, name, value);
 }
 
-function applyStyleValue(style: CSSStyleDeclaration, value: any, prev: any): void {
+function applyStyleValue(
+	el: HTMLElement | SVGElement,
+	style: CSSStyleDeclaration,
+	value: any,
+	prev: any,
+): void {
 	if (value == null || value === false || value === '') {
 		if (prev != null && prev !== false && prev !== '') style.cssText = '';
 		return;
@@ -12665,21 +12713,37 @@ function applyStyleValue(style: CSSStyleDeclaration, value: any, prev: any): voi
 			// Booleans clear the property (React parity): `fontFamily: true` must not
 			// set the literal string "true" (a valid font name!).
 			if (v == null || typeof v === 'boolean') style.removeProperty(styleName(k));
-			else applyStyleProperty(style, k, v);
+			else applyStyleProperty(el, style, k, v);
 		}
 	} else {
 		if (typeof prev === 'string') style.cssText = '';
 		for (const k in value) {
 			const v = value[k];
-			if (v != null && typeof v !== 'boolean') applyStyleProperty(style, k, v);
+			if (v != null && typeof v !== 'boolean') applyStyleProperty(el, style, k, v);
 		}
 	}
 }
 
-function applyStyleProperty(style: CSSStyleDeclaration, name: string, value: any): void {
+function applyStyleProperty(
+	el: HTMLElement | SVGElement,
+	style: CSSStyleDeclaration,
+	name: string,
+	value: any,
+): void {
 	const prop = styleName(name);
 	// React parity: a bare number gets `px` unless it's 0, a custom prop, or unitless.
-	const s = cssStyleValue(name, value);
+	let s: string;
+	if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
+		devWarnStyleProperty(name, value, false);
+		try {
+			s = cssStyleValue(name, value);
+		} catch (error) {
+			devWarnStyleCoercion(name, value);
+			throw error;
+		}
+	} else {
+		s = cssStyleValue(name, value);
+	}
 	// CodeQL flagged the prior `/\s*!important\s*$/` test+replace combo as
 	// polynomial-regex-on-uncontrolled-input. Same job in linear time using
 	// built-in trimEnd() + endsWith() — no regex, no backtracking risk.
@@ -12956,6 +13020,9 @@ export function setSpread(
 	skipDangerouslySetInnerHTML = false,
 	skipFormControls = false,
 ): void {
+	if (process.env.NODE_ENV !== 'production' && value != null) {
+		devValidateAriaProps(el, Object(value) as Record<string, unknown>);
+	}
 	// `mountScope` is passed only on the mount call (not on updates). When present
 	// a spread-supplied ref attach is DEFERRED to commit so a callback ref sees a
 	// connected node — same React-19 timing as element/fragment refs. Updates
@@ -27736,10 +27803,23 @@ export function preload(href: string, options: { as: string } & Record<string, u
 	// Connection/integrity options seed the matching future preinit (React's
 	// resource map carries them onto the initialized resource).
 	if (as === 'style' || as === 'script') stashPreloadTransfer(as, rawHref, options);
-	// After the matching resource is already live (a Float resource or preinit),
-	// a preload adds nothing — React's resource map has the same one-way
-	// upgrade: preload-then-init keeps both tags, init-then-preload no-ops.
-	if (as === 'style' && resourceState().sheets.has(rawHref)) return;
+	// After the matching external resource is already live (a Float resource or
+	// preinit), a preload adds nothing. Inline style resources share the sheet
+	// identity namespace but cannot consume an external stylesheet preload, so
+	// both entries must survive regardless of discovery order. Inspect DOM only
+	// on this uncommon identity collision and compare attribute values directly:
+	// href text may contain quotes or other CSS-selector metacharacters.
+	if (as === 'style' && resourceState().sheets.has(rawHref)) {
+		const styles = document.head.querySelectorAll('style[data-precedence]');
+		let hasInlineStyle = false;
+		for (let i = 0; i < styles.length; i++) {
+			if (styles[i].getAttribute('data-href') === rawHref) {
+				hasInlineStyle = true;
+				break;
+			}
+		}
+		if (!hasInlineStyle) return;
+	}
 	if (as === 'script' && resourceState().scripts.has(rawHref)) return;
 	// Image preloads with a srcset are keyed by the srcset+sizes pair, not the
 	// fallback href — two responsive preloads for one href stay distinct.
@@ -27986,8 +28066,32 @@ function applyResourceAttrs(el: Element, attrs: Record<string, unknown>): void {
 	}
 }
 
+function warnInvalidStylesheetResource(reason: string): void {
+	let conflict: string;
+	if (reason === 'missing-href') {
+		conflict = 'requires a non-empty string `href`';
+	} else if (reason === 'empty-href') {
+		conflict = 'has an empty `href`; a stylesheet resource requires a non-empty string `href`';
+	} else {
+		const props = reason === 'onLoad+onError' ? '`onLoad` and `onError`' : '`' + reason + '`';
+		conflict = 'also has ' + props + ', which requires an independently managed stylesheet';
+	}
+	console.error(
+		'A <link rel="stylesheet"> with `precedence` ' +
+			conflict +
+			'. It will not be hoisted or deduplicated; remove the conflicting prop or `precedence`.',
+	);
+}
+
 /** Compiler target for `<link rel="stylesheet" href precedence>` (React Float). */
-export function stylesheetResource(attrs: Record<string, unknown> | null): void {
+export function stylesheetResource(
+	attrs: Record<string, unknown> | null,
+	invalidReason?: string,
+): void {
+	if (process.env.NODE_ENV !== 'production' && invalidReason !== undefined) {
+		warnInvalidStylesheetResource(invalidReason);
+		return;
+	}
 	if (typeof document === 'undefined' || attrs == null) return;
 	const href = attrs.href;
 	if (typeof href !== 'string' || href === '') return;
@@ -28011,12 +28115,28 @@ export function stylesheetResource(attrs: Record<string, unknown> | null): void 
  * precedence-group ordering with link resources; the CSS ships as the tag's
  * text content and is NOT scoped (scoped CSS owns every other `<style>`).
  */
-export function styleResource(attrs: Record<string, unknown> | null, css: string): void {
+export function styleResource(
+	attrs: Record<string, unknown> | null,
+	css: string,
+	development?: boolean,
+): void {
 	if (typeof document === 'undefined' || attrs == null) return;
 	const href = attrs.href;
 	if (typeof href !== 'string' || href === '') return;
 	const state = resourceState();
 	if (state.sheets.has(href)) return;
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		development === true &&
+		hasHeadHint('preload:style:' + href)
+	) {
+		console.error(
+			'A <style> resource with href "' +
+				href +
+				'" follows a stylesheet preload for the same href. ' +
+				'Inline styles cannot consume a stylesheet preload; remove the preload or use a stylesheet link.',
+		);
+	}
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
 	// textContent makes any CSS safe to insert client-side, but the SSR twin
 	// must fail closed on "</style" (raw-text serialization) — surface the same

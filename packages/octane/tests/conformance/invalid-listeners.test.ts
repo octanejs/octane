@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { mount, createLog } from '../_helpers';
-import { BadListenerTree } from './_fixtures/invalid-listeners.tsrx';
+import { BadCaptureListenerTree, BadListenerTree } from './_fixtures/invalid-listeners.tsrx';
 
 const PROD_COMPILE = process.env.OCTANE_TEST_COMPILE_MODE === 'prod';
 
@@ -145,6 +145,83 @@ describe('InvalidEventListeners', () => {
 			window.removeEventListener('error', onError);
 			consoleError.mockRestore();
 			root.unmount();
+		}
+	});
+
+	// Per InvalidEventListeners-test.js:36. Capture listeners have the same
+	// render-time validation and authored-prop dispatch diagnostic as bubble listeners.
+	it('an invalid capture listener names its capture prop and preserves ancestor dispatch', () => {
+		const log = createLog();
+		const uncaught: unknown[] = [];
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const onError = (event: ErrorEvent) => {
+			uncaught.push(event.error);
+			event.preventDefault();
+		};
+		window.addEventListener('error', onError);
+		const root = mount(BadCaptureListenerTree, {
+			onAnc: () => log.push('ancestor capture'),
+			bad: 'not a capture listener',
+		});
+		try {
+			expectRenderWarning(
+				consoleError,
+				'Expected `onClickCapture` listener to be a function, instead got a value of `string` type.',
+			);
+			consoleError.mockClear();
+			root.find('.target').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+			expect(log.drain()).toEqual(['ancestor capture']);
+			expect(uncaught).toHaveLength(1);
+			expect(uncaught[0]).toEqual(
+				expect.objectContaining({
+					message: PROD_COMPILE
+						? 'Expected click event listener to be a function, instead got a value of `string` type.'
+						: 'Expected `onClickCapture` listener to be a function, instead got a value of `string` type.',
+				}),
+			);
+			expect(consoleError).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			window.removeEventListener('error', onError);
+			consoleError.mockRestore();
+		}
+	});
+
+	// Per InvalidEventListeners-test.js:36. Replacing a bad listener must
+	// restore ordinary event delivery without retaining its prior diagnostic.
+	it('replacing an invalid listener restores the active callback without another warning', () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const onAncestor = vi.fn();
+		const replacement = vi.fn();
+		const root = mount(BadListenerTree, { onAnc: onAncestor, bad: 42 });
+		try {
+			expectRenderWarning(consoleError, listenerMessage('number'));
+			consoleError.mockClear();
+			root.update(BadListenerTree, { onAnc: onAncestor, bad: replacement });
+			expect(consoleError).not.toHaveBeenCalled();
+			root.find('.target').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+			expect(replacement).toHaveBeenCalledOnce();
+			expect(onAncestor).toHaveBeenCalledOnce();
+			expect(consoleError).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			consoleError.mockRestore();
+		}
+	});
+
+	// Per InvalidEventListeners-test.js:36. Replacing a valid listener with a
+	// different invalid value validates the current prop and names its new type.
+	it('replacing a usable listener with an invalid value reports the new listener type', () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const onAncestor = vi.fn();
+		const root = mount(BadListenerTree, { onAnc: onAncestor, bad: () => undefined });
+		try {
+			expect(consoleError).not.toHaveBeenCalled();
+			root.update(BadListenerTree, { onAnc: onAncestor, bad: true });
+			expectRenderWarning(consoleError, listenerMessage('boolean'));
+		} finally {
+			root.unmount();
+			consoleError.mockRestore();
 		}
 	});
 });

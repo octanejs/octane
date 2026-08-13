@@ -2,7 +2,7 @@
 // evidence ports. Each component is cited from the test file; the contracts
 // under test are React Float resource semantics adapted to Octane's model
 // (resources are global, hoisted, deduped, precedence-grouped, retained).
-import { preinit, use, useState } from 'octane';
+import { preload, preinit, use, useState } from 'octane';
 
 // Same-commit release + acquire of one script resource identity: the @if flip
 // unmounts the first <script async src> site and mounts a second one carrying
@@ -148,4 +148,118 @@ export function NoModuleScripts() @{
 		<script src="/nomodule-sync.js" noModule data-meaningful="" />
 		<script async src="/nomodule-async.js" noModule data-meaningful="" />
 	</div>
+}
+
+// A precedence link loses Float resource semantics whenever its href cannot
+// identify a stylesheet or its author owns the loading/disabled lifecycle.
+export function PrecedenceWithoutHref() @{
+	<section class="invalid-precedence-host">
+		<link rel="stylesheet" precedence="default" />
+	</section>
+}
+
+export function PrecedenceWithEmptyHref() @{
+	<section class="invalid-precedence-host">
+		<link rel="stylesheet" href="" precedence="default" />
+	</section>
+}
+
+export function PrecedenceWithLoadHandler(props: { onLoad: () => void }) @{
+	<section class="invalid-precedence-host">
+		<link rel="stylesheet" href="/precedence-load.css" precedence="default" onLoad={props.onLoad} />
+	</section>
+}
+
+export function PrecedenceWithErrorHandler(props: { onError: () => void }) @{
+	<section class="invalid-precedence-host">
+		<link
+			rel="stylesheet"
+			href="/precedence-error.css"
+			precedence="default"
+			onError={props.onError}
+		/>
+	</section>
+}
+
+export function PrecedenceWithBothHandlers(props: { onLoad: () => void; onError: () => void }) @{
+	<section class="invalid-precedence-host">
+		<link
+			rel="stylesheet"
+			href="/precedence-both.css"
+			precedence="default"
+			onLoad={props.onLoad}
+			onError={props.onError}
+		/>
+	</section>
+}
+
+export function PrecedenceWithDisabledFalse() @{
+	<section class="invalid-precedence-host">
+		<link
+			rel="stylesheet"
+			href="/precedence-disabled-false.css"
+			precedence="default"
+			disabled={false}
+		/>
+	</section>
+}
+
+export function PrecedenceWithDisabledTrue() @{
+	<section class="invalid-precedence-host">
+		<link rel="stylesheet" href="/precedence-disabled-true.css" precedence="default" disabled />
+	</section>
+}
+
+export function PrecedenceResourceControl() @{
+	<section class="valid-precedence-host">
+		<link rel="stylesheet" href="/precedence-valid.css" precedence="default" />
+	</section>
+}
+
+export function DynamicPrecedenceResourceControl(props: { href: string }) @{
+	<section class="dynamic-precedence-host">
+		<link rel="stylesheet" href={props.href} precedence="default" />
+	</section>
+}
+
+export function PreloadedStyleResource() @{
+	preload('/inline-collision.css', { as: 'style' });
+	<>
+		<style href="/inline-collision.css" precedence="default">
+			.inline-collision {
+				color: red;
+			}
+		</style>
+		<main class="inline-collision">collision</main>
+	</>
+}
+
+export function PreloadedExternalStylesheet() @{
+	preload('/external-control.css', { as: 'style' });
+	<>
+		<link rel="stylesheet" href="/external-control.css" precedence="default" />
+		<main class="external-control">external</main>
+	</>
+}
+
+export function StyleResourceWithWhitespace() @{
+	<>
+		<style href="inline style key" precedence="default">
+			.whitespace-style-key {
+				color: blue;
+			}
+		</style>
+		<main class="whitespace-style-key">whitespace</main>
+	</>
+}
+
+export function StyleResourceWithoutWhitespace() @{
+	<>
+		<style href="inline-style-key" precedence="default">
+			.valid-style-key {
+				color: green;
+			}
+		</style>
+		<main class="valid-style-key">valid</main>
+	</>
 }

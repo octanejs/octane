@@ -4409,7 +4409,7 @@
     },
     {
       "caseId": "react-case-v1:0d30561035bd551e7e16",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInvalidARIAHook-test.js",
       "title": "should warn for many invalid aria-* props",
@@ -4417,7 +4417,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Development-only ARIA diagnostics preserve serialization and cover static/dynamic/spread host names, actionable casing guidance, grouped unknown names, ARIA 1.3, SSR/streaming, matching hydration, and production silence.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "groups multiple unknown ARIA attributes on one host into a plural warning",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "groups multiple unknown server-side ARIA names into one plural warning",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:0d3b45fa327f2618cac2",
@@ -5097,7 +5109,7 @@
     },
     {
       "caseId": "react-case-v1:0f528bed3f9e2be14997",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInput-test.js",
       "title": "should warn for controlled value of false with missing onChange",
@@ -5105,7 +5117,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Falsy controlled values remain controlled and emit one development-only actionable native onInput warning; production-compiled fixtures remain silent.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/controlled-input.test.ts",
+          "testName": "warns for a handler-less controlled input with the falsy value %j",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:0f567311924c1c8363c3",
@@ -8121,15 +8140,27 @@
     },
     {
       "caseId": "react-case-v1:1b02a5f96b7fd1719780",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/CSSPropertyOperations-test.js",
       "title": "should warn when using hyphenated style names",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Octane deliberately accepts native kebab-case CSS property names and complete cssText strings; warning for these supported authoring forms would contradict its documented style contract.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "keeps custom properties, valid vendors, supported kebab keys, and cssText silent",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "keeps custom properties, supported hyphenated names, and cssText silent in SSR",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:1b0f3ee4dd3d4d2fb798",
@@ -11708,7 +11739,7 @@
     },
     {
       "caseId": "react-case-v1:26a8088ef52e17d378cc",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInput-test.js",
       "title": "should warn for controlled value of \"0\" with missing onChange",
@@ -11716,7 +11747,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Falsy controlled values remain controlled and emit one development-only actionable native onInput warning; production-compiled fixtures remain silent.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/controlled-input.test.ts",
+          "testName": "warns for a handler-less controlled input with the falsy value %j",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:26a9727e648ecf87fa3b",
@@ -27221,7 +27259,7 @@
     },
     {
       "caseId": "react-case-v1:5a39913e192b98ff8fdc",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/CSSPropertyOperations-test.js",
       "title": "should not warn when setting CSS custom properties",
@@ -27229,7 +27267,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Custom CSS properties stay exempt from name, semicolon, and numeric diagnostics across client and server renderers.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "keeps custom properties, valid vendors, supported kebab keys, and cssText silent",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "keeps custom properties, supported hyphenated names, and cssText silent in SSR",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5a4cace7b62d8fe2c09f",
@@ -27649,7 +27699,7 @@
     },
     {
       "caseId": "react-case-v1:5b524c3dd4a534e3710b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/CSSPropertyOperations-test.js",
       "title": "should warn about style having a trailing semicolon",
@@ -27657,7 +27707,24 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Development-only client/server style diagnostics identify malformed vendor prefixes, trailing semicolons, NaN, and Infinity without changing CSS application; hydration and production compile are covered.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "warns for vendor casing, trailing semicolons, NaN, and Infinity",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "warns for malformed vendors, semicolons, NaN, and Infinity during SSR",
+          "modes": ["server-string"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "reports style diagnostics through $name",
+          "modes": ["server-stream"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:5b564efee6f08def0f53",
@@ -34398,7 +34465,7 @@
     },
     {
       "caseId": "react-case-v1:72311cfa4ee5d9a60035",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInvalidARIAHook-test.js",
       "title": "should allow valid aria-* props",
@@ -34406,7 +34473,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Development-only ARIA diagnostics preserve serialization and cover static/dynamic/spread host names, actionable casing guidance, grouped unknown names, ARIA 1.3, SSR/streaming, matching hydration, and production silence.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "accepts recognized ARIA attributes, including every React-supported ARIA 1.3 addition",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "accepts recognized ARIA attributes and every React-supported ARIA 1.3 addition during SSR",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:72337b2042308193b96d",
@@ -35854,7 +35933,7 @@
     },
     {
       "caseId": "react-case-v1:7760c076ed07a41f8608",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/CSSPropertyOperations-test.js",
       "title": "should not add units to CSS custom properties",
@@ -35862,7 +35941,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Existing client and server numeric custom-property evidence preserves values without appending px.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/style-px.test.ts",
+          "testName": "never adds px to a custom property (`--x`)",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/style-px.test.ts",
+          "testName": "serialises a dynamic object style with px / unitless / 0 / custom-prop rules",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:776eaea16db976740b35",
@@ -37191,7 +37282,7 @@
     },
     {
       "caseId": "react-case-v1:7c63edec9859d7649197",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInvalidARIAHook-test.js",
       "title": "should warn for one invalid aria-* prop",
@@ -37199,7 +37290,29 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Development-only ARIA diagnostics preserve serialization and cover static/dynamic/spread host names, actionable casing guidance, grouped unknown names, ARIA 1.3, SSR/streaming, matching hydration, and production silence.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "warns for one unknown ARIA attribute supplied through a JSX spread",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "warns for an invalid ARIA attribute in buffered server output",
+          "modes": ["server-string"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "reports invalid ARIA attributes in $name streaming output",
+          "modes": ["server-stream"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "warns during matching hydration without replacing server-rendered DOM",
+          "modes": ["hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7c69894ada4534f1e699",
@@ -37263,7 +37376,7 @@
     },
     {
       "caseId": "react-case-v1:7ca2ad53c4e23c9c7e62",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInput-test.js",
       "title": "should not warn with value and onInput handler",
@@ -37271,7 +37384,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "A usable native onInput listener keeps a controlled text input editable and does not emit missing-handler diagnostics.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/controlled-input.test.ts",
+          "testName": "does not warn when onInput is present",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7ca7fc174252e32391bb",
@@ -39438,7 +39558,7 @@
     },
     {
       "caseId": "react-case-v1:838f4a3ca2ac77bece4a",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "warns if you provide a `precedence` prop with other props that invalidate the creation of a stylesheet resource",
@@ -39446,7 +39566,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Client and server precedence-link diagnostics preserve authored inline placement for missing/empty href, load/error handlers, and disabled presence, including disabled=false; production compilation remains silent.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-resource-diagnostics.test.ts",
+          "testName": "keeps a precedence link with $name inline on the client",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/float-resource-diagnostics.test.ts",
+          "testName": "keeps a precedence link with $name inline on the server",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:8395e74cea196ab2006a",
@@ -40762,7 +40894,7 @@
     },
     {
       "caseId": "react-case-v1:882090a189f96326b578",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/CSSPropertyOperations-test.js",
       "title": "should warn about style containing an Infinity value",
@@ -40770,7 +40902,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Development-only client/server style diagnostics identify malformed vendor prefixes, trailing semicolons, NaN, and Infinity without changing CSS application; hydration and production compile are covered.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "warns for vendor casing, trailing semicolons, NaN, and Infinity",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "warns for malformed vendors, semicolons, NaN, and Infinity during SSR",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:882f08d93251cfae4514",
@@ -40883,7 +41027,7 @@
     },
     {
       "caseId": "react-case-v1:88938b9c8b37fd0cd0cb",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/InvalidEventListeners-test.js",
       "title": "should prevent non-function listeners, at dispatch",
@@ -40891,7 +41035,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Development warnings and dispatch errors identify invalid bubble/capture listeners and replacement values; Octane deliberately preserves guarded native ancestor propagation and production uses its compact native-event label.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/invalid-listeners.test.ts",
+          "testName": "an invalid capture listener names its capture prop and preserves ancestor dispatch",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:88a472bfc3642ca8bafd",
@@ -41831,7 +41982,7 @@
     },
     {
       "caseId": "react-case-v1:8b9cdaf807ceab6bb8c9",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInvalidARIAHook-test.js",
       "title": "should warn for use of unrecognized camel case aria attributes",
@@ -41839,7 +41990,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Development-only ARIA diagnostics preserve serialization and cover static/dynamic/spread host names, actionable casing guidance, grouped unknown names, ARIA 1.3, SSR/streaming, matching hydration, and production silence.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "explains the required lowercase naming pattern for unknown camelCase ARIA attributes",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "reports server ARIA casing guidance for $name",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:8b9de84a8443ccb70972",
@@ -41996,7 +42159,7 @@
     },
     {
       "caseId": "react-case-v1:8bf10d08cb574d844835",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInput-test.js",
       "title": "should not warn about missing onChange in uncontrolled inputs",
@@ -42004,7 +42167,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Uncontrolled, null-valued, explicitly read-only, and disabled form controls are negative cases for missing native input-handler warnings.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/controlled-input.test.ts",
+          "testName": "does not warn for a $label field without an input handler",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:8bf86305f17bb32e81d8",
@@ -46009,7 +46179,7 @@
     },
     {
       "caseId": "react-case-v1:9ab31b7dedd851aa5fe9",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/CSSPropertyOperations-test.js",
       "title": "should automatically append `px` to relevant styles",
@@ -46017,7 +46187,24 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Existing client, static, server, and matching hydration style evidence proves numeric non-unitless values gain px without changing unitless/custom properties.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/style-px.test.ts",
+          "testName": "appends px to a non-unitless numeric value",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/style-px.test.ts",
+          "testName": "serialises a dynamic object style with px / unitless / 0 / custom-prop rules",
+          "modes": ["server-string"]
+        },
+        {
+          "file": "packages/octane/tests/style-px.test.ts",
+          "testName": "adopts a numeric object style with no mismatch",
+          "modes": ["hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9acc7a3141ae4445adc8",
@@ -47637,7 +47824,7 @@
     },
     {
       "caseId": "react-case-v1:a0889b233e7ce8eb7b65",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInvalidARIAHook-test.js",
       "title": "should warn for an improperly cased aria-* prop",
@@ -47645,7 +47832,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Development-only ARIA diagnostics preserve serialization and cover static/dynamic/spread host names, actionable casing guidance, grouped unknown names, ARIA 1.3, SSR/streaming, matching hydration, and production silence.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "suggests the lowercase spelling of a miscased aria-* attribute",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "reports server ARIA casing guidance for $name",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a0978ee30dbd4f91a8b0",
@@ -48588,7 +48787,7 @@
     },
     {
       "caseId": "react-case-v1:a3aba3ac4c7b9acd1d11",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInput-test.js",
       "title": "should warn for controlled value of \"\" with missing onChange",
@@ -48596,7 +48795,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Falsy controlled values remain controlled and emit one development-only actionable native onInput warning; production-compiled fixtures remain silent.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/controlled-input.test.ts",
+          "testName": "warns for a handler-less controlled input with the falsy value %j",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a3b4b5c34eb225c619d6",
@@ -57433,7 +57639,7 @@
     },
     {
       "caseId": "react-case-v1:c188becca33d548367dc",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInvalidARIAHook-test.js",
       "title": "should allow new ARIA 1.3 attributes",
@@ -57441,7 +57647,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Development-only ARIA diagnostics preserve serialization and cover static/dynamic/spread host names, actionable casing guidance, grouped unknown names, ARIA 1.3, SSR/streaming, matching hydration, and production silence.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "accepts recognized ARIA attributes, including every React-supported ARIA 1.3 addition",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "accepts recognized ARIA attributes and every React-supported ARIA 1.3 addition during SSR",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c199f51c7a9a98a2a8e5",
@@ -61774,7 +61992,7 @@
     },
     {
       "caseId": "react-case-v1:ce1d7cb2c24e35e9fc6f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInput-test.js",
       "title": "should warn for controlled value of 0 with missing onChange",
@@ -61782,7 +62000,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Falsy controlled values remain controlled and emit one development-only actionable native onInput warning; production-compiled fixtures remain silent.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/controlled-input.test.ts",
+          "testName": "warns for a handler-less controlled input with the falsy value %j",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ce3cf9dc6f42fa9dfde1",
@@ -64746,7 +64971,7 @@
     },
     {
       "caseId": "react-case-v1:d7a8bf11f14ad0c1b0f5",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/CSSPropertyOperations-test.js",
       "title": "warns when miscapitalizing vendored style names",
@@ -64754,7 +64979,29 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Development-only client/server style diagnostics identify malformed vendor prefixes, trailing semicolons, NaN, and Infinity without changing CSS application; hydration and production compile are covered.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "warns for vendor casing, trailing semicolons, NaN, and Infinity",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "warns for malformed vendors, semicolons, NaN, and Infinity during SSR",
+          "modes": ["server-string"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "reports style diagnostics through $name",
+          "modes": ["server-stream"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "validates style values independently while hydrating server markup",
+          "modes": ["hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:d7be1dc3e527971ffa6c",
@@ -65521,7 +65768,7 @@
     },
     {
       "caseId": "react-case-v1:da304a248bf6e1591cd6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "should warn if you preload a stylesheet and then render a style tag with the same href",
@@ -65529,7 +65776,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Client and streamed SSR preserve both the incompatible stylesheet preload and inline style resource while reporting actionable development-only collision guidance.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-resource-diagnostics.test.ts",
+          "testName": "warns when a client style resource collides with a stylesheet preload",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/float-resource-diagnostics.test.ts",
+          "testName": "warns when streaming SSR discovers a style resource after a matching preload",
+          "modes": ["server-stream"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:da3b193c865786846596",
@@ -67661,7 +67920,7 @@
     },
     {
       "caseId": "react-case-v1:e1747a7158666f421f00",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/CSSPropertyOperations-test.js",
       "title": "should warn about style containing a NaN value",
@@ -67669,7 +67928,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Development-only client/server style diagnostics identify malformed vendor prefixes, trailing semicolons, NaN, and Infinity without changing CSS application; hydration and production compile are covered.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "warns for vendor casing, trailing semicolons, NaN, and Infinity",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "warns for malformed vendors, semicolons, NaN, and Infinity during SSR",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e17d0e48598da5325514",
@@ -68571,7 +68842,7 @@
     },
     {
       "caseId": "react-case-v1:e42448cea24c1fa601cc",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/InvalidEventListeners-test.js",
       "title": "should not prevent null listeners, at dispatch",
@@ -68579,7 +68850,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Null event listeners remain valid omission markers without warnings, dispatch failures, or blocked native ancestor propagation.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/invalid-listeners.test.ts",
+          "testName": "a null listener is skipped without warning, error, or blocking",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e4277b25d6dc0443d3ee",
@@ -70045,15 +70323,27 @@
     },
     {
       "caseId": "react-case-v1:e96277049a46a92b4c9e",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/CSSPropertyOperations-test.js",
       "title": "should warn when updating hyphenated style names",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "divergence",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Octane deliberately accepts native kebab-case CSS property names and complete cssText strings; warning for these supported authoring forms would contradict its documented style contract.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "keeps custom properties, valid vendors, supported kebab keys, and cssText silent",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/css-diagnostics.test.ts",
+          "testName": "keeps custom properties, supported hyphenated names, and cssText silent in SSR",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e975012da60684833d55",
@@ -74264,7 +74554,7 @@
     },
     {
       "caseId": "react-case-v1:f777e4009a3962dcc425",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInvalidARIAHook-test.js",
       "title": "should warn for use of recognized camel case aria attributes",
@@ -74272,7 +74562,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Development-only ARIA diagnostics preserve serialization and cover static/dynamic/spread host names, actionable casing guidance, grouped unknown names, ARIA 1.3, SSR/streaming, matching hydration, and production silence.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "suggests the recognized lowercase spelling for camelCase ARIA attributes",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/aria-diagnostics.test.ts",
+          "testName": "reports server ARIA casing guidance for $name",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:f78aea73bd8280f0da95",
@@ -75829,7 +76131,7 @@
     },
     {
       "caseId": "react-case-v1:fd0e247368ef6b86356a",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/CSSPropertyOperations-test.js",
       "title": "should set style attribute when styles exist",
@@ -75837,7 +76139,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Existing public host-style conformance proves non-empty static and dynamic style objects create their DOM style attribute.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/style.test.ts",
+          "testName": "inlines a static object literal as a \"k: v; k: v\" attribute",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:fd0f129eb4d61847c19d",
@@ -76540,7 +76849,7 @@
     },
     {
       "caseId": "react-case-v1:ffbef6b89310b5694dcf",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMFloat-test.js",
       "title": "warns if you render a <style> with an href with a space on the server",
@@ -76548,7 +76857,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Server rendering retains the style resource and diagnoses whitespace in its hydration identity only for development-compiled components.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/float-resource-diagnostics.test.ts",
+          "testName": "warns when an SSR style resource href contains whitespace",
+          "modes": ["server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ffc4ca5cde1c9e901f7d",

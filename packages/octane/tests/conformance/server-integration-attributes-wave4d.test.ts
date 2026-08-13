@@ -279,6 +279,15 @@ matrix.itRenders('serializes inline style values with CSS unit rules', {
 matrix.itRenders('serializes aria, unknown, event-like, and SVG attributes', {
 	component: 'AriaUnknownAndSvgAttributes',
 	mismatch,
+	clientDiagnostics(diagnostics) {
+		expect(diagnostics).toEqual(
+			PROD_COMPILE
+				? []
+				: [
+						'The `aria` attribute is reserved for future use. Pass individual `aria-*` attributes instead.',
+					],
+		);
+	},
 	captureBeforeHydrate: (container) => container.querySelector('#aria-unknown-svg-attributes'),
 	assertCommon({ root }) {
 		expect(attr(root, 'aria-string', 'aria-label')).toBe('hello');
