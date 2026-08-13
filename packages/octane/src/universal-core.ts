@@ -337,6 +337,8 @@ export interface UniversalHostCapabilities {
 	readonly lazyPublicInstances?: boolean;
 	/** Accepts consecutive contiguous instances of one immutable intrinsic host program. */
 	readonly templateProgramRuns?: boolean;
+	/** Accepts one destroy-run command per removed contiguous program-run range. */
+	readonly teardownRuns?: boolean;
 }
 
 export interface UniversalResourceHandle {
@@ -588,7 +590,17 @@ export type UniversalHostCommand =
 			readonly state: 'hidden' | 'visible';
 	  }
 	| { readonly op: 'remove'; readonly parent: UniversalHostParent; readonly id: number }
-	| { readonly op: 'destroy'; readonly id: number };
+	| { readonly op: 'destroy'; readonly id: number }
+	| {
+			/** Removes and destroys `count` contiguous collapsed program-run
+			 * instances of `width` hosts each, starting at `firstId`, without
+			 * shipping their per-host teardown commands. */
+			readonly op: 'destroy-run';
+			readonly parent: UniversalHostParent;
+			readonly firstId: number;
+			readonly count: number;
+			readonly width: number;
+	  };
 
 export type UniversalEventPriority = 'discrete' | 'continuous' | 'default';
 
@@ -9902,10 +9914,52 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 		};
 		if (topologyChanged) findRemoved(scopeRecord);
+		// A removed root that is itself a still-collapsed program-run instance
+		// with implicit contiguous ids needs no per-host teardown: a capable
+		// driver accepts one destroy-run per contiguous range and derives the
+		// removals, event unbinds, and destroys from the program it already
+		// holds. Anything observable per host (refs, callbacks, explicit node
+		// ids, portals) falls back to expansion.
+		const teardownRunRecords =
+			this.driver.capabilities?.teardownRuns === true
+				? new Map<LogicalRecord, CommittedCollapsedTemplate>()
+				: null;
+		const physicalParentIdOf = (record: LogicalRecord): number | null | undefined => {
+			let ancestor = record.parent;
+			while (ancestor !== undefined && ancestor !== null) {
+				if (ancestor.kind === 'portal') return undefined;
+				if (ancestor.kind === 'host') return ancestor.id;
+				ancestor = ancestor.parent;
+			}
+			return ancestor === null || record.parent === undefined ? null : undefined;
+		};
 		for (const removed of removedRoots) {
-			walkLogical(removed, (record) => {
-				if (record.collapsedTemplate !== undefined) this.expandCollapsedTemplate(record);
-			});
+			const visitRemoved = (record: LogicalRecord, underRemovedHost: boolean): void => {
+				if (record.collapsedTemplate !== undefined) {
+					const collapsed = record.collapsedTemplate;
+					if (
+						teardownRunRecords !== null &&
+						!underRemovedHost &&
+						record.kind === 'host' &&
+						collapsed.prepared !== undefined &&
+						collapsed.firstId !== undefined &&
+						(collapsed.nodes === null || collapsed.nodes.every((node) => node.id === undefined)) &&
+						record.visibility === 'visible' &&
+						record.ref == null &&
+						record.portalRegistration === null &&
+						record.lifecycles.size === 0 &&
+						record.localCallbacks.size === 0 &&
+						physicalParentIdOf(record) !== undefined
+					) {
+						teardownRunRecords.set(record, collapsed);
+						return;
+					}
+					this.expandCollapsedTemplate(record);
+				}
+				const nextUnderRemovedHost = underRemovedHost || record.kind === 'host';
+				for (const child of record.children) visitRemoved(child, nextUnderRemovedHost);
+			};
+			visitRemoved(removed, false);
 		}
 		const previousPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
 		const nextPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
@@ -10212,7 +10266,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				const old = oldPhysical[index];
 				previousPositions.set(old.id, index);
 				if (!desiredIds.has(old.id)) {
-					removes.push({ op: 'remove', parent: sourceParentId, id: old.id });
+					if (teardownRunRecords?.has(old) !== true) {
+						removes.push({ op: 'remove', parent: sourceParentId, id: old.id });
+					}
 				}
 			}
 			if (forceMove) {
@@ -10306,6 +10362,49 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					});
 				}
 			});
+		}
+		if (teardownRunRecords !== null && teardownRunRecords.size !== 0) {
+			const runs = [...teardownRunRecords.entries()].sort((a, b) => a[1].firstId! - b[1].firstId!);
+			let open: {
+				parent: UniversalHostParent;
+				firstId: number;
+				count: number;
+				width: number;
+				program: PreparedCollapsedTemplateProgram;
+			} | null = null;
+			const flush = () => {
+				if (open === null) return;
+				removes.push({
+					op: 'destroy-run',
+					parent: open.parent,
+					firstId: open.firstId,
+					count: open.count,
+					width: open.width,
+				});
+				open = null;
+			};
+			for (const [record, collapsed] of runs) {
+				const width = collapsed.shape.length;
+				const parent = physicalParentIdOf(record) as number | null;
+				if (
+					open !== null &&
+					open.program === collapsed.prepared &&
+					open.parent === parent &&
+					open.firstId + open.count * open.width === collapsed.firstId!
+				) {
+					open.count++;
+					continue;
+				}
+				flush();
+				open = {
+					parent,
+					firstId: collapsed.firstId!,
+					count: 1,
+					width,
+					program: collapsed.prepared!,
+				};
+			}
+			flush();
 		}
 		const hiddenVisibilityCommands: UniversalHostCommand[] = [];
 		const visibleVisibilityCommands: UniversalHostCommand[] = [];
@@ -10784,10 +10883,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 			}
 		}
-		const destroys: UniversalHostCommand[] = removedHosts.map((record) => ({
-			op: 'destroy',
-			id: record.id,
-		}));
+		const destroys: UniversalHostCommand[] = [];
+		for (const record of removedHosts) {
+			if (teardownRunRecords?.has(record) === true) continue;
+			destroys.push({ op: 'destroy', id: record.id });
+		}
 		const commands: UniversalHostCommand[] = [
 			...creates,
 			...updates,
@@ -11066,6 +11166,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				for (const event of record.events.values()) {
 					previousReplacedEventListeners.add(event.listener);
 				}
+				const collapsed = record.collapsedTemplate;
+				if (collapsed !== undefined && teardownRunRecords?.has(record) === true) {
+					for (const entry of collapsed.events) {
+						previousReplacedEventListeners.add(entry.event.listener);
+					}
+				}
 				for (const callback of record.localCallbacks.values()) {
 					previousReplacedLocalCallbacks.add(callback.listener);
 				}
@@ -11105,6 +11211,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			identity,
 			() => {
 				applyLogicalTopology();
+				if (teardownRunRecords !== null && teardownRunRecords.size !== 0) {
+					for (const record of teardownRunRecords.keys()) {
+						delete record.collapsedTemplate;
+						this.collapsedTemplates?.delete(record);
+					}
+				}
 				if (stagedCollapsedTemplates.size !== 0) {
 					const collapsed = (this.collapsedTemplates ??= new Set());
 					for (const [record, state] of stagedCollapsedTemplates) {

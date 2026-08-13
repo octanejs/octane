@@ -53,6 +53,16 @@ function createTemplateObjectDriver(
 			const [container, batch, context] = args;
 			const expanded: UniversalHostCommand[] = [];
 			for (const command of batch.commands) {
+				if (command.op === 'destroy-run') {
+					for (let row = 0; row < command.count; row++) {
+						const rootId = command.firstId + row * command.width;
+						expanded.push({ op: 'remove', parent: command.parent, id: rootId });
+						for (let node = command.width - 1; node >= 0; node--) {
+							expanded.push({ op: 'destroy', id: rootId + node });
+						}
+					}
+					continue;
+				}
 				if (command.op !== 'mount-template-run') {
 					expanded.push(command);
 					continue;
@@ -1598,6 +1608,68 @@ describe('universal prepared host SDK', () => {
 			'label:b',
 			'label:c',
 		]);
+		root.unmount();
+	});
+
+	it('tears down a cleared collapsed run with one destroy-run command', () => {
+		const container = createObjectContainer();
+		const driver = createTemplateObjectDriver(true, true, true, true);
+		(driver.capabilities as { teardownRuns?: boolean }).teardownRuns = true;
+		const root = createUniversalRoot(container, driver);
+		const rowPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'row',
+			bindings: [['id', 0]],
+			children: [{ kind: 'host', type: 'label', children: [{ kind: 'slot', slot: 1 }] }],
+		});
+		const shellPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'shell',
+			children: [{ kind: 'slot', slot: 0 }],
+		});
+		const Row = defineUniversalComponent('object', ({ id }: { id: string }) =>
+			universalValue(rowPlan, [id, `label:${id}`]),
+		);
+		const Scene = defineUniversalComponent('object', ({ ids }: { ids: readonly string[] }) =>
+			universalValue(shellPlan, [
+				universalFor(
+					ids,
+					(id) => id,
+					(id) => universalComponent('object', Row, universalProps([['set', 'id', id]])),
+					null,
+					false,
+					false,
+					undefined,
+					undefined,
+					undefined,
+					true,
+				),
+			]),
+		);
+
+		root.render(Scene, { ids: [] });
+		const shell = container.children[0];
+		const shellId = shell.id;
+		root.render(Scene, { ids: ['a', 'b', 'c'] });
+		expect(shell.children).toHaveLength(3);
+		const firstRowId = shell.children[0].id;
+
+		const prepared = root.prepare(Scene, { ids: [] });
+		if (prepared.status !== 'prepared') throw new Error('Expected a teardown batch.');
+		expect(prepared.batch.commands).toEqual([
+			{ op: 'destroy-run', parent: shellId, firstId: firstRowId, count: 3, width: 3 },
+		]);
+		prepared.commit();
+		expect(shell.children).toEqual([]);
+
+		// The run remounts and clears again without per-host teardown reappearing.
+		root.render(Scene, { ids: ['d', 'e'] });
+		expect(shell.children).toHaveLength(2);
+		const cleared = root.prepare(Scene, { ids: [] });
+		if (cleared.status !== 'prepared') throw new Error('Expected a second teardown batch.');
+		expect(cleared.batch.commands.every((command) => command.op === 'destroy-run')).toBe(true);
+		cleared.commit();
+		expect(shell.children).toEqual([]);
 		root.unmount();
 	});
 
