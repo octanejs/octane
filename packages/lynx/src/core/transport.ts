@@ -24,7 +24,7 @@ import {
 	LYNX_BACKGROUND_TO_MAIN_EVENT,
 	LYNX_COMPACT_ACKNOWLEDGEMENT,
 	LYNX_LAZY_PUBLIC_INSTANCES,
-	LYNX_TEMPLATE_RUN_READY_REQUEST_BASE,
+	LYNX_TEARDOWN_RUN_READY_REQUEST_BASE,
 	LYNX_MAIN_TO_BACKGROUND_EVENT,
 	LYNX_READY_ANNOUNCEMENT_REQUEST,
 	LYNX_TRANSPORT_PROTOCOL_VERSION,
@@ -259,7 +259,7 @@ export function createLynxBackgroundTransport(
 	const pending = new Map<number, PendingCommit>();
 	const pendingMainCalls = new Map<number, PendingMainThreadCall>();
 	const runningBackgroundCalls = new Map<number, RunningBackgroundCall>();
-	const readyRequest = LYNX_TEMPLATE_RUN_READY_REQUEST_BASE + NEXT_READY_REQUEST++;
+	const readyRequest = LYNX_TEARDOWN_RUN_READY_REQUEST_BASE + NEXT_READY_REQUEST++;
 	if (!Number.isSafeInteger(readyRequest)) {
 		throw new Error('Octane Lynx capability-ready request identities are exhausted.');
 	}

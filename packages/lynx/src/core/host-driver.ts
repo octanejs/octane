@@ -1,6 +1,7 @@
 import type {
 	UniversalEventListenerDescriptor,
 	UniversalHostBatch,
+	UniversalHostCommand,
 	UniversalHostCommitContext,
 	UniversalHostDriver,
 	UniversalHostTemplateProgram,
@@ -106,6 +107,15 @@ export type LynxHostHandleDelta =
 			readonly root: number;
 			readonly id: number;
 			readonly generation: number;
+	  }
+	| {
+			/** Retires hostCount contiguous same-generation hosts in one delta. */
+			readonly op: 'destroy-run';
+			readonly renderer: typeof LYNX_RENDERER_ID;
+			readonly root: number;
+			readonly firstId: number;
+			readonly hostCount: number;
+			readonly generation: number;
 	  };
 
 /** Physical attachment transition emitted by native list enter/leave callbacks. */
@@ -201,6 +211,11 @@ interface LynxHostState<Node extends LynxElementRef> {
 	 * qualify while any id reuse falls back to the explicit path.
 	 */
 	maxExplicitId: number;
+	/**
+	 * Generation-one tombstones for whole retired runs, kept as sorted
+	 * non-overlapping [first, last] ranges instead of one map entry per host.
+	 */
+	retiredRanges: [number, number][];
 	/** Ordinary pure template runs may retain compact metadata solely for certified teardown. */
 	teardownRecords: LynxDenseHostRecordStore<Node> | null;
 	/** Universal root provenance is fixed by the first accepted portal handle. */
@@ -671,6 +686,76 @@ class LynxDenseHostRecordStore<Node extends LynxElementRef> implements LynxHostR
 			offset < this.nodes.length &&
 			offset % this.program.shape.types.length === 0
 		);
+	}
+
+	/**
+	 * Expand one destroy-run command into the exact certified per-host
+	 * teardown sequence this store would verify: event unbinds, root removes,
+	 * then post-order destroys, in the accepted child order. The expansion is
+	 * synthesized from accepted state, so a full-store run re-enters the
+	 * certified teardown fast path unchanged while partial runs flow through
+	 * the general command loop.
+	 */
+	expandRunTeardown(
+		state: LynxHostState<Node>,
+		command: Extract<UniversalHostCommand, { op: 'destroy-run' }>,
+	): UniversalHostCommand[] | null {
+		const width = this.program.shape.types.length;
+		if (command.width !== width) return null;
+		if (this.cleared) return null;
+		if (!Object.is(command.parent, this.parent)) return null;
+		const offset = command.firstId - this.firstId;
+		const hostCount = command.count * width;
+		if (offset < 0 || offset % width !== 0 || offset + hostCount > this.nodes.length) {
+			return null;
+		}
+		const inRange = (id: number): boolean =>
+			id >= command.firstId && id < command.firstId + hostCount && this.isRunRoot(id);
+		for (let row = 0; row < command.count; row++) {
+			if (this.nodes[offset + row * width] === undefined) return null;
+			if (this.removed?.has(command.firstId + row * width)) return null;
+		}
+		const parentRecord = typeof this.parent === 'number' ? this.prefix.get(this.parent) : undefined;
+		const acceptedChildren =
+			this.parent === null ? state.rootChildren : (parentRecord?.children ?? null);
+		const orderedRoots: number[] = [];
+		if (acceptedChildren !== null) {
+			for (const id of acceptedChildren) if (inRange(id)) orderedRoots.push(id);
+		}
+		if (orderedRoots.length !== command.count) {
+			orderedRoots.length = 0;
+			for (let row = 0; row < command.count; row++) {
+				orderedRoots.push(command.firstId + row * width);
+			}
+		}
+		const postorder: number[] = [];
+		const visit = (node: number): void => {
+			for (let child = node + 1; child < width; child++) {
+				if (this.program.shape.parents[child] === node) visit(child);
+			}
+			postorder.push(node);
+		};
+		visit(0);
+		if (postorder.length !== width) return null;
+		const commands: UniversalHostCommand[] = [];
+		for (const rootId of orderedRoots) {
+			for (const node of postorder) {
+				const events = this.program.events[node];
+				if (events === undefined) continue;
+				for (const event of events) {
+					commands.push({ op: 'event', id: rootId + node, type: event.type, listener: null });
+				}
+			}
+		}
+		for (const rootId of orderedRoots) {
+			commands.push({ op: 'remove', parent: command.parent, id: rootId });
+		}
+		for (const rootId of orderedRoots) {
+			for (const node of postorder) {
+				commands.push({ op: 'destroy', id: rootId + node });
+			}
+		}
+		return commands;
 	}
 
 	prepareFullTeardown(
@@ -1594,6 +1679,19 @@ function requireWorkletRegistry<Node extends LynxElementRef>(
 		throw hostError('main-thread props require a main-thread worklet registry.');
 	}
 	return state.worklets;
+}
+
+function retiredRangeHit(ranges: readonly [number, number][], id: number): boolean {
+	let low = 0;
+	let high = ranges.length - 1;
+	while (low <= high) {
+		const middle = (low + high) >> 1;
+		const [first, last] = ranges[middle]!;
+		if (id < first) high = middle - 1;
+		else if (id > last) low = middle + 1;
+		else return true;
+	}
+	return false;
 }
 
 function removeNativeEvent<Node extends LynxElementRef>(
@@ -2590,6 +2688,7 @@ export function createLynxHostContainer<Node extends LynxElementRef>(
 		generations: new Map(),
 		implicitInitialGenerations: false,
 		maxExplicitId: 0,
+		retiredRanges: [],
 		teardownRecords: null,
 		portalRoot: null,
 		portalChildren: new Map(),
@@ -3243,6 +3342,7 @@ function prepareDenseTeardown<Node extends LynxElementRef>(
 	batch: UniversalHostBatch,
 	state: LynxHostState<Node>,
 	plan: LynxDenseTeardownPlan<Node>,
+	run: { firstId: number; hostCount: number } | null = null,
 ): LynxPreparedHostBatch {
 	const baseVersion = state.acceptedVersion;
 	const emptyListAncestryDelta = Object.freeze([]) as readonly LynxHostListAncestryDelta[];
@@ -3250,8 +3350,24 @@ function prepareDenseTeardown<Node extends LynxElementRef>(
 	let status: 'prepared' | 'applying' | 'applied' | 'aborted' | 'faulted' = 'prepared';
 	let mutationStarted = false;
 	let fault: unknown;
+	const uniformRun = run !== null && plan.store.hostGenerations === null;
 	const materializeHandleDelta = (): readonly LynxHostHandleDelta[] => {
 		if (handleDelta !== null) return handleDelta;
+		if (uniformRun) {
+			// The whole run retires at its uniform implicit generation: one
+			// range delta replaces one frozen object per destroyed host.
+			handleDelta = Object.freeze([
+				Object.freeze({
+					op: 'destroy-run' as const,
+					renderer: LYNX_RENDERER_ID,
+					root: container.root,
+					firstId: run.firstId,
+					hostCount: run.hostCount,
+					generation: 1,
+				}),
+			]);
+			return handleDelta;
+		}
 		const deltas: LynxHostHandleDelta[] = new Array(plan.hostCount);
 		for (let offset = 0; offset < plan.hostCount; offset++) {
 			const command = batch.commands[plan.eventCommands + plan.store.count + offset]!;
@@ -3298,9 +3414,22 @@ function prepareDenseTeardown<Node extends LynxElementRef>(
 				state.records = plan.records;
 				state.teardownRecords = null;
 				state.rootChildren = plan.rootChildren;
-				for (let offset = 0; offset < plan.hostCount; offset++) {
-					const id = plan.firstId + offset;
-					if (!state.generations.has(id)) state.generations.set(id, 1);
+				if (uniformRun) {
+					// One sorted range replaces one tombstone per retired host.
+					const last = run!.firstId + run!.hostCount - 1;
+					const ranges = state.retiredRanges;
+					const previous = ranges[ranges.length - 1];
+					if (previous === undefined || run!.firstId > previous[1]) {
+						ranges.push([run!.firstId, last]);
+					} else {
+						ranges.push([run!.firstId, last]);
+						ranges.sort((a, b) => a[0] - b[0]);
+					}
+				} else {
+					for (let offset = 0; offset < plan.hostCount; offset++) {
+						const id = plan.firstId + offset;
+						if (!state.generations.has(id)) state.generations.set(id, 1);
+					}
 				}
 				if (plan.firstId + plan.hostCount - 1 > state.maxExplicitId) {
 					state.maxExplicitId = plan.firstId + plan.hostCount - 1;
@@ -3384,6 +3513,44 @@ function prepareDenseTeardown<Node extends LynxElementRef>(
 	return Object.freeze(prepared);
 }
 
+/**
+ * Expand a destroy-run against ordinary accepted records when no dense store
+ * covers the range — rows that were reordered, adopted, or mounted through the
+ * explicit path. Produces the same event-unbind, remove, and post-order
+ * destroy sequence the background would have shipped host by host.
+ */
+function expandRecordsRunTeardown<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	command: Extract<UniversalHostCommand, { op: 'destroy-run' }>,
+): UniversalHostCommand[] | null {
+	const events: UniversalHostCommand[] = [];
+	const removes: UniversalHostCommand[] = [];
+	const destroys: UniversalHostCommand[] = [];
+	for (let row = 0; row < command.count; row++) {
+		const rootId = command.firstId + row * command.width;
+		const root = state.records.get(rootId);
+		if (root === undefined || !Object.is(root.parent, command.parent)) return null;
+		let visited = 0;
+		const visit = (id: number): boolean => {
+			const record = state.records.get(id);
+			if (record === undefined) return false;
+			visited++;
+			for (const child of record.children) {
+				if (!visit(child)) return false;
+			}
+			for (const type of record.events.keys()) {
+				events.push({ op: 'event', id, type, listener: null });
+			}
+			destroys.push({ op: 'destroy', id });
+			return true;
+		};
+		if (!visit(rootId) || visited !== command.width) return null;
+		removes.push({ op: 'remove', parent: command.parent, id: rootId });
+	}
+	events.push(...removes, ...destroys);
+	return events;
+}
+
 export function prepareLynxHostBatch<Node extends LynxElementRef>(
 	container: LynxHostContainer<Node>,
 	batch: UniversalHostBatch,
@@ -3434,6 +3601,48 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		}
 	}
 	const logicalTeardown = state.faulted;
+	let runExpansion: { firstId: number; hostCount: number } | null = null;
+	if (firstTree === undefined) {
+		const teardownStore =
+			state.records instanceof LynxDenseHostRecordStore ? state.records : state.teardownRecords;
+		let hasRun = false;
+		for (const command of batch.commands) {
+			if (command !== null && typeof command === 'object' && command.op === 'destroy-run') {
+				hasRun = true;
+				break;
+			}
+		}
+		if (hasRun) {
+			const sole = batch.commands.length === 1;
+			const commands: UniversalHostCommand[] = [];
+			for (const command of batch.commands) {
+				if (command !== null && typeof command === 'object' && command.op === 'destroy-run') {
+					const expanded =
+						teardownStore?.expandRunTeardown(state, command) ??
+						expandRecordsRunTeardown(state, command);
+					if (expanded === null) {
+						throw hostError('destroy-run does not match an accepted template run.');
+					}
+					for (const entry of expanded) commands.push(entry);
+					if (sole && expanded !== null && teardownStore !== null) {
+						runExpansion = {
+							firstId: command.firstId,
+							hostCount: command.count * command.width,
+						};
+					}
+				} else {
+					commands.push(command);
+				}
+			}
+			batch = { ...batch, commands };
+		}
+		if (!logicalTeardown) {
+			const denseTeardown = teardownStore?.prepareFullTeardown(state, batch) ?? null;
+			if (denseTeardown !== null) {
+				return prepareDenseTeardown(container, batch, state, denseTeardown, runExpansion);
+			}
+		}
+	}
 	if (
 		logicalTeardown &&
 		!batch.commands.every(
@@ -3448,14 +3657,6 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		throw hostError(
 			'after a host fault, only listener removal and remove/destroy teardown commands are accepted.',
 		);
-	}
-	if (!logicalTeardown && firstTree === undefined) {
-		const teardownStore =
-			state.records instanceof LynxDenseHostRecordStore ? state.records : state.teardownRecords;
-		const denseTeardown = teardownStore?.prepareFullTeardown(state, batch) ?? null;
-		if (denseTeardown !== null) {
-			return prepareDenseTeardown(container, batch, state, denseTeardown);
-		}
 	}
 
 	const baseVersion = state.acceptedVersion;
@@ -3551,14 +3752,18 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		stagedRecords.delete(id);
 		deletedRecords.add(id);
 	};
+	const rangedGeneration = (id: number): number | undefined =>
+		retiredRangeHit(state.retiredRanges, id) ? 1 : undefined;
 	const getGeneration = state.implicitInitialGenerations
 		? (id: number): number | undefined =>
 				stagedGenerations.get(id) ??
 				state.generations.get(id) ??
+				rangedGeneration(id) ??
 				state.records.get(id)?.handle.generation
 		: initiallyNoGenerations
-			? (id: number): number | undefined => stagedGenerations.get(id)
-			: (id: number): number | undefined => stagedGenerations.get(id) ?? state.generations.get(id);
+			? (id: number): number | undefined => stagedGenerations.get(id) ?? rangedGeneration(id)
+			: (id: number): number | undefined =>
+					stagedGenerations.get(id) ?? state.generations.get(id) ?? rangedGeneration(id);
 	const setGeneration = (id: number, generation: number): void => {
 		if (compactCandidate && generation === 1) return;
 		stagedGenerations.set(id, generation);
@@ -5444,6 +5649,7 @@ export function createLynxHostDriver<
 			templateMount: true,
 			templateProgramMount: true,
 			templateProgramRuns: true,
+			teardownRuns: true,
 			lazyPublicInstances: true,
 			stableStaticHostProps: true,
 		},
