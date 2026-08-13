@@ -23,14 +23,21 @@ function fixture(name, sourceFile) {
 	return directory;
 }
 
-test('the consumer project compiles with exactly the options octane init scaffolds', () => {
+test('the consumer project compiles with the options octane init scaffolds', () => {
 	const base = createConsumerBaseConfig();
+	const { types, ...rest } = base.compilerOptions;
 
-	assert.deepEqual(base.compilerOptions, JSON.parse(SCAFFOLDED_TSCONFIG).compilerOptions);
-	// A scaffolded application installs no @types/node, so the validation project
-	// must not quietly grant Node globals to published source either.
-	assert.equal(base.compilerOptions.types, undefined);
+	assert.deepEqual(rest, JSON.parse(SCAFFOLDED_TSCONFIG).compilerOptions);
 	assert.equal(base.compilerOptions.jsxImportSource, 'octane');
+});
+
+test('the consumer project denies published source the Node globals a browser app lacks', () => {
+	// `octane init` omits `types` because a scaffolded app has no `@types/*` at
+	// all. These projects run inside the monorepo, where omitting it would
+	// auto-include every installed `@types/*` and hand published source the Node
+	// globals it must not see. Empty is what reproduces the scaffolded app.
+	assert.deepEqual(createConsumerBaseConfig().compilerOptions.types, []);
+	assert.equal(JSON.parse(SCAFFOLDED_TSCONFIG).compilerOptions.types, undefined);
 });
 
 test('the consumer project checks .tsrx with the Octane compiler a real consumer resolves', () => {
