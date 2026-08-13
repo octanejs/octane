@@ -9,10 +9,10 @@ import {
 	analyzeCreateSample,
 	analyzeFcpSample,
 	interleavedABSchedule,
-	parseRealmSnapshots,
 	requireMinimumRepetitions,
 	summarizeSamples,
 } from './analyze.mjs';
+import { realmSnapshots, resetProfiles } from './profile-realms.mjs';
 import {
 	DRIVER_CLIENT_JS,
 	WIRE_INSTRUMENT_JS,
@@ -136,40 +136,6 @@ async function load(browser, variant) {
 		`http://127.0.0.1:${port}/bundle/${variant}`,
 	);
 	return page;
-}
-
-async function realmSnapshots(page) {
-	const read = () => {
-		const value = globalThis.__OCTANE_LYNX_PROF;
-		if (value === undefined) return null;
-		const copy = {};
-		for (const key of Object.keys(value)) {
-			if (typeof value[key] === 'number') copy[key] = value[key];
-		}
-		return copy;
-	};
-	const snapshots = [];
-	for (const frame of page.frames()) {
-		const profile = await frame.evaluate(read).catch(() => null);
-		if (profile !== null) snapshots.push({ kind: 'frame', profile });
-	}
-	for (const worker of page.workers()) {
-		const profile = await worker.evaluate(read).catch(() => null);
-		if (profile !== null) snapshots.push({ kind: 'worker', profile });
-	}
-	return parseRealmSnapshots(snapshots);
-}
-
-async function resetProfiles(page) {
-	const reset = () => {
-		const profile = globalThis.__OCTANE_LYNX_PROF;
-		if (profile === undefined) return;
-		for (const key of Object.keys(profile)) profile[key] = 0;
-	};
-	await Promise.all([
-		...page.frames().map((frame) => frame.evaluate(reset).catch(() => {})),
-		...page.workers().map((worker) => worker.evaluate(reset).catch(() => {})),
-	]);
 }
 
 async function wireSnapshot(page) {
