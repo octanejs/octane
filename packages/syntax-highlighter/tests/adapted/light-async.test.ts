@@ -114,6 +114,9 @@ test('SyntaxHighlighter renders fortran highlighted text', async () => {
 });
 test('SyntaxHighlighter renders text while language loads', async () => {
 	await SyntaxHighlighter.preload();
+	const loadLanguage = vi
+		.spyOn(SyntaxHighlighter, 'loadLanguage')
+		.mockImplementation(() => new Promise(() => {}));
 	const tree = renderer.create(
 		/* @__PURE__ */ React.createElement(
 			SyntaxHighlighter,
@@ -148,5 +151,7 @@ test('SyntaxHighlighter renders text while language loads', async () => {
                    `,
 		),
 	);
+	await vi.waitFor(() => expect(loadLanguage).toHaveBeenCalledWith('gherkin'));
 	expect(tree.toJSON()).toMatchSnapshot();
+	loadLanguage.mockRestore();
 });

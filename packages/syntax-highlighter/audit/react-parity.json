@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "0f8996a8276902084d612df401824f8b3661e28b60db2bdee3a96d5f44c5b993"
+      "lockfileSha256": "73960b1ef6c8f54c81474bedf9898ef2c13d3862d22a5c550f2796ba1a023607"
     }
   },
   "lanes": [
@@ -102,7 +102,7 @@
         {
           "path": "packages/syntax-highlighter/scripts/generate-adapted-tests.mjs",
           "role": "support",
-          "sha256": "abcaac5eb9347c3fce3bf127e1c7d193f7f872d1126759fee464a123246452c8"
+          "sha256": "3734fab41248ac52126a2fdb9b1a8ed497955194da9822dd192dcab7f33475f8"
         },
         {
           "path": "packages/syntax-highlighter/scripts/generate-parity-audit.mjs",
@@ -222,7 +222,7 @@
         {
           "path": "packages/syntax-highlighter/tests/adapted/light-async.test.ts",
           "role": "support",
-          "sha256": "10c6725c6767a74246dd9f7fce6c38b8f59296f5064cbbb8d80466edddef6eb0"
+          "sha256": "ce352e997eaf8cc4dd349b2b09c83db63dbf865ce7beb6a0982449ffe757315f"
         },
         {
           "path": "packages/syntax-highlighter/tests/adapted/line-numbers.test.ts",

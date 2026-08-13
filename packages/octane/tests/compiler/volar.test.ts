@@ -493,6 +493,58 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		}
 	});
 
+	it('keeps plain overload signatures non-ambient in the virtual TSX', () => {
+		// esrap <2.3.2 printed `declare` on EVERY bodyless function, so a plain
+		// overload pair next to its implementation typechecked as TS2384
+		// ("Overload signatures must all be ambient or non-ambient") in the
+		// editor and under tsrx-tsc, on source that compiles and runs fine
+		// (issue #736). An authored ambient declaration must keep `declare`.
+		const src =
+			'export function pick(a: string): string;\n' +
+			'export function pick(a: number): number;\n' +
+			'export function pick(a: unknown): unknown {\n' +
+			'\treturn a;\n' +
+			'}\n' +
+			'\n' +
+			'declare function ambient(a: string): string;\n' +
+			"export const kept = ambient('x');\n" +
+			'\n' +
+			'export function Overloaded() @{\n' +
+			"\t<p>{pick('label')}</p>\n" +
+			'}\n';
+		const result = compileToVolarMappings(src, '/src/Overloaded.tsrx');
+		expect(result.errors).toEqual([]);
+
+		// The full TypeScript checker is the oracle, covering both directions:
+		// overloads wrongly made ambient report TS2384; an authored `declare`
+		// wrongly dropped reports TS2391 (implementation missing).
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-overloads-'));
+		try {
+			writeOctaneJsxRuntimeStub(root, '\t\tp: { children?: unknown };');
+			const file = join(root, 'Overloaded.tsx');
+			writeFileSync(file, result.code);
+			const program = ts.createProgram({
+				rootNames: [file],
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					skipLibCheck: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+				},
+			});
+			expect(
+				ts
+					.getPreEmitDiagnostics(program)
+					.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n')),
+			).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('exposes both authored and generated ASTs for editor and playground integrations', () => {
 		const src = "export function Foo() @{ <p>{'x'}</p> }\n";
 		const result = compileToVolarMappings(src, 'foo.tsrx');
