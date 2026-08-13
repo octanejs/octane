@@ -10381,6 +10381,16 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	const firstSpreadIdx = attrs.findIndex(
 		(a) => a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute',
 	);
+	// Customized built-ins suppress native unknown-property diagnostics based on
+	// the final `is` prop, regardless of where that prop appears in JSX. Resolve
+	// directly authored DEV hosts through the existing whole-element attribute
+	// snapshot so sibling validators see that final value before serialization.
+	// Production keeps its original fully baked/direct-serializer paths.
+	const resolveDevCustomizedHost =
+		ctx.dev &&
+		(selfNs === 'html' || selfNs === 'opaque') &&
+		!tag.includes('-') &&
+		directAttributeIdentities.has('is');
 	// A single spread is the only possible content writer when an otherwise
 	// empty ordinary host has no explicit children/raw-HTML attributes. Its
 	// snapshot already owns evaluation order and enumerable-key semantics, so a
@@ -10433,7 +10443,8 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// HTML parsing keeps the FIRST duplicate, while JSX uses the final writer, so
 	// spread-bearing hosts serialize one source-resolved attribute set. Dedicated
 	// form/content channels are filtered by ssrAttrs and resolved separately.
-	const resolveAttrsAcrossSpreads = firstSpreadIdx !== -1 || hasDuplicateDirectAttribute;
+	const resolveAttrsAcrossSpreads =
+		firstSpreadIdx !== -1 || hasDuplicateDirectAttribute || resolveDevCustomizedHost;
 	const attrSources = [];
 	let attrPart = -1;
 	// Spreads are bound to temps (so their value is evaluated ONCE even though we
@@ -10924,11 +10935,13 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		) {
 			devFormActionSources.push([attrName, valueExpr]);
 		}
+		const authoredAttrName =
+			ctx.dev && (rawAttrName === 'tabIndex' || rawAttrName === 'htmlFor') ? rawAttrName : attrName;
 		parts.push(
 			ssrCall(
 				'ssrAttr',
 				[
-					b.literal(attrName, JSON.stringify(attrName)),
+					b.literal(authoredAttrName, JSON.stringify(authoredAttrName)),
 					valueExpr,
 					b.literal(tag, JSON.stringify(tag)),
 					b.literal(selfNs, JSON.stringify(selfNs)),
@@ -23158,6 +23171,15 @@ function emitElementHtml(
 			.filter((attr) => attr.type === 'Attribute' || attr.type === 'JSXAttribute')
 			.map((attr) => normalizeJsxAttrName(jsxAttrRawName(attr), tag, hostNs)),
 	);
+	// React validates a customized built-in from its complete final prop set,
+	// so an authored `is` must be visible before any sibling attr is checked even
+	// when it appears last. Reuse the existing DEV whole-host snapshot; keeping
+	// this proof behind ctx.dev preserves byte-identical production output.
+	const resolveDevCustomizedHost =
+		ctx.dev &&
+		(hostNs === 'html' || hostNs === 'opaque') &&
+		!tag.includes('-') &&
+		directPropNames.has('is');
 	const hasDirectFormCascade =
 		((tag === 'input' || tag === 'textarea' || tag === 'select') &&
 			directPropNames.has('value') &&
@@ -23167,7 +23189,10 @@ function emitElementHtml(
 			directPropNames.has('multiple') &&
 			(directPropNames.has('value') || directPropNames.has('defaultValue')));
 	const resolveHostPropsAcrossSources =
-		firstSpreadIdx !== -1 || hasDuplicateDirectProp || hasDirectFormCascade;
+		firstSpreadIdx !== -1 ||
+		hasDuplicateDirectProp ||
+		hasDirectFormCascade ||
+		resolveDevCustomizedHost;
 	const hostClientSources = [];
 	let directChildrenClientBinding = null;
 	let hostCommitClientBinding = null;
@@ -23251,6 +23276,25 @@ function emitElementHtml(
 					val.type === 'JSXExpressionContainer' ? val.expression : val,
 					cssHash,
 				);
+				if (
+					resolveDevCustomizedHost &&
+					firstSpreadIdx === -1 &&
+					!hasDuplicateDirectProp &&
+					rawAttrName === 'is' &&
+					inner.type === 'Literal' &&
+					typeof inner.value === 'string'
+				) {
+					// Customized built-ins must carry `is` when the browser constructs
+					// the template node; the diagnostic snapshot still needs its source.
+					appendBakedAttribute(
+						attrTemplate,
+						bakeStaticAttr('is', inner.value, tag, hostNs),
+						'is',
+						attr.name,
+						inner,
+						ctx.inspect,
+					);
+				}
 				expr = tsrxExprNode(inner, ctx, componentName, inlinedSubs);
 			}
 			const binding = {
@@ -23771,7 +23815,10 @@ function emitElementHtml(
 			bindings.push({
 				id: bindings.length,
 				kind: 'attr',
-				name: attrName,
+				name:
+					ctx.dev && (rawAttrName === 'tabIndex' || rawAttrName === 'htmlFor')
+						? rawAttrName
+						: attrName,
 				expr,
 				path,
 				ns: hostNs,

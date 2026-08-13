@@ -1937,7 +1937,7 @@ function devValidateSsrHostProps(
 			}
 			continue;
 		}
-		const warning = hostPropertyWarning(name, value);
+		const warning = hostPropertyWarning(name, value, tag);
 		if (warning !== null) {
 			devWarnSsrAttributeOnce(name, warning);
 			continue;
@@ -1985,6 +1985,7 @@ export function ssrAttr(
 						? 'formAction'
 						: name,
 					v,
+					tag,
 				);
 		if (warning !== null) devWarnSsrAttributeOnce(name, warning);
 	}
@@ -2364,7 +2365,14 @@ export function ssrAttrs(
 		const identity = namespace === 'html' ? name.toLowerCase() : name;
 		const previous = resolved.get(identity);
 		if (previous === undefined || previous[3] < lastOrder) {
-			resolved.set(identity, [name, value, firstOrder, lastOrder]);
+			resolved.set(identity, [
+				process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
+					? rawName
+					: name,
+				value,
+				firstOrder,
+				lastOrder,
+			]);
 		}
 	}
 

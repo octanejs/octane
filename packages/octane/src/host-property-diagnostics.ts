@@ -1,8 +1,10 @@
 import { ATTRIBUTE_ALIASES, BOOLEAN_ATTR_PROPS } from './constants.js';
 
 const KNOWN_CAMELCASE_PROPERTIES = new Set([
-	'autoFocus',
+	'autoCapitalize',
 	'autoComplete',
+	'autoCorrect',
+	'autoFocus',
 	'autoPlay',
 	'allowFullScreen',
 	'charSet',
@@ -22,11 +24,13 @@ const KNOWN_CAMELCASE_PROPERTIES = new Set([
 	'formTarget',
 	'imageSizes',
 	'imageSrcSet',
+	'inputMode',
 	'itemID',
 	'itemProp',
 	'itemRef',
 	'itemScope',
 	'itemType',
+	'maxLength',
 	'noModule',
 	'noValidate',
 	'playsInline',
@@ -52,8 +56,11 @@ for (const [name, alias] of ATTRIBUTE_ALIASES) {
 }
 
 /** Development-only host-name/value diagnostics shared by DOM and SSR. */
-export function hostPropertyWarning(name: string, value: unknown): string | null {
+export function hostPropertyWarning(name: string, value: unknown, tag?: string): string | null {
 	const lower = name.toLowerCase();
+	// Octane deliberately accepts native attribute spellings alongside React's
+	// camelCase aliases; a label's `for` is the native counterpart to htmlFor.
+	if (name === 'for' && tag === 'label') return null;
 	if (lower === 'innerhtml') {
 		return (
 			'Directly setting property `innerHTML` is not permitted. ' +

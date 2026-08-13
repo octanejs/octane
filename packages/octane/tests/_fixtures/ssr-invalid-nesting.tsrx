@@ -113,6 +113,50 @@ export function ValidListItemScope() @{
 	</ul>
 }
 
+function ScopedListItems(props: { active: string }) @{
+	const active = props.active;
+	const isActive = (value: string) => value === active;
+
+	<nav>
+		<div>
+			<ul>
+				@for (const item of ['scoped']; key item) {
+					<li
+						data-active={item === active ? 'true' : undefined}
+						onClick={() => isActive(item)}
+					>{item as string}</li>
+				}
+			</ul>
+		</div>
+	</nav>
+}
+
+export function ValidCrossComponentListScope(props: { active?: string } = {}) @{
+	<ul>
+		@for (const item of ['outer']; key item) {
+			<li>
+				@if (item === 'outer') {
+					<ScopedListItems active={props.active ?? item} />
+				}
+			</li>
+		}
+	</ul>
+}
+
+function TransparentListItem() @{
+	<li>nested list item</li>
+}
+
+export function InvalidCrossComponentNestedListItem() @{
+	<ul>
+		<li>
+			<div>
+				<TransparentListItem />
+			</div>
+		</li>
+	</ul>
+}
+
 // Per validateDOMNesting-test.js:88 — a plain div does not reset the
 // autoclosing list-item scope, so the browser repairs this authored shape.
 export function InvalidNestedListItem() @{

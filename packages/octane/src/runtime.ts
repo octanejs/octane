@@ -12130,7 +12130,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	) {
 		const warning = isAriaAttributeName(name)
 			? ariaAttributeWarning(name, el.localName)
-			: hostPropertyWarning(name, value);
+			: hostPropertyWarning(name, value, el.localName);
 		if (warning !== null) devWarnAttributeOnce(el, name, warning);
 	}
 	// React-style `dangerouslySetInnerHTML={{__html}}` is a PROPERTY write, not an
@@ -12394,7 +12394,7 @@ function devValidateHostProps(el: Element, props: Record<string, unknown>): void
 			}
 			continue;
 		}
-		const warning = hostPropertyWarning(name, value);
+		const warning = hostPropertyWarning(name, value, el.localName);
 		if (warning !== null) {
 			devWarnAttributeOnce(el, name, warning);
 			continue;
@@ -13074,7 +13074,15 @@ export function setHostPropSources(
 		const [identity, name] = normalizedHostProp(el, writer.rawName);
 		const previous = values.get(identity);
 		if (previous === undefined || previous[3] < writer.lastOrder) {
-			values.set(identity, [name, writer.value, writer.firstOrder, writer.lastOrder]);
+			values.set(identity, [
+				process.env.NODE_ENV !== 'production' &&
+				(writer.rawName === 'tabIndex' || writer.rawName === 'htmlFor')
+					? writer.rawName
+					: name,
+				writer.value,
+				writer.firstOrder,
+				writer.lastOrder,
+			]);
 		}
 	}
 	const resolved: Record<string, unknown> = Object.create(null);
@@ -27374,6 +27382,22 @@ export function devHtmlNesting(
 		let message: string | null = null;
 		if (ancestors.length === 0) {
 			let parent = activeBlock?.parentNode ?? null;
+			// Dependency-only keyed survivors intentionally skip renderBlock, so
+			// CURRENT_SCOPE still belongs to their parent component. Recover the
+			// actual list parent from the already-mounted row's authored location;
+			// otherwise an intervening <ul> disappears from parser-scope checks.
+			if (childLocation !== undefined && CURRENT_SCOPE !== null) {
+				for (const slot of CURRENT_SCOPE.slots) {
+					if (
+						slot?.__kind === 'forBlockSlot' &&
+						(slot.head?.startMarker as Element & { __oct_loc?: string })?.__oct_loc ===
+							childLocation
+					) {
+						parent = slot.start.parentNode;
+						break;
+					}
+				}
+			}
 			const actualAncestors: string[] = [];
 			while (parent !== null && parent.nodeType === 1) {
 				const element = parent as Element;

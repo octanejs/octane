@@ -1,13 +1,14 @@
 import { resolve } from 'node:path';
 import { compile } from 'octane/compiler';
 import { octane } from 'octane/compiler/vite';
-import { createRoot, flushSync } from 'octane';
+import { createRoot, flushSync, hydrateRoot } from 'octane';
 import { renderToString } from 'octane/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadServerFixture } from './_server-fixture';
 import {
 	Direct,
 	CrossComponent,
+	InvalidCrossComponentNestedListItem,
 	InvalidNestedAnchor,
 	InvalidNestedForm,
 	InvalidNestedListItem,
@@ -24,6 +25,7 @@ import {
 	SelectComponentRoot,
 	Valid,
 	ValidAnchorScope,
+	ValidCrossComponentListScope,
 	ValidListItemScope,
 	ValidParagraphScope,
 } from './_fixtures/ssr-invalid-nesting.tsrx';
@@ -109,6 +111,7 @@ describe('DEV SSR invalid HTML nesting', () => {
 		['an object-scoped nested anchor', 'ValidAnchorScope'],
 		['a button-scoped nested paragraph', 'ValidParagraphScope'],
 		['a section-scoped nested list item', 'ValidListItemScope'],
+		['a list-scoped nested list item across components', 'ValidCrossComponentListScope'],
 		['select, optgroup, and option children', 'ValidSelectChildren'],
 	])('keeps %s silent', (_description, component) => {
 		const spy = errors();
@@ -120,6 +123,7 @@ describe('DEV SSR invalid HTML nesting', () => {
 	// autoclosing or form/anchor ancestor scopes.
 	it.each([
 		['a nested list item', 'InvalidNestedListItem', '`<li>`'],
+		['a nested list item across components', 'InvalidCrossComponentNestedListItem', '`<li>`'],
 		['a nested anchor', 'InvalidNestedAnchor', '`<a>`'],
 		['a nested form', 'InvalidNestedForm', '`<form>`'],
 	])('reports %s across transparent HTML wrappers', (_description, component, tag) => {
@@ -332,12 +336,48 @@ describe('DEV client invalid HTML nesting', () => {
 		['an object-scoped nested anchor', ValidAnchorScope],
 		['a button-scoped nested paragraph', ValidParagraphScope],
 		['a section-scoped nested list item', ValidListItemScope],
+		['a list-scoped nested list item across components', ValidCrossComponentListScope],
 		['nested MathML anchors', MathMlNestedLinks],
 		['XML MathML annotations', MathMlAnnotationXml],
 	])('keeps %s silent on the client', (_description, component) => {
 		const spy = errors();
 		const { container, root } = mount(component);
 		try {
+			expect(spy).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+
+	it('hydrates a list-scoped nested list across components without an invalid nesting warning', () => {
+		const spy = errors();
+		const container = document.createElement('div');
+		container.innerHTML = renderToString(dev.ValidCrossComponentListScope).html;
+		document.body.appendChild(container);
+		const existingItem = container.querySelector('li nav ul li');
+		expect(existingItem?.textContent).toBe('scoped');
+		expect(spy).not.toHaveBeenCalled();
+		const root = hydrateRoot(container, ValidCrossComponentListScope);
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('li nav ul li')).toBe(existingItem);
+			expect(spy).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+
+	it('keeps nested keyed list rows silent when their captured dependencies update', () => {
+		const spy = errors();
+		const { container, root } = mount(ValidCrossComponentListScope);
+		try {
+			const existingItem = container.querySelector('li nav ul li');
+			expect(existingItem?.getAttribute('data-active')).toBe(null);
+			flushSync(() => root.render(ValidCrossComponentListScope, { active: 'scoped' }));
+			expect(container.querySelector('li nav ul li')).toBe(existingItem);
+			expect(existingItem?.getAttribute('data-active')).toBe('true');
 			expect(spy).not.toHaveBeenCalled();
 		} finally {
 			root.unmount();
@@ -377,6 +417,17 @@ describe('DEV client invalid HTML nesting', () => {
 			if (!productionCompile) {
 				expect(messageAt(spy).match(/ssr-invalid-nesting\.tsrx:\d+:\d+/g)).toHaveLength(2);
 			}
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+
+	it('reports a nested list item across components without an intervening list scope', () => {
+		const spy = errors();
+		const { container, root } = mount(InvalidCrossComponentNestedListItem);
+		try {
+			expectClientWarning(spy, 'cannot be a descendant of `<li>`');
 		} finally {
 			root.unmount();
 			container.remove();

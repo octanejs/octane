@@ -218,6 +218,89 @@ describe('React DOM unknown-property diagnostics', () => {
 		}
 	});
 
+	// Per React's possibleStandardNames: supported input authoring remains quiet.
+	it('accepts canonical input property spellings without unknown-property warnings', () => {
+		const error = captureErrors();
+		const root = mount(client.CanonicalInputProperties);
+		try {
+			const element = root.find('#canonical-input-properties') as HTMLInputElement;
+			expect(element.maxLength).toBe(12);
+			expect(element.getAttribute('inputmode')).toBe('numeric');
+			expect(element.getAttribute('autocapitalize')).toBe('none');
+			expect(element.getAttribute('autocorrect')).toBe('off');
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// Canonical JSX spellings are validated before their native HTML alias.
+	it('accepts canonical tabIndex and htmlFor direct attributes without alias warnings', () => {
+		const error = captureErrors();
+		const root = mount(client.CanonicalAliasedProperties);
+		try {
+			const element = root.find('#canonical-aliased-properties');
+			expect(element.getAttribute('tabindex')).toBe('-1');
+			expect(element.getAttribute('for')).toBe('canonical-input');
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('accepts canonical tabIndex and htmlFor through a final spread snapshot', () => {
+		const error = captureErrors();
+		const root = mount(client.SpreadUnknownProperties, {
+			attributes: { tabIndex: -1, htmlFor: 'canonical-input' },
+		});
+		try {
+			const element = root.find('#unknown-properties');
+			expect(element.getAttribute('tabindex')).toBe('-1');
+			expect(element.getAttribute('for')).toBe('canonical-input');
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// OCTANE DIVERGENCE: native label `for` is supported alongside React's htmlFor.
+	it('accepts the authored native label for attribute without a spelling diagnostic', () => {
+		const error = captureErrors();
+		const root = mount(client.NativeLabelFor, { target: 'native-label-input' });
+		try {
+			expect(root.find('#native-label-for').getAttribute('for')).toBe('native-label-input');
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('accepts a native label for attribute from a spread without a spelling diagnostic', () => {
+		const error = captureErrors();
+		const root = mount(client.SpreadLabelProperties, {
+			attributes: { for: 'spread-label-input' },
+		});
+		try {
+			expect(root.find('#spread-label-properties').getAttribute('for')).toBe('spread-label-input');
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('preserves the authored lowercase for spelling diagnostic on a non-label host', () => {
+		const error = captureErrors();
+		const root = mount(client.SpreadUnknownProperties, {
+			attributes: { for: 'authored-lowercase' },
+		});
+		try {
+			expect(root.find('#unknown-properties').getAttribute('for')).toBe('authored-lowercase');
+			expectClientWarnings(error, ['Invalid DOM property `for`. Did you mean `htmlFor`?']);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	// Per ReactDOMComponent-test.js:1861,1870 — bare innerHTML stays inert
 	// instead of parsing markup, while the author receives the safe replacement.
 	it.each([
@@ -280,6 +363,103 @@ describe('React DOM unknown-property diagnostics', () => {
 			root.unmount();
 		}
 	});
+
+	// Per ReactDOMUnknownPropertyHook.js:371-374 — directly authored customized
+	// built-ins use the final host props regardless of their source order.
+	it.each([
+		{
+			name: 'is first',
+			component: client.StaticCustomizedBuiltInIsFirst,
+			selector: '#static-customized-built-in-is-first',
+			attribute: 'customizedisfirstproperty',
+		},
+		{
+			name: 'is last',
+			component: client.StaticCustomizedBuiltInIsLast,
+			selector: '#static-customized-built-in-is-last',
+			attribute: 'customizedislastproperty',
+		},
+	])(
+		'keeps directly authored customized built-in properties silent with $name',
+		({ component, selector, attribute }) => {
+			const error = captureErrors();
+			const root = mount(component);
+			try {
+				const element = root.find(selector);
+				expect(element.getAttribute('is')).toBe('diagnostic-widget');
+				expect(element.getAttribute(attribute)).toBe('raw');
+				expect(messages(error)).toEqual([]);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('keeps directly authored customized properties silent for a dynamic string is', () => {
+		const error = captureErrors();
+		const root = mount(client.DynamicCustomizedBuiltIn, { kind: 'dynamic-widget' });
+		try {
+			const element = root.find('#dynamic-customized-built-in');
+			expect(element.getAttribute('is')).toBe('dynamic-widget');
+			expect(element.getAttribute('customizeddynamicproperty')).toBe('raw');
+			expect(messages(error)).toEqual([]);
+			root.update(client.DynamicCustomizedBuiltIn, { kind: 'updated-widget' });
+			expect(root.find('#dynamic-customized-built-in')).toBe(element);
+			expect(element.getAttribute('is')).toBe('updated-widget');
+			expect(element.getAttribute('customizeddynamicproperty')).toBe('raw');
+			expect(messages(error)).toEqual([]);
+			root.update(client.DynamicCustomizedBuiltIn, { kind: null });
+			expect(root.find('#dynamic-customized-built-in')).toBe(element);
+			expect(element.hasAttribute('is')).toBe(false);
+			expect(element.getAttribute('customizeddynamicproperty')).toBe('raw');
+			expectClientWarnings(error, [unknownPropertyWarning('customizedDynamicProperty')]);
+			error.mockClear();
+			root.update(client.DynamicCustomizedBuiltIn, { kind: 'restored-widget' });
+			expect(root.find('#dynamic-customized-built-in')).toBe(element);
+			expect(element.getAttribute('is')).toBe('restored-widget');
+			expect(element.getAttribute('customizeddynamicproperty')).toBe('raw');
+			expect(messages(error)).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// Per ReactDOMComponent-test.js:1499 — only a string `is` opts a native
+	// host out of normal property validation; null is simply an absent marker.
+	it.each([
+		{
+			name: 'number',
+			component: client.DynamicCustomizedBuiltInNumber,
+			selector: '#dynamic-customized-built-in-number',
+			attribute: 'customizedDynamicNumberProperty',
+			kind: 123,
+			serialized: '123',
+			warnings: [unknownPropertyWarning('customizedDynamicNumberProperty')],
+		},
+		{
+			name: 'null',
+			component: client.DynamicCustomizedBuiltInNull,
+			selector: '#dynamic-customized-built-in-null',
+			attribute: 'customizedDynamicNullProperty',
+			kind: null,
+			serialized: null,
+			warnings: [unknownPropertyWarning('customizedDynamicNullProperty')],
+		},
+	])(
+		'validates directly authored host properties when a dynamic is marker is $name',
+		({ component, selector, attribute, kind, serialized, warnings }) => {
+			const error = captureErrors();
+			const root = mount(component, { kind });
+			try {
+				const element = root.find(selector);
+				expect(element.getAttribute('is')).toBe(serialized);
+				expect(element.getAttribute(attribute.toLowerCase())).toBe('raw');
+				expectClientWarnings(error, warnings);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
 
 	// Per ReactDOMComponent-test.js:232,265 — lowercased event-shaped strings
 	// never become inline script attributes and explain why they were dropped.
@@ -484,6 +664,57 @@ describe('server and hydration unknown-property diagnostics', () => {
 		expect(messages(error)).toEqual([unknownPropertyWarning(name)]);
 	});
 
+	it('accepts canonical server input property spellings without diagnostics', () => {
+		const error = captureErrors();
+		const html = Server.renderToString(devServer.CanonicalInputProperties).html;
+		expect(html.toLowerCase()).toContain('maxlength="12"');
+		expect(html.toLowerCase()).toContain('inputmode="numeric"');
+		expect(html.toLowerCase()).toContain('autocapitalize="none"');
+		expect(html.toLowerCase()).toContain('autocorrect="off"');
+		expect(messages(error)).toEqual([]);
+	});
+
+	it('accepts canonical server tabIndex and htmlFor direct attributes', () => {
+		const error = captureErrors();
+		const html = Server.renderToString(devServer.CanonicalAliasedProperties).html;
+		expect(html).toContain('tabindex="-1"');
+		expect(html).toContain('for="canonical-input"');
+		expect(messages(error)).toEqual([]);
+	});
+
+	it('accepts canonical server tabIndex and htmlFor in a resolved spread', () => {
+		const error = captureErrors();
+		const html = Server.renderToString(devServer.SpreadUnknownProperties, {
+			attributes: { tabIndex: -1, htmlFor: 'canonical-input' },
+		}).html;
+		expect(html).toContain('tabindex="-1"');
+		expect(html).toContain('for="canonical-input"');
+		expect(messages(error)).toEqual([]);
+	});
+
+	// OCTANE DIVERGENCE: native label `for` also stays silent during SSR.
+	it('accepts an authored native server label for attribute without diagnostics', () => {
+		const error = captureErrors();
+		const direct = Server.renderToString(devServer.NativeLabelFor, {
+			target: 'direct-native-input',
+		}).html;
+		const spread = Server.renderToString(devServer.SpreadLabelProperties, {
+			attributes: { for: 'spread-native-input' },
+		}).html;
+		expect(direct).toContain('for="direct-native-input"');
+		expect(spread).toContain('for="spread-native-input"');
+		expect(messages(error)).toEqual([]);
+	});
+
+	it('preserves the lowercase for spelling diagnostic on a server non-label host', () => {
+		const error = captureErrors();
+		const html = Server.renderToString(devServer.SpreadUnknownProperties, {
+			attributes: { for: 'server-non-label' },
+		}).html;
+		expect(html).toContain('for="server-non-label"');
+		expect(messages(error)).toEqual(['Invalid DOM property `for`. Did you mean `htmlFor`?']);
+	});
+
 	// Per ReactDOMComponent-test.js:3611,3629 — server output writes boolean
 	// presence while reporting its ambiguous string input.
 	it('warns for an ambiguous boolean string while retaining server presence semantics', () => {
@@ -528,6 +759,67 @@ describe('server and hydration unknown-property diagnostics', () => {
 		expect(html).toContain('customizedServerProperty="raw"');
 		expect(messages(error)).toEqual([]);
 	});
+
+	// Per ReactDOMUnknownPropertyHook.js:371-374 — SSR sees the same finalized
+	// customized-built-in marker as client rendering for either author order.
+	it.each([
+		{
+			name: 'is first',
+			component: devServer.StaticCustomizedBuiltInIsFirst,
+			attribute: 'customizedIsFirstProperty',
+		},
+		{
+			name: 'is last',
+			component: devServer.StaticCustomizedBuiltInIsLast,
+			attribute: 'customizedIsLastProperty',
+		},
+	])(
+		'keeps directly authored server customized built-in properties silent with $name',
+		({ component, attribute }) => {
+			const error = captureErrors();
+			const html = Server.renderToString(component).html;
+			expect(html).toContain('is="diagnostic-widget"');
+			expect(html).toContain(`${attribute}="raw"`);
+			expect(messages(error)).toEqual([]);
+		},
+	);
+
+	it('keeps directly authored server customized properties silent for a dynamic string is', () => {
+		const error = captureErrors();
+		const html = Server.renderToString(devServer.DynamicCustomizedBuiltIn, {
+			kind: 'dynamic-widget',
+		}).html;
+		expect(html).toContain('customizedDynamicProperty="raw"');
+		expect(html).toContain('is="dynamic-widget"');
+		expect(messages(error)).toEqual([]);
+	});
+
+	it.each([
+		{
+			name: 'number',
+			component: devServer.DynamicCustomizedBuiltInNumber,
+			attribute: 'customizedDynamicNumberProperty',
+			kind: 123,
+			warnings: [unknownPropertyWarning('customizedDynamicNumberProperty')],
+		},
+		{
+			name: 'null',
+			component: devServer.DynamicCustomizedBuiltInNull,
+			attribute: 'customizedDynamicNullProperty',
+			kind: null,
+			warnings: [unknownPropertyWarning('customizedDynamicNullProperty')],
+		},
+	])(
+		'validates directly authored server host properties when a dynamic is marker is $name',
+		({ component, attribute, kind, warnings }) => {
+			const error = captureErrors();
+			const html = Server.renderToString(component, { kind }).html;
+			expect(html).toContain(`${attribute}="raw"`);
+			if (kind === null) expect(html).not.toContain(' is=');
+			else expect(html).toContain(`is="${kind}"`);
+			expect(messages(error)).toEqual(warnings);
+		},
+	);
 
 	// Per ReactDOMComponent-test.js:232,2681 — server filtering excludes event
 	// strings from serialized HTML and explains incorrect event naming.
@@ -681,6 +973,28 @@ describe('server and hydration unknown-property diagnostics', () => {
 			flushSync(() => {});
 			expect(container.querySelector('#unknown-properties')).toBe(original);
 			expectClientWarnings(error, [unknownPropertyWarning(name)]);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// Per ReactDOMUnknownPropertyHook.js:371-374 — customized-built-in hydration
+	// adopts existing server HTML without reporting its authored raw properties.
+	it('adopts a directly authored customized built-in without unknown-property warnings', () => {
+		const error = captureErrors();
+		const html = Server.renderToString(devServer.HydratedCustomizedBuiltIn).html;
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		const original = container.querySelector('#hydrated-customized-built-in');
+		expect(original?.getAttribute('is')).toBe('hydrated-widget');
+		expect(original?.getAttribute('customizedhydrationproperty')).toBe('raw');
+		expect(messages(error)).toEqual([]);
+		error.mockClear();
+		const root = hydrateRoot(container, client.HydratedCustomizedBuiltIn);
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('#hydrated-customized-built-in')).toBe(original);
+			expect(messages(error)).toEqual([]);
 		} finally {
 			root.unmount();
 		}

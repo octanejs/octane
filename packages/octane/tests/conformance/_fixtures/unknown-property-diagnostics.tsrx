@@ -34,6 +34,72 @@ export function StaticUnknownCamelProperty() @{
 	<div id="static-unknown-camel-property" mysteryStaticProperty="visible" />
 }
 
+export function CanonicalInputProperties() @{
+	<input
+		id="canonical-input-properties"
+		maxLength={12}
+		inputMode="numeric"
+		autoCapitalize="none"
+		autoCorrect="off"
+	/>
+}
+
+export function CanonicalAliasedProperties() @{
+	<label id="canonical-aliased-properties" htmlFor="canonical-input" tabIndex={-1} />
+}
+
+export function NativeLabelFor(props: { target: string }) @{
+	<label id="native-label-for" for={props.target} />
+}
+
+export function SpreadLabelProperties(props: AttributeProps) @{
+	<label id="spread-label-properties" {...props.attributes} />
+}
+
+export function StaticCustomizedBuiltInIsFirst() @{
+	<button
+		id="static-customized-built-in-is-first"
+		is="diagnostic-widget"
+		customizedIsFirstProperty="raw"
+	/>
+}
+
+export function StaticCustomizedBuiltInIsLast() @{
+	<button
+		id="static-customized-built-in-is-last"
+		customizedIsLastProperty="raw"
+		is="diagnostic-widget"
+	/>
+}
+
+export function DynamicCustomizedBuiltIn(props: { kind: unknown }) @{
+	<button id="dynamic-customized-built-in" customizedDynamicProperty="raw" is={props.kind} />
+}
+
+export function DynamicCustomizedBuiltInNumber(props: { kind: unknown }) @{
+	<button
+		id="dynamic-customized-built-in-number"
+		customizedDynamicNumberProperty="raw"
+		is={props.kind}
+	/>
+}
+
+export function DynamicCustomizedBuiltInNull(props: { kind: unknown }) @{
+	<button
+		id="dynamic-customized-built-in-null"
+		customizedDynamicNullProperty="raw"
+		is={props.kind}
+	/>
+}
+
+export function HydratedCustomizedBuiltIn() @{
+	<button
+		id="hydrated-customized-built-in"
+		customizedHydrationProperty="raw"
+		is="hydrated-widget"
+	/>
+}
+
 export function StaticReservedInnerHtml() @{
 	<div id="static-reserved-inner-html" InnerHTML="<strong>not parsed</strong>" />
 }
