@@ -35,8 +35,10 @@ import {
 } from './first-screen.js';
 import {
 	LYNX_CSS_SCOPE_PROP,
+	hasLynxMainThreadProp,
 	planLynxHostPropPatch,
 	type LynxHostPropPatch,
+	type LynxMainThreadEventPatch,
 	type LynxMainThreadRefDescriptor,
 	type LynxMainThreadWorkletDescriptor,
 } from './host-props.js';
@@ -507,6 +509,9 @@ const EMPTY_HOST_CHILDREN: number[] = [];
 // Most hosts never own a background event. Keep the shared map private and
 // replace it before the first write so ordinary hosts allocate no event table.
 const EMPTY_HOST_EVENTS = new Map<string, UniversalEventListenerDescriptor>();
+// Capture asks every host what the main thread should own. Hosts that declare
+// no `main-thread:` prop share this empty answer instead of planning for one.
+const EMPTY_MAIN_THREAD_EVENTS: readonly LynxMainThreadEventPatch[] = Object.freeze([]);
 // Raw text is initialized by __CreateRawText itself. Its synthetic `value`
 // attribute is never forwarded, so an unscoped creation needs no prop diff.
 const EMPTY_RAW_TEXT_CREATE_PATCH: LynxHostPropPatch = Object.freeze({
@@ -2993,7 +2998,21 @@ export function captureLynxFirstTree<Node extends LynxElementRef>(
 		throw hostError('portals cannot be captured before background adoption.');
 	}
 	const eventsByToken = new Map<string, LynxResolvedFirstTreeEvent>();
-	const nodes: LynxFirstTreeNodeSnapshot[] = [];
+	// Capture validates eagerly and describes lazily. Validation and the native
+	// ID read stay here because a host that cannot be captured has to fault the
+	// synchronous first screen, while its caller still holds the source to retry
+	// cleanup against. Turning the validated result into the clone-safe
+	// description is what waits: capture runs after the page is already published
+	// to the host, so every allocation it makes sits between the tree reaching
+	// the DOM and the browser painting it, and nothing before background
+	// adoption reads the description.
+	const described: {
+		readonly id: number;
+		readonly nativeId: number;
+		readonly parent: number | null;
+		readonly record: LynxHostRecord<Node>;
+		readonly events: readonly LynxFirstTreeEventSnapshot[];
+	}[] = [];
 	const ids = [...state.records.keys()].sort((first, second) => first - second);
 	for (const id of ids) {
 		const record = state.records.get(id)!;
@@ -3036,8 +3055,17 @@ export function captureLynxFirstTree<Node extends LynxElementRef>(
 				);
 			}
 		}
-		const mainThreadPatch = planLynxHostPropPatch(record.type, {}, record.props);
-		for (const event of mainThreadPatch.mainThreadEvents) {
+		// Capture re-plans a host's props only to recover what the main thread
+		// should own; the props themselves were already planned and applied when
+		// the tree was built. A host that declares no `main-thread:` prop can own
+		// neither a main-thread event nor a main-thread ref, so planning it again
+		// would spend the page's largest per-host cost rediscovering an empty
+		// answer. Skipping it leaves the checks below unchanged: they still assert
+		// that nothing main-thread-owned is mounted on a host that never asked.
+		const mainThreadPatch = hasLynxMainThreadProp(record.props)
+			? planLynxHostPropPatch(record.type, {}, record.props)
+			: null;
+		for (const event of mainThreadPatch?.mainThreadEvents ?? EMPTY_MAIN_THREAD_EVENTS) {
 			if (event.value === null) continue;
 			const registration = state.nativeEvents.get(record.node)?.get(event.binding.prop);
 			if (
@@ -3055,7 +3083,7 @@ export function captureLynxFirstTree<Node extends LynxElementRef>(
 				);
 			}
 		}
-		const expectedRef = mainThreadPatch.mainThreadRef?.value ?? null;
+		const expectedRef = mainThreadPatch?.mainThreadRef?.value ?? null;
 		const mountedRef = state.mainThreadRefs.get(record.node) ?? null;
 		if (
 			(record.visible && !sameSnapshotValue(expectedRef, mountedRef)) ||
@@ -3063,19 +3091,13 @@ export function captureLynxFirstTree<Node extends LynxElementRef>(
 		) {
 			throw hostError(`first-tree host ${id} has inconsistent main-thread ref ownership.`);
 		}
-		nodes.push(
-			Object.freeze({
-				id,
-				nativeId,
-				type: record.type,
-				generation: record.handle.generation,
-				parent: record.parent,
-				children: Object.freeze([...record.children]),
-				props: snapshotFirstTreeProps(record.props),
-				visible: record.visible,
-				events: Object.freeze(events),
-			}),
-		);
+		described.push({
+			id,
+			nativeId,
+			parent: record.parent,
+			record,
+			events: Object.freeze(events),
+		});
 	}
 	if (state.ownedNodes.size !== state.records.size) {
 		throw hostError('first-tree physical ownership contains untracked nodes.');
@@ -3089,16 +3111,33 @@ export function captureLynxFirstTree<Node extends LynxElementRef>(
 			throw hostError(`first-tree root ${id} is missing from page-root ownership.`);
 		}
 	}
-	const snapshot: LynxFirstTreeSnapshot = Object.freeze({
-		format: 1,
-		renderer: LYNX_RENDERER_ID,
-		root: container.root,
-		version: state.acceptedVersion,
-		plan: options.plan ?? null,
-		roots: Object.freeze([...state.rootChildren]),
-		nodes: Object.freeze(nodes),
-	});
-	const firstTree = createLynxFirstTree<Node>(snapshot, container, eventsByToken);
+	const capturedVersion = state.acceptedVersion;
+	const roots = Object.freeze([...state.rootChildren]);
+	const describe = (): LynxFirstTreeSnapshot =>
+		Object.freeze({
+			format: 1,
+			renderer: LYNX_RENDERER_ID,
+			root: container.root,
+			version: capturedVersion,
+			plan: options.plan ?? null,
+			roots,
+			nodes: Object.freeze(
+				described.map((entry) =>
+					Object.freeze({
+						id: entry.id,
+						nativeId: entry.nativeId,
+						type: entry.record.type,
+						generation: entry.record.handle.generation,
+						parent: entry.parent,
+						children: Object.freeze([...entry.record.children]),
+						props: snapshotFirstTreeProps(entry.record.props),
+						visible: entry.record.visible,
+						events: entry.events,
+					}),
+				),
+			),
+		});
+	const firstTree = createLynxFirstTree<Node>(describe, container, eventsByToken);
 	state.firstTree = firstTree;
 	return firstTree;
 }
