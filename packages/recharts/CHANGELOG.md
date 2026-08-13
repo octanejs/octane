@@ -1,5 +1,41 @@
 # @octanejs/recharts
 
+## 0.1.34
+
+### Patch Changes
+
+- 71e3382: Restore the `AnimationController` type module and fix the style-prop import in
+  `CSSTransitionAnimate`.
+
+  Upstream ships `animation/AnimationController.ts` as a types-only module whose
+  compiled JavaScript is `export {}`, so the vendoring pass, which copies compiled
+  `es6` output, skipped it. `CSSTransitionAnimate` imported the type from a module
+  that did not exist. `AnimationHandle` is reconstructed from the real
+  `JavascriptAnimation` and `CSSTransitionAnimation` classes.
+
+  `CSSTransitionAnimate` also imported `CSSProperties` from `octane`, which does
+  not export it. The style type is now derived from Octane's own JSX surface
+  instead, which avoids adding a `react` dependency this package does not have.
+
+- 0b7460e: Expose Recharts' public declaration surface to strict TypeScript consumers.
+
+  The package previously pointed its `types` and `exports` fields at the raw
+  TypeScript source entry, causing consumer programs to typecheck every internal
+  TSRX and vendored JavaScript module. The package now routes TypeScript through
+  its Octane-native public declarations while preserving the source runtime entry.
+
+- Updated dependencies [ce3a6fe]
+- Updated dependencies [954c75f]
+- Updated dependencies [94fa199]
+- Updated dependencies [c2e77a3]
+- Updated dependencies [125c861]
+- Updated dependencies [765134a]
+- Updated dependencies [9efd6f4]
+- Updated dependencies [603756a]
+- Updated dependencies [0b7460e]
+  - @octanejs/redux@0.1.34
+  - octane@0.1.37
+
 ## 0.1.33
 
 ### Patch Changes
