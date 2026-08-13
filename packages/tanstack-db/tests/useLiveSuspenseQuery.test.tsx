@@ -614,6 +614,78 @@ describe(`useLiveSuspenseQuery`, () => {
 		expect(container.textContent).not.toContain(`Loading...`);
 	});
 
+	it(`keeps a later sibling suspended when an earlier query resolves first`, async () => {
+		// Regression for the positional-`use()` bug. Octane keys `use(thenable)` by
+		// dynamic call-order index (not by compiler slot), so if the first
+		// `useLiveSuspenseQuery` stops calling `use()` once it is ready, the second
+		// hook's `use()` shifts onto the first's now-fulfilled thenable slot and
+		// stops suspending — surfacing its still-loading collection as ready. Two
+		// independently gated collections let the first resolve while the second is
+		// still loading, which is exactly the window that triggers the shift.
+		const gate = (id: string) => {
+			let release: (() => void) | null = null;
+			const opened = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			const collection = createCollection<Person>({
+				id,
+				getKey: (person) => person.id,
+				sync: {
+					sync: ({ begin, write, commit, markReady }) => {
+						void opened.then(() => {
+							begin();
+							for (const person of initialPersons) write({ type: `insert`, value: person });
+							commit();
+							markReady();
+						});
+					},
+				},
+			});
+			return { collection, release: () => release!() };
+		};
+
+		const first = gate(`suspense-sibling-first`);
+		const second = gate(`suspense-sibling-second`);
+
+		const Pair = () => {
+			const a = useLiveSuspenseQuery((q) => q.from({ persons: first.collection }));
+			const b = useLiveSuspenseQuery((q) => q.from({ persons: second.collection }));
+			return (
+				<div>
+					a:{String(a.data.length)}|b:{String(b.data.length)}
+				</div>
+			);
+		};
+		const App = () => (
+			<Suspense fallback={<div>Loading...</div>}>
+				<Pair />
+			</Suspense>
+		);
+
+		const { container } = render(<App />);
+
+		await waitFor(() => {
+			expect(container.textContent).toContain(`Loading...`);
+		});
+
+		// Release ONLY the first collection. The second is still loading, so the
+		// component must stay on the fallback. Pre-fix, the second hook read the
+		// first's fulfilled thenable and rendered `a:3|b:0` here.
+		first.release();
+		await waitFor(() => {
+			expect(first.collection.status).toBe(`ready`);
+		});
+		expect(container.textContent).toContain(`Loading...`);
+		expect(container.textContent).not.toContain(`b:`);
+
+		// Release the second collection; now both are ready and the pair renders.
+		second.release();
+		await waitFor(() => {
+			expect(container.textContent).toContain(`a:3|b:3`);
+		});
+		expect(container.textContent).not.toContain(`Loading...`);
+	});
+
 	it(`should not re-suspend after hasBeenReady when isLoadingSubset changes`, async () => {
 		// This test verifies that after the initial ready state is reached,
 		// subsequent isLoadingSubset changes don't cause re-suspension

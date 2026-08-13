@@ -13,6 +13,12 @@ import type {
 	SingleResult,
 } from '@tanstack/db';
 
+// Shared, already-resolved thenable handed to `use()` on the non-suspending
+// paths (see the divergence note in the hook body). Its resolved value is never
+// read — only its settled status matters — so a single module-level instance is
+// safe to share across every hook instance and render.
+const SETTLED: Promise<void> = Promise.resolve();
+
 /**
  * Create a live query with React Suspense support
  * @param queryFn - Query function that defines what data to fetch
@@ -197,7 +203,9 @@ export function useLiveSuspenseQuery(configOrQueryOrCollection: any, ...rest: Ar
 	}
 
 	// Only throw errors during initial load (before first ready)
-	// After success, errors surface as stale data (matches TanStack Query behavior)
+	// After success, errors surface as stale data (matches TanStack Query behavior).
+	// This throw aborts the whole component body (no later hook runs), so it does
+	// not perturb the call-order invariant the `use()` below depends on.
 	if (collectionStatus === `error` && !hasBeenReadyRef.current) {
 		promiseRef.current = null;
 		// TODO: Once collections hold a reference to their last error object (#671),
@@ -205,18 +213,25 @@ export function useLiveSuspenseQuery(configOrQueryOrCollection: any, ...rest: Ar
 		throw new Error(`Collection "${result.collection.id}" failed to load`);
 	}
 
-	if (collectionStatus === `loading` || collectionStatus === `idle`) {
-		// Create or reuse promise for current collection
-		const preloadPromise = (promiseRef.current ??= result.collection.preload());
-		// OCTANE DIVERGENCE: suspend via `use(thenable)`, not `throw promise`.
-		// React (and the upstream react-db adapter) throw the raw promise and rely
-		// on React Suspense catching it. Octane Suspense only recognizes the
-		// sentinel that `use()` produces; a raw thrown promise reaches Octane's
-		// error path and never renders the fallback. `use()` is exempt from
-		// call-site slotting, so no slot is needed, and reusing the same
-		// `promiseRef` identity lets `use()` dedupe the thenable across renders.
-		use(preloadPromise);
-	}
+	// OCTANE DIVERGENCE: suspend via `use(thenable)`, not `throw promise`, and call
+	// `use()` UNCONDITIONALLY — exactly once on every path that keeps rendering.
+	//
+	// Upstream react-db `throw`s the preload promise, and a React `throw` suspends
+	// the whole component with no positional state. Octane Suspense instead only
+	// recognizes the sentinel `use()` produces (a raw thrown promise reaches the
+	// error path and never renders the fallback), and Octane tracks `use(thenable)`
+	// by dynamic call-order index (the runtime's `__thenableIdx`), like React's
+	// positional `thenableState` — NOT by compiler slot. So skipping `use()` on the
+	// ready / stale-after-error paths would shift the thenable index of any sibling
+	// `use()` or second `useLiveSuspenseQuery` in the same component, which could
+	// then read a neighbor's fulfilled thenable and expose still-pending data as
+	// ready. Handing `use()` an already-resolved thenable when we are not loading
+	// keeps the call count stable and returns synchronously without suspending.
+	// Reusing the `promiseRef` identity lets `use()` dedupe the thenable across the
+	// suspension's replay renders.
+	const isLoading = collectionStatus === `loading` || collectionStatus === `idle`;
+	const preloadPromise = isLoading ? (promiseRef.current ??= result.collection.preload()) : SETTLED;
+	use(preloadPromise);
 
 	// Return data without status/loading flags (handled by Suspense/ErrorBoundary)
 	// If error after success, return last known good state (stale data)
