@@ -12,7 +12,8 @@
     "skipLibCheck": true,
     "jsx": "react-jsx",
     "jsxImportSource": "octane",
-    "plugins": [{ "name": "@tsrx/typescript-plugin" }]
+    "plugins": [{ "name": "@tsrx/typescript-plugin" }],
+    "types": []
   },
   "tsrx": { "compiler": "octane/compiler/volar" }
 }
