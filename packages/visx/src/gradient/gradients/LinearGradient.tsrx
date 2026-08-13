@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import useStableId from '../../kernel/ids/useStableId.tsrx';
 
@@ -36,7 +36,7 @@ type LinearGradientOwnProps = {
 };
 
 export type LinearGradientProps =
-	LinearGradientOwnProps & Omit<SVGProps<SVGLinearGradientElement>, keyof LinearGradientOwnProps>;
+	LinearGradientOwnProps & Omit<Octane.SVGProps<SVGLinearGradientElement>, keyof LinearGradientOwnProps>;
 
 export default function LinearGradient({
 	children,

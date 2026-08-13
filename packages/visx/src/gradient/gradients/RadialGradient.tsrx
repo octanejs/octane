@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { LinearGradientProps } from './LinearGradient.tsrx';
 import useStableId from '../../kernel/ids/useStableId.tsrx';
 
@@ -12,7 +12,7 @@ export type RadialGradientProps =
 	| 'toOpacity'
 	| 'rotate'
 	| 'transform'
-	| 'children'> & SVGProps<SVGRadialGradientElement>; // passed as rest props to radialGradient
+	| 'children'> & Octane.SVGProps<SVGRadialGradientElement>; // passed as rest props to radialGradient
 
 export default function RadialGradient({
 	children,

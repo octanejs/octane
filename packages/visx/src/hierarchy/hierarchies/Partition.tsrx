@@ -1,4 +1,3 @@
-import { createElement } from 'octane';
 import type { FunctionComponent, ComponentClass } from 'react';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
@@ -42,6 +41,10 @@ export default function Partition<Datum>({
 	children,
 	nodeComponent = DefaultNode,
 }: PartitionProps<Datum>) {
+	// Octane renders a component VALUE through a capitalized JSX tag; the prop
+	// keeps upstream's React component union for type parity.
+	const NodeComponent = nodeComponent;
+
 	const partition = d3partition<Datum>();
 	if (size) partition.size(size);
 	if (round) partition.round(round);
@@ -57,7 +60,7 @@ export default function Partition<Datum>({
 		{nodeComponent &&
 			data.descendants().map(
 				(node, i) =>
-					<Group key={`partition-node-${i}`}>{createElement(nodeComponent, { node })}</Group>,
+					<Group key={`partition-node-${i}`}><NodeComponent node={node} /></Group>,
 			)}
 	</Group>;
 }

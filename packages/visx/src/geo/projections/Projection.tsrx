@@ -1,4 +1,5 @@
-import type { SVGProps, Ref } from 'react';
+import type { Ref } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
@@ -132,7 +133,7 @@ export default function Projection<Datum extends GeoPermissibleObjects>({
 	pointRadius,
 	children,
 	...restProps
-}: ProjectionProps<Datum> & Omit<SVGProps<SVGPathElement>, keyof ProjectionProps<Datum>>) {
+}: ProjectionProps<Datum> & Omit<Octane.SVGProps<SVGPathElement>, keyof ProjectionProps<Datum>>) {
 	const maybeCustomProjection =
 		typeof projection === 'string' ? projectionMapping[projection] : projection;
 

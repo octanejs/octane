@@ -1,5 +1,5 @@
 import { useContext } from 'octane';
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 import type { AnnotationContextType } from '../types';
 import AnnotationContext from '../context/AnnotationContext.tsrx';
@@ -15,7 +15,7 @@ export type ConnectorProps = Pick<AnnotationContextType, 'x' | 'y' | 'dx' | 'dy'
 		/** Color of the connector line. */
 		stroke?: string;
 		/** Optional additional props. */
-		pathProps?: SVGProps<SVGPathElement>;
+		pathProps?: Octane.SVGProps<SVGPathElement>;
 	};
 
 export default function Connector({

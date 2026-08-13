@@ -1,4 +1,3 @@
-import { createElement } from 'octane';
 import type { FunctionComponent, ComponentClass } from 'react';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
@@ -56,6 +55,11 @@ export default function Cluster<Datum>({
 	linkComponent = DefaultLink,
 	nodeComponent = DefaultNode,
 }: ClusterProps<Datum>) {
+	// Octane renders a component VALUE through a capitalized JSX tag; the prop
+	// keeps upstream's React component union for type parity.
+	const LinkComponent = linkComponent;
+	const NodeComponent = nodeComponent;
+
 	const cluster = d3cluster<Datum>();
 	if (size) cluster.size(size);
 	if (nodeSize !== undefined) cluster.nodeSize(nodeSize);
@@ -71,12 +75,12 @@ export default function Cluster<Datum>({
 		{linkComponent &&
 			data.links().map(
 				(link, i) =>
-					<Group key={`cluster-link-${i}`}>{createElement(linkComponent, { link })}</Group>,
+					<Group key={`cluster-link-${i}`}><LinkComponent link={link} /></Group>,
 			)}
 		{nodeComponent &&
 			data.descendants().map(
 				(node, i) =>
-					<Group key={`cluster-node-${i}`}>{createElement(nodeComponent, { node })}</Group>,
+					<Group key={`cluster-node-${i}`}><NodeComponent node={node} /></Group>,
 			)}
 	</Group>;
 }

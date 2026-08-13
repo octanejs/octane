@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
@@ -59,7 +59,7 @@ export default function HeatmapCircle<ColumnDatum, BinDatum>({
 	count = (cell: any) => cell?.count, // eslint-disable-line @typescript-eslint/no-explicit-any
 	children,
 	...restProps
-}: HeatmapCircleProps<ColumnDatum, BinDatum> & Omit<SVGProps<SVGCircleElement>, | keyof HeatmapCircleProps<ColumnDatum, BinDatum>
+}: HeatmapCircleProps<ColumnDatum, BinDatum> & Omit<Octane.SVGProps<SVGCircleElement>, | keyof HeatmapCircleProps<ColumnDatum, BinDatum>
 | 'r'
 | 'cx'
 | 'cy'

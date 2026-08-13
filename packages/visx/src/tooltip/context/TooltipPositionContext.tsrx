@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'octane';
+import type { OctaneNode } from 'octane';
 
 export type TooltipPositionContextType = {
 	isFlippedVertically: boolean;
@@ -11,6 +12,19 @@ const TooltipPositionContext = createContext<TooltipPositionContextType>({
 });
 
 export const TooltipPositionProvider = TooltipPositionContext.Provider;
-export const TooltipPositionConsumer = TooltipPositionContext.Consumer;
+
+/**
+ * Octane deliberately has no render-prop `Context.Consumer` (see
+ * docs/differences-from-react.md); reading `.Consumer` returns `undefined` and
+ * warns in development. Keep upstream's render-prop API by reading the context
+ * with `useContext` instead.
+ */
+export function TooltipPositionConsumer({
+	children,
+}: {
+	children: (value: TooltipPositionContextType) => OctaneNode;
+}) {
+	return <>{children(useContext(TooltipPositionContext))}</>;
+}
 
 export const useTooltipPosition = () => useContext(TooltipPositionContext);

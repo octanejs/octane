@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 import Glyph from './Glyph.tsrx';
 
@@ -22,7 +22,7 @@ export default function GlyphDot({
 	left = 0,
 	className,
 	...restProps
-}: GlyphDotProps & Omit<SVGProps<SVGCircleElement>, keyof GlyphDotProps>) {
+}: GlyphDotProps & Omit<Octane.SVGProps<SVGCircleElement>, keyof GlyphDotProps>) {
 	return <Glyph top={top} left={left}>
 		<circle className={cx('visx-glyph-dot', className)} {...restProps} />
 	</Glyph>;

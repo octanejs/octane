@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import useStableId from '../../kernel/ids/useStableId.tsrx';
 
@@ -14,7 +14,7 @@ export default function ClipPath({
 	id,
 	children,
 	...restProps
-}: ClipPathProps & Omit<SVGProps<SVGClipPathElement>, keyof ClipPathProps>) {
+}: ClipPathProps & Omit<Octane.SVGProps<SVGClipPathElement>, keyof ClipPathProps>) {
 	const generatedId = useStableId('visx-clip');
 	return <defs>
 		<clipPath id={id ?? generatedId} {...restProps}>{children}</clipPath>
