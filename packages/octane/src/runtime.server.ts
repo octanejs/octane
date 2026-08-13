@@ -196,6 +196,15 @@ let PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 // `<head>` when present, else prepended).
 interface HeadBuffer {
 	html: string;
+	/**
+	 * Priority hoistables, folded ahead of everything else (React Fizz parity:
+	 * ReactDOMFloat-test.js:9085). `<meta charset>` must land in the first 1024
+	 * bytes for parsers to honor it without restarting; viewport affects first
+	 * layout. Charset precedes viewport regardless of discovery order; each
+	 * bucket keeps its own discovery order.
+	 */
+	charset: string;
+	viewport: string;
 	/** Resource-hint + Float-resource dedupe keys emitted during this pass. */
 	hints: Set<string>;
 	/**
@@ -219,9 +228,9 @@ interface HeadBuffer {
 	rootSuffix: string;
 }
 
-/** Fold order: hoisted head elements, then hints, then grouped stylesheets. */
+/** Fold order: charset, viewport, hoisted head elements, hints, grouped stylesheets. */
 function headHtmlWithSheets(buf: HeadBuffer): string {
-	let out = buf.html;
+	let out = buf.charset + buf.viewport + buf.html;
 	if (buf.hintHtml !== null) for (const tag of buf.hintHtml.values()) out += tag;
 	if (buf.sheets !== null && buf.sheets.size > 0) {
 		// Group by precedence in first-encounter group order: the per-resource map
@@ -234,6 +243,15 @@ function headHtmlWithSheets(buf: HeadBuffer): string {
 	return out;
 }
 let HEAD: HeadBuffer | null = null;
+
+// Depth of pending-arm (fallback) rendering. Hoistables authored inside a
+// fallback are transient — the fallback is discarded at reveal, but a streamed
+// head line is permanent — so ssrHeadEl suppresses while this is non-zero.
+// Suppression is TRANSITIVE (React parity: ReactDOMFloat-test.js:5431): a
+// completed boundary nested inside a fallback is still fallback territory, so
+// nested content arms never reset the depth. Balanced by withPendingArm's
+// finally; re-zeroed with each render's HEAD for crash hygiene.
+let FALLBACK_HOIST_DEPTH = 0;
 
 // Suspense (SSR Phase 4). A render pass that reaches an unresolved `use(thenable)`
 // records the thenable in SUSPENDED and throws SSR_SUSPENSE; the nearest @try
@@ -2892,6 +2910,8 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		cssEntries: css === null ? null : new Map(css),
 		head,
 		headLength: head !== null ? head.html.length : 0,
+		headCharsetLength: head !== null ? head.charset.length : 0,
+		headViewportLength: head !== null ? head.viewport.length : 0,
 		headHints: head === null ? null : new Set(head.hints),
 		headSheets: head === null || head.sheets === null ? null : new Map(head.sheets),
 		headHintHtml: head === null || head.hintHtml === null ? null : new Map(head.hintHtml),
@@ -2957,6 +2977,8 @@ function rewindComponentReplayState(
 	}
 	if (snapshot.head !== null && snapshot.headHints !== null) {
 		snapshot.head.html = snapshot.head.html.slice(0, snapshot.headLength);
+		snapshot.head.charset = snapshot.head.charset.slice(0, snapshot.headCharsetLength);
+		snapshot.head.viewport = snapshot.head.viewport.slice(0, snapshot.headViewportLength);
 		snapshot.head.hints.clear();
 		for (const key of snapshot.headHints) snapshot.head.hints.add(key);
 		if (snapshot.headSheets === null) snapshot.head.sheets = null;
@@ -5097,7 +5119,9 @@ export function ssrHeadEl(
 ): string {
 	// Returns '' so a NESTED hoist can sit in an html expression (the head write
 	// happens at the authored position; the body markup gains nothing).
-	if (HEAD === null) return '';
+	// Inside a fallback (any depth — see FALLBACK_HOIST_DEPTH) the hoist is
+	// dropped entirely, like React: the head outlives the fallback.
+	if (HEAD === null || FALLBACK_HOIST_DEPTH !== 0) return '';
 	// Paired ownership comments bound the exact adoption interval; static markup
 	// is non-hydratable, so both are omitted there.
 	const rootSuffix = HEAD.rootSuffix;
@@ -5117,6 +5141,19 @@ export function ssrHeadEl(
 		s += '>' + (text == null ? '' : escapeHtml(text)) + '</' + tag + '>';
 	}
 	if (MARKERS) s += '<!--/' + ownershipKey + '-->';
+	// Priority routing (fold order: charset, viewport, everything else — see
+	// HeadBuffer). Ownership markers travel with the element, so hydration
+	// adoption is position-independent.
+	if (tag === 'meta' && attrs !== null) {
+		if (attrs.charSet !== undefined || attrs.charset !== undefined) {
+			HEAD.charset += s;
+			return '';
+		}
+		if (attrs.name === 'viewport') {
+			HEAD.viewport += s;
+			return '';
+		}
+	}
 	HEAD.html += s;
 	return '';
 }
@@ -5451,6 +5488,7 @@ interface Ambient {
 	markers: boolean;
 	permanentStaticHydrateDepth: number;
 	head: HeadBuffer | null;
+	fallbackHoistDepth: number;
 	susp: SuspendedList | null;
 	res: ResolvedMap | null;
 	serial: unknown[] | null;
@@ -5478,6 +5516,7 @@ function saveAmbient(): Ambient {
 		markers: MARKERS,
 		permanentStaticHydrateDepth: PERMANENT_STATIC_HYDRATE_DEPTH,
 		head: HEAD,
+		fallbackHoistDepth: FALLBACK_HOIST_DEPTH,
 		susp: SUSPENDED,
 		res: RESOLVED,
 		serial: SERIAL,
@@ -5506,6 +5545,7 @@ function restoreAmbient(a: Ambient): void {
 	MARKERS = a.markers;
 	PERMANENT_STATIC_HYDRATE_DEPTH = a.permanentStaticHydrateDepth;
 	HEAD = a.head;
+	FALLBACK_HOIST_DEPTH = a.fallbackHoistDepth;
 	SUSPENDED = a.susp;
 	RESOLVED = a.res;
 	SERIAL = a.serial;
@@ -5558,12 +5598,15 @@ function runFullFramedPass(
 	const cssMap = (CSS = new Map<string, string>());
 	const headBuf = (HEAD = {
 		html: '',
+		charset: '',
+		viewport: '',
 		hints: new Set(),
 		sheets: null,
 		hintHtml: null,
 		preloadXfer: null,
 		rootSuffix: markers ? headOwnershipSuffix(identifierPrefix) : '',
 	} as HeadBuffer);
+	FALLBACK_HOIST_DEPTH = 0;
 	const suspended = (SUSPENDED = [] as SuspendedList);
 	const serial = (SERIAL = [] as unknown[]);
 	const deferred = (DEFERRED = [] as Job[]);
@@ -5658,12 +5701,15 @@ function runDiscoveryRound(
 	CSS = new Map();
 	HEAD = {
 		html: '',
+		charset: '',
+		viewport: '',
 		hints: new Set(),
 		sheets: null,
 		hintHtml: null,
 		preloadXfer: null,
 		rootSuffix: headOwnershipSuffix(identifierPrefix),
 	};
+	FALLBACK_HOIST_DEPTH = 0;
 	const suspended = (SUSPENDED = [] as SuspendedList);
 	SERIAL = [] as unknown[];
 	const deferred = (DEFERRED = [] as Job[]);
@@ -6569,12 +6615,17 @@ export function ssrTry(
 		});
 	const withPendingArm = <T>(fn: () => T): T => {
 		return withArmScope('pending', () => {
-			if (stream === null) return fn();
-			stream.activeOwnerKeys.push(key);
+			FALLBACK_HOIST_DEPTH++;
 			try {
-				return fn();
+				if (stream === null) return fn();
+				stream.activeOwnerKeys.push(key);
+				try {
+					return fn();
+				} finally {
+					stream.activeOwnerKeys.pop();
+				}
 			} finally {
-				stream.activeOwnerKeys.pop();
+				FALLBACK_HOIST_DEPTH--;
 			}
 		});
 	};
@@ -6632,6 +6683,8 @@ export function ssrTry(
 			const cssSnapshot = css === null ? null : new Map(css);
 			const head = HEAD;
 			const headHtml = head?.html;
+			const headCharset = head?.charset;
+			const headViewport = head?.viewport;
 			const headHints = head === null ? null : new Set(head.hints);
 			const headSheets = head === null || head.sheets === null ? null : new Map(head.sheets);
 			const headHintHtml = head === null || head.hintHtml === null ? null : new Map(head.hintHtml);
@@ -6660,6 +6713,8 @@ export function ssrTry(
 				}
 				if (head !== null && headHints !== null) {
 					head.html = headHtml!;
+					head.charset = headCharset!;
+					head.viewport = headViewport!;
 					head.hints.clear();
 					for (const hint of headHints) head.hints.add(hint);
 					if (headSheets === null) head.sheets = null;

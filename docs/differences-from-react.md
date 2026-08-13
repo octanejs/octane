@@ -583,6 +583,13 @@ differences:
 Metadata and resources hoist from ANY depth, matching React: an element
 nested inside a host partitions out of the body on both the client and the
 server, and a hoist inside an `@if` arm registers only while that arm renders.
+Two more Fizz-parity behaviors on the server: `<meta charSet>` and
+`<meta name="viewport">` serialize at the FRONT of the head (charset first —
+parsers only honor it within the first 1024 bytes — then viewport, then
+everything else in discovery order), and hoistables authored inside a pending
+boundary's fallback are dropped transitively (a completed boundary nested in a
+fallback is still fallback territory; the streamed head would outlive the
+fallback it came from).
 
 React Float **resources** are supported with React's semantics:
 

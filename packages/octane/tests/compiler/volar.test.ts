@@ -307,6 +307,36 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		expect(result.errors).toEqual([]);
 	});
 
+	it('keeps a component with CSS split across multiple <style> blocks analyzable', () => {
+		// One component scope may split its scoped CSS across several <style>
+		// blocks (tests/_fixtures/return-style.tsrx is the runtime proof). The
+		// unpatched @tsrx/core transform threw "TSRX fragments can only have one
+		// style tag" here, and tsrx-tsc's fallback then presented the raw source
+		// as the virtual TSX — every CSS brace became a TSX parse error.
+		const src =
+			'export function Split(props: { active: boolean }) {\n' +
+			'\treturn <>\n' +
+			"\t\t<section class={['mailbox', { active: props.active }]}>{'hi'}</section>\n" +
+			'\t\t<style>\n' +
+			'\t\t\t.mailbox { color: rgb(10, 20, 30); }\n' +
+			'\t\t</style>\n' +
+			'\t\t<>\n' +
+			'\t\t\t<style>\n' +
+			'\t\t\t\t.active { background-color: rgb(40, 50, 60); }\n' +
+			'\t\t\t</style>\n' +
+			'\t\t</>\n' +
+			'\t</>;\n' +
+			'}\n';
+		const result = compileToVolarMappings(src, 'split-style.tsrx');
+		expect(result.errors).toEqual([]);
+		// Both blocks surface as CSS embedded regions, and neither leaks its
+		// raw CSS text into the TSX the language service parses.
+		expect(result.cssMappings).toHaveLength(2);
+		expect(result.code).toContain('Split');
+		expect(result.code).not.toContain('rgb(10, 20, 30)');
+		expect(result.code).not.toContain('rgb(40, 50, 60)');
+	});
+
 	it('handles @if / @for / @try / @switch directives', () => {
 		const src =
 			"import { useState } from 'octane';\n" +

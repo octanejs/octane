@@ -65,7 +65,7 @@ const DEVIATIONS = {
 		['React.createElement(route.ErrorBoundary)', 'createElement(route.ErrorBoundary)'],
 		[
 			'// Provided by the build system\ndeclare const __DEV__: boolean;\nexport const ENABLE_DEV_WARNINGS = __DEV__;',
-			'export const ENABLE_DEV_WARNINGS = process.env.NODE_ENV !== "production";',
+			'// The consumer\'s bundler substitutes the whole `process.env.NODE_ENV` expression\n// below, so it must stay written out literally. Declared module-locally — never\n// `declare global`, which would ship in the tarball — so this file type-checks in\n// a browser app that has no `@types/node`.\ndeclare const process: { env: { NODE_ENV?: string } };\nexport const ENABLE_DEV_WARNINGS = process.env.NODE_ENV !== "production";',
 			'build-time __DEV__ constant → NODE_ENV check',
 		],
 	],
