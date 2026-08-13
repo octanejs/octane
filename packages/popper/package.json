@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/popper",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Exact Octane binding for react-popper 2.3.0",
   "license": "MIT",
   "type": "module",

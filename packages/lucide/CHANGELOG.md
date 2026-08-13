@@ -1,5 +1,19 @@
 # @octanejs/lucide
 
+## 0.1.32
+
+### Patch Changes
+
+- 0b7460e: Make published source bindings typecheck from strict Octane consumers without relying on repository-only ambient types.
+- Updated dependencies [954c75f]
+- Updated dependencies [94fa199]
+- Updated dependencies [c2e77a3]
+- Updated dependencies [125c861]
+- Updated dependencies [765134a]
+- Updated dependencies [9efd6f4]
+- Updated dependencies [603756a]
+  - octane@0.1.37
+
 ## 0.1.31
 
 ### Patch Changes

@@ -1,5 +1,131 @@
 # octane
 
+## 0.1.37
+
+### Patch Changes
+
+- 954c75f: React Float conformance evidence, plus two small fixes it surfaced.
+
+  The 121 planned `ReactDOMFloat-test.js` parity-ledger cases are all
+  dispositioned: 59 now carry executable adapted evidence (41 newly ported
+  conformance tests across three suites plus links into the existing Float/hint
+  suites), 54 are documented non-goals/divergences with per-case rationale
+  (suspensey commits, whole-document containers, Fizz bootstrap/external-runtime
+  protocol, `<img>`-preload scanning, SuspenseList, shadow-root scoping,
+  streamed-boundary head content), and 8 stay planned against two newly-filed
+  engine gaps, three warning-message families, and server-side hoistable
+  prioritization ordering.
+
+  Fixes: the document-metadata hoist partition is now HTML-scoped — nothing
+  hoists from an SVG lexical context (a precedence link inside `<svg>` no longer
+  becomes a stylesheet resource; `foreignObject` re-enters the HTML rules) — and
+  `preinitModule` with an invalid `as` now warns in development as documented
+  instead of failing silently.
+
+- 94fa199: Tear down removed collapsed template runs with one `destroy-run` command.
+
+  Clearing a 10,000-row keyed table shipped a 100,000-command teardown stream
+  (3.5 MB) from the background thread, acknowledged it with 70,000 per-host
+  tombstone deltas (2.9 MB), expanded every removed collapsed row into seven
+  logical records just to enumerate those commands, and left 70,000 generation
+  tombstones per clear cycle on both threads. All four costs were O(hosts) for an
+  operation whose input is O(runs).
+
+  The universal renderer now advertises a `teardownRuns` driver capability. When
+  the driver accepts it, a removed subtree that is still a collapsed program-run
+  instance with implicit contiguous ids skips expansion entirely and contributes
+  to one `destroy-run` command per contiguous range — the driver derives the
+  event unbinds, removals, and post-order destroys from the program it already
+  holds. Rows with refs, explicit ids, portals, or host callbacks keep the
+  explicit per-host path, as does any driver that does not advertise the
+  capability (the DOM boundary is unchanged).
+
+  The Lynx binding negotiates the capability end to end (a new teardown-run
+  readiness request base), expands the command against its dense record store to
+  re-enter the certified teardown fast path — falling back to an accepted-records
+  walk for reordered or explicit-path rows and to the general command loop for
+  partial ranges — and acknowledges a full-run teardown with a single
+  `remove-run` delta. Both threads then record one sorted retired-range tombstone
+  instead of 70,000 map entries, and the background client retires compact
+  metadata without materializing the handles it never observed.
+
+  On the shared 10,000-row table, the clear command stream drops from
+  3,514,556 B to ~370 B, the clear acknowledgement from 2,929,786 B to ~813 B,
+  and a create/clear/create cycle keeps the compact create acknowledgement from
+  the previous change. Reused id ranges keep bumping generations, partial-range
+  teardowns and rollbacks are pinned by new host-, client-, and emitter-side
+  regression tests, and the existing certified-teardown and remount suites run
+  unchanged.
+
+- c2e77a3: Keep plain function overload signatures non-ambient in the virtual TSX.
+
+  esrap before 2.3.2 printed `declare` on every bodyless function declaration, so
+  a plain overload pair next to its implementation typechecked as TS2384
+  ("Overload signatures must all be ambient or non-ambient") in the editor and
+  under `tsrx-tsc`, on source that compiles and runs fine. The dependency floor
+  now requires the fixed printer; an authored ambient `declare function` keeps
+  its modifier.
+
+- 125c861: Two server head-hoisting behaviors reach React Fizz parity, closing the last
+  Float engine gaps from the React 19 parity audit.
+
+  Fallback hoistables are now suppressed transitively: a `<title>`/`<meta>`/
+  `<link>` authored inside a pending boundary's fallback never reaches the
+  streamed head, including from a completed boundary nested inside that fallback
+  — the fallback is discarded at reveal, but a streamed head line is permanent.
+
+  Priority hoistables now lead the server head: `<meta charSet>` serializes
+  first (parsers only honor a charset within the first 1024 bytes), then
+  `<meta name="viewport">`, then everything else in discovery order — matching
+  React's ordering instead of pure discovery order.
+
+  The parity ledger also gains evidence for the `identifierPrefix` root option
+  and the external-store compatibility semantics (subscribe/snapshot/
+  server-snapshot through `useSyncExternalStore`), retiring those planned cases.
+
+- 765134a: Float precedence groups now form in tree discovery order on client mounts, and
+  head hoists computed from setup locals no longer crash SSR.
+
+  Precedence group order is CSS cascade order. Client mounts used to create
+  groups in the order component bodies finished executing — a nested child's or
+  `@try` arm's group could precede its parent's, so the same tree could cascade
+  differently on a client-only mount than on an SSR'd page. Resource
+  registrations now run after a component's setup but before its children mount,
+  so groups form parent-before-child, suspended arms at reveal, matching SSR and
+  React on both sides.
+
+  The server twin fixed a latent crash the same placement rule exposed: a hoisted
+  head element or resource whose attribute reads a setup local (for example
+  `<link href={slug} precedence …>` after `const slug = …`) used to emit its
+  registration ahead of the local's declaration and throw a TDZ ReferenceError
+  during render. Capture-free registrations still lead the body — arm-root sheets
+  keep shipping with the streaming shell — while ones that read setup locals now
+  run right after setup, still ahead of children.
+
+- 9efd6f4: Add actionable development diagnostics for React-compatible stylesheet resource,
+  ARIA attribute, CSS property, controlled-form, and event-listener authoring
+  mistakes without retaining development warnings in optimized production builds.
+- 603756a: Ship Float sheet resources discovered after the streaming shell.
+
+  Streaming SSR dropped `<link rel="stylesheet" href precedence>` and
+  `<style href precedence>` resources whose registration only ran on a
+  post-shell pass — a sheet inside a nested pending boundary, or one whose href
+  is computed from a `use()` resolution. Only the shell pass's head ever
+  flushed, so streamed content revealed unstyled until hydration re-inserted the
+  sheet client-side, and documents consumed without JavaScript never received
+  the CSS at all.
+
+  Each resolution wave now diffs the pass's per-resource sheet registrations
+  against what is already on the wire and ships new tags with the wave chunk,
+  ahead of its segment reveals: real markup in a hidden carrier (so no-JS
+  consumers still get working CSS) plus an inline `$OCTRH` call that hoists the
+  tags into `document.head` under the client's precedence grouping. Once client
+  Float resource state exists, the hoist hands each tag to the live runtime
+  instead, keeping dedupe and group ordering in one authority, and a hydrating
+  client adopts the streamed tags without duplicating. A still-pending child
+  boundary's sheet rides its parent's reveal wave, matching React's hoisting of
+  partial-boundary resources.
+
 ## 0.1.36
 
 ### Patch Changes
