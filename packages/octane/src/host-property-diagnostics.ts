@@ -55,8 +55,84 @@ for (const [name, alias] of ATTRIBUTE_ALIASES) {
 	KNOWN_PROPERTY_SPELLINGS.set(alias.toLowerCase(), name);
 }
 
+// React's possibleStandardNames SVG entries whose canonical DOM spelling is
+// already camelCase; presentation aliases are shared by ATTRIBUTE_ALIASES.
+const KNOWN_SVG_PROPERTY_SPELLINGS = new Map<string, string>();
+for (const name of [
+	'allowReorder',
+	'attributeName',
+	'attributeType',
+	'autoReverse',
+	'baseFrequency',
+	'baseProfile',
+	'calcMode',
+	'clipPathUnits',
+	'contentScriptType',
+	'contentStyleType',
+	'diffuseConstant',
+	'edgeMode',
+	'externalResourcesRequired',
+	'filterRes',
+	'filterUnits',
+	'glyphRef',
+	'gradientTransform',
+	'gradientUnits',
+	'kernelMatrix',
+	'kernelUnitLength',
+	'keyPoints',
+	'keySplines',
+	'keyTimes',
+	'lengthAdjust',
+	'limitingConeAngle',
+	'markerHeight',
+	'markerUnits',
+	'markerWidth',
+	'maskContentUnits',
+	'maskUnits',
+	'numOctaves',
+	'pathLength',
+	'patternContentUnits',
+	'patternTransform',
+	'patternUnits',
+	'pointsAtX',
+	'pointsAtY',
+	'pointsAtZ',
+	'preserveAlpha',
+	'preserveAspectRatio',
+	'primitiveUnits',
+	'refX',
+	'refY',
+	'repeatCount',
+	'repeatDur',
+	'requiredExtensions',
+	'requiredFeatures',
+	'specularConstant',
+	'specularExponent',
+	'spreadMethod',
+	'startOffset',
+	'stdDeviation',
+	'stitchTiles',
+	'surfaceScale',
+	'systemLanguage',
+	'tableValues',
+	'targetX',
+	'targetY',
+	'textLength',
+	'viewTarget',
+	'xChannelSelector',
+	'yChannelSelector',
+	'zoomAndPan',
+]) {
+	KNOWN_SVG_PROPERTY_SPELLINGS.set(name.toLowerCase(), name);
+}
+
 /** Development-only host-name/value diagnostics shared by DOM and SSR. */
-export function hostPropertyWarning(name: string, value: unknown, tag?: string): string | null {
+export function hostPropertyWarning(
+	name: string,
+	value: unknown,
+	tag?: string,
+	isSvg = false,
+): string | null {
 	const lower = name.toLowerCase();
 	// Octane deliberately accepts native attribute spellings alongside React's
 	// camelCase aliases; a label's `for` is the native counterpart to htmlFor.
@@ -77,8 +153,11 @@ export function hostPropertyWarning(name: string, value: unknown, tag?: string):
 		return `Unknown event handler property \`${name}\`. It will be ignored.`;
 	}
 	if (name.startsWith('aria-') || /^aria[A-Z]/.test(name) || name.startsWith('data-')) return null;
-	const known = KNOWN_PROPERTY_SPELLINGS.get(lower);
+	const known =
+		KNOWN_PROPERTY_SPELLINGS.get(lower) ??
+		(isSvg ? KNOWN_SVG_PROPERTY_SPELLINGS.get(lower) : undefined);
 	if (known !== undefined) {
+		if (isSvg && ATTRIBUTE_ALIASES.get(known) === name) return null;
 		return name !== known ? `Invalid DOM property \`${name}\`. Did you mean \`${known}\`?` : null;
 	}
 	if (name !== lower && !name.includes(':')) {

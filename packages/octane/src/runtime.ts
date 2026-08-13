@@ -12130,7 +12130,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	) {
 		const warning = isAriaAttributeName(name)
 			? ariaAttributeWarning(name, el.localName)
-			: hostPropertyWarning(name, value, el.localName);
+			: hostPropertyWarning(name, value, el.localName, el.namespaceURI === SVG_NS);
 		if (warning !== null) devWarnAttributeOnce(el, name, warning);
 	}
 	// React-style `dangerouslySetInnerHTML={{__html}}` is a PROPERTY write, not an
@@ -12394,7 +12394,7 @@ function devValidateHostProps(el: Element, props: Record<string, unknown>): void
 			}
 			continue;
 		}
-		const warning = hostPropertyWarning(name, value, el.localName);
+		const warning = hostPropertyWarning(name, value, el.localName, el.namespaceURI === SVG_NS);
 		if (warning !== null) {
 			devWarnAttributeOnce(el, name, warning);
 			continue;
@@ -27386,8 +27386,9 @@ export function devHtmlNesting(
 			// CURRENT_SCOPE still belongs to their parent component. Recover the
 			// actual list parent from the already-mounted row's authored location;
 			// otherwise an intervening <ul> disappears from parser-scope checks.
-			if (childLocation !== undefined && CURRENT_SCOPE !== null) {
-				for (const slot of CURRENT_SCOPE.slots) {
+			const ownedSlots = CURRENT_SCOPE?._slots;
+			if (childLocation !== undefined && ownedSlots !== null && ownedSlots !== undefined) {
+				for (const slot of ownedSlots) {
 					if (
 						slot?.__kind === 'forBlockSlot' &&
 						(slot.head?.startMarker as Element & { __oct_loc?: string })?.__oct_loc ===

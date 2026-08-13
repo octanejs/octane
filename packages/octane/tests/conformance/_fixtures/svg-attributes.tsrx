@@ -107,6 +107,30 @@ export function SvgSpreadNamespaced(props) @{
 	</svg>
 }
 
+export function SvgSpreadDiagnosticAttributes(props) @{
+	<svg id="svg-diagnostic-root" {...props.attrs} />
+}
+
+export function SvgDirectDiagnosticAttributes(props) @{
+	<svg id="svg-direct-diagnostic-root">
+		<filter>
+			<feTurbulence
+				id="svg-direct-filter"
+				baseFrequency={props.frequency}
+				color-interpolation={props.interpolation}
+			/>
+		</filter>
+	</svg>
+}
+
+export function SvgForeignObjectDiagnosticAttributes(props) @{
+	<svg>
+		<foreignObject>
+			<div id="foreign-object-html-host" {...props.attrs} />
+		</foreignObject>
+	</svg>
+}
+
 // ---------------------------------------------------------------------------
 // Dynamic `class` on SVG element — must NOT route to setClassName / the
 // .className property assignment (SVGElement.className is a read-only

@@ -27,6 +27,7 @@ import {
 	ValidAnchorScope,
 	ValidCrossComponentListScope,
 	ValidListItemScope,
+	ValidMultipleCrossComponentListScopes,
 	ValidParagraphScope,
 } from './_fixtures/ssr-invalid-nesting.tsrx';
 
@@ -378,6 +379,33 @@ describe('DEV client invalid HTML nesting', () => {
 			flushSync(() => root.render(ValidCrossComponentListScope, { active: 'scoped' }));
 			expect(container.querySelector('li nav ul li')).toBe(existingItem);
 			expect(existingItem?.getAttribute('data-active')).toBe('true');
+			expect(spy).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+
+	it('keeps independently updated nested lists free of false nesting diagnostics', () => {
+		const spy = errors();
+		const { container, root } = mount(ValidMultipleCrossComponentListScopes);
+		try {
+			const firstItem = container.querySelector('nav ul li');
+			const secondItem = container.querySelector('nav ol li');
+			expect(firstItem?.textContent).toBe('first');
+			expect(secondItem?.textContent).toBe('second');
+
+			flushSync(() => root.render(ValidMultipleCrossComponentListScopes, { active: 'first' }));
+			expect(container.querySelector('nav ul li')).toBe(firstItem);
+			expect(container.querySelector('nav ol li')).toBe(secondItem);
+			expect(firstItem?.getAttribute('data-active')).toBe('true');
+			expect(secondItem?.hasAttribute('data-active')).toBe(false);
+
+			flushSync(() => root.render(ValidMultipleCrossComponentListScopes, { active: 'second' }));
+			expect(container.querySelector('nav ul li')).toBe(firstItem);
+			expect(container.querySelector('nav ol li')).toBe(secondItem);
+			expect(firstItem?.hasAttribute('data-active')).toBe(false);
+			expect(secondItem?.getAttribute('data-active')).toBe('true');
 			expect(spy).not.toHaveBeenCalled();
 		} finally {
 			root.unmount();

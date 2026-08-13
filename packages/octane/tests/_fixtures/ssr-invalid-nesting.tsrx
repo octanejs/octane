@@ -143,6 +143,44 @@ export function ValidCrossComponentListScope(props: { active?: string } = {}) @{
 	</ul>
 }
 
+function MultipleScopedListItems(props: { active: string }) @{
+	const active = props.active;
+	const isActive = (value: string) => value === active;
+
+	<nav>
+		<div>
+			<ul>
+				@for (const item of ['first']; key item) {
+					<li
+						data-active={item === active ? 'true' : undefined}
+						onClick={() => isActive(item)}
+					>{item as string}</li>
+				}
+			</ul>
+			<ol>
+				@for (const item of ['second']; key item) {
+					<li
+						data-active={item === active ? 'true' : undefined}
+						onClick={() => isActive(item)}
+					>{item as string}</li>
+				}
+			</ol>
+		</div>
+	</nav>
+}
+
+export function ValidMultipleCrossComponentListScopes(props: { active?: string } = {}) @{
+	<ul>
+		@for (const item of ['outer']; key item) {
+			<li>
+				@if (item === 'outer') {
+					<MultipleScopedListItems active={props.active ?? item} />
+				}
+			</li>
+		}
+	</ul>
+}
+
 function TransparentListItem() @{
 	<li>nested list item</li>
 }

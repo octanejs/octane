@@ -1937,7 +1937,12 @@ function devValidateSsrHostProps(
 			}
 			continue;
 		}
-		const warning = hostPropertyWarning(name, value, tag);
+		const warning = hostPropertyWarning(
+			name,
+			value,
+			tag,
+			resolveAttributeNamespace(namespace) === 'svg',
+		);
 		if (warning !== null) {
 			devWarnSsrAttributeOnce(name, warning);
 			continue;
@@ -1986,6 +1991,7 @@ export function ssrAttr(
 						: name,
 					v,
 					tag,
+					namespace === 'svg',
 				);
 		if (warning !== null) devWarnSsrAttributeOnce(name, warning);
 	}
