@@ -330,6 +330,18 @@ describe('production error bundles', () => {
 			'Unknown event handler property',
 			'will stringify to "[object Object]"',
 			'Invalid DOM property `autofocus`',
+			'Invalid ARIA attribute',
+			'Unknown ARIA attribute',
+			'ARIA attributes must use valid, lowercase aria-* names.',
+			'ARIA attributes follow the pattern aria-* and must be lowercase.',
+			'attribute is reserved for future use. Pass individual',
+			'Unsupported vendor-prefixed style property',
+			"Style property values shouldn't contain a semicolon",
+			'is an invalid value for the',
+			'CSS property is an unsupported type',
+			'Inline styles cannot consume a stylesheet preload',
+			'independently managed stylesheet',
+			'resource href must not contain whitespace',
 		]) {
 			expect(client).not.toContain(warning);
 			expect(server).not.toContain(warning);

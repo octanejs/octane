@@ -22,14 +22,11 @@ import { StyleObj } from './_fixtures/css-properties.tsrx';
 //  - :275 'should not add units to CSS custom properties' →
 //    tests/style-px.test.ts ('--gap': 8 → '8', client + SSR).
 //
-// Not ported (DEV-warning-only cases; octane's warning policy differs, and the
-// functional outcome — the style still applies / renders — is covered by the
-// tests here and in style.test.ts):
-//  - :97 hyphenated style name warning (octane ACCEPTS kebab keys by design —
-//    tests/style.test.ts uses 'font-size' keys throughout),
-//  - :118 updating hyphenated names warning, :149 miscapitalized vendor prefix
-//    warning, :184 trailing-semicolon warning, :219 NaN warning, :240 no-warn
-//    for custom properties, :254 Infinity warning.
+// Development diagnostics for :149 miscapitalized vendor prefixes, :184 trailing
+// semicolons, :219 NaN, :240 custom-property exclusions, and :254 Infinity are
+// covered by css-diagnostics.test.ts on the client, during SSR, and in hydration.
+// OCTANE DIVERGENCE: :97/:118 intentionally do not warn for hyphenated style
+// names; Octane supports native kebab-case keys alongside camelCase keys.
 // ============================================================================
 
 const FIXTURE = join(

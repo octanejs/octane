@@ -8,3 +8,12 @@ export function BadListenerTree(props: { onAnc: (e: Event) => void; bad: any }) 
 		<div class="target" onClick={props.bad}>{'x'}</div>
 	</div>
 }
+
+export function BadCaptureListenerTree(props: {
+	onAnc: (e: Event) => void;
+	bad: any;
+}) @{
+	<div class="anc" onClickCapture={props.onAnc}>
+		<div class="target" onClickCapture={props.bad}>{'x'}</div>
+	</div>
+}

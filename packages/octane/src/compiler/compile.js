@@ -641,14 +641,22 @@ function bakeStaticAttr(attrName, lv, tag, namespace = 'html') {
 	return '';
 }
 
-// DEV must observe invalid boolean literals instead of folding them out before
-// the host validator runs. Production still takes bakeStaticAttr's zero-binding
-// path, so this diagnostic has no shipped runtime cost.
+// DEV must observe invalid boolean literals and ARIA names instead of folding
+// them out before the host validator runs. Production still takes
+// bakeStaticAttr's zero-binding path, so these diagnostics have no shipped
+// runtime cost.
 function needsDevStaticAttrValidation(attrName, lv, tag, namespace = 'html') {
-	if (typeof lv !== 'boolean' || attrName === 'class' || attrName === 'style') return false;
 	const isCustom =
 		(namespace === 'html' || namespace === 'opaque') && tag !== undefined && tag.includes('-');
-	if (isCustom || attrName.startsWith('aria-') || attrName.startsWith('data-')) return false;
+	if (isCustom) return false;
+	if (attrName === 'aria' || /^aria(?:-|[A-Z])/.test(attrName)) return true;
+	if (
+		typeof lv !== 'boolean' ||
+		attrName === 'class' ||
+		attrName === 'style' ||
+		attrName.startsWith('data-')
+	)
+		return false;
 	const lower = attrName.toLowerCase();
 	return !(
 		attrName === 'autoFocus' ||
@@ -1958,6 +1966,32 @@ function objectExprIsStaticLiteral(obj) {
 			return false;
 	}
 	return true;
+}
+
+// DEV must send invalid literal declarations through the same style helpers as
+// dynamic objects. Keep valid literals and all production output fully baked.
+function staticStyleObjectNeedsDevValidation(obj) {
+	if (obj?.type !== 'ObjectExpression') return false;
+	for (const property of obj.properties || []) {
+		if (property.type !== 'Property' && property.type !== 'ObjectProperty') continue;
+		if (property.computed || property.value?.type !== 'Literal') continue;
+		const key = property.key;
+		if (key?.type !== 'Identifier' && !(key?.type === 'Literal' && typeof key.value === 'string'))
+			continue;
+		const name = key.type === 'Identifier' ? key.name : key.value;
+		if (name.startsWith('--')) continue;
+		const value = property.value.value;
+		if (value == null || typeof value === 'boolean') continue;
+
+		let prefixLength = 0;
+		if (name.startsWith('webkit')) prefixLength = 6;
+		else if (name.startsWith('moz')) prefixLength = 3;
+		else if (name.charCodeAt(0) === 111 /* o */) prefixLength = 1;
+		const following = name.charCodeAt(prefixLength);
+		if (prefixLength !== 0 && following >= 65 && following <= 90) return true;
+		if (typeof value === 'string' && value.trimEnd().endsWith(';')) return true;
+	}
+	return false;
 }
 
 // Serialize a fully-literal style object into a `style="…"` string at compile
@@ -10177,6 +10211,9 @@ function ssrEmitNode(
 			// conditional timing as the client's arm-scoped headBlock — and the
 			// functions return '', so the body markup gains nothing and the
 			// hydration cursor stays aligned with the client template.
+			if (node.resourceDiagnostic !== undefined) {
+				return invalidStylesheetDiagnosticCall(node.element, node.resourceDiagnostic, ctx, true);
+			}
 			const kind = headResourceKind(node.element);
 			if (kind !== null) {
 				const fn =
@@ -10187,7 +10224,7 @@ function ssrEmitNode(
 							: 'ssrScriptResource';
 				ctx.runtimeNeeded.add(fn);
 				return inheritOriginLoc(
-					b.call('_$' + fn, ...headResourceArgNodes(node.element, kind)),
+					b.call('_$' + fn, ...headResourceArgNodes(node.element, kind, ctx)),
 					node.element,
 				);
 			}
@@ -10709,7 +10746,12 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				bakeLit(` style="${escapeAttr(inner.value)}"`, attrName, attr.name, inner);
 				continue;
 			}
-			if (!isAfterSpread && inner.type === 'ObjectExpression' && objectExprIsStaticLiteral(inner)) {
+			if (
+				!isAfterSpread &&
+				inner.type === 'ObjectExpression' &&
+				objectExprIsStaticLiteral(inner) &&
+				!(ctx.dev && staticStyleObjectNeedsDevValidation(inner))
+			) {
 				const css = staticObjectToCssString(inner);
 				if (css) bakeLit(` style="${escapeAttr(css)}"`, attrName, attr.name, inner);
 				continue;
@@ -18483,13 +18525,80 @@ function isHoistableHeadElementNode(n) {
 	// hoists microdata: an itemProp meta/link belongs to its itemScope host.
 	// Spread keys remain unknowable here and keep the existing head-hoist path.
 	const attrs = n.attributes || n.openingElement?.attributes || [];
+	let hasPrecedence = false;
+	let hasHref = false;
+	let emptyHref = false;
+	let relStylesheet = false;
 	for (const attr of attrs) {
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const name = jsxAttrRawName(attr);
 		if (name === 'itemProp' || name === 'itemprop') return false;
-		if (tag === 'link' && (name === 'onLoad' || name === 'onError')) return false;
+		if (tag !== 'link') continue;
+		if (name === 'onLoad' || name === 'onError' || name === 'disabled') return false;
+		if (name === 'precedence') hasPrecedence = true;
+		else if (name === 'href') {
+			hasHref = true;
+			const value = attr.value;
+			const inner = value && value.type === 'JSXExpressionContainer' ? value.expression : value;
+			emptyHref =
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'StringLiteral') &&
+				inner.value === '';
+		} else if (name === 'rel') {
+			const value = attr.value;
+			const inner = value && value.type === 'JSXExpressionContainer' ? value.expression : value;
+			relStylesheet =
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'StringLiteral') &&
+				inner.value === 'stylesheet';
+		}
 	}
+	if (tag === 'link' && relStylesheet && hasPrecedence && (!hasHref || emptyHref)) return false;
 	return true;
+}
+
+/** A precedence stylesheet that cannot safely become a shared Float resource. */
+function invalidStylesheetResourceReason(n) {
+	if (n == null || (n.type !== 'JSXElement' && n.type !== 'Element')) return null;
+	if ((jsxTagName(n) || elementTagName(n)) !== 'link') return null;
+	const attrs = n.attributes || n.openingElement?.attributes || [];
+	let hasPrecedence = false;
+	let hasHref = false;
+	let emptyHref = false;
+	let relStylesheet = false;
+	let onLoad = false;
+	let onError = false;
+	let disabled = false;
+	for (const attr of attrs) {
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+		const name = jsxAttrRawName(attr);
+		if (name === 'precedence') hasPrecedence = true;
+		else if (name === 'href') {
+			hasHref = true;
+			const value = attr.value;
+			const inner = value && value.type === 'JSXExpressionContainer' ? value.expression : value;
+			emptyHref =
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'StringLiteral') &&
+				inner.value === '';
+		} else if (name === 'rel') {
+			const value = attr.value;
+			const inner = value && value.type === 'JSXExpressionContainer' ? value.expression : value;
+			relStylesheet =
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'StringLiteral') &&
+				inner.value === 'stylesheet';
+		} else if (name === 'onLoad') onLoad = true;
+		else if (name === 'onError') onError = true;
+		else if (name === 'disabled') disabled = true;
+	}
+	if (!relStylesheet || !hasPrecedence) return null;
+	if (!hasHref) return 'missing-href';
+	if (emptyHref) return 'empty-href';
+	if (onLoad && onError) return 'onLoad+onError';
+	if (onLoad) return 'onLoad';
+	if (onError) return 'onError';
+	return disabled ? 'disabled' : null;
 }
 
 // React Float RESOURCES: `<link rel="stylesheet" href precedence>` (no
@@ -18532,11 +18641,24 @@ function headResourceKind(n) {
 		// Handlers keep the element per-site (matching React: a load/error
 		// listener needs an owned instance); markup injection disqualifies too,
 		// and microdata belongs to its itemScope host — never a resource.
-		if (name === 'onLoad' || name === 'onError' || name === 'dangerouslySetInnerHTML') return null;
+		if (
+			name === 'onLoad' ||
+			name === 'onError' ||
+			(tag === 'link' && name === 'disabled') ||
+			name === 'dangerouslySetInnerHTML'
+		)
+			return null;
 		if (name === 'itemProp' || name === 'itemprop') return null;
 		if (name === 'precedence') hasPrecedence = true;
-		else if (name === 'href') hasHref = true;
-		else if (name === 'async') {
+		else if (name === 'href') {
+			const value = attr.value;
+			const inner = value && value.type === 'JSXExpressionContainer' ? value.expression : value;
+			hasHref = !(
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'StringLiteral') &&
+				inner.value === ''
+			);
+		} else if (name === 'async') {
 			// A statically-false `async={false}` is not an async script; any other
 			// form (bare, true, or a dynamic expression) classifies as a resource.
 			const val = attr.value;
@@ -18860,11 +18982,27 @@ function styleResourceCssExpression(el) {
 }
 
 /** Shared resource-call argument list for the head emitters. */
-/** @param {any} el @param {'stylesheet'|'script'|'style'} kind @returns {any[]} */
-function headResourceArgNodes(el, kind) {
+/** @param {any} el @param {'stylesheet'|'script'|'style'} kind @param {any} ctx @returns {any[]} */
+function headResourceArgNodes(el, kind, ctx) {
 	const args = [inheritOriginLoc(headAttrsExpression(el), el)];
-	if (kind === 'style') args.push(inheritOriginLoc(styleResourceCssExpression(el), el));
+	if (kind === 'style') {
+		args.push(inheritOriginLoc(styleResourceCssExpression(el), el));
+		// Runtime modules are shared by the dev/prod Vitest projects, so an
+		// explicitly dev-compiled resource must opt into development warnings.
+		// Production output keeps the existing two-argument ABI byte-for-byte.
+		if (ctx.dev) args.push(b.literal(true, 'true'));
+	}
 	return args;
+}
+
+/** DEV-only ABI: an invalid precedence link stays inline and reports its reason. */
+function invalidStylesheetDiagnosticCall(element, reason, ctx, server) {
+	const helper = server ? 'ssrStylesheetResource' : 'stylesheetResource';
+	ctx.runtimeNeeded.add(helper);
+	return inheritOriginLoc(
+		b.call('_$' + helper, b.literal(null), b.literal(reason, JSON.stringify(reason))),
+		element,
+	);
 }
 
 // Build the CLIENT statement NODES for a component's hoisted head elements
@@ -18884,6 +19022,15 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 	const head = [];
 	const resources = [];
 	headNodes.forEach((h, i) => {
+		if (h.resourceDiagnostic !== undefined) {
+			resources.push(
+				inheritOriginLoc(
+					b.stmt(invalidStylesheetDiagnosticCall(h.element, h.resourceDiagnostic, ctx, false)),
+					h.element,
+				),
+			);
+			return;
+		}
 		const kind = headResourceKind(h.element);
 		if (kind !== null) {
 			const fn =
@@ -18895,7 +19042,7 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 			ctx.runtimeNeeded.add(fn);
 			resources.push(
 				inheritOriginLoc(
-					b.stmt(b.call('_$' + fn, ...headResourceArgNodes(h.element, kind))),
+					b.stmt(b.call('_$' + fn, ...headResourceArgNodes(h.element, kind, ctx))),
 					h.element ?? h,
 				),
 			);
@@ -18925,6 +19072,12 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 function emitHeadServer(headNodes, ctx) {
 	if (!headNodes.length) return [];
 	return headNodes.map((head, index) => {
+		if (head.resourceDiagnostic !== undefined) {
+			return inheritOriginLoc(
+				b.stmt(invalidStylesheetDiagnosticCall(head.element, head.resourceDiagnostic, ctx, true)),
+				head.element,
+			);
+		}
 		const kind = headResourceKind(head.element);
 		if (kind !== null) {
 			const fn =
@@ -18935,7 +19088,7 @@ function emitHeadServer(headNodes, ctx) {
 						: 'ssrScriptResource';
 			ctx.runtimeNeeded.add(fn);
 			return inheritOriginLoc(
-				b.stmt(b.call('_$' + fn, ...headResourceArgNodes(head.element, kind))),
+				b.stmt(b.call('_$' + fn, ...headResourceArgNodes(head.element, kind, ctx))),
 				head.element ?? head,
 			);
 		}
@@ -19101,6 +19254,11 @@ function normalizeChildren(nodes, inSvg = false, ctx = null, inNoscript = false)
 			) {
 				out.push({ type: 'HeadHoist', element: n });
 				continue;
+			}
+			if (!inNoscript && !inSvg && ctx?.dev && jsxTagName(n) === 'link') {
+				const reason = invalidStylesheetResourceReason(n);
+				if (reason !== null)
+					out.push({ type: 'HeadHoist', element: n, resourceDiagnostic: reason });
 			}
 			const element = {
 				type: 'Element',
@@ -23121,7 +23279,12 @@ function emitElementHtml(
 				appendBakedAttribute(attrTemplate, chunk, attrName, attr.name, inner, ctx.inspect);
 				continue;
 			}
-			if (!isAfterSpread && inner.type === 'ObjectExpression' && objectExprIsStaticLiteral(inner)) {
+			if (
+				!isAfterSpread &&
+				inner.type === 'ObjectExpression' &&
+				objectExprIsStaticLiteral(inner) &&
+				!(ctx.dev && staticStyleObjectNeedsDevValidation(inner))
+			) {
 				const css = staticObjectToCssString(inner);
 				if (css) {
 					const chunk = ` style="${escapeAttr(css)}"`;
@@ -23132,7 +23295,8 @@ function emitElementHtml(
 			if (
 				firstSpreadIdx === -1 &&
 				ctx._universalRuntimeUnit == null &&
-				!directPropNames.has('suppressHydrationWarning')
+				!directPropNames.has('suppressHydrationWarning') &&
+				!(ctx.dev && staticStyleObjectNeedsDevValidation(inner))
 			) {
 				const mixed = mixedStaticStyle(inner);
 				if (mixed !== null) {
