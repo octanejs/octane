@@ -19,6 +19,12 @@ tarball at `upstream/npm/swr-2.4.2.tgz`. The tarball is retained because it
 contains compiled condition branches and declarations rather than the canonical
 source and tests.
 
+The pristine Jest config maps `@testing-library/react` through a narrow harness
+for the `useSWR` remote-mutation race case. Upstream starts a 10 ms request and
+assumes the mutation click wins that wall-clock race. The harness holds only that
+request completion until the click has started the mutation, then releases it so
+the unchanged assertion deterministically exercises the intended overlap.
+
 ## Provenance status
 
 `packages/swr/audit/react-parity.json` is `recorded-unverified`. Required lanes
