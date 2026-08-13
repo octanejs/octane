@@ -31,15 +31,23 @@ import type { Effect, EffectConfig } from '@tanstack/db';
 export function useLiveQueryEffect<
 	TRow extends object = Record<string, unknown>,
 	TKey extends string | number = string | number,
->(config: EffectConfig<TRow, TKey>, deps: Array<unknown> = [], ...rest: Array<unknown>): void {
-	const [, slot] = splitTrailingSlot(rest);
+>(config: EffectConfig<TRow, TKey>, deps?: Array<unknown>): void;
+export function useLiveQueryEffect(config: any, ...rest: Array<unknown>): void {
+	// Parse the optional `deps` array and the compiler-injected trailing slot
+	// together from `...rest`, exactly as useLiveQuery/useLiveInfiniteQuery do.
+	// Binding the slot to a named `deps` parameter breaks the common no-deps call
+	// `useLiveQueryEffect(config)`: the injected slot lands in `deps`, leaving
+	// `rest` empty and the slot undefined, so every ref/effect below loses its
+	// call-site identity.
+	const [args, slot] = splitTrailingSlot(rest);
+	const deps = (args[0] as Array<unknown> | undefined) ?? [];
 
-	const configRef = useRef<EffectConfig<TRow, TKey>>(config, subSlot(slot, `cfg-ref`));
+	const configRef = useRef<EffectConfig<any, any>>(config, subSlot(slot, `cfg-ref`));
 	configRef.current = config;
 
 	useEffect(
 		() => {
-			const effect: Effect = createEffect<TRow, TKey>({
+			const effect: Effect = createEffect({
 				id: config.id,
 				query: config.query,
 				skipInitial: config.skipInitial,

@@ -2,9 +2,8 @@ import { useRef, useSyncExternalStore } from 'octane';
 import {
 	BaseQueryBuilder,
 	createLiveQueryCollection,
-	getLiveQueryStatusFlags,
+	createLiveQueryObserver,
 	isCollection,
-	isSingleResultCollection,
 } from '@tanstack/db';
 import { splitTrailingSlot, subSlot } from './slot';
 import type {
@@ -15,6 +14,7 @@ import type {
 	InferResultType,
 	InitialQueryBuilder,
 	LiveQueryCollectionConfig,
+	LiveQueryObserver,
 	NonSingleResult,
 	QueryBuilder,
 	SingleResult,
@@ -320,12 +320,16 @@ export function useLiveQuery(configOrQueryOrCollection: any, ...rest: Array<unkn
 	const depsRef = useRef<Array<unknown> | null>(null, subSlot(slot, `deps-ref`));
 	const configRef = useRef<unknown>(null, subSlot(slot, `cfg-ref`));
 
-	// Use refs to track version and memoized snapshot
-	const versionRef = useRef(0, subSlot(slot, `ver-ref`));
-	const snapshotRef = useRef<{
-		collection: Collection<object, string | number, {}> | null;
-		version: number;
-	} | null>(null, subSlot(slot, `snap-ref`));
+	// The shared observer owns the collection subscription, the ready-race, the
+	// status-transition notifications, and the stable per-revision snapshot. It
+	// replaces the previous hand-rolled `subscribeChanges` + version-counter,
+	// which only fired on row changes and therefore missed status-only
+	// transitions (a collection going to `error` or `cleaned-up` without any row
+	// delta left `status`/`isError`/`isCleanedUp` stale). See TanStack DB #1642.
+	const observerRef = useRef<LiveQueryObserver<object, string | number> | null>(
+		null,
+		subSlot(slot, `obs-ref`),
+	);
 
 	// Check if we need to create/recreate the collection
 	const needsNewCollection =
@@ -352,7 +356,7 @@ export function useLiveQuery(configOrQueryOrCollection: any, ...rest: Array<unkn
 						`Or switch to syncMode "eager" if you want all data to sync automatically.`,
 				);
 			}
-			// It's already a collection, ensure sync is started for React hooks
+			// It's already a collection, ensure sync is started for Octane hooks
 			configOrQueryOrCollection.startSyncImmediate();
 			collectionRef.current = configOrQueryOrCollection;
 			configRef.current = configOrQueryOrCollection;
@@ -404,146 +408,66 @@ export function useLiveQuery(configOrQueryOrCollection: any, ...rest: Array<unkn
 		}
 	}
 
-	// Reset refs when collection changes
+	// Recreate the observer when the underlying collection changes (including to
+	// `null` for a disabled query, which yields a stable disabled snapshot). The
+	// observer is not disposed explicitly here or on unmount: useSyncExternalStore
+	// unsubscribes it when the subscribe function changes or the component
+	// unmounts, which detaches the collection subscription and lets the observer
+	// be GC'd. An unmount effect that disposed it would misfire under effect
+	// replay, leaving a disposed observer in the ref.
 	if (needsNewCollection) {
-		versionRef.current = 0;
-		snapshotRef.current = null;
+		// Wholesale mode: Octane re-reads getSnapshot() on notify (matching
+		// useSyncExternalStore), preserves the hook's loading policy, and delivers
+		// nothing synchronously during subscribe — so subscribe never notifies the
+		// store from inside its own call.
+		observerRef.current = createLiveQueryObserver(collectionRef.current, {
+			mode: `wholesale`,
+		});
 	}
+	const observer = observerRef.current!;
 
-	// Create stable subscribe function using ref
+	// Stable subscribe/getSnapshot bound to the current observer. The observer
+	// returns a stable per-revision snapshot whose shape (state, data, collection,
+	// status + flags, isEnabled) is exactly what this hook exposes, so no
+	// post-processing is needed.
 	const subscribeRef = useRef<((onStoreChange: () => void) => () => void) | null>(
 		null,
 		subSlot(slot, `sub-ref`),
 	);
 	if (!subscribeRef.current || needsNewCollection) {
 		subscribeRef.current = (onStoreChange: () => void) => {
-			// If no collection, return a no-op unsubscribe function
-			if (!collectionRef.current) {
-				return () => {};
-			}
-
 			let unsubscribed = false;
-
-			const subscription = collectionRef.current.subscribeChanges(() => {
-				// Drop late notifies that race with unsubscribe.
-				if (unsubscribed) return;
-				// Bump version on any change; getSnapshot will rebuild next time
-				versionRef.current += 1;
-				onStoreChange();
+			const unsub = observer.subscribe(() => {
+				if (!unsubscribed) onStoreChange();
 			});
-			// Already-ready collections won't emit an initial change. Notify React
-			// ourselves, but defer to a microtask — calling onStoreChange synchronously
-			// here lands during the render-to-commit window and trips React's
-			// "state update on a component that hasn't mounted yet" warning.
-			if (collectionRef.current.status === `ready`) {
-				queueMicrotask(() => {
-					if (unsubscribed) return;
-					versionRef.current += 1;
-					onStoreChange();
-				});
-			}
+			// Nudge Octane to re-read the snapshot on the next microtask. Octane's
+			// useSyncExternalStore runs its commit-time tear-check BEFORE this passive
+			// subscribe effect calls us (React re-checks AFTER subscribe), so a
+			// collection that is already `ready` — or that starts sync synchronously
+			// during subscribe — publishes no change the observer can forward and the
+			// first committed value would stay stale. Deferring to a microtask keeps
+			// the notify outside the render→commit window. See the
+			// `eager-onstorechange` regression test.
+			queueMicrotask(() => {
+				if (!unsubscribed) onStoreChange();
+			});
 			return () => {
 				unsubscribed = true;
-				subscription.unsubscribe();
+				unsub();
 			};
 		};
 	}
 
-	// Create stable getSnapshot function using ref
-	const getSnapshotRef = useRef<
-		| (() => {
-				collection: Collection<object, string | number, {}> | null;
-				version: number;
-		  })
-		| null
-	>(null, subSlot(slot, `gs-ref`));
+	const getSnapshotRef = useRef<(() => unknown) | null>(null, subSlot(slot, `gs-ref`));
 	if (!getSnapshotRef.current || needsNewCollection) {
-		getSnapshotRef.current = () => {
-			const currentVersion = versionRef.current;
-			const currentCollection = collectionRef.current;
-
-			// Recreate snapshot object only if version/collection changed
-			if (
-				!snapshotRef.current ||
-				snapshotRef.current.version !== currentVersion ||
-				snapshotRef.current.collection !== currentCollection
-			) {
-				snapshotRef.current = {
-					collection: currentCollection,
-					version: currentVersion,
-				};
-			}
-
-			return snapshotRef.current;
-		};
+		getSnapshotRef.current = () => observer.getSnapshot();
 	}
 
-	// Use useSyncExternalStore to subscribe to collection changes
-	const snapshot = useSyncExternalStore(
+	// Keep implementation return loose to satisfy the overload signatures.
+	return useSyncExternalStore(
 		subscribeRef.current,
 		getSnapshotRef.current,
 		getSnapshotRef.current,
 		subSlot(slot, `uses`),
-	);
-
-	// Track last snapshot (from useSyncExternalStore) and the returned value separately
-	const returnedSnapshotRef = useRef<{
-		collection: Collection<object, string | number, {}> | null;
-		version: number;
-	} | null>(null, subSlot(slot, `ret-snap-ref`));
-	// Keep implementation return loose to satisfy overload signatures
-	const returnedRef = useRef<any>(null, subSlot(slot, `ret-ref`));
-
-	// Rebuild returned object only when the snapshot changes (version or collection identity)
-	if (
-		!returnedSnapshotRef.current ||
-		returnedSnapshotRef.current.version !== snapshot.version ||
-		returnedSnapshotRef.current.collection !== snapshot.collection
-	) {
-		// Handle null collection case (when callback returns undefined/null)
-		if (!snapshot.collection) {
-			returnedRef.current = {
-				state: undefined,
-				data: undefined,
-				collection: undefined,
-				status: `disabled`,
-				isLoading: false,
-				isReady: true,
-				isIdle: false,
-				isError: false,
-				isCleanedUp: false,
-				isEnabled: false,
-			};
-		} else {
-			// Capture a stable view of entries for this snapshot to avoid tearing
-			const entries = Array.from(snapshot.collection.entries());
-			const singleResult = isSingleResultCollection(snapshot.collection);
-			let stateCache: Map<string | number, unknown> | null = null;
-			let dataCache: Array<unknown> | null = null;
-
-			returnedRef.current = {
-				get state() {
-					if (!stateCache) {
-						stateCache = new Map(entries);
-					}
-					return stateCache;
-				},
-				get data() {
-					if (!dataCache) {
-						dataCache = entries.map(([, value]) => value);
-					}
-					return singleResult ? dataCache[0] : dataCache;
-				},
-				collection: snapshot.collection,
-				status: snapshot.collection.status,
-				...getLiveQueryStatusFlags(snapshot.collection.status),
-				isEnabled: true,
-			};
-		}
-
-		// Remember the snapshot that produced this returned value
-		returnedSnapshotRef.current = snapshot;
-	}
-
-	return returnedRef.current!;
+	) as any;
 }

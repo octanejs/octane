@@ -38,8 +38,13 @@ const ISSUES: Array<Issue> = [
 	{ id: `i3`, title: `Issue 3`, userId: `1` },
 ];
 
-/** Keys that are expected to fail on ALL adapters (core gaps, not adapter drift). */
-const UNIVERSAL_EXPECTED_FAIL = new Set<string>([`order-only-move`]);
+/**
+ * Keys that are expected to fail on ALL adapters (core gaps, not adapter drift).
+ * `order-only-move` was a pre-0.7.0 core gap; TanStack DB #1669 fixed the
+ * order-only-move republish contract, so the scenario now passes on every
+ * adapter and the set is empty.
+ */
+const UNIVERSAL_EXPECTED_FAIL = new Set<string>([]);
 
 export function runSuite(rawDriver: LiveQueryDriver) {
 	const { ops } = rawDriver;

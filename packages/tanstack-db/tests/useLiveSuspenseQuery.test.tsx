@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderHook, waitFor } from '@octanejs/testing-library';
+import { render, renderHook, waitFor } from '@octanejs/testing-library';
 import { createCollection, createLiveQueryCollection, eq, gt } from '@tanstack/db';
 import { Suspense } from 'octane';
 import { useLiveSuspenseQuery } from '../src/useLiveSuspenseQuery';
@@ -552,37 +552,66 @@ describe(`useLiveSuspenseQuery`, () => {
 		});
 	});
 
-	it.skip(`should handle StrictMode double-invocation correctly`, async () => {
-		// Octane does not ship StrictMode double-invocation.
-		const collection = createCollection(
-			mockSyncCollectionOptions<Person>({
-				id: `test-persons-suspense-strict`,
-				getKey: (person: Person) => person.id,
-				initialData: initialPersons,
-			}),
-		);
+	// OCTANE DIVERGENCE: the upstream `StrictMode double-invocation` case is NOT
+	// APPLICABLE. Octane has no StrictMode development double-invoke of component
+	// setup/cleanup, so there is no double-invocation behavior to assert. Recorded
+	// as not-applicable in UPSTREAM.md and audit/test-classifications.json rather
+	// than committed as a skipped test (which the committed-test-marker gate
+	// forbids).
 
-		const SuspenseWrapperOnly = ({ children }: ChildrenProps) => (
-			<Suspense fallback={<div>Loading...</div>}>{children}</Suspense>
-		);
-
-		const { result } = renderHook(
-			() => useLiveSuspenseQuery((q) => q.from({ persons: collection })),
-			{
-				wrapper: SuspenseWrapperOnly,
+	it(`renders the Suspense fallback while an async collection loads, then the data`, async () => {
+		// Regression for the raw-promise-throw bug. Octane Suspense only recognizes
+		// the sentinel from `use(thenable)`; the pre-fix `throw promiseRef.current`
+		// reached Octane's error path, so the fallback never rendered. Every other
+		// suspense test uses a synchronous fixture that is already `ready` at first
+		// render, so none of them exercises the suspend path. This one gates the
+		// collection's readiness behind a promise so the hook must actually suspend.
+		let releaseLoad: (() => void) | null = null;
+		const loadGate = new Promise<void>((resolve) => {
+			releaseLoad = resolve;
+		});
+		const collection = createCollection<Person>({
+			id: `suspense-async-fallback`,
+			getKey: (person) => person.id,
+			sync: {
+				sync: ({ begin, write, commit, markReady }) => {
+					// Stay in `loading` until the gate resolves; only then publish rows
+					// and mark ready. Until that happens the live query suspends.
+					void loadGate.then(() => {
+						begin();
+						for (const person of initialPersons) write({ type: `insert`, value: person });
+						commit();
+						markReady();
+					});
+				},
 			},
+		});
+
+		const List = () => {
+			const { data } = useLiveSuspenseQuery((q) => q.from({ persons: collection }));
+			return <div>ready:{String(data.length)}</div>;
+		};
+		const App = () => (
+			<Suspense fallback={<div>Loading...</div>}>
+				<List />
+			</Suspense>
 		);
 
-		await waitFor(() => {
-			expect(result.current.data).toHaveLength(3);
-		});
+		const { container } = render(<App />);
 
-		// Verify data is correct despite double-invocation
-		expect(result.current.data).toHaveLength(3);
-		expect(result.current.data[0]).toMatchObject({
-			id: `1`,
-			name: `John Doe`,
+		// The fallback must be in the DOM while the collection loads. With the raw
+		// `throw promise`, this assertion fails (the error path runs instead).
+		await waitFor(() => {
+			expect(container.textContent).toContain(`Loading...`);
 		});
+		expect(container.textContent).not.toContain(`ready:`);
+
+		// Resolve the load; the suspended content replaces the fallback.
+		releaseLoad!();
+		await waitFor(() => {
+			expect(container.textContent).toContain(`ready:3`);
+		});
+		expect(container.textContent).not.toContain(`Loading...`);
 	});
 
 	it(`should not re-suspend after hasBeenReady when isLoadingSubset changes`, async () => {

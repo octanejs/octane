@@ -46,7 +46,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tanstack/db": "^0.6.17"
+    "@tanstack/db": "^0.7.0"
   },
   "peerDependencies": {
     "octane": "workspace:*"

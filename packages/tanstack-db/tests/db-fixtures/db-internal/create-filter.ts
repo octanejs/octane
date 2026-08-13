@@ -1,4 +1,4 @@
-// Vendored from @tanstack/db@0.6.17
+// Vendored from @tanstack/db@0.7.0
 // (packages/db/src/collection/change-events.ts: createFilterFunctionFromExpression).
 // Not part of the public API; pinned here so the infinite-query tests can
 // evaluate the where/cursor IR expressions @tanstack/db generates internally.

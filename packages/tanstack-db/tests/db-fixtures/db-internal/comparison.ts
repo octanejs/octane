@@ -1,4 +1,7 @@
-// Vendored from @tanstack/db@0.6.17 (packages/db/src/utils/comparison.ts).
+// Vendored from @tanstack/db@0.7.0 (packages/db/src/utils/comparison.ts),
+// self-contained (the CompareOptions shape and isTemporal are inlined rather
+// than imported from db-internal sibling modules). Logic is unchanged from the
+// upstream 0.7.0 source.
 // Not part of the public API; pinned here for the vendored expression evaluator.
 import type { StringCollationConfig } from '@tanstack/db';
 

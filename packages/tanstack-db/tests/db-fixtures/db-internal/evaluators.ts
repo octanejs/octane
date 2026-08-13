@@ -1,7 +1,8 @@
-// Vendored from @tanstack/db@0.6.17 (packages/db/src/query/compiler/evaluators.ts).
+// Vendored from @tanstack/db@0.7.0 (packages/db/src/query/compiler/evaluators.ts).
 // db's expression evaluator is not part of the public API and its `exports` map
 // blocks deep imports, so it is pinned here to let the infinite-query tests
-// interpret the where/cursor IR that @tanstack/db generates internally.
+// interpret the where/cursor IR that @tanstack/db generates internally. The
+// exported/internal functions and IR opcode set are unchanged from 0.6.17.
 import {
 	EmptyReferencePathError,
 	UnknownExpressionTypeError,

@@ -1,4 +1,4 @@
-import { useRef } from 'octane';
+import { use, useRef } from 'octane';
 import { splitTrailingSlot, subSlot } from './slot';
 import { useLiveQuery } from './useLiveQuery';
 import type {
@@ -207,13 +207,15 @@ export function useLiveSuspenseQuery(configOrQueryOrCollection: any, ...rest: Ar
 
 	if (collectionStatus === `loading` || collectionStatus === `idle`) {
 		// Create or reuse promise for current collection
-		if (!promiseRef.current) {
-			promiseRef.current = result.collection.preload();
-		}
-		// THROW PROMISE - React Suspense catches this (React 18+ required)
-		// Note: We don't check React version here. In React <18, this will be caught
-		// by an Error Boundary, which provides a reasonable failure mode.
-		throw promiseRef.current;
+		const preloadPromise = (promiseRef.current ??= result.collection.preload());
+		// OCTANE DIVERGENCE: suspend via `use(thenable)`, not `throw promise`.
+		// React (and the upstream react-db adapter) throw the raw promise and rely
+		// on React Suspense catching it. Octane Suspense only recognizes the
+		// sentinel that `use()` produces; a raw thrown promise reaches Octane's
+		// error path and never renders the fallback. `use()` is exempt from
+		// call-site slotting, so no slot is needed, and reusing the same
+		// `promiseRef` identity lets `use()` dedupe the thenable across renders.
+		use(preloadPromise);
 	}
 
 	// Return data without status/loading flags (handled by Suspense/ErrorBoundary)

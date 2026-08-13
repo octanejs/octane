@@ -1543,9 +1543,11 @@ describe(`useLiveInfiniteQuery`, () => {
 			expect(result.current.data).toHaveLength(10);
 		});
 
-		it.skip(`should throw error if collection lacks orderBy`, async () => {
-			// Octane runs this validation in passive effects; the error is logged but
-			// not surfaced synchronously to renderHook expect().toThrow like React act().
+		it(`should throw error if collection lacks orderBy`, async () => {
+			// The coordinated window controller requires setWindow(), which a
+			// pre-created collection only exposes with an orderBy. The hook validates
+			// this synchronously during render, so renderHook's expect().toThrow
+			// observes it directly.
 			const posts = createMockPosts(50);
 			const collection = createCollection(
 				mockSyncCollectionOptions<Post>({
@@ -1602,6 +1604,75 @@ describe(`useLiveInfiniteQuery`, () => {
 					});
 				});
 			}).toThrow(/must be either a pre-created live query collection/);
+		});
+
+		it(`coordinates the window across two hooks on one shared collection (no truncation)`, async () => {
+			// Regression for the shared-window bug (TanStack DB #1675). Two hooks
+			// pointed at ONE pre-created collection each hold a window lease; the
+			// coordinated controller applies the union (max) window, so the smaller
+			// consumer must not truncate the larger one, and unmounting the smaller
+			// must not shrink the survivor. The pre-fix direct `setWindow` let the
+			// second hook's smaller window overwrite the first hook's larger one.
+			const posts = createMockPosts(50);
+			const base = createCollection(
+				mockSyncCollectionOptions<Post>({
+					autoIndex: `eager`,
+					id: `shared-window-test`,
+					getKey: (post: Post) => post.id,
+					initialData: posts,
+				}),
+			);
+			const shared = createLiveQueryCollection({
+				query: (q) =>
+					q
+						.from({ posts: base })
+						.orderBy(({ posts: p }) => p.createdAt, `desc`)
+						.limit(11),
+			});
+			await shared.preload();
+
+			// Hook A grows to two pages (window 21).
+			const a = renderHook(() =>
+				useLiveInfiniteQuery(shared as any, {
+					pageSize: 10,
+					getNextPageParam: (lp: Array<unknown>) => (lp.length === 10 ? 10 : undefined),
+				}),
+			);
+			await waitFor(() => {
+				expect(a.result.current.isReady).toBe(true);
+			});
+			act(() => {
+				a.result.current.fetchNextPage();
+			});
+			await waitFor(() => {
+				expect(a.result.current.pages).toHaveLength(2);
+			});
+			expect(a.result.current.data).toHaveLength(20);
+
+			// Hook B mounts on the SAME collection with a single (smaller) page window.
+			const b = renderHook(() =>
+				useLiveInfiniteQuery(shared as any, {
+					pageSize: 10,
+					getNextPageParam: (lp: Array<unknown>) => (lp.length === 10 ? 10 : undefined),
+				}),
+			);
+			await waitFor(() => {
+				expect(b.result.current.isReady).toBe(true);
+			});
+			expect(b.result.current.pages).toHaveLength(1);
+
+			// A must NOT have been truncated to B's smaller window.
+			expect(a.result.current.pages).toHaveLength(2);
+			expect(a.result.current.data).toHaveLength(20);
+
+			// Unmounting the smaller consumer must not shrink the survivor.
+			b.unmount();
+			await waitFor(() => {
+				expect(a.result.current.data).toHaveLength(20);
+			});
+			expect(a.result.current.pages).toHaveLength(2);
+
+			a.unmount();
 		});
 
 		it(`should work correctly even if pre-created collection has different initial limit`, async () => {
@@ -1772,31 +1843,9 @@ describe(`useLiveInfiniteQuery`, () => {
 		});
 	});
 
-	it(`throws a descriptive error when deps contain non-serializable values`, () => {
-		const posts = createMockPosts(10);
-		const collection = createCollection(
-			mockSyncCollectionOptions<Post>({
-				autoIndex: `eager`,
-				id: `circular-deps-test`,
-				getKey: (post: Post) => post.id,
-				initialData: posts,
-			}),
-		);
-
-		const circular: Record<string, unknown> = { a: 1 };
-		circular.self = circular;
-
-		expect(() => {
-			renderHook(() => {
-				return useLiveInfiniteQuery(
-					(q) => q.from({ posts: collection }).orderBy(({ posts: p }) => p.createdAt, `desc`),
-					{
-						pageSize: 5,
-						getNextPageParam: (lastPage) => (lastPage.length === 5 ? lastPage.length : undefined),
-					},
-					[circular],
-				);
-			});
-		}).toThrow(/useLiveInfiniteQuery.*dependency/);
-	});
+	// Deps are compared by reference identity plus `deepEquals` (the coordinated
+	// window controller's model, matching React's useEffect deps semantics), not
+	// serialized. Non-serializable or circular deps no longer throw a descriptive
+	// error — the pre-0.7.0 `JSON.stringify` guard was binding-specific and unlike
+	// React, so it was intentionally dropped with the controller port.
 });
