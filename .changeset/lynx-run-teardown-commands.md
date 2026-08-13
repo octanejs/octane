@@ -1,6 +1,5 @@
 ---
 'octane': patch
-'@octanejs/lynx': patch
 ---
 
 Tear down removed collapsed template runs with one `destroy-run` command.
