@@ -3932,6 +3932,217 @@ describe('Lynx Element PAPI host driver', () => {
 		).toBe(true);
 	});
 
+	it('tears down a compact run from one destroy-run command with a run delta', () => {
+		const { container, page } = createHost(67);
+		const program: UniversalHostTemplateProgram = Object.freeze({
+			nodes: Object.freeze([
+				Object.freeze({ type: 'view', parent: -1, props: Object.freeze({ class: 'row' }) }),
+				Object.freeze({ type: 'text', parent: 0, props: Object.freeze({}) }),
+				Object.freeze({ type: '#text', parent: 1, props: Object.freeze({ value: 'ready' }) }),
+			]),
+			events: Object.freeze([
+				Object.freeze({ node: 0, type: 'bindtap', priority: 'default' as const }),
+			]),
+		});
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: { id: 'shell' } },
+				{ op: 'create', id: 2, type: 'view', props: { id: 'rows' } },
+				{ op: 'insert', parent: 1, id: 2, before: null },
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		).apply();
+		const rows = page.children[0]!.children[0]!;
+		const mount = (version: number, firstId: number) =>
+			prepareLynxHostBatch(
+				container,
+				batch(version, [
+					{
+						op: 'mount-template-run',
+						parent: 2,
+						before: null,
+						program,
+						firstId,
+						firstListenerId: 100,
+						count: 2,
+						values: Object.freeze([]),
+					},
+				]),
+				{ compact: true, incrementalCompact: true, lazyPublicInstances: true },
+			);
+		const first = mount(2, 10);
+		expect(first.compactHostCount).toBe(6);
+		first.apply();
+		expect(rows.children).toHaveLength(2);
+
+		// A full-store destroy-run re-enters the certified teardown and
+		// acknowledges the whole run with one range delta.
+		const teardown = prepareLynxHostBatch(
+			container,
+			batch(3, [{ op: 'destroy-run', parent: 2, firstId: 10, count: 2, width: 3 }]),
+		);
+		expect(teardown.handleDelta).toEqual([
+			{
+				op: 'destroy-run',
+				renderer: 'lynx',
+				root: 67,
+				firstId: 10,
+				hostCount: 6,
+				generation: 1,
+			},
+		]);
+		teardown.apply();
+		expect(rows.children).toEqual([]);
+
+		// The retired range re-arms incremental compact for fresh ids…
+		const second = mount(4, 20);
+		expect(second.compactHostCount).toBe(6);
+		second.apply();
+		expect(rows.children).toHaveLength(2);
+
+		// …while a remount over the ranged ids keeps bumping generations.
+		prepareLynxHostBatch(
+			container,
+			batch(5, [{ op: 'destroy-run', parent: 2, firstId: 20, count: 2, width: 3 }]),
+		).apply();
+		const reused = prepareLynxHostBatch(
+			container,
+			batch(6, [
+				{ op: 'create', id: 10, type: 'view', props: { id: 'replacement' } },
+				{ op: 'insert', parent: 2, id: 10, before: null },
+			]),
+		);
+		reused.apply();
+		expect(
+			reused.handleDelta.some(
+				(delta) => delta.op === 'create' && delta.handle.id === 10 && delta.handle.generation === 2,
+			),
+		).toBe(true);
+	});
+
+	it('accepts a complete destroy-run teardown after an accepted host fault', () => {
+		const { container, page, papi } = createHost(69);
+		const program: UniversalHostTemplateProgram = Object.freeze({
+			nodes: Object.freeze([
+				Object.freeze({ type: 'view', parent: -1, props: Object.freeze({ class: 'row' }) }),
+				Object.freeze({ type: 'text', parent: 0, props: Object.freeze({}) }),
+				Object.freeze({ type: '#text', parent: 1, props: Object.freeze({ value: 'ready' }) }),
+			]),
+			events: Object.freeze([]),
+		});
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: { id: 'shell' } },
+				{ op: 'create', id: 2, type: 'view', props: { id: 'rows' } },
+				{ op: 'insert', parent: 1, id: 2, before: null },
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		).apply();
+		prepareLynxHostBatch(
+			container,
+			batch(2, [
+				{
+					op: 'mount-template-run',
+					parent: 2,
+					before: null,
+					program,
+					firstId: 10,
+					firstListenerId: null,
+					count: 2,
+					values: Object.freeze([]),
+				},
+			]),
+			{ compact: true, incrementalCompact: true, lazyPublicInstances: true },
+		).apply();
+		expect(page.children[0]!.children[0]!.children).toHaveLength(2);
+
+		const failure = new Error('accepted run update failed');
+		papi.failNext('setAttribute', 'after', failure);
+		const faulting = prepareLynxHostBatch(
+			container,
+			batch(3, [{ op: 'update', id: 10, props: { title: 'faulted' } }]),
+		);
+		expect(() => faulting.apply()).toThrow(failure);
+		expect(container.acceptedVersion).toBe(3);
+
+		const teardown = prepareLynxHostBatch(
+			container,
+			batch(4, [
+				{ op: 'destroy-run', parent: 2, firstId: 10, count: 2, width: 3 },
+				{ op: 'remove', parent: null, id: 1 },
+				{ op: 'destroy', id: 2 },
+				{ op: 'destroy', id: 1 },
+			]),
+		);
+		teardown.apply();
+		expect(container.instanceCount).toBe(0);
+		expect(container.acceptedVersion).toBe(4);
+
+		// Post-fault application is logical only; terminal disposal still owns
+		// and removes the accepted native tree.
+		expect(page.children).toHaveLength(1);
+		expect(disposeLynxHostContainer(container).complete).toBe(true);
+		expect(page.children).toEqual([]);
+	});
+
+	it('expands a partial destroy-run through the general teardown path', () => {
+		const { container, page } = createHost(68);
+		const program: UniversalHostTemplateProgram = Object.freeze({
+			nodes: Object.freeze([
+				Object.freeze({ type: 'view', parent: -1, props: Object.freeze({ class: 'row' }) }),
+				Object.freeze({ type: 'text', parent: 0, props: Object.freeze({}) }),
+				Object.freeze({ type: '#text', parent: 1, props: Object.freeze({ value: 'ready' }) }),
+			]),
+			events: Object.freeze([]),
+		});
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: { id: 'shell' } },
+				{ op: 'create', id: 2, type: 'view', props: { id: 'rows' } },
+				{ op: 'insert', parent: 1, id: 2, before: null },
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		).apply();
+		const rows = page.children[0]!.children[0]!;
+		prepareLynxHostBatch(
+			container,
+			batch(2, [
+				{
+					op: 'mount-template-run',
+					parent: 2,
+					before: null,
+					program,
+					firstId: 10,
+					firstListenerId: null,
+					count: 3,
+					values: Object.freeze([]),
+				},
+			]),
+			{ compact: true, incrementalCompact: true, lazyPublicInstances: true },
+		).apply();
+		expect(rows.children).toHaveLength(3);
+
+		const partial = prepareLynxHostBatch(
+			container,
+			batch(3, [{ op: 'destroy-run', parent: 2, firstId: 13, count: 1, width: 3 }]),
+		);
+		partial.apply();
+		expect(rows.children).toHaveLength(2);
+		expect(rows.children.map((node) => node.id)).toEqual([null, null]);
+		expect(partial.handleDelta.every((delta) => delta.op === 'destroy')).toBe(true);
+
+		// An unknown range is rejected before any mutation.
+		expect(() =>
+			prepareLynxHostBatch(
+				container,
+				batch(4, [{ op: 'destroy-run', parent: 2, firstId: 40, count: 1, width: 3 }]),
+			),
+		).toThrow(/destroy-run does not match an accepted template run/);
+	});
+
 	it('retains compact-run ownership for terminal cleanup when fast teardown faults', () => {
 		const { container, page, papi } = createHost(65);
 		const program: UniversalHostTemplateProgram = Object.freeze({
