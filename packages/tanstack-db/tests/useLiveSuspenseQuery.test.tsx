@@ -49,6 +49,56 @@ function SuspenseWrapper({ children }: ChildrenProps) {
 }
 
 describe(`useLiveSuspenseQuery`, () => {
+	it(`renders an already-ready collection without flashing the fallback`, async () => {
+		// Regression for the ready-path `use()` sentinel. On the non-loading paths
+		// the hook hands `use()` a shared settled thenable so its call-order index
+		// stays stable without suspending. That thenable must already carry
+		// `status: 'fulfilled'`: `use()` tags an untagged thenable `'pending'`
+		// synchronously (its fulfillment runs a microtask later), so a bare
+		// `Promise.resolve()` would suspend on first use and flash the fallback even
+		// though data is ready. Preloading the collection to `ready` before mount
+		// makes the very first render take the ready path, exercising the sentinel
+		// directly. This is placed first so it is the process-global first use.
+		const base = createCollection(
+			mockSyncCollectionOptions<Person>({
+				id: `test-persons-suspense-no-flash`,
+				getKey: (person: Person) => person.id,
+				initialData: initialPersons,
+			}),
+		);
+		const liveQuery = createLiveQueryCollection((q) => q.from({ persons: base }));
+		await liveQuery.preload();
+		expect(liveQuery.status).toBe(`ready`);
+
+		let fallbackRendered = false;
+		const List = () => {
+			const { data } = useLiveSuspenseQuery(liveQuery);
+			return <div>ready:{String(data.length)}</div>;
+		};
+		const App = () => (
+			<Suspense
+				fallback={
+					<div>
+						{(() => {
+							fallbackRendered = true;
+							return `Loading...`;
+						})()}
+					</div>
+				}
+			>
+				<List />
+			</Suspense>
+		);
+
+		const { container } = render(<App />);
+
+		// A ready collection must render on the first commit without suspending.
+		// Pre-fix (bare `Promise.resolve()`), the first `use()` suspended, so the
+		// fallback rendered and `container` showed `Loading...` here.
+		expect(container.textContent).toContain(`ready:3`);
+		expect(fallbackRendered).toBe(false);
+	});
+
 	it(`should suspend while loading and return data when ready`, async () => {
 		const collection = createCollection(
 			mockSyncCollectionOptions<Person>({

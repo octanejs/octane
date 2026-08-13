@@ -13,11 +13,19 @@ import type {
 	SingleResult,
 } from '@tanstack/db';
 
-// Shared, already-resolved thenable handed to `use()` on the non-suspending
-// paths (see the divergence note in the hook body). Its resolved value is never
-// read — only its settled status matters — so a single module-level instance is
-// safe to share across every hook instance and render.
-const SETTLED: Promise<void> = Promise.resolve();
+// Shared, already-fulfilled thenable handed to `use()` on the non-suspending
+// paths (see the divergence note in the hook body). It carries the React 19
+// `cache()` "settled thenable" shape (`status: 'fulfilled'`), which Octane's
+// `use()` returns synchronously without instrumentation. A bare
+// `Promise.resolve()` would NOT work: `use()` tags an untagged thenable
+// `'pending'` synchronously (the fulfillment callback runs a microtask later),
+// so its first use would suspend and flash the fallback even though data is
+// ready. Its resolved value is never read — only the settled status matters — so
+// one module-level instance is safe to share across every hook and render.
+const SETTLED: Promise<void> & { status: 'fulfilled'; value: undefined } = Object.assign(
+	Promise.resolve(),
+	{ status: `fulfilled` as const, value: undefined },
+);
 
 /**
  * Create a live query with React Suspense support
