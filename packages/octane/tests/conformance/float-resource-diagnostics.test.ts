@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createRoot, resetFloatResourceState } from '../../src/index.js';
+import { createRoot, preload, resetFloatResourceState } from '../../src/index.js';
 import * as Server from 'octane/server';
 import { loadServerFixture } from '../_server-fixture.js';
 import { collectPipeableStream } from '../_server-stream.js';
@@ -189,6 +189,67 @@ describe('React Float stylesheet resource diagnostics', () => {
 		).not.toBeNull();
 		expect(document.head.querySelector('style[data-href="/inline-collision.css"]')).not.toBeNull();
 		expectDevelopmentWarning(warningMessages(error), 'preload');
+	});
+
+	// Per ReactDOMFloat-test.js:4834 — an inline style cannot fulfill an external
+	// stylesheet preload, regardless of which resource reaches the client first.
+	it('preserves a later stylesheet preload alongside an existing inline style resource', () => {
+		mount(StyleResourceWithoutWhitespace);
+		const inlineStyle = document.head.querySelector('style[data-href="inline-style-key"]');
+
+		expect(inlineStyle).not.toBeNull();
+		preload('inline-style-key', { as: 'style' });
+		preload('inline-style-key', { as: 'style' });
+
+		const preloads = document.head.querySelectorAll('link[rel="preload"][href="inline-style-key"]');
+		expect(preloads).toHaveLength(1);
+		expect(preloads[0].getAttribute('as')).toBe('style');
+		expect(document.head.querySelector('style[data-href="inline-style-key"]')).toBe(inlineStyle);
+	});
+
+	// Per ReactDOMFloat-test.js:4834 — a server-authored style remains distinct
+	// from its preload even when its identity cannot safely enter a CSS selector.
+	it('preserves a preload for an SSR-seeded inline style whose href contains selector characters', () => {
+		resetFloatResourceState();
+		const href = 'seeded"]weird.css';
+		const inlineStyle = document.createElement('style');
+		inlineStyle.setAttribute('data-precedence', 'default');
+		inlineStyle.setAttribute('data-href', href);
+		inlineStyle.textContent = 'body { color: red; }';
+		document.head.appendChild(inlineStyle);
+
+		preload(href, { as: 'style' });
+		preload(href, { as: 'style' });
+
+		const preloads = Array.from(document.head.querySelectorAll('link[rel="preload"]')).filter(
+			(element) => element.getAttribute('href') === href,
+		);
+		expect(preloads).toHaveLength(1);
+		expect(preloads[0].getAttribute('as')).toBe('style');
+		expect(
+			Array.from(document.head.querySelectorAll('style[data-precedence]')).find(
+				(element) => element.getAttribute('data-href') === href,
+			),
+		).toBe(inlineStyle);
+	});
+
+	// Per ReactDOMFloat-test.js:4834 — external stylesheets can fulfill a
+	// matching preload, so the inline-style exception must not duplicate them.
+	it('suppresses a later stylesheet preload when an external stylesheet already exists', () => {
+		mount(PrecedenceResourceControl);
+		const stylesheet = document.head.querySelector(
+			'link[rel="stylesheet"][href="/precedence-valid.css"]',
+		);
+
+		expect(stylesheet).not.toBeNull();
+		preload('/precedence-valid.css', { as: 'style' });
+
+		expect(
+			document.head.querySelector('link[rel="preload"][href="/precedence-valid.css"]'),
+		).toBeNull();
+		expect(
+			document.head.querySelector('link[rel="stylesheet"][href="/precedence-valid.css"]'),
+		).toBe(stylesheet);
 	});
 
 	// Per ReactDOMFloat-test.js:4834 — Fizz retains the inline style and its

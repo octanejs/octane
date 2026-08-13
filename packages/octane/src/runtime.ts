@@ -27803,10 +27803,23 @@ export function preload(href: string, options: { as: string } & Record<string, u
 	// Connection/integrity options seed the matching future preinit (React's
 	// resource map carries them onto the initialized resource).
 	if (as === 'style' || as === 'script') stashPreloadTransfer(as, rawHref, options);
-	// After the matching resource is already live (a Float resource or preinit),
-	// a preload adds nothing — React's resource map has the same one-way
-	// upgrade: preload-then-init keeps both tags, init-then-preload no-ops.
-	if (as === 'style' && resourceState().sheets.has(rawHref)) return;
+	// After the matching external resource is already live (a Float resource or
+	// preinit), a preload adds nothing. Inline style resources share the sheet
+	// identity namespace but cannot consume an external stylesheet preload, so
+	// both entries must survive regardless of discovery order. Inspect DOM only
+	// on this uncommon identity collision and compare attribute values directly:
+	// href text may contain quotes or other CSS-selector metacharacters.
+	if (as === 'style' && resourceState().sheets.has(rawHref)) {
+		const styles = document.head.querySelectorAll('style[data-precedence]');
+		let hasInlineStyle = false;
+		for (let i = 0; i < styles.length; i++) {
+			if (styles[i].getAttribute('data-href') === rawHref) {
+				hasInlineStyle = true;
+				break;
+			}
+		}
+		if (!hasInlineStyle) return;
+	}
 	if (as === 'script' && resourceState().scripts.has(rawHref)) return;
 	// Image preloads with a srcset are keyed by the srcset+sizes pair, not the
 	// fallback href — two responsive preloads for one href stay distinct.
