@@ -95,6 +95,55 @@ describe('hydrateRoot — onRecoverableError', () => {
 		expect(onRecoverableError).toHaveBeenCalledTimes(1);
 	});
 
+	it('keeps recoverable reports isolated between separate hydrating roots', async () => {
+		const other = document.createElement('div');
+		document.body.appendChild(other);
+		try {
+			const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
+			container.innerHTML = html;
+			other.innerHTML = html;
+			const first = vi.fn();
+			const second = vi.fn();
+			hydrateRoot(container, cliDev.Swap, { host: false }, { onRecoverableError: first });
+			hydrateRoot(other, cliDev.Swap, { host: false }, { onRecoverableError: second });
+			flushSync(() => {});
+			await Promise.resolve();
+			expect(first).toHaveBeenCalledTimes(1);
+			expect(second).toHaveBeenCalledTimes(1);
+			expect(container.querySelector('b.inner')).not.toBeNull();
+			expect(other.querySelector('b.inner')).not.toBeNull();
+		} finally {
+			other.remove();
+		}
+	});
+
+	it('retains the recovery report when the root updates before callback delivery', async () => {
+		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
+		container.innerHTML = html;
+		const onRecoverableError = vi.fn();
+		const root = hydrateRoot(container, cliDev.Swap, { host: false }, { onRecoverableError });
+		flushSync(() => root.render(cliDev.Swap, { host: true }));
+		expect(container.querySelector('p.host')).not.toBeNull();
+		expect(onRecoverableError).not.toHaveBeenCalled();
+		await Promise.resolve();
+		expect(onRecoverableError).toHaveBeenCalledTimes(1);
+	});
+
+	it('reports a throwing recovery callback without undoing the repaired DOM', async () => {
+		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
+		container.innerHTML = html;
+		const failure = new Error('recovery callback failed');
+		const onRecoverableError = vi.fn(() => {
+			throw failure;
+		});
+		hydrateRoot(container, cliDev.Swap, { host: false }, { onRecoverableError });
+		flushSync(() => {});
+		await Promise.resolve();
+		expect(onRecoverableError).toHaveBeenCalledTimes(1);
+		expect(errSpy.mock.calls.some((call) => call[0] === failure)).toBe(true);
+		expect(container.querySelector('b.inner')).not.toBeNull();
+	});
+
 	it('control: a MATCHED hydration never fires the callback', async () => {
 		const { html } = await ServerRT.renderToString(srv.Swap, { host: true });
 		container.innerHTML = html;

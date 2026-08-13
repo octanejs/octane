@@ -9,7 +9,14 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { mount, createLog } from '../_helpers';
-import { BadCaptureListenerTree, BadListenerTree } from './_fixtures/invalid-listeners.tsrx';
+import {
+	BadCaptureListenerTree,
+	BadListenerTree,
+	BadLoadListener,
+	BadScrollListener,
+	CustomListenerVariants,
+	ThrowingListenerTree,
+} from './_fixtures/invalid-listeners.tsrx';
 
 const PROD_COMPILE = process.env.OCTANE_TEST_COMPILE_MODE === 'prod';
 
@@ -219,6 +226,183 @@ describe('InvalidEventListeners', () => {
 			expect(consoleError).not.toHaveBeenCalled();
 			root.update(BadListenerTree, { onAnc: onAncestor, bad: true });
 			expectRenderWarning(consoleError, listenerMessage('boolean'));
+		} finally {
+			root.unmount();
+			consoleError.mockRestore();
+		}
+	});
+
+	// Per InvalidEventListeners-test.js:36 and ReactDOMComponent-test.js:1711.
+	// Native scroll/load are heard through capture-phase delegation, so invalid
+	// listeners must retain the same authored prop and dispatch diagnostics.
+	it.each([
+		{ component: BadScrollListener, prop: 'onScroll', event: 'scroll' },
+		{ component: BadLoadListener, prop: 'onLoad', event: 'load' },
+	])(
+		'validates the non-bubbling $prop listener and reports its dispatch error',
+		({ component, prop, event }) => {
+			const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const uncaught: unknown[] = [];
+			const handleError = (value: ErrorEvent) => {
+				uncaught.push(value.error);
+				value.preventDefault();
+			};
+			window.addEventListener('error', handleError);
+			const root = mount(component, { bad: 'invalid native listener' });
+			try {
+				expectRenderWarning(
+					consoleError,
+					`Expected \`${prop}\` listener to be a function, instead got a value of \`string\` type.`,
+				);
+				consoleError.mockClear();
+				root.find('.target').dispatchEvent(new Event(event, { bubbles: false }));
+				expect(uncaught).toHaveLength(1);
+				expect((uncaught[0] as Error).message).toBe(
+					PROD_COMPILE
+						? `Expected ${event} event listener to be a function, instead got a value of \`string\` type.`
+						: `Expected \`${prop}\` listener to be a function, instead got a value of \`string\` type.`,
+				);
+				expect(consoleError).not.toHaveBeenCalled();
+			} finally {
+				root.unmount();
+				window.removeEventListener('error', handleError);
+				consoleError.mockRestore();
+			}
+		},
+	);
+
+	// Per ReactDOMEventListener-test.js:1197. User errors preserve their exact
+	// identity and surface once through the browser's uncaught-error channel;
+	// Octane's guarded native dispatch still reaches the ancestor listener.
+	it('reports an exactly-once throwing listener error and continues ancestor dispatch', () => {
+		const original = new Error('authored listener failure');
+		const ancestor = vi.fn();
+		const uncaught: unknown[] = [];
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const handleError = (event: ErrorEvent) => {
+			uncaught.push(event.error);
+			event.preventDefault();
+		};
+		window.addEventListener('error', handleError);
+		const root = mount(ThrowingListenerTree, {
+			onAnc: ancestor,
+			onTarget: () => {
+				throw original;
+			},
+		});
+		try {
+			expect(consoleError).not.toHaveBeenCalled();
+			root.find('.target').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+			expect(uncaught).toEqual([original]);
+			expect(ancestor).toHaveBeenCalledOnce();
+			expect(consoleError).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			window.removeEventListener('error', handleError);
+			consoleError.mockRestore();
+		}
+	});
+
+	// Per DOMPropertyOperations-test.js:251, :267, :283, :467, and :975.
+	// Custom-element events retain authored capitalization/dashes and capture
+	// registration, with identity-preserving replacement and complete removal.
+	it('attaches, replaces, and removes uppercase, dashed, and capture custom listeners', () => {
+		const upper = vi.fn();
+		const lower = vi.fn();
+		const dashed = vi.fn();
+		const capture = vi.fn();
+		const replacement = vi.fn();
+		const root = mount(CustomListenerVariants, { upper, lower, dashed, capture });
+		try {
+			const target = root.find('.target');
+			target.dispatchEvent(new CustomEvent('customevent', { bubbles: true }));
+			target.dispatchEvent(new CustomEvent('custom-event', { bubbles: true }));
+			expect(upper).toHaveBeenCalledOnce();
+			expect(lower).toHaveBeenCalledOnce();
+			expect(dashed).toHaveBeenCalledOnce();
+			expect(capture).toHaveBeenCalledOnce();
+			expect(capture.mock.invocationCallOrder[0]).toBeLessThan(lower.mock.invocationCallOrder[0]);
+
+			root.update(CustomListenerVariants, {
+				upper: undefined,
+				lower: replacement,
+				dashed: undefined,
+				capture: undefined,
+			});
+			expect(root.find('.target')).toBe(target);
+			target.dispatchEvent(new CustomEvent('customevent', { bubbles: true }));
+			target.dispatchEvent(new CustomEvent('custom-event', { bubbles: true }));
+			expect(upper).toHaveBeenCalledOnce();
+			expect(lower).toHaveBeenCalledOnce();
+			expect(dashed).toHaveBeenCalledOnce();
+			expect(capture).toHaveBeenCalledOnce();
+			expect(replacement).toHaveBeenCalledOnce();
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// Per DOMPropertyOperations-test.js:322. Custom elements deliberately keep
+	// non-function lowercase on* values as raw attributes instead of warning.
+	it('keeps non-function custom-event values as attributes without listener warnings', () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = mount(CustomListenerVariants, {
+			upper: undefined,
+			lower: 'raw listener attribute',
+			dashed: false,
+			capture: undefined,
+		});
+		try {
+			const target = root.find('.target');
+			expect(target.getAttribute('oncustomevent')).toBe('raw listener attribute');
+			expect(target.hasAttribute('oncustom-event')).toBe(false);
+			expect(consoleError).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			consoleError.mockRestore();
+		}
+	});
+
+	// Per DOMPropertyOperations-test.js:1126. Updating the same custom-event
+	// prop across function, string, and function values must detach/re-attach
+	// exactly once while preserving custom elements' raw attribute semantics.
+	it('alternates custom-event callbacks and string attributes without stale listeners', () => {
+		const initial = vi.fn();
+		const replacement = vi.fn();
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = mount(CustomListenerVariants, {
+			upper: undefined,
+			lower: initial,
+			dashed: undefined,
+			capture: undefined,
+		});
+		try {
+			const target = root.find('.target');
+			target.dispatchEvent(new CustomEvent('customevent', { bubbles: true }));
+			expect(initial).toHaveBeenCalledOnce();
+
+			root.update(CustomListenerVariants, {
+				upper: undefined,
+				lower: 'raw custom-event value',
+				dashed: undefined,
+				capture: undefined,
+			});
+			expect(root.find('.target')).toBe(target);
+			expect(target.getAttribute('oncustomevent')).toBe('raw custom-event value');
+			target.dispatchEvent(new CustomEvent('customevent', { bubbles: true }));
+			expect(initial).toHaveBeenCalledOnce();
+
+			root.update(CustomListenerVariants, {
+				upper: undefined,
+				lower: replacement,
+				dashed: undefined,
+				capture: undefined,
+			});
+			expect(target.hasAttribute('oncustomevent')).toBe(false);
+			target.dispatchEvent(new CustomEvent('customevent', { bubbles: true }));
+			expect(initial).toHaveBeenCalledOnce();
+			expect(replacement).toHaveBeenCalledOnce();
+			expect(consoleError).not.toHaveBeenCalled();
 		} finally {
 			root.unmount();
 			consoleError.mockRestore();

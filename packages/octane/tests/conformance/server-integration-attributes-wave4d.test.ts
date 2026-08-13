@@ -47,6 +47,7 @@ function expectAttributeDiagnostics(expected: readonly string[]) {
 		const mismatches = diagnostics.filter((message) => message.includes('hydration mismatch'));
 		const attributes = diagnostics.filter(
 			(message) =>
+				message.startsWith('An empty string was passed to the') ||
 				message.startsWith('Invalid value for prop') ||
 				message.startsWith('Received `true` for a non-boolean attribute') ||
 				message.startsWith('Received `false` for a non-boolean attribute'),
@@ -69,6 +70,12 @@ matrix.itRenders('serializes string attributes and strips unsafe empty URL value
 	component: 'StringAttributes',
 	mismatch,
 	clientDiagnostics: expectAttributeDiagnostics([
+		'An empty string was passed to the `src` attribute. ' +
+			'This may cause the browser to download the whole page again. ' +
+			'Pass null instead of an empty string.',
+		'An empty string was passed to the `href` attribute. ' +
+			'This may cause the browser to download the whole page again. ' +
+			'Pass null instead of an empty string.',
 		nonBooleanTrueWarning('href'),
 		invalidValueWarning('width', 'div'),
 	]),
@@ -285,6 +292,15 @@ matrix.itRenders('serializes aria, unknown, event-like, and SVG attributes', {
 				? []
 				: [
 						'The `aria` attribute is reserved for future use. Pass individual `aria-*` attributes instead.',
+						'Octane does not recognize the `CHILDREN` prop on a DOM element. ' +
+							'If you intentionally want it to appear in the DOM as a custom attribute, ' +
+							'spell it as lowercase `children` instead. ' +
+							'If you accidentally passed it from a parent component, remove it from the DOM element.',
+						'Octane does not recognize the `fooBar` prop on a DOM element. ' +
+							'If you intentionally want it to appear in the DOM as a custom attribute, ' +
+							'spell it as lowercase `foobar` instead. ' +
+							'If you accidentally passed it from a parent component, remove it from the DOM element.',
+						'Unknown event handler property `onunknownevent`. It will be ignored.',
 					],
 		);
 	},

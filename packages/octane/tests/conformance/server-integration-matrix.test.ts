@@ -41,6 +41,37 @@ function replaceWithMismatchedMarkupAndTrailingNode(container: HTMLElement): voi
 const structuralMismatch = { mutateServerDom: replaceWithMismatchedMarkup } as const;
 const PROD_COMPILE = process.env.OCTANE_TEST_COMPILE_MODE === 'prod';
 
+function controlledConflictDiagnostics(
+	tag: 'input' | 'textarea' | 'select',
+	controlled: 'value' | 'checked' = 'value',
+) {
+	const fallback = controlled === 'value' ? 'defaultValue' : 'defaultChecked';
+	return {
+		'hydrate-match': (diagnostics: readonly string[]) => {
+			if (PROD_COMPILE) {
+				expect(diagnostics).toEqual([]);
+				return;
+			}
+			expect(diagnostics).toHaveLength(1);
+			expect(diagnostics[0]).toContain(`<${tag}> has both \`${controlled}\` and \`${fallback}\``);
+		},
+		'hydrate-mismatch': (diagnostics: readonly string[]) => {
+			const conflicts = diagnostics.filter((message) =>
+				message.includes('controlled or uncontrolled'),
+			);
+			const mismatches = diagnostics.filter((message) => message.includes('hydration mismatch'));
+			if (PROD_COMPILE) {
+				expect(diagnostics).toEqual([]);
+				return;
+			}
+			expect(conflicts).toHaveLength(1);
+			expect(conflicts[0]).toContain(`<${tag}> has both \`${controlled}\` and \`${fallback}\``);
+			expect(mismatches.length).toBeGreaterThan(0);
+			expect(diagnostics).toHaveLength(conflicts.length + mismatches.length);
+		},
+	};
+}
+
 function expectSelectedOptions(
 	root: ParentNode,
 	selector: string,
@@ -246,6 +277,7 @@ matrix.itRenders('renders a nested fragment', {
 matrix.itRenders('renders an input value overriding defaultValue', {
 	component: 'ControlledInputMarkup',
 	mismatch: structuralMismatch,
+	hydrationDiagnostics: controlledConflictDiagnostics('input'),
 	assertCommon({ root }) {
 		const input = root.querySelector('#matrix-input') as HTMLInputElement;
 		expect(input.value).toBe('foo');
@@ -257,6 +289,7 @@ matrix.itRenders('renders an input value overriding defaultValue', {
 matrix.itRenders('renders checked overriding defaultChecked', {
 	component: 'ControlledCheckboxMarkup',
 	mismatch: structuralMismatch,
+	hydrationDiagnostics: controlledConflictDiagnostics('input', 'checked'),
 	assertCommon({ root }) {
 		const input = root.querySelector('#matrix-checkbox') as HTMLInputElement;
 		expect(input.checked).toBe(true);
@@ -268,6 +301,7 @@ matrix.itRenders('renders checked overriding defaultChecked', {
 matrix.itRenders('renders a textarea value overriding defaultValue', {
 	component: 'ControlledTextareaMarkup',
 	mismatch: structuralMismatch,
+	hydrationDiagnostics: controlledConflictDiagnostics('textarea'),
 	assertCommon({ root }) {
 		const textarea = root.querySelector('#matrix-textarea') as HTMLTextAreaElement;
 		expect(textarea.value).toBe('foo');
@@ -279,6 +313,7 @@ matrix.itRenders('renders a textarea value overriding defaultValue', {
 matrix.itRenders('renders a select value overriding defaultValue', {
 	component: 'ControlledSelectMarkup',
 	mismatch: structuralMismatch,
+	hydrationDiagnostics: controlledConflictDiagnostics('select'),
 	assertCommon({ root }) {
 		const select = root.querySelector('#matrix-select') as HTMLSelectElement;
 		expect(select.value).toBe('bar');
@@ -521,6 +556,7 @@ matrix.itRenders('serializes an uncontrolled input default value', {
 matrix.itRenders('lets an input value override an earlier defaultValue prop', {
 	component: 'ReverseControlledInputMarkup',
 	mismatch: structuralMismatch,
+	hydrationDiagnostics: controlledConflictDiagnostics('input'),
 	assertCommon({ root }) {
 		const input = root.querySelector('#matrix-input-reverse') as HTMLInputElement;
 		expect(input.value).toBe('foo');
@@ -554,6 +590,7 @@ matrix.itRenders('serializes an uncontrolled checkbox default', {
 matrix.itRenders('lets checkbox checked override an earlier defaultChecked prop', {
 	component: 'ReverseControlledCheckboxMarkup',
 	mismatch: structuralMismatch,
+	hydrationDiagnostics: controlledConflictDiagnostics('input', 'checked'),
 	assertCommon({ root }) {
 		const input = root.querySelector('#matrix-checkbox-reverse') as HTMLInputElement;
 		expect(input.checked).toBe(true);
@@ -610,6 +647,7 @@ matrix.itRenders('serializes an uncontrolled textarea default value', {
 matrix.itRenders('lets textarea value override an earlier defaultValue prop', {
 	component: 'ReverseControlledTextareaMarkup',
 	mismatch: structuralMismatch,
+	hydrationDiagnostics: controlledConflictDiagnostics('textarea'),
 	assertCommon({ root }) {
 		const textarea = root.querySelector('#matrix-textarea-reverse') as HTMLTextAreaElement;
 		expect(textarea.getAttribute('value')).toBeNull();
@@ -658,6 +696,7 @@ matrix.itRenders('projects an uncontrolled select default value', {
 matrix.itRenders('lets select value override an earlier defaultValue prop', {
 	component: 'ReverseControlledSelectMarkup',
 	mismatch: structuralMismatch,
+	hydrationDiagnostics: controlledConflictDiagnostics('select'),
 	assertCommon({ root }) {
 		expectSelectedOptions(root, '#matrix-select-reverse', ['bar']);
 	},
@@ -667,6 +706,7 @@ matrix.itRenders('lets select value override an earlier defaultValue prop', {
 matrix.itRenders('projects options whose text comes from dangerouslySetInnerHTML', {
 	component: 'SelectDangerousOptions',
 	mismatch: structuralMismatch,
+	hydrationDiagnostics: controlledConflictDiagnostics('select'),
 	assertCommon({ root }) {
 		const select = expectSelectedOptions(root, '#matrix-select-danger', ['bar']);
 		expect(Array.from(select.options, (option) => option.textContent)).toEqual([

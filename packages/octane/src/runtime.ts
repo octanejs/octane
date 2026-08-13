@@ -45,12 +45,20 @@ import {
 } from './constants.js';
 import { hasOwnProp } from './has-own.js';
 import { headOwnershipKey } from './head-ownership.js';
+import { resourceHintWarning } from './resource-hint-diagnostics.js';
 import {
 	ariaAttributeWarning,
 	isAriaAttributeName,
 	isUnknownAriaAttribute,
 	unknownAriaAttributeWarning,
 } from './aria-diagnostics.js';
+import {
+	booleanAttributeStringWarning,
+	emptyResourceUrlWarning,
+	hostPropertyWarning,
+	invalidHostPropertiesWarning,
+	unsupportedAttributeCoercionWarning,
+} from './host-property-diagnostics.js';
 import {
 	applyElementDefaultProps,
 	childElementKey,
@@ -108,11 +116,17 @@ import {
 } from './hydration/event-capture.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 import {
+	invalidHtmlNestingWithAncestor,
+	invalidHtmlNestingWithParent,
+	invalidHtmlTextNesting,
+} from './html-tree-validation.js';
+import {
 	COMPONENT_FLAG_BOUNDARY,
 	hasComponentFlags,
 	markComponentFlags,
 } from './component-flags.js';
 import { formatClientError } from './error-codes.client.generated.js';
+import { formAuthoringDiagnostics } from './form-diagnostics.js';
 import {
 	HYDRATE_STREAM_TOKEN_ATTR,
 	isRendererStreamBoundaryTemplate,
@@ -12111,10 +12125,12 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	if (
 		process.env.NODE_ENV !== 'production' &&
 		(el as any).__oct_loc !== undefined &&
-		isAriaAttributeName(name) &&
-		!isHtmlCustomElement(el)
+		!isHtmlCustomElement(el) &&
+		typeof (el as any).__oct_custom_is !== 'string'
 	) {
-		const warning = ariaAttributeWarning(name, el.localName);
+		const warning = isAriaAttributeName(name)
+			? ariaAttributeWarning(name, el.localName)
+			: hostPropertyWarning(name, value, el.localName, el.namespaceURI === SVG_NS);
 		if (warning !== null) devWarnAttributeOnce(el, name, warning);
 	}
 	// React-style `dangerouslySetInnerHTML={{__html}}` is a PROPERTY write, not an
@@ -12244,12 +12260,17 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		isHtmlCustomElement(el) &&
 		(typeof value === 'function' || (el as any).$$ceListeners?.[name] !== undefined)
 	) {
-		const type = name.slice(2);
+		// React 19 treats a trailing Capture on a custom-element listener as
+		// native capture registration, while preserving the authored event case
+		// and punctuation. The full prop name remains the identity so capture and
+		// bubble listeners can coexist and be replaced or removed independently.
+		const capture = name.endsWith('Capture');
+		const type = capture ? name.slice(2, -7) : name.slice(2);
 		const map: Record<string, EventListener> = ((el as any).$$ceListeners ??= {});
 		const prev = map[name];
-		if (prev !== undefined && prev !== value) el.removeEventListener(type, prev);
+		if (prev !== undefined && prev !== value) el.removeEventListener(type, prev, capture);
 		if (typeof value === 'function') {
-			if (prev !== value) el.addEventListener(type, value as EventListener);
+			if (prev !== value) el.addEventListener(type, value as EventListener, capture);
 			map[name] = value as EventListener;
 			el.removeAttribute(name); // a listener prop never lands in the markup
 			return;
@@ -12346,6 +12367,49 @@ function devValidateAriaProps(el: Element, props: Record<string, unknown>): void
 	}
 }
 
+function devValidateHostProps(el: Element, props: Record<string, unknown>): void {
+	if ((el as any).__oct_loc === undefined || isHtmlCustomElement(el)) return;
+	const customized = typeof props.is === 'string';
+	(el as any).__oct_custom_is = customized ? props.is : undefined;
+	if (customized) return;
+	let invalid: string[] | undefined;
+	for (const name of Object.keys(props)) {
+		if (
+			name === 'key' ||
+			name === 'ref' ||
+			name === 'children' ||
+			name === 'class' ||
+			name === 'className' ||
+			name === 'style' ||
+			name === 'dangerouslySetInnerHTML' ||
+			isAriaAttributeName(name)
+		) {
+			continue;
+		}
+		const value = props[name];
+		if (name.length > 2 && name[0] === 'o' && name[1] === 'n') {
+			if (typeof value === 'string') {
+				const warning = hostPropertyWarning(name, value);
+				if (warning !== null) devWarnAttributeOnce(el, name, warning);
+			}
+			continue;
+		}
+		const warning = hostPropertyWarning(name, value, el.localName, el.namespaceURI === SVG_NS);
+		if (warning !== null) {
+			devWarnAttributeOnce(el, name, warning);
+			continue;
+		}
+		if (typeof value === 'function' && formActionAttributeName(el, name) !== null) continue;
+		if (typeof value !== 'function' && typeof value !== 'symbol') continue;
+		if (DEV_ATTRIBUTE_WARNINGS?.has(name)) continue;
+		(DEV_ATTRIBUTE_WARNINGS ??= new Set()).add(name);
+		(invalid ??= []).push(name);
+	}
+	if (invalid !== undefined) {
+		console.error(invalidHostPropertiesWarning(invalid, el.localName));
+	}
+}
+
 /**
  * Compiler-only fast path for a statically named `data-*` attribute whose
  * expression is proven to be a string at authoring time. Runtime values still
@@ -12396,6 +12460,10 @@ export function setStringData(el: Element, name: string, value: unknown): void {
  * canonical empty-string presence form.
  */
 export function setBooleanAttribute(el: Element, name: string, value: unknown): void {
+	if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
+		const warning = booleanAttributeStringWarning(name, value);
+		if (warning !== null) devWarnAttributeOnce(el, name, warning);
+	}
 	const type = typeof value;
 	const next = !value || type === 'function' || type === 'symbol' ? null : '';
 	const hydration = activeHydration();
@@ -12492,6 +12560,10 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 		// `attr=""` presence form (`disabled="disabled"` → `disabled=""`),
 		// falsy removes (`hidden={0}`, `inert=""` → absent).
 		if (BOOLEAN_ATTR_PROPS.has(lower)) {
+			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
+				const warning = booleanAttributeStringWarning(name, value);
+				if (warning !== null) devWarnAttributeOnce(el, name, warning);
+			}
 			return value ? '' : null;
 		}
 		// The OVERLOADED booleans (download/capture): boolean values get
@@ -12558,7 +12630,21 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 			`Received NaN for the \`${name}\` attribute. If this is expected, cast the value to a string.`,
 		);
 	}
-	const v = value === true ? '' : String(value);
+	let v: string;
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		(el as any).__oct_loc !== undefined &&
+		!isHtmlCustomElement(el)
+	) {
+		try {
+			v = value === true ? '' : String(value);
+		} catch (error) {
+			devWarnAttributeOnce(el, name, unsupportedAttributeCoercionWarning(name, value));
+			throw error;
+		}
+	} else {
+		v = value === true ? '' : String(value);
+	}
 	// An empty `src`/`href`/`<object data>` resolves to the CURRENT PAGE's URL — browsers will
 	// re-fetch the whole document as an image/script/stylesheet. React strips
 	// these (dev AND prod); so do we. `<a href="">` (and `<area>`) stays — an
@@ -12569,6 +12655,13 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 			(name === 'href' && el.nodeName !== 'A' && el.nodeName !== 'AREA') ||
 			(name === 'data' && el.nodeName === 'OBJECT'))
 	) {
+		if (
+			process.env.NODE_ENV !== 'production' &&
+			(el as any).__oct_loc !== undefined &&
+			!isHtmlCustomElement(el)
+		) {
+			devWarnAttributeOnce(el, 'empty:' + name, emptyResourceUrlWarning(name));
+		}
 		return null;
 	}
 	return v;
@@ -12981,7 +13074,15 @@ export function setHostPropSources(
 		const [identity, name] = normalizedHostProp(el, writer.rawName);
 		const previous = values.get(identity);
 		if (previous === undefined || previous[3] < writer.lastOrder) {
-			values.set(identity, [name, writer.value, writer.firstOrder, writer.lastOrder]);
+			values.set(identity, [
+				process.env.NODE_ENV !== 'production' &&
+				(writer.rawName === 'tabIndex' || writer.rawName === 'htmlFor')
+					? writer.rawName
+					: name,
+				writer.value,
+				writer.firstOrder,
+				writer.lastOrder,
+			]);
 		}
 	}
 	const resolved: Record<string, unknown> = Object.create(null);
@@ -13022,6 +13123,7 @@ export function setSpread(
 ): void {
 	if (process.env.NODE_ENV !== 'production' && value != null) {
 		devValidateAriaProps(el, Object(value) as Record<string, unknown>);
+		devValidateHostProps(el, Object(value) as Record<string, unknown>);
 	}
 	// `mountScope` is passed only on the mount call (not on updates). When present
 	// a spread-supplied ref attach is DEFERRED to commit so a callback ref sees a
@@ -14281,6 +14383,7 @@ export function setFormAction(
 ): void {
 	if (typeof value === 'function') {
 		(el as any).$$formAction = value;
+		if (process.env.NODE_ENV !== 'production') queueFormActionAuthoringDiagnostic(el);
 		if (el.nodeName === 'FORM') {
 			if (!(el as any).$$formSubmitWired) {
 				(el as any).$$formSubmitWired = true;
@@ -14688,6 +14791,14 @@ interface DevFormDiagnosticState {
 	last: string | null;
 	/** The compiler already published the onChange-specific warning. */
 	staticNativeChange: boolean;
+	/** Final authoring props observed on this development-compiled host. */
+	authoringProps?: Record<string, unknown>;
+	/** Deferred selected binding, evaluated once only after its mount update. */
+	authoringSelected?: () => unknown;
+	/** Structural children markers published by DEV-only compiler bindings. */
+	authoringChildren?: 'textarea' | 'option';
+	/** Each contradictory authoring warning is emitted once per host. */
+	authoringWarnings?: Set<string>;
 }
 
 function getDevFormDiagnosticState(el: Element): DevFormDiagnosticState | undefined {
@@ -14750,8 +14861,32 @@ function queueDevFormDiagnostic(el: Element, scope?: Scope, force = false): void
 	if (process.env.NODE_ENV === 'production') return; // build-time stripped
 	const q = DEV_FORM_CHECKS;
 	if (q === null || (!force && !hasDevFormDiagnosticContext(el, scope))) return;
-	if (!hasPotentialFormDiagnostic(el)) return;
+	if (!force && !hasPotentialFormDiagnostic(el)) return;
 	if (q.indexOf(el) === -1) q.push(el);
+}
+
+/** Compiler-only DEV marker for form hosts whose authoring is otherwise baked. */
+export function queueFormAuthoringDiagnostic(
+	el: Element,
+	kind: string,
+	selected?: boolean | (() => unknown),
+): void {
+	if (process.env.NODE_ENV === 'production') return;
+	const state = ensureDevFormDiagnosticState(el);
+	if (kind === 'textarea-children') state.authoringChildren = 'textarea';
+	else if (kind === 'option-children') state.authoringChildren = 'option';
+	else if (kind === 'option-selected') {
+		if (typeof selected === 'function') state.authoringSelected = selected;
+		else (state.authoringProps ??= Object.create(null)).selected = selected ?? true;
+	}
+	queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined, true);
+}
+
+function queueFormActionAuthoringDiagnostic(el: Element): void {
+	if (process.env.NODE_ENV === 'production') return;
+	if (!hasDevFormDiagnosticContext(el, CURRENT_SCOPE ?? undefined)) return;
+	ensureDevFormDiagnosticState(el);
+	queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined, true);
 }
 
 /** @internal Compiler helper for a final-props runtime-check host. */
@@ -15141,6 +15276,19 @@ export function setFormControlSources(
 	ctrl.formSeen = true;
 	ctrl.formDefaultValue = defaultValue;
 	ctrl.formDefaultChecked = defaultChecked;
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		hasDevFormDiagnosticContext(el, CURRENT_SCOPE ?? undefined)
+	) {
+		const diagnostic = ensureDevFormDiagnosticState(el);
+		diagnostic.authoringProps = { value, defaultValue, checked, defaultChecked, multiple };
+		if (
+			(value !== undefined && defaultValue !== undefined) ||
+			(tag === 'input' && checked !== undefined && defaultChecked !== undefined)
+		) {
+			queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined, true);
+		}
+	}
 
 	if (tag === 'input') {
 		const input = el as HTMLInputElement;
@@ -15306,6 +15454,47 @@ function drainDevFormDiagnostics(): void {
 	DEV_FORM_CHECKS = [];
 	for (let i = 0; i < q.length; i++) {
 		const el = q[i];
+		const authoring = getDevFormDiagnosticState(el);
+		if (authoring !== undefined) {
+			let props = authoring.authoringProps;
+			if (authoring.authoringSelected !== undefined) {
+				(props ??= Object.create(null)).selected = authoring.authoringSelected();
+			}
+			const action = (el as any).$$formAction;
+			if (typeof action === 'function') {
+				const submitter = el.localName !== 'form';
+				props = {
+					...props,
+					...(submitter
+						? {
+								formAction: action,
+								type: el.getAttribute('type') ?? undefined,
+								name: el.getAttribute('name') ?? undefined,
+								formMethod: el.getAttribute('formmethod') ?? undefined,
+								formEncType: el.getAttribute('formenctype') ?? undefined,
+								formTarget: el.getAttribute('formtarget') ?? undefined,
+							}
+						: {
+								action,
+								method: el.getAttribute('method') ?? undefined,
+								encType: el.getAttribute('enctype') ?? undefined,
+								target: el.getAttribute('target') ?? undefined,
+							}),
+				};
+			}
+			const children =
+				authoring.authoringChildren === 'textarea'
+					? el.textContent
+					: authoring.authoringChildren === 'option'
+						? {}
+						: undefined;
+			for (const warning of formAuthoringDiagnostics(el.localName, props ?? {}, children)) {
+				const reported = (authoring.authoringWarnings ??= new Set<string>());
+				if (reported.has(warning.kind)) continue;
+				reported.add(warning.kind);
+				console.error(warning.message);
+			}
+		}
 		const outcome = formDiagnosticOutcome(el);
 		const previous = getDevFormDiagnosticState(el);
 		if (outcome === null) {
@@ -27179,6 +27368,110 @@ function warnRootLifecycleUnmount(): void {
 	}
 }
 
+let HTML_NESTING_WARNINGS: WeakMap<Block, Set<string>> | null = null;
+
+/** Compiler ABI: validate an authored candidate and publish only from a DEV render. */
+export function devHtmlNesting(
+	childTag: string,
+	ancestors: string[],
+	childLocation?: string,
+	ancestorLocation?: string,
+): void {
+	if (process.env.NODE_ENV !== 'production') {
+		const activeBlock = CURRENT_SCOPE?.block ?? CURRENT_BLOCK;
+		let message: string | null = null;
+		if (ancestors.length === 0) {
+			let parent = activeBlock?.parentNode ?? null;
+			// Dependency-only keyed survivors intentionally skip renderBlock, so
+			// CURRENT_SCOPE still belongs to their parent component. Recover the
+			// actual list parent from the already-mounted row's authored location;
+			// otherwise an intervening <ul> disappears from parser-scope checks.
+			const ownedSlots = CURRENT_SCOPE?._slots;
+			if (childLocation !== undefined && ownedSlots !== null && ownedSlots !== undefined) {
+				for (const slot of ownedSlots) {
+					if (
+						slot?.__kind === 'forBlockSlot' &&
+						(slot.head?.startMarker as Element & { __oct_loc?: string })?.__oct_loc ===
+							childLocation
+					) {
+						parent = slot.start.parentNode;
+						break;
+					}
+				}
+			}
+			const actualAncestors: string[] = [];
+			while (parent !== null && parent.nodeType === 1) {
+				const element = parent as Element;
+				if (element.namespaceURI !== 'http://www.w3.org/1999/xhtml') break;
+				actualAncestors.push(element.localName);
+				const location = (element as Element & { __oct_loc?: string }).__oct_loc;
+				message =
+					actualAncestors.length === 1
+						? invalidHtmlNestingWithParent(childTag, element.localName, childLocation, location)
+						: invalidHtmlNestingWithAncestor(childTag, actualAncestors, childLocation, location);
+				if (message !== null) break;
+				parent = element.parentNode;
+			}
+		} else {
+			message =
+				childTag === '#text'
+					? invalidHtmlTextNesting(childLocation ?? '', ancestors[0], ancestorLocation)
+					: ancestors.length === 1
+						? invalidHtmlNestingWithParent(childTag, ancestors[0], childLocation, ancestorLocation)
+						: invalidHtmlNestingWithAncestor(childTag, ancestors, childLocation, ancestorLocation);
+		}
+		if (message === null) return;
+		if (activeBlock !== null) {
+			const warningSets = (HTML_NESTING_WARNINGS ??= new WeakMap());
+			let warnings = warningSets.get(activeBlock);
+			if (warnings === undefined) {
+				warnings = new Set();
+				warningSets.set(activeBlock, warnings);
+			} else if (warnings.has(message)) {
+				return;
+			}
+			warnings.add(message);
+		}
+		console.error(
+			'Octane invalid HTML nesting: ' +
+				message +
+				'\n\nThe browser will repair this HTML before hydration. This can cause a hydration mismatch.',
+		);
+	}
+}
+
+/** Validate the supported Element root as the authored tree's outer HTML ancestor. */
+function validateRootHtmlNesting(container: Element, body: ComponentBody): void {
+	if (process.env.NODE_ENV !== 'production') {
+		if (
+			componentSourceLoc(body) === undefined ||
+			container.namespaceURI !== 'http://www.w3.org/1999/xhtml' ||
+			container.localName === 'div' ||
+			container.localName === 'body' ||
+			container.localName === 'html' ||
+			container.localName.includes('-')
+		) {
+			return;
+		}
+		const root = container.firstElementChild;
+		if (root === null) return;
+		if (invalidHtmlNestingWithParent(root.localName, container.localName) !== null) {
+			devHtmlNesting(root.localName, [container.localName]);
+			return;
+		}
+		let child = root.firstElementChild;
+		const ancestors = [root.localName, container.localName];
+		while (child !== null && child.namespaceURI === 'http://www.w3.org/1999/xhtml') {
+			if (invalidHtmlNestingWithAncestor(child.localName, ancestors) !== null) {
+				devHtmlNesting(child.localName, ancestors);
+				return;
+			}
+			ancestors.splice(ancestors.length - 1, 0, child.localName);
+			child = child.firstElementChild;
+		}
+	}
+}
+
 // Shared Root factory behind both `createRoot` and `hydrateRoot`. The
 // `rootBlock`/`currentBody` parameters are the live state captured by the
 // returned closures: `createRoot` starts them `null` (the block is created
@@ -27334,6 +27627,9 @@ function makeRoot(
 			const mountedRoot = rootBlock;
 			try {
 				renderBlock(mountedRoot);
+				if (process.env.NODE_ENV !== 'production') {
+					validateRootHtmlNesting(container, body);
+				}
 			} catch (error) {
 				try {
 					handleRenderError(mountedRoot, error);
@@ -27711,11 +28007,6 @@ function insertHeadHint(key: string, build: () => Element): void {
 	_resourceHints.add(key);
 }
 
-/** Malformed-hint diagnostics (dev only; the call stays a no-op either way). */
-function warnHintUsage(message: string): void {
-	if (process.env.NODE_ENV !== 'production') console.error(message);
-}
-
 /**
  * Connection/integrity options seeded by preload for the matching preinit —
  * React carries these onto the initialized resource. Keyed `as:href`; the
@@ -27750,12 +28041,8 @@ function takePreloadTransfer(kind: string, href: string): Record<string, unknown
 	return found;
 }
 
-function guardHintHref(fn: string, href: unknown): string | null {
-	if (typeof href !== 'string' || href === '') {
-		warnHintUsage(fn + '() requires a non-empty string href; the call was ignored.');
-		return null;
-	}
-	return href;
+function guardHintHref(href: unknown): string | null {
+	return typeof href === 'string' && href !== '' ? href : null;
 }
 
 /** The option keys React recognizes on resource hints; everything else drops. */
@@ -27786,15 +28073,19 @@ function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined):
 
 /** React DOM `preload(href, {as, …})` — `<link rel="preload">`. */
 export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
-	const guarded = guardHintHref('preload', href);
-	if (guarded === null) return;
-	if (!options?.as || typeof options.as !== 'string') {
-		warnHintUsage(
-			'preload() requires a string `as` option (e.g. "style", "script", "font", "image"); ' +
-				'the call was ignored.',
-		);
-		return;
+	if (process.env.NODE_ENV !== 'production') {
+		const warning = resourceHintWarning('preload', href, options);
+		if (warning !== null) console.error(warning);
 	}
+	const guarded = guardHintHref(href);
+	if (guarded === null) return;
+	if (
+		options === null ||
+		typeof options !== 'object' ||
+		!options.as ||
+		typeof options.as !== 'string'
+	)
+		return;
 	const as = options.as;
 	const rawHref = guarded;
 	// Fonts must be fetched anonymously to be reusable by CSS — React enforces
@@ -27850,17 +28141,15 @@ export function preload(href: string, options: { as: string } & Record<string, u
  * dedupes against `<script async src>`.
  */
 export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
-	const guarded = guardHintHref('preinit', href);
-	if (guarded === null) return;
-	const as = options?.as;
-	if (as !== 'style' && as !== 'script') {
-		warnHintUsage(
-			'preinit() supports only as: "style" or "script" (got ' +
-				JSON.stringify(as) +
-				'); the call was ignored. Use preload() for other destinations.',
-		);
-		return;
+	if (process.env.NODE_ENV !== 'production') {
+		const warning = resourceHintWarning('preinit', href, options);
+		if (warning !== null) console.error(warning);
 	}
+	const guarded = guardHintHref(href);
+	if (guarded === null) return;
+	if (options === null || typeof options !== 'object') return;
+	const as = options?.as;
+	if (as !== 'style' && as !== 'script') return;
 	const rawHref = guarded;
 	const seeded = takePreloadTransfer(as, rawHref);
 	if (as === 'style') {
@@ -27878,8 +28167,16 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 
 /** React DOM `preconnect(href, {crossOrigin?})` — `<link rel="preconnect">`. */
 export function preconnect(href: string, options?: { crossOrigin?: string }): void {
-	const rawHref = guardHintHref('preconnect', href);
+	if (process.env.NODE_ENV !== 'production') {
+		const warning = resourceHintWarning('preconnect', href, options);
+		if (warning !== null) console.error(warning);
+	}
+	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
+	if (options !== null && typeof options !== 'object') options = undefined;
+	else if (options?.crossOrigin !== undefined && typeof options.crossOrigin !== 'string') {
+		options = undefined;
+	}
 	const safeHref = sanitizeURL(rawHref);
 	const corsMode =
 		(options as any)?.crossOrigin == null ? '<none>' : String((options as any).crossOrigin);
@@ -27894,7 +28191,11 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 
 /** React DOM `prefetchDNS(href)` — `<link rel="dns-prefetch">`. */
 export function prefetchDNS(href: string): void {
-	const rawHref = guardHintHref('prefetchDNS', href);
+	if (process.env.NODE_ENV !== 'production') {
+		const warning = resourceHintWarning('prefetchDNS', href, arguments[1], arguments.length > 1);
+		if (warning !== null) console.error(warning);
+	}
+	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
 	const safeHref = sanitizeURL(rawHref);
 	insertHeadHint('dns-prefetch:' + rawHref, () => {
@@ -27911,8 +28212,16 @@ export function prefetchDNS(href: string): void {
  * options apply as attributes through the shared lenient pass-through.
  */
 export function preloadModule(href: string, options?: Record<string, unknown>): void {
-	const rawHref = guardHintHref('preloadModule', href);
+	if (process.env.NODE_ENV !== 'production') {
+		const warning = resourceHintWarning('preloadModule', href, options);
+		if (warning !== null) console.error(warning);
+	}
+	const rawHref = guardHintHref(href);
 	if (rawHref === null) return;
+	if (options === null || typeof options !== 'object') options = undefined;
+	else if ('as' in options && typeof options.as !== 'string') {
+		options = { ...options, as: undefined };
+	}
 	// A module that preinitModule or a Float script already executes needs no preload.
 	if (hasHeadHint('module:' + rawHref) || resourceState().scripts.has(rawHref)) return;
 	const safeHref = sanitizeURL(rawHref);
@@ -27934,16 +28243,14 @@ export function preinitModule(
 	href: string,
 	options?: { as?: string } & Record<string, unknown>,
 ): void {
-	const rawHref = guardHintHref('preinitModule', href);
-	if (rawHref === null) return;
-	if ((options?.as ?? 'script') !== 'script') {
-		warnHintUsage(
-			'preinitModule() supports only as: "script" (got ' +
-				JSON.stringify(options?.as) +
-				'); the call was ignored. Use preloadModule() for other module destinations.',
-		);
-		return;
+	if (process.env.NODE_ENV !== 'production') {
+		const warning = resourceHintWarning('preinitModule', href, options);
+		if (warning !== null) console.error(warning);
 	}
+	const rawHref = guardHintHref(href);
+	if (rawHref === null) return;
+	if (options != null && typeof options !== 'object') return;
+	if ((options?.as ?? 'script') !== 'script') return;
 	// One executable per src: a live Float script (SSR-seeded or client-
 	// discovered) already satisfies this init.
 	const state = resourceState();

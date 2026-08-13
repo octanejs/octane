@@ -650,6 +650,26 @@ function needsDevStaticAttrValidation(attrName, lv, tag, namespace = 'html') {
 		(namespace === 'html' || namespace === 'opaque') && tag !== undefined && tag.includes('-');
 	if (isCustom) return false;
 	if (attrName === 'aria' || /^aria(?:-|[A-Z])/.test(attrName)) return true;
+	const lower = attrName.toLowerCase();
+	if (lower === 'innerhtml') return true;
+	if ((lv === 'false' || lv === 'true') && BOOLEAN_ATTR_PROPS.has(lower)) return true;
+	if (
+		lv === '' &&
+		(attrName === 'src' ||
+			(attrName === 'href' && tag !== undefined && tag !== 'a' && tag !== 'area') ||
+			(attrName === 'data' && tag === 'object'))
+	) {
+		return true;
+	}
+	if (
+		attrName !== lower &&
+		!attrName.startsWith('data-') &&
+		!ATTRIBUTE_ALIASES.has(attrName) &&
+		attrName !== 'className' &&
+		attrName !== 'viewBox'
+	) {
+		return true;
+	}
 	if (
 		typeof lv !== 'boolean' ||
 		attrName === 'class' ||
@@ -657,7 +677,6 @@ function needsDevStaticAttrValidation(attrName, lv, tag, namespace = 'html') {
 		attrName.startsWith('data-')
 	)
 		return false;
-	const lower = attrName.toLowerCase();
 	return !(
 		attrName === 'autoFocus' ||
 		isEnumeratedBooleanAttr(lower) ||
@@ -10121,6 +10140,14 @@ function ssrEmitNode(
 		case 'Text': {
 			const expr = node.expression;
 			if (expr && expr.type === 'Literal' && typeof expr.value === 'string') {
+				if (ctx.dev && ctx._ssrNestingText === true) {
+					ctx.runtimeNeeded.add('ssrNestingText');
+					return ssrCall(
+						'ssrNestingText',
+						[b.literal(expr.value, JSON.stringify(expr.value))],
+						node,
+					);
+				}
 				// Static text — escape at compile time, inline as a literal chunk. In
 				// first-child position of a newline-eating tag, protect a leading '\n'
 				// by doubling it (the parser eats the first — see ssrEmitNodes).
@@ -10152,7 +10179,12 @@ function ssrEmitNode(
 			if (isKnownStringExpression(expr, ctx.knownStringLocals)) {
 				// ssrTextPre = ssrText + the runtime leading-'\n' protection (the value
 				// isn't known at compile time here).
-				const fn = nlGuard ? 'ssrTextPre' : 'ssrText';
+				const fn =
+					ctx.dev && ctx._ssrNestingText === true
+						? 'ssrNestingText'
+						: nlGuard
+							? 'ssrTextPre'
+							: 'ssrText';
 				ctx.runtimeNeeded.add(fn);
 				return ssrCall(fn, [resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash)], node);
 			}
@@ -10248,6 +10280,26 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	rejectTextareaValueChildren(tag, node, ctx);
 	rejectDangerouslySetInnerHTMLChildren(tag, node, ctx);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
+	const devFormActionAttribute =
+		ctx.dev && (tag === 'form' || tag === 'button' || tag === 'input')
+			? attrs.find(
+					(attr) =>
+						(attr.type === 'Attribute' || attr.type === 'JSXAttribute') &&
+						(tag === 'form'
+							? jsxAttrRawName(attr) === 'action'
+							: jsxAttrRawName(attr) === 'formAction' || jsxAttrRawName(attr) === 'formaction'),
+				)
+			: undefined;
+	const devFormActionSources = devFormActionAttribute === undefined ? null : [];
+	const htmlIntegrationPoint =
+		ctx.dev &&
+		tag.toLowerCase() === 'annotation-xml' &&
+		attrs.some((attr) => {
+			const attrName = attr.name?.name ?? attr.name;
+			if (typeof attrName !== 'string' || attrName.toLowerCase() !== 'encoding') return false;
+			const value = attr.value?.value ?? attr.value?.expression?.value;
+			return typeof value === 'string' && /^(text\/html|application\/xhtml\+xml)$/i.test(value);
+		});
 	// NB: the ns helpers take the TAG STRING (passing the node silently returns
 	// the inherited ns — svg subtrees would never enter the svg namespace).
 	const selfNs = nsForSelf(tag, parentNs);
@@ -10257,7 +10309,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// Preserve that inherited context through ordinary hosts/wrappers and emit an
 	// explicit override only at a parser transition we can prove lexically.
 	let childComponentNs = componentNs;
-	if (tag === 'foreignObject') childComponentNs = 'html';
+	if (tag === 'foreignObject' || htmlIntegrationPoint) childComponentNs = 'html';
 	else if (tag === 'svg') childComponentNs = 'svg';
 	else if (tag === 'math') childComponentNs = 'mathml';
 	else if (childNs !== 'html' && childNs !== 'opaque') childComponentNs = childNs;
@@ -10329,6 +10381,16 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	const firstSpreadIdx = attrs.findIndex(
 		(a) => a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute',
 	);
+	// Customized built-ins suppress native unknown-property diagnostics based on
+	// the final `is` prop, regardless of where that prop appears in JSX. Resolve
+	// directly authored DEV hosts through the existing whole-element attribute
+	// snapshot so sibling validators see that final value before serialization.
+	// Production keeps its original fully baked/direct-serializer paths.
+	const resolveDevCustomizedHost =
+		ctx.dev &&
+		(selfNs === 'html' || selfNs === 'opaque') &&
+		!tag.includes('-') &&
+		directAttributeIdentities.has('is');
 	// A single spread is the only possible content writer when an otherwise
 	// empty ordinary host has no explicit children/raw-HTML attributes. Its
 	// snapshot already owns evaluation order and enumerable-key semantics, so a
@@ -10359,8 +10421,21 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// generic attribute either creates first-wins duplicates or puts state in the
 	// wrong place entirely: textarea value is content and select value projects
 	// onto options. Resolve the effective props once whenever one has a spread.
+	const directTextareaConflict =
+		ctx.dev &&
+		tag === 'textarea' &&
+		attrs.some(
+			(attr) =>
+				(attr.type === 'Attribute' || attr.type === 'JSXAttribute') &&
+				jsxAttrRawName(attr) === 'value',
+		) &&
+		attrs.some(
+			(attr) =>
+				(attr.type === 'Attribute' || attr.type === 'JSXAttribute') &&
+				jsxAttrRawName(attr) === 'defaultValue',
+		);
 	const resolveFormControlsAcrossSpreads =
-		(firstSpreadIdx !== -1 || hasDuplicateDirectAttribute) &&
+		(firstSpreadIdx !== -1 || hasDuplicateDirectAttribute || directTextareaConflict) &&
 		(tag === 'input' || tag === 'textarea' || tag === 'select');
 	const formControlSources = [];
 	let formControlPart = -1;
@@ -10368,7 +10443,8 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// HTML parsing keeps the FIRST duplicate, while JSX uses the final writer, so
 	// spread-bearing hosts serialize one source-resolved attribute set. Dedicated
 	// form/content channels are filtered by ssrAttrs and resolved separately.
-	const resolveAttrsAcrossSpreads = firstSpreadIdx !== -1 || hasDuplicateDirectAttribute;
+	const resolveAttrsAcrossSpreads =
+		firstSpreadIdx !== -1 || hasDuplicateDirectAttribute || resolveDevCustomizedHost;
 	const attrSources = [];
 	let attrPart = -1;
 	// Spreads are bound to temps (so their value is evaluated ONCE even though we
@@ -10426,11 +10502,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				)
 			: ssrVoid(node);
 		ctx.runtimeNeeded.add('ssrElement');
-		return ssrCall(
-			'ssrElement',
-			[b.literal(tag, JSON.stringify(tag)), source, ssrThunk(body, node)],
-			node,
-		);
+		const args = [b.literal(tag, JSON.stringify(tag)), source, ssrThunk(body, node)];
+		if (htmlIntegrationPoint) args.push(b.literal(true, 'true'));
+		return ssrCall('ssrElement', args, node);
 	};
 
 	for (let attrI = 0; attrI < attrs.length; attrI++) {
@@ -10777,6 +10851,19 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			inner.type === 'Literal' &&
 			!(ctx.dev && needsDevStaticAttrValidation(attrName, inner.value, tag, selfNs))
 		) {
+			if (
+				devFormActionSources !== null &&
+				(attrName === 'type' ||
+					attrName === 'name' ||
+					attrName === 'method' ||
+					attrName === 'encType' ||
+					attrName === 'target' ||
+					attrName === 'formMethod' ||
+					attrName === 'formEncType' ||
+					attrName === 'formTarget')
+			) {
+				devFormActionSources.push([attrName, b.literal(inner.value)]);
+			}
 			bakeLit(bakeStaticAttr(attrName, inner.value, tag, selfNs), attrName, attr.name, inner);
 			continue;
 		}
@@ -10798,6 +10885,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			const outName = tag === 'form' ? 'action' : 'formaction';
 			registerAttrLoweringOrigin(ctx, attr.name, 'ssrAttr', outName);
 			const valueExpr = bindAttributeEvaluation(tsrxExprNode(inner, ctx, name, inlinedSubs));
+			if (devFormActionSources !== null) {
+				devFormActionSources.push([attrName, valueExpr]);
+			}
 			const filteredValue = inheritOriginLoc(
 				b.call(
 					b.arrow(
@@ -10816,7 +10906,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				ssrCall(
 					'ssrAttr',
 					[
-						b.literal(outName, JSON.stringify(outName)),
+						b.literal(ctx.dev ? attrName : outName, JSON.stringify(ctx.dev ? attrName : outName)),
 						filteredValue,
 						b.literal(tag, JSON.stringify(tag)),
 						b.literal(selfNs, JSON.stringify(selfNs)),
@@ -10832,11 +10922,26 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		ctx.runtimeNeeded.add('ssrAttr');
 		registerAttrLoweringOrigin(ctx, attr.name, 'ssrAttr', attrName);
 		const valueExpr = bindAttributeEvaluation(tsrxExprNode(inner, ctx, name, inlinedSubs));
+		if (
+			devFormActionSources !== null &&
+			(attrName === 'type' ||
+				attrName === 'name' ||
+				attrName === 'method' ||
+				attrName === 'encType' ||
+				attrName === 'target' ||
+				attrName === 'formMethod' ||
+				attrName === 'formEncType' ||
+				attrName === 'formTarget')
+		) {
+			devFormActionSources.push([attrName, valueExpr]);
+		}
+		const authoredAttrName =
+			ctx.dev && (rawAttrName === 'tabIndex' || rawAttrName === 'htmlFor') ? rawAttrName : attrName;
 		parts.push(
 			ssrCall(
 				'ssrAttr',
 				[
-					b.literal(attrName, JSON.stringify(attrName)),
+					b.literal(authoredAttrName, JSON.stringify(authoredAttrName)),
 					valueExpr,
 					b.literal(tag, JSON.stringify(tag)),
 					b.literal(selfNs, JSON.stringify(selfNs)),
@@ -10873,6 +10978,24 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				b.literal(resolveFormControlsAcrossSpreads),
 			],
 			node,
+		);
+	}
+	if (devFormActionSources !== null && devFormActionSources.length > 0) {
+		ctx.runtimeNeeded.add('ssrFormAuthoringDiagnostics');
+		flush();
+		parts.push(
+			ssrCall(
+				'ssrFormAuthoringDiagnostics',
+				[
+					b.literal(tag, JSON.stringify(tag)),
+					b.array(
+						devFormActionSources.map(([attrName, expression]) =>
+							b.array([b.literal(attrName, JSON.stringify(attrName)), expression]),
+						),
+					),
+				],
+				node,
+			),
 		);
 	}
 
@@ -10976,6 +11099,17 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		// positions reset this in ssrCompileBody.
 		const prevHostChildPos = ctx._ssrHostChildPos;
 		ctx._ssrHostChildPos = true;
+		const previousNestingText = ctx._ssrNestingText;
+		ctx._ssrNestingText =
+			ctx.dev &&
+			(tag === 'table' ||
+				tag === 'tbody' ||
+				tag === 'thead' ||
+				tag === 'tfoot' ||
+				tag === 'tr' ||
+				tag === 'colgroup' ||
+				tag === 'head' ||
+				tag === 'html');
 		childrenExpr = ssrEmitNodes(
 			normChildren,
 			ctx,
@@ -10986,6 +11120,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			childComponentNs,
 			nlGuardFirst,
 		);
+		ctx._ssrNestingText = previousNestingText;
 		ctx._ssrHostChildPos = prevHostChildPos;
 	}
 	// `children=` and spread-held children are content props, not attributes.
@@ -11089,7 +11224,20 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			ctx.runtimeNeeded.add('ssrOptionValueSources');
 			optionValueExpr = ssrCall('ssrOptionValueSources', [b.array(attrSources)], node);
 		}
-		parts.push(ssrCall('ssrOption', [optionValueExpr, attrsExpr, contentExpr], node));
+		const optionArguments = [optionValueExpr, attrsExpr, contentExpr];
+		if (
+			ctx.dev &&
+			(node.children || []).some(
+				(child) =>
+					child.type === 'Element' ||
+					child.type === 'JSXElement' ||
+					child.type === 'Fragment' ||
+					child.type === 'JSXFragment',
+			)
+		) {
+			optionArguments.push(b.literal(true, 'true'));
+		}
+		parts.push(ssrCall('ssrOption', optionArguments, node));
 		return finalize();
 	}
 	if (singleSpreadContentTemp !== null) {
@@ -13255,6 +13403,15 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// commit-time insertion; scope-owned `headBlock` metadata stays at the body
 	// tail (`plan.head`).
 	if (plan?.resources) bodyStatements.push(...plan.resources);
+	if (ctx.dev && plan?.nesting?.length > 0) {
+		ctx.runtimeNeeded.add('devHtmlNesting');
+		for (const candidate of plan.nesting) {
+			const args = candidate.map((value) =>
+				value === undefined ? undefinedNode() : jsonValueToNode(value),
+			);
+			bodyStatements.push(inheritOriginLoc(b.stmt(b.call('_$devHtmlNesting', ...args)), node));
+		}
+	}
 	// Inlined sub-helpers (children render fns, legacy-placement construct
 	// bodies, hoisted `<tsrx>` blocks) are function DECLARATION nodes embedded
 	// directly in the body — they hoist, so their placement after the setup
@@ -19805,7 +19962,9 @@ function planJsx(
 	// branch body during this body's emitElementHtml) can't clobber the outer body's map.
 	// `null` outside dev → zero work, prod output byte-identical.
 	const _prevElemLocs = ctx._elemLocs;
+	const previousNestingWarnings = ctx._clientNestingWarnings;
 	ctx._elemLocs = ctx.dev ? new Map() : null;
+	ctx._clientNestingWarnings = ctx.dev ? [] : null;
 	// NESTED HeadHoists lifted out of host-element children during the walk (see
 	// emitNodeHtml's element case) join this plan's head list, so client mounts
 	// match the server's any-depth hoisting. Saved/restored per plan: an @if
@@ -19830,6 +19989,7 @@ function planJsx(
 	// its constructs (see `headEmit` below), keeping every scope's `slots` packed.
 	if (jsxNodes.length === 0) {
 		ctx._elemLocs = _prevElemLocs;
+		ctx._clientNestingWarnings = previousNestingWarnings;
 		ctx._nestedHeadHoists = _prevNestedHeads;
 		const headOnlyEmit = emitHeadClient(headNodes, ctx, 0);
 		return {
@@ -19922,6 +20082,9 @@ function planJsx(
 	for (let rootI = 0; rootI < jsxNodes.length; rootI++) {
 		const node = jsxNodes[rootI];
 		const nodeIsComp = node.type === 'Element' && isComponentTag(node);
+		if (ctx.dev && node.type === 'Element' && !nodeIsComp) {
+			collectClientHtmlNestingWarnings(node, ctx, parentNs === 'opaque' ? 'html' : parentNs);
+		}
 		// Single non-comp Element: path=[] (lives at _root directly).
 		// Otherwise (wrapped in <octane-frag>): path=[htmlIdx] when HTML-contributing.
 		// Component-call: path=[] (no DOM contributed, host is the wrapper).
@@ -20347,6 +20510,7 @@ function planJsx(
 			ctx.runtimeNeeded.add('markNativeChangeDiagnosticStatic');
 		}
 		if (b.kind === 'nativeChangeRuntime') ctx.runtimeNeeded.add('queueNativeChangeDiagnostic');
+		if (b.kind === 'formDiagnostic') ctx.runtimeNeeded.add('queueFormAuthoringDiagnostic');
 		if (b.kind === 'event' && b.dev) ctx.runtimeNeeded.add('devEventListener');
 		if (b.kind === 'event-bundle') {
 			// 3b: mount builds the descriptor via evtN. Lifetime-stable bundles skip
@@ -21436,6 +21600,8 @@ function planJsx(
 	ctx._fragRefStack = _prevFragRefStack;
 	// Restore the outer plan's per-element LOC map — pairs with the save at planJsx top.
 	ctx._elemLocs = _prevElemLocs;
+	const nestingWarnings = ctx._clientNestingWarnings;
+	ctx._clientNestingWarnings = previousNestingWarnings;
 
 	// After-lines sorted by source id (see the pushAfter comment): each entry is
 	// a statement node.
@@ -21455,6 +21621,7 @@ function planJsx(
 		after: afterStatements,
 		head: headEmit.head,
 		resources: headEmit.resources,
+		nesting: nestingWarnings,
 		// DEV ONLY (`null` in prod → no body emission, byte-identical output): a structured
 		// `{ slotIndex: [line, column] }` literal for hydration-mismatch warnings + a future
 		// DevTools element→source layer. Keyed by the slot index the runtime already uses.
@@ -21741,6 +21908,13 @@ function emitBindingMount(bind, elVar, bag) {
 	}
 	if (bind.kind === 'nativeChangeRuntime') {
 		return [...mountHost().map(st), st(b.stmt(b.call('_$queueNativeChangeDiagnostic', el())))];
+	}
+	if (bind.kind === 'formDiagnostic') {
+		const args = [el(), b.literal(bind.diagnosticKind)];
+		if (bind.selectedBinding !== undefined) {
+			args.push(b.arrow([], bagFieldNode(bag, `_prev$${bind.selectedBinding.id}`)));
+		}
+		return st(b.stmt(b.call('_$queueFormAuthoringDiagnostic', ...args)));
 	}
 	switch (bind.kind) {
 		case 'textOnlyChild': {
@@ -22799,6 +22973,104 @@ function emitNodeHtml(
 	return createTemplateIr();
 }
 
+function collectClientHtmlNestingWarnings(root, ctx, inheritedNamespace) {
+	const sourceLocation = (node) => {
+		const loc = node?.loc?.start;
+		return loc ? `${ctx.mapSourceName}:${loc.line}:${loc.column}` : undefined;
+	};
+	const append = (message) => {
+		if (message === null) return;
+		const identity = JSON.stringify(message);
+		if (!ctx._clientNestingWarnings.some((existing) => JSON.stringify(existing) === identity)) {
+			ctx._clientNestingWarnings.push(message);
+		}
+	};
+	const parentMayBeInvalid = (child, parent) => {
+		if (child.includes('-') || parent.includes('-') || parent === 'template') return false;
+		return (
+			(parent === 'p' &&
+				/^(address|article|aside|blockquote|div|dl|fieldset|footer|form|h[1-6]|header|hgroup|hr|main|menu|nav|ol|p|pre|section|table|ul)$/.test(
+					child,
+				)) ||
+			(child === parent && /^(a|button|form|li|p|h[1-6])$/.test(child)) ||
+			/^(table|tbody|thead|tfoot|tr|colgroup|select|optgroup|option|head|html|frameset)$/.test(
+				parent,
+			) ||
+			/^(body|caption|col|colgroup|frame|frameset|head|html|tbody|td|tfoot|th|thead|tr)$/.test(
+				child,
+			)
+		);
+	};
+	const ancestorMayBeInvalid = (child, ancestor) =>
+		(child === ancestor &&
+			/^(a|button|form|li|p|dt|dd|rt|rp|optgroup|option|h[1-6])$/.test(child)) ||
+		(ancestor === 'p' &&
+			/^(address|article|aside|blockquote|div|dl|fieldset|footer|form|h[1-6]|header|hgroup|hr|main|menu|nav|ol|p|pre|section|table|ul)$/.test(
+				child,
+			));
+	const restrictedTextParent = (tag) =>
+		/^(table|tbody|thead|tfoot|tr|colgroup|head|html)$/.test(tag);
+	const htmlAnnotation = (node) => {
+		const attributes = node.attributes || node.openingElement?.attributes || [];
+		return attributes.some((attr) => {
+			const name = attr.name?.name ?? attr.name;
+			if (typeof name !== 'string' || name.toLowerCase() !== 'encoding') return false;
+			const value = attr.value?.value ?? attr.value?.expression?.value;
+			return typeof value === 'string' && /^(text\/html|application\/xhtml\+xml)$/i.test(value);
+		});
+	};
+	const visit = (node, namespace, ancestors) => {
+		if (node?.type !== 'Element' && node?.type !== 'JSXElement') return;
+		if (isComponentTag(node)) return;
+		const tag = elementTagName(node);
+		if (tag === null) return;
+		const semanticTag = tag.toLowerCase();
+		const ownNamespace = nsForSelf(tag, namespace);
+		const location = sourceLocation(node);
+		const parent = ancestors[ancestors.length - 1];
+		if (
+			ancestors.length === 0 &&
+			ownNamespace === 'html' &&
+			/^(a|address|article|aside|blockquote|button|div|dl|fieldset|footer|form|h[1-6]|header|hgroup|hr|li|main|menu|nav|ol|p|pre|section|table|ul|dt|dd|tr|td|th|tbody|thead|tfoot|option|optgroup)$/.test(
+				semanticTag,
+			)
+		) {
+			append([semanticTag, [], location]);
+		}
+		if (ownNamespace === 'html' && parent?.namespace === 'html') {
+			if (parentMayBeInvalid(semanticTag, parent.tag)) {
+				append([semanticTag, [parent.tag], location, parent.location]);
+			}
+			const path = [parent.tag];
+			for (let index = ancestors.length - 2; index >= 0; index--) {
+				const ancestor = ancestors[index];
+				if (ancestor.namespace !== 'html') break;
+				path.push(ancestor.tag);
+				if (ancestorMayBeInvalid(semanticTag, ancestor.tag)) {
+					append([semanticTag, [...path], location, ancestor.location]);
+				}
+			}
+		}
+		const childNamespace =
+			ownNamespace === 'mathml' && semanticTag === 'annotation-xml' && htmlAnnotation(node)
+				? 'html'
+				: nsForChildren(tag, namespace);
+		const nextAncestors = [...ancestors, { tag: semanticTag, namespace: ownNamespace, location }];
+		const children = normalizeChildren(node.children || [], childNamespace === 'svg', ctx);
+		for (const child of children) {
+			if (child.type === 'Text' && ownNamespace === 'html' && restrictedTextParent(semanticTag)) {
+				const text = staticTextLiteral(child.expression);
+				if (typeof text === 'string' && text !== '') {
+					append(['#text', [semanticTag], text, location]);
+				}
+			} else {
+				visit(child, childNamespace, nextAncestors);
+			}
+		}
+	};
+	visit(root, inheritedNamespace, []);
+}
+
 function emitElementHtml(
 	node,
 	path,
@@ -22864,7 +23136,6 @@ function emitElementHtml(
 	// (`<foreignObject>` is SVG-ns but its children are HTML).
 	const hostNs = nsForSelf(tag, parentNs);
 	const childNs = nsForChildren(tag, parentNs);
-
 	// Collect attributes.
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	// A null/undefined child alongside direct raw HTML is semantically absent.
@@ -22900,6 +23171,15 @@ function emitElementHtml(
 			.filter((attr) => attr.type === 'Attribute' || attr.type === 'JSXAttribute')
 			.map((attr) => normalizeJsxAttrName(jsxAttrRawName(attr), tag, hostNs)),
 	);
+	// React validates a customized built-in from its complete final prop set,
+	// so an authored `is` must be visible before any sibling attr is checked even
+	// when it appears last. Reuse the existing DEV whole-host snapshot; keeping
+	// this proof behind ctx.dev preserves byte-identical production output.
+	const resolveDevCustomizedHost =
+		ctx.dev &&
+		(hostNs === 'html' || hostNs === 'opaque') &&
+		!tag.includes('-') &&
+		directPropNames.has('is');
 	const hasDirectFormCascade =
 		((tag === 'input' || tag === 'textarea' || tag === 'select') &&
 			directPropNames.has('value') &&
@@ -22909,7 +23189,10 @@ function emitElementHtml(
 			directPropNames.has('multiple') &&
 			(directPropNames.has('value') || directPropNames.has('defaultValue')));
 	const resolveHostPropsAcrossSources =
-		firstSpreadIdx !== -1 || hasDuplicateDirectProp || hasDirectFormCascade;
+		firstSpreadIdx !== -1 ||
+		hasDuplicateDirectProp ||
+		hasDirectFormCascade ||
+		resolveDevCustomizedHost;
 	const hostClientSources = [];
 	let directChildrenClientBinding = null;
 	let hostCommitClientBinding = null;
@@ -22993,6 +23276,25 @@ function emitElementHtml(
 					val.type === 'JSXExpressionContainer' ? val.expression : val,
 					cssHash,
 				);
+				if (
+					resolveDevCustomizedHost &&
+					firstSpreadIdx === -1 &&
+					!hasDuplicateDirectProp &&
+					rawAttrName === 'is' &&
+					inner.type === 'Literal' &&
+					typeof inner.value === 'string'
+				) {
+					// Customized built-ins must carry `is` when the browser constructs
+					// the template node; the diagnostic snapshot still needs its source.
+					appendBakedAttribute(
+						attrTemplate,
+						bakeStaticAttr('is', inner.value, tag, hostNs),
+						'is',
+						attr.name,
+						inner,
+						ctx.inspect,
+					);
+				}
 				expr = tsrxExprNode(inner, ctx, componentName, inlinedSubs);
 			}
 			const binding = {
@@ -23513,7 +23815,10 @@ function emitElementHtml(
 			bindings.push({
 				id: bindings.length,
 				kind: 'attr',
-				name: attrName,
+				name:
+					ctx.dev && (rawAttrName === 'tabIndex' || rawAttrName === 'htmlFor')
+						? rawAttrName
+						: attrName,
 				expr,
 				path,
 				ns: hostNs,
@@ -23548,6 +23853,46 @@ function emitElementHtml(
 			origin: node,
 			sources: formControlClientSources,
 		});
+	}
+	if (ctx.dev) {
+		const selectedOption = tag === 'option' && directPropNames.has('selected');
+		const selectedBinding = selectedOption
+			? bindings.findLast((binding) => binding.path === path && binding.name === 'selected')
+			: undefined;
+		const complexOptionChildren =
+			tag === 'option' &&
+			!directPropNames.has('value') &&
+			sourceChildren.some(
+				(child) =>
+					child.type === 'Element' ||
+					child.type === 'JSXElement' ||
+					child.type === 'Fragment' ||
+					child.type === 'JSXFragment',
+			);
+		const textareaChildren =
+			tag === 'textarea' &&
+			!directPropNames.has('value') &&
+			!directPropNames.has('defaultValue') &&
+			hasNestedJsxChildren;
+		for (const diagnosticKind of [
+			selectedOption ? 'option-selected' : null,
+			complexOptionChildren ? 'option-children' : null,
+			textareaChildren ? 'textarea-children' : null,
+		]) {
+			if (diagnosticKind === null) continue;
+			const diagnostic = {
+				id: bindings.length,
+				kind: 'formDiagnostic',
+				diagnosticKind,
+				path,
+				origin: node,
+				mountOnly: true,
+			};
+			if (diagnosticKind === 'option-selected' && selectedBinding !== undefined) {
+				diagnostic.selectedBinding = selectedBinding;
+			}
+			bindings.push(diagnostic);
+		}
 	}
 	if (ctx.dev && firstSpreadIdx === -1) {
 		const classification = ctx.nativeChangeClassifications?.get(

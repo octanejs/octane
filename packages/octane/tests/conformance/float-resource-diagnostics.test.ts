@@ -92,13 +92,18 @@ function warningMessages(error: ReturnType<typeof vi.spyOn>): string[] {
 	return error.mock.calls.map((call) => String(call[0]));
 }
 
-function expectDevelopmentWarning(messages: string[], fragment: string): void {
+function expectDevelopmentWarning(
+	messages: string[],
+	fragment: string,
+	secondaryFragment?: string,
+): void {
 	if (productionCompile) {
 		expect(messages).toEqual([]);
 		return;
 	}
-	expect(messages).toHaveLength(1);
+	expect(messages).toHaveLength(secondaryFragment === undefined ? 1 : 2);
 	expect(messages[0]).toContain(fragment);
+	if (secondaryFragment !== undefined) expect(messages[1]).toContain(secondaryFragment);
 }
 
 afterEach(() => {
@@ -123,7 +128,11 @@ describe('React Float stylesheet resource diagnostics', () => {
 		expect(link?.getAttribute('rel')).toBe('stylesheet');
 		expect(link?.hasAttribute('data-precedence')).toBe(false);
 		expect(document.head.querySelector('[data-precedence]')).toBeNull();
-		expectDevelopmentWarning(warningMessages(error), variant.message);
+		expectDevelopmentWarning(
+			warningMessages(error),
+			variant.message,
+			variant.name === 'an empty href' ? 'An empty string was passed to the `href`' : undefined,
+		);
 	});
 
 	// Per ReactDOMFloat-test.js:7898 — server rendering must retain the ordinary
@@ -134,7 +143,11 @@ describe('React Float stylesheet resource diagnostics', () => {
 
 		expect(html).toMatch(/<section class="invalid-precedence-host"><link /);
 		expect(html).not.toContain('data-precedence=');
-		expectDevelopmentWarning(warningMessages(error), variant.message);
+		expectDevelopmentWarning(
+			warningMessages(error),
+			variant.message,
+			variant.name === 'an empty href' ? 'An empty string was passed to the `href`' : undefined,
+		);
 	});
 
 	// Per ReactDOMFloat-test.js:7898 — a valid precedence stylesheet remains a

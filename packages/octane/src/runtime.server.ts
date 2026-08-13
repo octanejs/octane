@@ -62,12 +62,20 @@ import {
 } from './constants.js';
 import { hasOwnProp } from './has-own.js';
 import { headOwnershipSuffix } from './head-ownership.js';
+import { resourceHintWarning } from './resource-hint-diagnostics.js';
 import {
 	ariaAttributeWarning,
 	isAriaAttributeName,
 	isUnknownAriaAttribute,
 	unknownAriaAttributeWarning,
 } from './aria-diagnostics.js';
+import {
+	booleanAttributeStringWarning,
+	emptyResourceUrlWarning,
+	hostPropertyWarning,
+	invalidHostPropertiesWarning,
+	unsupportedAttributeCoercionWarning,
+} from './host-property-diagnostics.js';
 import type { HydrateProps, HydrationStrategy } from './hydration/types.js';
 import {
 	applyElementDefaultProps,
@@ -83,6 +91,7 @@ import { devWarnStyleCoercion, devWarnStyleProperty, normalizeClass, styleName }
 import {
 	invalidHtmlNestingWithAncestor,
 	invalidHtmlNestingWithParent,
+	invalidHtmlTextNesting,
 } from './html-tree-validation.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 import {
@@ -91,6 +100,7 @@ import {
 	markComponentFlags,
 } from './component-flags.js';
 import { formatServerError } from './error-codes.server.generated.js';
+import { formAuthoringDiagnostics } from './form-diagnostics.js';
 import { isRendererContext, registerServerRendererContextProvider } from './renderer-bridge.js';
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
 
@@ -354,6 +364,7 @@ let SSR_NESTING_WARNINGS: Set<string> | null | undefined = null;
 // Match that prop-name de-duplication across independent SSR calls. Lazily
 // allocated from DEV-only branches, so optimized server bundles erase it.
 let DEV_SSR_ATTRIBUTE_WARNINGS: Set<string> | null = null;
+let DEV_SSR_CUSTOM_HOST_DEPTH = 0;
 
 // Walk a frame to its dotted path ('' for the root). Memoized per frame.
 function framePath(f: Frame): string {
@@ -443,12 +454,14 @@ function withSsrElementContext(
 	location: string | undefined,
 	render: () => string,
 	forcedNamespace?: ParserNamespace,
+	htmlIntegrationPoint?: boolean,
 ): string {
 	const parent = CURRENT_SSR_ELEMENT;
-	const { namespace, childrenNamespace } =
+	const { namespace, childrenNamespace: inheritedChildrenNamespace } =
 		forcedNamespace === undefined
 			? ssrElementNamespaces(tag, parent)
 			: { namespace: forcedNamespace, childrenNamespace: forcedNamespace };
+	const childrenNamespace = htmlIntegrationPoint === true ? 'html' : inheritedChildrenNamespace;
 	const semanticTag = tag.toLowerCase();
 	const element: SsrElementContext = {
 		tag: semanticTag,
@@ -502,9 +515,23 @@ export function ssrElement(
 	tag: string,
 	location: string | undefined,
 	render: () => string,
+	htmlIntegrationPoint?: boolean,
 ): string {
 	if (process.env.NODE_ENV === 'production' || SSR_NESTING_WARNINGS === null) return render();
-	return withSsrElementContext(tag, location, render);
+	return withSsrElementContext(tag, location, render, undefined, htmlIntegrationPoint);
+}
+
+/** Compiler ABI: validate one authored static or dynamic text child in DEV SSR. */
+export function ssrNestingText(value: unknown): string {
+	const text = ssrText(value);
+	if (process.env.NODE_ENV !== 'production' && text !== '') {
+		const parent = CURRENT_SSR_ELEMENT;
+		if (parent !== null && parent.namespace === 'html' && SSR_NESTING_WARNINGS !== null) {
+			const message = invalidHtmlTextNesting(text, parent.tag, parent.location);
+			if (message !== null) reportInvalidHtmlNesting(message);
+		}
+	}
+	return text;
 }
 
 const NOOP = (): void => {};
@@ -1397,6 +1424,8 @@ function ssrHostElement(
 		if (props != null) {
 			if (process.env.NODE_ENV !== 'production') {
 				devValidateSsrAriaProps(props, semanticTag, namespace);
+				devValidateSsrHostProps(props, semanticTag, namespace);
+				devValidateSsrFormProps(semanticTag, props, children);
 			}
 			for (const k in props) {
 				const val = props[k];
@@ -1872,6 +1901,67 @@ function devValidateSsrAriaProps(
 	}
 }
 
+function devValidateSsrHostProps(
+	props: Record<string, unknown> | Iterable<readonly [string, unknown]>,
+	tag: string | undefined,
+	namespace: AttributeNamespace,
+): void {
+	if (
+		SSR_NESTING_WARNINGS === null ||
+		tag === undefined ||
+		(resolveAttributeNamespace(namespace) === 'html' && tag.indexOf('-') !== -1)
+	) {
+		return;
+	}
+	const entries = Symbol.iterator in props ? props : Object.entries(props);
+	const snapshot = Array.isArray(entries) ? entries : [...entries];
+	if (snapshot.some(([name, value]) => name === 'is' && typeof value === 'string')) return;
+	let invalid: string[] | undefined;
+	for (const [name, value] of snapshot) {
+		if (
+			name === 'key' ||
+			name === 'ref' ||
+			name === 'children' ||
+			name === 'class' ||
+			name === 'className' ||
+			name === 'style' ||
+			name === 'dangerouslySetInnerHTML' ||
+			isAriaAttributeName(name)
+		) {
+			continue;
+		}
+		if (name.length > 2 && name[0] === 'o' && name[1] === 'n') {
+			if (typeof value === 'string') {
+				const warning = hostPropertyWarning(name, value);
+				if (warning !== null) devWarnSsrAttributeOnce(name, warning);
+			}
+			continue;
+		}
+		const warning = hostPropertyWarning(
+			name,
+			value,
+			tag,
+			resolveAttributeNamespace(namespace) === 'svg',
+		);
+		if (warning !== null) {
+			devWarnSsrAttributeOnce(name, warning);
+			continue;
+		}
+		if (typeof value !== 'function' && typeof value !== 'symbol') continue;
+		if (
+			typeof value === 'function' &&
+			((tag === 'form' && name === 'action') ||
+				((tag === 'button' || tag === 'input') && (name === 'formAction' || name === 'formaction')))
+		) {
+			continue;
+		}
+		if (DEV_SSR_ATTRIBUTE_WARNINGS?.has(name)) continue;
+		(DEV_SSR_ATTRIBUTE_WARNINGS ??= new Set()).add(name);
+		(invalid ??= []).push(name);
+	}
+	if (invalid !== undefined) console.error(invalidHostPropertiesWarning(invalid, tag));
+}
+
 /**
  * A dynamic attribute: ` name="value"`, ` name` for `true`, or '' to omit.
  * `tag` and `namespace` (when the emit site knows them) gate the tag-sensitive
@@ -1891,9 +1981,18 @@ export function ssrAttr(
 		process.env.NODE_ENV !== 'production' &&
 		!isCustomTag &&
 		tag !== undefined &&
-		isAriaAttributeName(name)
+		DEV_SSR_CUSTOM_HOST_DEPTH === 0
 	) {
-		const warning = ariaAttributeWarning(name, tag);
+		const warning = isAriaAttributeName(name)
+			? ariaAttributeWarning(name, tag)
+			: hostPropertyWarning(
+					name === 'formaction' && v === null && (tag === 'button' || tag === 'input')
+						? 'formAction'
+						: name,
+					v,
+					tag,
+					namespace === 'svg',
+				);
 		if (warning !== null) devWarnSsrAttributeOnce(name, warning);
 	}
 	// React-parity aliases (ATTRIBUTE_ALIASES, constants.ts): `htmlFor` → `for`,
@@ -1909,6 +2008,13 @@ export function ssrAttr(
 		}
 		const alias = ATTRIBUTE_ALIASES.get(name);
 		if (alias !== undefined) name = alias;
+		else if (
+			process.env.NODE_ENV !== 'production' &&
+			(tag === 'button' || tag === 'input') &&
+			name === 'formAction'
+		) {
+			name = 'formaction';
+		}
 	}
 	// `class` / `className` clsx-compose so arrays / objects serialise the same string
 	// the client writes (a nullish/false class still drops out; a truthy-but-empty
@@ -1994,6 +2100,10 @@ export function ssrAttr(
 		// the canonical `attr=""` presence form, falsy drops — mirroring the
 		// client's coerceAttrValue byte-for-byte (hydration parity).
 		if (BOOLEAN_ATTR_PROPS.has(lower)) {
+			if (process.env.NODE_ENV !== 'production' && tag !== undefined) {
+				const warning = booleanAttributeStringWarning(name, v);
+				if (warning !== null) devWarnSsrAttributeOnce(name, warning);
+			}
 			return v ? ' ' + lower + '=""' : '';
 		}
 		// The OVERLOADED booleans (download/capture): boolean values get
@@ -2054,7 +2164,17 @@ export function ssrAttr(
 			`Received NaN for the \`${name}\` attribute. If this is expected, cast the value to a string.`,
 		);
 	}
-	const s = v === true ? '' : String(v);
+	let s: string;
+	if (process.env.NODE_ENV !== 'production' && !isCustomTag && tag !== undefined) {
+		try {
+			s = v === true ? '' : String(v);
+		} catch (error) {
+			devWarnSsrAttributeOnce(name, unsupportedAttributeCoercionWarning(name, v));
+			throw error;
+		}
+	} else {
+		s = v === true ? '' : String(v);
+	}
 	// An empty `src`/`href`/`<object data>` resolves to the CURRENT PAGE's URL — browsers would
 	// re-fetch the whole document as an image/script/stylesheet. React strips
 	// these; so does the client's setAttribute (element-agnostic, custom
@@ -2067,6 +2187,9 @@ export function ssrAttr(
 			(name === 'href' && tag !== undefined && tag !== 'a' && tag !== 'area') ||
 			(name === 'data' && tag === 'object'))
 	) {
+		if (process.env.NODE_ENV !== 'production' && !isCustomTag && tag !== undefined) {
+			devWarnSsrAttributeOnce('empty:' + name, emptyResourceUrlWarning(name));
+		}
 		return '';
 	}
 	if (v === true) return ' ' + name;
@@ -2248,7 +2371,14 @@ export function ssrAttrs(
 		const identity = namespace === 'html' ? name.toLowerCase() : name;
 		const previous = resolved.get(identity);
 		if (previous === undefined || previous[3] < lastOrder) {
-			resolved.set(identity, [name, value, firstOrder, lastOrder]);
+			resolved.set(identity, [
+				process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
+					? rawName
+					: name,
+				value,
+				firstOrder,
+				lastOrder,
+			]);
 		}
 	}
 
@@ -2260,9 +2390,33 @@ export function ssrAttrs(
 			tag,
 			namespace,
 		);
+		devValidateSsrHostProps(
+			ordered.map(([name, value]) => [name, value] as const),
+			tag,
+			namespace,
+		);
+		if (tag === 'form' || tag === 'button' || tag === 'input') {
+			const formProps: Record<string, unknown> = Object.create(null);
+			for (const [name, value] of ordered) formProps[name] = value;
+			const action =
+				tag === 'form' ? formProps.action : (formProps.formAction ?? formProps.formaction);
+			if (typeof action === 'function') devValidateSsrFormProps(tag, formProps);
+		}
 	}
-	for (const [name, value] of ordered) {
-		out += ssrAttrEntry(name, value, tag, namespace);
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		ordered.some(([name, value]) => name === 'is' && typeof value === 'string')
+	) {
+		DEV_SSR_CUSTOM_HOST_DEPTH++;
+		try {
+			for (const [name, value] of ordered) out += ssrAttrEntry(name, value, tag, namespace);
+		} finally {
+			DEV_SSR_CUSTOM_HOST_DEPTH--;
+		}
+	} else {
+		for (const [name, value] of ordered) {
+			out += ssrAttrEntry(name, value, tag, namespace);
+		}
 	}
 	return out;
 }
@@ -2325,6 +2479,7 @@ export function ssrSpread(
 	if (obj == null) return '';
 	if (process.env.NODE_ENV !== 'production') {
 		devValidateSsrAriaProps(Object(obj) as Record<string, unknown>, tag, namespace);
+		devValidateSsrHostProps(Object(obj) as Record<string, unknown>, tag, namespace);
 	}
 	let out = '';
 	for (const k of Object.keys(Object(obj))) {
@@ -2511,6 +2666,42 @@ export function ssrVoidContent(
 // every <option> serialized inside mark itself ` selected`.
 // ---------------------------------------------------------------------------
 
+function devValidateSsrFormProps(
+	tag: string,
+	props: Record<string, unknown>,
+	children?: unknown,
+): void {
+	if (
+		process.env.NODE_ENV === 'production' ||
+		SSR_NESTING_WARNINGS === null ||
+		CURRENT_SSR_ELEMENT === null ||
+		(tag !== 'input' &&
+			tag !== 'textarea' &&
+			tag !== 'select' &&
+			tag !== 'option' &&
+			tag !== 'form' &&
+			tag !== 'button')
+	) {
+		return;
+	}
+	for (const warning of formAuthoringDiagnostics(tag, props, children)) {
+		console.error(warning.message);
+	}
+}
+
+/** DEV-only compiler target: validate final function-action props without emitting HTML. */
+export function ssrFormAuthoringDiagnostics(
+	tag: string,
+	sources: readonly (readonly [name: string, value: unknown])[],
+): string {
+	if (process.env.NODE_ENV !== 'production' && SSR_NESTING_WARNINGS !== null) {
+		const props: Record<string, unknown> = Object.create(null);
+		for (const [name, value] of sources) props[name] = value;
+		devValidateSsrFormProps(tag, props);
+	}
+	return '';
+}
+
 /**
  * The `value` attribute for a controlled/default `<input>` value. Mirrors the
  * client's toControlledString exactly — `value={false}` serializes "false"
@@ -2537,6 +2728,14 @@ export function ssrInputAttrs(
 	sources: Array<readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown]>,
 ): string {
 	const props = resolveFormControlSources(sources);
+	if (process.env.NODE_ENV !== 'production') {
+		devValidateSsrFormProps('input', {
+			value: props.value,
+			defaultValue: props.defaultValue,
+			checked: props.checked,
+			defaultChecked: props.defaultChecked,
+		});
+	}
 	return (
 		ssrValueAttr(props.value ?? props.defaultValue) +
 		ssrCheckedAttr(props.checked ?? props.defaultChecked)
@@ -2629,6 +2828,12 @@ export function ssrTextareaValueSources(
 	sources: readonly SsrFormControlSource[],
 ): string | undefined {
 	const props = resolveFormControlSources(sources);
+	if (process.env.NODE_ENV !== 'production') {
+		devValidateSsrFormProps('textarea', {
+			value: props.value,
+			defaultValue: props.defaultValue,
+		});
+	}
 	const value = props.value ?? props.defaultValue;
 	return value == null ? undefined : ssrTextareaValue(value);
 }
@@ -2664,6 +2869,9 @@ export function ssrSelectScope(
 	multiple: unknown,
 	children: () => string,
 ): string {
+	if (process.env.NODE_ENV !== 'production') {
+		devValidateSsrFormProps('select', { value, defaultValue, multiple });
+	}
 	const v = value != null ? value : defaultValue;
 	let frame: SelectScope;
 	if (v == null) {
@@ -2726,7 +2934,20 @@ export function ssrOptionValueSources(sources: readonly SsrAttributeSource[]): u
  * is the compare key, per React). Returns a plain option when no controlled
  * select scope is active.
  */
-export function ssrOption(value: unknown, attrs: string, content: string): string {
+export function ssrOption(
+	value: unknown,
+	attrs: string,
+	content: string,
+	complexAuthoredChildren = false,
+): string {
+	if (process.env.NODE_ENV !== 'production' && SSR_NESTING_WARNINGS !== null) {
+		if (/(?:^|\s)selected(?:\s|=|$)/i.test(attrs)) {
+			devValidateSsrFormProps('option', { value, selected: true });
+		}
+		if (value == null && complexAuthoredChildren) {
+			devValidateSsrFormProps('option', { value }, {});
+		}
+	}
 	return '<option' + attrs + ssrOptionSelected(value, content) + '>' + content + '</option>';
 }
 
@@ -8236,32 +8457,24 @@ function hintAttrs(
 }
 
 function coerceHintHref(href: unknown): string | null {
-	if (typeof href !== 'string' || href === '') {
-		warnHintUsage('resource hints require a non-empty string href; the call was ignored.');
-		return null;
-	}
-	return href;
+	return typeof href === 'string' && href !== '' ? href : null;
 }
 
 /** React DOM `preload(href, {as, …})`. */
-/** Malformed-hint diagnostics (dev only; the call stays a no-op either way). */
-function warnHintUsage(message: string): void {
-	if (process.env.NODE_ENV !== 'production') console.error(message);
-}
-
 export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
+	if (process.env.NODE_ENV !== 'production') {
+		const warning = resourceHintWarning('preload', href, options);
+		if (warning !== null) console.error(warning);
+	}
 	const value = coerceHintHref(href);
-	if (value === null) {
-		warnHintUsage('preload() requires a non-empty string href; the call was ignored.');
+	if (value === null) return;
+	if (
+		options === null ||
+		typeof options !== 'object' ||
+		!options.as ||
+		typeof options.as !== 'string'
+	)
 		return;
-	}
-	if (!options?.as || typeof options.as !== 'string') {
-		warnHintUsage(
-			'preload() requires a string `as` option (e.g. "style", "script", "font", "image"); ' +
-				'the call was ignored.',
-		);
-		return;
-	}
 	const as = options.as;
 	// Fonts must be fetched anonymously to be reusable by CSS — enforced
 	// regardless of the caller's crossOrigin, matching React and the client.
@@ -8325,20 +8538,15 @@ export function preload(href: string, options: { as: string } & Record<string, u
  * `<script async src>`), mirroring the client.
  */
 export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
+	if (process.env.NODE_ENV !== 'production') {
+		const warning = resourceHintWarning('preinit', href, options);
+		if (warning !== null) console.error(warning);
+	}
 	const value = coerceHintHref(href);
-	if (value === null) {
-		warnHintUsage('preinit() requires a non-empty string href; the call was ignored.');
-		return;
-	}
+	if (value === null) return;
+	if (options === null || typeof options !== 'object') return;
 	const as = options?.as;
-	if (as !== 'style' && as !== 'script') {
-		warnHintUsage(
-			'preinit() supports only as: "style" or "script" (got ' +
-				JSON.stringify(as) +
-				'); the call was ignored. Use preload() for other destinations.',
-		);
-		return;
-	}
+	if (as !== 'style' && as !== 'script') return;
 	let seeded: Record<string, unknown> | null = null;
 	if (HEAD !== null) {
 		const xfer = HEAD.preloadXfer?.get(as + ':' + value);
@@ -8366,8 +8574,16 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 
 /** React DOM `preconnect(href, {crossOrigin?})`. */
 export function preconnect(href: string, options?: { crossOrigin?: string }): void {
+	if (process.env.NODE_ENV !== 'production') {
+		const warning = resourceHintWarning('preconnect', href, options);
+		if (warning !== null) console.error(warning);
+	}
 	const value = coerceHintHref(href);
 	if (value === null) return;
+	if (options !== null && typeof options !== 'object') options = undefined;
+	else if (options?.crossOrigin !== undefined && typeof options.crossOrigin !== 'string') {
+		options = undefined;
+	}
 	const corsMode =
 		(options as any)?.crossOrigin == null ? '<none>' : String((options as any).crossOrigin);
 	const key = 'preconnect:' + corsMode + ':' + value;
@@ -8386,6 +8602,10 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 
 /** React DOM `prefetchDNS(href)`. */
 export function prefetchDNS(href: string): void {
+	if (process.env.NODE_ENV !== 'production') {
+		const warning = resourceHintWarning('prefetchDNS', href, arguments[1], arguments.length > 1);
+		if (warning !== null) console.error(warning);
+	}
 	const value = coerceHintHref(href);
 	if (value === null) return;
 	const key = 'dns-prefetch:' + value;
@@ -8543,8 +8763,16 @@ export function ssrScriptResource(attrs: Record<string, unknown> | null): string
 
 /** React DOM `preloadModule(href, options?)` — `<link rel="modulepreload">`, keyed by href. */
 export function preloadModule(href: string, options?: Record<string, unknown>): void {
+	if (process.env.NODE_ENV !== 'production') {
+		const warning = resourceHintWarning('preloadModule', href, options);
+		if (warning !== null) console.error(warning);
+	}
 	const value = coerceHintHref(href);
 	if (value === null) return;
+	if (options === null || typeof options !== 'object') options = undefined;
+	else if ('as' in options && typeof options.as !== 'string') {
+		options = { ...options, as: undefined };
+	}
 	// A module that preinitModule OR a classic Float script already executes in
 	// this pass needs no preload — one executable identity per src.
 	if (HEAD !== null && (HEAD.hints.has('module:' + value) || HEAD.hints.has('script:' + value)))
@@ -8571,16 +8799,14 @@ export function preinitModule(
 	href: string,
 	options?: { as?: string } & Record<string, unknown>,
 ): void {
+	if (process.env.NODE_ENV !== 'production') {
+		const warning = resourceHintWarning('preinitModule', href, options);
+		if (warning !== null) console.error(warning);
+	}
 	const value = coerceHintHref(href);
 	if (value === null) return;
-	if ((options?.as ?? 'script') !== 'script') {
-		warnHintUsage(
-			'preinitModule() supports only as: "script" (got ' +
-				JSON.stringify(options?.as) +
-				'); the call was ignored. Use preloadModule() for other module destinations.',
-		);
-		return;
-	}
+	if (options != null && typeof options !== 'object') return;
+	if ((options?.as ?? 'script') !== 'script') return;
 	if (HEAD !== null && HEAD.hints.has('script:' + value)) return;
 	const key = 'module:' + value;
 	const safeHref = sanitizeURL(value);
