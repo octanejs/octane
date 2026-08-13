@@ -3847,6 +3847,91 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(rows.children.map((node) => node.id)).toEqual(['replacement']);
 	});
 
+	it('re-arms incremental compact for fresh ids after a certified teardown', () => {
+		const { container, page } = createHost(66);
+		const program: UniversalHostTemplateProgram = Object.freeze({
+			nodes: Object.freeze([
+				Object.freeze({ type: 'view', parent: -1, props: Object.freeze({ class: 'row' }) }),
+				Object.freeze({ type: 'text', parent: 0, props: Object.freeze({}) }),
+				Object.freeze({ type: '#text', parent: 1, props: Object.freeze({ value: 'ready' }) }),
+			]),
+			events: Object.freeze([
+				Object.freeze({ node: 0, type: 'bindtap', priority: 'default' as const }),
+			]),
+		});
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: { id: 'shell' } },
+				{ op: 'create', id: 2, type: 'view', props: { id: 'rows' } },
+				{ op: 'insert', parent: 1, id: 2, before: null },
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		).apply();
+		const rows = page.children[0]!.children[0]!;
+
+		const mount = (version: number, firstId: number, firstListenerId: number) =>
+			prepareLynxHostBatch(
+				container,
+				batch(version, [
+					{
+						op: 'mount-template-run',
+						parent: 2,
+						before: null,
+						program,
+						firstId,
+						firstListenerId,
+						count: 2,
+						values: Object.freeze([]),
+					},
+				]),
+				{ compact: true, incrementalCompact: true, lazyPublicInstances: true },
+			);
+		const teardown = (version: number, firstId: number) =>
+			prepareLynxHostBatch(
+				container,
+				batch(version, [
+					{ op: 'event', id: firstId, type: 'bindtap', listener: null },
+					{ op: 'event', id: firstId + 3, type: 'bindtap', listener: null },
+					{ op: 'remove', parent: 2, id: firstId },
+					{ op: 'remove', parent: 2, id: firstId + 3 },
+					{ op: 'destroy', id: firstId + 2 },
+					{ op: 'destroy', id: firstId + 1 },
+					{ op: 'destroy', id: firstId },
+					{ op: 'destroy', id: firstId + 5 },
+					{ op: 'destroy', id: firstId + 4 },
+					{ op: 'destroy', id: firstId + 3 },
+				]),
+			);
+
+		const first = mount(2, 10, 100);
+		expect(first.compactHostCount).toBe(6);
+		first.apply();
+		expect(rows.children).toHaveLength(2);
+		teardown(3, 10).apply();
+		expect(rows.children).toEqual([]);
+
+		// The retired run left explicit tombstones behind, so a later pure run
+		// at fresh ids negotiates a new incremental compact acknowledgement
+		// instead of republishing every host.
+		const second = mount(4, 20, 200);
+		expect(second.compactHostCount).toBe(6);
+		second.apply();
+		expect(rows.children).toHaveLength(2);
+		teardown(5, 20).apply();
+
+		// Reusing a retired range still takes the explicit path so generations
+		// keep advancing.
+		const reused = mount(6, 20, 300);
+		expect(reused.compactHostCount).toBeUndefined();
+		reused.apply();
+		expect(
+			reused.handleDelta.some(
+				(delta) => delta.op === 'create' && delta.handle.id === 20 && delta.handle.generation === 2,
+			),
+		).toBe(true);
+	});
+
 	it('retains compact-run ownership for terminal cleanup when fast teardown faults', () => {
 		const { container, page, papi } = createHost(65);
 		const program: UniversalHostTemplateProgram = Object.freeze({

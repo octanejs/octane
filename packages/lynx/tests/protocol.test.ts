@@ -2707,6 +2707,65 @@ describe('@octanejs/lynx transported protocol', () => {
 		expect(isLynxClientEventTarget(container, acceptedIdentity.root, 5, 2)).toBe(false);
 	});
 
+	it('re-arms compact acknowledgements after the last compact host retires', () => {
+		const count = LYNX_COMPACT_ACKNOWLEDGEMENT_MIN_HOSTS;
+		const container = createLynxClientContainer();
+		prepareLynxCompactHandleDeltas(container, templateBatch(count), count, identity(96, 1)).apply();
+		expect(container.getPublicHandle(1)?.active).toBe(true);
+
+		const destroyAll = () =>
+			prepareLynxHandleDeltas(
+				container,
+				{
+					renderer: LYNX_TRANSPORT_RENDERER,
+					version: 2,
+					commands: Array.from({ length: count }, (_value, index) => ({
+						op: 'destroy' as const,
+						id: index + 1,
+					})),
+				},
+				Array.from({ length: count }, (_value, index) => ({
+					op: 'remove' as const,
+					id: index + 1,
+					generation: 1,
+				})),
+				identity(96, 2),
+			);
+		const original = templateProgramRunBatch(count, 3);
+		const run = original.commands[0]!;
+		if (run.op !== 'mount-template-run') throw new Error('Expected a contiguous host run.');
+		const fresh: UniversalHostBatch = {
+			...original,
+			commands: [Object.freeze({ ...run, firstId: count + 1 })],
+		};
+
+		// A rolled-back retirement keeps the segment pinned: the metadata is
+		// restored and a new compact acknowledgement is still refused.
+		const rolledBack = destroyAll();
+		rolledBack.apply();
+		rolledBack.rollback();
+		expect(container.getPublicHandle(2)?.active).toBe(true);
+		expect(() =>
+			prepareLynxCompactHandleDeltas(container, fresh, count, identity(96, 3), count, true),
+		).toThrow(/fresh client container/);
+
+		// Destroying the whole segment retires its metadata, so a later pure
+		// run at fresh ids may negotiate a new compact acknowledgement.
+		destroyAll().apply();
+		expect(container.getPublicHandle(1)).toBeNull();
+		const second = prepareLynxCompactHandleDeltas(
+			container,
+			fresh,
+			count,
+			identity(96, 3),
+			count,
+			true,
+		);
+		second.apply();
+		expect(container.getPublicHandle(count + 1)?.generation).toBe(1);
+		expect(container.getPublicHandle(count + 1)?.active).toBe(true);
+	});
+
 	it('preserves adopted handles when compact descendants are accepted or rolled back', () => {
 		const count = LYNX_COMPACT_ACKNOWLEDGEMENT_MIN_HOSTS;
 		const container = createLynxClientContainer();

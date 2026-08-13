@@ -280,6 +280,8 @@ interface LynxCompactHostMetadata {
 	readonly sparse: Map<number, number> | null;
 	readonly names: readonly string[];
 	active: boolean;
+	/** Non-zero codes still reachable; at zero the segment is fully retired. */
+	live: number;
 }
 
 function compactHostCode(metadata: LynxCompactHostMetadata, id: number): number {
@@ -291,12 +293,18 @@ function compactHostCode(metadata: LynxCompactHostMetadata, id: number): number 
 
 function setCompactHostCode(metadata: LynxCompactHostMetadata, id: number, code: number): void {
 	if (metadata.sparse !== null) {
+		const previous = metadata.sparse.get(id) ?? 0;
 		if (code === 0) metadata.sparse.delete(id);
 		else metadata.sparse.set(id, code);
+		metadata.live += (code === 0 ? 0 : 1) - (previous === 0 ? 0 : 1);
 		return;
 	}
 	const offset = id - metadata.base;
-	if (offset >= 0 && offset < metadata.types!.length) metadata.types![offset] = code;
+	if (offset >= 0 && offset < metadata.types!.length) {
+		const previous = metadata.types![offset]!;
+		metadata.types![offset] = code;
+		metadata.live += (code === 0 ? 0 : 1) - (previous === 0 ? 0 : 1);
+	}
 }
 
 function compactHandle(state: LynxClientContainerState, id: number): LynxHandleEntry | undefined {
@@ -776,6 +784,7 @@ export function prepareLynxCompactHandleDeltas(
 		sparse,
 		names,
 		active: true,
+		live: stagedCount,
 	};
 
 	let applied = false;
@@ -1089,6 +1098,7 @@ export function prepareLynxHandleDeltas(
 	}
 
 	const removedCompactHosts = new Map<number, number>();
+	let restoreRetiredCompactHosts: () => void = () => {};
 	let applied = false;
 	let rolledBack = false;
 	return {
@@ -1113,6 +1123,7 @@ export function prepareLynxHandleDeltas(
 			// forEach, not for-of destructuring: Map iteration allocates an iterator
 			// result and a two-element entry array per step, and a mount walks one
 			// entry per accepted node.
+			let retiredCompactHosts: LynxCompactHostMetadata | null = null;
 			stagedHandles.forEach((handle, id) => {
 				if (handle === null) {
 					originalHandles.delete(id);
@@ -1128,11 +1139,28 @@ export function prepareLynxHandleDeltas(
 					originalHandles.set(id, handle);
 				}
 			});
+			// A fully retired segment leaves no reachable compact host, so drop
+			// the metadata: the container is back to explicit handles only and a
+			// later pure template mount may negotiate a fresh incremental
+			// compact acknowledgement.
+			if (state.compactHosts !== null && state.compactHosts.live === 0) {
+				retiredCompactHosts = state.compactHosts;
+				retiredCompactHosts.active = false;
+				state.compactHosts = null;
+			}
+			restoreRetiredCompactHosts = () => {
+				if (retiredCompactHosts !== null) {
+					retiredCompactHosts.active = true;
+					state.compactHosts = retiredCompactHosts;
+					retiredCompactHosts = null;
+				}
+			};
 			nextGenerations.forEach((generation, id) => state.generations.set(id, generation));
 		},
 		rollback() {
 			if (!applied || rolledBack) return;
 			rolledBack = true;
+			restoreRetiredCompactHosts();
 			if (state.compactHosts !== null) {
 				for (const [id, code] of removedCompactHosts) {
 					setCompactHostCode(state.compactHosts, id, code);

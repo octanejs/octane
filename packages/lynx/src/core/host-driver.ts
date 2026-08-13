@@ -193,6 +193,14 @@ interface LynxHostState<Node extends LynxElementRef> {
 	generations: Map<number, number>;
 	/** Compact first mounts derive live generation-one entries from their records. */
 	implicitInitialGenerations: boolean;
+	/**
+	 * Highest host id that ever carried a stored generation or belonged to an
+	 * accepted compact segment. A compact segment publishes implicit
+	 * generation-one identities, so it may only cover ids above this ratchet;
+	 * the universal allocator issues ids monotonically, so real mounts always
+	 * qualify while any id reuse falls back to the explicit path.
+	 */
+	maxExplicitId: number;
 	/** Ordinary pure template runs may retain compact metadata solely for certified teardown. */
 	teardownRecords: LynxDenseHostRecordStore<Node> | null;
 	/** Universal root provenance is fixed by the first accepted portal handle. */
@@ -2581,6 +2589,7 @@ export function createLynxHostContainer<Node extends LynxElementRef>(
 		rootChildren: [],
 		generations: new Map(),
 		implicitInitialGenerations: false,
+		maxExplicitId: 0,
 		teardownRecords: null,
 		portalRoot: null,
 		portalChildren: new Map(),
@@ -3293,6 +3302,26 @@ function prepareDenseTeardown<Node extends LynxElementRef>(
 					const id = plan.firstId + offset;
 					if (!state.generations.has(id)) state.generations.set(id, 1);
 				}
+				if (plan.firstId + plan.hostCount - 1 > state.maxExplicitId) {
+					state.maxExplicitId = plan.firstId + plan.hostCount - 1;
+				}
+				if (state.implicitInitialGenerations) {
+					// The dense segment was the only supplier of implicit
+					// generation-one entries. Its hosts now carry explicit
+					// tombstones, so if every surviving record's generation is
+					// also stored, the container is back on fully explicit
+					// bookkeeping and the next pure template mount may
+					// negotiate an incremental compact acknowledgement again
+					// instead of republishing every host.
+					let explicit = true;
+					for (const id of plan.records.keys()) {
+						if (!state.generations.has(id)) {
+							explicit = false;
+							break;
+						}
+					}
+					if (explicit) state.implicitInitialGenerations = false;
+				}
 				state.acceptedVersion = batch.version;
 				let applicationFailed = false;
 				let applicationError: unknown;
@@ -3453,14 +3482,19 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				typeof command === 'object' &&
 				(command.op === 'mount-template-range' || command.op === 'mount-template-run'),
 		);
+	const incrementalCompactRun =
+		batch.commands.length === 1 && batch.commands[0]?.op === 'mount-template-run'
+			? batch.commands[0]
+			: null;
 	const incrementalCompactCandidate =
 		options?.compact === true &&
 		options.incrementalCompact === true &&
 		acceptedLazyPublicInstances &&
 		!state.implicitInitialGenerations &&
 		state.records instanceof Map &&
-		batch.commands.length === 1 &&
-		batch.commands[0]?.op === 'mount-template-run';
+		incrementalCompactRun !== null &&
+		// Implicit generation-one identities require a provably fresh id range.
+		incrementalCompactRun.firstId > state.maxExplicitId;
 	const teardownMirrorCandidate =
 		options?.compact === true &&
 		options.incrementalCompact === true &&
@@ -4861,12 +4895,29 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				if (stagedRootChildren !== null) state.rootChildren = stagedRootChildren;
 				if (initiallyNoGenerations) {
 					state.generations = stagedGenerations;
+					for (const id of stagedGenerations.keys()) {
+						if (id > state.maxExplicitId) state.maxExplicitId = id;
+					}
 				} else {
 					for (const [id, generation] of stagedGenerations) {
 						state.generations.set(id, generation);
+						if (id > state.maxExplicitId) state.maxExplicitId = id;
 					}
 				}
-				if (compactHostCount !== undefined) state.implicitInitialGenerations = true;
+				if (compactHostCount !== undefined) {
+					state.implicitInitialGenerations = true;
+					// The accepted segment's implicit identities occupy their id
+					// range even though no generation entry is stored for them.
+					for (const operation of operations) {
+						if (operation.op !== 'mount-template') continue;
+						const width = operation.parents.length;
+						const rows = operation.count ?? 1;
+						const firstId = operation.dense?.firstId ?? operation.firstId;
+						if (firstId === undefined) continue;
+						const lastId = firstId + rows * width - 1;
+						if (lastId > state.maxExplicitId) state.maxExplicitId = lastId;
+					}
+				}
 				state.portalRoot = stagedPortalRoot;
 				const portalChildrenChanges = readStagedPortalChildren();
 				if (portalChildrenChanges !== null) {
