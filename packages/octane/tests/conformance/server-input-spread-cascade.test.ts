@@ -10,6 +10,33 @@ import { createServerRenderMatrix } from './_helpers/server-render-matrix.js';
 const FIXTURE = 'packages/octane/tests/conformance/_fixtures/server-input-spread-cascade.tsrx';
 const server = loadServerFixture<typeof client>(FIXTURE);
 const matrix = createServerRenderMatrix({ clientModule: client, serverModule: server });
+const PROD_COMPILE = process.env.OCTANE_TEST_COMPILE_MODE === 'prod';
+
+function cascadeHydrationDiagnostics(expected: readonly string[]) {
+	const assert = (diagnostics: readonly string[], mismatch: boolean) => {
+		if (PROD_COMPILE) {
+			expect(diagnostics).toEqual([]);
+			return;
+		}
+		const formWarnings = diagnostics.filter(
+			(message) =>
+				message.includes('controlled or uncontrolled') ||
+				message.includes('children on <textarea>'),
+		);
+		expect(formWarnings).toHaveLength(expected.length);
+		for (let index = 0; index < expected.length; index++) {
+			expect(formWarnings[index]).toContain(expected[index]);
+		}
+		const mismatches = diagnostics.filter((message) => message.includes('hydration mismatch'));
+		if (mismatch) expect(mismatches.length).toBeGreaterThan(0);
+		else expect(mismatches).toEqual([]);
+		expect(diagnostics).toHaveLength(formWarnings.length + mismatches.length);
+	};
+	return {
+		'hydrate-match': (diagnostics: readonly string[]) => assert(diagnostics, false),
+		'hydrate-mismatch': (diagnostics: readonly string[]) => assert(diagnostics, true),
+	};
+}
 
 // Per ReactDOMServerIntegrationInput-test.js:84 and
 // ReactDOMServerIntegrationCheckbox-test.js:88. A controlled writer wins over
@@ -21,6 +48,12 @@ matrix.itRenders('resolves input controlled/default cascades across spreads', {
 			container.innerHTML = '<aside id="wrong-input-spread-tree">wrong</aside>';
 		},
 	},
+	hydrationDiagnostics: cascadeHydrationDiagnostics(
+		Array.from({ length: 5 }, () => [
+			'<input> has both `value` and `defaultValue`',
+			'<input> has both `checked` and `defaultChecked`',
+		]).flat(),
+	),
 	assertCommon({ root }) {
 		const inputs = root.querySelectorAll<HTMLInputElement>('#input-spread-cascades input');
 		expect(inputs).toHaveLength(5);
@@ -141,6 +174,17 @@ matrix.itRenders('resolves textarea and select form state across spreads', {
 			container.innerHTML = '<aside id="wrong-textarea-select-tree">wrong</aside>';
 		},
 	},
+	hydrationDiagnostics: cascadeHydrationDiagnostics([
+		'<textarea> has both `value` and `defaultValue`',
+		'<textarea> has both `value` and `defaultValue`',
+		'<textarea> has both `value` and `defaultValue`',
+		'<textarea> has both `value` and `defaultValue`',
+		'`defaultValue` or `value` instead of children on <textarea>',
+		'`defaultValue` or `value` instead of children on <textarea>',
+		'`defaultValue` or `value` instead of children on <textarea>',
+		'<select> has both `value` and `defaultValue`',
+		'<select> has both `value` and `defaultValue`',
+	]),
 	assertCommon({ root }) {
 		const textareas = root.querySelectorAll<HTMLTextAreaElement>(
 			'#textarea-select-spread-cascades textarea[data-expected="controlled"]',

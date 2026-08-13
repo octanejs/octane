@@ -342,6 +342,23 @@ describe('production error bundles', () => {
 			'Inline styles cannot consume a stylesheet preload',
 			'independently managed stylesheet',
 			'resource href must not contain whitespace',
+			'An empty string was passed to the',
+			'If you intentionally want it to appear in the DOM as a custom attribute',
+			'Either remove them from the element',
+			'The browser will interpret it as a truthy value',
+			'Directly setting property `innerHTML` is not permitted',
+			'for a string attribute `is`',
+			'attribute is an unsupported type',
+			'A form field must be either controlled or uncontrolled',
+			'Use `defaultValue` or `value` instead of children on <textarea>',
+			'Use `value` or `defaultValue` on <select>',
+			'Cannot infer an <option> value from complex children',
+			'A function form action cannot specify',
+			'A function `formAction` cannot specify',
+			'whitespace text nodes cannot be a child of',
+			'extra whitespace between tags',
+			'optional object-shaped `options`',
+			'Browsers never use `crossOrigin` for DNS queries',
 		]) {
 			expect(client).not.toContain(warning);
 			expect(server).not.toContain(warning);

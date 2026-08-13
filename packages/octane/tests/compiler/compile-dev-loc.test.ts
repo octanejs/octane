@@ -48,9 +48,10 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 
 	it('prod output == dev output with the dev-only LOC artifacts removed', () => {
 		// The ONLY differences dev introduces are: the `__s.locs`/`__s.locFile` table, the
-		// per-element `__oct_loc` stamps, and the `clone(tpl, "loc")` structural-mismatch loc
-		// argument — all strictly dev-gated. Normalize them away and the two outputs must be
-		// byte-identical (proving production carries zero LOC overhead).
+		// per-element `__oct_loc` stamps, the `clone(tpl, "loc")` structural-mismatch loc
+		// argument, and source-aware HTML-nesting import/calls — all strictly dev-gated.
+		// Normalize those exact diagnostics away and the outputs must be byte-identical,
+		// proving production carries neither LOC nor nesting overhead.
 		// Strip is statement-shaped, not line-shaped: the locs stash prints as one
 		// (possibly multi-line) `if (__s.locs === undefined) { … }` statement, and
 		// statement presence can shift the printer's blank-line placement — so
@@ -76,13 +77,24 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 					skippingDepth = (l.match(/\{/g) || []).length - (l.match(/\}/g) || []).length;
 					continue;
 				}
-				if (l.includes('__s.locs') || l.includes('__oct_loc')) continue;
+				if (
+					l.includes('__s.locs') ||
+					l.includes('__oct_loc') ||
+					/^\s*devHtmlNesting as _\$devHtmlNesting,\s*$/.test(l) ||
+					/^\s*_\$devHtmlNesting\([^;]*\);\s*$/.test(l)
+				)
+					continue;
 				if (l.trim() === '') continue;
 				kept.push(l);
 			}
 			return kept.join('\n').replace(/clone\((_t\$\d+), "[^"]*"\)/g, 'clone($1)');
 		};
-		expect(strip(prod(WITH_CONSTRUCTS))).toBe(strip(dev(WITH_CONSTRUCTS)));
+		const development = dev(WITH_CONSTRUCTS);
+		const production = prod(WITH_CONSTRUCTS);
+		expect(development).toContain('devHtmlNesting as _$devHtmlNesting');
+		expect(development).toContain('_$devHtmlNesting("li", [], "App.tsrx:4:43")');
+		expect(production).not.toContain('devHtmlNesting');
+		expect(strip(production)).toBe(strip(development));
 	});
 
 	it('omits the table entirely for a component with no located constructs', () => {

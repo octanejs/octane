@@ -145,6 +145,7 @@ export {
 	evtN,
 	evtNu,
 	devEventListener,
+	devHtmlNesting,
 	htext,
 	htextSwap,
 	child,
@@ -168,6 +169,7 @@ export {
 	snapshotSpread,
 	setHostPropSources,
 	queueNativeChangeDiagnostic,
+	queueFormAuthoringDiagnostic,
 	markNativeChangeDiagnosticStatic,
 	setFormAction,
 	// Controlled form components (value/checked/defaultValue/defaultChecked
