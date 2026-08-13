@@ -51,6 +51,7 @@
       "environment": "workspace-node",
       "project": "swr-pristine",
       "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the byte-exact SWR 2.4.2 Jest suite. A testing-library harness holds the initial request completion in the remote-mutation race case until the mutation starts, preserving the upstream assertion without wall-clock ordering.",
       "execution": {
         "kind": "jest-full",
         "config": "packages/swr/audit/jest-pristine.config.mjs",
@@ -66,7 +67,17 @@
         {
           "path": "packages/swr/audit/jest-pristine.config.mjs",
           "role": "support",
-          "sha256": "fb6901474496ccfde71ea7453af5033bc7747b93b7613b84456a1def154525e2"
+          "sha256": "cd9ca9ac112cafe7bcbc354d1c98a405c5d1c917443b21a069017ef60b7fe86a"
+        },
+        {
+          "path": "packages/swr/audit/upstream-testing-library.cjs",
+          "role": "support",
+          "sha256": "57f0b3c6585807fcf46dd988d2b657ad440008e77bd9700e2cf0d405cefae4bc"
+        },
+        {
+          "path": "packages/swr/audit/upstream-timer-gate.cjs",
+          "role": "support",
+          "sha256": "0c87828c172fe2a2ef69993f7242ec2383146f24a27df95c39b68d30bb113db4"
         },
         {
           "path": "packages/swr/upstream/SHA256SUMS",
@@ -82,6 +93,11 @@
           "path": "scripts/react-parity/swr-runtime-inventory.mjs",
           "role": "support",
           "sha256": "185d862650fd217503e440f7c781367ed726df26839b67296709b2b6bcaf31e8"
+        },
+        {
+          "path": "scripts/react-parity/swr-upstream-timer-gate.test.mjs",
+          "role": "support",
+          "sha256": "b158c5c7dead7aba1df0dd4ab8042c2bfcacb9818ef3ca7d1873b75ab02fa943"
         }
       ]
     },
