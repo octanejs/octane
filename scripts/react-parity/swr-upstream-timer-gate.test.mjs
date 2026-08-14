@@ -3,10 +3,7 @@ import { createRequire } from 'node:module';
 import test from 'node:test';
 
 const require = createRequire(import.meta.url);
-const {
-	holdFirstTimeout,
-	holdNextTimeout,
-} = require('../../packages/swr/audit/upstream-timer-gate.cjs');
+const { holdFirstTimeout } = require('../../packages/swr/audit/upstream-timer-gate.cjs');
 
 test('holds a request completion until the competing mutation has started', () => {
 	const events = [];
@@ -28,17 +25,22 @@ test('holds a request completion until the competing mutation has started', () =
 	assert.equal(globalThis.clearTimeout, originalClearTimeout);
 });
 
-test('holds an asynchronously scheduled revalidation until its in-flight state is observed', async () => {
+test('holds an initial request until its shared in-flight state is observed', () => {
 	const events = [];
-	const gate = holdNextTimeout(30);
-	queueMicrotask(() => {
+	const originalSetTimeout = globalThis.setTimeout;
+	const originalClearTimeout = globalThis.clearTimeout;
+
+	const held = holdFirstTimeout(30, () => {
 		setTimeout(() => events.push('revalidation completed'), 30);
+		return 'rendered';
 	});
 
+	assert.equal(held.result, 'rendered');
 	events.push('isValidating:true observed');
 	assert.deepEqual(events, ['isValidating:true observed']);
-	gate.releaseWhenScheduled();
-	await Promise.resolve();
-	await new Promise((resolve) => setTimeout(resolve, 0));
+	held.release();
 	assert.deepEqual(events, ['isValidating:true observed', 'revalidation completed']);
+	assert.throws(() => held.release(), /already been released/);
+	assert.equal(globalThis.setTimeout, originalSetTimeout);
+	assert.equal(globalThis.clearTimeout, originalClearTimeout);
 });

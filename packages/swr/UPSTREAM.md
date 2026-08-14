@@ -22,10 +22,11 @@ source and tests.
 The pristine Jest config maps `@testing-library/react` through a narrow harness
 for two `useSWR` mutation race cases. The remote-mutation case starts a 10 ms
 request and assumes the mutation click wins that wall-clock race; the local-
-mutation case starts a 30 ms revalidation and assumes its synchronous
-`isValidating:true` query wins. The harness holds only those request completions
-until the competing mutation or observation has happened, then releases them so
-the unchanged assertions deterministically exercise the intended overlap.
+mutation case shares a 30 ms initial request with a later subscriber and assumes
+its synchronous `isValidating:true` query wins. The harness holds only those
+initial request completions until the competing mutation or observation has
+happened, then releases them so the unchanged assertions deterministically
+exercise the intended overlap.
 
 ## Provenance status
 
