@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { flushSync, hydrateRoot } from 'octane';
+import * as Server from 'octane/server';
 import { mount } from '../_helpers';
+import { loadServerFixture } from '../_server-fixture.js';
 import {
 	SvgCamelAttrs,
 	SvgKebabAttrs,
@@ -8,10 +11,41 @@ import {
 	SvgPlainHref,
 	SvgClassPath,
 	SvgSpreadNamespaced,
+	SvgSpreadDiagnosticAttributes,
+	SvgDirectDiagnosticAttributes,
+	SvgForeignObjectDiagnosticAttributes,
 } from './_fixtures/svg-attributes.tsrx';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const XLINK_NS = 'http://www.w3.org/1999/xlink';
+const PRODUCTION_COMPILE = process.env.OCTANE_TEST_COMPILE_MODE === 'prod';
+const server = loadServerFixture<{
+	SvgSpreadDiagnosticAttributes: typeof SvgSpreadDiagnosticAttributes;
+	SvgDirectDiagnosticAttributes: typeof SvgDirectDiagnosticAttributes;
+	SvgForeignObjectDiagnosticAttributes: typeof SvgForeignObjectDiagnosticAttributes;
+}>('packages/octane/tests/conformance/_fixtures/svg-attributes.tsrx', {
+	compileOptions: { dev: true },
+});
+
+const SVG_CANONICAL_ATTRIBUTES = {
+	preserveAspectRatio: 'xMidYMid meet',
+	gradientTransform: 'rotate(45)',
+	gradientUnits: 'userSpaceOnUse',
+	clipPathUnits: 'userSpaceOnUse',
+	patternUnits: 'userSpaceOnUse',
+	markerWidth: '4',
+	markerHeight: '5',
+	markerUnits: 'strokeWidth',
+	refX: '1',
+	refY: '2',
+	textLength: '40',
+	'stroke-width': '2',
+	'shape-rendering': 'crispEdges',
+	'stroke-linecap': 'round',
+	'font-size': '12',
+	'stroke-dasharray': '4 2',
+	'pointer-events': 'none',
+};
 
 // ============================================================================
 // SVG attribute breadth + namespace decision (Audit Batch 2)
@@ -103,6 +137,186 @@ describe('SVG attributes — camelCase preservation', () => {
 		expect(pt.getAttribute('patternUnits')).toBe('objectBoundingBox');
 		expect(tx.getAttribute('textLength')).toBe('120');
 		r.unmount();
+	});
+});
+
+describe('SVG attributes — namespace-aware property diagnostics', () => {
+	it('accepts directly authored canonical SVG properties and native presentation aliases', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = mount(SvgDirectDiagnosticAttributes, {
+			frequency: '0.2',
+			interpolation: 'linearRGB',
+		});
+		try {
+			const element = root.find('#svg-direct-filter');
+			expect(element.getAttribute('baseFrequency')).toBe('0.2');
+			expect(element.getAttribute('color-interpolation')).toBe('linearRGB');
+			expect(error.mock.calls).toEqual([]);
+		} finally {
+			root.unmount();
+			error.mockRestore();
+		}
+	});
+
+	it('accepts canonical SVG properties and native presentation aliases from a spread', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = mount(SvgSpreadDiagnosticAttributes, { attrs: SVG_CANONICAL_ATTRIBUTES });
+		try {
+			const element = root.find('#svg-diagnostic-root');
+			for (const [name, value] of Object.entries(SVG_CANONICAL_ATTRIBUTES)) {
+				expect(element.getAttribute(name)).toBe(value);
+			}
+			expect(error.mock.calls).toEqual([]);
+		} finally {
+			root.unmount();
+			error.mockRestore();
+		}
+	});
+
+	it('suggests canonical spelling for a genuinely miscased SVG property', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = mount(SvgSpreadDiagnosticAttributes, {
+			attrs: { gradienttransform: 'rotate(45)' },
+		});
+		try {
+			expect(root.find('#svg-diagnostic-root').getAttribute('gradienttransform')).toBe(
+				'rotate(45)',
+			);
+			expect(error.mock.calls.map(([message]) => message)).toEqual(
+				PRODUCTION_COMPILE
+					? []
+					: ['Invalid DOM property `gradienttransform`. Did you mean `gradientTransform`?'],
+			);
+		} finally {
+			root.unmount();
+			error.mockRestore();
+		}
+	});
+
+	it('continues warning for unknown camelCase SVG properties', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = mount(SvgSpreadDiagnosticAttributes, {
+			attrs: { unknownSvgDiagnosticProperty: 'visible' },
+		});
+		try {
+			expect(root.find('#svg-diagnostic-root').getAttribute('unknownSvgDiagnosticProperty')).toBe(
+				'visible',
+			);
+			expect(error.mock.calls.map(([message]) => message)).toEqual(
+				PRODUCTION_COMPILE
+					? []
+					: [
+							'Octane does not recognize the `unknownSvgDiagnosticProperty` prop on a DOM element. ' +
+								'If you intentionally want it to appear in the DOM as a custom attribute, ' +
+								'spell it as lowercase `unknownsvgdiagnosticproperty` instead. ' +
+								'If you accidentally passed it from a parent component, remove it from the DOM element.',
+						],
+			);
+		} finally {
+			root.unmount();
+			error.mockRestore();
+		}
+	});
+
+	it('preserves HTML spelling diagnostics inside an SVG foreignObject', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = mount(SvgForeignObjectDiagnosticAttributes, {
+			attrs: { 'word-spacing': '2' },
+		});
+		try {
+			expect(root.find('#foreign-object-html-host').namespaceURI).toBe(
+				'http://www.w3.org/1999/xhtml',
+			);
+			expect(error.mock.calls.map(([message]) => message)).toEqual(
+				PRODUCTION_COMPILE
+					? []
+					: ['Invalid DOM property `word-spacing`. Did you mean `wordSpacing`?'],
+			);
+		} finally {
+			root.unmount();
+			error.mockRestore();
+		}
+	});
+
+	it('serializes canonical SVG properties and native aliases without warnings', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const html = Server.renderToString(server.SvgSpreadDiagnosticAttributes, {
+				attrs: SVG_CANONICAL_ATTRIBUTES,
+			}).html;
+			for (const [name, value] of Object.entries(SVG_CANONICAL_ATTRIBUTES)) {
+				expect(html).toContain(`${name}="${value}"`);
+			}
+			expect(error.mock.calls).toEqual([]);
+		} finally {
+			error.mockRestore();
+		}
+	});
+
+	it('serializes directly authored canonical SVG properties and native aliases without warnings', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const html = Server.renderToString(server.SvgDirectDiagnosticAttributes, {
+				frequency: '0.2',
+				interpolation: 'linearRGB',
+			}).html;
+			expect(html).toContain('baseFrequency="0.2"');
+			expect(html).toContain('color-interpolation="linearRGB"');
+			expect(error.mock.calls).toEqual([]);
+		} finally {
+			error.mockRestore();
+		}
+	});
+
+	it('preserves server HTML diagnostics inside an SVG foreignObject', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const html = Server.renderToString(server.SvgForeignObjectDiagnosticAttributes, {
+				attrs: { 'word-spacing': '2' },
+			}).html;
+			expect(html).toContain('word-spacing="2"');
+			expect(error.mock.calls.map(([message]) => message)).toEqual([
+				'Invalid DOM property `word-spacing`. Did you mean `wordSpacing`?',
+			]);
+		} finally {
+			error.mockRestore();
+		}
+	});
+
+	it('retains server spelling guidance for a genuinely miscased SVG property', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const html = Server.renderToString(server.SvgSpreadDiagnosticAttributes, {
+				attrs: { gradienttransform: 'rotate(45)' },
+			}).html;
+			expect(html).toContain('gradienttransform="rotate(45)"');
+			expect(error.mock.calls.map(([message]) => message)).toEqual([
+				'Invalid DOM property `gradienttransform`. Did you mean `gradientTransform`?',
+			]);
+		} finally {
+			error.mockRestore();
+		}
+	});
+
+	it('adopts SVG nodes with canonical and native attributes without hydration warnings', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const container = document.createElement('div');
+		container.innerHTML = Server.renderToString(server.SvgSpreadDiagnosticAttributes, {
+			attrs: SVG_CANONICAL_ATTRIBUTES,
+		}).html;
+		const existing = container.querySelector('#svg-diagnostic-root');
+		expect(error.mock.calls).toEqual([]);
+		const root = hydrateRoot(container, SvgSpreadDiagnosticAttributes, {
+			attrs: SVG_CANONICAL_ATTRIBUTES,
+		});
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('#svg-diagnostic-root')).toBe(existing);
+			expect(error.mock.calls).toEqual([]);
+		} finally {
+			root.unmount();
+			error.mockRestore();
+		}
 	});
 });
 

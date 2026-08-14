@@ -3317,7 +3317,7 @@
     },
     {
       "caseId": "react-case-v1:0a065be17f47241aab49",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "should warn about non-string \"is\" attribute",
@@ -3325,7 +3325,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "warns when the customized-built-in is property is not a string",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "warns for a non-string server is attribute",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:0a0a8c6993eb5c47a2bd",
@@ -3602,7 +3614,7 @@
     },
     {
       "caseId": "react-case-v1:0b05deb8a1f0e0f9c7e4",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "should validate against use of innerHTML without case sensitivity",
@@ -3610,7 +3622,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "rejects direct raw HTML intent expressed as $name",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "warns for direct innerHTML intent without injecting server markup",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:0b07474a1a5102fc633a",
@@ -7465,7 +7489,7 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "preloadModule's invalid-href triggers (undefined, empty, non-string) dev-warn and no-op with adapted messages; invalid option SHAPES (boolean options, boolean as) are handled leniently in Octane \u2014 the tag still inserts and no diagnostic fires \u2014 so the options-shape warnings remain a diagnostics gap noted for the ledger.",
+      "rationale": "Public client/server resource-hint evidence validates exact argument combinations, malformed options and destinations, preserved browser behavior, and production warning stripping.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
@@ -7476,6 +7500,11 @@
           "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
           "testName": "valid hrefs still insert",
           "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/resource-prop-diagnostics.test.ts",
+          "testName": "warns for invalid module preload $detail options while preserving the hint",
+          "modes": ["client", "server-string", "production-compile"]
         }
       ]
     },
@@ -7615,7 +7644,7 @@
     },
     {
       "caseId": "react-case-v1:1926510f1bbf4266a059",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "should suggest property name if available",
@@ -7623,7 +7652,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "suggests the supported spelling for a miscased known host property",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:1930eaabf992a2b51a26",
@@ -10243,7 +10279,7 @@
     },
     {
       "caseId": "react-case-v1:21b78ca96dd3fe0e22c7",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/DOMPropertyOperations-test.js",
       "title": "custom elements should be able to remove and re-add custom event listeners",
@@ -10251,7 +10287,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Public custom-element event evidence exercises authored event names, capture registration, exact callback identity, listener replacement/removal, and development plus production compiler modes.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/invalid-listeners.test.ts",
+          "testName": "attaches, replaces, and removes uppercase, dashed, and capture custom listeners",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:21b9159d44c3da41472e",
@@ -10619,7 +10662,7 @@
     },
     {
       "caseId": "react-case-v1:22cd581be6d714d8a8a3",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMSelect-test.js",
       "title": "should warn if selected is set on <option>",
@@ -10627,7 +10670,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable controlled-form authoring evidence preserves final writer semantics and native events while validating the exact client/server conflict and excluding warnings from production compilation.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "warns for a $name selected prop on option",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "reports selected option authoring during server rendering",
+          "modes": ["server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:22d5b226e496ba14fa99",
@@ -12076,7 +12131,7 @@
     },
     {
       "caseId": "react-case-v1:27ef648a31837e89b6de",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/DOMPropertyOperations-test.js",
       "title": "custom element custom events uppercase",
@@ -12084,7 +12139,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Public custom-element event evidence exercises authored event names, capture registration, exact callback identity, listener replacement/removal, and development plus production compiler modes.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/invalid-listeners.test.ts",
+          "testName": "attaches, replaces, and removes uppercase, dashed, and capture custom listeners",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:27f185139625132f0b5c",
@@ -12181,7 +12243,7 @@
     },
     {
       "caseId": "react-case-v1:2810b3c516982072d12c",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "should group multiple unknown prop warnings together",
@@ -12189,7 +12251,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "groups multiple unsupported property values into one actionable client warning",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "groups multiple unsupported property values into one server warning",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2819c5b6d71cbc85001f",
@@ -13377,7 +13451,7 @@
     },
     {
       "caseId": "react-case-v1:2c419215ded29fad79b8",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "should warn for badly cased React attributes",
@@ -13385,7 +13459,21 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/server-integration-attributes-wave4d.test.ts",
+          "testName": "serializes aria, unknown, event-like, and SVG attributes",
+          "modes": [
+            "client",
+            "server-string",
+            "server-stream",
+            "hydrate-match",
+            "hydrate-mismatch",
+            "production-compile"
+          ]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:2c52b86a6d71c9da8ac4",
@@ -29546,15 +29634,15 @@
     },
     {
       "caseId": "react-case-v1:613b092b918ab243bfd8",
-      "status": "planned",
+      "status": "documented",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/validateDOMNesting-test.js",
       "title": "relaxes the nesting rules at the root when the container is a singleton",
       "baselines": ["canary", "stable"],
-      "classification": "adaptable",
+      "classification": "non_goal",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Octane public roots intentionally require an Element container; React whole-Document singleton-root parser relaxations cannot be observed through a supported Octane root."
     },
     {
       "caseId": "react-case-v1:6143a00248f5bc2b8e54",
@@ -30525,7 +30613,7 @@
     },
     {
       "caseId": "react-case-v1:640ec7770a95fa3e8a4d",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMOption-test.js",
       "title": "should warn for invalid child tags",
@@ -30533,7 +30621,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable client and server HTML-parser-scope diagnostics cover valid/invalid ancestor relationships, source context, dedupe, and production compiler silence through public roots and SSR.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/ssr-invalid-nesting.test.ts",
+          "testName": "reports %s at render time",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/ssr-invalid-nesting.test.ts",
+          "testName": "reports %s",
+          "modes": ["server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:641064e8dd26c958b551",
@@ -30678,7 +30778,7 @@
     },
     {
       "caseId": "react-case-v1:64c5ad31d9d98a2a8459",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMTextarea-test.js",
       "title": "should warn if value and defaultValue are specified",
@@ -30686,7 +30786,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable controlled-form authoring evidence preserves final writer semantics and native events while validating the exact client/server conflict and excluding warnings from production compilation.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "warns when a $tag has both value and defaultValue",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "warns for conflicting $tag values during buffered SSR",
+          "modes": ["server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:64ced70773cea3bc19a8",
@@ -34787,7 +34899,7 @@
     },
     {
       "caseId": "react-case-v1:73497c1a1df4f9838a44",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/DOMPropertyOperations-test.js",
       "title": "custom elements should allow custom events with capture event listeners",
@@ -34795,7 +34907,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Public custom-element event evidence exercises authored event names, capture registration, exact callback identity, listener replacement/removal, and development plus production compiler modes.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/invalid-listeners.test.ts",
+          "testName": "attaches, replaces, and removes uppercase, dashed, and capture custom listeners",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:735508160a9eb6b2f0dd",
@@ -34941,7 +35060,7 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "dns-prefetch creation, dedupe, and SSR-to-client identity are pinned; React's prefetchDNS second-argument dev warnings have no Octane counterpart (extra arguments are ignored silently) \u2014 diagnostics remainder only.",
+      "rationale": "Public client/server resource-hint evidence validates exact argument combinations, malformed options and destinations, preserved browser behavior, and production warning stripping.",
       "evidence": [
         {
           "file": "packages/octane/tests/resource-hints.test.ts",
@@ -34952,6 +35071,11 @@
           "file": "packages/octane/tests/resource-hints.test.ts",
           "testName": "a client call for an SSR-emitted hint is a no-op (shared dedupe key)",
           "modes": ["client", "server-string", "production-compile", "hydrate-match"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/resource-prop-diagnostics.test.ts",
+          "testName": "explains why a DNS-prefetch crossOrigin argument has no effect",
+          "modes": ["client", "server-string", "production-compile"]
         }
       ]
     },
@@ -34977,7 +35101,7 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "preload's malformed-argument trigger set (missing/empty href, missing as) dev-warns and no-ops with adapted Octane-branded messages \u2014 message-exactness is not Octane's diagnostics contract. Note: the inventory pinned both duplicate-title cases to line 6137; this entry is matched to the preload variant.",
+      "rationale": "Public client/server resource-hint evidence validates exact argument combinations, malformed options and destinations, preserved browser behavior, and production warning stripping.",
       "evidence": [
         {
           "file": "packages/octane/tests/resource-hints.test.ts",
@@ -34993,6 +35117,11 @@
           "file": "packages/octane/tests/resource-hints.test.ts",
           "testName": "non-string hrefs dev-warn and no-op",
           "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/resource-prop-diagnostics.test.ts",
+          "testName": "reports invalid preload href and options together without creating a hint",
+          "modes": ["client", "server-string", "production-compile"]
         }
       ]
     },
@@ -35194,7 +35323,7 @@
     },
     {
       "caseId": "react-case-v1:746f9f1b1afcb34b5f61",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "warns on invalid nesting at root",
@@ -35202,7 +35331,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable client and server HTML-parser-scope diagnostics cover valid/invalid ancestor relationships, source context, dedupe, and production compiler silence through public roots and SSR.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/ssr-invalid-nesting.test.ts",
+          "testName": "reports an invalid descendant of the root container",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:7473fde3214d5f7d1e37",
@@ -35696,7 +35832,7 @@
     },
     {
       "caseId": "react-case-v1:764c90dfcb70dbcba34b",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/DOMPropertyOperations-test.js",
       "title": "custom element custom event handlers assign multiple types",
@@ -35704,7 +35840,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Public custom-element event evidence exercises authored event names, capture registration, exact callback identity, listener replacement/removal, and development plus production compiler modes.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/invalid-listeners.test.ts",
+          "testName": "alternates custom-event callbacks and string attributes without stale listeners",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:764ecffe031686592fae",
@@ -37936,7 +38079,7 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Matched to the preinitModule twin at upstream line 7113: invalid hrefs dev-warn and no-op; a non-script destination fails closed as a silent no-op in Octane (React warns) \u2014 the docs promise a dev warning for invalid `as` generally, so the silent fail-closed is flagged as a doc-vs-implementation nit for the parent.",
+      "rationale": "Public client/server resource-hint evidence validates exact argument combinations, malformed options and destinations, preserved browser behavior, and production warning stripping.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
@@ -37947,6 +38090,11 @@
           "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
           "testName": "valid hrefs still insert",
           "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/resource-prop-diagnostics.test.ts",
+          "testName": "rejects invalid module preinit $detail options without executing a module",
+          "modes": ["client", "server-string", "production-compile"]
         }
       ]
     },
@@ -38835,7 +38983,7 @@
     },
     {
       "caseId": "react-case-v1:80ff67d3c66ef7a851a2",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "should validate against use of innerHTML",
@@ -38843,7 +38991,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "rejects direct raw HTML intent expressed as $name",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "warns for direct innerHTML intent without injecting server markup",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:8111822d13673429a691",
@@ -41137,7 +41297,7 @@
     },
     {
       "caseId": "react-case-v1:8922b4725ed2fdd8c3dd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInput-test.js",
       "title": "should warn if value and defaultValue props are specified",
@@ -41145,7 +41305,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable controlled-form authoring evidence preserves final writer semantics and native events while validating the exact client/server conflict and excluding warnings from production compilation.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "warns when an input has both value and defaultValue",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "warns for conflicting $tag values during buffered SSR",
+          "modes": ["server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:89354f515e26186d5cd9",
@@ -42854,7 +43026,7 @@
     },
     {
       "caseId": "react-case-v1:8e16a1e32b5257d81e42",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMSelect-test.js",
       "title": "should warn if value and defaultValue props are specified",
@@ -42862,7 +43034,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable controlled-form authoring evidence preserves final writer semantics and native events while validating the exact client/server conflict and excluding warnings from production compilation.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "warns when a $tag has both value and defaultValue",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "warns for conflicting $tag values during buffered SSR",
+          "modes": ["server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:8e29c094776a25bcaf70",
@@ -46368,7 +46552,7 @@
     },
     {
       "caseId": "react-case-v1:9b62c1543626c0ad69c0",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "warns on the potentially-ambiguous string value \"true\"",
@@ -46376,7 +46560,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "warns for the ambiguous boolean string $value on a dynamic attribute",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "warns for a statically authored boolean string $name=$value",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9b6831e3b56861d3a259",
@@ -46478,7 +46674,7 @@
     },
     {
       "caseId": "react-case-v1:9ba72296401fb5a7e3d6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "warns on the ambiguous string value \"false\"",
@@ -46486,7 +46682,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "warns for the ambiguous boolean string $value on a dynamic attribute",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "warns for an ambiguous boolean string while retaining server presence semantics",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:9bce9ceea5a967ced7cf",
@@ -48359,7 +48567,7 @@
     },
     {
       "caseId": "react-case-v1:a1d6b61616ecf076b545",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMOption-test.js",
       "title": "should not warn for component child if value prop is provided",
@@ -48367,7 +48575,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable controlled-form authoring evidence preserves final writer semantics and native events while validating the exact client/server conflict and excluding warnings from production compilation.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "keeps complex option children with an explicit value silent",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a1e0f1a2041ce5d8fc63",
@@ -48383,7 +48598,7 @@
     },
     {
       "caseId": "react-case-v1:a2004ec5b43cde8afc12",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/validateDOMNesting-test.js",
       "title": "prevents problematic nestings",
@@ -48391,7 +48606,34 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable client and server HTML-parser-scope diagnostics cover valid/invalid ancestor relationships, source context, dedupe, and production compiler silence through public roots and SSR.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/ssr-invalid-nesting.test.ts",
+          "testName": "reports %s at render time",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/ssr-invalid-nesting.test.ts",
+          "testName": "tracks nested elements through transparent component boundaries on the client",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/ssr-invalid-nesting.test.ts",
+          "testName": "deduplicates identical client nesting diagnostics across repeated renders",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/ssr-invalid-nesting.test.ts",
+          "testName": "reports %s across transparent HTML wrappers",
+          "modes": ["server-string", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/ssr-invalid-nesting.test.ts",
+          "testName": "reports table markup the HTML parser will repair",
+          "modes": ["server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:a2182ef1bd2e295a3172",
@@ -52728,7 +52970,7 @@
     },
     {
       "caseId": "react-case-v1:b0ef9cffab55886ada13",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "warns on invalid nesting",
@@ -52736,7 +52978,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable client and server HTML-parser-scope diagnostics cover valid/invalid ancestor relationships, source context, dedupe, and production compiler silence through public roots and SSR.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/ssr-invalid-nesting.test.ts",
+          "testName": "reports %s at render time",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b0f8aa7706f85f542da5",
@@ -54422,7 +54671,7 @@
     },
     {
       "caseId": "react-case-v1:b65a1b04431737a0cc2f",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMInput-test.js",
       "title": "should warn if checked and defaultChecked props are specified",
@@ -54430,7 +54679,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable controlled-form authoring evidence preserves final writer semantics and native events while validating the exact client/server conflict and excluding warnings from production compilation.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "warns when a $type has both checked and defaultChecked",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "warns for conflicting $tag values during buffered SSR",
+          "modes": ["server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:b66657e7fd2a4a4c6ccc",
@@ -57615,7 +57876,7 @@
     },
     {
       "caseId": "react-case-v1:c17d69894c9f83ef9fce",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/DOMPropertyOperations-test.js",
       "title": "custom element custom event with dash in name",
@@ -57623,7 +57884,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Public custom-element event evidence exercises authored event names, capture registration, exact callback identity, listener replacement/removal, and development plus production compiler modes.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/invalid-listeners.test.ts",
+          "testName": "attaches, replaces, and removes uppercase, dashed, and capture custom listeners",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c17d92ef1597f721e5c0",
@@ -57883,7 +58151,7 @@
     },
     {
       "caseId": "react-case-v1:c234019e78273c726864",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "should warn about incorrect casing on properties",
@@ -57891,7 +58159,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "suggests the supported spelling for a miscased known host property",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c235b81417b58d1fe72e",
@@ -58334,7 +58609,7 @@
     },
     {
       "caseId": "react-case-v1:c36c0fadc09c93186340",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMOption-test.js",
       "title": "should warn for component child if no value prop is provided",
@@ -58342,7 +58617,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable controlled-form authoring evidence preserves final writer semantics and native events while validating the exact client/server conflict and excluding warnings from production compilation.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "warns for complex option children without an explicit value",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c379ead703d51e2f0df2",
@@ -58939,7 +59221,7 @@
     },
     {
       "caseId": "react-case-v1:c4f60e0ea1162e05f264",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/validateDOMNesting-test.js",
       "title": "allows valid nestings",
@@ -58947,7 +59229,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable client and server HTML-parser-scope diagnostics cover valid/invalid ancestor relationships, source context, dedupe, and production compiler silence through public roots and SSR.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/ssr-invalid-nesting.test.ts",
+          "testName": "keeps %s silent on the client",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/ssr-invalid-nesting.test.ts",
+          "testName": "keeps %s silent",
+          "modes": ["server-string", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c4f8ee910a47ec2429a5",
@@ -60257,7 +60551,7 @@
     },
     {
       "caseId": "react-case-v1:c8b52eea47da3da90156",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMHydrationDiff-test.js",
       "title": "warns when escaping on a checksum mismatch",
@@ -60265,7 +60559,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable client and server HTML-parser-scope diagnostics cover valid/invalid ancestor relationships, source context, dedupe, and production compiler silence through public roots and SSR.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
+          "testName": "warns for differing text beside an escaped nbsp entity (Per :155)",
+          "modes": ["hydrate-mismatch", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c8e1f8597ab328d734d6",
@@ -60463,7 +60764,7 @@
     },
     {
       "caseId": "react-case-v1:c971538af9e0798b3366",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMTextarea-test.js",
       "title": "should treat children like `defaultValue`",
@@ -60471,7 +60772,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable controlled-form authoring evidence preserves final writer semantics and native events while validating the exact client/server conflict and excluding warnings from production compilation.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/form-diagnostics.test.ts",
+          "testName": "recommends defaultValue instead of textarea text children",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:c9859b4d0d3cf9170b9c",
@@ -63013,7 +63321,7 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "CORS-keyed preconnect identity, dedupe, and SSR mirror are pinned; adaptations noted: Octane keys '' and 'anonymous' as distinct modes where React collapses both to crossorigin=\"\", and a boolean crossOrigin is keyed leniently instead of warned (React-exact warning absent).",
+      "rationale": "Public client/server resource-hint evidence validates exact argument combinations, malformed options and destinations, preserved browser behavior, and production warning stripping.",
       "evidence": [
         {
           "file": "packages/octane/tests/resource-hints.test.ts",
@@ -63028,6 +63336,11 @@
         {
           "file": "packages/octane/tests/resource-hints.test.ts",
           "testName": "SSR mirrors font CORS, option transfer with preload coalescing, and CORS-keyed preconnect",
+          "modes": ["client", "server-string", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/resource-prop-diagnostics.test.ts",
+          "testName": "rejects invalid preconnect $detail values",
           "modes": ["client", "server-string", "production-compile"]
         }
       ]
@@ -65134,7 +65447,7 @@
     },
     {
       "caseId": "react-case-v1:d800a55557f8db8a94b5",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "warns on bad casing of known HTML attributes",
@@ -65142,7 +65455,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "suggests the supported spelling for a miscased known host property",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:d80dee5696c5173ff42e",
@@ -67487,12 +67807,17 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "All five upstream preinit triggers (undefined href, empty href, null options, missing as, invalid as) produce an adapted dev diagnostic and stay no-ops. Note: the inventory pinned both duplicate-title cases to line 6137; this entry is matched to the preinit variant at upstream line 6733.",
+      "rationale": "Public client/server resource-hint evidence validates exact argument combinations, malformed options and destinations, preserved browser behavior, and production warning stripping.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/float-evidence-2.test.ts",
           "testName": "preinit dev-warns and no-ops on invalid href or options",
           "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/resource-prop-diagnostics.test.ts",
+          "testName": "explains the invalid preinit option $detail and preserves the no-op",
+          "modes": ["client", "server-string", "production-compile"]
         }
       ]
     },
@@ -70212,7 +70537,7 @@
     },
     {
       "caseId": "react-case-v1:e91f4c4f65b886e905c7",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "should warn for unknown prop",
@@ -70220,7 +70545,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "reports one unsupported host property value only once",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e925951402fce9f31caa",
@@ -71975,7 +72307,7 @@
     },
     {
       "caseId": "react-case-v1:eec78b0fc29f4adddde6",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "should warn for unknown string event handlers",
@@ -71983,7 +72315,19 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "warns and drops the unsupported event-shaped string $name",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/unknown-property-diagnostics.test.ts",
+          "testName": "warns and drops an unsupported event-shaped server property",
+          "modes": ["server-string"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:eed19c758a573e47a9bf",
@@ -75765,7 +76109,7 @@
     },
     {
       "caseId": "react-case-v1:fbdf0f62f5c66e3fdedf",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-dom/src/__tests__/ReactDOMComponent-test.js",
       "title": "should warn for unknown function event handlers",
@@ -75773,7 +76117,14 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+      "rationale": "Executable public-host diagnostics cover the precise authored property, actionable guidance, client/server behavior where applicable, and development-only production stripping.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/dom-attributes.test.ts",
+          "testName": "drops a lowercase function event prop and suggests the delegated spelling",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:fbf1477e9c9e4d516101",

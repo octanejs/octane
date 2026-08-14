@@ -17,3 +17,35 @@ export function BadCaptureListenerTree(props: {
 		<div class="target" onClickCapture={props.bad}>{'x'}</div>
 	</div>
 }
+
+export function BadScrollListener(props: { bad: any }) @{
+	<div class="target" onScroll={props.bad}>{'scroll target'}</div>
+}
+
+export function BadLoadListener(props: { bad: any }) @{
+	<img class="target" onLoad={props.bad} />
+}
+
+export function ThrowingListenerTree(props: {
+	onAnc: (event: Event) => void;
+	onTarget: (event: Event) => void;
+}) @{
+	<div class="anc" onClick={props.onAnc}>
+		<button class="target" onClick={props.onTarget}>{'throwing target'}</button>
+	</div>
+}
+
+export function CustomListenerVariants(props: {
+	upper: any;
+	lower: any;
+	dashed: any;
+	capture: any;
+}) @{
+	<diagnostic-widget
+		class="target"
+		onCustomEvent={props.upper}
+		oncustomevent={props.lower}
+		oncustom-event={props.dashed}
+		oncustomeventCapture={props.capture}
+	/>
+}

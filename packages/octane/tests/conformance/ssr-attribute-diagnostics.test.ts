@@ -99,6 +99,8 @@ function spreadWarnings(prefix: string): string[] {
 	const falseName = `${prefix}false`;
 	const eventName = `on${prefix}click`;
 	return [
+		`Invalid values for props \`${prefix}function\`, \`${prefix}symbol\` on <div> tag. ` +
+			'Either remove them from the element, or pass a string or number value to keep them in the DOM.',
 		`Received \`true\` for a non-boolean attribute \`${trueName}\`. ` +
 			`If you want to write it to the DOM, pass a string instead: ` +
 			`${trueName}="true" or ${trueName}={value.toString()}.`,
@@ -106,8 +108,6 @@ function spreadWarnings(prefix: string): string[] {
 			`If you used to conditionally omit it with ${falseName}={condition && value}, ` +
 			`pass ${falseName}={condition ? value : undefined} instead.`,
 		`Received NaN for the \`${prefix}nan\` attribute. If this is expected, cast the value to a string.`,
-		invalidValueWarning(`${prefix}function`),
-		invalidValueWarning(`${prefix}symbol`),
 		`The provided \`${prefix}object\` attribute is an object; it will stringify to ` +
 			'"[object Object]". Pass a string (or a value with a meaningful toString) instead.',
 		`Unknown event handler property \`${eventName}\` was dropped — did you mean ` +

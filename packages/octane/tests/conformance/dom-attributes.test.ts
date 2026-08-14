@@ -698,13 +698,11 @@ describe('DOMPropertyOperations — custom elements', () => {
 		r.unmount();
 	});
 
-	/* Accounting — DOMPropertyOperations custom-element cases NOT ported:
+	/* Accounting — DOMPropertyOperations custom-element cases:
 	 *  - :251 (uppercase onCustomevent), :267 (dashed oncustom-event),
-	 *    :283 (remove custom-event handler), :467 (remove/re-add custom-event
-	 *    listeners), :975 (custom events with capture listeners), :1126
-	 *    (handlers alternating string ↔ function) → covered at the behavior seam
-	 *    by the passing :235 representative above; port each matrix variant only
-	 *    when its distinct add/remove/capture behavior needs dedicated coverage.
+	 *    :283/:467 (remove/re-add custom-event listeners), :975 (capture
+	 *    listeners), and :1126 (handlers alternating string ↔ function) now
+	 *    have exact public-API coverage in conformance/invalid-listeners.test.ts.
 	 *  - :493, :586, :670 (`<input is=…>` etc. onChange matrix), :748, :829,
 	 *    :866, :903, :940 (simulated-change targeting matrix) → intentional
 	 *    divergence (§2): React's SYNTHETIC onChange simulation (input→change

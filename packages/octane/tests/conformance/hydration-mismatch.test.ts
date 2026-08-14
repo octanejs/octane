@@ -98,6 +98,22 @@ describe('conformance: hydration mismatch (ReactDOMHydrationDiff + ReactDOMServe
 			expect(warns().length).toBe(1);
 		});
 
+		// Per ReactDOMHydrationDiff-test.js:155 — hydration compares decoded
+		// Unicode text rather than mistaking an authored HTML entity for markup.
+		it('warns for differing text beside an escaped nbsp entity (Per :155)', async () => {
+			const html = await reconnect(
+				'EscapedEntityTextMismatch',
+				{ isClient: false },
+				{ isClient: true },
+			);
+			const node = container.querySelector('#escaped-entity-mismatch')!;
+			expect(html).toContain('nbsp entity:');
+			expect(node.textContent).toContain('\u00a0 client text');
+			expect(node.textContent).not.toContain('server text');
+			expect(warns()).toHaveLength(1);
+			expect(warns()[0]).toContain('hydration-mismatch.tsrx:');
+		});
+
 		// Per Reconnecting-test.js:306 — differing whitespace IS a real mismatch (not collapsed).
 		it('treats a whitespace-only text difference as a mismatch (Per :306)', async () => {
 			await reconnect('WhitespaceMismatch', { isClient: false }, { isClient: true });
