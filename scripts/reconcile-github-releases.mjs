@@ -218,11 +218,7 @@ async function releaseBody(pkg) {
 		if (error?.code === 'ENOENT') return undefined;
 		throw error;
 	}
-	const body = changelogEntry(changelog, pkg.version);
-	if (body === undefined) {
-		throw new Error(`Could not find changelog entry for ${identity(pkg)}`);
-	}
-	return body;
+	return changelogEntry(changelog, pkg.version);
 }
 
 export async function reconcileGithubReleases(
@@ -246,10 +242,7 @@ export async function reconcileGithubReleases(
 		throw new Error(`checked out HEAD ${head} does not match validated SHA ${expectedSha}`);
 	}
 
-	const [remoteTags, githubReleaseTags] = await Promise.all([
-		getRemoteTags({ cwd, git }),
-		getReleaseTags(packages),
-	]);
+	const remoteTags = await getRemoteTags({ cwd, git });
 	const missingTagPackages = packages.filter((pkg) => !remoteTags.has(releaseTag(pkg)));
 	for (const pkg of missingTagPackages) {
 		await ensureLocalTag(releaseTag(pkg), expectedSha, { cwd, git });
@@ -278,6 +271,7 @@ export async function reconcileGithubReleases(
 		}
 	}
 
+	const githubReleaseTags = await getReleaseTags(packages);
 	const missingReleasePackages = packages.filter((pkg) => !githubReleaseTags.has(releaseTag(pkg)));
 	const createdReleases = [];
 	const skippedReleases = [];
@@ -300,7 +294,7 @@ function renderReconciliationSummary(result) {
 		'',
 		`- Tags created: ${result.missingTagPackages.length}`,
 		`- Releases created: ${result.createdReleases.length}`,
-		`- Releases skipped (no changelog): ${result.skippedReleases.length}`,
+		`- Releases skipped (no matching changelog entry): ${result.skippedReleases.length}`,
 	].join('\n')}\n`;
 }
 

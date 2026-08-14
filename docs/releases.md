@@ -68,4 +68,6 @@ Tag and GitHub-release reconciliation is also idempotent. It runs after every
 validated publish attempt, including partial failures, and repairs metadata for
 every current version that npm confirms is published. If release creation fails
 after the atomic tag push, the next successful main run or manual recovery
-retries only the missing GitHub release.
+retries only the missing GitHub release. GitHub API availability cannot block
+tag repair, and a package without a matching changelog entry is reported as
+skipped so later releases can still be created.
