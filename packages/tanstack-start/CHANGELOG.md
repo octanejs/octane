@@ -1,5 +1,13 @@
 # @octanejs/tanstack-start
 
+## 0.1.27
+
+### Patch Changes
+
+- Updated dependencies [0635af6]
+  - octane@0.1.38
+  - @octanejs/tanstack-router@0.1.37
+
 ## 0.1.26
 
 ### Patch Changes

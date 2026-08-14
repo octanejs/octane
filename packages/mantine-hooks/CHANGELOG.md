@@ -1,5 +1,12 @@
 # @octanejs/mantine-hooks
 
+## 0.1.19
+
+### Patch Changes
+
+- Updated dependencies [0635af6]
+  - octane@0.1.38
+
 ## 0.1.18
 
 ### Patch Changes

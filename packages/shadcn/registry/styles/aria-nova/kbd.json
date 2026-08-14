@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/aria@0.0.31"
+    "@octanejs/aria@0.0.32"
   ],
   "registryDependencies": [
     "@octane/types",

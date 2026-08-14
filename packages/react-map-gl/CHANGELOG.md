@@ -1,5 +1,12 @@
 # @octanejs/react-map-gl
 
+## 0.0.10
+
+### Patch Changes
+
+- Updated dependencies [0635af6]
+  - octane@0.1.38
+
 ## 0.0.9
 
 ### Patch Changes

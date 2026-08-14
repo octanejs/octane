@@ -1,5 +1,12 @@
 # @octanejs/zag
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [0635af6]
+  - octane@0.1.38
+
 ## 0.0.3
 
 ### Patch Changes
