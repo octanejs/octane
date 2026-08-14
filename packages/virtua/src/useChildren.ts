@@ -1,4 +1,4 @@
-import { useMemo, type OctaneNode } from 'octane';
+import { isChildrenBlock, useMemo, type OctaneNode } from 'octane';
 import type { OctaneElement } from 'octane/jsx-runtime';
 import { type ItemElement, flattenChildren } from './utils.js';
 
@@ -10,7 +10,7 @@ export const useChildren = <T>(
 	data: ArrayLike<T> | undefined,
 ) => {
 	return useMemo((): [(index: number) => ItemElement, number] => {
-		if (typeof children === 'function') {
+		if (typeof children === 'function' && !isChildrenBlock(children)) {
 			return [(index) => children(data![index]!, index), data!.length];
 		}
 		const elements = flattenChildren(children);

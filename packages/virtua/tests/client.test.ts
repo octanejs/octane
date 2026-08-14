@@ -6,6 +6,7 @@ import {
 	CustomContainer,
 	CustomItem,
 	ListFixture,
+	StaticChildrenFixture,
 	TwoListsFixture,
 	VirtualizerFixture,
 	WindowFixture,
@@ -44,6 +45,14 @@ describe('Octane VList', () => {
 		expect(container.querySelector('[data-index="20"]')?.textContent).toBe('Item 20');
 		expect(container.querySelector('[data-index="90"]')?.textContent).toBe('Item 90');
 		expect(container.querySelectorAll('[data-index]').length).toBeLessThan(items.length);
+	});
+
+	it('renders ordinary TSRX element children without invoking them as a render prop', async () => {
+		const { container } = render(StaticChildrenFixture);
+		await settleResize();
+
+		expect(container.querySelector('[data-static-item="first"]')?.textContent).toBe('First');
+		expect(container.querySelector('[data-static-item="second"]')?.textContent).toBe('Second');
 	});
 
 	it('exposes the complete imperative handle after dynamic measurement', async () => {

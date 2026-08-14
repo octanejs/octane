@@ -62,6 +62,13 @@ export function ListFixture({
 	</VList>;
 }
 
+export function StaticChildrenFixture(): OctaneElement {
+	return <VList itemSize={50}>
+		<div data-static-item="first">First</div>
+		<div data-static-item="second">Second</div>
+	</VList>;
+}
+
 interface VirtualizerFixtureProps extends Pick<VirtualizerProps<Item>, 'as' | 'item'> {
 	items: Item[];
 }
