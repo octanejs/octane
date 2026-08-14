@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 
@@ -22,7 +22,7 @@ export default function Polygon({
 	className,
 	children,
 	...restProps
-}: PolygonProps & Omit<SVGProps<SVGPathElement>, keyof PolygonProps>) {
+}: PolygonProps & Omit<Octane.SVGProps<SVGPathElement>, keyof PolygonProps>) {
 	if (!polygon) return null;
 	const path = `M${polygon.join('L')}Z`;
 	if (children) return <>

@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import type { PickD3Scale, ContinuousDomainScaleType } from '@octanejs/visx/scale';
@@ -36,7 +36,7 @@ export default function ViolinPlot<Datum extends object>({
 	horizontal,
 	children,
 	...restProps
-}: ViolinPlotProps<Datum> & Omit<SVGProps<SVGPathElement>, keyof ViolinPlotProps<Datum>>) {
+}: ViolinPlotProps<Datum> & Omit<Octane.SVGProps<SVGPathElement>, keyof ViolinPlotProps<Datum>>) {
 	const center = (horizontal ? top : left) + width / 2;
 	const binCounts = data.map((bin) => count(bin));
 	const widthScale = scaleLinear<number>({

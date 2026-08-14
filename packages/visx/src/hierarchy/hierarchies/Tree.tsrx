@@ -1,4 +1,3 @@
-import { createElement } from 'octane';
 import type { FunctionComponent, ComponentClass } from 'react';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
@@ -59,6 +58,11 @@ export default function Tree<Datum>({
 	linkComponent = DefaultLink,
 	nodeComponent = DefaultNode,
 }: TreeProps<Datum>) {
+	// Octane renders a component VALUE through a capitalized JSX tag; the prop
+	// keeps upstream's React component union for type parity.
+	const LinkComponent = linkComponent;
+	const NodeComponent = nodeComponent;
+
 	const tree = d3tree<Datum>();
 	if (size) tree.size(size);
 	if (nodeSize) tree.nodeSize(nodeSize);
@@ -73,11 +77,11 @@ export default function Tree<Datum>({
 	return <Group top={top} left={left} className={cx('visx-tree', className)}>
 		{linkComponent &&
 			data.links().map(
-				(link, i) => <Group key={`tree-link-${i}`}>{createElement(linkComponent, { link })}</Group>,
+				(link, i) => <Group key={`tree-link-${i}`}><LinkComponent link={link} /></Group>,
 			)}
 		{nodeComponent &&
 			data.descendants().map(
-				(node, i) => <Group key={`tree-node-${i}`}>{createElement(nodeComponent, { node })}</Group>,
+				(node, i) => <Group key={`tree-node-${i}`}><NodeComponent node={node} /></Group>,
 			)}
 	</Group>;
 }

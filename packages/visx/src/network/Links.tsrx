@@ -1,4 +1,3 @@
-import { createElement } from 'octane';
 import type { FunctionComponent, ComponentClass } from 'react';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
@@ -15,13 +14,17 @@ export type LinkProps<Link> = {
 };
 
 export default function Links<Link>({ links = [], linkComponent, className }: LinkProps<Link>) {
+	// Octane renders a component VALUE through a capitalized JSX tag; the prop
+	// keeps upstream's React component union for type parity.
+	const LinkComponent = linkComponent;
+
 	return <>
 		{links.map(
 			(link, i) =>
 				<Group
 					key={`network-link-${i}`}
 					className={cx('visx-network-link', className)}
-				>{createElement(linkComponent, { link })}</Group>,
+				><LinkComponent link={link} /></Group>,
 		)}
 	</>;
 }

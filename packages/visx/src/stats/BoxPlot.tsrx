@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import classnames from 'classnames';
 import { Group } from '@octanejs/visx/group';
@@ -44,19 +44,19 @@ export type BoxPlotProps = SharedProps & {
 		/** Array of outlier values to be rendered. */
 		outliers?: number[];
 		/** Props to pass to the median glyph line. */
-		medianProps?: SVGProps<SVGLineElement>;
+		medianProps?: Octane.SVGProps<SVGLineElement>;
 		/** Props to pass to the maximum glyph line. */
-		maxProps?: SVGProps<SVGLineElement>;
+		maxProps?: Octane.SVGProps<SVGLineElement>;
 		/** Props to pass to the minimum glyph line. */
-		minProps?: SVGProps<SVGLineElement>;
+		minProps?: Octane.SVGProps<SVGLineElement>;
 		/** Props to pass to the box glyph rect. */
-		boxProps?: SVGProps<SVGRectElement>;
+		boxProps?: Octane.SVGProps<SVGRectElement>;
 		/** Props to pass to the outlier glyph circles. */
-		outlierProps?: SVGProps<SVGCircleElement>;
+		outlierProps?: Octane.SVGProps<SVGCircleElement>;
 		/** Whether to render a container rect element (e.g., to capture mouse events). */
 		container?: boolean;
 		/** Props to pass to the container glyph rect if rendered. */
-		containerProps?: SVGProps<SVGRectElement>;
+		containerProps?: Octane.SVGProps<SVGRectElement>;
 		/** Override render function to fully control the rendering of the BoxPlot glyph. */
 		children?: (childRenderProps: ChildRenderProps) => OctaneNode;
 	};

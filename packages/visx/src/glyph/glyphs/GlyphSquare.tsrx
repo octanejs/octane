@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import type { Symbol } from 'd3-shape';
@@ -29,7 +29,7 @@ export default function GlyphSquare<Datum = unknown>({
 	left,
 	size,
 	...restProps
-}: GlyphSquareProps<Datum> & Omit<SVGProps<SVGPathElement>, keyof GlyphSquareProps<Datum>>) {
+}: GlyphSquareProps<Datum> & Omit<Octane.SVGProps<SVGPathElement>, keyof GlyphSquareProps<Datum>>) {
 	const path = symbol<Datum>();
 	path.type(symbolSquare);
 

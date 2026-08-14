@@ -93,7 +93,7 @@ const manifest = {
 			project: 'swr-pristine',
 			evidenceOrigin: 'upstream-suite',
 			notes:
-				'Runs the byte-exact SWR 2.4.2 Jest suite. A testing-library harness holds the initial request completion in the remote-mutation race case until the mutation starts, preserving the upstream assertion without wall-clock ordering.',
+				'Runs the byte-exact SWR 2.4.2 Jest suite. A testing-library harness holds initial request completion in two mutation race cases until the competing mutation starts or the shared in-flight state is observed, preserving the upstream assertions without wall-clock ordering.',
 			execution: {
 				kind: 'jest-full',
 				config: 'packages/swr/audit/jest-pristine.config.mjs',
@@ -175,7 +175,6 @@ const manifest = {
 			files: [
 				file('packages/swr/audit/adapted-runtime.json'),
 				file('scripts/react-parity/swr-runtime-inventory.mjs'),
-				file('vitest.config.js'),
 			],
 		},
 		{
@@ -218,7 +217,6 @@ const manifest = {
 							'SWR U4 exact specialized runtime oracles matches every pinned specialized runtime name',
 					},
 				]),
-				file('vitest.config.js'),
 			],
 		},
 	],

@@ -1,5 +1,5 @@
 import { useContext } from 'octane';
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 import AnnotationContext from '../context/AnnotationContext.tsrx';
 
@@ -31,7 +31,7 @@ export default function LineSubject({
 	max,
 	stroke = '#222',
 	...restProps
-}: LineSubjectProps & Omit<SVGProps<SVGLineElement>, keyof LineSubjectProps>) {
+}: LineSubjectProps & Omit<Octane.SVGProps<SVGLineElement>, keyof LineSubjectProps>) {
 	// if props are provided, they take precedence over context
 	const annotationContext = useContext(AnnotationContext);
 	const lineIsVertical = orientation === 'vertical';

@@ -1,4 +1,3 @@
-import { createElement } from 'octane';
 import type { FunctionComponent, ComponentClass } from 'react';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
@@ -70,6 +69,10 @@ export default function Treemap<Datum>({
 	children,
 	nodeComponent = HierarchyDefaultRectNode,
 }: TreemapProps<Datum>) {
+	// Octane renders a component VALUE through a capitalized JSX tag; the prop
+	// keeps upstream's React component union for type parity.
+	const NodeComponent = nodeComponent;
+
 	const treemap = d3treemap<Datum>();
 	if (tile) treemap.tile(tile);
 	if (size) treemap.size(size);
@@ -92,7 +95,7 @@ export default function Treemap<Datum>({
 		{nodeComponent &&
 			data.descendants().map(
 				(node, i) =>
-					<Group key={`treemap-node-${i}`}>{createElement(nodeComponent, { node })}</Group>,
+					<Group key={`treemap-node-${i}`}><NodeComponent node={node} /></Group>,
 			)}
 	</Group>;
 }

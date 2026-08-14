@@ -24,3 +24,23 @@ test('holds a request completion until the competing mutation has started', () =
 	assert.equal(globalThis.setTimeout, originalSetTimeout);
 	assert.equal(globalThis.clearTimeout, originalClearTimeout);
 });
+
+test('holds an initial request until its shared in-flight state is observed', () => {
+	const events = [];
+	const originalSetTimeout = globalThis.setTimeout;
+	const originalClearTimeout = globalThis.clearTimeout;
+
+	const held = holdFirstTimeout(30, () => {
+		setTimeout(() => events.push('revalidation completed'), 30);
+		return 'rendered';
+	});
+
+	assert.equal(held.result, 'rendered');
+	events.push('isValidating:true observed');
+	assert.deepEqual(events, ['isValidating:true observed']);
+	held.release();
+	assert.deepEqual(events, ['isValidating:true observed', 'revalidation completed']);
+	assert.throws(() => held.release(), /already been released/);
+	assert.equal(globalThis.setTimeout, originalSetTimeout);
+	assert.equal(globalThis.clearTimeout, originalClearTimeout);
+});

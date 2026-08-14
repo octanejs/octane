@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import useStableId from '../../kernel/ids/useStableId.tsrx';
 
@@ -23,7 +23,7 @@ export interface Props {
 	children: OctaneNode;
 }
 
-export type MarkerProps = Props & Omit<SVGProps<SVGMarkerElement>, keyof Props>;
+export type MarkerProps = Props & Omit<Octane.SVGProps<SVGMarkerElement>, keyof Props>;
 export type MarkerComponentProps = Omit<MarkerProps, 'children'>;
 
 export default function Marker({

@@ -20,10 +20,13 @@ contains compiled condition branches and declarations rather than the canonical
 source and tests.
 
 The pristine Jest config maps `@testing-library/react` through a narrow harness
-for the `useSWR` remote-mutation race case. Upstream starts a 10 ms request and
-assumes the mutation click wins that wall-clock race. The harness holds only that
-request completion until the click has started the mutation, then releases it so
-the unchanged assertion deterministically exercises the intended overlap.
+for two `useSWR` mutation race cases. The remote-mutation case starts a 10 ms
+request and assumes the mutation click wins that wall-clock race; the local-
+mutation case shares a 30 ms initial request with a later subscriber and assumes
+its synchronous `isValidating:true` query wins. The harness holds only those
+initial request completions until the competing mutation or observation has
+happened, then releases them so the unchanged assertions deterministically
+exercise the intended overlap.
 
 ## Provenance status
 

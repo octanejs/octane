@@ -1,4 +1,3 @@
-import { createElement } from 'octane';
 import type { FunctionComponent, ComponentClass } from 'react';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
@@ -50,6 +49,10 @@ export default function Pack<Datum>({
 	children,
 	nodeComponent = DefaultNode,
 }: PackProps<Datum>) {
+	// Octane renders a component VALUE through a capitalized JSX tag; the prop
+	// keeps upstream's React component union for type parity.
+	const NodeComponent = nodeComponent;
+
 	const pack = d3pack<Datum>();
 	if (size) pack.size(size);
 	if (radius !== undefined) pack.radius(radius);
@@ -64,7 +67,7 @@ export default function Pack<Datum>({
 	return <Group top={top} left={left} className={cx('visx-pack', className)}>
 		{nodeComponent &&
 			data.descendants().map(
-				(node, i) => <Group key={`pack-node-${i}`}>{createElement(nodeComponent, { node })}</Group>,
+				(node, i) => <Group key={`pack-node-${i}`}><NodeComponent node={node} /></Group>,
 			)}
 	</Group>;
 }

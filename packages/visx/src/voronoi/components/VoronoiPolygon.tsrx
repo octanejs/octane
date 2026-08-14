@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 
@@ -22,7 +22,7 @@ export default function VoronoiPolygon({
 	className,
 	children,
 	...restProps
-}: VoronoiPolygonProps & Omit<SVGProps<SVGPathElement>, keyof VoronoiPolygonProps>) {
+}: VoronoiPolygonProps & Omit<Octane.SVGProps<SVGPathElement>, keyof VoronoiPolygonProps>) {
 	if (!polygon) return null;
 	const path = `M${polygon.join('L')}Z`;
 	if (children) return <>

@@ -1,5 +1,5 @@
 import { useContext } from 'octane';
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import { LineSubject as BaseLineSubject } from '@octanejs/visx/annotation';
 import type { LineSubjectProps } from '@octanejs/visx/annotation';
 import DataContext from '../../context/DataContext.tsrx';
@@ -14,7 +14,7 @@ export default function AnnotationLineSubject({
 	min,
 	max,
 	...props
-}: AnnotationLineSubjectProps & Omit<SVGProps<SVGLineElement>, keyof AnnotationLineSubjectProps>) {
+}: AnnotationLineSubjectProps & Omit<Octane.SVGProps<SVGLineElement>, keyof AnnotationLineSubjectProps>) {
 	const { theme, margin, innerHeight = 0, innerWidth = 0 } = useContext(DataContext);
 	return <BaseLineSubject
 		stroke={theme?.axisStyles.x.bottom.axisLine.stroke}

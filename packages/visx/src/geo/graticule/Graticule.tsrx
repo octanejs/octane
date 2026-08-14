@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import { Group } from '@octanejs/visx/group';
 import type { GeoGraticuleGenerator } from 'd3-geo';
@@ -69,7 +69,7 @@ export default function Graticule({
 	precision,
 	children,
 	...restProps
-}: GraticuleProps & Omit<SVGProps<SVGPathElement>, keyof GraticuleProps>) {
+}: GraticuleProps & Omit<Octane.SVGProps<SVGPathElement>, keyof GraticuleProps>) {
 	const currGraticule = geoGraticule();
 
 	if (extent) currGraticule.extent(extent);

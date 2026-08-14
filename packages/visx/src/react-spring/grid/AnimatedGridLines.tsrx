@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import { animated, useTransition as useSpringTransition } from '../../internal/spring.tsrx';
 import type { GridScale, GridLines, CommonGridProps } from '@octanejs/visx/grid';
 import type { TransitionConfig } from '../spring-configs/useLineTransitionConfig.tsrx';
@@ -8,7 +8,7 @@ export type AnimatedGridLinesProps<Scale extends GridScale> = {
 		lines: GridLines;
 		lineKey: (line: GridLines[number]) => string;
 		scale: Scale;
-	} & Omit<SVGProps<SVGLineElement>, 'ref' | 'scale'> & Pick<TransitionConfig<Scale>, 'animationTrajectory' | 'animateXOrY'> & Pick<CommonGridProps, 'stroke' | 'strokeWidth' | 'lineStyle' | 'strokeDasharray'>;
+	} & Omit<Octane.SVGProps<SVGLineElement>, 'ref' | 'scale'> & Pick<TransitionConfig<Scale>, 'animationTrajectory' | 'animateXOrY'> & Pick<CommonGridProps, 'stroke' | 'strokeWidth' | 'lineStyle' | 'strokeDasharray'>;
 
 export default function AnimatedGridLines<Scale extends GridScale>({
 	scale,

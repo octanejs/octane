@@ -1,7 +1,6 @@
 import { memo, useCallback, useRef } from 'octane';
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import { animated, useSpring } from '../../../../internal/spring.tsrx';
-// @ts-expect-error no types
 import { interpolatePath } from 'd3-interpolate-path';
 import { debounce } from '@octanejs/visx/responsive';
 
@@ -10,7 +9,7 @@ function AnimatedPath({
 	stroke = 'transparent',
 	fill = 'transparent',
 	...lineProps
-}: Omit<SVGProps<SVGPathElement>, 'ref'>) {
+}: Omit<Octane.SVGProps<SVGPathElement>, 'ref'>) {
 	const previousD = useRef(d);
 	// updating d in quick succession will ruin the animation because startD === endD.
 	// debounce it slightly

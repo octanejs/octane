@@ -1,5 +1,6 @@
 import { useContext, useMemo } from 'octane';
-import type { SVGProps, CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import type { TextProps } from '@octanejs/visx/text';
@@ -16,7 +17,7 @@ export type LabelProps = {
 	/** Padding of text from background. */
 	backgroundPadding?: number | { top?: number; right?: number; bottom?: number; left?: number };
 	/** Additional props to be passed to background SVGRectElement. */
-	backgroundProps?: SVGProps<SVGRectElement>;
+	backgroundProps?: Octane.SVGProps<SVGRectElement>;
 	/** Optional className to apply to container in addition to 'visx-annotation-label'. */
 	className?: string;
 	/** Color of title and subtitle text. */
