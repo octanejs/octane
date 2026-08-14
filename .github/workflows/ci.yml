@@ -810,6 +810,14 @@ jobs:
       - name: Disallow wildcard .tsrx declarations in published sources
         run: pnpm tsrx-decls:check
 
+      # The type-only lowerings rewrite some constructs into a generated binding
+      # plus references to it. A position no hoisting pass reaches keeps the
+      # references and drops the declaration, so editors and tsrx-tsc report
+      # TS2304 on source that compiles and runs correctly. Packages typechecked
+      # through tsgo cannot catch this — tsgo does not read .tsrx at all.
+      - name: Disallow undeclared generated names in the virtual TSX
+        run: pnpm virtual-tsx:check
+
       # The root rule and every skill description load on EVERY agent session.
       # Path-scoped rules under .rulesync carry `globs` and load only when a
       # matching file is opened, so they are deliberately not budgeted.

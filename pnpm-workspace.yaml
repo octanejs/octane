@@ -530,7 +530,7 @@ catalogs:
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36
+  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37
   - react-dropzone@20.0.0
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
@@ -544,6 +544,22 @@ minimumReleaseAgeExclude:
 # packages/octane/src/compiler/compile.js applyCssScoping), so the patch makes
 # the TYPE-ONLY path accept multiple sheets and rebase them onto the first
 # sheet's hash; runtime transforms keep the throw. Remove once @tsrx/core
+# ships the equivalent fix upstream.
+#
+# @tsrx/core 0.1.56: a host element carrying `ref` plus a spread lowers to a
+# generated `let X = __normalize_spread_props_for_ref_attr(…)` that rides on the
+# element's metadata for a later pass to hoist. Only the render-block statement
+# builder and the native-directive path hoist it, so the same element in
+# plain-JS expression position (a ternary arm, a concise arrow body, a
+# declarator init, a callback body, an attribute value, an array element) lost
+# the declaration while the rewritten attributes still referenced the name —
+# TS2304 in the virtual TSX for source that compiles and runs correctly
+# (octanejs/octane#737). Such an element also reached BOTH lowering sites, and
+# the lowering is not idempotent, so it emitted a second binding and a nested
+# ref array. The patch wraps residual declarations in the IIFE the
+# native-directive path already uses and marks an element whose host ref/spread
+# is lowered; both are scoped to the TYPE-ONLY path, so runtime emit for the
+# other platforms sharing this transform is unchanged. Remove once @tsrx/core
 # ships the equivalent fix upstream.
 patchedDependencies:
   '@changesets/cli@2.31.1': patches/@changesets__cli@2.31.1.patch
