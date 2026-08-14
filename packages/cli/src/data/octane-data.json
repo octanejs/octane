@@ -1115,6 +1115,23 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/virtua",
+      "version": "0.0.1",
+      "category": "Data-heavy screens",
+      "upstream": {
+        "package": "virtua",
+        "version": "0.50.1",
+        "commit": "d8ec8680a3b396c2c29082583ef10d28cc41baa8"
+      },
+      "surface": "Complete Virtua 0.50.1 React adapter surface for Octane: VList, Virtualizer, WindowVirtualizer, experimental_VGrid, imperative handles, lazy data, dynamic measurement, scrolling, keepMounted, custom container/item/cell elements, and SSR counts. Framework-neutral behavior is delegated to virtua/unstable_core.",
+      "divergences": [
+        "Components are compiled Octane .tsrx modules and receive refs as ordinary props instead of using React forwardRef.",
+        "Native DOM event types replace React synthetic event types on viewport attributes."
+      ],
+      "ssr": "VList, WindowVirtualizer, and experimental_VGrid render deterministic ssrCount/ssrRowCount/ssrColCount windows without browser globals.",
+      "verified": "2026-08-15"
+    },
+    {
       "name": "@octanejs/visx",
       "version": "0.1.32",
       "category": "Data-heavy screens",
@@ -1324,6 +1341,7 @@
     "usehooks-ts": "@octanejs/usehooks-ts",
     "valtio": "@octanejs/valtio",
     "vaul": "@octanejs/vaul",
+    "virtua": "@octanejs/virtua",
     "wagmi": "@octanejs/wagmi",
     "zustand": "@octanejs/zustand"
   },

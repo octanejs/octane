@@ -1,0 +1,122 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/inokawa/virtua.git",
+    "version": "0.50.1",
+    "commit": "d8ec8680a3b396c2c29082583ef10d28cc41baa8",
+    "sourceRoot": "src/react",
+    "testRoot": "src/react",
+    "license": "MIT",
+    "integrity": "sha256:371354b85332a88d2b2729a66d84c8406eaca16dceb45b83bb5fc06e7d988d3a",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/virtua/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/virtua/tests/differential"],
+      "include": ["parity\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "b3425dec1cd9282e8a4c0ac44458c5faea1f4780c2fd2e44bc5661922e33cdb7"
+    }
+  },
+  "lanes": [
+    {
+      "id": "virtua-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "virtua-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 63 runtime and SSR assertions from the byte-exact Virtua 0.50.1 React suite against its pinned React adapter.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/virtua/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/virtua/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "8a9b96e7c22b99a7c8ab5e1607d1711e6b173ab93ad3345d5c9438bc6ff6ee37"
+        },
+        {
+          "path": "packages/virtua/upstream/COMMIT",
+          "role": "support",
+          "sha256": "5d8a6f514ccce76f85c6d528f4b4350dfe0c913e968f5fc7ff9cc6d36451e494"
+        },
+        {
+          "path": "packages/virtua/audit/verify-provenance.mjs",
+          "role": "support",
+          "sha256": "c041bdd363dbc3874cf4ed10b41525935cc8ef3fa3b6e522b564d3437f2fc06b"
+        }
+      ]
+    },
+    {
+      "id": "virtua-vlist-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "virtua-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles one .tsrx fixture to both Octane and React, rewrites only the binding/runtime imports, and compares byte-identical VList output for initial and count-update windows.",
+      "files": [
+        {
+          "path": "packages/virtua/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "a00ec0a1bfd870ad933f7e6ad38f4cb866da7783db1b0569a4dc1971c7c4dfd4",
+          "cases": [
+            {
+              "id": "differential:virtua-vlist",
+              "testName": "VList initial window and count updates are byte-identical",
+              "fullName": "differential: @octanejs/virtua vs virtua VList initial window and count updates are byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/virtua/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "7c5f163bdc728f75998003ea7023751bead0ceeae8a6db26d11a47aa7c4ac5e1"
+        },
+        {
+          "path": "packages/virtua/tests/differential/fixture-compiler.ts",
+          "role": "support",
+          "sha256": "c5aabdab08f49bd08525f857a6ac9d645d7e31e803d17848e20ef39d64dbfa01"
+        },
+        {
+          "path": "packages/virtua/tests/_fixtures/vlist-diff.tsrx",
+          "role": "support",
+          "sha256": "ebe558823ec7428ce7ee0cc67f0071ac91c71c281291f6c87a9e611c439c5772"
+        },
+        {
+          "path": "packages/virtua/tests/_setup.ts",
+          "role": "support",
+          "sha256": "a4a0194cdf5bdcf9530b2737b75c2e11ac416565e6fd22de2b1d73f2dc8a99e4"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

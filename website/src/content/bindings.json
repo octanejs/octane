@@ -96,6 +96,7 @@
     "packages": [
       "@octanejs/tanstack-table",
       "@octanejs/tanstack-virtual",
+      "@octanejs/virtua",
       "@octanejs/window",
       "@octanejs/recharts",
       "@octanejs/visx",

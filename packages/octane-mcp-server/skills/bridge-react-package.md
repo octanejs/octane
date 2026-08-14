@@ -19,6 +19,7 @@ of bridging by hand:
 | `@tanstack/react-store` | `@octanejs/tanstack-store` |
 | `@tanstack/react-table` | `@octanejs/tanstack-table` |
 | `@tanstack/react-virtual` | `@octanejs/tanstack-virtual` |
+| `virtua` | `@octanejs/virtua` |
 | `framer-motion` / `motion` | `@octanejs/motion` |
 | `@stylexjs/stylex` | `@octanejs/stylex` |
 | `styled-components` | `@octanejs/styled-components` |

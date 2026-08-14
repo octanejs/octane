@@ -457,6 +457,9 @@ export default defineConfig({
 			},
 			{
 				testExecution: { group: 'heavy-browser' },
+				optimizeDeps: {
+					include: ['virtua/unstable_core'],
+				},
 				test: {
 					name: 'octane-events-browser',
 					include: ['packages/octane/tests/browser/**/*.test.ts'],
@@ -464,6 +467,12 @@ export default defineConfig({
 					globals: false,
 					testTimeout: 60_000,
 					hookTimeout: 60_000,
+					onUnhandledError(error) {
+						// Chromium reports this while ResizeObserver-driven item styles converge.
+						return !String(error).includes(
+							'ResizeObserver loop completed with undelivered notifications',
+						);
+					},
 				},
 			},
 			{
@@ -1825,6 +1834,98 @@ export default defineConfig({
 						},
 					],
 				},
+			},
+			{
+				test: {
+					name: 'virtua',
+					include: ['packages/virtua/tests/**/*.test.ts'],
+					exclude: [
+						'packages/virtua/tests/browser/**/*.test.ts',
+						'packages/virtua/tests/differential/**/*.test.ts',
+						'packages/virtua/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/virtua$/,
+							replacement: resolve(import.meta.dirname, 'packages/virtua/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'virtua-pristine',
+					include: ['packages/virtua/upstream/src/react/**/*.spec.tsx'],
+					environment: 'jsdom',
+					setupFiles: ['packages/virtua/upstream/spec/setup.ts'],
+					globals: false,
+				},
+				plugins: [react()],
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'virtua-differential',
+					include: ['packages/virtua/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/virtua/tests/differential/_setup.ts'],
+					setupFiles: ['packages/virtua/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane(), react()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/virtua$/,
+							replacement: resolve(import.meta.dirname, 'packages/virtua/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'virtua-ssr',
+					include: ['packages/virtua/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/virtua$/,
+							replacement: resolve(import.meta.dirname, 'packages/virtua/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'virtua-browser',
+					include: ['packages/virtua/tests/browser/**/*.test.ts'],
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+					browser: {
+						enabled: true,
+						provider: playwright(),
+						headless: true,
+						instances: [{ browser: 'chromium' }],
+						screenshotFailures: false,
+					},
+				},
+				plugins: [octane()],
 			},
 			{
 				test: {

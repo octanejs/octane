@@ -1,0 +1,68 @@
+{
+  "name": "@octanejs/virtua",
+  "version": "0.0.1",
+  "description": "Octane bindings for Virtua virtual lists and grids, backed by the framework-neutral virtua core.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/virtua"
+  },
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "UPSTREAM.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project virtua",
+    "test:ssr": "vitest run --root ../.. --project virtua-ssr",
+    "test:browser": "vitest run --root ../.. --project virtua-browser",
+    "test:parity": "node ../../scripts/react-parity/harness.mjs run-required --manifest packages/virtua/audit/react-parity.json",
+    "test:performance": "node audit/measure-bundle.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
+    "upstream:verify": "node audit/verify-provenance.mjs",
+    "test:packed": "node tests/package/packed-exports.test.mjs"
+  },
+  "dependencies": {
+    "virtua": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/react": "16.3.2",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "@vitejs/plugin-react": "catalog:default",
+    "esbuild": "catalog:default",
+    "jsdom": "catalog:default",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

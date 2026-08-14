@@ -442,6 +442,7 @@ catalogs:
     type-fest: ^5.8.0
     typescript: ^5.9.3
     valtio: ^2.3.2
+    virtua: 0.50.1
     vite: ^8.1.5
     astro: ^5.16.0
     vite-plugin-solid: '3.0.0-next.5'

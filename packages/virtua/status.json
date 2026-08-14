@@ -1,0 +1,19 @@
+{
+  "upstream": {
+    "package": "virtua",
+    "version": "0.50.1",
+    "commit": "d8ec8680a3b396c2c29082583ef10d28cc41baa8"
+  },
+  "surface": "Complete Virtua 0.50.1 React adapter surface for Octane: VList, Virtualizer, WindowVirtualizer, experimental_VGrid, imperative handles, lazy data, dynamic measurement, scrolling, keepMounted, custom container/item/cell elements, and SSR counts. Framework-neutral behavior is delegated to virtua/unstable_core.",
+  "divergences": [
+    "Components are compiled Octane .tsrx modules and receive refs as ordinary props instead of using React forwardRef.",
+    "Native DOM event types replace React synthetic event types on viewport attributes."
+  ],
+  "ssr": "VList, WindowVirtualizer, and experimental_VGrid render deterministic ssrCount/ssrRowCount/ssrColCount windows without browser globals.",
+  "verified": "2026-08-15",
+  "notes": [
+    "Pinned to virtua 0.50.1 and reuses its published virtua/unstable_core export.",
+    "The full four-component entry measures 9,002 gzip bytes versus React Virtua's 7,461 bytes under the same Vite build, within the binding's explicit 25% initial budget.",
+    "Recorded-unverified provenance is retained until every upstream React test identity has a one-for-one adapted counterpart."
+  ]
+}

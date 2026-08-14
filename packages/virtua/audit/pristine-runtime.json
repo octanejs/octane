@@ -1,0 +1,331 @@
+{
+  "schemaVersion": 1,
+  "project": "virtua-pristine",
+  "roots": ["packages/virtua/upstream/src/react"],
+  "files": [
+    "packages/virtua/upstream/src/react/VGrid.spec.tsx",
+    "packages/virtua/upstream/src/react/VGrid.ssr.spec.tsx",
+    "packages/virtua/upstream/src/react/VList.spec.tsx",
+    "packages/virtua/upstream/src/react/VList.ssr.spec.tsx",
+    "packages/virtua/upstream/src/react/Virtualizer.spec.tsx",
+    "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+    "packages/virtua/upstream/src/react/WindowVirtualizer.ssr.spec.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:virtua-pristine-001",
+      "file": "packages/virtua/upstream/src/react/VGrid.spec.tsx",
+      "fullName": "grid should render 0 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-002",
+      "file": "packages/virtua/upstream/src/react/VGrid.spec.tsx",
+      "fullName": "grid should render 1 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-003",
+      "file": "packages/virtua/upstream/src/react/VGrid.spec.tsx",
+      "fullName": "grid should render 10000x10000 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-004",
+      "file": "packages/virtua/upstream/src/react/VGrid.spec.tsx",
+      "fullName": "grid should render 100x100 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-005",
+      "file": "packages/virtua/upstream/src/react/VGrid.spec.tsx",
+      "fullName": "grid should render 4x4 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-006",
+      "file": "packages/virtua/upstream/src/react/VGrid.spec.tsx",
+      "fullName": "grid should render component"
+    },
+    {
+      "id": "runtime:virtua-pristine-007",
+      "file": "packages/virtua/upstream/src/react/VGrid.spec.tsx",
+      "fullName": "grid should render fragments"
+    },
+    {
+      "id": "runtime:virtua-pristine-008",
+      "file": "packages/virtua/upstream/src/react/VGrid.spec.tsx",
+      "fullName": "grid should render non elements"
+    },
+    {
+      "id": "runtime:virtua-pristine-009",
+      "file": "packages/virtua/upstream/src/react/VGrid.spec.tsx",
+      "fullName": "grid should render with given width / height"
+    },
+    {
+      "id": "runtime:virtua-pristine-010",
+      "file": "packages/virtua/upstream/src/react/VGrid.spec.tsx",
+      "fullName": "should pass attributes to element"
+    },
+    {
+      "id": "runtime:virtua-pristine-011",
+      "file": "packages/virtua/upstream/src/react/VGrid.ssr.spec.tsx",
+      "fullName": "SSR should render items with renderToStaticMarkup and vertical"
+    },
+    {
+      "id": "runtime:virtua-pristine-012",
+      "file": "packages/virtua/upstream/src/react/VGrid.ssr.spec.tsx",
+      "fullName": "SSR should render items with renderToString and vertical"
+    },
+    {
+      "id": "runtime:virtua-pristine-013",
+      "file": "packages/virtua/upstream/src/react/VGrid.ssr.spec.tsx",
+      "fullName": "SSR should render nothing"
+    },
+    {
+      "id": "runtime:virtua-pristine-014",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "horizontal should render 1 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-015",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "horizontal should render 100 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-016",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "horizontal should render 10000 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-017",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "horizontal should render 5 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-018",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "horizontal should render component"
+    },
+    {
+      "id": "runtime:virtua-pristine-019",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "horizontal should render fragments"
+    },
+    {
+      "id": "runtime:virtua-pristine-020",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "horizontal should render non elements"
+    },
+    {
+      "id": "runtime:virtua-pristine-021",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "horizontal should render with given width / height"
+    },
+    {
+      "id": "runtime:virtua-pristine-022",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "should pass attributes to element"
+    },
+    {
+      "id": "runtime:virtua-pristine-023",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "should pass index to items"
+    },
+    {
+      "id": "runtime:virtua-pristine-024",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "should render with keepMounted"
+    },
+    {
+      "id": "runtime:virtua-pristine-025",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "should render with render prop"
+    },
+    {
+      "id": "runtime:virtua-pristine-026",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "vertical should render 0 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-027",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "vertical should render 1 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-028",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "vertical should render 100 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-029",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "vertical should render 10000 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-030",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "vertical should render 5 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-031",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "vertical should render component"
+    },
+    {
+      "id": "runtime:virtua-pristine-032",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "vertical should render fragments"
+    },
+    {
+      "id": "runtime:virtua-pristine-033",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "vertical should render non elements"
+    },
+    {
+      "id": "runtime:virtua-pristine-034",
+      "file": "packages/virtua/upstream/src/react/VList.spec.tsx",
+      "fullName": "vertical should render with given width / height"
+    },
+    {
+      "id": "runtime:virtua-pristine-035",
+      "file": "packages/virtua/upstream/src/react/VList.ssr.spec.tsx",
+      "fullName": "SSR should render items with renderToStaticMarkup and horizontal"
+    },
+    {
+      "id": "runtime:virtua-pristine-036",
+      "file": "packages/virtua/upstream/src/react/VList.ssr.spec.tsx",
+      "fullName": "SSR should render items with renderToStaticMarkup and vertical"
+    },
+    {
+      "id": "runtime:virtua-pristine-037",
+      "file": "packages/virtua/upstream/src/react/VList.ssr.spec.tsx",
+      "fullName": "SSR should render items with renderToString and horizontal"
+    },
+    {
+      "id": "runtime:virtua-pristine-038",
+      "file": "packages/virtua/upstream/src/react/VList.ssr.spec.tsx",
+      "fullName": "SSR should render items with renderToString and vertical"
+    },
+    {
+      "id": "runtime:virtua-pristine-039",
+      "file": "packages/virtua/upstream/src/react/VList.ssr.spec.tsx",
+      "fullName": "SSR should render nothing"
+    },
+    {
+      "id": "runtime:virtua-pristine-040",
+      "file": "packages/virtua/upstream/src/react/Virtualizer.spec.tsx",
+      "fullName": "should change components"
+    },
+    {
+      "id": "runtime:virtua-pristine-041",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "horizontal should render 1 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-042",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "horizontal should render 100 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-043",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "horizontal should render 10000 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-044",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "horizontal should render 5 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-045",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "horizontal should render component"
+    },
+    {
+      "id": "runtime:virtua-pristine-046",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "horizontal should render fragments"
+    },
+    {
+      "id": "runtime:virtua-pristine-047",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "horizontal should render non elements"
+    },
+    {
+      "id": "runtime:virtua-pristine-048",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "horizontal should render with given width / height"
+    },
+    {
+      "id": "runtime:virtua-pristine-049",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "should pass index to items"
+    },
+    {
+      "id": "runtime:virtua-pristine-050",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "should render with render prop"
+    },
+    {
+      "id": "runtime:virtua-pristine-051",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "vertical should render 1 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-052",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "vertical should render 100 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-053",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "vertical should render 10000 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-054",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "vertical should render 5 children"
+    },
+    {
+      "id": "runtime:virtua-pristine-055",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "vertical should render component"
+    },
+    {
+      "id": "runtime:virtua-pristine-056",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "vertical should render fragments"
+    },
+    {
+      "id": "runtime:virtua-pristine-057",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "vertical should render non elements"
+    },
+    {
+      "id": "runtime:virtua-pristine-058",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.spec.tsx",
+      "fullName": "vertical should render with given width / height"
+    },
+    {
+      "id": "runtime:virtua-pristine-059",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.ssr.spec.tsx",
+      "fullName": "SSR should render items with renderToStaticMarkup and horizontal"
+    },
+    {
+      "id": "runtime:virtua-pristine-060",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.ssr.spec.tsx",
+      "fullName": "SSR should render items with renderToStaticMarkup and vertical"
+    },
+    {
+      "id": "runtime:virtua-pristine-061",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.ssr.spec.tsx",
+      "fullName": "SSR should render items with renderToString and horizontal"
+    },
+    {
+      "id": "runtime:virtua-pristine-062",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.ssr.spec.tsx",
+      "fullName": "SSR should render items with renderToString and vertical"
+    },
+    {
+      "id": "runtime:virtua-pristine-063",
+      "file": "packages/virtua/upstream/src/react/WindowVirtualizer.ssr.spec.tsx",
+      "fullName": "SSR should render nothing"
+    }
+  ]
+}
