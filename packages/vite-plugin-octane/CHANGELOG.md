@@ -1,5 +1,13 @@
 # @octanejs/vite-plugin
 
+## 0.1.38
+
+### Patch Changes
+
+- Updated dependencies [0635af6]
+  - octane@0.1.38
+  - @octanejs/app-core@0.0.34
+
 ## 0.1.37
 
 ### Patch Changes

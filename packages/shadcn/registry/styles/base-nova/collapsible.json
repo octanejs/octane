@@ -12,6 +12,6 @@
     }
   ],
   "dependencies": [
-    "@octanejs/base-ui@0.1.35"
+    "@octanejs/base-ui@0.1.36"
   ]
 }

@@ -1,5 +1,12 @@
 # @octanejs/electron
 
+## 0.0.16
+
+### Patch Changes
+
+- Updated dependencies [0635af6]
+  - octane@0.1.38
+
 ## 0.0.15
 
 ### Patch Changes

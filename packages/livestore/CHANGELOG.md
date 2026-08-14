@@ -1,5 +1,12 @@
 # @octanejs/livestore
 
+## 0.0.8
+
+### Patch Changes
+
+- Updated dependencies [0635af6]
+  - octane@0.1.38
+
 ## 0.0.7
 
 ### Patch Changes
