@@ -172,9 +172,24 @@ jobs:
         if: steps.npm_release.outputs.needs_publish == 'true'
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
         with:
+          # changesets/action pushes every package tag concurrently when it also
+          # creates GitHub releases. Large releases can overwhelm GitHub's ref
+          # transaction hook, so the reconciliation step below owns both.
+          createGithubReleases: false
           publish: pnpm changeset:publish
         env:
           GITHUB_TOKEN: ${{ github.token }}
           # npm trusted publishing via OIDC (id-token: write) — no NPM_TOKEN.
           PNPM_CONFIG_PROVENANCE: true
           NPM_CONFIG_PROVENANCE: true
+
+      # Run even after a partial npm failure: published versions are immutable,
+      # and this idempotent pass can finish their tags/releases before the next
+      # recovery run. Missing tags move in one atomic push; releases are created
+      # sequentially so GitHub never receives dozens of concurrent ref updates.
+      - name: Reconcile GitHub tags and releases
+        if: always() && steps.npm_release.outcome == 'success'
+        run: pnpm release:reconcile
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
