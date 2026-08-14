@@ -3,7 +3,10 @@ import { createRequire } from 'node:module';
 import test from 'node:test';
 
 const require = createRequire(import.meta.url);
-const { holdFirstTimeout } = require('../../packages/swr/audit/upstream-timer-gate.cjs');
+const {
+	holdFirstTimeout,
+	holdNextTimeout,
+} = require('../../packages/swr/audit/upstream-timer-gate.cjs');
 
 test('holds a request completion until the competing mutation has started', () => {
 	const events = [];
@@ -23,4 +26,19 @@ test('holds a request completion until the competing mutation has started', () =
 	assert.throws(() => held.release(), /already been released/);
 	assert.equal(globalThis.setTimeout, originalSetTimeout);
 	assert.equal(globalThis.clearTimeout, originalClearTimeout);
+});
+
+test('holds an asynchronously scheduled revalidation until its in-flight state is observed', async () => {
+	const events = [];
+	const gate = holdNextTimeout(30);
+	queueMicrotask(() => {
+		setTimeout(() => events.push('revalidation completed'), 30);
+	});
+
+	events.push('isValidating:true observed');
+	assert.deepEqual(events, ['isValidating:true observed']);
+	gate.releaseWhenScheduled();
+	await Promise.resolve();
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	assert.deepEqual(events, ['isValidating:true observed', 'revalidation completed']);
 });
