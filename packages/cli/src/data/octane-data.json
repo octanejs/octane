@@ -843,6 +843,21 @@
       "verified": "2026-08-09"
     },
     {
+      "name": "@octanejs/tanstack-db",
+      "version": "0.0.1",
+      "category": "AI, data, and routing",
+      "upstream": { "package": "@tanstack/db", "version": "0.7.0" },
+      "surface": "Re-exports `@tanstack/db@0.7.0` unchanged and ports the React live-query binding surface of `@tanstack/react-db@0.1.96` (`useLiveQuery`, `useLiveInfiniteQuery`, `useLiveSuspenseQuery`, `useLiveQueryEffect`, `usePacedMutations`) onto Octane hooks. `useLiveQuery`/`useLiveSuspenseQuery` are driven by db's shared `createLiveQueryObserver`; `useLiveInfiniteQuery` by the coordinated `createLiveQueryWindowController`.",
+      "divergences": [
+        "Suspense integrates via Octane's `use(thenable)` rather than throwing a raw promise. React (and `@tanstack/react-db`) throw the promise and rely on React Suspense catching it; Octane Suspense only recognizes the `use()` sentinel, so a raw throw would reach the error path and never render the fallback. Because Octane keys `use()` by dynamic call-order index (not compiler slot), `useLiveSuspenseQuery` calls `use()` unconditionally — exactly once per render, handing it an already-resolved thenable on the ready/stale paths — so a sibling `use()` or a second `useLiveSuspenseQuery` in the same component keeps a stable thenable index. Observable behavior (fallback then data) matches.",
+        "`useLiveQuery`/`useLiveInfiniteQuery` subscribe wrappers defer an initial `onStoreChange` to a microtask so an already-ready collection (or a synchronous subscribe-time window growth) is reflected in the first committed snapshot. Octane's `useSyncExternalStore` re-checks the store snapshot before, not after, the subscribe call (React re-checks after), so this nudge stands in for React's post-subscribe reconciliation. Pinned by the `eager-onstorechange` test.",
+        "`useLiveInfiniteQuery` rejects a pre-created collection that lacks an `orderBy` synchronously during render (detected via `getWindow()` returning a window object), so the error is observable to the caller, rather than letting `setWindow()` throw later inside a passive subscribe effect that Octane swallows.",
+        "StrictMode double-invocation is not applicable: Octane has no development double-invoke of component setup/cleanup."
+      ],
+      "ssr": "Not yet exercised: no server-render tests are included for the live-query hooks.",
+      "verified": "2026-08-13"
+    },
+    {
       "name": "@octanejs/tanstack-devtools",
       "version": "0.0.32",
       "category": "Styling, tests, and devtools",
@@ -1215,6 +1230,7 @@
     "@streamdown/mermaid": "@octanejs/streamdown",
     "@stylexjs/stylex": "@octanejs/stylex",
     "@tanstack/ai-react": "@octanejs/tanstack-ai",
+    "@tanstack/react-db": "@octanejs/tanstack-db",
     "@tanstack/react-devtools": "@octanejs/tanstack-devtools",
     "@tanstack/react-form": "@octanejs/tanstack-form",
     "@tanstack/react-hotkeys": "@octanejs/tanstack-hotkeys",

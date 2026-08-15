@@ -1,0 +1,27 @@
+{
+  "upstream": {
+    "package": "@tanstack/db",
+    "version": "0.7.0"
+  },
+  "surface": "Re-exports `@tanstack/db@0.7.0` unchanged and ports the React live-query binding surface of `@tanstack/react-db@0.1.96` (`useLiveQuery`, `useLiveInfiniteQuery`, `useLiveSuspenseQuery`, `useLiveQueryEffect`, `usePacedMutations`) onto Octane hooks. `useLiveQuery`/`useLiveSuspenseQuery` are driven by db's shared `createLiveQueryObserver`; `useLiveInfiniteQuery` by the coordinated `createLiveQueryWindowController`.",
+  "divergences": [
+    "Suspense integrates via Octane's `use(thenable)` rather than throwing a raw promise. React (and `@tanstack/react-db`) throw the promise and rely on React Suspense catching it; Octane Suspense only recognizes the `use()` sentinel, so a raw throw would reach the error path and never render the fallback. Because Octane keys `use()` by dynamic call-order index (not compiler slot), `useLiveSuspenseQuery` calls `use()` unconditionally — exactly once per render, handing it an already-resolved thenable on the ready/stale paths — so a sibling `use()` or a second `useLiveSuspenseQuery` in the same component keeps a stable thenable index. Observable behavior (fallback then data) matches.",
+    "`useLiveQuery`/`useLiveInfiniteQuery` subscribe wrappers defer an initial `onStoreChange` to a microtask so an already-ready collection (or a synchronous subscribe-time window growth) is reflected in the first committed snapshot. Octane's `useSyncExternalStore` re-checks the store snapshot before, not after, the subscribe call (React re-checks after), so this nudge stands in for React's post-subscribe reconciliation. Pinned by the `eager-onstorechange` test.",
+    "`useLiveInfiniteQuery` rejects a pre-created collection that lacks an `orderBy` synchronously during render (detected via `getWindow()` returning a window object), so the error is observable to the caller, rather than letting `setWindow()` throw later inside a passive subscribe effect that Octane swallows.",
+    "StrictMode double-invocation is not applicable: Octane has no development double-invoke of component setup/cleanup."
+  ],
+  "ssr": "Not yet exercised: no server-render tests are included for the live-query hooks.",
+  "provenance": {
+    "source": "@tanstack/react-db@0.1.96 (adapter) over @tanstack/db@0.7.0 (core)",
+    "license": "MIT",
+    "integrity": "sha256:2c9f6022aab930ada80d82fdadef6c7ec23bcd42b2e776c44f1806e70b7a228c",
+    "verification": "recorded-unverified"
+  },
+  "notes": [
+    "Adapter source is vendored byte-exact under `upstream/react-db/src` (with `upstream/SHA256SUMS`, `.prettierignore`d, excluded from published `files`) so an upstream bump is a reviewable diff. See `UPSTREAM.md` for the pin, export crosswalk, and upstream-suite disposition.",
+    "Bounded evidence: the shared `@tanstack/db` live-query conformance suite runs against the Octane adapter driver with zero known gaps and zero universal expected-fails (after the 0.7.0 order-only-move fix, db #1669), plus local coverage for suspense (incl. an async fallback), coordinated infinite-query windows, effect hooks, paced mutations, and eager onStoreChange; type tests cover the `useLiveQuery` overload families.",
+    "Open toward full `verified`: no executable React-differential lane and no one-for-one adaptation of the upstream `@tanstack/react-db` runtime/type suites (which the npm artifact does not ship) yet; consistent with the recorded-unverified posture of the other bindings.",
+    "The `@tanstack/db` expression evaluator and comparison utilities are vendored under `tests/db-fixtures/db-internal/` (pinned to 0.7.0, logic unchanged from 0.6.17) so the infinite-query tests can interpret the where/cursor IR db generates internally; these are test-only and not shipped."
+  ],
+  "verified": "2026-08-13"
+}

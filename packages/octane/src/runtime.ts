@@ -13,6 +13,12 @@
  * Reconciliation: LIS-based keyed list inside forBlock (ported from Ripple's patchKeyedChildrenComplex).
  */
 
+// The consumer's bundler substitutes the whole Node environment expression below,
+// so the source guard must stay written out literally. Declared module-locally — never
+// `declare global`, which would ship in the tarball — so this file type-checks in
+// a browser app that has no `@types/node`.
+declare const process: { env: { NODE_ENV?: string } };
+
 import {
 	SUSPENSE_SCRIPT_ATTR,
 	HYDRATE_STATIC_ID_COUNT_PREFIX,

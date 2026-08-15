@@ -288,6 +288,11 @@ describe('KNOWN_BINDINGS', () => {
 		expect(KNOWN_BINDINGS['react-window']).toBe('@octanejs/window');
 	});
 
+	it('maps TanStack React DB to the Octane binding and framework-neutral core', () => {
+		expect(KNOWN_BINDINGS['@tanstack/react-db']).toBe('@octanejs/tanstack-db');
+		expect(KNOWN_VANILLA_CORES['@tanstack/react-db']).toBe('@tanstack/db');
+	});
+
 	it('maps Streamdown and every official plugin package to the consolidated binding', () => {
 		const upstreamPackages = [
 			'streamdown',

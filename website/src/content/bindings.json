@@ -24,6 +24,7 @@
       "@octanejs/dexie",
       "@octanejs/swr",
       "@octanejs/tanstack-query",
+      "@octanejs/tanstack-db",
       "@octanejs/tanstack-router",
       "@octanejs/tanstack-router-ssr-query",
       "@octanejs/remix-router",

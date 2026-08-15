@@ -745,6 +745,26 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tanstack-db',
+					include: ['packages/tanstack-db/tests/**/*.test.tsx'],
+					environment: 'jsdom',
+					setupFiles: ['packages/tanstack-db/tests/test-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				// `@octanejs/tanstack-db` is the package under test; alias the public
+				// name to source so tests can import it exactly as a consumer would.
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-db$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-db/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'jotai',
 					include: ['packages/jotai/tests/**/*.test.ts'],
 					environment: 'jsdom',
