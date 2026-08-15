@@ -1,5 +1,5 @@
 import { useContext } from 'octane';
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 import type { AnnotationContextType } from '../types';
 import AnnotationContext from '../context/AnnotationContext.tsrx';
@@ -20,7 +20,7 @@ export default function CircleSubject({
 	stroke = '#222',
 	radius = 16,
 	...restProps
-}: CircleSubjectProps & Omit<SVGProps<SVGCircleElement>, keyof CircleSubjectProps>) {
+}: CircleSubjectProps & Omit<Octane.SVGProps<SVGCircleElement>, keyof CircleSubjectProps>) {
 	// if props are provided, they take precedence over context
 	const annotationContext = useContext(AnnotationContext);
 

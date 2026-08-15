@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import ClipPath from './ClipPath.tsrx';
 
 export type CircleClipPathProps = {
@@ -19,7 +19,7 @@ export default function CircleClipPath({
 	cy,
 	r,
 	...restProps
-}: CircleClipPathProps & Omit<SVGProps<SVGCircleElement>, keyof CircleClipPathProps>) {
+}: CircleClipPathProps & Omit<Octane.SVGProps<SVGCircleElement>, keyof CircleClipPathProps>) {
 	return <ClipPath id={id}>
 		<circle cx={cx} cy={cy} r={r} {...restProps} />
 	</ClipPath>;

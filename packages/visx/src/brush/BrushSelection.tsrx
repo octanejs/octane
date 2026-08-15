@@ -1,5 +1,6 @@
 /* eslint react/jsx-handler-names: 0 */
-import type { SVGProps, PointerEvent } from 'react';
+import type { PointerEvent } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { HandlerArgs as DragArgs } from '@octanejs/visx/drag';
 import { Drag } from '@octanejs/visx/drag';
 
@@ -26,7 +27,7 @@ export type BrushSelectionProps = {
 	onMouseMove?: PointerHandler;
 	onMouseUp?: PointerHandler;
 	onClick?: PointerHandler;
-	selectedBoxStyle: SVGProps<SVGRectElement>;
+	selectedBoxStyle: Octane.SVGProps<SVGRectElement>;
 	isControlled?: boolean;
 	isDragInProgress?: boolean;
 };

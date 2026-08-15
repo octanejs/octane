@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useRef } from 'octane';
-import type { CSSProperties, SVGProps } from 'react';
+import type { CSSProperties } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import { useTooltipInPortal, defaultStyles } from '@octanejs/visx/tooltip';
 import type {
@@ -27,7 +28,7 @@ export type RenderTooltipParams<Datum extends object> = TooltipContextType<Datum
 	};
 
 export interface RenderTooltipGlyphProps<Datum extends object> extends RenderGlyphProps<Datum> {
-	glyphStyle?: SVGProps<SVGCircleElement>;
+	glyphStyle?: Octane.SVGProps<SVGCircleElement>;
 	isNearestDatum: boolean;
 }
 
@@ -58,11 +59,11 @@ export type TooltipProps<Datum extends object> = {
 		/** Whether to show a glyph for the nearest Datum in each series. */
 		showSeriesGlyphs?: boolean;
 		/** Optional styles for the vertical crosshair, if visible. */
-		verticalCrosshairStyle?: SVGProps<SVGLineElement>;
+		verticalCrosshairStyle?: Octane.SVGProps<SVGLineElement>;
 		/** Optional styles for the vertical crosshair, if visible. */
-		horizontalCrosshairStyle?: SVGProps<SVGLineElement>;
+		horizontalCrosshairStyle?: Octane.SVGProps<SVGLineElement>;
 		/** Optional styles for the point, if visible. */
-		glyphStyle?: SVGProps<SVGCircleElement>;
+		glyphStyle?: Octane.SVGProps<SVGCircleElement>;
 		/**
  * Tooltip depends on ResizeObserver, which may be polyfilled globally,
  * passed to XYChart, or injected into this component.

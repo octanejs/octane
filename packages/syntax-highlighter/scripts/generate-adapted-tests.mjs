@@ -23,7 +23,7 @@ await mkdir(generatedTests, { recursive: true });
 const testFiles = (await readdir(upstreamTests)).filter((name) => name.endsWith('.js')).sort();
 for (const name of testFiles) {
 	const source = await readFile(join(upstreamTests, name), 'utf8');
-	const adapted = `import { expect, test, vi } from 'vitest';\n${source}`
+	let adapted = `import { expect, test, vi } from 'vitest';\n${source}`
 		.replace("import React from 'react';", "import * as React from 'octane';")
 		.replace(
 			"import renderer from 'react-test-renderer';",
@@ -33,6 +33,25 @@ for (const name of testFiles) {
 		.replace(/jest\.fn\(\)/g, 'vi.fn()')
 		.replace(/jest\.fn/g, 'vi.fn')
 		.replace(/jest\./g, 'vi.');
+	if (name === 'light-async.js') {
+		const loadingCase = "test('SyntaxHighlighter renders text while language loads', async () => {";
+		const loadingCaseIndex = adapted.indexOf(loadingCase);
+		const preload = '  await SyntaxHighlighter.preload();';
+		const preloadIndex = adapted.indexOf(preload, loadingCaseIndex);
+		const assertion = '  expect(tree.toJSON()).toMatchSnapshot();';
+		const assertionIndex = adapted.indexOf(assertion, preloadIndex);
+		if (loadingCaseIndex === -1 || preloadIndex === -1 || assertionIndex === -1) {
+			throw new Error('Unable to stabilize the async loading-state case');
+		}
+		adapted = `${adapted.slice(0, preloadIndex + preload.length)}
+
+  // Keep the request pending so runner load cannot race the loading-state assertion.
+  const loadLanguage = vi
+    .spyOn(SyntaxHighlighter, 'loadLanguage')
+    .mockImplementation(() => new Promise(() => {}));${adapted.slice(preloadIndex + preload.length, assertionIndex)}  await vi.waitFor(() => expect(loadLanguage).toHaveBeenCalledWith('gherkin'));
+${assertion}
+  loadLanguage.mockRestore();${adapted.slice(assertionIndex + assertion.length)}`;
+	}
 	const outputName = name.replace(/\.js$/, '.test.ts');
 	const compiled = await transform(adapted, {
 		loader: 'jsx',

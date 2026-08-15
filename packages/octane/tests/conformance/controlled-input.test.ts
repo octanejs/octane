@@ -355,4 +355,56 @@ describe('conformance: missing-onInput dev warning', () => {
 		expect(errSpy).not.toHaveBeenCalled();
 		r.unmount();
 	});
+
+	// Per ReactDOMInput-test.js:114, :127, :140, and :153. Falsy controlled
+	// values still own the field and require a native per-edit handler.
+	it.each([0, '', '0', false])(
+		'warns for a handler-less controlled input with the falsy value %j',
+		(value) => {
+			const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const r = mount(ControlledInput, { value });
+			try {
+				expect(r.find('#ci').getAttribute('value')).toBe(String(value));
+				const warnings = errSpy.mock.calls.filter((call) =>
+					String(call[0]).includes('without an `onInput` handler'),
+				);
+				expect(warnings).toHaveLength(PROD_COMPILE ? 0 : 1);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	// Per ReactDOMInput-test.js:165 and :183. An explicitly read-only,
+	// disabled, or uncontrolled field is not missing an edit handler.
+	it.each([
+		{ label: 'read-only', props: { value: 'locked', readOnly: true } },
+		{ label: 'disabled', props: { value: 'locked', disabled: true } },
+		{ label: 'uncontrolled', props: { defaultValue: 'editable' } },
+		{ label: 'null-valued', props: { value: null } },
+	])('does not warn for a $label field without an input handler', ({ props }) => {
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(SpreadInput, { sp: props });
+		try {
+			expect(errSpy).not.toHaveBeenCalled();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	// Per ReactDOMInput-test.js:165. A read-only or disabled checkable is a
+	// deliberate controlled field, while a mutable checkable needs a handler.
+	it.each([
+		{ label: 'read-only', props: { type: 'checkbox', checked: false, readOnly: true } },
+		{ label: 'disabled', props: { type: 'radio', checked: true, disabled: true } },
+		{ label: 'uncontrolled', props: { type: 'checkbox', defaultChecked: true } },
+	])('does not warn for a $label checkable without a change handler', ({ props }) => {
+		const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(SpreadInput, { sp: props });
+		try {
+			expect(errSpy).not.toHaveBeenCalled();
+		} finally {
+			r.unmount();
+		}
+	});
 });

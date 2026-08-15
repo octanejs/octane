@@ -13,38 +13,16 @@ type Upstream = typeof import('@visx/visx');
 // carry renderable props assert `Extends<Local, Upstream>` (every upstream
 // call site still type-checks against the local component); modules without
 // renderable props keep exact `Equal`.
-type _Annotation = Assert<
-	Extends<
-		Omit<Local['Annotation'], 'AnnotationContext'>,
-		Omit<Upstream['Annotation'], 'AnnotationContext'>
-	>
->;
-// Some components take a render-prop (`children: (renderProps) => ReactNode`)
-// whose renderProps THEMSELVES carry renderable members — the OctaneNode
-// divergence then appears on both sides of the variance, so no single
-// assignability direction can hold for the whole component. For those, compare
-// props with every renderable hole collapsed on BOTH sides: members typed
-// `ReactNode` (upstream) or `unknown` (local) normalize to `unknown`, function
-// members normalize their return the same way and their props parameter
-// recursively (multi-parameter render functions, e.g. Pie's `centroid`, keep
-// their parameter tuple exact and collapse only the return); everything else
-// must match exactly.
+//
+// Where a component needs comparing on its own, the renderable holes are
+// collapsed on BOTH sides first: members typed `ReactNode` (upstream) or
+// `unknown` (local) normalize to `unknown`, and function members normalize
+// their return the same way (multi-parameter render functions, e.g. Pie's
+// `centroid`, keep their parameter tuple exact and collapse only the return).
+// Everything else must match exactly.
 type ComponentProps<C> = C extends (props: infer P) => any ? P : never;
 type IsUnknown<T> = unknown extends T ? ([T] extends [{}] ? false : true) : false;
 type IsRenderable<T> = IsUnknown<T> extends true ? true : Equal<T, import('react').ReactNode>;
-type NormalizeProp<T> =
-	IsRenderable<T> extends true
-		? unknown
-		: T extends (props: infer P) => any
-			? (props: NormalizeProps<P>) => unknown
-			: T extends (...args: infer A) => any
-				? (...args: A) => unknown
-				: T;
-type NormalizeProps<P> = { [K in keyof P]: NormalizeProp<P[K]> };
-type RenderableNormalizedPropsEqual<LocalComponent, UpstreamComponent> = Equal<
-	NormalizeProps<ComponentProps<LocalComponent>>,
-	NormalizeProps<ComponentProps<UpstreamComponent>>
->;
 
 // OCTANE DIVERGENCE: components whose rest props spread an octane attribute
 // bag (`Octane.SVGProps` / `Octane.HTMLAttributes`, e.g. via `AddSVGProps`)
@@ -58,8 +36,33 @@ type RenderableNormalizedPropsEqual<LocalComponent, UpstreamComponent> = Equal<
 // drop out and `on*` / `className` / `style` / `ref` members normalize to
 // `unknown` — on top of the renderable normalization above; every remaining
 // member must match exactly.
+//
+// A bag reaches a component's surface in three shapes, so this normalization
+// recurses through all of them: spread flat into the props, held by an
+// object-typed member (`tickLabelProps`, `backgroundProps`, `lineProps`,
+// `glyphStyle`, a `styles` record), or carried by a RENDER PROP'S ARGUMENT
+// (Axis passes `AxisRendererProps` to `children`). A member is treated as a
+// bag when it has a `className` key, which both octane's and React's bags do
+// and ordinary data objects do not. Recursion only ever collapses more of the
+// same divergence on both sides, so it cannot turn a passing comparison into a
+// failing one — it just stops the surface from falling through to a key-only
+// pin.
 type OctaneOnlyAttributeKeys = 'class' | 'for';
 type AttributeBagDivergentKeys = 'className' | 'style' | 'ref' | `on${string}`;
+type NormalizeProp<T> =
+	IsRenderable<T> extends true
+		? unknown
+		: T extends undefined
+			? T
+			: T extends null
+				? T
+				: T extends (props: infer P) => any
+					? (props: NormalizeAttributeBagProps<P>) => unknown
+					: T extends (...args: infer A) => any
+						? (...args: A) => unknown
+						: 'className' extends keyof T
+							? NormalizeAttributeBagProps<T>
+							: T;
 type NormalizeAttributeBagProps<P> = {
 	[
 		K in keyof P as K extends OctaneOnlyAttributeKeys ? never : K
@@ -69,33 +72,100 @@ type AttributeBagNormalizedPropsEqual<LocalComponent, UpstreamComponent> = Equal
 	NormalizeAttributeBagProps<ComponentProps<LocalComponent>>,
 	NormalizeAttributeBagProps<ComponentProps<UpstreamComponent>>
 >;
-// Components that carry an attribute bag NESTED inside a non-bag member (a
-// styles/lineStyle member or a render-prop argument) diverge on both sides of
-// the variance at a depth the flat normalization cannot reach; like Drag,
-// their props surface is pinned key-for-key instead.
+// A few bag-spreading components additionally diverge where this port is
+// deliberately MORE permissive than upstream: ClipPath, the gradients, and the
+// markers generate a fallback id with `useStableId`, so `id` is optional here
+// where upstream requires it. That is exactly the one-directional relationship
+// the module-level `Extends` asserts describe, so those components keep that
+// direction with the bag divergences collapsed — every upstream call site still
+// type-checks against the local component. Props sit in a contravariant
+// position, hence the flipped operands.
+type AttributeBagNormalizedPropsExtends<LocalComponent, UpstreamComponent> = Extends<
+	NormalizeAttributeBagProps<ComponentProps<UpstreamComponent>>,
+	NormalizeAttributeBagProps<ComponentProps<LocalComponent>>
+>;
+// The last resort, for the three components the normalization above still
+// cannot reconcile: SplitLinePath, whose `styles` members keep `className` a
+// plain string locally so it can forward to LinePath, and the two area stacks,
+// which take their children as `ReactElement<AreaSeriesProps>` — a React
+// element type, not a renderable hole, so the bag inside its type argument is
+// unreachable. Like Drag, whose divergence is the native event union rather
+// than a bag, their props surface is pinned key-for-key. Such a pin must also
+// ignore what a TOP-LEVEL bag contributes to the key set: octane's bags add
+// exactly `class`, `for`, `hidden`, and `tabindex` beside React's canonical
+// camelCase props and drop nothing, so those keys are excluded from both
+// sides. They are optional, which is why the member-by-member comparisons
+// above tolerate them without listing them.
+type OctaneOnlyAttributeSurfaceKeys = OctaneOnlyAttributeKeys | 'hidden' | 'tabindex';
 type PropsShapeEqual<LocalComponent, UpstreamComponent> = Equal<
-	keyof ComponentProps<LocalComponent>,
-	keyof ComponentProps<UpstreamComponent>
+	Exclude<keyof ComponentProps<LocalComponent>, OctaneOnlyAttributeSurfaceKeys>,
+	Exclude<keyof ComponentProps<UpstreamComponent>, OctaneOnlyAttributeSurfaceKeys>
 >;
 
+type AnnotationCarveouts =
+	| 'AnnotationContext'
+	| 'CircleSubject'
+	| 'Connector'
+	| 'EditableAnnotation'
+	| 'Label'
+	| 'LineSubject';
+type _Annotation = Assert<
+	Extends<
+		Omit<Local['Annotation'], AnnotationCarveouts>,
+		Omit<Upstream['Annotation'], AnnotationCarveouts>
+	>
+>;
+// CircleSubject and LineSubject spread an octane attribute bag; Connector,
+// Label, and EditableAnnotation nest one inside `pathProps`,
+// `backgroundProps`, and the two drag-handle prop members respectively.
+type _AnnotationCircleSubjectProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['Annotation']['CircleSubject'],
+		Upstream['Annotation']['CircleSubject']
+	>
+>;
+type _AnnotationLineSubjectProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['Annotation']['LineSubject'],
+		Upstream['Annotation']['LineSubject']
+	>
+>;
+type _AnnotationConnectorProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['Annotation']['Connector'],
+		Upstream['Annotation']['Connector']
+	>
+>;
+type _AnnotationLabelProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Annotation']['Label'], Upstream['Annotation']['Label']>
+>;
+type _AnnotationEditableProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['Annotation']['EditableAnnotation'],
+		Upstream['Annotation']['EditableAnnotation']
+	>
+>;
 type AxisComponents = 'Axis' | 'AxisBottom' | 'AxisLeft' | 'AxisRight' | 'AxisTop';
 type _Axis = Assert<
 	Extends<Omit<Local['Axis'], AxisComponents>, Omit<Upstream['Axis'], AxisComponents>>
 >;
+// Axis takes `children` as a RENDER PROP, and its `AxisRendererProps` argument
+// carries `tickLabelProps` / `tickLineProps` attribute bags — the render-prop
+// argument case the normalization recurses through.
 type _AxisProps = Assert<
-	RenderableNormalizedPropsEqual<Local['Axis']['Axis'], Upstream['Axis']['Axis']>
+	AttributeBagNormalizedPropsEqual<Local['Axis']['Axis'], Upstream['Axis']['Axis']>
 >;
 type _AxisBottomProps = Assert<
-	RenderableNormalizedPropsEqual<Local['Axis']['AxisBottom'], Upstream['Axis']['AxisBottom']>
+	AttributeBagNormalizedPropsEqual<Local['Axis']['AxisBottom'], Upstream['Axis']['AxisBottom']>
 >;
 type _AxisLeftProps = Assert<
-	RenderableNormalizedPropsEqual<Local['Axis']['AxisLeft'], Upstream['Axis']['AxisLeft']>
+	AttributeBagNormalizedPropsEqual<Local['Axis']['AxisLeft'], Upstream['Axis']['AxisLeft']>
 >;
 type _AxisRightProps = Assert<
-	RenderableNormalizedPropsEqual<Local['Axis']['AxisRight'], Upstream['Axis']['AxisRight']>
+	AttributeBagNormalizedPropsEqual<Local['Axis']['AxisRight'], Upstream['Axis']['AxisRight']>
 >;
 type _AxisTopProps = Assert<
-	RenderableNormalizedPropsEqual<Local['Axis']['AxisTop'], Upstream['Axis']['AxisTop']>
+	AttributeBagNormalizedPropsEqual<Local['Axis']['AxisTop'], Upstream['Axis']['AxisTop']>
 >;
 type _Bounds = Assert<
 	Equal<Omit<Local['Bounds'], 'withBoundingRects'>, Omit<Upstream['Bounds'], 'withBoundingRects'>>
@@ -108,7 +178,34 @@ type _FunctionalWithBoundingRects = Assert<
 		) => import('react').ComponentType<Props>
 	>
 >;
-type _ClipPath = Assert<Extends<Local['ClipPath'], Upstream['ClipPath']>>;
+// Every clip-path component spreads an octane attribute bag AND generates its
+// own `id`, so all three are asserted individually; the module assert stays as
+// a guard for exports added later.
+type ClipPathComponents = 'ClipPath' | 'CircleClipPath' | 'RectClipPath';
+type _ClipPath = Assert<
+	Extends<
+		Omit<Local['ClipPath'], ClipPathComponents>,
+		Omit<Upstream['ClipPath'], ClipPathComponents>
+	>
+>;
+type _ClipPathProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['ClipPath']['ClipPath'],
+		Upstream['ClipPath']['ClipPath']
+	>
+>;
+type _CircleClipPathProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['ClipPath']['CircleClipPath'],
+		Upstream['ClipPath']['CircleClipPath']
+	>
+>;
+type _RectClipPathProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['ClipPath']['RectClipPath'],
+		Upstream['ClipPath']['RectClipPath']
+	>
+>;
 type _Curve = Assert<Equal<Local['Curve'], Upstream['Curve']>>;
 // OCTANE DIVERGENCE: drag handlers receive native DOM events (octane has no
 // synthetic event layer), so `MouseTouchOrPointerEvent` is the native
@@ -130,9 +227,147 @@ type _UseDragShape = Assert<
 	>
 >;
 type _Event = Assert<Equal<Local['Event'], Upstream['Event']>>;
-type _Geo = Assert<Extends<Local['Geo'], Upstream['Geo']>>;
-type _Glyph = Assert<Extends<Local['Glyph'], Upstream['Glyph']>>;
-type _Gradient = Assert<Extends<Local['Gradient'], Upstream['Gradient']>>;
+// Graticule and the glyphs spread octane attribute bags.
+type _Geo = Assert<Extends<Omit<Local['Geo'], 'Graticule'>, Omit<Upstream['Geo'], 'Graticule'>>>;
+type _GeoGraticuleProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Geo']['Graticule'], Upstream['Geo']['Graticule']>
+>;
+type GlyphComponents =
+	| 'GlyphCircle'
+	| 'GlyphCross'
+	| 'GlyphDiamond'
+	| 'GlyphDot'
+	| 'GlyphSquare'
+	| 'GlyphStar'
+	| 'GlyphTriangle'
+	| 'GlyphWye';
+type _Glyph = Assert<
+	Extends<Omit<Local['Glyph'], GlyphComponents>, Omit<Upstream['Glyph'], GlyphComponents>>
+>;
+type _GlyphCircleProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Glyph']['GlyphCircle'], Upstream['Glyph']['GlyphCircle']>
+>;
+type _GlyphCrossProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Glyph']['GlyphCross'], Upstream['Glyph']['GlyphCross']>
+>;
+type _GlyphDiamondProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['Glyph']['GlyphDiamond'],
+		Upstream['Glyph']['GlyphDiamond']
+	>
+>;
+type _GlyphDotProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Glyph']['GlyphDot'], Upstream['Glyph']['GlyphDot']>
+>;
+type _GlyphSquareProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Glyph']['GlyphSquare'], Upstream['Glyph']['GlyphSquare']>
+>;
+type _GlyphStarProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Glyph']['GlyphStar'], Upstream['Glyph']['GlyphStar']>
+>;
+type _GlyphTriangleProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['Glyph']['GlyphTriangle'],
+		Upstream['Glyph']['GlyphTriangle']
+	>
+>;
+type _GlyphWyeProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Glyph']['GlyphWye'], Upstream['Glyph']['GlyphWye']>
+>;
+// Every gradient spreads an octane attribute bag AND generates its own `id`,
+// so all twelve are asserted individually; the module assert stays as a guard
+// for exports added later.
+type GradientComponents =
+	| 'GradientDarkgreenGreen'
+	| 'GradientLightgreenGreen'
+	| 'GradientOrangeRed'
+	| 'GradientPinkBlue'
+	| 'GradientPinkRed'
+	| 'GradientPurpleOrange'
+	| 'GradientPurpleRed'
+	| 'GradientPurpleTeal'
+	| 'GradientSteelPurple'
+	| 'GradientTealBlue'
+	| 'LinearGradient'
+	| 'RadialGradient';
+type _Gradient = Assert<
+	Extends<
+		Omit<Local['Gradient'], GradientComponents>,
+		Omit<Upstream['Gradient'], GradientComponents>
+	>
+>;
+type _LinearGradientProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Gradient']['LinearGradient'],
+		Upstream['Gradient']['LinearGradient']
+	>
+>;
+type _RadialGradientProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Gradient']['RadialGradient'],
+		Upstream['Gradient']['RadialGradient']
+	>
+>;
+type _GradientDarkgreenGreenProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Gradient']['GradientDarkgreenGreen'],
+		Upstream['Gradient']['GradientDarkgreenGreen']
+	>
+>;
+type _GradientLightgreenGreenProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Gradient']['GradientLightgreenGreen'],
+		Upstream['Gradient']['GradientLightgreenGreen']
+	>
+>;
+type _GradientOrangeRedProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Gradient']['GradientOrangeRed'],
+		Upstream['Gradient']['GradientOrangeRed']
+	>
+>;
+type _GradientPinkBlueProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Gradient']['GradientPinkBlue'],
+		Upstream['Gradient']['GradientPinkBlue']
+	>
+>;
+type _GradientPinkRedProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Gradient']['GradientPinkRed'],
+		Upstream['Gradient']['GradientPinkRed']
+	>
+>;
+type _GradientPurpleOrangeProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Gradient']['GradientPurpleOrange'],
+		Upstream['Gradient']['GradientPurpleOrange']
+	>
+>;
+type _GradientPurpleRedProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Gradient']['GradientPurpleRed'],
+		Upstream['Gradient']['GradientPurpleRed']
+	>
+>;
+type _GradientPurpleTealProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Gradient']['GradientPurpleTeal'],
+		Upstream['Gradient']['GradientPurpleTeal']
+	>
+>;
+type _GradientSteelPurpleProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Gradient']['GradientSteelPurple'],
+		Upstream['Gradient']['GradientSteelPurple']
+	>
+>;
+type _GradientTealBlueProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Gradient']['GradientTealBlue'],
+		Upstream['Gradient']['GradientTealBlue']
+	>
+>;
 // Grid/Group components spread octane attribute bags — see the attribute-bag
 // carve-out above.
 type GridComponents =
@@ -156,19 +391,87 @@ type _GridRadialProps = Assert<
 	AttributeBagNormalizedPropsEqual<Local['Grid']['GridRadial'], Upstream['Grid']['GridRadial']>
 >;
 // GridPolar nests the bag inside `lineStyleAngle` / `lineStyleRadial`.
-type _GridPolarPropsShape = Assert<
-	PropsShapeEqual<Local['Grid']['GridPolar'], Upstream['Grid']['GridPolar']>
+type _GridPolarProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Grid']['GridPolar'], Upstream['Grid']['GridPolar']>
 >;
 type _Group = Assert<Extends<Omit<Local['Group'], 'Group'>, Omit<Upstream['Group'], 'Group'>>>;
 type _GroupProps = Assert<
 	AttributeBagNormalizedPropsEqual<Local['Group']['Group'], Upstream['Group']['Group']>
 >;
-type _Heatmap = Assert<Extends<Local['Heatmap'], Upstream['Heatmap']>>;
+// Both heatmaps spread an octane attribute bag; the module assert stays as a
+// guard for exports added later.
+type HeatmapComponents = 'HeatmapCircle' | 'HeatmapRect';
+type _Heatmap = Assert<
+	Extends<Omit<Local['Heatmap'], HeatmapComponents>, Omit<Upstream['Heatmap'], HeatmapComponents>>
+>;
+type _HeatmapCircleProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['Heatmap']['HeatmapCircle'],
+		Upstream['Heatmap']['HeatmapCircle']
+	>
+>;
+type _HeatmapRectProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['Heatmap']['HeatmapRect'],
+		Upstream['Heatmap']['HeatmapRect']
+	>
+>;
 type _Hierarchy = Assert<Extends<Local['Hierarchy'], Upstream['Hierarchy']>>;
 type _Legend = Assert<Extends<Local['Legend'], Upstream['Legend']>>;
-type _Marker = Assert<Extends<Local['Marker'], Upstream['Marker']>>;
+// Every marker spreads an octane attribute bag AND generates its own `id`, so
+// all six are asserted individually; the module assert stays as a guard for
+// exports added later.
+type MarkerComponents =
+	'Marker' | 'MarkerArrow' | 'MarkerCircle' | 'MarkerCross' | 'MarkerLine' | 'MarkerX';
+type _Marker = Assert<
+	Extends<Omit<Local['Marker'], MarkerComponents>, Omit<Upstream['Marker'], MarkerComponents>>
+>;
+type _MarkerProps = Assert<
+	AttributeBagNormalizedPropsExtends<Local['Marker']['Marker'], Upstream['Marker']['Marker']>
+>;
+type _MarkerArrowProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Marker']['MarkerArrow'],
+		Upstream['Marker']['MarkerArrow']
+	>
+>;
+type _MarkerCircleProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Marker']['MarkerCircle'],
+		Upstream['Marker']['MarkerCircle']
+	>
+>;
+type _MarkerCrossProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Marker']['MarkerCross'],
+		Upstream['Marker']['MarkerCross']
+	>
+>;
+type _MarkerLineProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Marker']['MarkerLine'],
+		Upstream['Marker']['MarkerLine']
+	>
+>;
+type _MarkerXProps = Assert<
+	AttributeBagNormalizedPropsExtends<Local['Marker']['MarkerX'], Upstream['Marker']['MarkerX']>
+>;
 type _MockData = Assert<Equal<Local['MockData'], Upstream['MockData']>>;
-type _Network = Assert<Equal<Local['Network'], Upstream['Network']>>;
+// DefaultNode spreads an octane attribute bag. The rest of the module drops to
+// `Extends` like its peers: Graph, Links, and Nodes RETURN octane elements,
+// which are nominal, so the upstream-to-local direction cannot hold. Checking
+// the generated `.tsrx.d.ts` hides this — the generator annotates the return as
+// React's `JSX.Element` — but checking the published `.tsrx` sources, which is
+// what a consumer's program does, does not.
+type _Network = Assert<
+	Extends<Omit<Local['Network'], 'DefaultNode'>, Omit<Upstream['Network'], 'DefaultNode'>>
+>;
+type _NetworkDefaultNodeProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['Network']['DefaultNode'],
+		Upstream['Network']['DefaultNode']
+	>
+>;
 type _Pattern = Assert<Extends<Local['Pattern'], Upstream['Pattern']>>;
 type _Point = Assert<Equal<Local['Point'], Upstream['Point']>>;
 // ParentSize spreads `Octane.HTMLAttributes` — see the attribute-bag
@@ -363,7 +666,19 @@ type _SplitLinePathPropsShape = Assert<
 	PropsShapeEqual<Local['Shape']['SplitLinePath'], Upstream['Shape']['SplitLinePath']>
 >;
 type _Text = Assert<Equal<Local['Text'], Upstream['Text']>>;
-type _Threshold = Assert<Extends<Local['Threshold'], Upstream['Threshold']>>;
+// Threshold nests the bag inside `aboveAreaProps` / `belowAreaProps` and, like
+// the clip-paths above, generates a fallback `id`, so it holds one-directionally.
+// It is the module's only component; the module assert stays as a guard for
+// exports added later.
+type _Threshold = Assert<
+	Extends<Omit<Local['Threshold'], 'Threshold'>, Omit<Upstream['Threshold'], 'Threshold'>>
+>;
+type _ThresholdProps = Assert<
+	AttributeBagNormalizedPropsExtends<
+		Local['Threshold']['Threshold'],
+		Upstream['Threshold']['Threshold']
+	>
+>;
 type _TooltipUse = Assert<Equal<Local['Tooltip']['useTooltip'], Upstream['Tooltip']['useTooltip']>>;
 type _TooltipInPortal = Assert<
 	Extends<Local['Tooltip']['useTooltipInPortal'], Upstream['Tooltip']['useTooltipInPortal']>
@@ -377,7 +692,16 @@ type _TooltipStyles = Assert<
 type _TooltipWithBounds = Assert<
 	Equal<Local['Tooltip']['TooltipWithBounds'], Upstream['Tooltip']['TooltipWithBounds']>
 >;
-type _Voronoi = Assert<Extends<Local['Voronoi'], Upstream['Voronoi']>>;
+// VoronoiPolygon spreads an octane attribute bag.
+type _Voronoi = Assert<
+	Extends<Omit<Local['Voronoi'], 'VoronoiPolygon'>, Omit<Upstream['Voronoi'], 'VoronoiPolygon'>>
+>;
+type _VoronoiPolygonProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['Voronoi']['VoronoiPolygon'],
+		Upstream['Voronoi']['VoronoiPolygon']
+	>
+>;
 type _Wordcloud = Assert<Extends<Local['Wordcloud'], Upstream['Wordcloud']>>;
 type XYChartCarveouts =
 	| 'DataContext'
@@ -385,41 +709,161 @@ type XYChartCarveouts =
 	| 'ThemeContext'
 	| 'TooltipContext'
 	| 'AnimatedAxis'
-	| 'Axis';
+	| 'Axis'
+	| 'AnimatedAreaSeries'
+	| 'AnimatedAreaStack'
+	| 'AnimatedLineSeries'
+	| 'AnnotationConnector'
+	| 'AnnotationLabel'
+	| 'AnnotationLineSubject'
+	| 'AreaSeries'
+	| 'AreaStack'
+	| 'LineSeries'
+	| 'Tooltip';
 type _XYChart = Assert<
 	Extends<Omit<Local['XYChart'], XYChartCarveouts>, Omit<Upstream['XYChart'], XYChartCarveouts>>
 >;
+// Axis/AnimatedAxis take `children` as a render prop whose `AxisRendererProps`
+// argument carries tick attribute bags — see the Axis module above.
 type _XYChartAxisProps = Assert<
-	RenderableNormalizedPropsEqual<Local['XYChart']['Axis'], Upstream['XYChart']['Axis']>
+	AttributeBagNormalizedPropsEqual<Local['XYChart']['Axis'], Upstream['XYChart']['Axis']>
 >;
 type _XYChartAnimatedAxisProps = Assert<
-	RenderableNormalizedPropsEqual<
+	AttributeBagNormalizedPropsEqual<
 		Local['XYChart']['AnimatedAxis'],
 		Upstream['XYChart']['AnimatedAxis']
 	>
 >;
+// The line series and AnnotationLineSubject spread an octane attribute bag.
+type _XYChartLineSeriesProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['XYChart']['LineSeries'],
+		Upstream['XYChart']['LineSeries']
+	>
+>;
+type _XYChartAnimatedLineSeriesProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['XYChart']['AnimatedLineSeries'],
+		Upstream['XYChart']['AnimatedLineSeries']
+	>
+>;
+type _XYChartAnnotationLineSubjectProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['XYChart']['AnnotationLineSubject'],
+		Upstream['XYChart']['AnnotationLineSubject']
+	>
+>;
+// The area series nest a bag inside `lineProps` and `PathComponent`, the
+// annotation components inherit annotation's nested
+// `pathProps`/`backgroundProps`, and Tooltip nests one inside `glyphStyle` and
+// the two crosshair style members. The two area STACKS take their children as
+// `ReactElement<AreaSeriesProps>`, whose bag sits inside a React element type
+// rather than a renderable hole, so they alone stay pinned key-for-key.
+type _XYChartAreaSeriesProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['XYChart']['AreaSeries'],
+		Upstream['XYChart']['AreaSeries']
+	>
+>;
+type _XYChartAnimatedAreaSeriesProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['XYChart']['AnimatedAreaSeries'],
+		Upstream['XYChart']['AnimatedAreaSeries']
+	>
+>;
+type _XYChartAreaStackPropsShape = Assert<
+	PropsShapeEqual<Local['XYChart']['AreaStack'], Upstream['XYChart']['AreaStack']>
+>;
+type _XYChartAnimatedAreaStackPropsShape = Assert<
+	PropsShapeEqual<Local['XYChart']['AnimatedAreaStack'], Upstream['XYChart']['AnimatedAreaStack']>
+>;
+type _XYChartAnnotationConnectorProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['XYChart']['AnnotationConnector'],
+		Upstream['XYChart']['AnnotationConnector']
+	>
+>;
+type _XYChartAnnotationLabelProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['XYChart']['AnnotationLabel'],
+		Upstream['XYChart']['AnnotationLabel']
+	>
+>;
+type _XYChartTooltipProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['XYChart']['Tooltip'], Upstream['XYChart']['Tooltip']>
+>;
 type _Zoom = Assert<Equal<Local['Zoom'], Upstream['Zoom']>>;
 
-type _Chord = Assert<Extends<typeof import('@octanejs/visx/chord'), typeof import('@visx/chord')>>;
-type _Delaunay = Assert<
-	Extends<typeof import('@octanejs/visx/delaunay'), typeof import('@visx/delaunay')>
+// Ribbon and Polygon spread octane attribute bags.
+type _Chord = Assert<
+	Extends<
+		Omit<typeof import('@octanejs/visx/chord'), 'Ribbon'>,
+		Omit<typeof import('@visx/chord'), 'Ribbon'>
+	>
 >;
+type _ChordRibbonProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		(typeof import('@octanejs/visx/chord'))['Ribbon'],
+		(typeof import('@visx/chord'))['Ribbon']
+	>
+>;
+type _Delaunay = Assert<
+	Extends<
+		Omit<typeof import('@octanejs/visx/delaunay'), 'Polygon'>,
+		Omit<typeof import('@visx/delaunay'), 'Polygon'>
+	>
+>;
+type _DelaunayPolygonProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		(typeof import('@octanejs/visx/delaunay'))['Polygon'],
+		(typeof import('@visx/delaunay'))['Polygon']
+	>
+>;
+// AnimatedTicks renders `TicksRendererProps`, which nests bags inside
+// `tickLabelProps` and `tickLineProps`.
+type ReactSpringCarveouts = 'AnimatedAxis' | 'AnimatedTicks';
 type _ReactSpring = Assert<
 	Extends<
-		Omit<typeof import('@octanejs/visx/react-spring'), 'AnimatedAxis'>,
-		Omit<typeof import('@visx/react-spring'), 'AnimatedAxis'>
+		Omit<typeof import('@octanejs/visx/react-spring'), ReactSpringCarveouts>,
+		Omit<typeof import('@visx/react-spring'), ReactSpringCarveouts>
 	>
 >;
 type _ReactSpringAnimatedAxisProps = Assert<
-	RenderableNormalizedPropsEqual<
+	AttributeBagNormalizedPropsEqual<
 		(typeof import('@octanejs/visx/react-spring'))['AnimatedAxis'],
 		(typeof import('@visx/react-spring'))['AnimatedAxis']
+	>
+>;
+type _ReactSpringAnimatedTicksProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		(typeof import('@octanejs/visx/react-spring'))['AnimatedTicks'],
+		(typeof import('@visx/react-spring'))['AnimatedTicks']
 	>
 >;
 type _Sankey = Assert<
 	Extends<typeof import('@octanejs/visx/sankey'), typeof import('@visx/sankey')>
 >;
-type _Stats = Assert<Extends<typeof import('@octanejs/visx/stats'), typeof import('@visx/stats')>>;
+// ViolinPlot spreads an octane attribute bag; BoxPlot nests one inside its
+// per-part `*Props` members and its render-prop argument.
+type StatsComponents = 'BoxPlot' | 'ViolinPlot';
+type _Stats = Assert<
+	Extends<
+		Omit<typeof import('@octanejs/visx/stats'), StatsComponents>,
+		Omit<typeof import('@visx/stats'), StatsComponents>
+	>
+>;
+type _StatsViolinPlotProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		(typeof import('@octanejs/visx/stats'))['ViolinPlot'],
+		(typeof import('@visx/stats'))['ViolinPlot']
+	>
+>;
+type _StatsBoxPlotProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		(typeof import('@octanejs/visx/stats'))['BoxPlot'],
+		(typeof import('@visx/stats'))['BoxPlot']
+	>
+>;
 
 import type { AnnotationContextType as LocalAnnotationContextType } from '@octanejs/visx/annotation';
 import type { AnnotationContextType as UpstreamAnnotationContextType } from '@visx/annotation';
@@ -445,11 +889,14 @@ type _AnnotationContextValue = Assert<
 >;
 // Props-type asserts stay exact `Equal`, with the OctaneNode divergence spelled
 // out member-by-member on the upstream side (renderable holes are `unknown`).
+// `selectedBoxStyle` holds a whole attribute bag rather than spreading one, so
+// it is spelled out the same way: octane's bag in the member's position.
 type _BrushProps = Assert<
 	Equal<
 		LocalBrushProps,
-		Omit<UpstreamBrushProps, 'innerRef' | 'renderBrushHandle'> & {
+		Omit<UpstreamBrushProps, 'innerRef' | 'renderBrushHandle' | 'selectedBoxStyle'> & {
 			renderBrushHandle?: (props: import('@visx/brush').BrushHandleRenderProps) => unknown;
+			selectedBoxStyle: import('octane/jsx-runtime').Octane.SVGProps<SVGRectElement>;
 		}
 	>
 >;

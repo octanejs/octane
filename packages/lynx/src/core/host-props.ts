@@ -412,6 +412,21 @@ const MAX_CACHED_CLASS_LENGTH = 256;
 const CLASS_HOST_PROP_PATCHES = new Map<string, LynxHostPropPatch>();
 const MAIN_THREAD_PREFIX = 'main-thread:';
 
+/**
+ * Does this prop bag declare anything the main thread owns directly — a
+ * main-thread event handler or `main-thread:ref`?
+ *
+ * Both are spelled with the `main-thread:` prefix, so the answer is a prop-name
+ * test. A caller that only needs to know whether a host can own main-thread
+ * bindings can ask this instead of planning the host's whole prop patch.
+ */
+export function hasLynxMainThreadProp(props: Readonly<Record<string, unknown>>): boolean {
+	for (const name of Object.keys(props)) {
+		if (name.startsWith(MAIN_THREAD_PREFIX)) return true;
+	}
+	return false;
+}
+
 function localPlainPropBag(value: Readonly<Record<string, unknown>>): boolean {
 	const prototype = Object.getPrototypeOf(value);
 	return prototype === null || prototype === Object.prototype;

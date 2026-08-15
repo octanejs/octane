@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
@@ -49,7 +49,7 @@ export type RectCell<ColumnDatum, BinDatum> = GenericCell<ColumnDatum, BinDatum>
 	};
 
 export type ComponentProps<ColumnDatum, BinDatum> =
-	HeatmapRectProps<ColumnDatum, BinDatum> & Omit<SVGProps<SVGRectElement>, | keyof HeatmapRectProps<ColumnDatum, BinDatum>
+	HeatmapRectProps<ColumnDatum, BinDatum> & Omit<Octane.SVGProps<SVGRectElement>, | keyof HeatmapRectProps<ColumnDatum, BinDatum>
 	| 'width'
 	| 'height'
 	| 'x'

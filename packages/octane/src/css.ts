@@ -52,3 +52,73 @@ export function styleName(name: string): string {
 	styleNameCache.set(name, result);
 	return result;
 }
+
+// Both runtimes share validation text, but React keeps its style-name/value
+// warning caches per renderer. Allocate the sets only after the first warning;
+// the DEV-guarded callers and their private state disappear from prod bundles.
+let warnedStyleNames: Set<string> | null = null;
+let warnedStyleValues: Set<string> | null = null;
+let warnedStyleNaN = 0;
+let warnedStyleInfinity = 0;
+
+/** @internal Development-only React-style inline CSS diagnostics. */
+export function devWarnStyleProperty(name: string, value: unknown, server: boolean): void {
+	const type = typeof value;
+	// React intentionally exempts custom properties from property-name,
+	// semicolon, NaN, and Infinity validation; callers still report failed coercion.
+	if (name.charCodeAt(0) === 45 && name.charCodeAt(1) === 45) return;
+
+	let prefixLength = 0;
+	if (name.startsWith('webkit')) prefixLength = 6;
+	else if (name.startsWith('moz')) prefixLength = 3;
+	else if (name.charCodeAt(0) === 111 /* o */) prefixLength = 1;
+	const following = name.charCodeAt(prefixLength);
+	if (prefixLength !== 0 && following >= 65 && following <= 90) {
+		const key = (server ? 's:' : 'c:') + name;
+		const warned = (warnedStyleNames ??= new Set<string>());
+		if (!warned.has(key)) {
+			warned.add(key);
+			console.error(
+				`Unsupported vendor-prefixed style property ${name}. ` +
+					`Did you mean ${name.charAt(0).toUpperCase()}${name.slice(1)}?`,
+			);
+		}
+	} else if (type === 'string') {
+		const text = value as string;
+		if (text.trimEnd().endsWith(';')) {
+			const key = (server ? 's:' : 'c:') + text;
+			const warned = (warnedStyleValues ??= new Set<string>());
+			if (!warned.has(key)) {
+				warned.add(key);
+				console.error(
+					"Style property values shouldn't contain a semicolon. " +
+						`Try "${name}: ${text.slice(0, text.lastIndexOf(';'))}" instead.`,
+				);
+			}
+		}
+	}
+
+	if (type !== 'number') return;
+	const surface = server ? 2 : 1;
+	if (Number.isNaN(value)) {
+		if ((warnedStyleNaN & surface) !== 0) return;
+		warnedStyleNaN |= surface;
+		console.error(`\`NaN\` is an invalid value for the \`${name}\` css style property.`);
+	} else if (!Number.isFinite(value)) {
+		if ((warnedStyleInfinity & surface) !== 0) return;
+		warnedStyleInfinity |= surface;
+		console.error(`\`Infinity\` is an invalid value for the \`${name}\` css style property.`);
+	}
+}
+
+/** @internal Development-only guidance after an existing CSS coercion fails. */
+export function devWarnStyleCoercion(name: string, value: unknown): void {
+	const valueType =
+		typeof value === 'symbol'
+			? 'Symbol'
+			: (value as { constructor?: { name?: string } }).constructor?.name || 'Object';
+	console.error(
+		`The provided \`${name}\` CSS property is an unsupported type ${valueType}. ` +
+			'This value must be coerced to a string before using it here.',
+	);
+}

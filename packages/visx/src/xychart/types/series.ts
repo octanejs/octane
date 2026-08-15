@@ -1,4 +1,5 @@
-import type { PointerEvent, FocusEvent, SVGProps } from 'react';
+import type { PointerEvent, FocusEvent } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { AxisScale } from '@octanejs/visx/axis';
 import type { ScaleInput } from '@octanejs/visx/scale';
 import type { Series, SeriesPoint } from 'd3-shape';
@@ -151,7 +152,7 @@ export type BarsProps<XScale extends AxisScale, YScale extends AxisScale> = {
 	/** Whether to apply radius to left corners. */
 	radiusLeft?: boolean;
 } & Omit<
-	SVGProps<SVGRectElement | SVGPathElement>,
+	Octane.SVGProps<SVGRectElement | SVGPathElement>,
 	'x' | 'y' | 'width' | 'height' | 'ref' | 'children'
 >;
 

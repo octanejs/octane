@@ -56,7 +56,17 @@ export function scaffoldedCompilerOptions(template = SCAFFOLDED_TSCONFIG) {
  */
 export function createConsumerBaseConfig(template = SCAFFOLDED_TSCONFIG) {
 	return {
-		compilerOptions: scaffoldedCompilerOptions(template),
+		compilerOptions: {
+			...scaffoldedCompilerOptions(template),
+			// `octane init` omits `types` because a freshly scaffolded application
+			// has no `@types/*` installed at all. Here, omitting it means the
+			// opposite: these projects run inside the monorepo, where TypeScript
+			// would auto-include every installed `@types/*`, handing published
+			// source the Node globals a browser application never gets. Pinning it
+			// empty is what reproduces the scaffolded app. The packed-tarball
+			// consumer sets it the same way, for the same reason.
+			types: [],
+		},
 		// A real consumer resolves this through the `octane` it installed. A
 		// project file has to name it, and without it `.tsrx` type errors in
 		// published source stay invisible.

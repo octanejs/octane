@@ -1,0 +1,1130 @@
+{
+  "meta": {
+    "date": "2026-08-12T20:17:34.674Z",
+    "rows": 10000,
+    "repetitions": 5,
+    "samplingIntervalMicros": 100,
+    "cpus": 4,
+    "cpuModel": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "platform": "linux",
+    "release": "6.18.5-fc-v20",
+    "node": "v22.22.2",
+    "loadStart": [1.19, 0.52, 0.33],
+    "loadEnd": [1.36, 0.64, 0.39],
+    "protocol": "fresh page per sample; CDP sampling profiler attached to the lynx-bg worker only; wall is pointerdown to composed rowCount predicate"
+  },
+  "fresh": {
+    "wallMs": {
+      "n": 5,
+      "min": 1321,
+      "max": 1874,
+      "mean": 1519.7400000000373,
+      "median": 1396.5,
+      "std": 204.2557475323708,
+      "ci95": 179.03805662074708
+    },
+    "backgroundSelfMsPerSample": 224.9378
+  },
+  "warmed": {
+    "wallMs": {
+      "n": 5,
+      "min": 1451.699999999255,
+      "max": 1559.6000000005588,
+      "mean": 1504.6799999998882,
+      "median": 1511.2999999998137,
+      "std": 37.53922748307575,
+      "ci95": 32.90458367419439
+    },
+    "backgroundSelfMsPerSample": 565.759
+  },
+  "top": [
+    {
+      "functionName": "(garbage collector)",
+      "selfMsPerSample": 47.461200000000005,
+      "share": 0.2109969956138986,
+      "hits": 880,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "createPreparedTransaction",
+      "selfMsPerSample": 15.7808,
+      "share": 0.0701562832036234,
+      "hits": 411,
+      "line": 2,
+      "column": 102897,
+      "snippet": null
+    },
+    {
+      "functionName": "a",
+      "selfMsPerSample": 11.4428,
+      "share": 0.050870951880919967,
+      "hits": 271,
+      "line": 2,
+      "column": 511,
+      "snippet": null
+    },
+    {
+      "functionName": "r",
+      "selfMsPerSample": 10.491,
+      "share": 0.04663955991389619,
+      "hits": 222,
+      "line": 2,
+      "column": 125618,
+      "snippet": null
+    },
+    {
+      "functionName": "createTransaction",
+      "selfMsPerSample": 7.295,
+      "share": 0.03243118764387311,
+      "hits": 172,
+      "line": 2,
+      "column": 102208,
+      "snippet": null
+    },
+    {
+      "functionName": "n",
+      "selfMsPerSample": 6.864199999999999,
+      "share": 0.030515991531881254,
+      "hits": 181,
+      "line": 2,
+      "column": 183,
+      "snippet": null
+    },
+    {
+      "functionName": "eE",
+      "selfMsPerSample": 6.5596000000000005,
+      "share": 0.02916183940627142,
+      "hits": 159,
+      "line": 2,
+      "column": 10763,
+      "snippet": null
+    },
+    {
+      "functionName": "postMessage",
+      "selfMsPerSample": 5.1798,
+      "share": 0.023027699212849063,
+      "hits": 112,
+      "line": 0,
+      "column": 380,
+      "snippet": null
+    },
+    {
+      "functionName": "P",
+      "selfMsPerSample": 4.9092,
+      "share": 0.021824699983728834,
+      "hits": 126,
+      "line": 2,
+      "column": 126875,
+      "snippet": null
+    },
+    {
+      "functionName": "eH",
+      "selfMsPerSample": 4.8944,
+      "share": 0.021758904017021595,
+      "hits": 106,
+      "line": 2,
+      "column": 14529,
+      "snippet": null
+    },
+    {
+      "functionName": "e$",
+      "selfMsPerSample": 4.7734000000000005,
+      "share": 0.021220977532455637,
+      "hits": 103,
+      "line": 2,
+      "column": 10326,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 4.6708,
+      "share": 0.020764851438931115,
+      "hits": 52,
+      "line": 2,
+      "column": 104528,
+      "snippet": null
+    },
+    {
+      "functionName": "x",
+      "selfMsPerSample": 4.245,
+      "share": 0.018871883694070096,
+      "hits": 107,
+      "line": 2,
+      "column": 103936,
+      "snippet": null
+    },
+    {
+      "functionName": "u",
+      "selfMsPerSample": 4.059,
+      "share": 0.018044988436803418,
+      "hits": 96,
+      "line": 2,
+      "column": 126106,
+      "snippet": null
+    },
+    {
+      "functionName": "ex",
+      "selfMsPerSample": 3.6672,
+      "share": 0.016303173588431998,
+      "hits": 78,
+      "line": 2,
+      "column": 10016,
+      "snippet": null
+    },
+    {
+      "functionName": "B",
+      "selfMsPerSample": 3.5574,
+      "share": 0.01581503864623909,
+      "hits": 95,
+      "line": 2,
+      "column": 24684,
+      "snippet": null
+    },
+    {
+      "functionName": "a",
+      "selfMsPerSample": 3.3200000000000003,
+      "share": 0.014759635774867542,
+      "hits": 51,
+      "line": 2,
+      "column": 238378,
+      "snippet": null
+    },
+    {
+      "functionName": "eT",
+      "selfMsPerSample": 3.1757999999999997,
+      "share": 0.014118569666814558,
+      "hits": 68,
+      "line": 2,
+      "column": 12583,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 3.086,
+      "share": 0.013719348193144949,
+      "hits": 79,
+      "line": 2,
+      "column": 108145,
+      "snippet": null
+    },
+    {
+      "functionName": "ro",
+      "selfMsPerSample": 2.961,
+      "share": 0.013163639014874332,
+      "hits": 49,
+      "line": 2,
+      "column": 42981,
+      "snippet": null
+    },
+    {
+      "functionName": "eZ",
+      "selfMsPerSample": 2.877,
+      "share": 0.012790202447076479,
+      "hits": 75,
+      "line": 2,
+      "column": 38365,
+      "snippet": null
+    },
+    {
+      "functionName": "rd",
+      "selfMsPerSample": 2.7758,
+      "share": 0.01234030029634859,
+      "hits": 54,
+      "line": 2,
+      "column": 44152,
+      "snippet": null
+    },
+    {
+      "functionName": "t",
+      "selfMsPerSample": 2.7602,
+      "share": 0.012270947790900417,
+      "hits": 71,
+      "line": 2,
+      "column": 63,
+      "snippet": null
+    },
+    {
+      "functionName": "eo",
+      "selfMsPerSample": 2.5788,
+      "share": 0.0114645026313941,
+      "hits": 63,
+      "line": 2,
+      "column": 111164,
+      "snippet": null
+    },
+    {
+      "functionName": "e3",
+      "selfMsPerSample": 2.4998,
+      "share": 0.011113294430727071,
+      "hits": 46,
+      "line": 2,
+      "column": 39851,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 2.4826,
+      "share": 0.011036828847797034,
+      "hits": 63,
+      "line": 2,
+      "column": 20913,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 2.3853999999999997,
+      "share": 0.010604709390773804,
+      "hits": 64,
+      "line": 2,
+      "column": 16485,
+      "snippet": null
+    },
+    {
+      "functionName": "eG",
+      "selfMsPerSample": 2.308,
+      "share": 0.010260614267588638,
+      "hits": 55,
+      "line": 2,
+      "column": 20240,
+      "snippet": null
+    },
+    {
+      "functionName": "rY",
+      "selfMsPerSample": 2.2526,
+      "share": 0.010014323959779102,
+      "hits": 55,
+      "line": 2,
+      "column": 122736,
+      "snippet": null
+    },
+    {
+      "functionName": "eS",
+      "selfMsPerSample": 2.213,
+      "share": 0.00983827529210297,
+      "hits": 61,
+      "line": 2,
+      "column": 9841,
+      "snippet": null
+    }
+  ],
+  "warmedTop": [
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 317.9814,
+      "share": 0.5620439091556652,
+      "hits": 4109,
+      "line": 2,
+      "column": 238005,
+      "snippet": null
+    },
+    {
+      "functionName": "(garbage collector)",
+      "selfMsPerSample": 93.72999999999999,
+      "share": 0.16567124871190736,
+      "hits": 1686,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "a",
+      "selfMsPerSample": 16.221600000000002,
+      "share": 0.028672279186013835,
+      "hits": 403,
+      "line": 2,
+      "column": 238378,
+      "snippet": null
+    },
+    {
+      "functionName": "r",
+      "selfMsPerSample": 14.407,
+      "share": 0.025464906435425684,
+      "hits": 308,
+      "line": 2,
+      "column": 125618,
+      "snippet": null
+    },
+    {
+      "functionName": "createPreparedTransaction",
+      "selfMsPerSample": 10.9954,
+      "share": 0.019434776998686717,
+      "hits": 288,
+      "line": 2,
+      "column": 102897,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 9.2,
+      "share": 0.01626134095966657,
+      "hits": 250,
+      "line": 2,
+      "column": 248195,
+      "snippet": null
+    },
+    {
+      "functionName": "a",
+      "selfMsPerSample": 8.49,
+      "share": 0.015006389646474914,
+      "hits": 230,
+      "line": 2,
+      "column": 511,
+      "snippet": null
+    },
+    {
+      "functionName": "createTransaction",
+      "selfMsPerSample": 6.4932,
+      "share": 0.011476971643402932,
+      "hits": 167,
+      "line": 2,
+      "column": 102208,
+      "snippet": null
+    },
+    {
+      "functionName": "rd",
+      "selfMsPerSample": 5.7101999999999995,
+      "share": 0.01009299012477044,
+      "hits": 122,
+      "line": 2,
+      "column": 44152,
+      "snippet": null
+    },
+    {
+      "functionName": "P",
+      "selfMsPerSample": 4.9288,
+      "share": 0.008711836665435282,
+      "hits": 112,
+      "line": 2,
+      "column": 126875,
+      "snippet": null
+    },
+    {
+      "functionName": "postMessage",
+      "selfMsPerSample": 4.396,
+      "share": 0.007770092919423288,
+      "hits": 109,
+      "line": 0,
+      "column": 380,
+      "snippet": null
+    },
+    {
+      "functionName": "n",
+      "selfMsPerSample": 3.2854,
+      "share": 0.0058070662596617995,
+      "hits": 88,
+      "line": 2,
+      "column": 183,
+      "snippet": null
+    },
+    {
+      "functionName": "B",
+      "selfMsPerSample": 3.2692,
+      "share": 0.0057784321592763,
+      "hits": 84,
+      "line": 2,
+      "column": 24684,
+      "snippet": null
+    },
+    {
+      "functionName": "x",
+      "selfMsPerSample": 3.2556,
+      "share": 0.005754393655248966,
+      "hits": 74,
+      "line": 2,
+      "column": 103936,
+      "snippet": null
+    },
+    {
+      "functionName": "ro",
+      "selfMsPerSample": 3.163,
+      "share": 0.0055907197234158,
+      "hits": 82,
+      "line": 2,
+      "column": 42981,
+      "snippet": null
+    },
+    {
+      "functionName": "eo",
+      "selfMsPerSample": 3.1358,
+      "share": 0.0055426427153611344,
+      "hits": 65,
+      "line": 2,
+      "column": 111164,
+      "snippet": null
+    },
+    {
+      "functionName": "eS",
+      "selfMsPerSample": 3.1252,
+      "share": 0.005523906822516301,
+      "hits": 81,
+      "line": 2,
+      "column": 9841,
+      "snippet": null
+    },
+    {
+      "functionName": "t",
+      "selfMsPerSample": 3.0698,
+      "share": 0.005425985269346135,
+      "hits": 83,
+      "line": 2,
+      "column": 63,
+      "snippet": null
+    },
+    {
+      "functionName": "eE",
+      "selfMsPerSample": 2.7034,
+      "share": 0.004778359690256805,
+      "hits": 69,
+      "line": 2,
+      "column": 10763,
+      "snippet": null
+    },
+    {
+      "functionName": "eZ",
+      "selfMsPerSample": 2.356,
+      "share": 0.004164317315323309,
+      "hits": 56,
+      "line": 2,
+      "column": 38365,
+      "snippet": null
+    },
+    {
+      "functionName": "eG",
+      "selfMsPerSample": 2.3036000000000003,
+      "share": 0.004071698373335643,
+      "hits": 45,
+      "line": 2,
+      "column": 20240,
+      "snippet": null
+    },
+    {
+      "functionName": "e3",
+      "selfMsPerSample": 2.2234000000000003,
+      "share": 0.003929941901056811,
+      "hits": 57,
+      "line": 2,
+      "column": 39851,
+      "snippet": null
+    },
+    {
+      "functionName": "ex",
+      "selfMsPerSample": 2.1536,
+      "share": 0.0038065678142106445,
+      "hits": 59,
+      "line": 2,
+      "column": 10016,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 1.972,
+      "share": 0.003485583083963313,
+      "hits": 53,
+      "line": 2,
+      "column": 108145,
+      "snippet": null
+    },
+    {
+      "functionName": "eE",
+      "selfMsPerSample": 1.8474,
+      "share": 0.003265347966183481,
+      "hits": 48,
+      "line": 2,
+      "column": 10763,
+      "snippet": null
+    },
+    {
+      "functionName": "n",
+      "selfMsPerSample": 1.7635999999999998,
+      "share": 0.0031172283604856484,
+      "hits": 49,
+      "line": 2,
+      "column": 183,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 1.6686,
+      "share": 0.0029493123397064825,
+      "hits": 45,
+      "line": 2,
+      "column": 16485,
+      "snippet": null
+    },
+    {
+      "functionName": "eI",
+      "selfMsPerSample": 1.6443999999999999,
+      "share": 0.002906537942834316,
+      "hits": 43,
+      "line": 2,
+      "column": 13036,
+      "snippet": null
+    },
+    {
+      "functionName": "u",
+      "selfMsPerSample": 1.5104,
+      "share": 0.002669687976682651,
+      "hits": 35,
+      "line": 2,
+      "column": 126106,
+      "snippet": null
+    },
+    {
+      "functionName": "eH",
+      "selfMsPerSample": 1.5070000000000001,
+      "share": 0.002663678350675818,
+      "hits": 41,
+      "line": 2,
+      "column": 14529,
+      "snippet": null
+    }
+  ],
+  "pageTop": [
+    {
+      "functionName": "(garbage collector)",
+      "selfMsPerSample": 185.91500000000002,
+      "share": 0.14314785926905776,
+      "hits": 4015,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "setAttribute",
+      "selfMsPerSample": 109.4106,
+      "share": 0.084242224518426,
+      "hits": 2759,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "appendChild",
+      "selfMsPerSample": 88.4158,
+      "share": 0.06807698408176402,
+      "hits": 2191,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "append",
+      "selfMsPerSample": 87.87140000000001,
+      "share": 0.06765781567369542,
+      "hits": 2179,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "cloneNode",
+      "selfMsPerSample": 79.2872,
+      "share": 0.061048290602897216,
+      "hits": 2042,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "HTMLElement",
+      "selfMsPerSample": 53.151599999999995,
+      "share": 0.040924819173951806,
+      "hits": 1319,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "createElement",
+      "selfMsPerSample": 48.4446,
+      "share": 0.03730059857002284,
+      "hits": 1236,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "l",
+      "selfMsPerSample": 39.948,
+      "share": 0.030758522346665516,
+      "hits": 998,
+      "line": 1,
+      "column": 23320,
+      "snippet": null
+    },
+    {
+      "functionName": "attachShadow",
+      "selfMsPerSample": 31.8024,
+      "share": 0.024486703491478808,
+      "hits": 806,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "wasm-function[52]",
+      "selfMsPerSample": 26.0628,
+      "share": 0.020067418048880393,
+      "hits": 620,
+      "line": 0,
+      "column": 43863,
+      "snippet": null
+    },
+    {
+      "functionName": "removeProperty",
+      "selfMsPerSample": 23.2892,
+      "share": 0.017931845865524244,
+      "hits": 604,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "__CreateRawText",
+      "selfMsPerSample": 22.3326,
+      "share": 0.01719529829175784,
+      "hits": 585,
+      "line": 0,
+      "column": 135254,
+      "snippet": null
+    },
+    {
+      "functionName": "l",
+      "selfMsPerSample": 20.543799999999997,
+      "share": 0.015817986667303167,
+      "hits": 474,
+      "line": 1,
+      "column": 23303,
+      "snippet": null
+    },
+    {
+      "functionName": "attributeChangedCallback",
+      "selfMsPerSample": 17.8592,
+      "share": 0.013750941281004526,
+      "hits": 439,
+      "line": 1,
+      "column": 24249,
+      "snippet": null
+    },
+    {
+      "functionName": "__CreateText",
+      "selfMsPerSample": 17.7084,
+      "share": 0.013634830708012706,
+      "hits": 470,
+      "line": 0,
+      "column": 134895,
+      "snippet": null
+    },
+    {
+      "functionName": "#W",
+      "selfMsPerSample": 17.2148,
+      "share": 0.01325477647174771,
+      "hits": 435,
+      "line": 1,
+      "column": 24046,
+      "snippet": null
+    },
+    {
+      "functionName": "getAttributeNames",
+      "selfMsPerSample": 14.5568,
+      "share": 0.01120821212816513,
+      "hits": 348,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "_handleAttributeChange",
+      "selfMsPerSample": 14.2566,
+      "share": 0.010977068931798128,
+      "hits": 382,
+      "line": 363,
+      "column": 45092,
+      "snippet": null
+    },
+    {
+      "functionName": "setAttribute",
+      "selfMsPerSample": 13.7824,
+      "share": 0.010611951997363643,
+      "hits": 349,
+      "line": 1,
+      "column": 23906,
+      "snippet": null
+    },
+    {
+      "functionName": "Text",
+      "selfMsPerSample": 13.5404,
+      "share": 0.010425620706488177,
+      "hits": 353,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 13.3382,
+      "share": 0.010269933983285622,
+      "hits": 285,
+      "line": 1,
+      "column": 26101,
+      "snippet": null
+    },
+    {
+      "functionName": "wasm-function[288]",
+      "selfMsPerSample": 12.353,
+      "share": 0.00951136543877939,
+      "hits": 316,
+      "line": 0,
+      "column": 197708,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 12.3476,
+      "share": 0.009507207633115227,
+      "hits": 308,
+      "line": 1,
+      "column": 24721,
+      "snippet": null
+    },
+    {
+      "functionName": "i",
+      "selfMsPerSample": 11.9792,
+      "share": 0.009223552891137868,
+      "hits": 300,
+      "line": 1,
+      "column": 22088,
+      "snippet": null
+    },
+    {
+      "functionName": "#H",
+      "selfMsPerSample": 11.713,
+      "share": 0.009018588471174857,
+      "hits": 243,
+      "line": 1,
+      "column": 24685,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 11.1354,
+      "share": 0.008573857257911764,
+      "hits": 279,
+      "line": 1,
+      "column": 23553,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 11.041599999999999,
+      "share": 0.008501634633597224,
+      "hits": 283,
+      "line": 363,
+      "column": 42977,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 10.479600000000001,
+      "share": 0.008068914858919495,
+      "hits": 281,
+      "line": 363,
+      "column": 49211,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 9.681799999999999,
+      "share": 0.007454637570239966,
+      "hits": 252,
+      "line": 1,
+      "column": 27819,
+      "snippet": null
+    },
+    {
+      "functionName": "removeAttribute",
+      "selfMsPerSample": 9.6784,
+      "share": 0.007452019692599568,
+      "hits": 248,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    }
+  ],
+  "warmedPageTop": [
+    {
+      "functionName": "(garbage collector)",
+      "selfMsPerSample": 140.6568,
+      "share": 0.11880670285738902,
+      "hits": 3253,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "setAttribute",
+      "selfMsPerSample": 115.03659999999999,
+      "share": 0.09716643030357805,
+      "hits": 2978,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "appendChild",
+      "selfMsPerSample": 92.7904,
+      "share": 0.07837602931972197,
+      "hits": 2453,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "cloneNode",
+      "selfMsPerSample": 87.3292,
+      "share": 0.07376319036956264,
+      "hits": 2264,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "append",
+      "selfMsPerSample": 87.11,
+      "share": 0.07357804162974814,
+      "hits": 2265,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "HTMLElement",
+      "selfMsPerSample": 54.5684,
+      "share": 0.046091562471228885,
+      "hits": 1414,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "createElement",
+      "selfMsPerSample": 48.5272,
+      "share": 0.04098882265842169,
+      "hits": 1315,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 42.7074,
+      "share": 0.036073089830080424,
+      "hits": 1158,
+      "line": 1,
+      "column": 109835,
+      "snippet": ""
+    },
+    {
+      "functionName": "l",
+      "selfMsPerSample": 31.636200000000002,
+      "share": 0.02672172701879277,
+      "hits": 860,
+      "line": 1,
+      "column": 23320,
+      "snippet": null
+    },
+    {
+      "functionName": "attachShadow",
+      "selfMsPerSample": 29.998399999999997,
+      "share": 0.025338348341474415,
+      "hits": 790,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "__CreateRawText",
+      "selfMsPerSample": 27.3856,
+      "share": 0.023131429420911842,
+      "hits": 743,
+      "line": 0,
+      "column": 135254,
+      "snippet": null
+    },
+    {
+      "functionName": "removeProperty",
+      "selfMsPerSample": 25.2658,
+      "share": 0.021340926233599934,
+      "hits": 652,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "#W",
+      "selfMsPerSample": 20.3308,
+      "share": 0.017172545617794552,
+      "hits": 553,
+      "line": 1,
+      "column": 24046,
+      "snippet": null
+    },
+    {
+      "functionName": "__CreateText",
+      "selfMsPerSample": 18.093,
+      "share": 0.015282372944633603,
+      "hits": 490,
+      "line": 0,
+      "column": 134895,
+      "snippet": null
+    },
+    {
+      "functionName": "_handleAttributeChange",
+      "selfMsPerSample": 16.1702,
+      "share": 0.013658267119290015,
+      "hits": 436,
+      "line": 363,
+      "column": 45092,
+      "snippet": null
+    },
+    {
+      "functionName": "rp",
+      "selfMsPerSample": 15.915000000000001,
+      "share": 0.013442710739724964,
+      "hits": 419,
+      "line": 1,
+      "column": 53776,
+      "snippet": ""
+    },
+    {
+      "functionName": "apply",
+      "selfMsPerSample": 14.8338,
+      "share": 0.012529467959216598,
+      "hits": 397,
+      "line": 1,
+      "column": 106496,
+      "snippet": ""
+    },
+    {
+      "functionName": "getAttributeNames",
+      "selfMsPerSample": 13.4774,
+      "share": 0.011383775665948427,
+      "hits": 373,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "Text",
+      "selfMsPerSample": 13.1804,
+      "share": 0.01113291263800634,
+      "hits": 355,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "wasm-function[288]",
+      "selfMsPerSample": 12.8242,
+      "share": 0.010832045935807784,
+      "hits": 353,
+      "line": 0,
+      "column": 197708,
+      "snippet": null
+    },
+    {
+      "functionName": "setAttribute",
+      "selfMsPerSample": 11.4596,
+      "share": 0.009679427457929764,
+      "hits": 289,
+      "line": 1,
+      "column": 23906,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 11.080400000000001,
+      "share": 0.009359133652557241,
+      "hits": 297,
+      "line": 1,
+      "column": 24721,
+      "snippet": null
+    },
+    {
+      "functionName": "removeAttribute",
+      "selfMsPerSample": 9.983799999999999,
+      "share": 0.008432883159488916,
+      "hits": 274,
+      "line": -1,
+      "column": -1,
+      "snippet": null
+    },
+    {
+      "functionName": "i",
+      "selfMsPerSample": 9.731,
+      "share": 0.008219353955907234,
+      "hits": 256,
+      "line": 1,
+      "column": 22088,
+      "snippet": null
+    },
+    {
+      "functionName": "l",
+      "selfMsPerSample": 9.5908,
+      "share": 0.008100933092212013,
+      "hits": 253,
+      "line": 1,
+      "column": 23303,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 9.577200000000001,
+      "share": 0.00808944576163958,
+      "hits": 262,
+      "line": 1,
+      "column": 26101,
+      "snippet": null
+    },
+    {
+      "functionName": "wasm-function[124]",
+      "selfMsPerSample": 9.3902,
+      "share": 0.007931494966268637,
+      "hits": 263,
+      "line": 0,
+      "column": 132216,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 8.5702,
+      "share": 0.00723887650528375,
+      "hits": 237,
+      "line": 363,
+      "column": 49211,
+      "snippet": null
+    },
+    {
+      "functionName": "wasm-function[52]",
+      "selfMsPerSample": 8.4698,
+      "share": 0.007154072976646088,
+      "hits": 223,
+      "line": 0,
+      "column": 43863,
+      "snippet": null
+    },
+    {
+      "functionName": "(anonymous)",
+      "selfMsPerSample": 8.4536,
+      "share": 0.007140389538758339,
+      "hits": 224,
+      "line": 363,
+      "column": 42977,
+      "snippet": null
+    }
+  ],
+  "pageSelfMsPerSample": 1298.7620000000002,
+  "warmedPageSelfMsPerSample": 1183.913
+}

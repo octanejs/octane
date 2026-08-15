@@ -1,4 +1,3 @@
-import { createElement } from 'octane';
 import type { FunctionComponent, ComponentClass } from 'react';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
@@ -27,6 +26,10 @@ export default function Nodes<Node>({
 	x = (d: any) => d?.x || 0, // eslint-disable-line @typescript-eslint/no-explicit-any
 	y = (d: any) => d?.y || 0, // eslint-disable-line @typescript-eslint/no-explicit-any
 }: NodeProps<Node>) {
+	// Octane renders a component VALUE through a capitalized JSX tag; the prop
+	// keeps upstream's React component union for type parity.
+	const NodeComponent = nodeComponent;
+
 	return <>
 		{nodes.map(
 			(node, i) =>
@@ -35,7 +38,7 @@ export default function Nodes<Node>({
 					className={cx('visx-network-node', className)}
 					left={x(node)}
 					top={y(node)}
-				>{createElement(nodeComponent, { node })}</Group>,
+				><NodeComponent node={node} /></Group>,
 		)}
 	</>;
 }

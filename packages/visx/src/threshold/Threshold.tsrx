@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 import { Area } from '@octanejs/visx/shape';
 import type { AreaProps as AreaOwnProps } from '@octanejs/visx/shape';
@@ -6,7 +6,7 @@ import { ClipPath } from '@octanejs/visx/clip-path';
 import useStableId from '../kernel/ids/useStableId.tsrx';
 
 type AreaProps<Datum> =
-	AreaOwnProps<Datum> & Omit<SVGProps<SVGPathElement>, keyof AreaOwnProps<Datum>>;
+	AreaOwnProps<Datum> & Omit<Octane.SVGProps<SVGPathElement>, keyof AreaOwnProps<Datum>>;
 
 type NumberAccessor<Datum> = (datum: Datum, index: number, data: Datum[]) => number;
 

@@ -14,6 +14,13 @@ export function TextMismatch(props) @{
 	</div>
 }
 
+// Per ReactDOMHydrationDiff-test.js:155 — entities are decoded before the
+// browser compares server markup to the client text value.
+export function EscapedEntityTextMismatch(props) @{
+	<div id="escaped-entity-mismatch">{'This markup contains an nbsp entity:   ' +
+		(props.isClient ? 'client text' : 'server text') as string}</div>
+}
+
 // Two different attributes differ (Per ReactDOMHydrationDiff-test.js:245).
 export function AttrMismatch(props) @{
 	<div class="parent">

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'octane';
-import type { PointerEvent, SVGProps } from 'react';
+import type { PointerEvent } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import { Group } from '@octanejs/visx/group';
 import type { HandlerArgs as DragArgs } from '@octanejs/visx/drag';
@@ -39,7 +40,7 @@ export type BaseBrushProps = {
 	resizeTriggerAreas?: ResizeTriggerAreas[];
 	onBrushStart?: (start: BaseBrushState['start']) => void;
 	onBrushEnd?: (state: BaseBrushState) => void;
-	selectedBoxStyle: SVGProps<SVGRectElement>;
+	selectedBoxStyle: Octane.SVGProps<SVGRectElement>;
 	onMouseLeave?: (event: PointerHandlerEvent) => void;
 	onMouseUp?: (event: PointerHandlerEvent) => void;
 	onMouseMove?: (event: PointerHandlerEvent) => void;

@@ -1,15 +1,22 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { flushSync, hydrateRoot } from 'octane';
 import { renderDropzoneHydrationFixture } from './hydration-server';
 import { HookProbe } from './dropzone.tsrx';
 
+const onDrop = vi.fn();
+const props = { options: { onDrop }, rootRef: null, inputRef: null };
+let serverHtml: string;
+
+// Server-mode compilation starts a separate Vite module graph. Keep that
+// integration setup out of the five-second behavioral assertion budget.
+beforeAll(async () => {
+	serverHtml = (await renderDropzoneHydrationFixture(props)).html;
+}, 30_000);
+
 describe('react-dropzone U1 hydration gate', () => {
 	it('adopts root/input nodes and remains interactive without diagnostics', async () => {
-		const onDrop = vi.fn();
-		const props = { options: { onDrop }, rootRef: null, inputRef: null };
-		const { html } = await renderDropzoneHydrationFixture(props);
 		const container = document.createElement('div');
-		container.innerHTML = html;
+		container.innerHTML = serverHtml;
 		const rootNode = container.querySelector('[data-probe=root]');
 		const inputNode = container.querySelector('input')!;
 		inputNode.value = '';

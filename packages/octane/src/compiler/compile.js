@@ -641,15 +641,42 @@ function bakeStaticAttr(attrName, lv, tag, namespace = 'html') {
 	return '';
 }
 
-// DEV must observe invalid boolean literals instead of folding them out before
-// the host validator runs. Production still takes bakeStaticAttr's zero-binding
-// path, so this diagnostic has no shipped runtime cost.
+// DEV must observe invalid boolean literals and ARIA names instead of folding
+// them out before the host validator runs. Production still takes
+// bakeStaticAttr's zero-binding path, so these diagnostics have no shipped
+// runtime cost.
 function needsDevStaticAttrValidation(attrName, lv, tag, namespace = 'html') {
-	if (typeof lv !== 'boolean' || attrName === 'class' || attrName === 'style') return false;
 	const isCustom =
 		(namespace === 'html' || namespace === 'opaque') && tag !== undefined && tag.includes('-');
-	if (isCustom || attrName.startsWith('aria-') || attrName.startsWith('data-')) return false;
+	if (isCustom) return false;
+	if (attrName === 'aria' || /^aria(?:-|[A-Z])/.test(attrName)) return true;
 	const lower = attrName.toLowerCase();
+	if (lower === 'innerhtml') return true;
+	if ((lv === 'false' || lv === 'true') && BOOLEAN_ATTR_PROPS.has(lower)) return true;
+	if (
+		lv === '' &&
+		(attrName === 'src' ||
+			(attrName === 'href' && tag !== undefined && tag !== 'a' && tag !== 'area') ||
+			(attrName === 'data' && tag === 'object'))
+	) {
+		return true;
+	}
+	if (
+		attrName !== lower &&
+		!attrName.startsWith('data-') &&
+		!ATTRIBUTE_ALIASES.has(attrName) &&
+		attrName !== 'className' &&
+		attrName !== 'viewBox'
+	) {
+		return true;
+	}
+	if (
+		typeof lv !== 'boolean' ||
+		attrName === 'class' ||
+		attrName === 'style' ||
+		attrName.startsWith('data-')
+	)
+		return false;
 	return !(
 		attrName === 'autoFocus' ||
 		isEnumeratedBooleanAttr(lower) ||
@@ -1958,6 +1985,32 @@ function objectExprIsStaticLiteral(obj) {
 			return false;
 	}
 	return true;
+}
+
+// DEV must send invalid literal declarations through the same style helpers as
+// dynamic objects. Keep valid literals and all production output fully baked.
+function staticStyleObjectNeedsDevValidation(obj) {
+	if (obj?.type !== 'ObjectExpression') return false;
+	for (const property of obj.properties || []) {
+		if (property.type !== 'Property' && property.type !== 'ObjectProperty') continue;
+		if (property.computed || property.value?.type !== 'Literal') continue;
+		const key = property.key;
+		if (key?.type !== 'Identifier' && !(key?.type === 'Literal' && typeof key.value === 'string'))
+			continue;
+		const name = key.type === 'Identifier' ? key.name : key.value;
+		if (name.startsWith('--')) continue;
+		const value = property.value.value;
+		if (value == null || typeof value === 'boolean') continue;
+
+		let prefixLength = 0;
+		if (name.startsWith('webkit')) prefixLength = 6;
+		else if (name.startsWith('moz')) prefixLength = 3;
+		else if (name.charCodeAt(0) === 111 /* o */) prefixLength = 1;
+		const following = name.charCodeAt(prefixLength);
+		if (prefixLength !== 0 && following >= 65 && following <= 90) return true;
+		if (typeof value === 'string' && value.trimEnd().endsWith(';')) return true;
+	}
+	return false;
 }
 
 // Serialize a fully-literal style object into a `style="…"` string at compile
@@ -8587,6 +8640,29 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 						return true;
 					}
 				}
+				// METHOD-style custom hooks — `route.useLoaderData()`, `api.useSearch()`,
+				// `SomeContext.useSelector(fn)`. The free-identifier sweep above only sees
+				// bare names, and the unknown-call rule above only inspects Identifier
+				// callees, so without this a component whose ONLY hook is member-form
+				// looks hookless: it takes the lite path, gets no block of its own, and
+				// its hook state lands on the parent — an update from that hook then
+				// re-renders the parent and every sibling.
+				//
+				// Same `use[A-Z]` convention, applied to the PROPERTY name, that the
+				// slot-injection pass already uses for these calls. `useContext` is
+				// included rather than excluded: it is not lite-safe either (the sweep
+				// above rejects the bare name for the same reason).
+				if (
+					t === 'CallExpression' &&
+					n.callee &&
+					n.callee.type === 'MemberExpression' &&
+					!n.callee.computed &&
+					n.callee.property &&
+					n.callee.property.type === 'Identifier' &&
+					/^use[A-Z]/.test(n.callee.property.name)
+				) {
+					return true;
+				}
 				for (const k in n) {
 					if (AST_WALK_SKIP_KEYS.has(k)) continue;
 					if (walk(n[k])) return true;
@@ -10087,6 +10163,14 @@ function ssrEmitNode(
 		case 'Text': {
 			const expr = node.expression;
 			if (expr && expr.type === 'Literal' && typeof expr.value === 'string') {
+				if (ctx.dev && ctx._ssrNestingText === true) {
+					ctx.runtimeNeeded.add('ssrNestingText');
+					return ssrCall(
+						'ssrNestingText',
+						[b.literal(expr.value, JSON.stringify(expr.value))],
+						node,
+					);
+				}
 				// Static text — escape at compile time, inline as a literal chunk. In
 				// first-child position of a newline-eating tag, protect a leading '\n'
 				// by doubling it (the parser eats the first — see ssrEmitNodes).
@@ -10118,7 +10202,12 @@ function ssrEmitNode(
 			if (isKnownStringExpression(expr, ctx.knownStringLocals)) {
 				// ssrTextPre = ssrText + the runtime leading-'\n' protection (the value
 				// isn't known at compile time here).
-				const fn = nlGuard ? 'ssrTextPre' : 'ssrText';
+				const fn =
+					ctx.dev && ctx._ssrNestingText === true
+						? 'ssrNestingText'
+						: nlGuard
+							? 'ssrTextPre'
+							: 'ssrText';
 				ctx.runtimeNeeded.add(fn);
 				return ssrCall(fn, [resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash)], node);
 			}
@@ -10177,6 +10266,9 @@ function ssrEmitNode(
 			// conditional timing as the client's arm-scoped headBlock — and the
 			// functions return '', so the body markup gains nothing and the
 			// hydration cursor stays aligned with the client template.
+			if (node.resourceDiagnostic !== undefined) {
+				return invalidStylesheetDiagnosticCall(node.element, node.resourceDiagnostic, ctx, true);
+			}
 			const kind = headResourceKind(node.element);
 			if (kind !== null) {
 				const fn =
@@ -10187,7 +10279,7 @@ function ssrEmitNode(
 							: 'ssrScriptResource';
 				ctx.runtimeNeeded.add(fn);
 				return inheritOriginLoc(
-					b.call('_$' + fn, ...headResourceArgNodes(node.element, kind)),
+					b.call('_$' + fn, ...headResourceArgNodes(node.element, kind, ctx)),
 					node.element,
 				);
 			}
@@ -10211,6 +10303,26 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	rejectTextareaValueChildren(tag, node, ctx);
 	rejectDangerouslySetInnerHTMLChildren(tag, node, ctx);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
+	const devFormActionAttribute =
+		ctx.dev && (tag === 'form' || tag === 'button' || tag === 'input')
+			? attrs.find(
+					(attr) =>
+						(attr.type === 'Attribute' || attr.type === 'JSXAttribute') &&
+						(tag === 'form'
+							? jsxAttrRawName(attr) === 'action'
+							: jsxAttrRawName(attr) === 'formAction' || jsxAttrRawName(attr) === 'formaction'),
+				)
+			: undefined;
+	const devFormActionSources = devFormActionAttribute === undefined ? null : [];
+	const htmlIntegrationPoint =
+		ctx.dev &&
+		tag.toLowerCase() === 'annotation-xml' &&
+		attrs.some((attr) => {
+			const attrName = attr.name?.name ?? attr.name;
+			if (typeof attrName !== 'string' || attrName.toLowerCase() !== 'encoding') return false;
+			const value = attr.value?.value ?? attr.value?.expression?.value;
+			return typeof value === 'string' && /^(text\/html|application\/xhtml\+xml)$/i.test(value);
+		});
 	// NB: the ns helpers take the TAG STRING (passing the node silently returns
 	// the inherited ns — svg subtrees would never enter the svg namespace).
 	const selfNs = nsForSelf(tag, parentNs);
@@ -10220,7 +10332,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// Preserve that inherited context through ordinary hosts/wrappers and emit an
 	// explicit override only at a parser transition we can prove lexically.
 	let childComponentNs = componentNs;
-	if (tag === 'foreignObject') childComponentNs = 'html';
+	if (tag === 'foreignObject' || htmlIntegrationPoint) childComponentNs = 'html';
 	else if (tag === 'svg') childComponentNs = 'svg';
 	else if (tag === 'math') childComponentNs = 'mathml';
 	else if (childNs !== 'html' && childNs !== 'opaque') childComponentNs = childNs;
@@ -10292,6 +10404,16 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	const firstSpreadIdx = attrs.findIndex(
 		(a) => a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute',
 	);
+	// Customized built-ins suppress native unknown-property diagnostics based on
+	// the final `is` prop, regardless of where that prop appears in JSX. Resolve
+	// directly authored DEV hosts through the existing whole-element attribute
+	// snapshot so sibling validators see that final value before serialization.
+	// Production keeps its original fully baked/direct-serializer paths.
+	const resolveDevCustomizedHost =
+		ctx.dev &&
+		(selfNs === 'html' || selfNs === 'opaque') &&
+		!tag.includes('-') &&
+		directAttributeIdentities.has('is');
 	// A single spread is the only possible content writer when an otherwise
 	// empty ordinary host has no explicit children/raw-HTML attributes. Its
 	// snapshot already owns evaluation order and enumerable-key semantics, so a
@@ -10322,8 +10444,21 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// generic attribute either creates first-wins duplicates or puts state in the
 	// wrong place entirely: textarea value is content and select value projects
 	// onto options. Resolve the effective props once whenever one has a spread.
+	const directTextareaConflict =
+		ctx.dev &&
+		tag === 'textarea' &&
+		attrs.some(
+			(attr) =>
+				(attr.type === 'Attribute' || attr.type === 'JSXAttribute') &&
+				jsxAttrRawName(attr) === 'value',
+		) &&
+		attrs.some(
+			(attr) =>
+				(attr.type === 'Attribute' || attr.type === 'JSXAttribute') &&
+				jsxAttrRawName(attr) === 'defaultValue',
+		);
 	const resolveFormControlsAcrossSpreads =
-		(firstSpreadIdx !== -1 || hasDuplicateDirectAttribute) &&
+		(firstSpreadIdx !== -1 || hasDuplicateDirectAttribute || directTextareaConflict) &&
 		(tag === 'input' || tag === 'textarea' || tag === 'select');
 	const formControlSources = [];
 	let formControlPart = -1;
@@ -10331,7 +10466,8 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// HTML parsing keeps the FIRST duplicate, while JSX uses the final writer, so
 	// spread-bearing hosts serialize one source-resolved attribute set. Dedicated
 	// form/content channels are filtered by ssrAttrs and resolved separately.
-	const resolveAttrsAcrossSpreads = firstSpreadIdx !== -1 || hasDuplicateDirectAttribute;
+	const resolveAttrsAcrossSpreads =
+		firstSpreadIdx !== -1 || hasDuplicateDirectAttribute || resolveDevCustomizedHost;
 	const attrSources = [];
 	let attrPart = -1;
 	// Spreads are bound to temps (so their value is evaluated ONCE even though we
@@ -10389,11 +10525,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				)
 			: ssrVoid(node);
 		ctx.runtimeNeeded.add('ssrElement');
-		return ssrCall(
-			'ssrElement',
-			[b.literal(tag, JSON.stringify(tag)), source, ssrThunk(body, node)],
-			node,
-		);
+		const args = [b.literal(tag, JSON.stringify(tag)), source, ssrThunk(body, node)];
+		if (htmlIntegrationPoint) args.push(b.literal(true, 'true'));
+		return ssrCall('ssrElement', args, node);
 	};
 
 	for (let attrI = 0; attrI < attrs.length; attrI++) {
@@ -10709,7 +10843,12 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				bakeLit(` style="${escapeAttr(inner.value)}"`, attrName, attr.name, inner);
 				continue;
 			}
-			if (!isAfterSpread && inner.type === 'ObjectExpression' && objectExprIsStaticLiteral(inner)) {
+			if (
+				!isAfterSpread &&
+				inner.type === 'ObjectExpression' &&
+				objectExprIsStaticLiteral(inner) &&
+				!(ctx.dev && staticStyleObjectNeedsDevValidation(inner))
+			) {
 				const css = staticObjectToCssString(inner);
 				if (css) bakeLit(` style="${escapeAttr(css)}"`, attrName, attr.name, inner);
 				continue;
@@ -10735,6 +10874,19 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			inner.type === 'Literal' &&
 			!(ctx.dev && needsDevStaticAttrValidation(attrName, inner.value, tag, selfNs))
 		) {
+			if (
+				devFormActionSources !== null &&
+				(attrName === 'type' ||
+					attrName === 'name' ||
+					attrName === 'method' ||
+					attrName === 'encType' ||
+					attrName === 'target' ||
+					attrName === 'formMethod' ||
+					attrName === 'formEncType' ||
+					attrName === 'formTarget')
+			) {
+				devFormActionSources.push([attrName, b.literal(inner.value)]);
+			}
 			bakeLit(bakeStaticAttr(attrName, inner.value, tag, selfNs), attrName, attr.name, inner);
 			continue;
 		}
@@ -10756,6 +10908,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			const outName = tag === 'form' ? 'action' : 'formaction';
 			registerAttrLoweringOrigin(ctx, attr.name, 'ssrAttr', outName);
 			const valueExpr = bindAttributeEvaluation(tsrxExprNode(inner, ctx, name, inlinedSubs));
+			if (devFormActionSources !== null) {
+				devFormActionSources.push([attrName, valueExpr]);
+			}
 			const filteredValue = inheritOriginLoc(
 				b.call(
 					b.arrow(
@@ -10774,7 +10929,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				ssrCall(
 					'ssrAttr',
 					[
-						b.literal(outName, JSON.stringify(outName)),
+						b.literal(ctx.dev ? attrName : outName, JSON.stringify(ctx.dev ? attrName : outName)),
 						filteredValue,
 						b.literal(tag, JSON.stringify(tag)),
 						b.literal(selfNs, JSON.stringify(selfNs)),
@@ -10790,11 +10945,26 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		ctx.runtimeNeeded.add('ssrAttr');
 		registerAttrLoweringOrigin(ctx, attr.name, 'ssrAttr', attrName);
 		const valueExpr = bindAttributeEvaluation(tsrxExprNode(inner, ctx, name, inlinedSubs));
+		if (
+			devFormActionSources !== null &&
+			(attrName === 'type' ||
+				attrName === 'name' ||
+				attrName === 'method' ||
+				attrName === 'encType' ||
+				attrName === 'target' ||
+				attrName === 'formMethod' ||
+				attrName === 'formEncType' ||
+				attrName === 'formTarget')
+		) {
+			devFormActionSources.push([attrName, valueExpr]);
+		}
+		const authoredAttrName =
+			ctx.dev && (rawAttrName === 'tabIndex' || rawAttrName === 'htmlFor') ? rawAttrName : attrName;
 		parts.push(
 			ssrCall(
 				'ssrAttr',
 				[
-					b.literal(attrName, JSON.stringify(attrName)),
+					b.literal(authoredAttrName, JSON.stringify(authoredAttrName)),
 					valueExpr,
 					b.literal(tag, JSON.stringify(tag)),
 					b.literal(selfNs, JSON.stringify(selfNs)),
@@ -10831,6 +11001,24 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				b.literal(resolveFormControlsAcrossSpreads),
 			],
 			node,
+		);
+	}
+	if (devFormActionSources !== null && devFormActionSources.length > 0) {
+		ctx.runtimeNeeded.add('ssrFormAuthoringDiagnostics');
+		flush();
+		parts.push(
+			ssrCall(
+				'ssrFormAuthoringDiagnostics',
+				[
+					b.literal(tag, JSON.stringify(tag)),
+					b.array(
+						devFormActionSources.map(([attrName, expression]) =>
+							b.array([b.literal(attrName, JSON.stringify(attrName)), expression]),
+						),
+					),
+				],
+				node,
+			),
 		);
 	}
 
@@ -10934,6 +11122,17 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		// positions reset this in ssrCompileBody.
 		const prevHostChildPos = ctx._ssrHostChildPos;
 		ctx._ssrHostChildPos = true;
+		const previousNestingText = ctx._ssrNestingText;
+		ctx._ssrNestingText =
+			ctx.dev &&
+			(tag === 'table' ||
+				tag === 'tbody' ||
+				tag === 'thead' ||
+				tag === 'tfoot' ||
+				tag === 'tr' ||
+				tag === 'colgroup' ||
+				tag === 'head' ||
+				tag === 'html');
 		childrenExpr = ssrEmitNodes(
 			normChildren,
 			ctx,
@@ -10944,6 +11143,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			childComponentNs,
 			nlGuardFirst,
 		);
+		ctx._ssrNestingText = previousNestingText;
 		ctx._ssrHostChildPos = prevHostChildPos;
 	}
 	// `children=` and spread-held children are content props, not attributes.
@@ -11047,7 +11247,20 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			ctx.runtimeNeeded.add('ssrOptionValueSources');
 			optionValueExpr = ssrCall('ssrOptionValueSources', [b.array(attrSources)], node);
 		}
-		parts.push(ssrCall('ssrOption', [optionValueExpr, attrsExpr, contentExpr], node));
+		const optionArguments = [optionValueExpr, attrsExpr, contentExpr];
+		if (
+			ctx.dev &&
+			(node.children || []).some(
+				(child) =>
+					child.type === 'Element' ||
+					child.type === 'JSXElement' ||
+					child.type === 'Fragment' ||
+					child.type === 'JSXFragment',
+			)
+		) {
+			optionArguments.push(b.literal(true, 'true'));
+		}
+		parts.push(ssrCall('ssrOption', optionArguments, node));
 		return finalize();
 	}
 	if (singleSpreadContentTemp !== null) {
@@ -13213,6 +13426,15 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// commit-time insertion; scope-owned `headBlock` metadata stays at the body
 	// tail (`plan.head`).
 	if (plan?.resources) bodyStatements.push(...plan.resources);
+	if (ctx.dev && plan?.nesting?.length > 0) {
+		ctx.runtimeNeeded.add('devHtmlNesting');
+		for (const candidate of plan.nesting) {
+			const args = candidate.map((value) =>
+				value === undefined ? undefinedNode() : jsonValueToNode(value),
+			);
+			bodyStatements.push(inheritOriginLoc(b.stmt(b.call('_$devHtmlNesting', ...args)), node));
+		}
+	}
 	// Inlined sub-helpers (children render fns, legacy-placement construct
 	// bodies, hoisted `<tsrx>` blocks) are function DECLARATION nodes embedded
 	// directly in the body — they hoist, so their placement after the setup
@@ -18483,13 +18705,80 @@ function isHoistableHeadElementNode(n) {
 	// hoists microdata: an itemProp meta/link belongs to its itemScope host.
 	// Spread keys remain unknowable here and keep the existing head-hoist path.
 	const attrs = n.attributes || n.openingElement?.attributes || [];
+	let hasPrecedence = false;
+	let hasHref = false;
+	let emptyHref = false;
+	let relStylesheet = false;
 	for (const attr of attrs) {
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const name = jsxAttrRawName(attr);
 		if (name === 'itemProp' || name === 'itemprop') return false;
-		if (tag === 'link' && (name === 'onLoad' || name === 'onError')) return false;
+		if (tag !== 'link') continue;
+		if (name === 'onLoad' || name === 'onError' || name === 'disabled') return false;
+		if (name === 'precedence') hasPrecedence = true;
+		else if (name === 'href') {
+			hasHref = true;
+			const value = attr.value;
+			const inner = value && value.type === 'JSXExpressionContainer' ? value.expression : value;
+			emptyHref =
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'StringLiteral') &&
+				inner.value === '';
+		} else if (name === 'rel') {
+			const value = attr.value;
+			const inner = value && value.type === 'JSXExpressionContainer' ? value.expression : value;
+			relStylesheet =
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'StringLiteral') &&
+				inner.value === 'stylesheet';
+		}
 	}
+	if (tag === 'link' && relStylesheet && hasPrecedence && (!hasHref || emptyHref)) return false;
 	return true;
+}
+
+/** A precedence stylesheet that cannot safely become a shared Float resource. */
+function invalidStylesheetResourceReason(n) {
+	if (n == null || (n.type !== 'JSXElement' && n.type !== 'Element')) return null;
+	if ((jsxTagName(n) || elementTagName(n)) !== 'link') return null;
+	const attrs = n.attributes || n.openingElement?.attributes || [];
+	let hasPrecedence = false;
+	let hasHref = false;
+	let emptyHref = false;
+	let relStylesheet = false;
+	let onLoad = false;
+	let onError = false;
+	let disabled = false;
+	for (const attr of attrs) {
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
+		const name = jsxAttrRawName(attr);
+		if (name === 'precedence') hasPrecedence = true;
+		else if (name === 'href') {
+			hasHref = true;
+			const value = attr.value;
+			const inner = value && value.type === 'JSXExpressionContainer' ? value.expression : value;
+			emptyHref =
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'StringLiteral') &&
+				inner.value === '';
+		} else if (name === 'rel') {
+			const value = attr.value;
+			const inner = value && value.type === 'JSXExpressionContainer' ? value.expression : value;
+			relStylesheet =
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'StringLiteral') &&
+				inner.value === 'stylesheet';
+		} else if (name === 'onLoad') onLoad = true;
+		else if (name === 'onError') onError = true;
+		else if (name === 'disabled') disabled = true;
+	}
+	if (!relStylesheet || !hasPrecedence) return null;
+	if (!hasHref) return 'missing-href';
+	if (emptyHref) return 'empty-href';
+	if (onLoad && onError) return 'onLoad+onError';
+	if (onLoad) return 'onLoad';
+	if (onError) return 'onError';
+	return disabled ? 'disabled' : null;
 }
 
 // React Float RESOURCES: `<link rel="stylesheet" href precedence>` (no
@@ -18532,11 +18821,24 @@ function headResourceKind(n) {
 		// Handlers keep the element per-site (matching React: a load/error
 		// listener needs an owned instance); markup injection disqualifies too,
 		// and microdata belongs to its itemScope host — never a resource.
-		if (name === 'onLoad' || name === 'onError' || name === 'dangerouslySetInnerHTML') return null;
+		if (
+			name === 'onLoad' ||
+			name === 'onError' ||
+			(tag === 'link' && name === 'disabled') ||
+			name === 'dangerouslySetInnerHTML'
+		)
+			return null;
 		if (name === 'itemProp' || name === 'itemprop') return null;
 		if (name === 'precedence') hasPrecedence = true;
-		else if (name === 'href') hasHref = true;
-		else if (name === 'async') {
+		else if (name === 'href') {
+			const value = attr.value;
+			const inner = value && value.type === 'JSXExpressionContainer' ? value.expression : value;
+			hasHref = !(
+				inner != null &&
+				(inner.type === 'Literal' || inner.type === 'StringLiteral') &&
+				inner.value === ''
+			);
+		} else if (name === 'async') {
 			// A statically-false `async={false}` is not an async script; any other
 			// form (bare, true, or a dynamic expression) classifies as a resource.
 			const val = attr.value;
@@ -18860,11 +19162,27 @@ function styleResourceCssExpression(el) {
 }
 
 /** Shared resource-call argument list for the head emitters. */
-/** @param {any} el @param {'stylesheet'|'script'|'style'} kind @returns {any[]} */
-function headResourceArgNodes(el, kind) {
+/** @param {any} el @param {'stylesheet'|'script'|'style'} kind @param {any} ctx @returns {any[]} */
+function headResourceArgNodes(el, kind, ctx) {
 	const args = [inheritOriginLoc(headAttrsExpression(el), el)];
-	if (kind === 'style') args.push(inheritOriginLoc(styleResourceCssExpression(el), el));
+	if (kind === 'style') {
+		args.push(inheritOriginLoc(styleResourceCssExpression(el), el));
+		// Runtime modules are shared by the dev/prod Vitest projects, so an
+		// explicitly dev-compiled resource must opt into development warnings.
+		// Production output keeps the existing two-argument ABI byte-for-byte.
+		if (ctx.dev) args.push(b.literal(true, 'true'));
+	}
 	return args;
+}
+
+/** DEV-only ABI: an invalid precedence link stays inline and reports its reason. */
+function invalidStylesheetDiagnosticCall(element, reason, ctx, server) {
+	const helper = server ? 'ssrStylesheetResource' : 'stylesheetResource';
+	ctx.runtimeNeeded.add(helper);
+	return inheritOriginLoc(
+		b.call('_$' + helper, b.literal(null), b.literal(reason, JSON.stringify(reason))),
+		element,
+	);
 }
 
 // Build the CLIENT statement NODES for a component's hoisted head elements
@@ -18884,6 +19202,15 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 	const head = [];
 	const resources = [];
 	headNodes.forEach((h, i) => {
+		if (h.resourceDiagnostic !== undefined) {
+			resources.push(
+				inheritOriginLoc(
+					b.stmt(invalidStylesheetDiagnosticCall(h.element, h.resourceDiagnostic, ctx, false)),
+					h.element,
+				),
+			);
+			return;
+		}
 		const kind = headResourceKind(h.element);
 		if (kind !== null) {
 			const fn =
@@ -18895,7 +19222,7 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 			ctx.runtimeNeeded.add(fn);
 			resources.push(
 				inheritOriginLoc(
-					b.stmt(b.call('_$' + fn, ...headResourceArgNodes(h.element, kind))),
+					b.stmt(b.call('_$' + fn, ...headResourceArgNodes(h.element, kind, ctx))),
 					h.element ?? h,
 				),
 			);
@@ -18925,6 +19252,12 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 function emitHeadServer(headNodes, ctx) {
 	if (!headNodes.length) return [];
 	return headNodes.map((head, index) => {
+		if (head.resourceDiagnostic !== undefined) {
+			return inheritOriginLoc(
+				b.stmt(invalidStylesheetDiagnosticCall(head.element, head.resourceDiagnostic, ctx, true)),
+				head.element,
+			);
+		}
 		const kind = headResourceKind(head.element);
 		if (kind !== null) {
 			const fn =
@@ -18935,7 +19268,7 @@ function emitHeadServer(headNodes, ctx) {
 						: 'ssrScriptResource';
 			ctx.runtimeNeeded.add(fn);
 			return inheritOriginLoc(
-				b.stmt(b.call('_$' + fn, ...headResourceArgNodes(head.element, kind))),
+				b.stmt(b.call('_$' + fn, ...headResourceArgNodes(head.element, kind, ctx))),
 				head.element ?? head,
 			);
 		}
@@ -19101,6 +19434,11 @@ function normalizeChildren(nodes, inSvg = false, ctx = null, inNoscript = false)
 			) {
 				out.push({ type: 'HeadHoist', element: n });
 				continue;
+			}
+			if (!inNoscript && !inSvg && ctx?.dev && jsxTagName(n) === 'link') {
+				const reason = invalidStylesheetResourceReason(n);
+				if (reason !== null)
+					out.push({ type: 'HeadHoist', element: n, resourceDiagnostic: reason });
 			}
 			const element = {
 				type: 'Element',
@@ -19647,7 +19985,9 @@ function planJsx(
 	// branch body during this body's emitElementHtml) can't clobber the outer body's map.
 	// `null` outside dev → zero work, prod output byte-identical.
 	const _prevElemLocs = ctx._elemLocs;
+	const previousNestingWarnings = ctx._clientNestingWarnings;
 	ctx._elemLocs = ctx.dev ? new Map() : null;
+	ctx._clientNestingWarnings = ctx.dev ? [] : null;
 	// NESTED HeadHoists lifted out of host-element children during the walk (see
 	// emitNodeHtml's element case) join this plan's head list, so client mounts
 	// match the server's any-depth hoisting. Saved/restored per plan: an @if
@@ -19672,6 +20012,7 @@ function planJsx(
 	// its constructs (see `headEmit` below), keeping every scope's `slots` packed.
 	if (jsxNodes.length === 0) {
 		ctx._elemLocs = _prevElemLocs;
+		ctx._clientNestingWarnings = previousNestingWarnings;
 		ctx._nestedHeadHoists = _prevNestedHeads;
 		const headOnlyEmit = emitHeadClient(headNodes, ctx, 0);
 		return {
@@ -19764,6 +20105,9 @@ function planJsx(
 	for (let rootI = 0; rootI < jsxNodes.length; rootI++) {
 		const node = jsxNodes[rootI];
 		const nodeIsComp = node.type === 'Element' && isComponentTag(node);
+		if (ctx.dev && node.type === 'Element' && !nodeIsComp) {
+			collectClientHtmlNestingWarnings(node, ctx, parentNs === 'opaque' ? 'html' : parentNs);
+		}
 		// Single non-comp Element: path=[] (lives at _root directly).
 		// Otherwise (wrapped in <octane-frag>): path=[htmlIdx] when HTML-contributing.
 		// Component-call: path=[] (no DOM contributed, host is the wrapper).
@@ -20189,6 +20533,7 @@ function planJsx(
 			ctx.runtimeNeeded.add('markNativeChangeDiagnosticStatic');
 		}
 		if (b.kind === 'nativeChangeRuntime') ctx.runtimeNeeded.add('queueNativeChangeDiagnostic');
+		if (b.kind === 'formDiagnostic') ctx.runtimeNeeded.add('queueFormAuthoringDiagnostic');
 		if (b.kind === 'event' && b.dev) ctx.runtimeNeeded.add('devEventListener');
 		if (b.kind === 'event-bundle') {
 			// 3b: mount builds the descriptor via evtN. Lifetime-stable bundles skip
@@ -21278,6 +21623,8 @@ function planJsx(
 	ctx._fragRefStack = _prevFragRefStack;
 	// Restore the outer plan's per-element LOC map — pairs with the save at planJsx top.
 	ctx._elemLocs = _prevElemLocs;
+	const nestingWarnings = ctx._clientNestingWarnings;
+	ctx._clientNestingWarnings = previousNestingWarnings;
 
 	// After-lines sorted by source id (see the pushAfter comment): each entry is
 	// a statement node.
@@ -21297,6 +21644,7 @@ function planJsx(
 		after: afterStatements,
 		head: headEmit.head,
 		resources: headEmit.resources,
+		nesting: nestingWarnings,
 		// DEV ONLY (`null` in prod → no body emission, byte-identical output): a structured
 		// `{ slotIndex: [line, column] }` literal for hydration-mismatch warnings + a future
 		// DevTools element→source layer. Keyed by the slot index the runtime already uses.
@@ -21583,6 +21931,13 @@ function emitBindingMount(bind, elVar, bag) {
 	}
 	if (bind.kind === 'nativeChangeRuntime') {
 		return [...mountHost().map(st), st(b.stmt(b.call('_$queueNativeChangeDiagnostic', el())))];
+	}
+	if (bind.kind === 'formDiagnostic') {
+		const args = [el(), b.literal(bind.diagnosticKind)];
+		if (bind.selectedBinding !== undefined) {
+			args.push(b.arrow([], bagFieldNode(bag, `_prev$${bind.selectedBinding.id}`)));
+		}
+		return st(b.stmt(b.call('_$queueFormAuthoringDiagnostic', ...args)));
 	}
 	switch (bind.kind) {
 		case 'textOnlyChild': {
@@ -22641,6 +22996,104 @@ function emitNodeHtml(
 	return createTemplateIr();
 }
 
+function collectClientHtmlNestingWarnings(root, ctx, inheritedNamespace) {
+	const sourceLocation = (node) => {
+		const loc = node?.loc?.start;
+		return loc ? `${ctx.mapSourceName}:${loc.line}:${loc.column}` : undefined;
+	};
+	const append = (message) => {
+		if (message === null) return;
+		const identity = JSON.stringify(message);
+		if (!ctx._clientNestingWarnings.some((existing) => JSON.stringify(existing) === identity)) {
+			ctx._clientNestingWarnings.push(message);
+		}
+	};
+	const parentMayBeInvalid = (child, parent) => {
+		if (child.includes('-') || parent.includes('-') || parent === 'template') return false;
+		return (
+			(parent === 'p' &&
+				/^(address|article|aside|blockquote|div|dl|fieldset|footer|form|h[1-6]|header|hgroup|hr|main|menu|nav|ol|p|pre|section|table|ul)$/.test(
+					child,
+				)) ||
+			(child === parent && /^(a|button|form|li|p|h[1-6])$/.test(child)) ||
+			/^(table|tbody|thead|tfoot|tr|colgroup|select|optgroup|option|head|html|frameset)$/.test(
+				parent,
+			) ||
+			/^(body|caption|col|colgroup|frame|frameset|head|html|tbody|td|tfoot|th|thead|tr)$/.test(
+				child,
+			)
+		);
+	};
+	const ancestorMayBeInvalid = (child, ancestor) =>
+		(child === ancestor &&
+			/^(a|button|form|li|p|dt|dd|rt|rp|optgroup|option|h[1-6])$/.test(child)) ||
+		(ancestor === 'p' &&
+			/^(address|article|aside|blockquote|div|dl|fieldset|footer|form|h[1-6]|header|hgroup|hr|main|menu|nav|ol|p|pre|section|table|ul)$/.test(
+				child,
+			));
+	const restrictedTextParent = (tag) =>
+		/^(table|tbody|thead|tfoot|tr|colgroup|head|html)$/.test(tag);
+	const htmlAnnotation = (node) => {
+		const attributes = node.attributes || node.openingElement?.attributes || [];
+		return attributes.some((attr) => {
+			const name = attr.name?.name ?? attr.name;
+			if (typeof name !== 'string' || name.toLowerCase() !== 'encoding') return false;
+			const value = attr.value?.value ?? attr.value?.expression?.value;
+			return typeof value === 'string' && /^(text\/html|application\/xhtml\+xml)$/i.test(value);
+		});
+	};
+	const visit = (node, namespace, ancestors) => {
+		if (node?.type !== 'Element' && node?.type !== 'JSXElement') return;
+		if (isComponentTag(node)) return;
+		const tag = elementTagName(node);
+		if (tag === null) return;
+		const semanticTag = tag.toLowerCase();
+		const ownNamespace = nsForSelf(tag, namespace);
+		const location = sourceLocation(node);
+		const parent = ancestors[ancestors.length - 1];
+		if (
+			ancestors.length === 0 &&
+			ownNamespace === 'html' &&
+			/^(a|address|article|aside|blockquote|button|div|dl|fieldset|footer|form|h[1-6]|header|hgroup|hr|li|main|menu|nav|ol|p|pre|section|table|ul|dt|dd|tr|td|th|tbody|thead|tfoot|option|optgroup)$/.test(
+				semanticTag,
+			)
+		) {
+			append([semanticTag, [], location]);
+		}
+		if (ownNamespace === 'html' && parent?.namespace === 'html') {
+			if (parentMayBeInvalid(semanticTag, parent.tag)) {
+				append([semanticTag, [parent.tag], location, parent.location]);
+			}
+			const path = [parent.tag];
+			for (let index = ancestors.length - 2; index >= 0; index--) {
+				const ancestor = ancestors[index];
+				if (ancestor.namespace !== 'html') break;
+				path.push(ancestor.tag);
+				if (ancestorMayBeInvalid(semanticTag, ancestor.tag)) {
+					append([semanticTag, [...path], location, ancestor.location]);
+				}
+			}
+		}
+		const childNamespace =
+			ownNamespace === 'mathml' && semanticTag === 'annotation-xml' && htmlAnnotation(node)
+				? 'html'
+				: nsForChildren(tag, namespace);
+		const nextAncestors = [...ancestors, { tag: semanticTag, namespace: ownNamespace, location }];
+		const children = normalizeChildren(node.children || [], childNamespace === 'svg', ctx);
+		for (const child of children) {
+			if (child.type === 'Text' && ownNamespace === 'html' && restrictedTextParent(semanticTag)) {
+				const text = staticTextLiteral(child.expression);
+				if (typeof text === 'string' && text !== '') {
+					append(['#text', [semanticTag], text, location]);
+				}
+			} else {
+				visit(child, childNamespace, nextAncestors);
+			}
+		}
+	};
+	visit(root, inheritedNamespace, []);
+}
+
 function emitElementHtml(
 	node,
 	path,
@@ -22706,7 +23159,6 @@ function emitElementHtml(
 	// (`<foreignObject>` is SVG-ns but its children are HTML).
 	const hostNs = nsForSelf(tag, parentNs);
 	const childNs = nsForChildren(tag, parentNs);
-
 	// Collect attributes.
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	// A null/undefined child alongside direct raw HTML is semantically absent.
@@ -22742,6 +23194,15 @@ function emitElementHtml(
 			.filter((attr) => attr.type === 'Attribute' || attr.type === 'JSXAttribute')
 			.map((attr) => normalizeJsxAttrName(jsxAttrRawName(attr), tag, hostNs)),
 	);
+	// React validates a customized built-in from its complete final prop set,
+	// so an authored `is` must be visible before any sibling attr is checked even
+	// when it appears last. Reuse the existing DEV whole-host snapshot; keeping
+	// this proof behind ctx.dev preserves byte-identical production output.
+	const resolveDevCustomizedHost =
+		ctx.dev &&
+		(hostNs === 'html' || hostNs === 'opaque') &&
+		!tag.includes('-') &&
+		directPropNames.has('is');
 	const hasDirectFormCascade =
 		((tag === 'input' || tag === 'textarea' || tag === 'select') &&
 			directPropNames.has('value') &&
@@ -22751,7 +23212,10 @@ function emitElementHtml(
 			directPropNames.has('multiple') &&
 			(directPropNames.has('value') || directPropNames.has('defaultValue')));
 	const resolveHostPropsAcrossSources =
-		firstSpreadIdx !== -1 || hasDuplicateDirectProp || hasDirectFormCascade;
+		firstSpreadIdx !== -1 ||
+		hasDuplicateDirectProp ||
+		hasDirectFormCascade ||
+		resolveDevCustomizedHost;
 	const hostClientSources = [];
 	let directChildrenClientBinding = null;
 	let hostCommitClientBinding = null;
@@ -22835,6 +23299,25 @@ function emitElementHtml(
 					val.type === 'JSXExpressionContainer' ? val.expression : val,
 					cssHash,
 				);
+				if (
+					resolveDevCustomizedHost &&
+					firstSpreadIdx === -1 &&
+					!hasDuplicateDirectProp &&
+					rawAttrName === 'is' &&
+					inner.type === 'Literal' &&
+					typeof inner.value === 'string'
+				) {
+					// Customized built-ins must carry `is` when the browser constructs
+					// the template node; the diagnostic snapshot still needs its source.
+					appendBakedAttribute(
+						attrTemplate,
+						bakeStaticAttr('is', inner.value, tag, hostNs),
+						'is',
+						attr.name,
+						inner,
+						ctx.inspect,
+					);
+				}
 				expr = tsrxExprNode(inner, ctx, componentName, inlinedSubs);
 			}
 			const binding = {
@@ -23121,7 +23604,12 @@ function emitElementHtml(
 				appendBakedAttribute(attrTemplate, chunk, attrName, attr.name, inner, ctx.inspect);
 				continue;
 			}
-			if (!isAfterSpread && inner.type === 'ObjectExpression' && objectExprIsStaticLiteral(inner)) {
+			if (
+				!isAfterSpread &&
+				inner.type === 'ObjectExpression' &&
+				objectExprIsStaticLiteral(inner) &&
+				!(ctx.dev && staticStyleObjectNeedsDevValidation(inner))
+			) {
 				const css = staticObjectToCssString(inner);
 				if (css) {
 					const chunk = ` style="${escapeAttr(css)}"`;
@@ -23132,7 +23620,8 @@ function emitElementHtml(
 			if (
 				firstSpreadIdx === -1 &&
 				ctx._universalRuntimeUnit == null &&
-				!directPropNames.has('suppressHydrationWarning')
+				!directPropNames.has('suppressHydrationWarning') &&
+				!(ctx.dev && staticStyleObjectNeedsDevValidation(inner))
 			) {
 				const mixed = mixedStaticStyle(inner);
 				if (mixed !== null) {
@@ -23349,7 +23838,10 @@ function emitElementHtml(
 			bindings.push({
 				id: bindings.length,
 				kind: 'attr',
-				name: attrName,
+				name:
+					ctx.dev && (rawAttrName === 'tabIndex' || rawAttrName === 'htmlFor')
+						? rawAttrName
+						: attrName,
 				expr,
 				path,
 				ns: hostNs,
@@ -23384,6 +23876,46 @@ function emitElementHtml(
 			origin: node,
 			sources: formControlClientSources,
 		});
+	}
+	if (ctx.dev) {
+		const selectedOption = tag === 'option' && directPropNames.has('selected');
+		const selectedBinding = selectedOption
+			? bindings.findLast((binding) => binding.path === path && binding.name === 'selected')
+			: undefined;
+		const complexOptionChildren =
+			tag === 'option' &&
+			!directPropNames.has('value') &&
+			sourceChildren.some(
+				(child) =>
+					child.type === 'Element' ||
+					child.type === 'JSXElement' ||
+					child.type === 'Fragment' ||
+					child.type === 'JSXFragment',
+			);
+		const textareaChildren =
+			tag === 'textarea' &&
+			!directPropNames.has('value') &&
+			!directPropNames.has('defaultValue') &&
+			hasNestedJsxChildren;
+		for (const diagnosticKind of [
+			selectedOption ? 'option-selected' : null,
+			complexOptionChildren ? 'option-children' : null,
+			textareaChildren ? 'textarea-children' : null,
+		]) {
+			if (diagnosticKind === null) continue;
+			const diagnostic = {
+				id: bindings.length,
+				kind: 'formDiagnostic',
+				diagnosticKind,
+				path,
+				origin: node,
+				mountOnly: true,
+			};
+			if (diagnosticKind === 'option-selected' && selectedBinding !== undefined) {
+				diagnostic.selectedBinding = selectedBinding;
+			}
+			bindings.push(diagnostic);
+		}
 	}
 	if (ctx.dev && firstSpreadIdx === -1) {
 		const classification = ctx.nativeChangeClassifications?.get(

@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import ClipPath from './ClipPath.tsrx';
 
 export type RectClipPathProps = {
@@ -21,7 +21,7 @@ export default function RectClipPath({
 	width = 1,
 	height = 1,
 	...restProps
-}: RectClipPathProps & Omit<SVGProps<SVGRectElement>, keyof RectClipPathProps>) {
+}: RectClipPathProps & Omit<Octane.SVGProps<SVGRectElement>, keyof RectClipPathProps>) {
 	return <ClipPath id={id}>
 		<rect x={x} y={y} width={width} height={height} {...restProps} />
 	</ClipPath>;

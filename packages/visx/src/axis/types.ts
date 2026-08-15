@@ -1,6 +1,7 @@
 import type { D3Scale, NumberLike, ScaleInput, ValueOf } from '@octanejs/visx/scale';
 import type { TextProps } from '@octanejs/visx/text';
-import type { Ref, SVGProps } from 'react';
+import type { Ref } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import type Orientation from './constants/orientation';
 
@@ -12,7 +13,7 @@ export type AxisScaleOutput = number | NumberLike | undefined;
 export type AxisScale<Output extends AxisScaleOutput = AxisScaleOutput> =
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	D3Scale<Output, any, any>;
-type LineProps = Omit<SVGProps<SVGLineElement>, 'to' | 'from' | 'ref'>;
+type LineProps = Omit<Octane.SVGProps<SVGLineElement>, 'to' | 'from' | 'ref'>;
 
 type FormattedValue = string | undefined;
 

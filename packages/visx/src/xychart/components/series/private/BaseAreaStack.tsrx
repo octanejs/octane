@@ -1,5 +1,6 @@
 import { Fragment, createElement, useCallback, useContext, useMemo } from 'octane';
-import type { ReactElement, FC, SVGProps } from 'react';
+import type { ReactElement, FC } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { AxisScale } from '@octanejs/visx/axis';
 import type { SeriesPoint } from 'd3-shape';
 import type { StackPathConfig, AreaProps } from '@octanejs/visx/shape';
@@ -38,7 +39,7 @@ export type BaseAreaStackProps<XScale extends AxisScale, YScale extends AxisScal
 		children: | ReactElement<AreaStackChildProps<XScale, YScale, Datum>>
 		| ReactElement<AreaStackChildProps<XScale, YScale, Datum>>[];
 		/** Rendered component which is passed path props by BaseAreaStack after processing. */
-		PathComponent?: FC<Omit<SVGProps<SVGPathElement>, 'ref'>> | 'path';
+		PathComponent?: FC<Omit<Octane.SVGProps<SVGPathElement>, 'ref'>> | 'path';
 		/** Sets the curve factory (from @octanejs/visx/curve or d3-curve) for the line generator. Defaults to curveLinear. */
 		curve?: AreaProps<Datum>['curve'];
 		/** Whether to render a Line along value of the Area shape (area is fill only). */
@@ -131,7 +132,7 @@ function BaseAreaStack<XScale extends AxisScale, YScale extends AxisScale, Datum
 				...svgPathProps
 			} = areaSeries?.props || {};
 
-			const areaProps: SVGProps<SVGPathElement> = {
+			const areaProps: Octane.SVGProps<SVGPathElement> = {
 				fill: colorScale?.(stack.key) ?? theme?.colors?.[0] ?? '#222',
 				...svgPathProps,
 			};

@@ -1,6 +1,7 @@
 import type {
 	UniversalEventListenerDescriptor,
 	UniversalHostBatch,
+	UniversalHostCommand,
 	UniversalHostCommitContext,
 	UniversalHostDriver,
 	UniversalHostTemplateProgram,
@@ -34,8 +35,10 @@ import {
 } from './first-screen.js';
 import {
 	LYNX_CSS_SCOPE_PROP,
+	hasLynxMainThreadProp,
 	planLynxHostPropPatch,
 	type LynxHostPropPatch,
+	type LynxMainThreadEventPatch,
 	type LynxMainThreadRefDescriptor,
 	type LynxMainThreadWorkletDescriptor,
 } from './host-props.js';
@@ -105,6 +108,15 @@ export type LynxHostHandleDelta =
 			readonly renderer: typeof LYNX_RENDERER_ID;
 			readonly root: number;
 			readonly id: number;
+			readonly generation: number;
+	  }
+	| {
+			/** Retires hostCount contiguous same-generation hosts in one delta. */
+			readonly op: 'destroy-run';
+			readonly renderer: typeof LYNX_RENDERER_ID;
+			readonly root: number;
+			readonly firstId: number;
+			readonly hostCount: number;
 			readonly generation: number;
 	  };
 
@@ -193,6 +205,19 @@ interface LynxHostState<Node extends LynxElementRef> {
 	generations: Map<number, number>;
 	/** Compact first mounts derive live generation-one entries from their records. */
 	implicitInitialGenerations: boolean;
+	/**
+	 * Highest host id that ever carried a stored generation or belonged to an
+	 * accepted compact segment. A compact segment publishes implicit
+	 * generation-one identities, so it may only cover ids above this ratchet;
+	 * the universal allocator issues ids monotonically, so real mounts always
+	 * qualify while any id reuse falls back to the explicit path.
+	 */
+	maxExplicitId: number;
+	/**
+	 * Generation-one tombstones for whole retired runs, kept as sorted
+	 * non-overlapping [first, last] ranges instead of one map entry per host.
+	 */
+	retiredRanges: [number, number][];
 	/** Ordinary pure template runs may retain compact metadata solely for certified teardown. */
 	teardownRecords: LynxDenseHostRecordStore<Node> | null;
 	/** Universal root provenance is fixed by the first accepted portal handle. */
@@ -484,6 +509,9 @@ const EMPTY_HOST_CHILDREN: number[] = [];
 // Most hosts never own a background event. Keep the shared map private and
 // replace it before the first write so ordinary hosts allocate no event table.
 const EMPTY_HOST_EVENTS = new Map<string, UniversalEventListenerDescriptor>();
+// Capture asks every host what the main thread should own. Hosts that declare
+// no `main-thread:` prop share this empty answer instead of planning for one.
+const EMPTY_MAIN_THREAD_EVENTS: readonly LynxMainThreadEventPatch[] = Object.freeze([]);
 // Raw text is initialized by __CreateRawText itself. Its synthetic `value`
 // attribute is never forwarded, so an unscoped creation needs no prop diff.
 const EMPTY_RAW_TEXT_CREATE_PATCH: LynxHostPropPatch = Object.freeze({
@@ -663,6 +691,76 @@ class LynxDenseHostRecordStore<Node extends LynxElementRef> implements LynxHostR
 			offset < this.nodes.length &&
 			offset % this.program.shape.types.length === 0
 		);
+	}
+
+	/**
+	 * Expand one destroy-run command into the exact certified per-host
+	 * teardown sequence this store would verify: event unbinds, root removes,
+	 * then post-order destroys, in the accepted child order. The expansion is
+	 * synthesized from accepted state, so a full-store run re-enters the
+	 * certified teardown fast path unchanged while partial runs flow through
+	 * the general command loop.
+	 */
+	expandRunTeardown(
+		state: LynxHostState<Node>,
+		command: Extract<UniversalHostCommand, { op: 'destroy-run' }>,
+	): UniversalHostCommand[] | null {
+		const width = this.program.shape.types.length;
+		if (command.width !== width) return null;
+		if (this.cleared) return null;
+		if (!Object.is(command.parent, this.parent)) return null;
+		const offset = command.firstId - this.firstId;
+		const hostCount = command.count * width;
+		if (offset < 0 || offset % width !== 0 || offset + hostCount > this.nodes.length) {
+			return null;
+		}
+		const inRange = (id: number): boolean =>
+			id >= command.firstId && id < command.firstId + hostCount && this.isRunRoot(id);
+		for (let row = 0; row < command.count; row++) {
+			if (this.nodes[offset + row * width] === undefined) return null;
+			if (this.removed?.has(command.firstId + row * width)) return null;
+		}
+		const parentRecord = typeof this.parent === 'number' ? this.prefix.get(this.parent) : undefined;
+		const acceptedChildren =
+			this.parent === null ? state.rootChildren : (parentRecord?.children ?? null);
+		const orderedRoots: number[] = [];
+		if (acceptedChildren !== null) {
+			for (const id of acceptedChildren) if (inRange(id)) orderedRoots.push(id);
+		}
+		if (orderedRoots.length !== command.count) {
+			orderedRoots.length = 0;
+			for (let row = 0; row < command.count; row++) {
+				orderedRoots.push(command.firstId + row * width);
+			}
+		}
+		const postorder: number[] = [];
+		const visit = (node: number): void => {
+			for (let child = node + 1; child < width; child++) {
+				if (this.program.shape.parents[child] === node) visit(child);
+			}
+			postorder.push(node);
+		};
+		visit(0);
+		if (postorder.length !== width) return null;
+		const commands: UniversalHostCommand[] = [];
+		for (const rootId of orderedRoots) {
+			for (const node of postorder) {
+				const events = this.program.events[node];
+				if (events === undefined) continue;
+				for (const event of events) {
+					commands.push({ op: 'event', id: rootId + node, type: event.type, listener: null });
+				}
+			}
+		}
+		for (const rootId of orderedRoots) {
+			commands.push({ op: 'remove', parent: command.parent, id: rootId });
+		}
+		for (const rootId of orderedRoots) {
+			for (const node of postorder) {
+				commands.push({ op: 'destroy', id: rootId + node });
+			}
+		}
+		return commands;
 	}
 
 	prepareFullTeardown(
@@ -1586,6 +1684,19 @@ function requireWorkletRegistry<Node extends LynxElementRef>(
 		throw hostError('main-thread props require a main-thread worklet registry.');
 	}
 	return state.worklets;
+}
+
+function retiredRangeHit(ranges: readonly [number, number][], id: number): boolean {
+	let low = 0;
+	let high = ranges.length - 1;
+	while (low <= high) {
+		const middle = (low + high) >> 1;
+		const [first, last] = ranges[middle]!;
+		if (id < first) high = middle - 1;
+		else if (id > last) low = middle + 1;
+		else return true;
+	}
+	return false;
 }
 
 function removeNativeEvent<Node extends LynxElementRef>(
@@ -2581,6 +2692,8 @@ export function createLynxHostContainer<Node extends LynxElementRef>(
 		rootChildren: [],
 		generations: new Map(),
 		implicitInitialGenerations: false,
+		maxExplicitId: 0,
+		retiredRanges: [],
 		teardownRecords: null,
 		portalRoot: null,
 		portalChildren: new Map(),
@@ -2885,7 +2998,21 @@ export function captureLynxFirstTree<Node extends LynxElementRef>(
 		throw hostError('portals cannot be captured before background adoption.');
 	}
 	const eventsByToken = new Map<string, LynxResolvedFirstTreeEvent>();
-	const nodes: LynxFirstTreeNodeSnapshot[] = [];
+	// Capture validates eagerly and describes lazily. Validation and the native
+	// ID read stay here because a host that cannot be captured has to fault the
+	// synchronous first screen, while its caller still holds the source to retry
+	// cleanup against. Turning the validated result into the clone-safe
+	// description is what waits: capture runs after the page is already published
+	// to the host, so every allocation it makes sits between the tree reaching
+	// the DOM and the browser painting it, and nothing before background
+	// adoption reads the description.
+	const described: {
+		readonly id: number;
+		readonly nativeId: number;
+		readonly parent: number | null;
+		readonly record: LynxHostRecord<Node>;
+		readonly events: readonly LynxFirstTreeEventSnapshot[];
+	}[] = [];
 	const ids = [...state.records.keys()].sort((first, second) => first - second);
 	for (const id of ids) {
 		const record = state.records.get(id)!;
@@ -2928,8 +3055,17 @@ export function captureLynxFirstTree<Node extends LynxElementRef>(
 				);
 			}
 		}
-		const mainThreadPatch = planLynxHostPropPatch(record.type, {}, record.props);
-		for (const event of mainThreadPatch.mainThreadEvents) {
+		// Capture re-plans a host's props only to recover what the main thread
+		// should own; the props themselves were already planned and applied when
+		// the tree was built. A host that declares no `main-thread:` prop can own
+		// neither a main-thread event nor a main-thread ref, so planning it again
+		// would spend the page's largest per-host cost rediscovering an empty
+		// answer. Skipping it leaves the checks below unchanged: they still assert
+		// that nothing main-thread-owned is mounted on a host that never asked.
+		const mainThreadPatch = hasLynxMainThreadProp(record.props)
+			? planLynxHostPropPatch(record.type, {}, record.props)
+			: null;
+		for (const event of mainThreadPatch?.mainThreadEvents ?? EMPTY_MAIN_THREAD_EVENTS) {
 			if (event.value === null) continue;
 			const registration = state.nativeEvents.get(record.node)?.get(event.binding.prop);
 			if (
@@ -2947,7 +3083,7 @@ export function captureLynxFirstTree<Node extends LynxElementRef>(
 				);
 			}
 		}
-		const expectedRef = mainThreadPatch.mainThreadRef?.value ?? null;
+		const expectedRef = mainThreadPatch?.mainThreadRef?.value ?? null;
 		const mountedRef = state.mainThreadRefs.get(record.node) ?? null;
 		if (
 			(record.visible && !sameSnapshotValue(expectedRef, mountedRef)) ||
@@ -2955,19 +3091,13 @@ export function captureLynxFirstTree<Node extends LynxElementRef>(
 		) {
 			throw hostError(`first-tree host ${id} has inconsistent main-thread ref ownership.`);
 		}
-		nodes.push(
-			Object.freeze({
-				id,
-				nativeId,
-				type: record.type,
-				generation: record.handle.generation,
-				parent: record.parent,
-				children: Object.freeze([...record.children]),
-				props: snapshotFirstTreeProps(record.props),
-				visible: record.visible,
-				events: Object.freeze(events),
-			}),
-		);
+		described.push({
+			id,
+			nativeId,
+			parent: record.parent,
+			record,
+			events: Object.freeze(events),
+		});
 	}
 	if (state.ownedNodes.size !== state.records.size) {
 		throw hostError('first-tree physical ownership contains untracked nodes.');
@@ -2981,16 +3111,33 @@ export function captureLynxFirstTree<Node extends LynxElementRef>(
 			throw hostError(`first-tree root ${id} is missing from page-root ownership.`);
 		}
 	}
-	const snapshot: LynxFirstTreeSnapshot = Object.freeze({
-		format: 1,
-		renderer: LYNX_RENDERER_ID,
-		root: container.root,
-		version: state.acceptedVersion,
-		plan: options.plan ?? null,
-		roots: Object.freeze([...state.rootChildren]),
-		nodes: Object.freeze(nodes),
-	});
-	const firstTree = createLynxFirstTree<Node>(snapshot, container, eventsByToken);
+	const capturedVersion = state.acceptedVersion;
+	const roots = Object.freeze([...state.rootChildren]);
+	const describe = (): LynxFirstTreeSnapshot =>
+		Object.freeze({
+			format: 1,
+			renderer: LYNX_RENDERER_ID,
+			root: container.root,
+			version: capturedVersion,
+			plan: options.plan ?? null,
+			roots,
+			nodes: Object.freeze(
+				described.map((entry) =>
+					Object.freeze({
+						id: entry.id,
+						nativeId: entry.nativeId,
+						type: entry.record.type,
+						generation: entry.record.handle.generation,
+						parent: entry.parent,
+						children: Object.freeze([...entry.record.children]),
+						props: snapshotFirstTreeProps(entry.record.props),
+						visible: entry.record.visible,
+						events: entry.events,
+					}),
+				),
+			),
+		});
+	const firstTree = createLynxFirstTree<Node>(describe, container, eventsByToken);
 	state.firstTree = firstTree;
 	return firstTree;
 }
@@ -3234,6 +3381,7 @@ function prepareDenseTeardown<Node extends LynxElementRef>(
 	batch: UniversalHostBatch,
 	state: LynxHostState<Node>,
 	plan: LynxDenseTeardownPlan<Node>,
+	run: { firstId: number; hostCount: number } | null = null,
 ): LynxPreparedHostBatch {
 	const baseVersion = state.acceptedVersion;
 	const emptyListAncestryDelta = Object.freeze([]) as readonly LynxHostListAncestryDelta[];
@@ -3241,8 +3389,24 @@ function prepareDenseTeardown<Node extends LynxElementRef>(
 	let status: 'prepared' | 'applying' | 'applied' | 'aborted' | 'faulted' = 'prepared';
 	let mutationStarted = false;
 	let fault: unknown;
+	const uniformRun = run !== null && plan.store.hostGenerations === null;
 	const materializeHandleDelta = (): readonly LynxHostHandleDelta[] => {
 		if (handleDelta !== null) return handleDelta;
+		if (uniformRun) {
+			// The whole run retires at its uniform implicit generation: one
+			// range delta replaces one frozen object per destroyed host.
+			handleDelta = Object.freeze([
+				Object.freeze({
+					op: 'destroy-run' as const,
+					renderer: LYNX_RENDERER_ID,
+					root: container.root,
+					firstId: run.firstId,
+					hostCount: run.hostCount,
+					generation: 1,
+				}),
+			]);
+			return handleDelta;
+		}
 		const deltas: LynxHostHandleDelta[] = new Array(plan.hostCount);
 		for (let offset = 0; offset < plan.hostCount; offset++) {
 			const command = batch.commands[plan.eventCommands + plan.store.count + offset]!;
@@ -3289,9 +3453,42 @@ function prepareDenseTeardown<Node extends LynxElementRef>(
 				state.records = plan.records;
 				state.teardownRecords = null;
 				state.rootChildren = plan.rootChildren;
-				for (let offset = 0; offset < plan.hostCount; offset++) {
-					const id = plan.firstId + offset;
-					if (!state.generations.has(id)) state.generations.set(id, 1);
+				if (uniformRun) {
+					// One sorted range replaces one tombstone per retired host.
+					const last = run!.firstId + run!.hostCount - 1;
+					const ranges = state.retiredRanges;
+					const previous = ranges[ranges.length - 1];
+					if (previous === undefined || run!.firstId > previous[1]) {
+						ranges.push([run!.firstId, last]);
+					} else {
+						ranges.push([run!.firstId, last]);
+						ranges.sort((a, b) => a[0] - b[0]);
+					}
+				} else {
+					for (let offset = 0; offset < plan.hostCount; offset++) {
+						const id = plan.firstId + offset;
+						if (!state.generations.has(id)) state.generations.set(id, 1);
+					}
+				}
+				if (plan.firstId + plan.hostCount - 1 > state.maxExplicitId) {
+					state.maxExplicitId = plan.firstId + plan.hostCount - 1;
+				}
+				if (state.implicitInitialGenerations) {
+					// The dense segment was the only supplier of implicit
+					// generation-one entries. Its hosts now carry explicit
+					// tombstones, so if every surviving record's generation is
+					// also stored, the container is back on fully explicit
+					// bookkeeping and the next pure template mount may
+					// negotiate an incremental compact acknowledgement again
+					// instead of republishing every host.
+					let explicit = true;
+					for (const id of plan.records.keys()) {
+						if (!state.generations.has(id)) {
+							explicit = false;
+							break;
+						}
+					}
+					if (explicit) state.implicitInitialGenerations = false;
 				}
 				state.acceptedVersion = batch.version;
 				let applicationFailed = false;
@@ -3355,6 +3552,44 @@ function prepareDenseTeardown<Node extends LynxElementRef>(
 	return Object.freeze(prepared);
 }
 
+/**
+ * Expand a destroy-run against ordinary accepted records when no dense store
+ * covers the range — rows that were reordered, adopted, or mounted through the
+ * explicit path. Produces the same event-unbind, remove, and post-order
+ * destroy sequence the background would have shipped host by host.
+ */
+function expandRecordsRunTeardown<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	command: Extract<UniversalHostCommand, { op: 'destroy-run' }>,
+): UniversalHostCommand[] | null {
+	const events: UniversalHostCommand[] = [];
+	const removes: UniversalHostCommand[] = [];
+	const destroys: UniversalHostCommand[] = [];
+	for (let row = 0; row < command.count; row++) {
+		const rootId = command.firstId + row * command.width;
+		const root = state.records.get(rootId);
+		if (root === undefined || !Object.is(root.parent, command.parent)) return null;
+		let visited = 0;
+		const visit = (id: number): boolean => {
+			const record = state.records.get(id);
+			if (record === undefined) return false;
+			visited++;
+			for (const child of record.children) {
+				if (!visit(child)) return false;
+			}
+			for (const type of record.events.keys()) {
+				events.push({ op: 'event', id, type, listener: null });
+			}
+			destroys.push({ op: 'destroy', id });
+			return true;
+		};
+		if (!visit(rootId) || visited !== command.width) return null;
+		removes.push({ op: 'remove', parent: command.parent, id: rootId });
+	}
+	events.push(...removes, ...destroys);
+	return events;
+}
+
 export function prepareLynxHostBatch<Node extends LynxElementRef>(
 	container: LynxHostContainer<Node>,
 	batch: UniversalHostBatch,
@@ -3405,6 +3640,48 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		}
 	}
 	const logicalTeardown = state.faulted;
+	let runExpansion: { firstId: number; hostCount: number } | null = null;
+	if (firstTree === undefined) {
+		const teardownStore =
+			state.records instanceof LynxDenseHostRecordStore ? state.records : state.teardownRecords;
+		let hasRun = false;
+		for (const command of batch.commands) {
+			if (command !== null && typeof command === 'object' && command.op === 'destroy-run') {
+				hasRun = true;
+				break;
+			}
+		}
+		if (hasRun) {
+			const sole = batch.commands.length === 1;
+			const commands: UniversalHostCommand[] = [];
+			for (const command of batch.commands) {
+				if (command !== null && typeof command === 'object' && command.op === 'destroy-run') {
+					const expanded =
+						teardownStore?.expandRunTeardown(state, command) ??
+						expandRecordsRunTeardown(state, command);
+					if (expanded === null) {
+						throw hostError('destroy-run does not match an accepted template run.');
+					}
+					for (const entry of expanded) commands.push(entry);
+					if (sole && expanded !== null && teardownStore !== null) {
+						runExpansion = {
+							firstId: command.firstId,
+							hostCount: command.count * command.width,
+						};
+					}
+				} else {
+					commands.push(command);
+				}
+			}
+			batch = { ...batch, commands };
+		}
+		if (!logicalTeardown) {
+			const denseTeardown = teardownStore?.prepareFullTeardown(state, batch) ?? null;
+			if (denseTeardown !== null) {
+				return prepareDenseTeardown(container, batch, state, denseTeardown, runExpansion);
+			}
+		}
+	}
 	if (
 		logicalTeardown &&
 		!batch.commands.every(
@@ -3419,14 +3696,6 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		throw hostError(
 			'after a host fault, only listener removal and remove/destroy teardown commands are accepted.',
 		);
-	}
-	if (!logicalTeardown && firstTree === undefined) {
-		const teardownStore =
-			state.records instanceof LynxDenseHostRecordStore ? state.records : state.teardownRecords;
-		const denseTeardown = teardownStore?.prepareFullTeardown(state, batch) ?? null;
-		if (denseTeardown !== null) {
-			return prepareDenseTeardown(container, batch, state, denseTeardown);
-		}
 	}
 
 	const baseVersion = state.acceptedVersion;
@@ -3453,14 +3722,19 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				typeof command === 'object' &&
 				(command.op === 'mount-template-range' || command.op === 'mount-template-run'),
 		);
+	const incrementalCompactRun =
+		batch.commands.length === 1 && batch.commands[0]?.op === 'mount-template-run'
+			? batch.commands[0]
+			: null;
 	const incrementalCompactCandidate =
 		options?.compact === true &&
 		options.incrementalCompact === true &&
 		acceptedLazyPublicInstances &&
 		!state.implicitInitialGenerations &&
 		state.records instanceof Map &&
-		batch.commands.length === 1 &&
-		batch.commands[0]?.op === 'mount-template-run';
+		incrementalCompactRun !== null &&
+		// Implicit generation-one identities require a provably fresh id range.
+		incrementalCompactRun.firstId > state.maxExplicitId;
 	const teardownMirrorCandidate =
 		options?.compact === true &&
 		options.incrementalCompact === true &&
@@ -3517,14 +3791,18 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		stagedRecords.delete(id);
 		deletedRecords.add(id);
 	};
+	const rangedGeneration = (id: number): number | undefined =>
+		retiredRangeHit(state.retiredRanges, id) ? 1 : undefined;
 	const getGeneration = state.implicitInitialGenerations
 		? (id: number): number | undefined =>
 				stagedGenerations.get(id) ??
 				state.generations.get(id) ??
+				rangedGeneration(id) ??
 				state.records.get(id)?.handle.generation
 		: initiallyNoGenerations
-			? (id: number): number | undefined => stagedGenerations.get(id)
-			: (id: number): number | undefined => stagedGenerations.get(id) ?? state.generations.get(id);
+			? (id: number): number | undefined => stagedGenerations.get(id) ?? rangedGeneration(id)
+			: (id: number): number | undefined =>
+					stagedGenerations.get(id) ?? state.generations.get(id) ?? rangedGeneration(id);
 	const setGeneration = (id: number, generation: number): void => {
 		if (compactCandidate && generation === 1) return;
 		stagedGenerations.set(id, generation);
@@ -4861,12 +5139,29 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				if (stagedRootChildren !== null) state.rootChildren = stagedRootChildren;
 				if (initiallyNoGenerations) {
 					state.generations = stagedGenerations;
+					for (const id of stagedGenerations.keys()) {
+						if (id > state.maxExplicitId) state.maxExplicitId = id;
+					}
 				} else {
 					for (const [id, generation] of stagedGenerations) {
 						state.generations.set(id, generation);
+						if (id > state.maxExplicitId) state.maxExplicitId = id;
 					}
 				}
-				if (compactHostCount !== undefined) state.implicitInitialGenerations = true;
+				if (compactHostCount !== undefined) {
+					state.implicitInitialGenerations = true;
+					// The accepted segment's implicit identities occupy their id
+					// range even though no generation entry is stored for them.
+					for (const operation of operations) {
+						if (operation.op !== 'mount-template') continue;
+						const width = operation.parents.length;
+						const rows = operation.count ?? 1;
+						const firstId = operation.dense?.firstId ?? operation.firstId;
+						if (firstId === undefined) continue;
+						const lastId = firstId + rows * width - 1;
+						if (lastId > state.maxExplicitId) state.maxExplicitId = lastId;
+					}
+				}
 				state.portalRoot = stagedPortalRoot;
 				const portalChildrenChanges = readStagedPortalChildren();
 				if (portalChildrenChanges !== null) {
@@ -5393,6 +5688,7 @@ export function createLynxHostDriver<
 			templateMount: true,
 			templateProgramMount: true,
 			templateProgramRuns: true,
+			teardownRuns: true,
 			lazyPublicInstances: true,
 			stableStaticHostProps: true,
 		},
