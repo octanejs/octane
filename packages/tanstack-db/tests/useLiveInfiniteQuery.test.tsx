@@ -99,6 +99,29 @@ function createOnDemandCollection(opts: OnDemandCollectionOptions) {
 }
 
 describe(`useLiveInfiniteQuery`, () => {
+	it(`does not start query synchronization when render fails before commit`, () => {
+		// Per @tanstack/react-db@0.1.96, query-function collections stay idle
+		// until the window controller holds its lease and subscribes after commit.
+		// Starting during render leaks an on-demand request from an abandoned tree.
+		const { collection, loadSubsetCalls } = createOnDemandCollection({
+			id: `failed-render-sync-test`,
+			allPosts: createMockPosts(10),
+		});
+		const renderError = new Error(`render failed`);
+
+		expect(() => {
+			renderHook(() => {
+				useLiveInfiniteQuery(
+					(q) => q.from({ posts: collection }).orderBy(({ posts: p }) => p.createdAt, `desc`),
+					{ pageSize: 10 },
+				);
+				throw renderError;
+			});
+		}).toThrow(renderError);
+
+		expect(loadSubsetCalls).toHaveLength(0);
+	});
+
 	it(`should fetch initial page of data`, async () => {
 		const posts = createMockPosts(50);
 		const collection = createCollection(

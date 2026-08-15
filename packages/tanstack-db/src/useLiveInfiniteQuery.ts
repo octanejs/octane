@@ -254,13 +254,15 @@ export function useLiveInfiniteQuery<TContext extends Context>(
 			configRef.current = queryFnOrCollection;
 		} else {
 			// Wrap the query with the first page's peek-ahead window; the controller
-			// grows the limit from here.
+			// grows the limit from here. Construction happens during render, so keep
+			// synchronization idle until the committed controller subscription first
+			// acquires the matching window lease.
 			collectionRef.current = createLiveQueryCollection({
 				query: (q: InitialQueryBuilder) =>
 					queryFnOrCollection(q)
 						.limit(pageSize + 1)
 						.offset(0),
-				startSync: true,
+				startSync: false,
 				gcTime: DEFAULT_GC_TIME_MS,
 			});
 			depsRef.current = [...deps];
