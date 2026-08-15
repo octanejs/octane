@@ -43,6 +43,7 @@ test('validates and generates surface-specific formatter cases', () => {
 	});
 	const generated = generateFiles(input);
 	assert.match(generated.client, /declare const process: \{ env: \{ NODE_ENV\?: string \} \};/);
+	assert.doesNotMatch(generated.client, /^\/\/.*process\.env\.NODE_ENV/m);
 	assert.doesNotMatch(generated.server, /declare const process/);
 	assert.match(generated.client, /case 1:/);
 	assert.match(generated.client, /case 2:/);

@@ -114,8 +114,8 @@ export function validateCatalogCompatibility(previous, current) {
 	}
 }
 
-const CLIENT_PROCESS_DECLARATION = `// The consumer's bundler substitutes the whole \`process.env.NODE_ENV\` expression
-// below, so it must stay written out literally. Declared module-locally — never
+const CLIENT_PROCESS_DECLARATION = `// The consumer's bundler substitutes the whole Node environment expression below,
+// so the source guard must stay written out literally. Declared module-locally — never
 // \`declare global\`, which would ship in the tarball — so this file type-checks in
 // a browser app that has no \`@types/node\`.
 declare const process: { env: { NODE_ENV?: string } };
