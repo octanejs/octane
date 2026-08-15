@@ -10,6 +10,10 @@ packages/shadcn/registry/
 # Vendored pinned upstream sources a port is written against (byte-exact
 # provenance; do not reformat)
 packages/*/upstream/
+# Runner-owned scratch for the pristine upstream suites: a temp copy of the
+# vendored bytes, and Vitest's own results cache. Neither is source.
+packages/*/.pristine-upstream-*/
+packages/*/.upstream-vitest-cache/
 # Attribution-compatible application input frozen byte-exact by its adoption test.
 packages/markdown/tests/adoption/public-app/MarkdownBlock.react.tsx
 # Adapted Markdown assertions carry independently pinned row/declaration hashes.
@@ -30,6 +34,11 @@ packages/solana-react/typetests/query/__typetests__/
 # popper adapted typings mirrors stay printer-identical to upstream.
 packages/popper/typetests/main-test.tsx
 packages/popper/typetests/svg-test.tsx
+# xstate adapted type suites stay byte-identical to the vendored upstream
+# typetests below their header, so the permitted-transformation ledger in each
+# package's audit/type-parity.json is verifiable by diff.
+packages/xstate/typetests/types.test-d.tsx
+packages/xstate-store/typetests/types.test-d.tsx
 packages/shadcn/tests/differential/upstream/
 # The framework-neutral half of @vis.gl/react-mapbox is reused byte-for-byte, so
 # an upstream bump stays a clean diff against packages/react-map-gl/upstream/.

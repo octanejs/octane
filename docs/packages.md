@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**95 publishable package(s), including 81 framework binding(s) and 3 framework integration(s).**
+**97 publishable package(s), including 83 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -103,6 +103,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.38` | 3 |
 | `@octanejs/wagmi` | [`packages/wagmi`](../packages/wagmi) | framework binding | `0.0.18` | 3 |
 | `@octanejs/window` | [`packages/window`](../packages/window) | framework binding | `0.0.4` | 1 |
+| `@octanejs/xstate` | [`packages/xstate`](../packages/xstate) | framework binding | `0.0.1` | 2 |
+| `@octanejs/xstate-store` | [`packages/xstate-store`](../packages/xstate-store) | framework binding | `0.0.1` | 2 |
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.4` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.37` | 6 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.8` | 1 |
