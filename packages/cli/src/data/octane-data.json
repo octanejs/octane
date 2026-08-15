@@ -1230,6 +1230,7 @@
     "@streamdown/mermaid": "@octanejs/streamdown",
     "@stylexjs/stylex": "@octanejs/stylex",
     "@tanstack/ai-react": "@octanejs/tanstack-ai",
+    "@tanstack/react-db": "@octanejs/tanstack-db",
     "@tanstack/react-devtools": "@octanejs/tanstack-devtools",
     "@tanstack/react-form": "@octanejs/tanstack-form",
     "@tanstack/react-hotkeys": "@octanejs/tanstack-hotkeys",
