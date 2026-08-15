@@ -8640,6 +8640,29 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 						return true;
 					}
 				}
+				// METHOD-style custom hooks — `route.useLoaderData()`, `api.useSearch()`,
+				// `SomeContext.useSelector(fn)`. The free-identifier sweep above only sees
+				// bare names, and the unknown-call rule above only inspects Identifier
+				// callees, so without this a component whose ONLY hook is member-form
+				// looks hookless: it takes the lite path, gets no block of its own, and
+				// its hook state lands on the parent — an update from that hook then
+				// re-renders the parent and every sibling.
+				//
+				// Same `use[A-Z]` convention, applied to the PROPERTY name, that the
+				// slot-injection pass already uses for these calls. `useContext` is
+				// included rather than excluded: it is not lite-safe either (the sweep
+				// above rejects the bare name for the same reason).
+				if (
+					t === 'CallExpression' &&
+					n.callee &&
+					n.callee.type === 'MemberExpression' &&
+					!n.callee.computed &&
+					n.callee.property &&
+					n.callee.property.type === 'Identifier' &&
+					/^use[A-Z]/.test(n.callee.property.name)
+				) {
+					return true;
+				}
 				for (const k in n) {
 					if (AST_WALK_SKIP_KEYS.has(k)) continue;
 					if (walk(n[k])) return true;
