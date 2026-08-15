@@ -96,6 +96,7 @@
     "binding-parity:gaps:check": "node scripts/generate-binding-parity-gaps.mjs --check",
     "test:markers:check": "node scripts/check-test-markers.mjs",
     "tsrx-decls:check": "node scripts/check-tsrx-module-decls.mjs",
+    "virtual-tsx:check": "node scripts/check-virtual-tsx-declarations.mjs",
     "context:budget:check": "node scripts/check-context-budget.mjs",
     "bindings:status": "node scripts/generate-bindings-status.mjs",
     "bindings:status:check": "node scripts/generate-bindings-status.mjs --check",

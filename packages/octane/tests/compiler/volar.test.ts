@@ -337,6 +337,187 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		expect(result.code).not.toContain('rgb(40, 50, 60)');
 	});
 
+	/**
+	 * `ref` plus a spread on a HOST element is ordinary authoring — nothing in
+	 * docs/differences-from-react.md or the tsrx-authoring rule restricts where
+	 * such an element may sit. The type-only lowering rewrites the spread to a
+	 * generated binding and reads the composed ref back off it, so the binding
+	 * must be declared wherever the element appears, and it must be produced
+	 * once. Every entry below is the SAME element in a different position.
+	 */
+	const REF_SPREAD_POSITIONS: ReadonlyArray<readonly [name: string, body: string]> = [
+		['return statement', 'return <text ref={props.nodeRef} {...props.rest} />;'],
+		[
+			'nested in a returned element',
+			'return <svg><text ref={props.nodeRef} {...props.rest} /></svg>;',
+		],
+		[
+			'declarator init',
+			'const label = <text ref={props.nodeRef} {...props.rest} />;\n\treturn <svg>{label}</svg>;',
+		],
+		[
+			'ternary arm of a return',
+			'return props.show ? <text ref={props.nodeRef} {...props.rest} /> : null;',
+		],
+		[
+			'ternary arm inside a JSX hole',
+			'return <svg>{props.show ? <text ref={props.nodeRef} {...props.rest} /> : null}</svg>;',
+		],
+		[
+			'logical operand inside a JSX hole',
+			'return <svg>{props.show && <text ref={props.nodeRef} {...props.rest} />}</svg>;',
+		],
+		[
+			'callback body',
+			'return <svg>{props.rows.map((row: number) => <text key={row} ref={props.nodeRef} {...props.rest} />)}</svg>;',
+		],
+		['attribute value', 'return <svg>{<text ref={props.nodeRef} {...props.rest} />}</svg>;'],
+		[
+			'array literal element',
+			'return <svg>{[<text ref={props.nodeRef} {...props.rest} />]}</svg>;',
+		],
+		[
+			'element with two spreads',
+			'return <svg>{props.show ? <text ref={props.nodeRef} {...props.rest} {...props.more} /> : null}</svg>;',
+		],
+	];
+
+	/** The same element as a concise arrow body, which has no statement slot. */
+	const CONCISE_ARROW_POSITION =
+		'export const Chart = (props: Props) => <text ref={props.nodeRef} {...props.rest} />;\n';
+
+	/** The same element inside plain JS nested in a native `@{ … }` template. */
+	const NATIVE_TEMPLATE_POSITIONS: ReadonlyArray<readonly [name: string, body: string]> = [
+		[
+			'native @if directive',
+			'<svg>@if (props.show) { <text ref={props.nodeRef} {...props.rest} /> }</svg>',
+		],
+		[
+			'plain-JS callback inside a native template',
+			'<svg>{props.rows.map((row: number) => <text key={row} ref={props.nodeRef} {...props.rest} />)}</svg>',
+		],
+	];
+
+	const REF_SPREAD_PROPS_TYPE =
+		'type Props = {\n' +
+		'\tnodeRef: (node: SVGTextElement | null) => void;\n' +
+		'\trest: { x?: number };\n' +
+		'\tmore: { y?: number };\n' +
+		'\trows: number[];\n' +
+		'\tshow: boolean;\n' +
+		'};\n\n';
+
+	function refSpreadModules(): ReadonlyArray<readonly [name: string, source: string]> {
+		return [
+			...REF_SPREAD_POSITIONS.map(
+				([name, body]) =>
+					[
+						name,
+						`${REF_SPREAD_PROPS_TYPE}export function Chart(props: Props) {\n\t${body}\n}\n`,
+					] as const,
+			),
+			['concise arrow body', REF_SPREAD_PROPS_TYPE + CONCISE_ARROW_POSITION] as const,
+			...NATIVE_TEMPLATE_POSITIONS.map(
+				([name, body]) =>
+					[
+						name,
+						`${REF_SPREAD_PROPS_TYPE}export function Chart(props: Props) @{\n\t${body}\n}\n`,
+					] as const,
+			),
+		];
+	}
+
+	it('declares the generated host ref/spread binding in every element position', () => {
+		// The binding used to ride on the element's metadata for a later pass to
+		// hoist, and only the render-block statement builder and the native
+		// directive path hoisted it. Everywhere else the declaration was dropped
+		// while the rewritten attributes still referenced the name, so the
+		// language service reported "Cannot find name" on source that compiles
+		// and runs correctly (octanejs/octane#737).
+		//
+		// Undefined names are reported without resolving any import, so the
+		// program below deliberately runs without an `octane` stub: unresolved
+		// module diagnostics are irrelevant to this contract and filtered out.
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-ref-spread-'));
+		try {
+			const files = refSpreadModules().map(([name, source], index) => {
+				const compiled = compileToVolarMappings(source, `/src/Chart${index}.tsrx`);
+				expect(compiled.errors).toEqual([]);
+				const file = join(root, `Chart${index}.tsx`);
+				writeFileSync(file, compiled.code);
+				return { name, file };
+			});
+
+			const program = ts.createProgram({
+				rootNames: files.map(({ file }) => file),
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					skipLibCheck: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+				},
+			});
+			const undefinedNames = ts
+				.getPreEmitDiagnostics(program)
+				.filter((diagnostic) => diagnostic.code === 2304)
+				.map((diagnostic) => {
+					const position = files.find(({ file }) => file === diagnostic.file?.fileName);
+					return `${position?.name ?? diagnostic.file?.fileName}: ${ts.flattenDiagnosticMessageText(
+						diagnostic.messageText,
+						' ',
+					)}`;
+				});
+			expect(undefinedNames).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('lowers a host element ref/spread exactly once, whatever position it sits in', () => {
+		// An element in plain-JS expression position reached both lowering sites,
+		// and the lowering is not idempotent: the second pass read the composed
+		// `ref={[authored, generated.ref]}` array as an authored ref and composed
+		// it again, so the element ended up with a second generated binding and a
+		// ref nested one level deeper than the runtime ever produces.
+		for (const [name, source] of refSpreadModules()) {
+			const compiled = compileToVolarMappings(source, '/src/Chart.tsrx');
+			const generated = ts.createSourceFile(
+				'/src/Chart.tsx',
+				compiled.code,
+				ts.ScriptTarget.ESNext,
+				true,
+				ts.ScriptKind.TSX,
+			);
+
+			const refArrays: ts.ArrayLiteralExpression[] = [];
+			const visit = (node: ts.Node): void => {
+				if (
+					ts.isJsxAttribute(node) &&
+					ts.isIdentifier(node.name) &&
+					node.name.text === 'ref' &&
+					node.initializer &&
+					ts.isJsxExpression(node.initializer) &&
+					node.initializer.expression &&
+					ts.isArrayLiteralExpression(node.initializer.expression)
+				) {
+					refArrays.push(node.initializer.expression);
+				}
+				ts.forEachChild(node, visit);
+			};
+			visit(generated);
+
+			// One composed ref per element: the authored ref and the spread bag's.
+			expect(refArrays, name).toHaveLength(1);
+			const nested = refArrays[0].elements
+				.filter((element) => ts.isArrayLiteralExpression(element))
+				.map((element) => element.getText(generated));
+			expect(nested, name).toEqual([]);
+		}
+	});
+
 	it('handles @if / @for / @try / @switch directives', () => {
 		const src =
 			"import { useState } from 'octane';\n" +
