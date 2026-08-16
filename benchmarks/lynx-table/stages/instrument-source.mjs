@@ -94,6 +94,15 @@ export function instrumentLynxStageSources(repositoryRoot) {
 \t\tprepareCheckMs: 0,
 \t\tapplyMs: 0,
 \t\tackMs: 0,
+\t\tdestroyRunExpandMs: 0,
+\t\tdenseValidateMs: 0,
+\t\teventDetachMs: 0,
+\t\tpapiRemoveMs: 0,
+\t\tdenseReleaseMs: 0,
+\t\tsynthesizedCommands: 0,
+\t\teventDetachCount: 0,
+\t\tpapiRemoveCount: 0,
+\t\tdenseReleaseHostCount: 0,
 \t});
 \tprofile.papiCreateMs = (profile.papiCreateMs ?? 0) + performance.now() - started;
 }
@@ -247,6 +256,15 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 \t\t\t\t\tprepareCheckMs: 0,
 \t\t\t\t\tapplyMs: 0,
 \t\t\t\t\tackMs: 0,
+\t\t\t\t\tdestroyRunExpandMs: 0,
+\t\t\t\t\tdenseValidateMs: 0,
+\t\t\t\t\teventDetachMs: 0,
+\t\t\t\t\tpapiRemoveMs: 0,
+\t\t\t\t\tdenseReleaseMs: 0,
+\t\t\t\t\tsynthesizedCommands: 0,
+\t\t\t\t\teventDetachCount: 0,
+\t\t\t\t\tpapiRemoveCount: 0,
+\t\t\t\t\tdenseReleaseHostCount: 0,
 \t\t\t\t});
 \t\t\t\tprofile.firstScreenPlanMs =
 \t\t\t\t\t(profile.firstScreenPlanMs ?? 0) + performance.now() - startedPlan;

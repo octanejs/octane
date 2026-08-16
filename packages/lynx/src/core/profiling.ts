@@ -45,6 +45,24 @@ export interface LynxWireProfile {
 	applyMs: number;
 	/** Main: acknowledgement handle computation + dispatch time. */
 	ackMs: number;
+	/** Main: destroy-run expansion into certified teardown commands. */
+	destroyRunExpandMs: number;
+	/** Main: dense direct certification or expanded full-teardown validation. */
+	denseValidateMs: number;
+	/** Main: explicit native-event detach or structural journal release during dense apply. */
+	eventDetachMs: number;
+	/** Main: Element PAPI removal during dense destroy-run apply. */
+	papiRemoveMs: number;
+	/** Main: accepted-state and dense-store release during destroy-run apply. */
+	denseReleaseMs: number;
+	/** Main: commands synthesized from accepted state for destroy-run batches. */
+	synthesizedCommands: number;
+	/** Main: explicit Element PAPI native-event detachments completed during dense apply. */
+	eventDetachCount: number;
+	/** Main: Element PAPI removals completed during dense destroy-run apply. */
+	papiRemoveCount: number;
+	/** Main: dense host records released by destroy-run apply. */
+	denseReleaseHostCount: number;
 }
 
 interface LynxProfileGlobals {
@@ -64,6 +82,15 @@ export function lynxWireProfile(): LynxWireProfile {
 		prepareMs: 0,
 		applyMs: 0,
 		ackMs: 0,
+		destroyRunExpandMs: 0,
+		denseValidateMs: 0,
+		eventDetachMs: 0,
+		papiRemoveMs: 0,
+		denseReleaseMs: 0,
+		synthesizedCommands: 0,
+		eventDetachCount: 0,
+		papiRemoveCount: 0,
+		denseReleaseHostCount: 0,
 	});
 }
 

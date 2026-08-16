@@ -292,9 +292,7 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 		insertBefore(parent, child, before) {
 			insertBefore(parent, child, before ?? undefined);
 		},
-		remove(parent, child) {
-			remove(parent, child);
-		},
+		remove,
 		replace(replacement, previous) {
 			replace(replacement, previous);
 		},

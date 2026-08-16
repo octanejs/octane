@@ -17,6 +17,17 @@ const sourceFiles = [
 	'packages/lynx/src/main-renderer.ts',
 	'packages/lynx/src/main-thread.ts',
 ];
+const destroyRunProfileFields = [
+	'destroyRunExpandMs',
+	'denseValidateMs',
+	'eventDetachMs',
+	'papiRemoveMs',
+	'denseReleaseMs',
+	'synthesizedCommands',
+	'eventDetachCount',
+	'papiRemoveCount',
+	'denseReleaseHostCount',
+];
 
 test('instruments an isolated Lynx source copy and restores every byte', () => {
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-lynx-stage-source-'));
@@ -41,14 +52,18 @@ test('instruments an isolated Lynx source copy and restores every byte', () => {
 			fs.readFileSync(path.join(temporary, 'packages/lynx/src/main-thread.ts'), 'utf8'),
 			/mtExpandMs/,
 		);
-		assert.match(
-			fs.readFileSync(path.join(temporary, 'packages/lynx/src/main-renderer.ts'), 'utf8'),
-			/firstScreenPlanMs/,
+		const mainRenderer = fs.readFileSync(
+			path.join(temporary, 'packages/lynx/src/main-renderer.ts'),
+			'utf8',
 		);
-		assert.match(
-			fs.readFileSync(path.join(temporary, 'packages/lynx/src/core/papi.ts'), 'utf8'),
-			/papiCreateMs/,
-		);
+		assert.match(mainRenderer, /firstScreenPlanMs/);
+		const papi = fs.readFileSync(path.join(temporary, 'packages/lynx/src/core/papi.ts'), 'utf8');
+		assert.match(papi, /papiCreateMs/);
+		for (const name of destroyRunProfileFields) {
+			const initializer = new RegExp(`\\b${name}: 0`);
+			assert.match(mainRenderer, initializer);
+			assert.match(papi, initializer);
+		}
 		restore();
 		for (const relative of sourceFiles) {
 			assert.equal(fs.readFileSync(path.join(temporary, relative), 'utf8'), before.get(relative));
@@ -107,6 +122,7 @@ test('profiled first-screen rendering works without a stage-harness slice hook',
 			'prepareCheckMs',
 			'applyMs',
 			'ackMs',
+			...destroyRunProfileFields,
 		]) {
 			assert.equal(profile[name], 0);
 		}
