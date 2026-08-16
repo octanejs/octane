@@ -3,8 +3,9 @@
  * runtime.
  *
  * Architecture:
- *   1. Parse TSRX via @tsrx/core's parseModule and run its target-neutral
- *      semantic analysis on the authored module.
+ *   1. Parse TSRX through the environment-selected @tsrx/core-compatible
+ *      parser (native oxc-tsrx in Node, pure JavaScript elsewhere), then run
+ *      @tsrx/core's target-neutral semantic analysis on the authored module.
  *   2. For each top-level node:
  *        - Component (`@{ … }` body or a return-JSX function) → compile to a
  *          function taking the props-first ABI `(…userParams, __s, __extra)`.
@@ -30,7 +31,6 @@
 import {
 	analyzeCss,
 	analyzeTsrx,
-	parseModule,
 	prepareStylesheetForRender,
 	renderStylesheets,
 	builders as b,
@@ -38,6 +38,7 @@ import {
 	clone_ast_node as cloneAstNode,
 	strongHash,
 } from '@tsrx/core';
+import { parseModule } from '#octane/compiler-parser';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { buildFatSegments } from './fat-segments.js';

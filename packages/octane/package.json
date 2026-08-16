@@ -27,6 +27,12 @@
     "dist",
     "README.md"
   ],
+  "imports": {
+    "#octane/compiler-parser": {
+      "node": "oxc-tsrx/tsrx-core-compat",
+      "default": "@tsrx/core"
+    }
+  },
   "exports": {
     ".": "./src/index.ts",
     "./jsx-runtime": "./src/jsx-runtime.d.ts",
@@ -160,7 +166,8 @@
     "@types/react": "catalog:default",
     "devalue": "catalog:default",
     "es-module-lexer": "catalog:default",
-    "esrap": "catalog:default"
+    "esrap": "catalog:default",
+    "oxc-tsrx": "catalog:default"
   },
   "peerDependencies": {
     "react": "^19.0.0",
