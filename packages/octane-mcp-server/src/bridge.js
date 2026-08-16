@@ -146,6 +146,7 @@ export const KNOWN_BINDINGS = {
 	'@testing-library/react': '@octanejs/testing-library',
 	'react-i18next': '@octanejs/i18next',
 	'@inertiajs/react': '@octanejs/inertia',
+	ink: '@octanejs/ink',
 	'@mdx-js/react': '@octanejs/mdx',
 	'dexie-react-hooks': '@octanejs/dexie',
 	'@livestore/react': '@octanejs/livestore',

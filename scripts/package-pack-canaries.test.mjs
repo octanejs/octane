@@ -8,6 +8,7 @@ import {
 	createPackedTsrxConsumerManifest,
 	findPackedTsrxSourceConsumerPackages,
 	findPackedTsrxSourceConsumerSpecifiers,
+	findPackedTsrxBrowserSourceConsumerPackages,
 	findPackedWorkspaceDependencyClosure,
 	findExternalDependencySpecs,
 	isForbiddenNativeGraphModule,
@@ -292,6 +293,29 @@ describe('packed TSRX source consumers', () => {
 		assert.deepEqual(
 			findPackedWorkspaceDependencyClosure(manifests, ['@octanejs/source', 'octane']),
 			['@octanejs/helper', '@octanejs/optional', '@octanejs/source', 'octane'],
+		);
+	});
+
+	test('excludes Node-only packages and their dependants from the browser source consumer', () => {
+		const manifests = new Map([
+			['@octanejs/browser', {}],
+			['@octanejs/node-only', { octane: { sourceEnvironment: 'node' } }],
+			['@octanejs/node-dependent', { dependencies: { '@octanejs/node-only': '1.0.0' } }],
+			['@octanejs/deferred', {}],
+		]);
+
+		assert.deepEqual(
+			findPackedTsrxBrowserSourceConsumerPackages(
+				manifests,
+				[
+					'@octanejs/browser',
+					'@octanejs/node-only',
+					'@octanejs/node-dependent',
+					'@octanejs/deferred',
+				],
+				new Set(['@octanejs/deferred']),
+			),
+			['@octanejs/browser'],
 		);
 	});
 

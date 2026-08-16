@@ -109,6 +109,11 @@
     "packages": ["@octanejs/three", "@octanejs/drei"]
   },
   {
+    "title": "Terminal UI",
+    "description": "Ink components, Yoga layout, input handling, and interactive ANSI terminal rendering.",
+    "packages": ["@octanejs/ink"]
+  },
+  {
     "title": "Desktop",
     "description": "Tauri v2 and Electron desktop bindings for Octane applications.",
     "packages": ["@octanejs/tauri", "@octanejs/electron"]

@@ -726,6 +726,7 @@ describe('manifest-declared manual hook slots', () => {
 			'gsap',
 			'i18next',
 			'inertia',
+			'ink',
 			'jotai',
 			'lexical',
 			'livestore',

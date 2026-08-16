@@ -1,0 +1,814 @@
+import {EventEmitter} from 'node:events';
+import process from 'node:process';
+import React, {
+	type ReactNode,
+	useState,
+	useRef,
+	useCallback,
+	useMemo,
+	useEffect,
+	useInsertionEffect,
+} from 'react';
+import cliCursor from 'cli-cursor';
+import {type CursorPosition} from '../log-update.js';
+import {createInputParser} from '../input-parser.js';
+import AppContext, {type SuspendTerminal} from './AppContext.js';
+import StdinContext from './StdinContext.js';
+import StdoutContext from './StdoutContext.js';
+import StderrContext from './StderrContext.js';
+import FocusContext from './FocusContext.js';
+import AnimationContext from './AnimationContext.js';
+import CursorContext from './CursorContext.js';
+import ErrorBoundary from './ErrorBoundary.js';
+
+const tab = '\t';
+const shiftTab = '\u001B[Z';
+const escape = '\u001B';
+
+type AnimationSubscriber = {
+	readonly callback: (currentTime: number) => void;
+	readonly interval: number;
+	readonly startTime: number;
+	nextDueTime: number;
+};
+
+type Props = {
+	readonly children: ReactNode;
+	readonly stdin: NodeJS.ReadStream;
+	readonly stdout: NodeJS.WriteStream;
+	readonly stderr: NodeJS.WriteStream;
+	readonly writeToStdout: (data: string) => void;
+	readonly writeToStderr: (data: string) => void;
+	readonly exitOnCtrlC: boolean;
+	readonly onExit: (errorOrResult?: unknown) => void;
+	readonly onWaitUntilRenderFlush: () => Promise<void>;
+	readonly onSuspendTerminal: SuspendTerminal;
+	readonly onRegisterInputControl: (
+		pauseInput: () => void,
+		resumeInput: () => void,
+	) => void;
+	readonly setCursorPosition: (position: CursorPosition | undefined) => void;
+	readonly interactive: boolean;
+	readonly renderThrottleMs: number;
+};
+
+type Focusable = {
+	readonly id: string;
+	readonly isActive: boolean;
+};
+
+// Root component for all Ink apps
+// It renders stdin and stdout contexts, so that children can access them if needed
+// It also handles Ctrl+C exiting and cursor visibility
+function App({
+	children,
+	stdin,
+	stdout,
+	stderr,
+	writeToStdout,
+	writeToStderr,
+	exitOnCtrlC,
+	onExit,
+	onWaitUntilRenderFlush,
+	onSuspendTerminal,
+	onRegisterInputControl,
+	setCursorPosition,
+	interactive,
+	renderThrottleMs,
+}: Props): React.ReactNode {
+	const [isFocusEnabled, setIsFocusEnabled] = useState(true);
+	const [activeFocusId, setActiveFocusId] = useState<string | undefined>(
+		undefined,
+	);
+	// Focusables array is managed internally via setFocusables callback pattern
+	// eslint-disable-next-line react/hook-use-state
+	const [, setFocusables] = useState<Focusable[]>([]);
+	// Track focusables count for tab navigation check (avoids stale closure)
+	const focusablesCountRef = useRef(0);
+	const animationSubscribersRef = useRef(
+		new Map<(currentTime: number) => void, AnimationSubscriber>(),
+	);
+	const animationTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
+	// Count how many components enabled raw mode to avoid disabling
+	// raw mode until all components don't need it anymore
+	const rawModeEnabledCount = useRef(0);
+	const pendingDisableRawModeRef = useRef(false);
+	// Count how many components enabled bracketed paste mode
+	const bracketedPasteModeEnabledCount = useRef(0);
+	// eslint-disable-next-line @typescript-eslint/naming-convention
+	const internal_eventEmitter = useRef(new EventEmitter());
+	// Each useInput hook adds a listener, so the count can legitimately exceed the default limit of 10.
+	internal_eventEmitter.current.setMaxListeners(Infinity);
+	// Store the currently attached readable listener to avoid stale closure issues
+	const readableListenerRef = useRef<(() => void) | undefined>(undefined);
+	const inputParserRef = useRef(createInputParser());
+	const pendingInputFlushRef = useRef<NodeJS.Timeout | undefined>(undefined);
+	// Small delay to let chunked escape sequences complete before flushing as literal input.
+	const pendingInputFlushDelayMilliseconds = 20;
+
+	const clearPendingInputFlush = useCallback((): void => {
+		if (!pendingInputFlushRef.current) {
+			return;
+		}
+
+		clearTimeout(pendingInputFlushRef.current);
+		pendingInputFlushRef.current = undefined;
+	}, []);
+
+	const clearAnimationTimer = useCallback((): void => {
+		if (!animationTimerRef.current) {
+			return;
+		}
+
+		clearTimeout(animationTimerRef.current);
+		animationTimerRef.current = undefined;
+	}, []);
+
+	const scheduleAnimationTick = useCallback((): void => {
+		clearAnimationTimer();
+
+		if (animationSubscribersRef.current.size === 0) {
+			return;
+		}
+
+		let nextDueTime = Number.POSITIVE_INFINITY;
+
+		for (const subscriber of animationSubscribersRef.current.values()) {
+			// One shared timer is enough as long as it wakes at the earliest
+			// subscriber deadline and lets slower animations skip that tick.
+			nextDueTime = Math.min(nextDueTime, subscriber.nextDueTime);
+		}
+
+		const delay = Math.max(0, nextDueTime - performance.now());
+		animationTimerRef.current = setTimeout(() => {
+			animationTimerRef.current = undefined;
+			const currentTime = performance.now();
+
+			for (const subscriber of animationSubscribersRef.current.values()) {
+				if (currentTime < subscriber.nextDueTime) {
+					continue;
+				}
+
+				subscriber.callback(currentTime);
+				const elapsedTime = currentTime - subscriber.startTime;
+				const elapsedFrames = Math.floor(elapsedTime / subscriber.interval) + 1;
+				// Advance from elapsed time rather than callback count so delayed
+				// ticks catch up instead of stretching the animation timeline.
+				subscriber.nextDueTime =
+					subscriber.startTime + elapsedFrames * subscriber.interval;
+			}
+
+			scheduleAnimationTick();
+		}, delay);
+		// Keep the timer ref'd while animations are active so `useAnimation()`
+		// can drive process lifetime in both interactive and non-interactive apps.
+	}, [clearAnimationTimer]);
+
+	const animationSubscribe = useCallback(
+		(
+			callback: (currentTime: number) => void,
+			interval: number,
+		): {readonly startTime: number; readonly unsubscribe: () => void} => {
+			const startTime = performance.now();
+			// The scheduler owns the start timestamp so hooks can derive frames from
+			// the exact same origin that determines each subscriber's due time.
+			animationSubscribersRef.current.set(callback, {
+				callback,
+				interval,
+				startTime,
+				nextDueTime: startTime + interval,
+			});
+			scheduleAnimationTick();
+
+			return {
+				startTime,
+				unsubscribe() {
+					animationSubscribersRef.current.delete(callback);
+
+					if (animationSubscribersRef.current.size === 0) {
+						clearAnimationTimer();
+						return;
+					}
+
+					scheduleAnimationTick();
+				},
+			};
+		},
+		[clearAnimationTimer, scheduleAnimationTick],
+	);
+
+	useEffect(() => {
+		return () => {
+			clearAnimationTimer();
+		};
+	}, [clearAnimationTimer]);
+
+	// Determines if TTY is supported on the provided stdin
+	const isRawModeSupported = stdin.isTTY;
+
+	const detachReadableListener = useCallback((): void => {
+		if (!readableListenerRef.current) {
+			return;
+		}
+
+		stdin.removeListener('readable', readableListenerRef.current);
+		readableListenerRef.current = undefined;
+	}, [stdin]);
+
+	const clearInputState = useCallback((): void => {
+		inputParserRef.current.reset();
+		clearPendingInputFlush();
+		detachReadableListener();
+	}, [clearPendingInputFlush, detachReadableListener]);
+
+	const disableRawMode = useCallback((): void => {
+		pendingDisableRawModeRef.current = false;
+		stdin.setRawMode(false);
+		stdin.unref();
+		rawModeEnabledCount.current = 0;
+		clearInputState();
+	}, [stdin, clearInputState]);
+
+	const handleExit = useCallback(
+		(errorOrResult?: unknown): void => {
+			if (
+				isRawModeSupported &&
+				(rawModeEnabledCount.current > 0 || pendingDisableRawModeRef.current)
+			) {
+				disableRawMode();
+			}
+
+			onExit(errorOrResult);
+		},
+		[isRawModeSupported, disableRawMode, onExit],
+	);
+
+	const handleInput = useCallback(
+		(input: string): void => {
+			// Exit on Ctrl+C
+			// eslint-disable-next-line unicorn/no-hex-escape
+			if (input === '\x03' && exitOnCtrlC) {
+				handleExit();
+				return;
+			}
+
+			// Reset focus when there's an active focused component on Esc
+			if (input === escape && isFocusEnabled) {
+				setActiveFocusId(undefined);
+			}
+		},
+		[exitOnCtrlC, handleExit, isFocusEnabled],
+	);
+
+	const emitInput = useCallback(
+		(input: string): void => {
+			handleInput(input);
+			internal_eventEmitter.current.emit('input', input);
+		},
+		[handleInput],
+	);
+
+	const schedulePendingInputFlush = useCallback((): void => {
+		clearPendingInputFlush();
+		pendingInputFlushRef.current = setTimeout(() => {
+			pendingInputFlushRef.current = undefined;
+			const pendingEscape = inputParserRef.current.flushPendingEscape();
+			if (!pendingEscape) {
+				return;
+			}
+
+			emitInput(pendingEscape);
+		}, pendingInputFlushDelayMilliseconds);
+	}, [clearPendingInputFlush, emitInput]);
+
+	const handleReadable = useCallback((): void => {
+		clearPendingInputFlush();
+		let chunk;
+		// eslint-disable-next-line @typescript-eslint/no-restricted-types
+		while ((chunk = stdin.read() as string | null) !== null) {
+			const inputEvents = inputParserRef.current.push(chunk);
+			for (const event of inputEvents) {
+				if (typeof event === 'string') {
+					emitInput(event);
+				} else {
+					// Keep paste on a separate channel from `useInput` so key handlers
+					// don't need to branch on mixed key-vs-paste event shapes.
+					if (internal_eventEmitter.current.listenerCount('paste') === 0) {
+						emitInput(event.paste);
+						continue;
+					}
+
+					internal_eventEmitter.current.emit('paste', event.paste);
+				}
+			}
+		}
+
+		if (inputParserRef.current.hasPendingEscape()) {
+			schedulePendingInputFlush();
+		}
+	}, [stdin, emitInput, clearPendingInputFlush, schedulePendingInputFlush]);
+
+	const attachReadableListener = useCallback((): void => {
+		if (readableListenerRef.current) {
+			return;
+		}
+
+		// Store the listener reference to avoid stale closure when removing
+		readableListenerRef.current = handleReadable;
+		stdin.addListener('readable', handleReadable);
+	}, [stdin, handleReadable]);
+
+	const handleSetRawMode = useCallback(
+		(isEnabled: boolean): void => {
+			if (!isRawModeSupported) {
+				if (stdin === process.stdin) {
+					throw new Error(
+						'Raw mode is not supported on the current process.stdin, which Ink uses as input stream by default.\nRead about how to prevent this error on https://github.com/vadimdemedes/ink/#israwmodesupported',
+					);
+				} else {
+					throw new Error(
+						'Raw mode is not supported on the stdin provided to Ink.\nRead about how to prevent this error on https://github.com/vadimdemedes/ink/#israwmodesupported',
+					);
+				}
+			}
+
+			stdin.setEncoding('utf8');
+
+			if (isEnabled) {
+				if (rawModeEnabledCount.current === 0) {
+					// A same-render component swap may have detached input handling while
+					// leaving terminal raw mode enabled until the queued disable runs.
+					const isRawModeAlreadyEnabled = pendingDisableRawModeRef.current;
+					pendingDisableRawModeRef.current = false;
+
+					if (!isRawModeAlreadyEnabled) {
+						stdin.ref();
+						stdin.setRawMode(true);
+					}
+
+					attachReadableListener();
+				}
+
+				rawModeEnabledCount.current++;
+				return;
+			}
+
+			if (rawModeEnabledCount.current === 0) {
+				return;
+			}
+
+			if (--rawModeEnabledCount.current === 0) {
+				// Stop owning input immediately so pending parser state cannot leak into
+				// a replacement `useInput` component mounted in the same React update.
+				clearInputState();
+
+				// Defer only the terminal raw-mode teardown so a same-render replacement
+				// can keep the process ref and raw mode active without a disable/enable cycle.
+				pendingDisableRawModeRef.current = true;
+				queueMicrotask(() => {
+					if (!pendingDisableRawModeRef.current) {
+						return;
+					}
+
+					disableRawMode();
+				});
+			}
+		},
+		[
+			isRawModeSupported,
+			stdin,
+			attachReadableListener,
+			clearInputState,
+			disableRawMode,
+		],
+	);
+
+	const handleSetBracketedPasteMode = useCallback(
+		(isEnabled: boolean): void => {
+			if (!stdout.isTTY) {
+				return;
+			}
+
+			if (isEnabled) {
+				if (bracketedPasteModeEnabledCount.current === 0) {
+					stdout.write('\u001B[?2004h');
+				}
+
+				bracketedPasteModeEnabledCount.current++;
+				return;
+			}
+
+			if (bracketedPasteModeEnabledCount.current === 0) {
+				return;
+			}
+
+			if (--bracketedPasteModeEnabledCount.current === 0) {
+				stdout.write('\u001B[?2004l');
+			}
+		},
+		[stdout],
+	);
+
+	// Remembers which input modes were active so resumeInput can reinstate exactly
+	// those after a terminal suspension, without touching the ref counts (the React
+	// components still "own" raw mode/bracketed paste across the suspension).
+	const suspendedInputStateRef = useRef({
+		rawMode: false,
+		bracketedPaste: false,
+	});
+
+	const pauseInput = useCallback((): void => {
+		const wasRawMode = isRawModeSupported && rawModeEnabledCount.current > 0;
+		const wasBracketedPaste = bracketedPasteModeEnabledCount.current > 0;
+		suspendedInputStateRef.current = {
+			rawMode: wasRawMode,
+			bracketedPaste: wasBracketedPaste,
+		};
+
+		if (wasBracketedPaste && stdout.isTTY) {
+			try {
+				stdout.write('\u001B[?2004l');
+			} catch {}
+		}
+
+		if (wasRawMode) {
+			stdin.setRawMode(false);
+			stdin.unref();
+			clearInputState();
+		}
+	}, [isRawModeSupported, stdin, stdout, clearInputState]);
+
+	const resumeInput = useCallback((): void => {
+		const {rawMode, bracketedPaste} = suspendedInputStateRef.current;
+
+		if (rawMode) {
+			stdin.setEncoding('utf8');
+			stdin.ref();
+			stdin.setRawMode(true);
+			attachReadableListener();
+		}
+
+		if (bracketedPaste && stdout.isTTY) {
+			try {
+				stdout.write('\u001B[?2004h');
+			} catch {}
+		}
+	}, [stdin, stdout, attachReadableListener]);
+
+	// Register input pause/resume in an insertion effect: it runs before every
+	// passive effect (parent and child), so a child that calls suspendTerminal()
+	// from its own effect always finds the input control already registered. A
+	// normal effect would run too late (child effects fire before the parent's).
+	useInsertionEffect(() => {
+		onRegisterInputControl(pauseInput, resumeInput);
+	}, [onRegisterInputControl, pauseInput, resumeInput]);
+
+	// Focus navigation helpers
+	const findNextFocusable = useCallback(
+		(
+			currentFocusables: Focusable[],
+			currentActiveFocusId: string | undefined,
+		): string | undefined => {
+			const activeIndex = currentFocusables.findIndex(focusable => {
+				return focusable.id === currentActiveFocusId;
+			});
+
+			for (
+				let index = activeIndex + 1;
+				index < currentFocusables.length;
+				index++
+			) {
+				const focusable = currentFocusables[index];
+
+				if (focusable?.isActive) {
+					return focusable.id;
+				}
+			}
+
+			return undefined;
+		},
+		[],
+	);
+
+	const findPreviousFocusable = useCallback(
+		(
+			currentFocusables: Focusable[],
+			currentActiveFocusId: string | undefined,
+		): string | undefined => {
+			const activeIndex = currentFocusables.findIndex(focusable => {
+				return focusable.id === currentActiveFocusId;
+			});
+
+			for (let index = activeIndex - 1; index >= 0; index--) {
+				const focusable = currentFocusables[index];
+
+				if (focusable?.isActive) {
+					return focusable.id;
+				}
+			}
+
+			return undefined;
+		},
+		[],
+	);
+
+	const focusNext = useCallback((): void => {
+		setFocusables(currentFocusables => {
+			setActiveFocusId(currentActiveFocusId => {
+				const firstFocusableId = currentFocusables.find(
+					focusable => focusable.isActive,
+				)?.id;
+				const nextFocusableId = findNextFocusable(
+					currentFocusables,
+					currentActiveFocusId,
+				);
+
+				return nextFocusableId ?? firstFocusableId;
+			});
+			return currentFocusables;
+		});
+	}, [findNextFocusable]);
+
+	const focusPrevious = useCallback((): void => {
+		setFocusables(currentFocusables => {
+			setActiveFocusId(currentActiveFocusId => {
+				const lastFocusableId = currentFocusables.findLast(
+					focusable => focusable.isActive,
+				)?.id;
+				const previousFocusableId = findPreviousFocusable(
+					currentFocusables,
+					currentActiveFocusId,
+				);
+
+				return previousFocusableId ?? lastFocusableId;
+			});
+			return currentFocusables;
+		});
+	}, [findPreviousFocusable]);
+
+	// Handle tab navigation via effect that subscribes to input events
+	useEffect(() => {
+		const handleTabNavigation = (input: string): void => {
+			if (!isFocusEnabled || focusablesCountRef.current === 0) return;
+
+			if (input === tab) {
+				focusNext();
+			}
+
+			if (input === shiftTab) {
+				focusPrevious();
+			}
+		};
+
+		internal_eventEmitter.current.on('input', handleTabNavigation);
+		const emitter = internal_eventEmitter.current;
+
+		return () => {
+			emitter.off('input', handleTabNavigation);
+		};
+	}, [isFocusEnabled, focusNext, focusPrevious]);
+
+	const enableFocus = useCallback((): void => {
+		setIsFocusEnabled(true);
+	}, []);
+
+	const disableFocus = useCallback((): void => {
+		setIsFocusEnabled(false);
+	}, []);
+
+	const focus = useCallback((id: string): void => {
+		setFocusables(currentFocusables => {
+			const hasFocusableId = currentFocusables.some(
+				focusable => focusable?.id === id,
+			);
+
+			if (hasFocusableId) {
+				setActiveFocusId(id);
+			}
+
+			return currentFocusables;
+		});
+	}, []);
+
+	const addFocusable = useCallback(
+		(id: string, {autoFocus}: {autoFocus: boolean}): void => {
+			setFocusables(currentFocusables => {
+				focusablesCountRef.current = currentFocusables.length + 1;
+
+				return [
+					...currentFocusables,
+					{
+						id,
+						isActive: true,
+					},
+				];
+			});
+
+			if (autoFocus) {
+				setActiveFocusId(currentActiveFocusId => {
+					if (!currentActiveFocusId) {
+						return id;
+					}
+
+					return currentActiveFocusId;
+				});
+			}
+		},
+		[],
+	);
+
+	const removeFocusable = useCallback((id: string): void => {
+		setActiveFocusId(currentActiveFocusId => {
+			if (currentActiveFocusId === id) {
+				return undefined;
+			}
+
+			return currentActiveFocusId;
+		});
+
+		setFocusables(currentFocusables => {
+			const filtered = currentFocusables.filter(focusable => {
+				return focusable.id !== id;
+			});
+			focusablesCountRef.current = filtered.length;
+
+			return filtered;
+		});
+	}, []);
+
+	const activateFocusable = useCallback((id: string): void => {
+		setFocusables(currentFocusables =>
+			currentFocusables.map(focusable => {
+				if (focusable.id !== id) {
+					return focusable;
+				}
+
+				return {
+					id,
+					isActive: true,
+				};
+			}),
+		);
+	}, []);
+
+	const deactivateFocusable = useCallback((id: string): void => {
+		setActiveFocusId(currentActiveFocusId => {
+			if (currentActiveFocusId === id) {
+				return undefined;
+			}
+
+			return currentActiveFocusId;
+		});
+
+		setFocusables(currentFocusables =>
+			currentFocusables.map(focusable => {
+				if (focusable.id !== id) {
+					return focusable;
+				}
+
+				return {
+					id,
+					isActive: false,
+				};
+			}),
+		);
+	}, []);
+
+	// Handle cursor visibility, raw mode, and bracketed paste mode cleanup on unmount
+	useEffect(() => {
+		return () => {
+			const canWriteToStdout = !stdout.destroyed && !stdout.writableEnded;
+
+			if (interactive && canWriteToStdout) {
+				cliCursor.show(stdout);
+			}
+
+			if (
+				isRawModeSupported &&
+				(rawModeEnabledCount.current > 0 || pendingDisableRawModeRef.current)
+			) {
+				disableRawMode();
+			}
+
+			if (bracketedPasteModeEnabledCount.current > 0) {
+				if (stdout.isTTY && canWriteToStdout) {
+					stdout.write('\u001B[?2004l');
+				}
+
+				bracketedPasteModeEnabledCount.current = 0;
+			}
+		};
+	}, [stdout, isRawModeSupported, disableRawMode, interactive]);
+
+	// Memoize context values to prevent unnecessary re-renders
+	const appContextValue = useMemo(
+		() => ({
+			exit: handleExit,
+			waitUntilRenderFlush: onWaitUntilRenderFlush,
+			suspendTerminal: onSuspendTerminal,
+		}),
+		[handleExit, onWaitUntilRenderFlush, onSuspendTerminal],
+	);
+
+	const stdinContextValue = useMemo(
+		() => ({
+			stdin,
+			setRawMode: handleSetRawMode,
+			setBracketedPasteMode: handleSetBracketedPasteMode,
+			isRawModeSupported,
+			// eslint-disable-next-line @typescript-eslint/naming-convention
+			internal_exitOnCtrlC: exitOnCtrlC,
+			// eslint-disable-next-line @typescript-eslint/naming-convention
+			internal_eventEmitter: internal_eventEmitter.current,
+		}),
+		[
+			stdin,
+			handleSetRawMode,
+			handleSetBracketedPasteMode,
+			isRawModeSupported,
+			exitOnCtrlC,
+		],
+	);
+
+	const stdoutContextValue = useMemo(
+		() => ({
+			stdout,
+			write: writeToStdout,
+		}),
+		[stdout, writeToStdout],
+	);
+
+	const stderrContextValue = useMemo(
+		() => ({
+			stderr,
+			write: writeToStderr,
+		}),
+		[stderr, writeToStderr],
+	);
+
+	const cursorContextValue = useMemo(
+		() => ({
+			setCursorPosition,
+		}),
+		[setCursorPosition],
+	);
+
+	const focusContextValue = useMemo(
+		() => ({
+			activeId: activeFocusId,
+			add: addFocusable,
+			remove: removeFocusable,
+			activate: activateFocusable,
+			deactivate: deactivateFocusable,
+			enableFocus,
+			disableFocus,
+			focusNext,
+			focusPrevious,
+			focus,
+		}),
+		[
+			activeFocusId,
+			addFocusable,
+			removeFocusable,
+			activateFocusable,
+			deactivateFocusable,
+			enableFocus,
+			disableFocus,
+			focusNext,
+			focusPrevious,
+			focus,
+		],
+	);
+
+	const animationContextValue = useMemo(
+		() => ({
+			renderThrottleMs,
+			subscribe: animationSubscribe,
+		}),
+		[animationSubscribe, renderThrottleMs],
+	);
+
+	return (
+		<AppContext.Provider value={appContextValue}>
+			<StdinContext.Provider value={stdinContextValue}>
+				<StdoutContext.Provider value={stdoutContextValue}>
+					<StderrContext.Provider value={stderrContextValue}>
+						<FocusContext.Provider value={focusContextValue}>
+							<AnimationContext.Provider value={animationContextValue}>
+								<CursorContext.Provider value={cursorContextValue}>
+									<ErrorBoundary onError={handleExit}>{children}</ErrorBoundary>
+								</CursorContext.Provider>
+							</AnimationContext.Provider>
+						</FocusContext.Provider>
+					</StderrContext.Provider>
+				</StdoutContext.Provider>
+			</StdinContext.Provider>
+		</AppContext.Provider>
+	);
+}
+
+App.displayName = 'InternalApp';
+
+export default App;

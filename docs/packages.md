@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**95 publishable package(s), including 81 framework binding(s) and 3 framework integration(s).**
+**96 publishable package(s), including 82 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -39,6 +39,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/hook-form` | [`packages/hook-form`](../packages/hook-form) | framework binding | `0.1.35` | 1 |
 | `@octanejs/i18next` | [`packages/i18next`](../packages/i18next) | framework binding | `0.1.33` | 3 |
 | `@octanejs/inertia` | [`packages/inertia`](../packages/inertia) | framework binding | `0.0.7` | 3 |
+| `@octanejs/ink` | [`packages/ink`](../packages/ink) | framework binding | `0.0.1` | 5 |
 | `@octanejs/input-otp` | [`packages/input-otp`](../packages/input-otp) | framework binding | `0.0.4` | 1 |
 | `@octanejs/intersection-observer` | [`packages/intersection-observer`](../packages/intersection-observer) | framework binding | `0.0.4` | 2 |
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.35` | 7 |

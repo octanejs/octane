@@ -1,0 +1,20 @@
+{
+  "upstream": {
+    "package": "ink",
+    "version": "7.1.1"
+  },
+  "surface": "Complete against Ink 7.1.1's published exports: terminal render roots, Yoga-backed Box and Text primitives, Static/Transform/Newline/Spacer, application and stream hooks, input/paste/focus/cursor/animation/window-size/metrics hooks, measurement helpers, DOM element types, and Kitty keyboard protocol helpers.",
+  "divergences": [
+    "Octane programmatic roots accept a component and props separately instead of a pre-created React element.",
+    "The concurrent render option remains accepted for source compatibility, but scheduling is owned by Octane rather than React Concurrent Mode.",
+    "Components are authored as .ink.tsrx and require @octanejs/ink's renderer configuration and JSX intrinsics."
+  ],
+  "ssr": "Ink is a native terminal renderer. renderToString uses the same Octane universal host driver and Yoga/ANSI renderer without a terminal session.",
+  "verified": "2026-08-10",
+  "provenance": {
+    "source": "https://github.com/vadimdemedes/ink",
+    "license": "MIT",
+    "commit": "70af033dbd2b126a16f144164685612b2c1fd554",
+    "verification": "recorded-unverified"
+  }
+}

@@ -225,6 +225,7 @@ Bindings — reach for these when asked about the React equivalent:
 - **Forms and content** — `@octanejs/hook-form`, `@octanejs/input-otp`, `@octanejs/dropzone`, `@octanejs/tanstack-form`, `@octanejs/lexical`, `@octanejs/tiptap`, `@octanejs/markdown`, `@octanejs/streamdown`, `@octanejs/pdf`, `@octanejs/monaco-editor`, `@octanejs/syntax-highlighter`, `@octanejs/mdx`, and `@octanejs/i18next`.
 - **Data-heavy screens** — `@octanejs/tanstack-table`, `@octanejs/tanstack-virtual`, `@octanejs/window`, `@octanejs/recharts`, `@octanejs/visx`, and `@octanejs/react-map-gl`.
 - **Web 3D** — `@octanejs/three` and `@octanejs/drei`.
+- **Terminal UI** — `@octanejs/ink`.
 - **Desktop** — `@octanejs/tauri` and `@octanejs/electron`.
 - **Styling, tests, and devtools** — `@octanejs/stylex`, `@octanejs/styled-components`, `@octanejs/testing-library`, `@octanejs/tanstack-devtools`, and `@octanejs/devtools`.
 

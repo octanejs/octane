@@ -1,0 +1,77 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/vadimdemedes/ink.git",
+    "version": "7.1.1",
+    "commit": "70af033dbd2b126a16f144164685612b2c1fd554",
+    "sourceRoot": "src",
+    "testRoot": "test",
+    "license": "MIT",
+    "integrity": "sha256:593eaa38fabc7cba587566b524adfbe3c89c2901850c9524768258a2d76bda62",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/ink/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/ink/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "b54691d66f34dd344cf94f6c5074519198a934ee46d3817762fc23b8d813076f"
+    }
+  },
+  "lanes": [
+    {
+      "id": "ink-framework-neutral-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "ink-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs identical terminal parser, keypress, ANSI sanitization, and width-measurement inputs through the Octane port and the vendored Ink 7.1.1 source.",
+      "files": [
+        {
+          "path": "packages/ink/tests/differential/core.test.ts",
+          "role": "test",
+          "sha256": "4de846720cc86535756407509f7910312896bc283b90ac61df3e135cb15b7987",
+          "cases": [
+            {
+              "id": "differential:ink-framework-neutral-primitives",
+              "testName": "framework-neutral terminal primitives remain byte-identical",
+              "fullName": "differential: @octanejs/ink vs pinned Ink 7.1.1 framework-neutral terminal primitives remain byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "16e1bd172c45c3bb1fbb17e1dd53b7fd9ff0cd2e6827a4e2902b782fc79c7b83"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}
