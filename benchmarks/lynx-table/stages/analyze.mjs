@@ -8,11 +8,9 @@ export function requireMinimumRepetitions(value) {
 	return repetitions;
 }
 
-export function interleavedABSchedule(repetitions) {
+export function interleavedABSchedule(repetitions, a = 'control', b = 'profile') {
 	const count = requireMinimumRepetitions(repetitions);
-	return Array.from({ length: count }, (_, index) =>
-		index % 2 === 0 ? ['control', 'profile'] : ['profile', 'control'],
-	);
+	return Array.from({ length: count }, (_, index) => (index % 2 === 0 ? [a, b] : [b, a]));
 }
 
 function finite(value, label) {
@@ -34,16 +32,35 @@ function residual(total, stages, label) {
 
 export function analyzeFcpSample({ wallMs, main }) {
 	const totalMs = finite(wallMs, 'FCP wallMs');
+	const renderMs = observed(main?.firstScreenRenderMs, 'firstScreenRenderMs');
+	const planMs = observed(main?.firstScreenPlanMs, 'firstScreenPlanMs');
+	const commandStageMs = observed(main?.firstScreenCommandStageMs, 'firstScreenCommandStageMs');
+	if (planMs + commandStageMs > renderMs + 0.5) {
+		throw new Error(
+			'FCP plan interpretation and command staging exceed their enclosing first-screen render.',
+		);
+	}
+	const applyMs = observed(main?.firstScreenApplyMs, 'firstScreenApplyMs');
+	const papiCreateMs = observed(main?.firstScreenPapiCreateMs, 'firstScreenPapiCreateMs');
+	if (papiCreateMs > applyMs + 0.5) {
+		throw new Error('FCP PAPI element creation exceeds the enclosing first-screen apply.');
+	}
 	const stages = {
 		mt_slice_eval: observed(main?.mtSliceEvalMs, 'mtSliceEvalMs'),
-		plan_interpretation: observed(main?.firstScreenPlanMs, 'firstScreenPlanMs'),
-		papi_element_creation: observed(main?.papiCreateMs, 'papiCreateMs'),
+		plan_interpretation: planMs,
+		first_screen_render_other: Math.max(0, renderMs - planMs - commandStageMs),
+		first_screen_command_staging: commandStageMs,
+		first_screen_host_container: observed(main?.firstScreenContainerMs, 'firstScreenContainerMs'),
+		first_screen_host_prepare: observed(main?.firstScreenPrepareMs, 'firstScreenPrepareMs'),
+		papi_element_creation: papiCreateMs,
+		first_screen_host_apply_other: Math.max(0, applyMs - papiCreateMs),
+		first_screen_capture: observed(main?.firstScreenCaptureMs, 'firstScreenCaptureMs'),
 	};
 	return {
 		totalMs,
 		stages: {
 			...stages,
-			layout_flush_residual: residual(totalMs, stages, 'FCP'),
+			publication_layout_predicate_residual: residual(totalMs, stages, 'FCP'),
 		},
 	};
 }

@@ -43,14 +43,15 @@ const PREVIEW_RECEIVER_NAME = 'main__preview_receiver';
 const BUNDLE_NAME = 'main.lynx.bundle';
 const FORBIDDEN_RUNTIME = /(?:^|[^$\w])(?:react|react-dom|preact|ReactLynx)(?:[^$\w]|$)/i;
 const FORBIDDEN_DOM = /\b(?:document|window|HTMLElement|MutationObserver)\b/;
-// Recalibrated on upstream main ffadd397, which contains merged #706 and #707.
-// These exact deterministic caps keep the accepted worklet boundary, #706
-// size tax, and subsequent mainline parity work visible together instead of
-// applying any controlled gzip delta additively.
+// Recalibrated on the issue #57 first-screen template candidate over exact base
+// dcf94cfc8. The base already exceeded the ffadd397 caps (preview/IFR main gzip
+// 80,507/85,724); the controlled candidate moved them to 82,070/87,566 while
+// retaining the 1.08 relative gate below. The inventory ledger separates that
+// accepted size tax from pre-existing mainline drift.
 const NO_WORKLET_BUDGET = Object.freeze({
-	previewMainGzip: 77_286,
-	ifrMainGzip: 82_274,
-	backgroundRaw: 272_504,
+	previewMainGzip: 82_070,
+	ifrMainGzip: 87_566,
+	backgroundRaw: 276_922,
 });
 
 function packageEntry(packageName) {

@@ -1,0 +1,582 @@
+{
+  "meta": {
+    "date": "2026-08-16T05:01:12.471Z",
+    "node": "v22.22.2",
+    "cpus": 32,
+    "cpuModel": "Intel(R) Xeon(R) Platinum 8336C CPU @ 2.30GHz",
+    "platform": "linux",
+    "release": "5.15.120.bsk.3-amd64",
+    "chromium": "149.0.7827.55",
+    "repetitions": 7,
+    "rows": 10000,
+    "reportable": true,
+    "loadStart": [0.83, 0.66, 0.75],
+    "loadEnd": [1.07, 0.77, 0.79],
+    "protocol": "fresh page per sample; control/profile order alternates AB/BA; no retained first-screen batch or post-FCP command scan in the timing build"
+  },
+  "fcp": {
+    "attribution": {
+      "total": {
+        "median": 1458.5,
+        "min": 1383.39990234375,
+        "max": 1511.30029296875,
+        "spread": 127.900390625,
+        "n": 7
+      },
+      "stages": {
+        "mt_slice_eval": {
+          "median": 22.099853515625,
+          "min": 19.699951171875,
+          "max": 22.39990234375,
+          "spread": 2.699951171875,
+          "n": 7,
+          "share": 0.015152453558878985
+        },
+        "plan_interpretation": {
+          "median": 135.59999990463257,
+          "min": 126.70000004768372,
+          "max": 137.5,
+          "spread": 10.799999952316284,
+          "n": 7,
+          "share": 0.0929722316795561
+        },
+        "first_screen_render_other": {
+          "median": 7.299999952316284,
+          "min": 6.3999998569488525,
+          "max": 8.100000143051147,
+          "spread": 1.700000286102295,
+          "n": 7,
+          "share": 0.005005142236761251
+        },
+        "first_screen_command_staging": {
+          "median": 13.400000095367432,
+          "min": 11.200000047683716,
+          "max": 17.200000047683716,
+          "spread": 6,
+          "n": 7,
+          "share": 0.009187521491510066
+        },
+        "first_screen_host_container": {
+          "median": 0.09999990463256836,
+          "min": 0.09999990463256836,
+          "max": 0.20000004768371582,
+          "spread": 0.10000014305114746,
+          "n": 7,
+          "share": 0.00006856352734492175
+        },
+        "first_screen_host_prepare": {
+          "median": 143.70000004768372,
+          "min": 133.5,
+          "max": 152.20000004768372,
+          "spread": 18.700000047683716,
+          "n": 7,
+          "share": 0.0985258827889501
+        },
+        "papi_element_creation": {
+          "median": 532.5999953746796,
+          "min": 502.69999837875366,
+          "max": 547.0000002384186,
+          "spread": 44.30000185966492,
+          "n": 7,
+          "share": 0.3651696917207265
+        },
+        "first_screen_host_apply_other": {
+          "median": 429.500004529953,
+          "min": 420.9999978542328,
+          "max": 487.900004863739,
+          "spread": 66.90000700950623,
+          "n": 7,
+          "share": 0.29448063389095164
+        },
+        "first_screen_capture": {
+          "median": 90.20000004768372,
+          "min": 82.5,
+          "max": 99.90000009536743,
+          "spread": 17.40000009536743,
+          "n": 7,
+          "share": 0.06184436067719144
+        },
+        "publication_layout_predicate_residual": {
+          "median": 78.7001953125,
+          "min": 72.79995131492615,
+          "max": 81.90019512176514,
+          "spread": 9.10024380683899,
+          "n": 7,
+          "share": 0.053959681393555024
+        }
+      },
+      "ratios": {}
+    },
+    "rawControl": {
+      "median": 1407.7000000476837,
+      "min": 1366.2999999523163,
+      "max": 1458.3999998569489,
+      "spread": 92.09999990463257,
+      "n": 7
+    },
+    "rawProfile": {
+      "median": 1484.7999999523163,
+      "min": 1409.1000001430511,
+      "max": 1534.9000000953674,
+      "spread": 125.79999995231628,
+      "n": 7
+    }
+  },
+  "verdicts": [
+    {
+      "step": "first-screen generic command staging + host prepare owner gate",
+      "verdict": "GO",
+      "reason": "directly timed exclusive share is 10.8%; Phase B requires at least 10.0%."
+    }
+  ],
+  "samples": {
+    "fcp": {
+      "control": [
+        {
+          "rawMs": 1398.7000000476837
+        },
+        {
+          "rawMs": 1420.6000001430511
+        },
+        {
+          "rawMs": 1441.2000000476837
+        },
+        {
+          "rawMs": 1407.7000000476837
+        },
+        {
+          "rawMs": 1458.3999998569489
+        },
+        {
+          "rawMs": 1366.2999999523163
+        },
+        {
+          "rawMs": 1372.7000000476837
+        }
+      ],
+      "profile": [
+        {
+          "rawMs": 1515.2000000476837,
+          "attribution": {
+            "totalMs": 1488.2001953125,
+            "stages": {
+              "mt_slice_eval": 21.699951171875,
+              "plan_interpretation": 137.5,
+              "first_screen_render_other": 8.100000143051147,
+              "first_screen_command_staging": 13.5,
+              "first_screen_host_container": 0.09999990463256836,
+              "first_screen_host_prepare": 152.20000004768372,
+              "papi_element_creation": 547.0000002384186,
+              "first_screen_host_apply_other": 445.099999666214,
+              "first_screen_capture": 86.59999990463257,
+              "publication_layout_predicate_residual": 76.40024423599243
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.20000004768371582,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 547.5000002384186,
+              "mtSliceStartEpochMs": 1786856423574.5999,
+              "mtSliceEvalMs": 21.699951171875,
+              "firstScreenPlanMs": 137.5,
+              "firstScreenCommandStageMs": 13.5,
+              "firstScreenRenderMs": 159.10000014305115,
+              "firstScreenCommands": 10094,
+              "firstScreenHosts": 70041,
+              "firstScreenLogicalIds": 90041,
+              "firstScreenContainerMs": 0.09999990463256836,
+              "firstScreenPrepareMs": 152.20000004768372,
+              "firstScreenApplyMs": 992.0999999046326,
+              "firstScreenPapiCreateMs": 547.0000002384186,
+              "firstScreenCaptureMs": 86.59999990463257
+            }
+          }
+        },
+        {
+          "rawMs": 1478.4000000953674,
+          "attribution": {
+            "totalMs": 1448.69970703125,
+            "stages": {
+              "mt_slice_eval": 22.2998046875,
+              "plan_interpretation": 133.5,
+              "first_screen_render_other": 7.299999952316284,
+              "first_screen_command_staging": 13.299999952316284,
+              "first_screen_host_container": 0.10000014305114746,
+              "first_screen_host_prepare": 145.5,
+              "papi_element_creation": 536.3000020980835,
+              "first_screen_host_apply_other": 420.9999978542328,
+              "first_screen_capture": 89.70000004768372,
+              "publication_layout_predicate_residual": 79.69990229606628
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.19999980926513672,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 536.7000021934509,
+              "mtSliceStartEpochMs": 1786856427728.6,
+              "mtSliceEvalMs": 22.2998046875,
+              "firstScreenPlanMs": 133.5,
+              "firstScreenCommandStageMs": 13.299999952316284,
+              "firstScreenRenderMs": 154.09999990463257,
+              "firstScreenCommands": 10094,
+              "firstScreenHosts": 70041,
+              "firstScreenLogicalIds": 90041,
+              "firstScreenContainerMs": 0.10000014305114746,
+              "firstScreenPrepareMs": 145.5,
+              "firstScreenApplyMs": 957.2999999523163,
+              "firstScreenPapiCreateMs": 536.3000020980835,
+              "firstScreenCaptureMs": 89.70000004768372
+            }
+          }
+        },
+        {
+          "rawMs": 1467.3999998569489,
+          "attribution": {
+            "totalMs": 1440.300048828125,
+            "stages": {
+              "mt_slice_eval": 22.099853515625,
+              "plan_interpretation": 137,
+              "first_screen_render_other": 7.200000047683716,
+              "first_screen_command_staging": 12.799999952316284,
+              "first_screen_host_container": 0.09999990463256836,
+              "first_screen_host_prepare": 143.70000004768372,
+              "papi_element_creation": 521.4000108242035,
+              "first_screen_host_apply_other": 427.0999891757965,
+              "first_screen_capture": 90.20000004768372,
+              "publication_layout_predicate_residual": 78.7001953125
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.20000004768371582,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 521.9000108242035,
+              "mtSliceStartEpochMs": 1786856438925.1,
+              "mtSliceEvalMs": 22.099853515625,
+              "firstScreenPlanMs": 137,
+              "firstScreenCommandStageMs": 12.799999952316284,
+              "firstScreenRenderMs": 157,
+              "firstScreenCommands": 10094,
+              "firstScreenHosts": 70041,
+              "firstScreenLogicalIds": 90041,
+              "firstScreenContainerMs": 0.09999990463256836,
+              "firstScreenPrepareMs": 143.70000004768372,
+              "firstScreenApplyMs": 948.5,
+              "firstScreenPapiCreateMs": 521.4000108242035,
+              "firstScreenCaptureMs": 90.20000004768372
+            }
+          }
+        },
+        {
+          "rawMs": 1534.9000000953674,
+          "attribution": {
+            "totalMs": 1511.30029296875,
+            "stages": {
+              "mt_slice_eval": 21.60009765625,
+              "plan_interpretation": 127,
+              "first_screen_render_other": 6.5,
+              "first_screen_command_staging": 11.200000047683716,
+              "first_screen_host_container": 0.09999990463256836,
+              "first_screen_host_prepare": 133.5,
+              "papi_element_creation": 541.6999952793121,
+              "first_screen_host_apply_other": 487.900004863739,
+              "first_screen_capture": 99.90000009536743,
+              "publication_layout_predicate_residual": 81.90019512176514
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 542.0999953746796,
+              "mtSliceStartEpochMs": 1786856442855.2998,
+              "mtSliceEvalMs": 21.60009765625,
+              "firstScreenPlanMs": 127,
+              "firstScreenCommandStageMs": 11.200000047683716,
+              "firstScreenRenderMs": 144.70000004768372,
+              "firstScreenCommands": 10094,
+              "firstScreenHosts": 70041,
+              "firstScreenLogicalIds": 90041,
+              "firstScreenContainerMs": 0.09999990463256836,
+              "firstScreenPrepareMs": 133.5,
+              "firstScreenApplyMs": 1029.6000001430511,
+              "firstScreenPapiCreateMs": 541.6999952793121,
+              "firstScreenCaptureMs": 99.90000009536743
+            }
+          }
+        },
+        {
+          "rawMs": 1484.7999999523163,
+          "attribution": {
+            "totalMs": 1458.5,
+            "stages": {
+              "mt_slice_eval": 22.39990234375,
+              "plan_interpretation": 135.59999990463257,
+              "first_screen_render_other": 7.5,
+              "first_screen_command_staging": 17.200000047683716,
+              "first_screen_host_container": 0.09999990463256836,
+              "first_screen_host_prepare": 142.60000014305115,
+              "papi_element_creation": 532.5999953746796,
+              "first_screen_host_apply_other": 429.500004529953,
+              "first_screen_capture": 90.40000009536743,
+              "publication_layout_predicate_residual": 80.60009765625
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.10000014305114746,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 532.9999952316284,
+              "mtSliceStartEpochMs": 1786856453906,
+              "mtSliceEvalMs": 22.39990234375,
+              "firstScreenPlanMs": 135.59999990463257,
+              "firstScreenCommandStageMs": 17.200000047683716,
+              "firstScreenRenderMs": 160.29999995231628,
+              "firstScreenCommands": 10094,
+              "firstScreenHosts": 70041,
+              "firstScreenLogicalIds": 90041,
+              "firstScreenContainerMs": 0.09999990463256836,
+              "firstScreenPrepareMs": 142.60000014305115,
+              "firstScreenApplyMs": 962.0999999046326,
+              "firstScreenPapiCreateMs": 532.5999953746796,
+              "firstScreenCaptureMs": 90.40000009536743
+            }
+          }
+        },
+        {
+          "rawMs": 1514.1000001430511,
+          "attribution": {
+            "totalMs": 1484.2998046875,
+            "stages": {
+              "mt_slice_eval": 22.39990234375,
+              "plan_interpretation": 137.39999985694885,
+              "first_screen_render_other": 7.799999952316284,
+              "first_screen_command_staging": 13.400000095367432,
+              "first_screen_host_container": 0.20000004768371582,
+              "first_screen_host_prepare": 146.89999985694885,
+              "papi_element_creation": 519.4000036716461,
+              "first_screen_host_apply_other": 468.69999647140503,
+              "first_screen_capture": 93.09999990463257,
+              "publication_layout_predicate_residual": 74.99990248680115
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.09999990463256836,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 519.800003528595,
+              "mtSliceStartEpochMs": 1786856457927.6,
+              "mtSliceEvalMs": 22.39990234375,
+              "firstScreenPlanMs": 137.39999985694885,
+              "firstScreenCommandStageMs": 13.400000095367432,
+              "firstScreenRenderMs": 158.59999990463257,
+              "firstScreenCommands": 10094,
+              "firstScreenHosts": 70041,
+              "firstScreenLogicalIds": 90041,
+              "firstScreenContainerMs": 0.20000004768371582,
+              "firstScreenPrepareMs": 146.89999985694885,
+              "firstScreenApplyMs": 988.1000001430511,
+              "firstScreenPapiCreateMs": 519.4000036716461,
+              "firstScreenCaptureMs": 93.09999990463257
+            }
+          }
+        },
+        {
+          "rawMs": 1409.1000001430511,
+          "attribution": {
+            "totalMs": 1383.39990234375,
+            "stages": {
+              "mt_slice_eval": 19.699951171875,
+              "plan_interpretation": 126.70000004768372,
+              "first_screen_render_other": 6.3999998569488525,
+              "first_screen_command_staging": 14.100000143051147,
+              "first_screen_host_container": 0.09999990463256836,
+              "first_screen_host_prepare": 133.70000004768372,
+              "papi_element_creation": 502.69999837875366,
+              "first_screen_host_apply_other": 424.7000014781952,
+              "first_screen_capture": 82.5,
+              "publication_layout_predicate_residual": 72.79995131492615
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0.10000014305114746,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 0,
+              "pacedCommits": 0,
+              "commands": 0,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "prepareCheckMs": 0,
+              "applyMs": 0,
+              "ackMs": 0,
+              "papiCreateMs": 502.99999833106995,
+              "mtSliceStartEpochMs": 1786856468705.6,
+              "mtSliceEvalMs": 19.699951171875,
+              "firstScreenPlanMs": 126.70000004768372,
+              "firstScreenCommandStageMs": 14.100000143051147,
+              "firstScreenRenderMs": 147.20000004768372,
+              "firstScreenCommands": 10094,
+              "firstScreenHosts": 70041,
+              "firstScreenLogicalIds": 90041,
+              "firstScreenContainerMs": 0.09999990463256836,
+              "firstScreenPrepareMs": 133.70000004768372,
+              "firstScreenApplyMs": 927.3999998569489,
+              "firstScreenPapiCreateMs": 502.69999837875366,
+              "firstScreenCaptureMs": 82.5
+            }
+          }
+        }
+      ]
+    },
+    "create": {
+      "control": [],
+      "profile": [],
+      "vueVdom": []
+    },
+    "replace": {
+      "control": [],
+      "profile": [],
+      "vueVdom": []
+    },
+    "append": {
+      "control": [],
+      "profile": [],
+      "vueVdom": []
+    }
+  }
+}

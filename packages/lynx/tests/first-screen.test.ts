@@ -22,6 +22,7 @@ import {
 	defineUniversalComponent as defineFirstScreenComponent,
 	firstScreenEvent,
 	renderLynxFirstScreen,
+	universalComponent as firstScreenComponent,
 	universalFor as firstScreenFor,
 	universalPlan as firstScreenPlan,
 	universalProps as firstScreenProps,
@@ -45,12 +46,14 @@ interface SceneProps {
 	readonly items: readonly string[];
 	readonly componentItems?: readonly string[];
 	readonly rowPrefix?: string;
-	readonly onRowTap?: (id: string) => void;
+	readonly onRowTap?: (id: string, payload: unknown) => void;
 	readonly onTap: (payload: unknown) => void;
 	readonly onEffect: (owner: 'main' | 'background') => void;
 }
 
 interface EventRegistration {
+	readonly node: object;
+	readonly name: string;
 	readonly listener: string | undefined;
 }
 
@@ -73,6 +76,26 @@ const mainScenePlan = firstScreenPlan('lynx', {
 	children: [{ kind: 'slot', slot: 1 }],
 });
 
+const mainComponentRowPlan = firstScreenPlan('lynx', {
+	kind: 'host',
+	type: 'view',
+	bindings: [['id', 0]],
+	children: [
+		{
+			kind: 'host',
+			type: 'text',
+			bindings: [['bindtap', 2]],
+			children: [{ kind: 'slot', slot: 1 }],
+		},
+	],
+});
+
+const MainComponentRow = defineFirstScreenComponent(
+	'lynx',
+	(props: { readonly id: string; readonly label: string }) =>
+		firstScreenValue(mainComponentRowPlan, [props.id, props.label, firstScreenEvent]),
+);
+
 const MainScene = defineFirstScreenComponent('lynx', (props: SceneProps) => {
 	useFirstScreenLayoutEffect(() => {
 		props.onEffect('main');
@@ -83,7 +106,28 @@ const MainScene = defineFirstScreenComponent('lynx', (props: SceneProps) => {
 				['set', 'id', props.id],
 				['set', 'bindtap', firstScreenEvent],
 			]),
-			null,
+			props.componentItems === undefined
+				? null
+				: firstScreenFor(
+						props.componentItems,
+						(id) => id,
+						(id) =>
+							firstScreenComponent(
+								'lynx',
+								MainComponentRow,
+								firstScreenProps([
+									['set', 'id', id],
+									['set', 'label', `${props.rowPrefix ?? 'label'}:${id}`],
+								]),
+							),
+						null,
+						false,
+						false,
+						undefined,
+						undefined,
+						undefined,
+						true,
+					),
 		]),
 		firstScreenFor(
 			props.items,
@@ -237,8 +281,8 @@ const PostAdoptionRow = defineUniversalComponent(
 	}: {
 		readonly id: string;
 		readonly label: string;
-		readonly onTap: (id: string) => void;
-	}) => universalValue(postAdoptionRowPlan, [id, label, () => onTap(id)]),
+		readonly onTap: (id: string, payload: unknown) => void;
+	}) => universalValue(postAdoptionRowPlan, [id, label, (payload: unknown) => onTap(id, payload)]),
 );
 
 const BackgroundScene = defineUniversalComponent('lynx', (props: SceneProps) => {
@@ -266,6 +310,13 @@ const BackgroundScene = defineUniversalComponent('lynx', (props: SceneProps) => 
 									['set', 'onTap', props.onRowTap ?? (() => {})],
 								]),
 							),
+						null,
+						false,
+						false,
+						undefined,
+						undefined,
+						undefined,
+						true,
 					),
 		]),
 		universalFor(
@@ -317,7 +368,7 @@ function installEnvironment(
 		listener: string | undefined,
 	) => void;
 	target.__AddEvent = (node, kind, name, listener) => {
-		registrations.push(Object.freeze({ listener }));
+		registrations.push(Object.freeze({ node, name, listener }));
 		addEvent(node, kind, name, listener);
 	};
 	const main = installLynxMainThread({
@@ -423,10 +474,14 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 		});
 		const effects: string[] = [];
 		const events: unknown[] = [];
+		const initialRowEvents: Array<readonly [string, unknown]> = [];
+		const initialComponentItems = ['initial-a', 'initial-b'];
 		let placeholderToken: string | undefined;
+		let initialRowToken: string | undefined;
 		const props: SceneProps = {
 			id: 'first-screen',
 			items: ['a', 'b'],
+			componentItems: initialComponentItems,
 			onTap(payload) {
 				events.push(payload);
 				if (
@@ -434,6 +489,18 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 					placeholderToken !== undefined
 				) {
 					main.dispatchNativeEvent(placeholderToken, {
+						type: 'tap',
+						detail: { phase: 'reentrant' },
+					});
+				}
+			},
+			onRowTap(id, payload) {
+				initialRowEvents.push([id, payload]);
+				if (
+					(payload as { detail?: { phase?: unknown } }).detail?.phase === 'first' &&
+					initialRowToken !== undefined
+				) {
+					main.dispatchNativeEvent(initialRowToken, {
 						type: 'tap',
 						detail: { phase: 'reentrant' },
 					});
@@ -448,16 +515,29 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 		const firstNode = dom.window.document.querySelector('#first-screen');
 		const firstA = dom.window.document.querySelector('#a');
 		const firstB = dom.window.document.querySelector('#b');
-		expect(painted).toMatchObject({ hostCount: 3, logicalCount: 5 });
+		const firstInitialA = dom.window.document.querySelector('#initial-a');
+		const firstInitialB = dom.window.document.querySelector('#initial-b');
+		expect(painted).toMatchObject({ hostCount: 9, logicalCount: 15 });
 		expect(firstNode).not.toBeNull();
 		expect(firstA).not.toBeNull();
 		expect(firstB).not.toBeNull();
+		expect(firstInitialA?.textContent).toBe('label:initial-a');
+		expect(firstInitialB?.textContent).toBe('label:initial-b');
 		expect(effects).toEqual([]);
 		expect(main.firstScreenSnapshot()).toMatchObject({ root: 1, version: 1 });
 
-		placeholderToken = registrations.find((entry) => entry.listener !== undefined)?.listener;
+		placeholderToken = registrations.find(
+			(registration) => registration.name === 'tap' && registration.node === firstNode,
+		)?.listener;
+		initialRowToken = registrations.find(
+			(registration) =>
+				registration.name === 'tap' &&
+				firstInitialA?.contains(registration.node as unknown as Node) === true,
+		)?.listener;
 		expect(placeholderToken).toBeTypeOf('string');
+		expect(initialRowToken).toBeTypeOf('string');
 		main.dispatchNativeEvent(placeholderToken!, { type: 'tap', detail: { phase: 'first' } });
+		main.dispatchNativeEvent(initialRowToken!, { type: 'tap', detail: { phase: 'first' } });
 
 		globalThis.lynxTestingEnv.switchToBackgroundThread();
 		const context = backgroundContext();
@@ -492,6 +572,7 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 		await Promise.resolve();
 		expect(settled).toBe(false);
 		expect(events).toEqual([]);
+		expect(initialRowEvents).toEqual([]);
 
 		globalThis.lynxTestingEnv.switchToMainThread();
 		main.markFirstScreenSyncReady();
@@ -501,11 +582,17 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 		expect(dom.window.document.querySelector('#first-screen')).toBe(firstNode);
 		expect(dom.window.document.querySelector('#a')).toBe(firstA);
 		expect(dom.window.document.querySelector('#b')).toBe(firstB);
+		expect(dom.window.document.querySelector('#initial-a')).toBe(firstInitialA);
+		expect(dom.window.document.querySelector('#initial-b')).toBe(firstInitialB);
 		expect(effects).toEqual(['background']);
 		expect(main.diagnostics()).toEqual([]);
 		expect(events).toEqual([
 			{ type: 'tap', detail: { phase: 'first' } },
 			{ type: 'tap', detail: { phase: 'reentrant' } },
+		]);
+		expect(initialRowEvents).toEqual([
+			['initial-a', { type: 'tap', detail: { phase: 'first' } }],
+			['initial-a', { type: 'tap', detail: { phase: 'reentrant' } }],
 		]);
 		expect(main.firstScreenSnapshot()).toBeNull();
 		expect(main.activeIdentity()).toMatchObject({ root: 1, version: 1 });
@@ -520,6 +607,13 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 		const adoptionCommit = outbound.find((message) => message.type === 'commit');
 		expect(adoptionCommit).not.toHaveProperty('ack');
 		expect(adoptionCommit).not.toHaveProperty('instances');
+
+		await backgroundRoot.render(BackgroundScene, {
+			...props,
+			componentItems: [],
+		});
+		expect(dom.window.document.querySelector('#initial-a')).toBeNull();
+		expect(dom.window.document.querySelector('#initial-b')).toBeNull();
 
 		const componentItems = ['row-a', 'row-b', 'row-c', 'row-d', 'row-e', 'row-f', 'row-g', 'row-h'];
 		const rowTaps: string[] = [];

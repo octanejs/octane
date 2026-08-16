@@ -92,6 +92,11 @@ from a degraded run.
 ```bash
 node stages/run.mjs --smoke --rows 1000 --allow-busy-host
 node stages/run.mjs --reps 5
+node stages/run.mjs --fcp-only --reps 7 --rows 10000 --output-tag candidate-attribution
+node stages/run.mjs --fcp-production-ab --reps 7 --rows 10000 \
+  --baseline-bundle /absolute/path/to/baseline/main.web.bundle \
+  --candidate-bundle /absolute/path/to/candidate/main.web.bundle \
+  --min-content public --output-tag production-ab
 ```
 
 The reportable command builds control and `__OCTANE_LYNX_PROFILE__` variants,
@@ -102,7 +107,43 @@ load at both ends, medians, min-max spread, raw milliseconds, shares, and
 same-window ratios. Do not run other builds, tests, browsers, or benchmark
 processes during that window. The default quiet-host preflight rejects a
 one-minute load average above `0.5 * logical CPUs`; `--allow-busy-host` exists
-only for non-reportable smoke/debug runs or an explicitly disclosed exception.
+only for non-reportable smoke/debug runs or an explicitly disclosed
+candidate-only exception. Production baseline/candidate A/B always remains
+reportable and rejects that override.
+
+FCP performance decisions use two deliberately separate protocols:
+
+- **Production baseline/candidate A/B.** `--fcp-production-ab` takes two explicit
+  production bundle paths, rejects profiling markers or identical bundle
+  SHA-256s, records each absolute path, byte length, and SHA-256, and alternates
+  fresh-page baseline/candidate samples AB / BA with `n >= 5` under the
+  mandatory quiet-host preflight. Neither cell reads profiler state. The default
+  `--min-content public` measures the public first-content threshold of five
+  content nodes; `--min-content all` instead measures the first frame whose
+  table row count is exactly N. Every settled sample must also preserve the same
+  deterministic `{finalRows: N, finalCount, checksum}` semantic tuple across
+  both cells. It writes a standalone
+  `*-production-ab-<rows>.{json,md}` report with both FCP and settled timing.
+- **Candidate-only attribution.** The ordinary `--fcp-only` session builds
+  profile-off and profile-on variants of the same candidate. Its same-window
+  control/profile ratio quantifies measurement overhead; only the profiled
+  candidate contributes stage attribution. Those cells are not the production
+  baseline and candidate.
+
+The Phase A baseline owner measurements and a final candidate attribution run
+occur in different host windows. They can show that a candidate still has (or
+has shifted) directly observed cost, but subtracting their medians is not a
+same-window owner-removal result. Only the production baseline/candidate AB/BA
+session supports the end-to-end removal claim; candidate-only attribution then
+explains where the candidate's remaining time went.
+
+The archived Phase A FCP@N evidence predates the exact row predicate and used
+`contentCount >= N`. This table's current first-screen batch reaches its tail in
+one publication flush, so those two signals were observed in the same frame,
+but that is an inference rather than a reusable measurement contract. Final
+candidate attribution must use exact `rowCount=N`. Production A/B may use the
+declared public threshold or exact all-N predicate, and both modes require the
+settled N-row semantic tuple above.
 
 The reusable analyzer and protocol tests are:
 
@@ -122,17 +163,28 @@ driver sees all 10,000 rows:
 
 1. `mt_slice_eval`: Blob script assignment through the first `root.render()`
    call, including browser load, parse, and evaluation.
-2. `plan_interpretation`: time inside first-screen `renderPlanNode` walks.
-3. `papi_element_creation`: time inside Element PAPI page/element/list creation
-   calls.
-4. `layout_flush_residual`: the exclusive wall-clock remainder. Web Core does
-   not expose a stable boundary separating PAPI prop/insertion work,
-   `__FlushElementTree`, DOM publication, style/layout, and observer-frame
-   delay, so those costs remain named and visible rather than guessed apart.
+2. `plan_interpretation`: nested time inside first-screen `renderPlanNode`
+   walks.
+3. `first_screen_render_other`: the enclosing first-screen render after
+   subtracting plan interpretation and command staging.
+4. `first_screen_command_staging`: template selection, command materialization,
+   and batch freezing.
+5. `first_screen_host_container`: main-local host-container creation.
+6. `first_screen_host_prepare`: clone-safe host batch preparation.
+7. `papi_element_creation`: nested Element PAPI page/element/list creation.
+8. `first_screen_host_apply_other`: host apply after subtracting PAPI creation.
+9. `first_screen_capture`: adoptable first-tree capture.
+10. `publication_layout_predicate_residual`: the exclusive wall-clock
+    remainder through Web Core publication, style/layout, and observer-frame
+    delay.
+
+The analyzer enforces both nesting relations: plan plus command staging cannot
+exceed first-screen render, and PAPI creation cannot exceed host apply. It then
+subtracts the nested intervals so every reported segment is exclusive.
 
 Raw view-attach FCP is also reported for control/profile overhead and same-run
-comparison, but decode/fetch before slice evaluation is outside the four-stage
-attribution.
+comparison, but decode/fetch before slice evaluation remains outside the
+exclusive stage attribution.
 
 **create@10k** starts at the byte-identical page driver's `pointerdown` boundary
 and ends when that same driver sees 10,000 rows:

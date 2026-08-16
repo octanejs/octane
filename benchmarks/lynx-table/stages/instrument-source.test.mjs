@@ -13,6 +13,7 @@ const repositoryRoot = path.resolve(import.meta.dirname, '../../..');
 const sourceFiles = [
 	'packages/lynx/src/core/profiling.ts',
 	'packages/lynx/src/core/papi.ts',
+	'packages/lynx/src/core/own-symbols.ts',
 	'packages/lynx/src/core/transport.ts',
 	'packages/lynx/src/main-renderer.ts',
 	'packages/lynx/src/main-thread.ts',
@@ -52,16 +53,32 @@ test('instruments an isolated Lynx source copy and restores every byte', () => {
 			fs.readFileSync(path.join(temporary, 'packages/lynx/src/main-thread.ts'), 'utf8'),
 			/mtExpandMs/,
 		);
-		const mainRenderer = fs.readFileSync(
+		const instrumentedMainThread = fs.readFileSync(
+			path.join(temporary, 'packages/lynx/src/main-thread.ts'),
+			'utf8',
+		);
+		assert.match(instrumentedMainThread, /firstScreenPrepareMs/);
+		assert.match(instrumentedMainThread, /firstScreenApplyMs/);
+		assert.match(instrumentedMainThread, /firstScreenCaptureMs/);
+		assert.doesNotMatch(
+			instrumentedMainThread,
+			/for \(const rawCommand of result\.batch\.commands\)/,
+		);
+		const instrumentedMainRenderer = fs.readFileSync(
 			path.join(temporary, 'packages/lynx/src/main-renderer.ts'),
 			'utf8',
 		);
-		assert.match(mainRenderer, /firstScreenPlanMs/);
+		assert.match(instrumentedMainRenderer, /firstScreenPlanMs/);
+		assert.match(
+			instrumentedMainRenderer,
+			/startedCommandStage[\s\S]*selectFirstScreenTemplates\(nodes\)[\s\S]*const commands/,
+		);
+		assert.match(instrumentedMainRenderer, /batch,[\s\S]*hostCount: attempt\.hostCount/);
 		const papi = fs.readFileSync(path.join(temporary, 'packages/lynx/src/core/papi.ts'), 'utf8');
 		assert.match(papi, /papiCreateMs/);
 		for (const name of destroyRunProfileFields) {
 			const initializer = new RegExp(`\\b${name}: 0`);
-			assert.match(mainRenderer, initializer);
+			assert.match(instrumentedMainRenderer, initializer);
 			assert.match(papi, initializer);
 		}
 		restore();
@@ -111,6 +128,7 @@ test('profiled first-screen rendering works without a stage-harness slice hook',
 		const { profile, result } = run();
 		assert.equal(result.hostCount, 1);
 		assert.ok(Number.isFinite(profile.firstScreenPlanMs));
+		assert.ok(Number.isFinite(profile.firstScreenCommandStageMs));
 		for (const name of [
 			'commits',
 			'commands',

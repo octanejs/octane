@@ -1669,7 +1669,7 @@
     "target": "octane-ifr",
     "reference": "octane-preview",
     "maxRatio": 1.05,
-    "note": "Deterministic pinned-Rspeedy artifact gate for the same semantic-checksummed app. On 2026-07-22 the IFR artifact measured 110670 / 107222 = 1.0322x preview gzip. This is source/build evidence only; it makes no native first-paint or timing claim."
+    "note": "Deterministic pinned-Rspeedy artifact gate for the same semantic-checksummed app. On 2026-08-16 the issue #57 candidate measured 162569 / 157182 = 1.0343x preview gzip. This is source/build evidence only; it makes no native first-paint or timing claim."
   },
   {
     "suite": "lynx-bundle-size",
@@ -1677,7 +1677,7 @@
     "target": "octane-ifr",
     "reference": "octane-preview",
     "maxRatio": 1.08,
-    "note": "Deterministic decoded main-program gate comparing the common host receiver plus IFR's authored first-tree graph with the preview's receiver-only program. The source/build record is 59260 / 55709 = 1.0637x; background bytes are separately required to remain byte-identical by the harness."
+    "note": "Deterministic decoded main-program gate comparing the common host receiver plus IFR's authored first-tree graph with the preview's receiver-only program. The issue #57 source/build record is 87566 / 82070 = 1.0670x; background bytes are separately required to remain byte-identical by the harness."
   },
   {
     "suite": "ssr-http",

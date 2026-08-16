@@ -14,6 +14,15 @@ import {
 } from './analyze.mjs';
 import { realmSnapshots, resetProfiles } from './profile-realms.mjs';
 import {
+	describeProductionBundle,
+	productionAbConfig,
+	productionAbMarkdown,
+	summarizeProductionAbSamples,
+	validateProductionFcpObservation,
+	validateDistinctProductionBundles,
+	verifyProductionBundle,
+} from './production-ab.mjs';
+import {
 	DRIVER_CLIENT_JS,
 	WIRE_INSTRUMENT_JS,
 	applyNeutralize,
@@ -32,13 +41,24 @@ const { values: args } = parseArgs({
 		smoke: { type: 'boolean', default: false },
 		'skip-build': { type: 'boolean', default: false },
 		'allow-busy-host': { type: 'boolean', default: false },
+		'fcp-only': { type: 'boolean', default: false },
+		'fcp-production-ab': { type: 'boolean', default: false },
+		'baseline-bundle': { type: 'string' },
+		'candidate-bundle': { type: 'string' },
+		'min-content': { type: 'string', default: 'public' },
+		'output-tag': { type: 'string', default: 'live' },
 	},
 });
 const repetitions = args.smoke ? 1 : requireMinimumRepetitions(args.reps);
 const rows = Number(args.rows);
 if (!Number.isSafeInteger(rows) || rows <= 0)
 	throw new TypeError('rows must be a positive integer.');
+const productionAb = productionAbConfig(args, { rows });
 const port = Number(args.port);
+const fcpOnly = args['fcp-only'];
+if (!/^[a-z0-9][a-z0-9-]*$/.test(args['output-tag'])) {
+	throw new TypeError('output-tag must contain only lowercase letters, digits, and hyphens.');
+}
 const cpuCount = os.cpus().length;
 const loadPerCpu = os.loadavg()[0] / cpuCount;
 if (!args['allow-busy-host'] && loadPerCpu > 0.5) {
@@ -53,21 +73,32 @@ const variants = {
 	'control-fcp': path.join(root, `app/dist-rows${rows}/main.web.bundle`),
 	'profile-fcp': path.join(root, `app/dist-rows${rows}-profile/main.web.bundle`),
 	'vue-vdom': path.join(root, 'reference/vdom-ifr-et/main.web.bundle'),
+	...(productionAb === null
+		? null
+		: { baseline: productionAb.baselinePath, candidate: productionAb.candidatePath }),
 };
 const webCoreClientJs = require.resolve('@lynx-js/web-core/client.prod.js');
 const webCoreRoot = path.resolve(path.dirname(webCoreClientJs), '../..');
-const html = makeBenchHtml({ instrumentJs: WIRE_INSTRUMENT_JS });
+const html = makeBenchHtml({
+	instrumentJs: productionAb === null ? WIRE_INSTRUMENT_JS : '',
+});
 
 function buildVariants() {
 	const previousProfile = process.env.OCTANE_LYNX_PROFILE;
 	const previousRows = process.env.BENCH_AUTOROWS;
 	try {
-		for (const [profile, autoRows] of [
-			['0', '0'],
-			['1', '0'],
-			['0', String(rows)],
-			['1', String(rows)],
-		]) {
+		const builds = fcpOnly
+			? [
+					['0', String(rows)],
+					['1', String(rows)],
+				]
+			: [
+					['0', '0'],
+					['1', '0'],
+					['0', String(rows)],
+					['1', String(rows)],
+				];
+		for (const [profile, autoRows] of builds) {
 			process.env.OCTANE_LYNX_PROFILE = profile;
 			process.env.BENCH_AUTOROWS = autoRows;
 			buildTableApp({ silent: true });
@@ -78,13 +109,17 @@ function buildVariants() {
 		if (previousRows === undefined) delete process.env.BENCH_AUTOROWS;
 		else process.env.BENCH_AUTOROWS = previousRows;
 	}
-	const control = fs.readFileSync(variants.control);
-	const profile = fs.readFileSync(variants.profile);
-	const marker = Buffer.from('__OCTANE_LYNX_MT_SLICE_LOAD_START_EPOCH__');
-	if (control.includes(marker))
-		throw new Error('default production bundle retained stage profiling.');
-	if (!profile.includes(marker))
-		throw new Error('profile bundle omitted its browser-owned slice-start read.');
+	const control = fs.readFileSync(fcpOnly ? variants['control-fcp'] : variants.control);
+	const profile = fs.readFileSync(fcpOnly ? variants['profile-fcp'] : variants.profile);
+	for (const name of ['__OCTANE_LYNX_MT_SLICE_LOAD_START_EPOCH__', 'firstScreenPrepareMs']) {
+		const marker = Buffer.from(name);
+		if (control.includes(marker)) {
+			throw new Error(`default production bundle retained stage profiling marker ${name}.`);
+		}
+		if (!profile.includes(marker)) {
+			throw new Error(`profile bundle omitted stage profiling marker ${name}.`);
+		}
+	}
 }
 
 function startServer() {
@@ -118,7 +153,7 @@ function startServer() {
 	return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve(server)));
 }
 
-async function load(browser, variant) {
+async function load(browser, variant, { stageClock = true } = {}) {
 	const page = await browser.newPage();
 	if (process.env.LYNX_BENCH_DEBUG) {
 		page.on('console', (message) =>
@@ -129,13 +164,27 @@ async function load(browser, variant) {
 		);
 	}
 	await applyNeutralize(page);
-	await applyStageClock(page);
+	if (stageClock) await applyStageClock(page);
 	await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load' });
 	await page.evaluate(
 		(url) => globalThis.__x.createView(url),
 		`http://127.0.0.1:${port}/bundle/${variant}`,
 	);
 	return page;
+}
+
+async function runProductionFcp(browser, variant) {
+	const page = await load(browser, variant, { stageClock: false });
+	try {
+		const observation = await page.evaluate((options) => globalThis.__x.fcp(options), {
+			...productionAb.fcpOptions,
+			idleMs: 300,
+			timeoutMs: 120000,
+		});
+		return validateProductionFcpObservation(variant, observation, rows, productionAb.fcpOptions);
+	} finally {
+		await page.close();
+	}
 }
 
 async function wireSnapshot(page) {
@@ -166,11 +215,13 @@ async function runFcp(browser, variant, profile) {
 	const page = await load(browser, `${variant}-fcp`);
 	try {
 		const observation = await page.evaluate(
-			(count) => globalThis.__x.fcp({ minContent: count, idleMs: 300, timeoutMs: 120000 }),
+			(count) => globalThis.__x.fcp({ rowCount: count, idleMs: 300, timeoutMs: 120000 }),
 			rows,
 		);
 		if (observation.dnf || observation.fcp === null)
 			throw new Error(`${variant} FCP did not finish.`);
+		if (observation.finalRows !== rows)
+			throw new Error(`${variant} settled with ${observation.finalRows} rows; expected ${rows}.`);
 		if (!profile) return { rawMs: observation.fcp };
 		const realms = await realmSnapshots(page);
 		if (realms.main === null || realms.main.mtSliceStartEpochMs === 0) {
@@ -280,7 +331,7 @@ function markdown(report) {
 		'',
 		`## FCP@${report.meta.rows}`,
 		'',
-		`Attribution starts when the shared browser hook assigns the hidden main-thread iframe Blob script URL, before load/parse/evaluation, and ends when the shared composed-tree observer first sees all ${report.meta.rows.toLocaleString('en-US')} rows. \`layout_flush_residual\` is the exclusive remainder after directly observed slice evaluation, plan interpretation, and PAPI element creation; it includes PAPI prop/insertion work, \`__FlushElementTree\`, Web Core DOM publication, style/layout, and observer-frame delay because the host exposes no stable boundary between those costs.`,
+		`Attribution starts when the shared browser hook assigns the hidden main-thread iframe Blob script URL, before load/parse/evaluation, and ends when the shared composed-tree observer first sees all ${report.meta.rows.toLocaleString('en-US')} rows. Render, command staging, host prepare, host apply, and first-tree capture are directly timed. Nested plan and PAPI-create intervals are subtracted from their enclosing stages. \`publication_layout_predicate_residual\` is the exclusive remainder through Web Core publication, style/layout, and observer-frame delay.`,
 		'',
 		'| segment | median ms | min–max ms | share |',
 		'|---|---:|---:|---:|',
@@ -294,6 +345,19 @@ function markdown(report) {
 		'',
 		`Raw view-attach FCP: profile ${round(report.fcp.rawProfile.median)} ms (${round(report.fcp.rawProfile.min)}–${round(report.fcp.rawProfile.max)}), control ${round(report.fcp.rawControl.median)} ms; same-window profile/control ${round(report.fcp.rawProfile.median / report.fcp.rawControl.median, 3)}×.`,
 		'',
+	);
+	if (report.create === undefined) {
+		lines.push(
+			'## Verdicts',
+			'',
+			...report.verdicts.map(
+				(verdict) => `- **${verdict.step}: ${verdict.verdict}.** ${verdict.reason}`,
+			),
+			'',
+		);
+		return lines.join('\n');
+	}
+	lines.push(
 		`## create@${report.meta.rows}`,
 		'',
 		`Attribution starts at the shared pointerdown boundary and ends when the shared composed-tree observer sees ${report.meta.rows.toLocaleString('en-US')} rows. All named intervals are directly observed and exclusive; \`presentation_residual\` is the wall-clock remainder through final composed-tree presentation.`,
@@ -334,10 +398,23 @@ function markdown(report) {
 	return lines.join('\n');
 }
 
-if (!args['skip-build']) buildVariants();
-for (const [name, file] of Object.entries(variants)) {
+if (productionAb === null && !args['skip-build']) buildVariants();
+const requiredVariants =
+	productionAb === null
+		? fcpOnly
+			? ['control-fcp', 'profile-fcp'].map((name) => [name, variants[name]])
+			: Object.entries(variants)
+		: ['baseline', 'candidate'].map((name) => [name, variants[name]]);
+for (const [name, file] of requiredVariants) {
 	if (!fs.existsSync(file)) throw new Error(`${name} bundle is missing: ${file}`);
 }
+const productionBundles =
+	productionAb === null
+		? null
+		: validateDistinctProductionBundles(
+				describeProductionBundle('baseline', productionAb.baselinePath),
+				describeProductionBundle('candidate', productionAb.candidatePath),
+			);
 const server = await startServer();
 const { chromium } = require('playwright');
 const browser = await chromium.launch({
@@ -346,6 +423,62 @@ const browser = await chromium.launch({
 });
 const browserVersion = browser.version();
 const loadStart = os.loadavg();
+if (productionAb !== null) {
+	const productionSamples = { baseline: [], candidate: [] };
+	try {
+		for (const [first, second] of interleavedABSchedule(
+			productionAb.repetitions,
+			'baseline',
+			'candidate',
+		)) {
+			for (const variant of [first, second]) {
+				const sample = await runProductionFcp(browser, variant);
+				productionSamples[variant].push(sample);
+				console.log(
+					`[stage:production-ab] ${variant} fcp=${sample.fcpMs.toFixed(1)} settled=${sample.settledMs.toFixed(1)} finalCount=${sample.finalCount}`,
+				);
+			}
+		}
+	} finally {
+		await browser.close();
+		server.close();
+	}
+	verifyProductionBundle('baseline', productionBundles.baseline);
+	verifyProductionBundle('candidate', productionBundles.candidate);
+	const report = {
+		meta: {
+			date: new Date().toISOString(),
+			node: process.version,
+			cpus: cpuCount,
+			cpuModel: os.cpus()[0]?.model ?? 'unknown',
+			platform: os.platform(),
+			release: os.release(),
+			chromium: browserVersion,
+			repetitions: productionAb.repetitions,
+			rows,
+			reportable: true,
+			loadStart,
+			loadEnd: os.loadavg(),
+			protocol:
+				'fresh page per sample; production baseline/candidate order alternates AB/BA; neither cell reads profiler state',
+		},
+		threshold: {
+			mode: productionAb.minContentMode,
+			fcpOptions: productionAb.fcpOptions,
+			rowCount: rows,
+		},
+		bundles: productionBundles,
+		results: summarizeProductionAbSamples(productionSamples),
+		samples: productionSamples,
+	};
+	const output = path.join(import.meta.dirname, 'results');
+	fs.mkdirSync(output, { recursive: true });
+	const base = `${args['output-tag']}-production-ab-${rows}`;
+	fs.writeFileSync(path.join(output, `${base}.json`), JSON.stringify(report, null, 2) + '\n');
+	fs.writeFileSync(path.join(output, `${base}.md`), productionAbMarkdown(report) + '\n');
+	console.log(productionAbMarkdown(report));
+	process.exit(0);
+}
 const samples = {
 	fcp: { control: [], profile: [] },
 	create: { control: [], profile: [], vueVdom: [] },
@@ -359,6 +492,10 @@ try {
 			const profile = variant === 'profile';
 			const fcp = await runFcp(browser, variant, profile);
 			samples.fcp[variant].push(fcp);
+			if (fcpOnly) {
+				console.log(`[stage] ${variant} fcp=${fcp.rawMs.toFixed(1)}`);
+				continue;
+			}
 			const measured = {};
 			for (const operation of Object.keys(operations)) {
 				measured[operation] = await runOperation(browser, variant, profile, operation);
@@ -368,6 +505,7 @@ try {
 				`[stage] ${variant} fcp=${fcp.rawMs.toFixed(1)} create=${measured.create.rawMs.toFixed(1)} replace=${measured.replace.rawMs.toFixed(1)} append=${measured.append.rawMs.toFixed(1)}`,
 			);
 		}
+		if (fcpOnly) continue;
 		const reference = {};
 		for (const operation of Object.keys(operations)) {
 			reference[operation] = await runOperation(browser, 'vue-vdom', false, operation);
@@ -386,7 +524,7 @@ if (args.smoke) {
 	const output = path.join(import.meta.dirname, 'results');
 	fs.mkdirSync(output, { recursive: true });
 	fs.writeFileSync(
-		path.join(output, `smoke-${rows}.json`),
+		path.join(output, `${args['output-tag']}-smoke-${rows}.json`),
 		JSON.stringify(
 			{
 				meta: {
@@ -408,7 +546,56 @@ if (args.smoke) {
 	process.exit(0);
 }
 
+function summarizeRaw(cell) {
+	return summarizeSamples(
+		cell.map((sample) => ({ totalMs: sample.rawMs, stages: { raw: sample.rawMs } })),
+	).total;
+}
+
 const fcpAttribution = summarizeSamples(samples.fcp.profile.map((sample) => sample.attribution));
+if (fcpOnly) {
+	const ownerShare =
+		fcpAttribution.stages.first_screen_command_staging.share +
+		fcpAttribution.stages.first_screen_host_prepare.share;
+	const report = {
+		meta: {
+			date: new Date().toISOString(),
+			node: process.version,
+			cpus: cpuCount,
+			cpuModel: os.cpus()[0]?.model ?? 'unknown',
+			platform: os.platform(),
+			release: os.release(),
+			chromium: browserVersion,
+			repetitions,
+			rows,
+			reportable: true,
+			loadStart,
+			loadEnd: os.loadavg(),
+			protocol:
+				'fresh page per sample; control/profile order alternates AB/BA; no retained first-screen batch or post-FCP command scan in the timing build',
+		},
+		fcp: {
+			attribution: fcpAttribution,
+			rawControl: summarizeRaw(samples.fcp.control),
+			rawProfile: summarizeRaw(samples.fcp.profile),
+		},
+		verdicts: [
+			{
+				step: 'first-screen generic command staging + host prepare owner gate',
+				verdict: ownerShare >= 0.1 ? 'GO' : 'NO-GO',
+				reason: `directly timed exclusive share is ${(ownerShare * 100).toFixed(1)}%; Phase B requires at least 10.0%.`,
+			},
+		],
+		samples,
+	};
+	const output = path.join(import.meta.dirname, 'results');
+	fs.mkdirSync(output, { recursive: true });
+	const base = `${args['output-tag']}-${rows}`;
+	fs.writeFileSync(path.join(output, `${base}.json`), JSON.stringify(report, null, 2) + '\n');
+	fs.writeFileSync(path.join(output, `${base}.md`), markdown(report) + '\n');
+	console.log(markdown(report));
+	process.exit(0);
+}
 const createAttribution = summarizeSamples(
 	samples.create.profile.map((sample) => sample.attribution),
 	{
@@ -416,11 +603,6 @@ const createAttribution = summarizeSamples(
 		reference: samples.create.vueVdom.map((sample) => sample.rawMs),
 	},
 );
-function summarizeRaw(cell) {
-	return summarizeSamples(
-		cell.map((sample) => ({ totalMs: sample.rawMs, stages: { raw: sample.rawMs } })),
-	).total;
-}
 function summarizeWire(cell, side, field) {
 	return summarizeSamples(
 		cell.map((sample) => {
@@ -543,6 +725,7 @@ const report = {
 };
 const output = path.join(import.meta.dirname, 'results');
 fs.mkdirSync(output, { recursive: true });
-fs.writeFileSync(path.join(output, `live-${rows}.json`), JSON.stringify(report, null, 2) + '\n');
-fs.writeFileSync(path.join(output, `live-${rows}.md`), markdown(report) + '\n');
+const base = `${args['output-tag']}-${rows}`;
+fs.writeFileSync(path.join(output, `${base}.json`), JSON.stringify(report, null, 2) + '\n');
+fs.writeFileSync(path.join(output, `${base}.md`), markdown(report) + '\n');
 console.log(markdown(report));

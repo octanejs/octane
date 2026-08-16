@@ -232,7 +232,13 @@ export const lynxMainThreadRenderer = {
 	server: 'unsupported',
 	intrinsics: '@octanejs/lynx/intrinsics',
 	text: 'host',
-	capabilities: ['class-name-alias', 'visibility', 'main-thread-render-only', 'thread-functions'],
+	capabilities: [
+		'class-name-alias',
+		'component-scope-for',
+		'visibility',
+		'main-thread-render-only',
+		'thread-functions',
+	],
 	firstScreenEvents: ['bind*', 'catch*', 'capture-bind*', 'capture-catch*', 'global-bind*'],
 	validation: LYNX_MAIN_THREAD_VALIDATION,
 };

@@ -102,6 +102,15 @@ describe('@octanejs/lynx renderer preset', () => {
 		expect(mainThread.hostProps).toBe(background.hostProps);
 		expect(
 			normalizeRendererConfig(lynxRspeedyMainThreadRenderers).registry.lynx.capabilities,
+		).toEqual(
+			expect.arrayContaining([
+				'component-scope-for',
+				'main-thread-render-only',
+				'thread-functions',
+			]),
+		);
+		expect(
+			normalizeRendererConfig(lynxRspeedyMainThreadRenderers).registry.lynx.capabilities,
 		).not.toContain('template-program-mount');
 	});
 });

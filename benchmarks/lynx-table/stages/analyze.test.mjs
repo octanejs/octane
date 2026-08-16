@@ -52,17 +52,53 @@ test('attributes only exclusive observed time and assigns the remainder to named
 	assert.deepEqual(
 		analyzeFcpSample({
 			wallMs: 100,
-			main: { mtSliceEvalMs: 15, firstScreenPlanMs: 25, papiCreateMs: 30 },
+			main: {
+				mtSliceEvalMs: 5,
+				firstScreenRenderMs: 30,
+				firstScreenPlanMs: 10,
+				firstScreenCommandStageMs: 15,
+				firstScreenContainerMs: 2,
+				firstScreenPrepareMs: 8,
+				firstScreenApplyMs: 30,
+				firstScreenPapiCreateMs: 20,
+				firstScreenCaptureMs: 5,
+			},
 		}),
 		{
 			totalMs: 100,
 			stages: {
-				mt_slice_eval: 15,
-				plan_interpretation: 25,
-				papi_element_creation: 30,
-				layout_flush_residual: 30,
+				mt_slice_eval: 5,
+				plan_interpretation: 10,
+				first_screen_render_other: 5,
+				first_screen_command_staging: 15,
+				first_screen_host_container: 2,
+				first_screen_host_prepare: 8,
+				papi_element_creation: 20,
+				first_screen_host_apply_other: 10,
+				first_screen_capture: 5,
+				publication_layout_predicate_residual: 20,
 			},
 		},
+	);
+	assert.throws(
+		() =>
+			analyzeFcpSample({
+				wallMs: 100,
+				main: {
+					firstScreenRenderMs: 10,
+					firstScreenPlanMs: 6,
+					firstScreenCommandStageMs: 5,
+				},
+			}),
+		/exceed their enclosing first-screen render/,
+	);
+	assert.throws(
+		() =>
+			analyzeFcpSample({
+				wallMs: 100,
+				main: { firstScreenApplyMs: 10, firstScreenPapiCreateMs: 11 },
+			}),
+		/exceeds the enclosing first-screen apply/,
 	);
 	assert.deepEqual(
 		analyzeCreateSample({

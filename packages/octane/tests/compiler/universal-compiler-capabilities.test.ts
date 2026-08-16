@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
-import { lynxRenderer } from '../../../lynx/src/config.js';
+import { lynxMainThreadRenderer, lynxRenderer } from '../../../lynx/src/config.js';
 import { compile } from '../../src/compiler/compile.js';
 
 const { parseModule } = createRequire(import.meta.url)('@tsrx/core') as {
@@ -14,6 +14,7 @@ const baseRenderer = {
 } as const;
 
 const resolvedLynxRenderer = { id: 'lynx', ...lynxRenderer } as const;
+const resolvedLynxMainThreadRenderer = { id: 'lynx', ...lynxMainThreadRenderer } as const;
 
 const threeRenderer = {
 	id: 'three',
@@ -249,6 +250,46 @@ describe('component-owned Lynx template rows', () => {
 		});
 	});
 
+	it('proves the same component scope for the Lynx main-thread renderer', () => {
+		const args = compiledUniversalForArguments(source, {
+			renderer: resolvedLynxMainThreadRenderer,
+		});
+
+		expect(args[9]).toMatchObject({ type: 'Literal', value: true });
+		expect(args[2].body).toMatchObject({ type: 'CallExpression' });
+		expect(args[2].body.arguments[2]).toMatchObject({
+			type: 'CallExpression',
+			arguments: [
+				{
+					type: 'ObjectExpression',
+					properties: [
+						{ key: { value: 'row' } },
+						{ key: { value: 'selected' } },
+						{ key: { value: 'onSelect' } },
+					],
+				},
+				{ type: 'UnaryExpression', operator: 'void' },
+				{ type: 'Literal', value: false },
+				{ type: 'Literal', value: true },
+			],
+		});
+	});
+
+	it('does not grant host template programs to the narrow main-thread capability', () => {
+		const args = compiledUniversalForArguments(
+			`export function Scene({ items, select }) @{
+				@for (const item of items; key item.id) {
+					<view id={item.id}>
+						<text bindtap={() => select(item.id)}>{item.label}</text>
+					</view>
+				}
+			}`,
+			{ renderer: resolvedLynxMainThreadRenderer },
+		);
+
+		expect(args).toHaveLength(3);
+	});
+
 	it.each([
 		['HMR', source, { hmr: true }],
 		[
@@ -267,12 +308,14 @@ describe('component-owned Lynx template rows', () => {
 			{},
 		],
 	])('keeps the original loop owner for %s', (_label, candidate, options) => {
-		const args = compiledUniversalForArguments(candidate, {
-			renderer: resolvedLynxRenderer,
-			...options,
-		});
+		for (const renderer of [resolvedLynxRenderer, resolvedLynxMainThreadRenderer]) {
+			const args = compiledUniversalForArguments(candidate, {
+				renderer,
+				...options,
+			});
 
-		expect(args[9]).toBeUndefined();
+			expect(args[9]).toBeUndefined();
+		}
 	});
 });
 

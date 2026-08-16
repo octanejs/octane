@@ -29,6 +29,16 @@ export function instrumentLynxStageSources(repositoryRoot) {
 \tbgReplayMs?: number;
 \tmtExpandMs?: number;
 \tfirstScreenPlanMs?: number;
+\tfirstScreenRenderMs?: number;
+\tfirstScreenCommandStageMs?: number;
+\tfirstScreenContainerMs?: number;
+\tfirstScreenPrepareMs?: number;
+\tfirstScreenApplyMs?: number;
+\tfirstScreenPapiCreateMs?: number;
+\tfirstScreenCaptureMs?: number;
+\tfirstScreenCommands?: number;
+\tfirstScreenHosts?: number;
+\tfirstScreenLogicalIds?: number;
 \tmtSliceEvalMs?: number;
 \tmtSliceStartEpochMs?: number;
 \tpapiCreateMs?: number;
@@ -228,7 +238,7 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 				'let CURRENT_ATTEMPT: FirstScreenAttempt | null = null;\nlet FIRST_SCREEN_PLAN_PROFILE_DEPTH = 0;\n',
 				file,
 			);
-			return replaceOnce(
+			next = replaceOnce(
 				next,
 				`\t\tassertRenderer(planValue.plan.renderer);
 \t\tconst rendered = renderPlanNode(planValue.plan.root, planValue.values);
@@ -273,6 +283,49 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 `,
 				file,
 			);
+			next = replaceOnce(
+				next,
+				'\tconst templates = selectFirstScreenTemplates(nodes);\n\tconst commands: UniversalHostCommand[] = [];\n',
+				`\tconst startedCommandStage = performance.now();
+\tconst templates = selectFirstScreenTemplates(nodes);
+\tconst commands: UniversalHostCommand[] = [];
+`,
+				file,
+			);
+			return replaceOnce(
+				next,
+				`\treturn Object.freeze({
+\t\tbatch: freezeBatch(commands),
+\t\thostCount: attempt.hostCount,
+\t\tlogicalCount: attempt.nextId - 1,
+\t});
+`,
+				`\tconst batch = freezeBatch(commands);
+\tconst commandStageEnded = performance.now();
+\tconst globals = globalThis as any;
+\tconst profile = (globals.__OCTANE_LYNX_PROF ??= {
+\t\tcommits: 0,
+\t\tpacedCommits: 0,
+\t\tcommands: 0,
+\t\tbytes: 0,
+\t\tselfcheckMs: 0,
+\t\tdispatchMs: 0,
+\t\tvalidateMs: 0,
+\t\tprepareMs: 0,
+\t\tprepareCheckMs: 0,
+\t\tapplyMs: 0,
+\t\tackMs: 0,
+\t});
+\tprofile.firstScreenCommandStageMs =
+\t\t(profile.firstScreenCommandStageMs ?? 0) + commandStageEnded - startedCommandStage;
+\treturn Object.freeze({
+\t\tbatch,
+\t\thostCount: attempt.hostCount,
+\t\tlogicalCount: attempt.nextId - 1,
+\t});
+`,
+				file,
+			);
 		});
 
 		update('packages/lynx/src/main-thread.ts', (source, file) => {
@@ -298,7 +351,68 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 \t\t\t\tprofile.mtSliceEvalMs =
 \t\t\t\t\t(profile.mtSliceEvalMs ?? 0) + performance.timeOrigin + performance.now() - sliceStart;
 \t\t\t}
+\t\t\tconst startedFirstScreenRender = performance.now();
 \t\t\tconst result = renderLynxFirstScreen(component, props);
+\t\t\tconst firstScreenProfile = lynxWireProfile();
+\t\t\tfirstScreenProfile.firstScreenRenderMs =
+\t\t\t\t(firstScreenProfile.firstScreenRenderMs ?? 0) +
+\t\t\t\tperformance.now() -
+\t\t\t\tstartedFirstScreenRender;
+\t\t\tfirstScreenProfile.firstScreenCommands = result.batch.commands.length;
+\t\t\tfirstScreenProfile.firstScreenHosts = result.hostCount;
+\t\t\tfirstScreenProfile.firstScreenLogicalIds = result.logicalCount;
+`,
+				file,
+			);
+			next = replaceOnce(
+				next,
+				`\t\t\tsource = createLynxHostContainer(papi, {
+\t\t\t\troot: FIRST_SCREEN_ROOT_ID,
+\t\t\t\tpage,
+\t\t\t\tworklets: hostWorklets,
+\t\t\t});
+\t\t\tconst prepared = prepareLynxHostBatch(source, result.batch);
+\t\t\tprepared.apply();
+`,
+				`\t\t\tconst startedFirstScreenContainer = performance.now();
+\t\t\tsource = createLynxHostContainer(papi, {
+\t\t\t\troot: FIRST_SCREEN_ROOT_ID,
+\t\t\t\tpage,
+\t\t\t\tworklets: hostWorklets,
+\t\t\t});
+\t\t\tfirstScreenProfile.firstScreenContainerMs =
+\t\t\t\t(firstScreenProfile.firstScreenContainerMs ?? 0) +
+\t\t\t\tperformance.now() -
+\t\t\t\tstartedFirstScreenContainer;
+\t\t\tconst startedFirstScreenPrepare = performance.now();
+\t\t\tconst prepared = prepareLynxHostBatch(source, result.batch);
+\t\t\tfirstScreenProfile.firstScreenPrepareMs =
+\t\t\t\t(firstScreenProfile.firstScreenPrepareMs ?? 0) +
+\t\t\t\tperformance.now() -
+\t\t\t\tstartedFirstScreenPrepare;
+\t\t\tconst papiCreateBeforeApply = firstScreenProfile.papiCreateMs ?? 0;
+\t\t\tconst startedFirstScreenApply = performance.now();
+\t\t\tprepared.apply();
+\t\t\tfirstScreenProfile.firstScreenApplyMs =
+\t\t\t\t(firstScreenProfile.firstScreenApplyMs ?? 0) +
+\t\t\t\tperformance.now() -
+\t\t\t\tstartedFirstScreenApply;
+\t\t\tfirstScreenProfile.firstScreenPapiCreateMs =
+\t\t\t\t(firstScreenProfile.firstScreenPapiCreateMs ?? 0) +
+\t\t\t\t(firstScreenProfile.papiCreateMs ?? 0) -
+\t\t\t\tpapiCreateBeforeApply;
+`,
+				file,
+			);
+			next = replaceOnce(
+				next,
+				'\t\t\tconst captured = captureLynxFirstTree(source);\n',
+				`\t\t\tconst startedFirstScreenCapture = performance.now();
+\t\t\tconst captured = captureLynxFirstTree(source);
+\t\t\tfirstScreenProfile.firstScreenCaptureMs =
+\t\t\t\t(firstScreenProfile.firstScreenCaptureMs ?? 0) +
+\t\t\t\tperformance.now() -
+\t\t\t\tstartedFirstScreenCapture;
 `,
 				file,
 			);

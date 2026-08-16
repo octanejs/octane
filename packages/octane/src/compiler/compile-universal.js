@@ -272,6 +272,7 @@ const UNIVERSAL_RUNTIME_IMPORTS = new Set([
 // ordinary renderers while allowing native first-screen programs to erase
 // background-owned callbacks from their render-only specialization.
 const MAIN_THREAD_RENDER_ONLY_CAPABILITY = 'main-thread-render-only';
+const COMPONENT_SCOPE_FOR_CAPABILITY = 'component-scope-for';
 const THREAD_FUNCTION_CAPABILITY = 'thread-functions';
 const THREAD_DIRECTIVES = new Map([
 	['main thread', 'main-thread'],
@@ -2453,7 +2454,8 @@ function templateProgramForHost(node, state) {
 function templateProgramForComponent(node, state) {
 	if (
 		node.empty != null ||
-		!rendererHasCapability(state, 'template-program-mount') ||
+		(!rendererHasCapability(state, 'template-program-mount') &&
+			!rendererHasCapability(state, COMPONENT_SCOPE_FOR_CAPABILITY)) ||
 		!isOwnerFreeForExpression(node.right) ||
 		!isOwnerFreeForExpression(node.key)
 	) {

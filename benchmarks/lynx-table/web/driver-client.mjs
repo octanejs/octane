@@ -180,11 +180,13 @@ export const DRIVER_CLIENT_JS = `(() => {
       requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, extraMs))));
 
   // -- FCP + settled ---------------------------------------------------------
-  // From viewAttachTime, poll the composed tree per animation frame. FCP =
-  // first frame with contentCount >= minContent; settled = content count then
-  // stable for idleMs. Hard timeout aborts as DNF.
+  // From viewAttachTime, poll the composed tree per animation frame. FCP uses
+  // either the workload-agnostic content threshold (the public default) or an
+  // exact table-row predicate. Settled = the selected signal stable for
+  // idleMs. Hard timeout aborts as DNF.
   x.fcp = (opts = {}) => {
-    const minContent = opts.minContent ?? 5;
+    const targetRows = opts.rowCount ?? null;
+    const minContent = targetRows === null ? (opts.minContent ?? 5) : null;
     const idleMs = opts.idleMs ?? 400;
     const timeoutMs = opts.timeoutMs ?? 120000;
     return new Promise((resolve) => {
@@ -192,22 +194,41 @@ export const DRIVER_CLIENT_JS = `(() => {
       const deadline = performance.now() + timeoutMs;
       let fcp = null;
       let fcpEpoch = null;
-      let lastCount = -1;
+      let lastSignal = -1;
       let lastChange = performance.now();
       const tick = () => {
         const now = performance.now();
-        const c = x.contentCount();
-        if (fcp == null && c >= minContent) {
+        const signal = targetRows === null ? x.contentCount() : x.rowCount();
+        const reachedFcp = targetRows === null ? signal >= minContent : signal === targetRows;
+        if (fcp == null && reachedFcp) {
           fcp = now - t0;
           fcpEpoch = performance.timeOrigin + now;
         }
-        if (c !== lastCount) { lastCount = c; lastChange = now; }
+        if (signal !== lastSignal) { lastSignal = signal; lastChange = now; }
         if (fcp != null && now - lastChange >= idleMs) {
-          resolve({ fcp, fcpEpoch, settled: lastChange - t0, finalCount: c, dnf: false });
+          const tableOracle = x.tableOracle();
+          resolve({
+            fcp,
+            fcpEpoch,
+            settled: lastChange - t0,
+            finalCount: x.contentCount(),
+            finalRows: tableOracle.rows,
+            tableOracle,
+            dnf: false,
+          });
           return;
         }
         if (now > deadline) {
-          resolve({ fcp, fcpEpoch, settled: null, finalCount: c, dnf: true });
+          const tableOracle = x.tableOracle();
+          resolve({
+            fcp,
+            fcpEpoch,
+            settled: null,
+            finalCount: x.contentCount(),
+            finalRows: tableOracle.rows,
+            tableOracle,
+            dnf: true,
+          });
           return;
         }
         requestAnimationFrame(tick);
