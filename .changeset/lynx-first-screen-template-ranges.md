@@ -1,5 +1,4 @@
 ---
-'@octanejs/lynx': patch
 'octane': patch
 ---
 
