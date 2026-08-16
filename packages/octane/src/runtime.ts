@@ -19812,6 +19812,7 @@ export function childSlot(
 				emptyBlock: null,
 				env: undefined,
 				adopt: null,
+				plainDeopt: false,
 			};
 			if (upgradeArmed) {
 				state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start, state.end!);
@@ -19905,10 +19906,16 @@ export function childSlot(
 				descriptorBody(item, scope);
 			};
 		}
+		// `body` is `deoptItemBody` exactly when the compiler supplied no map body
+		// and this is not the mapped fallback — both wrapper assignments above are
+		// guarded by those two conditions. Record it on the slot rather than
+		// re-deriving it by identity in mountItem (see ForSlot.plainDeopt).
+		const plainDeopt = compiledMapBody === undefined && mappedFallback !== true;
+		state.forSlot.plainDeopt = plainDeopt;
 		const fastFlags = compiledMapFlags || 0;
 		const ssrMarkerless =
 			compiledMapBody === undefined
-				? markerlessMappedFallback || body === deoptItemBody
+				? markerlessMappedFallback || plainDeopt
 				: (fastFlags & 16) !== 0;
 		let pure = (fastFlags & 1) !== 0;
 		let lite = false;
@@ -25016,6 +25023,18 @@ interface ForSlot {
 	// Present only on a childSlot owned by the compiler's guarded map ABI.
 	// Keeps descriptor↔compiled adoption off every ordinary descriptor list.
 	mappedNative?: boolean;
+	// True when this de-opt list's items render through the plain `deoptItemBody`
+	// — no compiled map body, no mapped fallback wrapper. `mountItem` needs the
+	// fact but must NOT name `deoptItemBody` to get it: a live identity
+	// comparison there is a reference from the compiled `@for` path that every
+	// application reaches, and it makes the entire descriptor renderer
+	// (childSlot, fragment refs, portals, transitions, the attribute tables)
+	// reachable from apps that only ever render compiled templates. Recorded on
+	// the slot instead, so the reference stays inside childSlot, which already
+	// retains that graph. Both ForSlot literals declare it so every slot shares
+	// one hidden class; only childSlot ever stamps or reads it, because only
+	// childSlot passes mountItem the de-opt sentinel.
+	plainDeopt: boolean;
 	// Present only when the compiler proved a keyed equality selection. Identity
 	// gates the two-row update without retaining extra state on ordinary lists.
 	selectionItems?: ArrayLike<any>;
@@ -25096,6 +25115,10 @@ export function forBlock<T>(
 			emptyBlock: null,
 			env: undefined,
 			adopt: null,
+			// Compiled `@for` slots never read this — they never pass the de-opt
+			// sentinel — but both ForSlot literals declare it so every slot shares
+			// one hidden class and the stamp in childSlot transitions nothing.
+			plainDeopt: false,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -26451,7 +26474,7 @@ function mountItem<T>(
 			ssrMarkerless &&
 			!hydration.isOpen(hydration.node) &&
 			(singleRoot !== 2 ||
-				body !== deoptItemBody ||
+				forSlot.plainDeopt !== true ||
 				(isHostDescriptor(item) && !descNeedsBlocks(item)))
 		) {
 			// The outer @for pair is the only list framing on the wire. Each proven
@@ -26462,7 +26485,7 @@ function mountItem<T>(
 				hydration.node !== null &&
 				hydration.node !== forSlot.end &&
 				(singleRoot !== 2 ||
-					body !== deoptItemBody ||
+					forSlot.plainDeopt !== true ||
 					(hydration.node.nodeType === 1 && hydration.node.parentNode === parentNode))
 			) {
 				const root = hydration.node;
@@ -26478,7 +26501,7 @@ function mountItem<T>(
 				);
 				block.forSlot = forSlot;
 				block.itemIndex = index;
-				if (singleRoot === 2 && body === deoptItemBody) block.deoptNode = root;
+				if (singleRoot === 2 && forSlot.plainDeopt === true) block.deoptNode = root;
 				renderBlock(block);
 				hydration.node = block.endMarker?.nextSibling ?? root.nextSibling;
 				return block;
