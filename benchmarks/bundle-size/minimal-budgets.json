@@ -5,9 +5,9 @@
     "brotli": 1536
   },
   "cli-spa-starter": {
-    "raw": 80736,
-    "gzip": 27936,
-    "brotli": 24768
+    "raw": 69617,
+    "gzip": 24621,
+    "brotli": 21766
   },
   "root-static-specialized": {
     "raw": 49760,
