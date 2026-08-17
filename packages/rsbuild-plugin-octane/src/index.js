@@ -233,6 +233,7 @@ function assertRootPublicPaths(config, clientEnvironment) {
  *
  * @param {{
  *   hmr?: boolean,
+ *   parallel?: boolean | { maxWorkers?: number },
  *   profile?: boolean,
  *   strong?: boolean,
  *   exclude?: string[],
@@ -546,6 +547,7 @@ export function pluginOctane(inlineOptions = {}) {
 						root,
 						environment,
 						transpile: false,
+						...(inlineOptions.parallel === undefined ? null : { parallel: inlineOptions.parallel }),
 						...(strong === undefined ? null : { strong }),
 						...(inlineOptions.hmr === undefined ? null : { hmr: inlineOptions.hmr }),
 						...(inlineOptions.profile === undefined

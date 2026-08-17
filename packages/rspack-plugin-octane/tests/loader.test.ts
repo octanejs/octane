@@ -14,11 +14,14 @@ vi.mock('octane/compiler/bundler', () => ({
 }));
 
 import octaneLoader from '../src/loader.js';
+import finalizeOctaneLoader, { pitch as pitchOctaneLoader } from '../src/finalize-loader.js';
+import parallelOctaneLoader from '../src/parallel-loader.js';
 
 interface LoaderResult {
 	error: Error | null;
 	content?: string | Buffer;
 	map?: unknown;
+	metadata?: unknown;
 }
 
 function runLoader({
@@ -64,6 +67,68 @@ function runLoader({
 	};
 	octaneLoader.call(context, source, inputSourceMap);
 	return { context, dependencies, missingDependencies, module, result: result! };
+}
+
+function runParallelLoader({
+	options = {},
+	source = 'export function App() @{ <div /> }',
+	inputSourceMap,
+	module = { buildInfo: {} as Record<string, unknown>, layer: undefined as string | undefined },
+}: {
+	options?: Record<string, unknown>;
+	source?: string;
+	inputSourceMap?: unknown;
+	module?: { buildInfo: Record<string, unknown>; layer?: string };
+} = {}) {
+	const dependencies: string[] = [];
+	const missingDependencies: string[] = [];
+	let result: LoaderResult | undefined;
+	const finalizer = {
+		_module: module,
+		data: {} as Record<string, unknown>,
+		addMissingDependency: (dependency: string) => missingDependencies.push(dependency),
+		callback: (
+			error: Error | null,
+			content?: string | Buffer,
+			map?: unknown,
+			metadata?: unknown,
+		) => {
+			result = { error, content, map, ...(metadata === undefined ? {} : { metadata }) };
+		},
+	};
+	pitchOctaneLoader.call(finalizer);
+
+	const workerCallback = (
+		error: Error | null,
+		content?: string | Buffer,
+		map?: unknown,
+		metadata?: unknown,
+	) => {
+		if (error) {
+			result = { error, content, map };
+			return;
+		}
+		finalizeOctaneLoader.call(finalizer, content, map, metadata);
+	};
+	const worker = {
+		rootContext: '/project',
+		resource: '/project/src/App.tsrx?cache=1',
+		resourcePath: '/project/src/App.tsrx',
+		target: 'web',
+		hot: false,
+		mode: 'development',
+		sourceMap: true,
+		_module: { buildInfo: {} as Record<string, unknown>, layer: undefined as string | undefined },
+		loaders: [{ loaderItem: { data: finalizer.data } }, {}],
+		loaderIndex: 1,
+		cacheable: vi.fn(),
+		getOptions: () => options,
+		addDependency: (dependency: string) => dependencies.push(dependency),
+		callback: workerCallback,
+		async: () => workerCallback,
+	};
+	parallelOctaneLoader.call(worker, source, inputSourceMap);
+	return { dependencies, missingDependencies, module, result: result! };
 }
 
 describe('octane Rspack loader', () => {
@@ -314,5 +379,118 @@ describe('octane Rspack loader', () => {
 		const output = runLoader();
 		expect(output.result.error).toEqual(new Error('bad TSRX'));
 		expect(output.result.content).toBeUndefined();
+	});
+
+	it('preserves layers, source maps, file watches, and public module metadata in parallel', () => {
+		const map = { version: 3, sources: ['App.tsrx'], mappings: 'AAAA' };
+		const clientReference = {
+			id: 'octane-client-reference-v1:object:/src/App.tsrx',
+			moduleId: '/src/App.tsrx',
+			renderer: 'object',
+		};
+		mocks.transform.mockReturnValue({
+			code: 'export const rendered = true;',
+			map,
+			kind: 'compile',
+			clientReference,
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			dependencies: ['/project/package.json', '/project/package.json'],
+			missingDependencies: ['/project/src/package.json', '/project/src/package.json'],
+		});
+		const module = { buildInfo: {}, layer: 'octane:main-thread' };
+		const output = runParallelLoader({
+			module,
+			options: {
+				universalRuntime: { runtime: 'object', thread: 'background' },
+				layerSpecializations: {
+					'octane:main-thread': {
+						universalRuntime: { runtime: 'object', thread: 'main-thread' },
+					},
+				},
+			},
+		});
+
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
+			expect.objectContaining({ universalRuntime: { runtime: 'object', thread: 'main-thread' } }),
+		);
+		expect(output.result).toEqual({ error: null, content: 'export const rendered = true;', map });
+		expect(output.dependencies).toEqual(['/project/package.json']);
+		expect(output.missingDependencies).toEqual(['/project/src/package.json']);
+		expect(output.module.layer).toBe('octane:main-thread');
+		expect(output.module.buildInfo.octane).toEqual({
+			canonicalId: '/src/App.tsrx',
+			transformKind: 'compile',
+			serverRpc: false,
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			clientReference,
+		});
+	});
+
+	it('clears obsolete parallel-build metadata when a module becomes pass-through', () => {
+		mocks.transform.mockReturnValue({
+			code: 'export const untouched = true;',
+			map: null,
+			kind: 'none',
+			dependencies: ['/project/package.json'],
+			missingDependencies: ['/project/src/package.json'],
+		});
+		const inputSourceMap = { version: 3, sources: ['authored.ts'], mappings: 'AAAA' };
+		const module = {
+			buildInfo: {
+				octane: { canonicalId: '/stale', transformKind: 'compile', serverRpc: false },
+			},
+		};
+		const output = runParallelLoader({
+			module,
+			source: 'export const untouched = true;',
+			inputSourceMap,
+		});
+
+		expect(output.result).toEqual({
+			error: null,
+			content: 'export const untouched = true;',
+			map: inputSourceMap,
+		});
+		expect(output.dependencies).toEqual(['/project/package.json']);
+		expect(output.missingDependencies).toEqual(['/project/src/package.json']);
+		expect(output.module.buildInfo).not.toHaveProperty('octane');
+	});
+
+	it('preserves unrelated loader metadata while restoring worker compilation state', () => {
+		const module = { buildInfo: {} as Record<string, unknown> };
+		const callback = vi.fn();
+		const addMissingDependency = vi.fn();
+		const sourceMap = { version: 3, sources: ['App.tsrx'], mappings: 'AAAA' };
+		const info = { canonicalId: '/src/App.tsrx', transformKind: 'compile', serverRpc: false };
+
+		finalizeOctaneLoader.call(
+			{ _module: module, addMissingDependency, callback },
+			'export const rendered = true;',
+			sourceMap,
+			{
+				upstream: { generated: true },
+				__octaneParallelLoader: {
+					buildInfo: info,
+					missingDependencies: ['/project/src/package.json'],
+				},
+			},
+		);
+
+		expect(module.buildInfo.octane).toEqual(info);
+		expect(addMissingDependency).toHaveBeenCalledWith('/project/src/package.json');
+		expect(callback).toHaveBeenCalledWith(null, 'export const rendered = true;', sourceMap, {
+			upstream: { generated: true },
+		});
+	});
+
+	it('reports parallel compilation errors without attaching incomplete module metadata', () => {
+		mocks.transform.mockImplementation(() => {
+			throw new Error('bad TSRX');
+		});
+		const output = runParallelLoader();
+
+		expect(output.result.error).toEqual(new Error('bad TSRX'));
+		expect(output.result.content).toBeUndefined();
+		expect(output.module.buildInfo).not.toHaveProperty('octane');
 	});
 });

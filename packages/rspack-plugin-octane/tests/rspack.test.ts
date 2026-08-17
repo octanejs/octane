@@ -3,6 +3,7 @@ import {
 	mkdtempSync,
 	mkdirSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
@@ -20,6 +21,7 @@ const profilerGlobal = '__OCTANE_PROFILER__';
 const runGlobal = '__octane_rspack_profile_bundle_runs__';
 const productionErrorGlobal = '__octane_rspack_production_error__';
 const transpileGlobal = '__octane_rspack_transpiled_value__';
+const slotArgumentCountGlobal = '__octane_rspack_slot_argument_count__';
 const lynxWorkletFeatureGlobal = '__octane_rspack_lynx_worklet_feature__';
 const lynxWorkletHelperGlobal = '__octane_rspack_lynx_worklet_helper__';
 
@@ -189,6 +191,7 @@ export function App() @{
 		Reflect.deleteProperty(globalThis, runGlobal);
 		Reflect.deleteProperty(globalThis, productionErrorGlobal);
 		Reflect.deleteProperty(globalThis, transpileGlobal);
+		Reflect.deleteProperty(globalThis, slotArgumentCountGlobal);
 		Reflect.deleteProperty(globalThis, lynxWorkletFeatureGlobal);
 		Reflect.deleteProperty(globalThis, lynxWorkletHelperGlobal);
 		await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
@@ -322,6 +325,114 @@ ${includeRawBinding ? "export { Raw } from '@fixture/raw';" : ''}
 			expect(map.sources.some((source: string) => source.includes('src/App.tsrx'))).toBe(true);
 			expect(map.sources.some((source: string) => source.includes('@fixture/raw/index.tsx'))).toBe(
 				true,
+			);
+		}
+	}, 30_000);
+
+	it('rebuilds hook ownership when a watched missing package manifest is created', async () => {
+		write(
+			root,
+			'node_modules/octane/server.cjs',
+			`exports.useState = function (...args) {
+	globalThis.${slotArgumentCountGlobal} = args.length;
+	return [args[0]];
+};
+exports.hookSlots = () => 0;\n`,
+		);
+		write(
+			root,
+			'src/pkg/hooks/useValue.ts',
+			`import { useState } from 'octane';
+export function useValue(): number { return useState(1)[0]; }\n`,
+		);
+		write(
+			root,
+			'src/index.js',
+			`import { useValue } from './pkg/hooks/useValue.ts';\nuseValue();\n`,
+		);
+
+		const outputPath = join(root, 'dist-manifest-watch');
+		const compiler = rspack({
+			context: root,
+			mode: 'development',
+			target: 'node',
+			entry: './src/index.js',
+			optimization: { minimize: false },
+			output: { path: outputPath, filename: '[fullhash].cjs' },
+			plugins: [new OctaneRspackPlugin()],
+		} as any) as any;
+		const completed: Array<{ error: Error | null; stats?: any }> = [];
+		const waiting: Array<{ resolve: (stats: any) => void; reject: (error: Error) => void }> = [];
+		const watching = compiler.watch(
+			{ aggregateTimeout: 20, poll: 50 },
+			(error: Error, stats: any) => {
+				const buildError =
+					error ??
+					(stats?.hasErrors()
+						? new Error(
+								(stats.toJson({ all: false, errors: true }).errors ?? [])
+									.map((entry: any) => entry.message ?? String(entry))
+									.join('\n'),
+							)
+						: null);
+				const next = waiting.shift();
+				if (!next) {
+					completed.push({ error: buildError, stats });
+					return;
+				}
+				if (buildError) next.reject(buildError);
+				else next.resolve(stats);
+			},
+		);
+		const nextBuild = () =>
+			new Promise<any>((resolve, reject) => {
+				const ready = completed.shift();
+				if (ready) {
+					if (ready.error) reject(ready.error);
+					else resolve(ready.stats);
+					return;
+				}
+				waiting.push({ resolve, reject });
+			});
+		const loadBundle = async (stats: any) => {
+			const filename = (stats.toJson({ all: false, assets: true }).assets ?? []).find(
+				(asset: { name: string }) => asset.name.endsWith('.cjs'),
+			)?.name;
+			expect(filename).toBeTypeOf('string');
+			await import(pathToFileURL(join(outputPath, filename)).href);
+		};
+		const hookInfo = (stats: any) =>
+			getOctaneRspackBuildInfo(
+				[...stats.compilation.modules].find((module: any) =>
+					module.resource?.endsWith('/src/pkg/hooks/useValue.ts'),
+				),
+			);
+
+		try {
+			const initial = await nextBuild();
+			const manifest = join(realpathSync(root), 'src/pkg/package.json');
+			expect([...initial.compilation.missingDependencies]).toContain(manifest);
+			expect(hookInfo(initial)).toMatchObject({ transformKind: 'slots' });
+			await loadBundle(initial);
+			expect(globalThis[slotArgumentCountGlobal as keyof typeof globalThis]).toBe(2);
+
+			const rebuild = nextBuild();
+			write(
+				root,
+				'src/pkg/package.json',
+				'{"name":"nested","octane":{"hookSlots":{"manual":["hooks"]}}}\n',
+			);
+			const updated = await rebuild;
+			expect([...updated.compilation.fileDependencies]).toContain(manifest);
+			expect(hookInfo(updated)).toBeNull();
+			await loadBundle(updated);
+			expect(globalThis[slotArgumentCountGlobal as keyof typeof globalThis]).toBe(1);
+		} finally {
+			await new Promise<void>((resolve, reject) =>
+				watching.close((error: Error | null) => (error ? reject(error) : resolve())),
+			);
+			await new Promise<void>((resolve, reject) =>
+				compiler.close((error: Error | null) => (error ? reject(error) : resolve())),
 			);
 		}
 	}, 30_000);
@@ -593,6 +704,31 @@ export function App() @{ const live = Scene as unknown; <Canvas><Scene /></Canva
 		const bundle = readFileSync(join(outputPath, 'bundle.js'), 'utf8');
 		expect(bundle).toContain('__octaneComponents');
 		expect(bundle).toContain('__webpack_require__.hmrD');
+	}, 30_000);
+
+	it('reports worker compiler warnings and syntax errors through Rspack diagnostics', async () => {
+		write(root, 'src/App.tsrx', `export function App() @{ <input onChange={() => {}} /> }\n`);
+		const build = (name: string) =>
+			compile({
+				context: root,
+				mode: 'development',
+				target: 'web',
+				entry: './src/index.js',
+				optimization: { minimize: false },
+				output: { path: join(root, `dist-${name}`), filename: 'bundle.js' },
+				plugins: [new OctaneRspackPlugin()],
+			});
+
+		const warnings = (await build('worker-warning')).toJson({
+			all: false,
+			warnings: true,
+		}).warnings;
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0].message).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
+		expect(warnings[0].message).toContain('/src/App.tsrx:1:');
+
+		write(root, 'src/App.tsrx', `export function App() @{ <main>unterminated }\n`);
+		await expect(build('worker-error')).rejects.toThrow(/Unclosed tag '<main>'/);
 	}, 30_000);
 
 	it('erases profiling and full diagnostics from a real production bundle', async () => {

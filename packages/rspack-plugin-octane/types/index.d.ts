@@ -153,6 +153,13 @@ export interface OctaneRspackLoaderOptions {
 
 export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
 	/**
+	 * Compile Octane modules in Rspack worker threads. Enabled by default with
+	 * at most four workers; set `false` to keep compilation on the main thread.
+	 * Provide `maxWorkers` to request a different shared worker-pool limit.
+	 * @default true
+	 */
+	parallel?: boolean | { maxWorkers?: number };
+	/**
 	 * Compiler and exact-runtime overrides selected by the current module's
 	 * Rspack layer. Unknown layers retain the top-level plugin options.
 	 */
