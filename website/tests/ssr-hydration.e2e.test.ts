@@ -798,16 +798,18 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 		]);
 		await waitForServer(server, `http://localhost:${DEV_PORT}/`, 60_000);
 		// Answering a request does not mean the client module graph is compiled:
-		// Vite transforms it on demand, and the route cases below run four-at-a-time,
-		// so without this the first of them each pay the shared app shell's compile
-		// at the same time, inside one ordinary action budget. Measured against this
-		// cold server, that left the worst route ~12s into its 20s budget on a fast
-		// machine, which a loaded CI runner has no headroom to absorb; compiling the
-		// shell once here first brings the worst route to ~5.5s. The cold start is
-		// still proven, because this load is the one that pays for it, on a budget
-		// that says so rather than an ordinary one.
-		const warmup = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs', { timeout: 120_000 });
-		await warmup.page.close();
+		// Vite transforms it on demand, and the route cases below run four-at-a-time.
+		// Warm their route-specific graphs serially under the setup budget so the
+		// assertion pass measures hydration correctness instead of concurrent dev
+		// compilation. The fresh-cache contract remains covered because these loads
+		// are the ones that pay for every transform before the ordinary 20s action
+		// budget applies.
+		for (const route of ROUTES) {
+			const warmup = await loadRoute(`http://localhost:${DEV_PORT}`, route, {
+				timeout: 120_000,
+			});
+			await warmup.page.close();
+		}
 		// Covers the production-build wait above, the cold dev boot, and the warm-up.
 	}, 540_000);
 

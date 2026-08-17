@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import rspack from '@rspack/core';
+import { compile as compileOctane } from 'octane/compiler';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getOctaneRspackBuildInfo, OctaneRspackPlugin } from '../src/index.js';
 
@@ -752,8 +753,20 @@ export function App() @{ const live = Scene as unknown; <Canvas><Scene /></Canva
 		expect(warnings[0].message).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
 		expect(warnings[0].message).toContain('/src/App.tsrx:1:');
 
-		write(root, 'src/App.tsrx', `export function App() @{ <main>unterminated }\n`);
-		await expect(build('worker-error')).rejects.toThrow(/Unclosed tag '<main>'/);
+		const invalidSource = `export function App() @{ <main>unterminated }\n`;
+		const filename = write(root, 'src/App.tsrx', invalidSource);
+		const compilerError = (() => {
+			try {
+				compileOctane(invalidSource, filename);
+			} catch (error) {
+				return error;
+			}
+			throw new Error('Expected malformed TSRX to fail compilation.');
+		})();
+		expect(compilerError).toBeInstanceOf(SyntaxError);
+		// The loader must preserve the compiler diagnostic, regardless of which
+		// supported parser produced its wording.
+		await expect(build('worker-error')).rejects.toThrow((compilerError as SyntaxError).message);
 	}, 30_000);
 
 	it('erases profiling and full diagnostics from a real production bundle', async () => {
