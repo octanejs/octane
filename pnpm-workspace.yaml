@@ -269,6 +269,7 @@ catalogs:
     '@tsrx/core': ^0.1.56
     '@tsrx/prettier-plugin': ^0.3.118
     '@tsrx/typescript-plugin': ^0.3.118
+    '@volar/source-map': ^2.4.28
     '@tsrx/ripple': ^0.1.57
     '@tsrx/react': ^0.2.56
     '@tsrx/solid': ^0.1.56
@@ -572,6 +573,13 @@ minimumReleaseAgeExclude:
 # is lowered; both are scoped to the TYPE-ONLY path, so runtime emit for the
 # other platforms sharing this transform is unchanged. Remove once @tsrx/core
 # ships the equivalent fix upstream.
+#
+# @tsrx/core 0.1.56: preserve declaration/member documentation and custom
+# annotation comments in type-only TSX, and map whole exports and property
+# signatures back to their authored ranges. Keep this backport in the shared
+# compiler owner so language hosts do not need to rewrite generated code.
+# Published Octane consumers still need the corresponding @tsrx/core release;
+# remove this section and raise the catalog minimum when that release ships.
 patchedDependencies:
   '@changesets/cli@2.31.1': patches/@changesets__cli@2.31.1.patch
   '@tsrx/core@0.1.56': patches/@tsrx__core@0.1.56.patch

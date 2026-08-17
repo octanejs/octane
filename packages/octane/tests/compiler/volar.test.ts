@@ -1,6 +1,7 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { SourceMap } from '@volar/source-map';
 import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
 import { compileToVolarMappings } from 'octane/compiler/volar';
@@ -31,6 +32,53 @@ function writeOctaneJsxRuntimeStub(root: string, intrinsics: string): void {
 		join(octaneRoot, 'jsx-runtime.d.ts'),
 		`export namespace JSX {\n\tinterface IntrinsicElements {\n${intrinsics}\n\t}\n}\n`,
 	);
+}
+
+function parseVirtualTsx(code: string): ts.SourceFile {
+	return ts.createSourceFile('virtual.tsx', code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+}
+
+/** Comments as TypeScript and native-code generators see them on a declaration. */
+function declarationComments(file: ts.SourceFile, node: ts.Node) {
+	const docs = ts
+		.getJSDocCommentsAndTags(node)
+		.filter(ts.isJSDoc)
+		.filter((doc) => !doc.tags?.some((tag) => tag.tagName.text === 'jsxImportSource'))
+		.map((doc) => ({
+			text: ts.getTextOfJSDocComment(doc.comment) ?? '',
+			tags: (doc.tags ?? []).map((tag) => ({
+				name: tag.tagName.text,
+				text: ts.getTextOfJSDocComment(tag.comment) ?? '',
+			})),
+		}));
+	const annotations = (ts.getLeadingCommentRanges(file.text, node.getFullStart()) ?? [])
+		.filter((comment) => comment.kind === ts.SyntaxKind.SingleLineCommentTrivia)
+		.map((comment) => file.text.slice(comment.pos + 2, comment.end).trim())
+		.filter((comment) => comment.startsWith('@'));
+	return { docs, annotations };
+}
+
+/** Full exported statements and their property signatures, in authored order. */
+function declarationRanges(file: ts.SourceFile): ts.Node[] {
+	const declarations: ts.Node[] = [];
+	const visitMembers = (node: ts.Node): void => {
+		if (ts.isPropertySignature(node)) declarations.push(node);
+		ts.forEachChild(node, visitMembers);
+	};
+	for (const statement of file.statements) {
+		if (
+			ts.isExportAssignment(statement) ||
+			ts.isExportDeclaration(statement) ||
+			(ts.canHaveModifiers(statement) &&
+				ts
+					.getModifiers(statement)
+					?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword))
+		) {
+			declarations.push(statement);
+			ts.forEachChild(statement, visitMembers);
+		}
+	}
+	return declarations;
 }
 
 /**
@@ -120,6 +168,153 @@ describe('compileToVolarMappings', () => {
 		// positions instead of inheriting the preceding token's location.
 		expectExactSpan('{ list: [run(input)] }');
 		expectExactSpan('value.list[0]');
+	});
+
+	it('keeps declaration and member documentation attached to its TypeScript owner', () => {
+		const src =
+			'/** @ExportModel @Version(1) */\n' +
+			'export interface NativeModel {\n' +
+			'\t/** A stable identifier. */\n' +
+			'\t// @Version(1)\n' +
+			'\treadonly value?: string;\n' +
+			'\t/** @Version(2) */\n' +
+			'\tcount: number;\n' +
+			'}\n' +
+			'/** A separate model. */\n' +
+			'// @ExportModel\n' +
+			'export interface OtherModel {\n' +
+			'\t/** The visible label. */\n' +
+			'\tlabel: string;\n' +
+			'}\n';
+		const result = compileToVolarMappings(src, 'models.tsrx');
+		expect(result.errors).toEqual([]);
+		const authored = parseVirtualTsx(src);
+		const generated = parseVirtualTsx(result.code);
+		const describeDeclarations = (file: ts.SourceFile) =>
+			declarationRanges(file).map((node) => ({
+				kind: node.kind,
+				name:
+					ts.isInterfaceDeclaration(node) || ts.isPropertySignature(node)
+						? node.name.getText(file)
+						: undefined,
+				...declarationComments(file, node),
+			}));
+
+		// The same source in a .ts file is the consumer's reference behavior.
+		// Comparing attachment, not comment text somewhere in the output, also
+		// detects a member's annotation being copied onto its neighbor.
+		expect(describeDeclarations(generated)).toEqual(describeDeclarations(authored));
+	});
+
+	it.each(['export', 'export default'])(
+		'keeps %s component documentation on the function when JSX is hoisted',
+		(exportKind) => {
+			const src =
+				'/** Component documentation. */\n' +
+				'// @ExportModel\n' +
+				`${exportKind} function Scene() @{ <div /> }\n`;
+			const result = compileToVolarMappings(src, 'scene.tsrx');
+			expect(result.errors).toEqual([]);
+			const generated = parseVirtualTsx(result.code);
+			const component = generated.statements.find(
+				(statement) => ts.isFunctionDeclaration(statement) && statement.name?.text === 'Scene',
+			);
+			expect(component).toBeDefined();
+			expect(declarationComments(generated, component!)).toEqual({
+				docs: [{ text: 'Component documentation.', tags: [] }],
+				annotations: ['@ExportModel'],
+			});
+			const documentedStatements = generated.statements.filter((statement) => {
+				const comments = declarationComments(generated, statement);
+				return comments.docs.length > 0 || comments.annotations.length > 0;
+			});
+			expect(documentedStatements).toHaveLength(1);
+			expect(documentedStatements[0]).toBe(component);
+		},
+	);
+
+	it.each([
+		['interface at offset zero', 'export interface Model { value: string\ncount: number }'],
+		[
+			'type alias with readonly and optional members',
+			'export type Model = { readonly value?: string; count: number };',
+		],
+		['named function', 'export function read(value: string): string { return value; }'],
+		['named variable', 'export const version = 1;'],
+		['named variable without a terminator', 'export const version = 1'],
+		['named re-export', "export { NativeModel as Model } from './native';"],
+		['export-all without a terminator', "export * from './native'"],
+		['default expression', 'export default 42;'],
+		['default expression without a terminator', 'export default 42'],
+		['anonymous default function', 'export default function () { return 42; }'],
+		['block declaration followed by an empty statement', 'export default function read() {};'],
+		['named default class', 'export default class Model {}'],
+		[
+			'adjacent declaration documentation',
+			'/** Model docs. */export interface Model { value: string; }',
+		],
+		[
+			'adjacent member documentation',
+			'export interface Model { /** Field docs. */readonly value?: string; }',
+		],
+		[
+			'mixed property separators',
+			'export interface Model {\n\treadonly value?: string;\n\tcount: number\n\tenabled?: boolean,\n}',
+		],
+	])('maps complete authored declaration ranges for %s', (_name, src) => {
+		const result = compileToVolarMappings(src, 'model.tsrx');
+		expect(result.errors).toEqual([]);
+		const authored = parseVirtualTsx(src);
+		const generated = parseVirtualTsx(result.code);
+		const sourceDeclarations = declarationRanges(authored);
+		const generatedDeclarations = declarationRanges(generated);
+		expect(generatedDeclarations.map((node) => node.kind)).toEqual(
+			sourceDeclarations.map((node) => node.kind),
+		);
+		const map = new SourceMap(result.mappings);
+		for (let index = 0; index < sourceDeclarations.length; index++) {
+			const sourceNode = sourceDeclarations[index];
+			const generatedNode = generatedDeclarations[index];
+			// Native tooling uses the first Volar range, including the export
+			// keyword, modifiers, and any authored member terminator. A later
+			// correct alternative cannot repair an incorrect first result.
+			const mapped = map
+				.toSourceRange(generatedNode.getStart(generated), generatedNode.getEnd(), true)
+				.next().value;
+			expect(mapped?.slice(0, 2), sourceNode.getText(authored)).toEqual([
+				sourceNode.getStart(authored),
+				sourceNode.getEnd(),
+			]);
+		}
+	});
+
+	it('does not change return or throw semantics when preserving inline JSDoc', () => {
+		const src =
+			'export function read() { return /** @type {number} */ 42; }\n' +
+			"export function fail() { throw /** @type {Error} */ new Error('failure'); }\n";
+		const result = compileToVolarMappings(src, 'inline-docs.tsrx');
+		expect(result.errors).toEqual([]);
+		const generated = parseVirtualTsx(result.code);
+		const functions = generated.statements.filter(ts.isFunctionDeclaration);
+		const read = functions.find((node) => node.name?.text === 'read');
+		const fail = functions.find((node) => node.name?.text === 'fail');
+		expect(read?.body?.statements).toHaveLength(1);
+		expect(fail?.body?.statements).toHaveLength(1);
+		const returnStatement = read!.body!.statements[0];
+		const throwStatement = fail!.body!.statements[0];
+		expect(ts.isReturnStatement(returnStatement)).toBe(true);
+		expect(ts.isThrowStatement(throwStatement)).toBe(true);
+		const returned = ts.isReturnStatement(returnStatement) ? returnStatement.expression : undefined;
+		const thrown = ts.isThrowStatement(throwStatement) ? throwStatement.expression : undefined;
+		expect(returned && ts.isNumericLiteral(returned) ? returned.text : undefined).toBe('42');
+		expect(
+			thrown && ts.isNewExpression(thrown) ? thrown.expression.getText(generated) : undefined,
+		).toBe('Error');
+		expect(
+			thrown && ts.isNewExpression(thrown) && thrown.arguments?.[0]
+				? ts.isStringLiteral(thrown.arguments[0]) && thrown.arguments[0].text
+				: undefined,
+		).toBe('failure');
 	});
 
 	it('selects renderer intrinsics by canonical filename in the mapped virtual-code print', () => {

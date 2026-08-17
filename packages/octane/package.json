@@ -193,6 +193,7 @@
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
+    "@volar/source-map": "catalog:default",
     "@wagmi/connectors": "catalog:default",
     "@wagmi/core": "catalog:default",
     "esbuild": "catalog:default",

@@ -135,3 +135,448 @@ index 636ee666f44026e2667d5d99638d920a202d6abb..f9df8d9cadce600cba8d38788cff437b
  		transform_context,
  	);
  }
+diff --git a/src/comment-utils.js b/src/comment-utils.js
+index 6691a10f..9da1576f 100644
+--- a/src/comment-utils.js
++++ b/src/comment-utils.js
+@@ -29,6 +29,14 @@ export function is_triple_slash_directive(comment) {
+ 	return /^\/\s*<(reference|amd-module|amd-dependency)/.test(value);
+ }
+ 
++/**
++ * @param {AST.CommentWithLocation} comment
++ * @returns {boolean}
++ */
++export function is_jsdoc_comment(comment) {
++	return comment.type === 'Block' && comment.value.startsWith('*');
++}
++
+ /**
+  * Check if a comment is a JSDoc comment with TypeScript annotations
+  * Examples: block comments containing `@type`, `@typedef`, `@param`, `@returns`, etc.
+@@ -36,10 +44,7 @@ export function is_triple_slash_directive(comment) {
+  * @returns {boolean}
+  */
+ export function is_jsdoc_ts_annotation(comment) {
+-	if (comment.type !== 'Block') return false;
+-
+-	// JSDoc comments start with /** which means the value starts with * after /* is stripped
+-	if (!comment.value.startsWith('*')) return false;
++	if (!is_jsdoc_comment(comment)) return false;
+ 
+ 	// Check if it contains TypeScript-relevant tags
+ 	const tsAnnotations = [
+@@ -84,6 +89,36 @@ export function should_preserve_comment(comment) {
+ 	);
+ }
+ 
++/**
++ * Declaration generators also consume documentation and custom `// @...`
++ * annotations from JSX-backed virtual TypeScript. Keep this broader policy
++ * separate from the legacy to_ts printer's semantic-comment policy.
++ * @param {AST.CommentWithLocation} comment
++ * @returns {boolean}
++ */
++export function should_preserve_jsx_tooling_comment(comment) {
++	return (
++		should_preserve_comment(comment) ||
++		is_jsdoc_comment(comment) ||
++		(comment.type === 'Line' && comment.value.trimStart().startsWith('@'))
++	);
++}
++
++/**
++ * Only file-wide directives may move ahead of generated imports or hoists.
++ * In particular, @ts-ignore/@ts-expect-error and declaration JSDoc must stay
++ * with the statement they describe.
++ * @param {AST.CommentWithLocation} comment
++ * @returns {boolean}
++ */
++export function is_file_level_pragma(comment) {
++	return (
++		is_jsx_pragma(comment) ||
++		is_triple_slash_directive(comment) ||
++		(comment.type === 'Line' && /^\s*@ts-(?:no)?check\b/.test(comment.value))
++	);
++}
++
+ /**
+  * Format a comment for output
+  * @param {AST.CommentWithLocation} comment
+diff --git a/src/transform/jsx/helpers.js b/src/transform/jsx/helpers.js
+index dab9fc78..38888d14 100644
+--- a/src/transform/jsx/helpers.js
++++ b/src/transform/jsx/helpers.js
+@@ -2,7 +2,13 @@
+ /** @import * as ESRap from 'esrap' */
+ 
+ import tsx from 'esrap/languages/tsx';
+-import { should_preserve_comment, format_comment } from '../../comment-utils.js';
++import {
++	should_preserve_comment,
++	should_preserve_jsx_tooling_comment,
++	is_file_level_pragma,
++	format_comment,
++} from '../../comment-utils.js';
++import { has_location } from '../../utils/ast.js';
+ import { with_deferred_imports } from '../imports.js';
+ 
+ /**
+@@ -69,25 +75,64 @@ export function set_node_path_metadata(node, path) {
+  * (structural tokens carry one-character source locations). typeOnly/volar
+  * prints opt in — their maps are consumed positionally by the language
+  * tooling and never shipped; build prints stay sparse.
+- * @param {AST.CommentWithLocation[]} [comments] Source comments; the ones
+- * `should_preserve_comment` classifies as semantic-to-TS (`@ts-nocheck`,
+- * `@jsxImportSource`, triple-slash references, …) and that LEAD the program
+- * are re-emitted at the top of the printed output. The generated TSX is real
+- * TS input — dropping a leading pragma changes how the whole file checks.
++ * @param {AST.CommentWithLocation[]} [comments] Source comments. In type-only
++ * output, file-wide pragmas lead the program while documentation and scoped
++ * annotations stay with their declarations, members, or statements. A sparse
++ * print with explicitly supplied comments retains its existing leading-pragma
++ * behavior. Ordinary build callers supply no comments.
+  */
+ export function tsx_with_ts_locations(boundary_tokens = false, comments = undefined) {
+ 	const base = with_deferred_imports(tsx({ boundaryTokens: boundary_tokens }));
+ 	const { _: base_visitor, ...base_visitors } = base;
++	const preserve_comments = comments !== undefined;
++	const preserve_owner_comments = boundary_tokens && preserve_comments;
++	/** @type {Set<string> | null} */
++	const emitted_comments = preserve_comments ? new Set() : null;
++
++	/**
++	 * @param {AST.CommentWithLocation} comment
++	 * @param {ESRap.Context} context
++	 */
++	const write_preserved_comment = (comment, context) => {
++		if (
++			!emitted_comments ||
++			!(preserve_owner_comments
++				? should_preserve_jsx_tooling_comment(comment)
++				: should_preserve_comment(comment))
++		) {
++			return;
++		}
++		const key = `${comment.start}:${comment.end}:${comment.type}:${comment.value}`;
++		if (emitted_comments.has(key)) return;
++		emitted_comments.add(key);
++		if (comment.loc) context.location(comment.loc.start.line, comment.loc.start.column);
++		context.write(format_comment(comment));
++		if (comment.loc) context.location(comment.loc.end.line, comment.loc.end.column);
++		context.newline();
++	};
++
++	/**
++	 * @param {AST.Node} node
++	 * @param {ESRap.Context} context
++	 */
++	const write_leading_comments = (node, context) => {
++		if (!node.leadingComments || !is_comment_owner(node)) return;
++		for (const comment of node.leadingComments) {
++			if (has_location(comment)) write_preserved_comment(comment, context);
++		}
++	};
+ 
+ 	const leading_preserved = (/** @type {AST.Program} */ program) => {
+-		if (!comments?.length) return [];
++		if (!preserve_comments || !comments?.length) return [];
+ 		// Injected statements (dynamic-import/try-import prepends) carry no
+ 		// loc; anchor "leading" on the first statement that maps to source,
+ 		// else every preserved comment in the file would hoist to the top.
+ 		const first = program.body.find((node) => node.loc);
+ 		return comments.filter(
+ 			(comment) =>
+-				should_preserve_comment(comment) &&
++				(preserve_owner_comments
++					? is_file_level_pragma(comment)
++					: should_preserve_comment(comment)) &&
+ 				(first?.loc == null ||
+ 					(comment.loc &&
+ 						(comment.loc.end.line < first.loc.start.line ||
+@@ -100,10 +145,7 @@ export function tsx_with_ts_locations(boundary_tokens = false, comments = undefi
+ 	const wrappers = {
+ 		Program: (node, context) => {
+ 			for (const comment of leading_preserved(node)) {
+-				if (comment.loc) context.location(comment.loc.start.line, comment.loc.start.column);
+-				context.write(format_comment(comment));
+-				if (comment.loc) context.location(comment.loc.end.line, comment.loc.end.column);
+-				context.newline();
++				write_preserved_comment(comment, context);
+ 			}
+ 			/** @type {NonNullable<typeof base.Program>} */ (base.Program)(node, context);
+ 		},
+@@ -206,8 +248,13 @@ export function tsx_with_ts_locations(boundary_tokens = false, comments = undefi
+ 			context.visit(node.body);
+ 		},
+ 		_(node, context, visit) {
++			if (preserve_owner_comments) write_leading_comments(node, context);
+ 			const visit_with_locations = () => {
+-				if (!LOCATION_WRAPPED_NODE_TYPES.has(node.type) || !node.loc) {
++				if (
++					!node.loc ||
++					(!LOCATION_WRAPPED_NODE_TYPES.has(node.type) &&
++						!(boundary_tokens && TOOLING_LOCATION_WRAPPED_NODE_TYPES.has(node.type)))
++				) {
+ 					visit(node);
+ 					return;
+ 				}
+@@ -226,6 +273,44 @@ export function tsx_with_ts_locations(boundary_tokens = false, comments = undefi
+ 	return { ...base_visitors, ...wrappers };
+ }
+ 
++/**
++ * A newline is safe before a statement/declaration or a member, but not before
++ * an arbitrary expression: `return /** @type {number} *\/ 1` must not become a
++ * bare return, and `throw` forbids a line terminator before its argument.
++ * @param {AST.Node} node
++ * @returns {boolean}
++ */
++function is_comment_owner(node) {
++	return (
++		node.type.endsWith('Declaration') ||
++		node.type.endsWith('Statement') ||
++		COMMENT_OWNER_NODE_TYPES.has(node.type)
++	);
++}
++
++const COMMENT_OWNER_NODE_TYPES = new Set([
++	'VariableDeclarator',
++	'Property',
++	'PropertyDefinition',
++	'AccessorProperty',
++	'MethodDefinition',
++	'TSAbstractPropertyDefinition',
++	'TSAbstractAccessorProperty',
++	'TSAbstractMethodDefinition',
++	'TSPropertySignature',
++	'TSMethodSignature',
++	'TSIndexSignature',
++	'TSEnumMember',
++	'TSExportAssignment',
++]);
++
++const TOOLING_LOCATION_WRAPPED_NODE_TYPES = new Set([
++	'ExportNamedDeclaration',
++	'ExportDefaultDeclaration',
++	'ExportAllDeclaration',
++	'TSPropertySignature',
++]);
++
+ // Be careful when adding visitors that are already defined in `wrappers`.
+ // JSXOpeningElement is intentionally in both places: its custom printer still
+ // needs a location marker around the whole node.
+diff --git a/src/transform/segments.js b/src/transform/segments.js
+index 61059e24..a857fe3a 100644
+--- a/src/transform/segments.js
++++ b/src/transform/segments.js
+@@ -34,11 +34,19 @@ import {
+ 	build_line_offsets,
+ 	get_mapping_from_node,
+ } from '../source-map-utils.js';
+-import { should_preserve_comment } from '../comment-utils.js';
++import { should_preserve_jsx_tooling_comment, format_comment } from '../comment-utils.js';
+ import { has_location } from '../utils/ast.js';
+ 
+ const LAZY_PARAM_IDENTIFIER_REGEX = /^__lazy\d+$/;
+ const RETURN_KEYWORD = 'return';
++const EXPORT_KEYWORD = 'export';
++const BLOCK_DECLARATION_TYPES = new Set([
++	'FunctionDeclaration',
++	'ClassDeclaration',
++	'TSInterfaceDeclaration',
++	'TSEnumDeclaration',
++	'TSModuleDeclaration',
++]);
+ 
+ /**
+  * @param {string} value
+@@ -418,6 +426,88 @@ export function convert_source_map_to_mappings(
+ 		return candidates[Math.min(index, candidates.length - 1)];
+ 	}
+ 
++	/**
++	 * A comment's end can share a source coordinate with the next declaration,
++	 * and synthetic file pragmas can share offset zero with the first export.
++	 * Select the position that actually prints this node's opening text instead
++	 * of treating the first source-map entry as an unambiguous boundary.
++	 * @param {AST.Position} position
++	 * @param {string} text
++	 * @returns {number | undefined}
++	 */
++	function generated_offset_for_text(position, text) {
++		const positions = src_to_gen_map.get(`${position.line}:${position.column}`);
++		for (const generated of positions ?? []) {
++			const offset = loc_to_offset(generated.line, generated.column, gen_line_offsets);
++			if (generated_code.startsWith(text, offset)) return offset;
++		}
++	}
++
++	/**
++	 * @param {AST.NodeWithLocation} node
++	 * @param {string} start_text
++	 * @returns {CodeMapping | undefined}
++	 */
++	function declaration_mapping(node, start_text) {
++		const start = generated_offset_for_text(node.loc.start, start_text);
++		if (start === undefined) return;
++		const positions = src_to_gen_map.get(`${node.loc.end.line}:${node.loc.end.column}`);
++		for (const generated of positions ?? []) {
++			const end = loc_to_offset(generated.line, generated.column, gen_line_offsets);
++			if (end < start) continue;
++			return {
++				sourceOffsets: [node.start],
++				lengths: [node.end - node.start],
++				generatedOffsets: [start],
++				generatedLengths: [end - start],
++				data: { ...mapping_data_verify_only, customData: {} },
++			};
++		}
++	}
++
++	/** @param {AST.ExportNamedDeclaration | AST.ExportDefaultDeclaration | AST.ExportAllDeclaration} node */
++	function add_export_mapping(node) {
++		if (!has_location(node)) return;
++		const mapping = declaration_mapping(node, EXPORT_KEYWORD);
++		if (mapping) {
++			const declaration = node.type === 'ExportAllDeclaration' ? null : node.declaration;
++			const end = mapping.generatedOffsets[0] + mapping.generatedLengths[0];
++			// A semicolon-free source declaration shares its end with its last
++			// expression. The first map entry then precedes the statement's emitted
++			// semicolon. Block declarations are different: a following `;` is an
++			// empty statement, not part of TypeScript's declaration range.
++			if (
++				generated_code[end] === ';' &&
++				(!declaration || !BLOCK_DECLARATION_TYPES.has(declaration.type))
++			) {
++				mapping.generatedLengths[0]++;
++			}
++			// Full declaration queries need both endpoints in the same Volar
++			// mapping, not a linear claim over the generated body. A transformed
++			// component can contain synthetic imports, tags, and helper calls that
++			// must not acquire source locations merely because it is exported.
++			const generated_start = mapping.generatedOffsets[0];
++			const generated_end = generated_start + mapping.generatedLengths[0];
++			mapping.sourceOffsets = [node.start, node.end];
++			mapping.generatedOffsets = [generated_start, generated_end];
++			mapping.lengths = [0, 0];
++			mapping.generatedLengths = [0, 0];
++			mappings.push(mapping);
++		}
++		tokens.push({
++			source: EXPORT_KEYWORD,
++			generated: EXPORT_KEYWORD,
++			loc: {
++				start: node.loc.start,
++				end: {
++					line: node.loc.start.line,
++					column: node.loc.start.column + EXPORT_KEYWORD.length,
++				},
++			},
++			metadata: {},
++		});
++	}
++
+ 	/**
+ 	 * Needed for a mapping that includes the computed brackets for diagnostics
+ 	 * @param {AST.MethodDefinition | AST.Property} node
+@@ -464,25 +554,24 @@ export function convert_source_map_to_mappings(
+ 			if (!Array.isArray(comments)) continue;
+ 
+ 			for (const comment of comments) {
+-				if (!has_location(comment) || !should_preserve_comment(comment)) continue;
++				if (!has_location(comment) || !should_preserve_jsx_tooling_comment(comment)) continue;
+ 
+ 				const comment_key = `${comment.start}:${comment.end}`;
+ 				if (mapped_comments.has(comment_key)) continue;
+ 				mapped_comments.add(comment_key);
+ 
+-				try {
+-					mappings.push(
+-						get_mapping_from_node(
+-							comment,
+-							src_to_gen_map,
+-							gen_line_offsets,
+-							mapping_data_verify_only,
+-						),
+-					);
+-				} catch {
+-					// Comments that were not emitted in generated TSX have no source-map
+-					// segment. They should not produce Volar mappings.
+-				}
++				const text = format_comment(comment);
++				const start = generated_offset_for_text(comment.loc.start, text);
++				// A stripped or moved comment must not claim another node's shared
++				// source coordinate. The printer writes this exact formatted text.
++				if (start === undefined) continue;
++				mappings.push({
++					sourceOffsets: [comment.start],
++					lengths: [comment.end - comment.start],
++					generatedOffsets: [start],
++					generatedLengths: [text.length],
++					data: { ...mapping_data_verify_only, customData: {} },
++				});
+ 			}
+ 		}
+ 	}
+@@ -704,6 +793,7 @@ export function convert_source_map_to_mappings(
+ 				}
+ 				return;
+ 			} else if (node.type === 'ExportNamedDeclaration') {
++				add_export_mapping(node);
+ 				if (node.specifiers && node.specifiers.length > 0) {
+ 					for (const specifier of node.specifiers) {
+ 						visit(specifier);
+@@ -715,12 +805,14 @@ export function convert_source_map_to_mappings(
+ 				}
+ 				return;
+ 			} else if (node.type === 'ExportDefaultDeclaration') {
++				add_export_mapping(node);
+ 				// Visit the declaration
+ 				if (node.declaration) {
+ 					visit(/** @type {AST.Node} */ (node.declaration));
+ 				}
+ 				return;
+ 			} else if (node.type === 'ExportAllDeclaration') {
++				add_export_mapping(node);
+ 				// Nothing to visit (just source string)
+ 				return;
+ 			} else if (node.type === 'JSXOpeningElement') {
+@@ -1908,6 +2000,24 @@ export function convert_source_map_to_mappings(
+ 				}
+ 				return;
+ 			} else if (node.type === 'TSPropertySignature') {
++				if (has_location(node)) {
++					const start_text = node.readonly
++						? 'readonly'
++						: node.computed
++							? '['
++							: node.key.type === 'Identifier'
++								? node.key.name
++								: source.slice(node.start, node.key.end);
++					const mapping = declaration_mapping(node, start_text);
++					if (mapping) {
++						const end = mapping.generatedOffsets[0] + mapping.generatedLengths[0];
++						// esrap's containing type/interface prints member separators
++						// after the property's own end marker. TS includes that `;`
++						// in its PropertySignature range, even when it was not authored.
++						if (generated_code[end] === ';') mapping.generatedLengths[0]++;
++						mappings.push(mapping);
++					}
++				}
+ 				// Property signature in type
+ 				if (node.key) {
+ 					visit(node.key);
+@@ -2354,7 +2464,11 @@ export function convert_source_map_to_mappings(
+ 
+ 	// Add a mapping for the very beginning of the file to handle import additions
+ 	// This ensures that code actions adding imports at the top work correctly
+-	if (!isImportDeclarationPresent && mappings.length > 0 && mappings[0].sourceOffsets[0] > 0) {
++	if (
++		!isImportDeclarationPresent &&
++		mappings.length > 0 &&
++		(mappings[0].sourceOffsets[0] > 0 || mappings[0].generatedOffsets[0] > 0)
++	) {
+ 		mappings.unshift({
+ 			sourceOffsets: [0],
+ 			generatedOffsets: [0],
