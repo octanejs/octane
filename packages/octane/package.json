@@ -29,8 +29,8 @@
   ],
   "imports": {
     "#octane/compiler-parser": {
-      "node": "oxc-tsrx/tsrx-core-compat",
-      "default": "@tsrx/core"
+      "node": "./src/compiler/parser.node.js",
+      "default": "./src/compiler/parser.browser.js"
     }
   },
   "exports": {
@@ -67,6 +67,12 @@
     "main": "./dist/index.js",
     "module": "./dist/index.js",
     "types": "./dist/index.d.ts",
+    "imports": {
+      "#octane/compiler-parser": {
+        "node": "./dist/compiler/parser.node.js",
+        "default": "./dist/compiler/parser.browser.js"
+      }
+    },
     "exports": {
       ".": {
         "types": "./dist/index.d.ts",

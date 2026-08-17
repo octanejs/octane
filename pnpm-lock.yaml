@@ -716,8 +716,8 @@ catalogs:
       specifier: 2.9.1
       version: 2.9.1
     oxc-tsrx:
-      specifier: 0.4.0
-      version: 0.4.0
+      specifier: 0.5.0
+      version: 0.5.0
     picocolors:
       specifier: ^1.1.1
       version: 1.1.1
@@ -6076,7 +6076,7 @@ importers:
         version: 2.3.2
       oxc-tsrx:
         specifier: catalog:default
-        version: 0.4.0(svelte@5.56.7)
+        version: 0.5.0(svelte@5.56.7)
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
@@ -13510,54 +13510,54 @@ packages:
   '@oxc-project/types@0.140.0':
     resolution: {integrity: sha512-h5LUOzGArYemnW1NMz/DuuQhBi96J6JL2Bk8zE4kvqxB5Sg3jxmCiH4uyOWHDkiKSt5vWlG4FIwCR/DbstcNRQ==}
 
-  '@oxc-tsrx/native-darwin-arm64@0.4.0':
-    resolution: {integrity: sha512-edXqGmGvE6VC5FV7ds8ArWs6DuiJ3kIT049Intjg/SjBhpRe14wM76KQU4ED9axF3u0bHCEiMxwaAlkYnunF7g==}
+  '@oxc-tsrx/native-darwin-arm64@0.5.0':
+    resolution: {integrity: sha512-PRymiTwR4BGOp72HF8hLh7D1Hmmm1+xAgus3j7GSHDzKx7qic+BKXAReR4whlaJtgsHIhGKnJqnx5aJ6HRsrXA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [darwin]
 
-  '@oxc-tsrx/native-darwin-x64@0.4.0':
-    resolution: {integrity: sha512-ZRyaW2K7yNWoztW9S76Kwc5iwobkiOBZXRgzxkjU4IazOIEf1jy+jiz88+iJ033FP2+Rf/JcLVnutB8gfhf7Ng==}
+  '@oxc-tsrx/native-darwin-x64@0.5.0':
+    resolution: {integrity: sha512-xk+Jd/+/icskBs9I5B+yWx//W7tRkxocv4j/DvnkavznuFc8GZHrNTFYyMusAzXsxup7Q0hiqbewAW+HJjt5uw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [darwin]
 
-  '@oxc-tsrx/native-linux-arm64-gnu@0.4.0':
-    resolution: {integrity: sha512-EXSybhBhTWdTuxAEV0KVEv1MStsq58JbkDbOjqoh22gXAieNkuUcxcwRiK11cf0qKPc/iGiUhnm6J8mSefVCkw==}
+  '@oxc-tsrx/native-linux-arm64-gnu@0.5.0':
+    resolution: {integrity: sha512-ref3olCGoKXeKTbCfycfKLtOiwvgZkyOeI8aJXMi0/tl4LvKZ8j9xvydyWgVu8gxQQW4Zx5SnrMDIkYWsvm4+A==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@oxc-tsrx/native-linux-arm64-musl@0.4.0':
-    resolution: {integrity: sha512-OrCwVQpa5torMnnOTQ4q+ptLkmL/mDzFAe3+UR3U9+NBwo8V01Xwg36Aai0pFtGbWUO+XdPbuwSOCueO/E+bAg==}
+  '@oxc-tsrx/native-linux-arm64-musl@0.5.0':
+    resolution: {integrity: sha512-vzRmD2idbXvFqjCcAYHkfO04lDiKExQJZsyjx/US7n+c+CQ4rjIKMMLKMpXnLf9MVqA+Xa8KutKFTsW5f+nJaw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@oxc-tsrx/native-linux-x64-gnu@0.4.0':
-    resolution: {integrity: sha512-PVgnNLEcyN9H8Jc7tIIMAxeGytyZY4zKmrrueCpxWna0skgsgSjQL7/TYCoFZpHUdpd4jRLag78uq/fZT8Zf7w==}
+  '@oxc-tsrx/native-linux-x64-gnu@0.5.0':
+    resolution: {integrity: sha512-kHa7ulfZgBpMyKPrgiOmh0dMzrWOXAt0TxkdjUIBb1iFjh2zvPySZCLfSD+FJXQyOuyhRVl4OSvSZ2gNBj5mFg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@oxc-tsrx/native-linux-x64-musl@0.4.0':
-    resolution: {integrity: sha512-fw8z/eyCVT4JKk1dkfK8q4uwxcMqj8cD3/fAwy656CVaYdUPKVO7MS9tLNOQWhmOoGnPf82NRX/WcBThT1RCgw==}
+  '@oxc-tsrx/native-linux-x64-musl@0.5.0':
+    resolution: {integrity: sha512-Cffw2VVQqKrhaNMv0g/09ZDOdE8rafhB9s6/XmbDuJyG9DY43gwcsG1k70Gr+MDzqKRatV+GfanD/W7w1/zc2g==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@oxc-tsrx/native-win32-arm64-msvc@0.4.0':
-    resolution: {integrity: sha512-AFavE/l5j9oNpj9yQSv3iO4ZG8O7EOQCmZByabmoetvoU58iRq+NrnUVkOWwUff5ZjG8idAEs9PwI83tqwJ/Mg==}
+  '@oxc-tsrx/native-win32-arm64-msvc@0.5.0':
+    resolution: {integrity: sha512-uV6hp46bHIrsaqKe6hwwHRh170Vp3ZJ+PRisPjhmC5G6tPhYhOYAM+5/SzAlulXpEq3s5h/AtO8U3E+dvSOkeA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [win32]
 
-  '@oxc-tsrx/native-win32-x64-msvc@0.4.0':
-    resolution: {integrity: sha512-whPnfMyOKLng0D5xYPRZ7K1tqfOVPkkxSAIZckWpc2piPUNYGIWGPcRfPuJI0FavJtn/E2iGWAPszhPqtPRqBg==}
+  '@oxc-tsrx/native-win32-x64-msvc@0.5.0':
+    resolution: {integrity: sha512-OfOSm4m2ZkXQDtYle0bc4tKMOdHVrcyfbxHiox9aobTQ8TYY96dIi6n8F+EX/2CqW25jeVQnKRWWCyh8+vEX7w==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [win32]
@@ -25225,8 +25225,8 @@ packages:
       typescript:
         optional: true
 
-  oxc-tsrx@0.4.0:
-    resolution: {integrity: sha512-eUn0gbQDcpTkg1BDpbtIwUAvAHAtiI8Qow/ecJ/Hdqic3PkXl343RUZpzd0qYhlueKj456ZYxqXRTlAs7V/h0A==}
+  oxc-tsrx@0.5.0:
+    resolution: {integrity: sha512-gyuPG5K54eeDmnBjVBcG2IGONGgLzv8FP/arClMWrFu8sgoZ42vB+Tegj1/Zti1TrtRDOafGyHneTPDMCA6HCg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
@@ -35726,28 +35726,28 @@ snapshots:
 
   '@oxc-project/types@0.140.0': {}
 
-  '@oxc-tsrx/native-darwin-arm64@0.4.0':
+  '@oxc-tsrx/native-darwin-arm64@0.5.0':
     optional: true
 
-  '@oxc-tsrx/native-darwin-x64@0.4.0':
+  '@oxc-tsrx/native-darwin-x64@0.5.0':
     optional: true
 
-  '@oxc-tsrx/native-linux-arm64-gnu@0.4.0':
+  '@oxc-tsrx/native-linux-arm64-gnu@0.5.0':
     optional: true
 
-  '@oxc-tsrx/native-linux-arm64-musl@0.4.0':
+  '@oxc-tsrx/native-linux-arm64-musl@0.5.0':
     optional: true
 
-  '@oxc-tsrx/native-linux-x64-gnu@0.4.0':
+  '@oxc-tsrx/native-linux-x64-gnu@0.5.0':
     optional: true
 
-  '@oxc-tsrx/native-linux-x64-musl@0.4.0':
+  '@oxc-tsrx/native-linux-x64-musl@0.5.0':
     optional: true
 
-  '@oxc-tsrx/native-win32-arm64-msvc@0.4.0':
+  '@oxc-tsrx/native-win32-arm64-msvc@0.5.0':
     optional: true
 
-  '@oxc-tsrx/native-win32-x64-msvc@0.4.0':
+  '@oxc-tsrx/native-win32-x64-msvc@0.5.0':
     optional: true
 
   '@oxfmt/binding-android-arm-eabi@0.59.0':
@@ -52705,7 +52705,7 @@ snapshots:
       - zod
     optional: true
 
-  oxc-tsrx@0.4.0(svelte@5.56.7):
+  oxc-tsrx@0.5.0(svelte@5.56.7):
     dependencies:
       '@oxc-project/types': 0.140.0
       oxfmt-current: oxfmt@0.59.0(svelte@5.56.7)
@@ -52714,14 +52714,14 @@ snapshots:
       pathe: 2.0.3
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@oxc-tsrx/native-darwin-arm64': 0.4.0
-      '@oxc-tsrx/native-darwin-x64': 0.4.0
-      '@oxc-tsrx/native-linux-arm64-gnu': 0.4.0
-      '@oxc-tsrx/native-linux-arm64-musl': 0.4.0
-      '@oxc-tsrx/native-linux-x64-gnu': 0.4.0
-      '@oxc-tsrx/native-linux-x64-musl': 0.4.0
-      '@oxc-tsrx/native-win32-arm64-msvc': 0.4.0
-      '@oxc-tsrx/native-win32-x64-msvc': 0.4.0
+      '@oxc-tsrx/native-darwin-arm64': 0.5.0
+      '@oxc-tsrx/native-darwin-x64': 0.5.0
+      '@oxc-tsrx/native-linux-arm64-gnu': 0.5.0
+      '@oxc-tsrx/native-linux-arm64-musl': 0.5.0
+      '@oxc-tsrx/native-linux-x64-gnu': 0.5.0
+      '@oxc-tsrx/native-linux-x64-musl': 0.5.0
+      '@oxc-tsrx/native-win32-arm64-msvc': 0.5.0
+      '@oxc-tsrx/native-win32-x64-msvc': 0.5.0
     transitivePeerDependencies:
       - svelte
       - vite-plus
