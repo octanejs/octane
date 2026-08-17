@@ -361,8 +361,9 @@ export function useValue(): number { return useState(1)[0]; }\n`,
 			output: { path: outputPath, filename: '[fullhash].cjs' },
 			plugins: [new OctaneRspackPlugin()],
 		} as any) as any;
-		const completed: Array<{ error: Error | null; stats?: any }> = [];
-		const waiting: Array<{ resolve: (stats: any) => void; reject: (error: Error) => void }> = [];
+		type WatchBuild = { error: Error | null; stats?: any; modifiedFiles: Set<string> };
+		const completed: WatchBuild[] = [];
+		const waiting: Array<(build: WatchBuild) => void> = [];
 		const watching = compiler.watch(
 			{ aggregateTimeout: 20, poll: 50 },
 			(error: Error, stats: any) => {
@@ -375,25 +376,44 @@ export function useValue(): number { return useState(1)[0]; }\n`,
 									.join('\n'),
 							)
 						: null);
+				const build = {
+					error: buildError,
+					stats,
+					modifiedFiles: new Set<string>(compiler.modifiedFiles ?? []),
+				};
 				const next = waiting.shift();
-				if (!next) {
-					completed.push({ error: buildError, stats });
-					return;
-				}
-				if (buildError) next.reject(buildError);
-				else next.resolve(stats);
+				if (next) next(build);
+				else completed.push(build);
 			},
 		);
-		const nextBuild = () =>
-			new Promise<any>((resolve, reject) => {
-				const ready = completed.shift();
-				if (ready) {
-					if (ready.error) reject(ready.error);
-					else resolve(ready.stats);
-					return;
-				}
-				waiting.push({ resolve, reject });
-			});
+		const nextBuild = async (modifiedFile?: string) => {
+			const deadline = Date.now() + 10_000;
+			for (;;) {
+				const build =
+					completed.shift() ??
+					(await new Promise<WatchBuild>((resolve, reject) => {
+						const deliver = (result: WatchBuild) => {
+							clearTimeout(timeout);
+							resolve(result);
+						};
+						const timeout = setTimeout(
+							() => {
+								const index = waiting.indexOf(deliver);
+								if (index !== -1) waiting.splice(index, 1);
+								reject(
+									new Error(
+										`Timed out waiting for a Rspack build${modifiedFile ? ` for ${modifiedFile}` : ''}.`,
+									),
+								);
+							},
+							Math.max(0, deadline - Date.now()),
+						);
+						waiting.push(deliver);
+					}));
+				if (build.error) throw build.error;
+				if (modifiedFile === undefined || build.modifiedFiles.has(modifiedFile)) return build.stats;
+			}
+		};
 		const loadBundle = async (stats: any) => {
 			const filename = (stats.toJson({ all: false, assets: true }).assets ?? []).find(
 				(asset: { name: string }) => asset.name.endsWith('.cjs'),
@@ -416,7 +436,12 @@ export function useValue(): number { return useState(1)[0]; }\n`,
 			await loadBundle(initial);
 			expect(globalThis[slotArgumentCountGlobal as keyof typeof globalThis]).toBe(2);
 
-			const rebuild = nextBuild();
+			// Watchers may queue an unrelated rebuild before the manifest changes.
+			// Keep one queued so this test cannot accidentally consume stale stats.
+			await new Promise<void>((resolve, reject) =>
+				watching.invalidate((error: Error | null) => (error ? reject(error) : resolve())),
+			);
+			const rebuild = nextBuild(manifest);
 			write(
 				root,
 				'src/pkg/package.json',
