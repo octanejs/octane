@@ -1467,7 +1467,7 @@ describe(
 		// not queue behind it; the origin is reserved but not yet answering when this
 		// module loads, and `outputDir` is not populated either. Both the browser
 		// cases and the Build Output assertions need it finished.
-		beforeAll(() => waitForReadyState(inject('productionReadyFile'), 340_000));
+		beforeAll(() => waitForReadyState(inject('productionReadyFile'), 460_000));
 
 		it.concurrent('emits the Vercel Build Output API contract', () => {
 			const config = JSON.parse(readFileSync(join(outputDir, 'config.json'), 'utf8')) as {
