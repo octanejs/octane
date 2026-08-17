@@ -5,6 +5,12 @@ privileged workflow: after any successful `main` CI run, `publish.yml` checks
 every publishable workspace version against npm and runs `changeset publish`
 only when at least one version is missing.
 
+Changesets creates the local annotated tags, but the action does not publish
+them itself. A repository-owned reconciliation step pushes every missing tag in
+one atomic transaction, then creates missing GitHub releases sequentially. This
+avoids GitHub ref-hook failures during large releases, when the upstream action
+would otherwise push one tag per package concurrently.
+
 This is deliberately a reconciliation loop rather than a one-shot tied to the
 Version Packages commit. If that commit's CI fails, a later fix on `main` can
 publish the stranded versions after it passes the same required checks.
@@ -57,3 +63,11 @@ Because npm package versions are immutable, the preflight is safe to repeat:
 already-published versions are skipped. It also refuses a stale checkout when a
 newer npm version exists, preventing an out-of-order workflow from moving the
 `latest` tag backwards.
+
+Tag and GitHub-release reconciliation is also idempotent. It runs after every
+validated publish attempt, including partial failures, and repairs metadata for
+every current version that npm confirms is published. If release creation fails
+after the atomic tag push, the next successful main run or manual recovery
+retries only the missing GitHub release. GitHub API availability cannot block
+tag repair, and a package without a matching changelog entry is reported as
+skipped so later releases can still be created.
