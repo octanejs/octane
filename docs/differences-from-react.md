@@ -331,11 +331,18 @@ Alternatively, enable it across application-owned modules with
 `compiler: { strong: true }` in `octane.config.ts`. Installed dependencies stay
 in compatibility mode unless their own source opts in.
 
-A Strong module cannot call a state updater during render or directly while
-setting up an effect, and it cannot assign to `ref.current` during render.
-Event handlers, effects that synchronize an external system, and normal DOM or
-timer refs remain supported. Replace prop-driven state resets with
-`useLinkedState` instead of calling a setter during render.
+A Strong module cannot call a state updater during render or synchronously while
+setting up an effect, and it cannot assign to `ref.current` during render. The
+checks follow provable synchronous calls through `useCallback`, `useEffectEvent`,
+and functions returned by analyzable `useMemo` factories. Calling a statically
+known Effect Event during render or including it in an explicit hook dependency
+list is also a compile error. The hooks themselves remain supported, and other
+explicit dependency lists retain their existing meaning.
+
+Event handlers, genuinely deferred callbacks, effect cleanup, effects that
+synchronize an external system, and normal DOM or timer refs remain supported.
+Replace prop-driven state resets with `useLinkedState` instead of calling a
+setter during render.
 
 ## JSX values follow the represented render scope
 
