@@ -12,6 +12,7 @@ export const KNOWN_BINDINGS = {
 	zustand: '@octanejs/zustand',
 	valtio: '@octanejs/valtio',
 	jotai: '@octanejs/jotai',
+	'@xstate/react': '@octanejs/xstate',
 	'@mantine/hooks': '@octanejs/mantine-hooks',
 	'mobx-react-lite': '@octanejs/mobx',
 	'mobx-react': '@octanejs/mobx',

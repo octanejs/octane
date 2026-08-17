@@ -623,6 +623,46 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'xstate',
+					include: ['packages/xstate/tests/**/*.test.ts'],
+					exclude: ['packages/xstate/tests/ssr/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+					globalSetup: ['packages/xstate/tests/differential/_setup.ts'],
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/xstate$/,
+							replacement: resolve(import.meta.dirname, 'packages/xstate/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'xstate-ssr',
+					include: ['packages/xstate/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/xstate$/,
+							replacement: resolve(import.meta.dirname, 'packages/xstate/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'dexie',
 					include: ['packages/dexie/tests/**/*.test.ts'],
 					exclude: [

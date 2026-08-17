@@ -1189,6 +1189,16 @@
       "verified": "2026-08-03"
     },
     {
+      "name": "@octanejs/xstate",
+      "version": "0.0.1",
+      "category": "Shared state",
+      "upstream": { "package": "@xstate/react", "version": "6.1.0" },
+      "surface": "Complete @xstate/react 6.1 runtime surface: useActor, useActorRef, deprecated useMachine, useSelector, createActorContext, and shallowEqual. The framework-independent xstate 5.32.5 actor runtime is reused unchanged.",
+      "divergences": [],
+      "ssr": "Supported: machine and actor-context hooks render their initial snapshots on the server; actors start after client mount.",
+      "verified": "2026-08-17"
+    },
+    {
       "name": "@octanejs/zag",
       "version": "0.0.5",
       "category": "UI and interaction",
@@ -1307,6 +1317,7 @@
     "@visx/wordcloud": "@octanejs/visx",
     "@visx/xychart": "@octanejs/visx",
     "@visx/zoom": "@octanejs/visx",
+    "@xstate/react": "@octanejs/xstate",
     "@zag-js/react": "@octanejs/zag",
     "animejs": "@octanejs/animejs",
     "cmdk": "@octanejs/cmdk",
