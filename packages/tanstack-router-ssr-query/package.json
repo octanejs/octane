@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-router-ssr-query",
-  "version": "0.0.27",
+  "version": "0.0.28",
   "description": "Octane port of @tanstack/react-router-ssr-query — TanStack Router ⇄ Query SSR integration.",
   "type": "module",
   "main": "src/index.tsrx",

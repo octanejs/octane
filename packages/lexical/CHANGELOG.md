@@ -1,5 +1,16 @@
 # @octanejs/lexical
 
+## 0.1.38
+
+### Patch Changes
+
+- Updated dependencies [954028b]
+- Updated dependencies [21f4dfb]
+- Updated dependencies [1cb4a19]
+- Updated dependencies [0fc84da]
+  - octane@0.1.39
+  - @octanejs/floating-ui@0.1.38
+
 ## 0.1.37
 
 ### Patch Changes

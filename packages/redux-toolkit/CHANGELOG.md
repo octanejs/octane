@@ -1,5 +1,16 @@
 # @octanejs/redux-toolkit
 
+## 0.1.34
+
+### Patch Changes
+
+- Updated dependencies [954028b]
+- Updated dependencies [21f4dfb]
+- Updated dependencies [1cb4a19]
+- Updated dependencies [0fc84da]
+  - octane@0.1.39
+  - @octanejs/redux@0.1.36
+
 ## 0.1.33
 
 ### Patch Changes
