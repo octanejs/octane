@@ -782,7 +782,7 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 		// concurrent. Letting it race a full production build times it out. Waiting
 		// restores the ordering globalSetup used to guarantee, without putting the
 		// other ~90 projects back behind the build.
-		await waitForReadyState(inject('productionReadyFile'), 340_000);
+		await waitForReadyState(inject('productionReadyFile'), 460_000);
 		DEV_PORT = await getFreePort();
 		// Fresh optimize-deps cache → prove the declared dependency graph handles
 		// a deterministic cold start without an "Outdated Optimize Dep" reload.
