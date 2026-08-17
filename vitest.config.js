@@ -2999,6 +2999,7 @@ export default defineConfig({
 				test: {
 					name: 'tanstack-start',
 					include: ['packages/tanstack-start/tests/**/*.test.ts'],
+					exclude: ['packages/tanstack-start/tests/rsbuild-plugin.test.ts'],
 					environment: 'jsdom',
 					globals: false,
 				},
@@ -3036,6 +3037,15 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src') + '/$1',
 						},
 					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-start-rsbuild',
+					include: ['packages/tanstack-start/tests/rsbuild-plugin.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 120_000,
 				},
 			},
 			{
