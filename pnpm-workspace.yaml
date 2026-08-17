@@ -266,14 +266,14 @@ catalogs:
     '@testing-library/jest-dom': ^6.9.1
     '@vitest/coverage-istanbul': 4.1.10
     '@vitest/coverage-v8': 4.1.10
-    '@tsrx/core': ^0.1.56
-    '@tsrx/prettier-plugin': ^0.3.118
-    '@tsrx/typescript-plugin': ^0.3.118
-    '@tsrx/ripple': ^0.1.57
-    '@tsrx/react': ^0.2.56
-    '@tsrx/solid': ^0.1.56
-    '@tsrx/vite-plugin-react': ^0.0.88
-    '@tsrx/vite-plugin-solid': ^0.0.86
+    '@tsrx/core': ^0.1.58
+    '@tsrx/prettier-plugin': ^0.3.120
+    '@tsrx/typescript-plugin': ^0.3.120
+    '@tsrx/ripple': ^0.1.59
+    '@tsrx/react': ^0.2.58
+    '@tsrx/solid': ^0.1.58
+    '@tsrx/vite-plugin-react': ^0.0.91
+    '@tsrx/vite-plugin-solid': ^0.0.88
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.14
@@ -531,7 +531,7 @@ catalogs:
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37
+  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37 || 0.1.39
   - react-dropzone@20.0.0
   - '@tanstack/db@0.7.0'
   - '@oxc-tsrx/native-darwin-arm64@0.5.0'
@@ -547,7 +547,7 @@ minimumReleaseAgeExclude:
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.
 #
-# @tsrx/core 0.1.56: the shared JSX transform hard-throws "TSRX fragments can
+# @tsrx/core 0.1.56/0.1.58: the shared JSX transform hard-throws "TSRX fragments can
 # only have one style tag", which in type-only mode makes tsrx-tsc/editors
 # fall back to the raw source as the virtual TSX — every CSS brace then
 # surfaces as a TSX parse error (TS1381/TS1005). Octane components may split
@@ -557,7 +557,7 @@ minimumReleaseAgeExclude:
 # sheet's hash; runtime transforms keep the throw. Remove once @tsrx/core
 # ships the equivalent fix upstream.
 #
-# @tsrx/core 0.1.56: a host element carrying `ref` plus a spread lowers to a
+# @tsrx/core 0.1.56/0.1.58: a host element carrying `ref` plus a spread lowers to a
 # generated `let X = __normalize_spread_props_for_ref_attr(…)` that rides on the
 # element's metadata for a later pass to hoist. Only the render-block statement
 # builder and the native-directive path hoist it, so the same element in
@@ -574,4 +574,5 @@ minimumReleaseAgeExclude:
 # ships the equivalent fix upstream.
 patchedDependencies:
   '@changesets/cli@2.31.1': patches/@changesets__cli@2.31.1.patch
-  '@tsrx/core@0.1.56': patches/@tsrx__core@0.1.56.patch
+  '@tsrx/core@0.1.56': patches/@tsrx__core@0.1.56-0.1.58.patch
+  '@tsrx/core@0.1.58': patches/@tsrx__core@0.1.56-0.1.58.patch
