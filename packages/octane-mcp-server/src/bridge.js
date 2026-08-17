@@ -9,6 +9,7 @@ export const KNOWN_BINDINGS = {
 	zustand: '@octanejs/zustand',
 	valtio: '@octanejs/valtio',
 	jotai: '@octanejs/jotai',
+	'@xstate/react': '@octanejs/xstate',
 	'@apollo/client': '@octanejs/apollo-client',
 	'@tanstack/ai-react': '@octanejs/tanstack-ai',
 	'@tanstack/react-devtools': '@octanejs/tanstack-devtools',

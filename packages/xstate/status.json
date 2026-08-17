@@ -1,0 +1,14 @@
+{
+  "upstream": {
+    "package": "@xstate/react",
+    "version": "6.1.0"
+  },
+  "surface": "Complete @xstate/react 6.1 runtime surface: useActor, useActorRef, deprecated useMachine, useSelector, createActorContext, and shallowEqual. The framework-independent xstate 5.32.5 actor runtime is reused unchanged.",
+  "divergences": [],
+  "ssr": "Supported: machine and actor-context hooks render their initial snapshots on the server; actors start after client mount.",
+  "notes": [
+    "Differential coverage runs useMachine and createActorContext through this adapter and real @xstate/react, comparing rendered output after the same events.",
+    "Conformance coverage additionally checks external actor selectors, comparator bailouts, actor-ref identity and cleanup, missing-provider errors, export parity, and required actor-input types."
+  ],
+  "verified": "2026-08-17"
+}

@@ -1,14 +1,15 @@
 [
   {
     "title": "Shared state",
-    "description": "Small stores, atoms, Redux, RTK Query, and TanStack Store.",
+    "description": "Small stores, atoms, state machines, Redux, RTK Query, and TanStack Store.",
     "packages": [
       "@octanejs/zustand",
       "@octanejs/valtio",
       "@octanejs/jotai",
       "@octanejs/redux",
       "@octanejs/redux-toolkit",
-      "@octanejs/tanstack-store"
+      "@octanejs/tanstack-store",
+      "@octanejs/xstate"
     ]
   },
   {

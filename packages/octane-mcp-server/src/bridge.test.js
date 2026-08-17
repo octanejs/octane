@@ -186,6 +186,13 @@ describe('bridgeReport', () => {
 		expect(report.plan[0]).toContain('@octanejs/zustand');
 	});
 
+	it('routes the XState React adapter to the maintained Octane binding', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));
+		await writeFakePackage(root, '@xstate/react', { 'index.js': `export {};` });
+		const report = await bridgeReport({ packageName: '@xstate/react', projectRoot: root });
+		expect(report.existingBinding).toBe('@octanejs/xstate');
+	});
+
 	it('errors clearly when the package is not installed', async () => {
 		const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));
 		const report = await bridgeReport({ packageName: 'missing-lib', projectRoot: root });

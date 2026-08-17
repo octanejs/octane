@@ -1,0 +1,2993 @@
+{
+  "schemaVersion": 1,
+  "batchId": "pr705-hotkeys-use-player-carousel",
+  "inventoryFingerprint": "71abb51189a05a96441f70e8cd410765a8c93968eaaae07a9ed53ff18177791a",
+  "graphFingerprint": "0dbe43e6f62c5d55ee77d5376602ae054feade01bfdd4db657e659c89340bc74",
+  "nodes": {
+    "pkg:@mux/mux-player-react": {
+      "id": "pkg:@mux/mux-player-react",
+      "packageName": "@mux/mux-player-react",
+      "constraints": [
+        {
+          "range": "3.13.2",
+          "via": "@mux/mux-player-react"
+        },
+        {
+          "range": "^3.8.0",
+          "via": "react-player"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "blocked",
+      "action": "repair-preflight",
+      "blockers": [
+        "Published artifact: No license file was found in the applicable package scope.",
+        "Immutable source: License evidence LICENSE is not recognizable approved-license text."
+      ],
+      "repair": "Resolve every identity conflict and supply matching MIT or Unlicense evidence without overriding the policy gate.",
+      "input": "@mux/mux-player-react@^3.8.0",
+      "version": "3.13.2",
+      "identity": {
+        "packageName": "@mux/mux-player-react",
+        "version": "3.13.2",
+        "repository": {
+          "owner": "muxinc",
+          "repo": "elements",
+          "subdirectory": "packages/mux-player-react"
+        },
+        "commit": "e1a32eb3fb147fcbd42f810ecf54101f4582f868",
+        "integrity": "sha512-yjAmiqVPYTKi88LAuHxSwKiYrZUDy1ofUYjrDP91mvPfz8BfTvUanzpyE8+a6pRIZFp55rmiAnWyjWKuqSGASw=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "source": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "License evidence LICENSE is not recognizable approved-license text."
+          ],
+          "evidence": [
+            {
+              "path": "LICENSE",
+              "scope": "root",
+              "classification": "unrecognized",
+              "sha256": "807c483a5e073a718af04d0731bc815d4d5d69813614b02290c9ff026bc77e5b"
+            }
+          ],
+          "notices": [],
+          "obligations": []
+        },
+        "obligations": [],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "422bcb6925981a7fb96239d8f5f752a13d591119a4470bf739f71423e086e955",
+        "sourceManifestSha256": "422bcb6925981a7fb96239d8f5f752a13d591119a4470bf739f71423e086e955",
+        "artifactUrl": "https://registry.npmjs.org/@mux/mux-player-react/-/mux-player-react-3.13.2.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 18,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "createElement",
+            "count": 69,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "use",
+            "count": 24,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "useEffect",
+            "count": 16,
+            "status": "same",
+            "note": "Identical deps/cleanup semantics."
+          },
+          {
+            "name": "useState",
+            "count": 13,
+            "status": "same",
+            "note": "Same lazy initializer and functional-update semantics; Octane additionally exposes a stable current-state getter at tuple index 2."
+          },
+          {
+            "name": "forwardRef",
+            "count": 9,
+            "status": "rewrite",
+            "note": "No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop."
+          },
+          {
+            "name": "lazy",
+            "count": 9,
+            "status": "same",
+            "note": "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not)."
+          },
+          {
+            "name": "useRef",
+            "count": 8,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "useCallback",
+            "count": 5,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "Fragment",
+            "count": 4,
+            "status": "same",
+            "note": "Supported."
+          },
+          {
+            "name": "Suspense",
+            "count": 1,
+            "status": "same",
+            "note": "Supported (also available as the @try/@pending directive in .tsrx)."
+          }
+        ],
+        "imports": [
+          "./-SWV3FE67.mjs",
+          "@mux/mux-player",
+          "@mux/mux-player-react",
+          "@mux/mux-player-react/ads",
+          "@mux/mux-player-react/themes/news",
+          "@mux/mux-player/ads",
+          "@mux/mux-player/themes/classic",
+          "@mux/mux-player/themes/gerwig",
+          "@mux/mux-player/themes/microvideo",
+          "@mux/mux-player/themes/minimal",
+          "@mux/mux-player/themes/news",
+          "@mux/playback-core",
+          "react"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (69x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "forwardRef (9x): No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "09cb0b9a0195227a384eea2dccb77eaafb155794333a88ada0c70a8498a661b2",
+      "evidenceFingerprint": "09cb0b9a0195227a384eea2dccb77eaafb155794333a88ada0c70a8498a661b2"
+    },
+    "pkg:@types/js-cookie": {
+      "id": "pkg:@types/js-cookie",
+      "packageName": "@types/js-cookie",
+      "constraints": [
+        {
+          "range": "^3.0.0",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "9917f54dd7ae87839aad6057fc1032bbbc11153a7adea2de4d9a01680d1b1e08",
+      "evidenceFingerprint": "9917f54dd7ae87839aad6057fc1032bbbc11153a7adea2de4d9a01680d1b1e08"
+    },
+    "pkg:@types/react": {
+      "id": "pkg:@types/react",
+      "packageName": "@types/react",
+      "constraints": [
+        {
+          "range": "^17.0.0 || ^18 || ^19",
+          "via": "react-player"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "8d6f41a456cca05dc3f9936a6893c22e6b83079b652c3a9930739ec67e12f932",
+      "evidenceFingerprint": "8d6f41a456cca05dc3f9936a6893c22e6b83079b652c3a9930739ec67e12f932"
+    },
+    "pkg:@xobotyi/scrollbar-width": {
+      "id": "pkg:@xobotyi/scrollbar-width",
+      "packageName": "@xobotyi/scrollbar-width",
+      "constraints": [
+        {
+          "range": "^1.9.5",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "6e274fcd7f77a89c8869e3eee806b65068aa528e481289ec6a97c3759384b5fb",
+      "evidenceFingerprint": "6e274fcd7f77a89c8869e3eee806b65068aa528e481289ec6a97c3759384b5fb"
+    },
+    "pkg:classnames": {
+      "id": "pkg:classnames",
+      "packageName": "classnames",
+      "constraints": [
+        {
+          "range": "^2.2.5",
+          "via": "react-responsive-carousel"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "068916d67e6fb37f52abf5b47c057937713ab8f757157fa000e1583242b769e7",
+      "evidenceFingerprint": "068916d67e6fb37f52abf5b47c057937713ab8f757157fa000e1583242b769e7"
+    },
+    "pkg:cloudflare-video-element": {
+      "id": "pkg:cloudflare-video-element",
+      "packageName": "cloudflare-video-element",
+      "constraints": [
+        {
+          "range": "^1.3.4",
+          "via": "react-player"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "aa643216e4ec20f15cfaf2c42eb0519f940b746be3b449e9bc644fc0116d8941",
+      "evidenceFingerprint": "aa643216e4ec20f15cfaf2c42eb0519f940b746be3b449e9bc644fc0116d8941"
+    },
+    "pkg:copy-to-clipboard": {
+      "id": "pkg:copy-to-clipboard",
+      "packageName": "copy-to-clipboard",
+      "constraints": [
+        {
+          "range": "^3.3.1",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "ebdb899ab5f79b57fa3c6b90263c15133b7dedd6c126cd8d98063f7ae427f632",
+      "evidenceFingerprint": "ebdb899ab5f79b57fa3c6b90263c15133b7dedd6c126cd8d98063f7ae427f632"
+    },
+    "pkg:dash-video-element": {
+      "id": "pkg:dash-video-element",
+      "packageName": "dash-video-element",
+      "constraints": [
+        {
+          "range": "0.3.2",
+          "via": "dash-video-element"
+        },
+        {
+          "range": "^0.3.0",
+          "via": "react-player"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "./react"
+      ],
+      "requested": false,
+      "state": "blocked",
+      "action": "repair-preflight",
+      "blockers": [
+        "Published artifact: No license file was found in the applicable package scope.",
+        "Immutable source: No license file was found in the applicable package scope."
+      ],
+      "repair": "Resolve every identity conflict and supply matching MIT or Unlicense evidence without overriding the policy gate.",
+      "input": "dash-video-element@^0.3.0",
+      "version": "0.3.2",
+      "identity": {
+        "packageName": "dash-video-element",
+        "version": "0.3.2",
+        "repository": {
+          "owner": "muxinc",
+          "repo": "media-elements",
+          "subdirectory": "packages/dash-video-element"
+        },
+        "commit": "97748e77a8b2bd4efdcf4075cfff85e856409e30",
+        "integrity": "sha512-eN1IqgtTAbq4zVkbt82BDwQtybQ6WOXyQU5HbftUSnqo+SHAPbZCif1Y7uViAhgvuEPvZtbiXDiacvvTeGxc/g=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "source": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "obligations": [],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "ab1eb6fa8d1d1995a756488501a11baa1b648947e7c76abcdb448e7e204818d2",
+        "sourceManifestSha256": "ab1eb6fa8d1d1995a756488501a11baa1b648947e7c76abcdb448e7e204818d2",
+        "artifactUrl": "https://registry.npmjs.org/dash-video-element/-/dash-video-element-0.3.2.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 4,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "createElement",
+            "count": 6,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "useLayoutEffect",
+            "count": 4,
+            "status": "same",
+            "note": "Identical: synchronous after DOM mutation."
+          },
+          {
+            "name": "useRef",
+            "count": 4,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "defaultProps",
+            "count": 4,
+            "status": "rewrite",
+            "note": "Use default parameter values / destructuring defaults."
+          },
+          {
+            "name": "useCallback",
+            "count": 2,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "use",
+            "count": 2,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "forwardRef",
+            "count": 2,
+            "status": "rewrite",
+            "note": "No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop."
+          }
+        ],
+        "imports": [
+          "./dash-video-element.js",
+          "custom-media-element",
+          "dashjs",
+          "media-tracks",
+          "react"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (6x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "defaultProps (4x): Use default parameter values / destructuring defaults.",
+          "forwardRef (2x): No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "b6f74540d41168c9b1d360fccb057f9d3c6f0599344dd195e2b611561e8cda52",
+      "evidenceFingerprint": "b6f74540d41168c9b1d360fccb057f9d3c6f0599344dd195e2b611561e8cda52"
+    },
+    "pkg:fast-deep-equal": {
+      "id": "pkg:fast-deep-equal",
+      "packageName": "fast-deep-equal",
+      "constraints": [
+        {
+          "range": "^3.1.3",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "./react"
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "7fa524bea4bfc729c7fefa0aa28d4ce8eeaaa8c1c4ffd32698227878c103f52d",
+      "evidenceFingerprint": "7fa524bea4bfc729c7fefa0aa28d4ce8eeaaa8c1c4ffd32698227878c103f52d"
+    },
+    "pkg:fast-shallow-equal": {
+      "id": "pkg:fast-shallow-equal",
+      "packageName": "fast-shallow-equal",
+      "constraints": [
+        {
+          "range": "^1.0.0",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "e415283f336223673f22e2974c691de7738438fdc35fe976fc6e1aa991b44460",
+      "evidenceFingerprint": "e415283f336223673f22e2974c691de7738438fdc35fe976fc6e1aa991b44460"
+    },
+    "pkg:hls-video-element": {
+      "id": "pkg:hls-video-element",
+      "packageName": "hls-video-element",
+      "constraints": [
+        {
+          "range": "1.5.11",
+          "via": "hls-video-element"
+        },
+        {
+          "range": "^1.5.9",
+          "via": "react-player"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "./react"
+      ],
+      "requested": false,
+      "state": "blocked",
+      "action": "repair-preflight",
+      "blockers": [
+        "Published artifact: No license file was found in the applicable package scope.",
+        "Immutable source: No license file was found in the applicable package scope."
+      ],
+      "repair": "Resolve every identity conflict and supply matching MIT or Unlicense evidence without overriding the policy gate.",
+      "input": "hls-video-element@^1.5.9",
+      "version": "1.5.11",
+      "identity": {
+        "packageName": "hls-video-element",
+        "version": "1.5.11",
+        "repository": {
+          "owner": "muxinc",
+          "repo": "media-elements",
+          "subdirectory": "packages/hls-video-element"
+        },
+        "commit": "97748e77a8b2bd4efdcf4075cfff85e856409e30",
+        "integrity": "sha512-tJJ65/52CDxj8XFyIve6zT9nVVdUIc6mqvKR25X0ycPKHk07rpjp4xxVteeCefDUBSf/tFLhlICFmn3KWj37xA=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "source": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "obligations": [],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "3d1e9acbb1e24fa7d4e7f19aaf113365ecbcdb93f284f7096fccb0e2f6fe0885",
+        "sourceManifestSha256": "3d1e9acbb1e24fa7d4e7f19aaf113365ecbcdb93f284f7096fccb0e2f6fe0885",
+        "artifactUrl": "https://registry.npmjs.org/hls-video-element/-/hls-video-element-1.5.11.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 4,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "createElement",
+            "count": 6,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "useLayoutEffect",
+            "count": 4,
+            "status": "same",
+            "note": "Identical: synchronous after DOM mutation."
+          },
+          {
+            "name": "useRef",
+            "count": 4,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "defaultProps",
+            "count": 4,
+            "status": "rewrite",
+            "note": "Use default parameter values / destructuring defaults."
+          },
+          {
+            "name": "useCallback",
+            "count": 2,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "use",
+            "count": 2,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "forwardRef",
+            "count": 2,
+            "status": "rewrite",
+            "note": "No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop."
+          },
+          {
+            "name": "lazy",
+            "count": 2,
+            "status": "same",
+            "note": "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not)."
+          }
+        ],
+        "imports": [
+          "./hls-video-element.js",
+          "custom-media-element",
+          "hls.js/dist/hls.mjs",
+          "media-tracks",
+          "react"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (6x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "defaultProps (4x): Use default parameter values / destructuring defaults.",
+          "forwardRef (2x): No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "0be59c12fc4cef81a517cbfc6123511fb42d2d9015b0a1f54432714cd2b21125",
+      "evidenceFingerprint": "0be59c12fc4cef81a517cbfc6123511fb42d2d9015b0a1f54432714cd2b21125"
+    },
+    "pkg:js-cookie": {
+      "id": "pkg:js-cookie",
+      "packageName": "js-cookie",
+      "constraints": [
+        {
+          "range": "^3.0.0",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "97b0c8937ffb2df053321c772b8570fa5187645d7ba38ec8f49ae85a3fb18ca1",
+      "evidenceFingerprint": "97b0c8937ffb2df053321c772b8570fa5187645d7ba38ec8f49ae85a3fb18ca1"
+    },
+    "pkg:nano-css": {
+      "id": "pkg:nano-css",
+      "packageName": "nano-css",
+      "constraints": [
+        {
+          "range": "^5.6.2",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        ".",
+        "./addon/cssom",
+        "./addon/vcssom",
+        "./addon/vcssom/cssToTree"
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "c2cfc842f620ab4620b3168a595420412c00382bbdddec21d27c3982e4fe0d8f",
+      "evidenceFingerprint": "c2cfc842f620ab4620b3168a595420412c00382bbdddec21d27c3982e4fe0d8f"
+    },
+    "pkg:prop-types": {
+      "id": "pkg:prop-types",
+      "packageName": "prop-types",
+      "constraints": [
+        {
+          "range": "^15.5.8",
+          "via": "react-responsive-carousel"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "f1c9a41658a43b82b6260137c95310828dcdf29e881a3e9346bdedc3fdb8c741",
+      "evidenceFingerprint": "f1c9a41658a43b82b6260137c95310828dcdf29e881a3e9346bdedc3fdb8c741"
+    },
+    "pkg:react-easy-swipe": {
+      "id": "pkg:react-easy-swipe",
+      "packageName": "react-easy-swipe",
+      "constraints": [
+        {
+          "range": "0.0.21",
+          "via": "react-easy-swipe"
+        },
+        {
+          "range": "^0.0.21",
+          "via": "react-responsive-carousel"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "blocked",
+      "action": "repair-preflight",
+      "blockers": [
+        "Published artifact: No license file was found in the applicable package scope.",
+        "Immutable source: No license file was found in the applicable package scope."
+      ],
+      "repair": "Resolve every identity conflict and supply matching MIT or Unlicense evidence without overriding the policy gate.",
+      "input": "react-easy-swipe@^0.0.21",
+      "version": "0.0.21",
+      "identity": {
+        "packageName": "react-easy-swipe",
+        "version": "0.0.21",
+        "repository": {
+          "owner": "leandrowd",
+          "repo": "react-easy-swipe",
+          "subdirectory": null
+        },
+        "commit": "e016d64710e9780403c9aaa01705535966e214b5",
+        "integrity": "sha512-OeR2jAxdoqUMHIn/nS9fgreI5hSpgGoL5ezdal4+oO7YSSgJR8ga+PkYGJrSrJ9MKlPcQjMQXnketrD7WNmNsg=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "source": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "obligations": [],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "9d9a3b4c211e4308b346197da5ac96bf214d0b6464718f47cb1420e32802a6ea",
+        "sourceManifestSha256": "9d9a3b4c211e4308b346197da5ac96bf214d0b6464718f47cb1420e32802a6ea",
+        "artifactUrl": "https://registry.npmjs.org/react-easy-swipe/-/react-easy-swipe-0.0.21.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 3,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "createElement",
+            "count": 4,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "use",
+            "count": 3,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "Component",
+            "count": 2,
+            "status": "rewrite",
+            "note": "No class components. Rewrite as a function component."
+          },
+          {
+            "name": "defaultProps",
+            "count": 1,
+            "status": "rewrite",
+            "note": "Use default parameter values / destructuring defaults."
+          }
+        ],
+        "imports": [
+          "./react-swipe",
+          "prop-types",
+          "react",
+          "react-dom"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (4x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "Component (2x): No class components. Rewrite as a function component.",
+          "defaultProps (1x): Use default parameter values / destructuring defaults.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "fc0efb317a8fbbe89e568a84c51dd7709a3af67781207998223b3b892df10352",
+      "evidenceFingerprint": "fc0efb317a8fbbe89e568a84c51dd7709a3af67781207998223b3b892df10352"
+    },
+    "pkg:react-hotkeys-hook": {
+      "id": "pkg:react-hotkeys-hook",
+      "packageName": "react-hotkeys-hook",
+      "constraints": [
+        {
+          "range": "5.3.3",
+          "via": "react-hotkeys-hook"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [],
+      "requested": true,
+      "state": "implementing",
+      "action": "create-binding",
+      "blockers": [],
+      "repair": null,
+      "input": "react-hotkeys-hook@5.3.3",
+      "version": "5.3.3",
+      "identity": {
+        "packageName": "react-hotkeys-hook",
+        "version": "5.3.3",
+        "repository": {
+          "owner": "JohannesKlauss",
+          "repo": "react-keymap-hook",
+          "subdirectory": null
+        },
+        "commit": "7f3fffdec3e3bd1aeeadb9d00827368c7eb83e04",
+        "integrity": "sha512-aswgyWUnE25hmhzHTfKDmKzsaSE5DJ4LKaU/o6rQSXkDd/1Bh9TfAFQbHkf6fLy11HvlYkp+cDDarGdhmCDhoQ=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "passed",
+          "spdx": "MIT",
+          "reasons": [],
+          "evidence": [
+            {
+              "path": "package/LICENSE",
+              "scope": "package",
+              "classification": "MIT",
+              "sha256": "1def416e8042d3442057400f3345c3bd089476898d94b5d5ae9669b0c0d340a8"
+            }
+          ],
+          "notices": [],
+          "obligations": [
+            "Retain the upstream copyright and permission notice in all copies or substantial portions of the software."
+          ]
+        },
+        "source": {
+          "status": "passed",
+          "spdx": "MIT",
+          "reasons": [],
+          "evidence": [
+            {
+              "path": "LICENSE",
+              "scope": "package",
+              "classification": "MIT",
+              "sha256": "1def416e8042d3442057400f3345c3bd089476898d94b5d5ae9669b0c0d340a8"
+            }
+          ],
+          "notices": [],
+          "obligations": [
+            "Retain the upstream copyright and permission notice in all copies or substantial portions of the software."
+          ]
+        },
+        "obligations": [
+          "Retain the upstream copyright and permission notice in all copies or substantial portions of the software."
+        ],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "6561fc774751719ea89eaae243374a758b193432585b86f00b835cdeb9a3484f",
+        "sourceManifestSha256": "6561fc774751719ea89eaae243374a758b193432585b86f00b835cdeb9a3484f",
+        "artifactUrl": "https://registry.npmjs.org/react-hotkeys-hook/-/react-hotkeys-hook-5.3.3.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable",
+        "requiresAdaptation": false,
+        "filesScanned": 1,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "useState",
+            "count": 1,
+            "status": "same",
+            "note": "Same lazy initializer and functional-update semantics; Octane additionally exposes a stable current-state getter at tuple index 2."
+          },
+          {
+            "name": "useEffect",
+            "count": 1,
+            "status": "same",
+            "note": "Identical deps/cleanup semantics."
+          },
+          {
+            "name": "useLayoutEffect",
+            "count": 1,
+            "status": "same",
+            "note": "Identical: synchronous after DOM mutation."
+          },
+          {
+            "name": "useMemo",
+            "count": 1,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "useCallback",
+            "count": 1,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "useRef",
+            "count": 1,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "useContext",
+            "count": 1,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "createContext",
+            "count": 1,
+            "status": "same",
+            "note": "Supported."
+          }
+        ],
+        "imports": [
+          "react",
+          "react/jsx-runtime"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "binding": "@octanejs/hotkeys-hook",
+      "bindingDirectory": "packages/hotkeys-hook",
+      "evidenceFingerprint": "de527375926e570030c74e5f6673b71a232e7555fd8a31f8b91105c976d95ffa",
+      "vanillaCore": null,
+      "disposition": "actionable",
+      "nodeFingerprint": "28754331b111a30b6c1bf35e7b9dbd71538d8c65072f2985754263745f17cf37",
+      "evidenceMatrix": {
+        "schemaVersion": 1,
+        "categories": [
+          "hooks-store",
+          "provider-portal"
+        ],
+        "gates": {
+          "identity-license": {
+            "id": "identity-license",
+            "label": "Immutable identity and approved-license preflight",
+            "status": "passed",
+            "allowInapplicable": false,
+            "artifact": ".react-port-work/pr705-hotkeys-use-player-carousel/manifest.json",
+            "observed": "Node reached ready through immutable identity and approved-license preflight."
+          },
+          "upstream-crosswalk": {
+            "id": "upstream-crosswalk",
+            "label": "Complete upstream test-registration crosswalk",
+            "status": "required",
+            "allowInapplicable": false
+          },
+          "package-tests": {
+            "id": "package-tests",
+            "label": "Focused package behavior tests",
+            "status": "required",
+            "allowInapplicable": false
+          },
+          "typecheck": {
+            "id": "typecheck",
+            "label": "Public and authored-source typecheck",
+            "status": "required",
+            "allowInapplicable": false
+          },
+          "public-exports": {
+            "id": "public-exports",
+            "label": "Public entrypoint and export checks",
+            "status": "required",
+            "allowInapplicable": false
+          },
+          "package-pack": {
+            "id": "package-pack",
+            "label": "Packed external-consumer check",
+            "status": "required",
+            "allowInapplicable": false
+          },
+          "package-contract": {
+            "id": "package-contract",
+            "label": "Binding package contract",
+            "status": "required",
+            "allowInapplicable": false
+          },
+          "provenance": {
+            "id": "provenance",
+            "label": "UPSTREAM, license, and notice provenance",
+            "status": "required",
+            "allowInapplicable": false
+          },
+          "closure-audit": {
+            "id": "closure-audit",
+            "label": "Final shipped dependency and adapted-source closure",
+            "status": "required",
+            "allowInapplicable": false
+          },
+          "generated-data": {
+            "id": "generated-data",
+            "label": "Affected catalog and generated-data checks",
+            "status": "required",
+            "allowInapplicable": true
+          },
+          "format": {
+            "id": "format",
+            "label": "Formatting checks",
+            "status": "required",
+            "allowInapplicable": false
+          },
+          "identity-lifecycle": {
+            "id": "identity-lifecycle",
+            "label": "Subscription, identity, bailout, effect, and cleanup behavior",
+            "status": "required",
+            "allowInapplicable": false
+          },
+          "server-snapshot": {
+            "id": "server-snapshot",
+            "label": "Server snapshot and hydration-safe store behavior",
+            "status": "required",
+            "allowInapplicable": true
+          },
+          "provider-identity": {
+            "id": "provider-identity",
+            "label": "Provider/context identity and nested ownership",
+            "status": "required",
+            "allowInapplicable": false
+          },
+          "portal-lifecycle": {
+            "id": "portal-lifecycle",
+            "label": "Portal ancestry, suspension/error ownership, and teardown",
+            "status": "required",
+            "allowInapplicable": false
+          }
+        }
+      }
+    },
+    "pkg:react-player": {
+      "id": "pkg:react-player",
+      "packageName": "react-player",
+      "constraints": [
+        {
+          "range": "3.4.0",
+          "via": "react-player"
+        }
+      ],
+      "dependsOn": [
+        "pkg:@mux/mux-player-react",
+        "pkg:@types/react",
+        "pkg:cloudflare-video-element",
+        "pkg:dash-video-element",
+        "pkg:hls-video-element",
+        "pkg:spotify-audio-element",
+        "pkg:tiktok-video-element",
+        "pkg:twitch-video-element",
+        "pkg:vimeo-video-element",
+        "pkg:wistia-video-element",
+        "pkg:youtube-video-element"
+      ],
+      "requiredSubpaths": [],
+      "requested": true,
+      "state": "blocked",
+      "action": "create-binding",
+      "blockers": [
+        "Blocked prerequisite(s): pkg:@mux/mux-player-react, pkg:dash-video-element, pkg:hls-video-element, pkg:spotify-audio-element, pkg:tiktok-video-element, pkg:twitch-video-element, pkg:vimeo-video-element, pkg:wistia-video-element, pkg:youtube-video-element."
+      ],
+      "repair": "Repair every named prerequisite, then rebuild the graph.",
+      "input": "react-player@3.4.0",
+      "version": "3.4.0",
+      "identity": {
+        "packageName": "react-player",
+        "version": "3.4.0",
+        "repository": {
+          "owner": "cookpete",
+          "repo": "react-player",
+          "subdirectory": null
+        },
+        "commit": "258fce939638a295f6a429ad683935254d1bfda2",
+        "integrity": "sha512-QpQSHXtnMBKjQVNeaCYMtTVcynWQ0DDDhz/FJu1OR9PHLC1Aih94UqNstywzSHbJ6Oc7lI8/7kDDqcIvyTI6zQ=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "passed",
+          "spdx": "MIT",
+          "reasons": [],
+          "evidence": [
+            {
+              "path": "package/LICENSE.md",
+              "scope": "package",
+              "classification": "MIT",
+              "sha256": "3a4ea23f7decc1b113c7b785719c486ee348887af0c121e087aece09c2492f34"
+            }
+          ],
+          "notices": [],
+          "obligations": [
+            "Retain the upstream copyright and permission notice in all copies or substantial portions of the software."
+          ]
+        },
+        "source": {
+          "status": "passed",
+          "spdx": "MIT",
+          "reasons": [],
+          "evidence": [
+            {
+              "path": "LICENSE.md",
+              "scope": "package",
+              "classification": "MIT",
+              "sha256": "3a4ea23f7decc1b113c7b785719c486ee348887af0c121e087aece09c2492f34"
+            }
+          ],
+          "notices": [],
+          "obligations": [
+            "Retain the upstream copyright and permission notice in all copies or substantial portions of the software."
+          ]
+        },
+        "obligations": [
+          "Retain the upstream copyright and permission notice in all copies or substantial portions of the software."
+        ],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "918d7d2bb5eeac1df4fa5701a37e2d1c440144311713436322fe4a7f8e479032",
+        "sourceManifestSha256": "918d7d2bb5eeac1df4fa5701a37e2d1c440144311713436322fe4a7f8e479032",
+        "artifactUrl": "https://registry.npmjs.org/react-player/-/react-player-3.4.0.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 9,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "lazy",
+            "count": 12,
+            "status": "same",
+            "note": "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not)."
+          },
+          {
+            "name": "createElement",
+            "count": 9,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "useEffect",
+            "count": 7,
+            "status": "same",
+            "note": "Identical deps/cleanup semantics."
+          },
+          {
+            "name": "useState",
+            "count": 4,
+            "status": "same",
+            "note": "Same lazy initializer and functional-update semantics; Octane additionally exposes a stable current-state getter at tuple index 2."
+          },
+          {
+            "name": "defaultProps",
+            "count": 4,
+            "status": "rewrite",
+            "note": "Use default parameter values / destructuring defaults."
+          },
+          {
+            "name": "useRef",
+            "count": 3,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "forwardRef",
+            "count": 3,
+            "status": "rewrite",
+            "note": "No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop."
+          },
+          {
+            "name": "useCallback",
+            "count": 2,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "isValidElement",
+            "count": 2,
+            "status": "same",
+            "note": "Supported for Octane descriptors."
+          },
+          {
+            "name": "Suspense",
+            "count": 2,
+            "status": "same",
+            "note": "Supported (also available as the @try/@pending directive in .tsrx)."
+          },
+          {
+            "name": "use",
+            "count": 1,
+            "status": "same",
+            "note": "Supported for promises and context."
+          }
+        ],
+        "imports": [
+          "./HtmlPlayer.js",
+          "./Player.js",
+          "./Preview.js",
+          "./ReactPlayer.js",
+          "./patterns.js",
+          "./players.js",
+          "./props.js",
+          "@mux/mux-player-react",
+          "dash-video-element/react",
+          "hls-video-element/react",
+          "react",
+          "spotify-audio-element/react",
+          "tiktok-video-element/react",
+          "twitch-video-element/react",
+          "vimeo-video-element/react",
+          "wistia-video-element/react",
+          "youtube-video-element/react"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (9x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "defaultProps (4x): Use default parameter values / destructuring defaults.",
+          "forwardRef (3x): No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "binding": "@octanejs/player",
+      "bindingDirectory": "packages/player",
+      "evidenceFingerprint": "d9d254f5df0480b58fb9d8e779f70e78a4612242440b102faac32382443e2389",
+      "vanillaCore": null,
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "5cb71c3e42eacd9ff486238c39ced8f0b48fd5742ac16acc5721ba1a9f43e32e"
+    },
+    "pkg:react-responsive-carousel": {
+      "id": "pkg:react-responsive-carousel",
+      "packageName": "react-responsive-carousel",
+      "constraints": [
+        {
+          "range": "3.2.23",
+          "via": "react-responsive-carousel"
+        }
+      ],
+      "dependsOn": [
+        "pkg:classnames",
+        "pkg:prop-types",
+        "pkg:react-easy-swipe"
+      ],
+      "requiredSubpaths": [],
+      "requested": true,
+      "state": "blocked",
+      "action": "create-binding",
+      "blockers": [
+        "Blocked prerequisite(s): pkg:react-easy-swipe."
+      ],
+      "repair": "Repair every named prerequisite, then rebuild the graph.",
+      "input": "react-responsive-carousel@3.2.23",
+      "version": "3.2.23",
+      "identity": {
+        "packageName": "react-responsive-carousel",
+        "version": "3.2.23",
+        "repository": {
+          "owner": "leandrowd",
+          "repo": "react-responsive-carousel",
+          "subdirectory": null
+        },
+        "commit": "6d0896aaf55780e5bd53d2ae30e8faa14845fce4",
+        "integrity": "sha512-pqJLsBaKHWJhw/ItODgbVoziR2z4lpcJg+YwmRlSk4rKH32VE633mAtZZ9kDXjy4wFO+pgUZmDKPsPe1fPmHCg=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "passed",
+          "spdx": "MIT",
+          "reasons": [],
+          "evidence": [
+            {
+              "path": "package/LICENSE.md",
+              "scope": "package",
+              "classification": "MIT",
+              "sha256": "002c2696d92b5c8cf956c11072baa58eaf9f6ade995c031ea635c6a1ee342ad1"
+            }
+          ],
+          "notices": [],
+          "obligations": [
+            "Retain the upstream copyright and permission notice in all copies or substantial portions of the software."
+          ]
+        },
+        "source": {
+          "status": "passed",
+          "spdx": "MIT",
+          "reasons": [],
+          "evidence": [
+            {
+              "path": "LICENSE.md",
+              "scope": "package",
+              "classification": "MIT",
+              "sha256": "002c2696d92b5c8cf956c11072baa58eaf9f6ade995c031ea635c6a1ee342ad1"
+            }
+          ],
+          "notices": [],
+          "obligations": [
+            "Retain the upstream copyright and permission notice in all copies or substantial portions of the software."
+          ]
+        },
+        "obligations": [
+          "Retain the upstream copyright and permission notice in all copies or substantial portions of the software."
+        ],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "da7299e1689af15faaaa89f56926c3f2d5f48ab2beac7ca322ae9a6176c10965",
+        "sourceManifestSha256": "da7299e1689af15faaaa89f56926c3f2d5f48ab2beac7ca322ae9a6176c10965",
+        "artifactUrl": "https://registry.npmjs.org/react-responsive-carousel/-/react-responsive-carousel-3.2.23.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 12,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "createElement",
+            "count": 39,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "Children",
+            "count": 22,
+            "status": "partial",
+            "note": "Supported for Octane descriptors; React.Children traversal idioms over arbitrary VDOM do not apply."
+          },
+          {
+            "name": "use",
+            "count": 13,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "Component",
+            "count": 4,
+            "status": "rewrite",
+            "note": "No class components. Rewrite as a function component."
+          },
+          {
+            "name": "defaultProps",
+            "count": 2,
+            "status": "rewrite",
+            "note": "Use default parameter values / destructuring defaults."
+          }
+        ],
+        "imports": [
+          "../../CSSTranslate",
+          "../../cssClasses",
+          "../../shims/document",
+          "../../shims/window",
+          "../CSSTranslate",
+          "../Thumbs",
+          "../cssClasses",
+          "../dimensions",
+          "../shims/window",
+          "./animations",
+          "./components/Carousel",
+          "./components/Carousel/types",
+          "./components/Thumbs",
+          "./utils",
+          "classnames",
+          "react",
+          "react-dom",
+          "react-easy-swipe"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (39x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "Children (22x): Supported for Octane descriptors; React.Children traversal idioms over arbitrary VDOM do not apply.",
+          "Component (4x): No class components. Rewrite as a function component.",
+          "defaultProps (2x): Use default parameter values / destructuring defaults.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "binding": "@octanejs/responsive-carousel",
+      "bindingDirectory": "packages/responsive-carousel",
+      "evidenceFingerprint": "e945e7738849093f17e2d7711e77a39c9e195273f7e2629322a59ccad33a177f",
+      "vanillaCore": null,
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "6390fb7f2182b70c68b8fd3254ec8be1b72a18dd1d0c1d666f39681cc857ecca"
+    },
+    "pkg:react-universal-interface": {
+      "id": "pkg:react-universal-interface",
+      "packageName": "react-universal-interface",
+      "constraints": [
+        {
+          "range": "0.6.2",
+          "via": "react-universal-interface"
+        },
+        {
+          "range": "^0.6.2",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "blocked",
+      "action": "repair-preflight",
+      "blockers": [
+        "Published package version 0.6.2 does not match source version 0.0.1.",
+        "Published artifact: The package manifest does not declare a license.",
+        "Immutable source: The package manifest does not declare a license."
+      ],
+      "repair": "Resolve every identity conflict and supply matching MIT or Unlicense evidence without overriding the policy gate.",
+      "input": "react-universal-interface@^0.6.2",
+      "version": "0.6.2",
+      "identity": {
+        "packageName": "react-universal-interface",
+        "version": "0.6.2",
+        "repository": {
+          "owner": "streamich",
+          "repo": "react-universal-interface",
+          "subdirectory": null
+        },
+        "commit": "06a34a6ca85b50452d3507aa3aaa97308e9d2a33",
+        "integrity": "sha512-dg8yXdcQmvgR13RIlZbTRQOoUrDciFVoSBZILwjE2LFISxZZ8loVJKAkuzswl5js8BHda79bIb2b84ehU8IjXw=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "The package manifest does not declare a license."
+          ],
+          "evidence": [
+            {
+              "path": "package/LICENSE",
+              "scope": "package",
+              "classification": "Unlicense",
+              "sha256": "6b0382b16279f26ff69014300541967a356a666eb0b91b422f6862f6b7dad17e"
+            }
+          ],
+          "notices": [],
+          "obligations": []
+        },
+        "source": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "The package manifest does not declare a license."
+          ],
+          "evidence": [
+            {
+              "path": "LICENSE",
+              "scope": "package",
+              "classification": "Unlicense",
+              "sha256": "6b0382b16279f26ff69014300541967a356a666eb0b91b422f6862f6b7dad17e"
+            }
+          ],
+          "notices": [],
+          "obligations": []
+        },
+        "obligations": [],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "7933eb70cf28ad4ed8066217edc14751c2d34c66701bd56ba662f2e3b0275d89",
+        "sourceManifestSha256": "8616b41240e1b8798443b35414ce1e5d08fd7ffaabed9d98a7bf45370d1ffbfc",
+        "artifactUrl": "https://registry.npmjs.org/react-universal-interface/-/react-universal-interface-0.6.2.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 12,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": true,
+        "apis": [
+          {
+            "name": "use",
+            "count": 6,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "createElement",
+            "count": 5,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "cloneElement",
+            "count": 5,
+            "status": "partial",
+            "note": "Works on Octane element descriptors only."
+          },
+          {
+            "name": "Children",
+            "count": 2,
+            "status": "partial",
+            "note": "Supported for Octane descriptors; React.Children traversal idioms over arbitrary VDOM do not apply."
+          },
+          {
+            "name": "Component",
+            "count": 2,
+            "status": "rewrite",
+            "note": "No class components. Rewrite as a function component."
+          }
+        ],
+        "imports": [
+          "./addClassDecoratorSupport",
+          "./createEnhancer",
+          "./hookToRenderProp",
+          "./render",
+          "./wrapInStatefulComponent",
+          "react",
+          "tslib"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (5x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "cloneElement (5x): Works on Octane element descriptors only.",
+          "Children (2x): Supported for Octane descriptors; React.Children traversal idioms over arbitrary VDOM do not apply.",
+          "Component (2x): No class components. Rewrite as a function component.",
+          "Class components detected: rewrite each as a function component; error boundaries become the @try/@catch directive or the ErrorBoundary component.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "0bde2d0d0217e73a33a51090280e1835174b08d2a81cb54425ebba0f7e0925d6",
+      "evidenceFingerprint": "0bde2d0d0217e73a33a51090280e1835174b08d2a81cb54425ebba0f7e0925d6"
+    },
+    "pkg:react-use": {
+      "id": "pkg:react-use",
+      "packageName": "react-use",
+      "constraints": [
+        {
+          "range": "17.6.1",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [
+        "pkg:@types/js-cookie",
+        "pkg:@xobotyi/scrollbar-width",
+        "pkg:copy-to-clipboard",
+        "pkg:fast-deep-equal",
+        "pkg:fast-shallow-equal",
+        "pkg:js-cookie",
+        "pkg:nano-css",
+        "pkg:react-universal-interface",
+        "pkg:resize-observer-polyfill",
+        "pkg:screenfull",
+        "pkg:set-harmonic-interval",
+        "pkg:throttle-debounce",
+        "pkg:ts-easing",
+        "pkg:tslib"
+      ],
+      "requiredSubpaths": [],
+      "requested": true,
+      "state": "blocked",
+      "action": "create-binding",
+      "blockers": [
+        "Blocked prerequisite(s): pkg:react-universal-interface."
+      ],
+      "repair": "Repair every named prerequisite, then rebuild the graph.",
+      "input": "react-use@17.6.1",
+      "version": "17.6.1",
+      "identity": {
+        "packageName": "react-use",
+        "version": "17.6.1",
+        "repository": {
+          "owner": "streamich",
+          "repo": "react-use",
+          "subdirectory": null
+        },
+        "commit": "fbe99c6327e6af94df03bc8bd6ecc5e3ff04fbcc",
+        "integrity": "sha512-uibb3pgzV4LFsYPHyXYGu7dD2+pyk/ZJlPH+AizBR3zolqPWyCleKcWWbUQaKSKfydwgnQ3ymGm1Ab3/saGHCA=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "passed",
+          "spdx": "Unlicense",
+          "reasons": [],
+          "evidence": [
+            {
+              "path": "package/LICENSE",
+              "scope": "package",
+              "classification": "Unlicense",
+              "sha256": "6b0382b16279f26ff69014300541967a356a666eb0b91b422f6862f6b7dad17e"
+            }
+          ],
+          "notices": [],
+          "obligations": [
+            "Retain the upstream Unlicense text with copied or adapted source to preserve provenance and its warranty disclaimer."
+          ]
+        },
+        "source": {
+          "status": "passed",
+          "spdx": "Unlicense",
+          "reasons": [],
+          "evidence": [
+            {
+              "path": "LICENSE",
+              "scope": "package",
+              "classification": "Unlicense",
+              "sha256": "6b0382b16279f26ff69014300541967a356a666eb0b91b422f6862f6b7dad17e"
+            }
+          ],
+          "notices": [],
+          "obligations": [
+            "Retain the upstream Unlicense text with copied or adapted source to preserve provenance and its warranty disclaimer."
+          ]
+        },
+        "obligations": [
+          "Retain the upstream Unlicense text with copied or adapted source to preserve provenance and its warranty disclaimer."
+        ],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "5c329040df88366a62900d1697400a5513333e5c44a3d41f68132a49c06cb1bf",
+        "sourceManifestSha256": "5c329040df88366a62900d1697400a5513333e5c44a3d41f68132a49c06cb1bf",
+        "artifactUrl": "https://registry.npmjs.org/react-use/-/react-use-17.6.1.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 254,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "useEffect",
+            "count": 204,
+            "status": "same",
+            "note": "Identical deps/cleanup semantics."
+          },
+          {
+            "name": "useState",
+            "count": 182,
+            "status": "same",
+            "note": "Same lazy initializer and functional-update semantics; Octane additionally exposes a stable current-state getter at tuple index 2."
+          },
+          {
+            "name": "useRef",
+            "count": 151,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "use",
+            "count": 132,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "useCallback",
+            "count": 93,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "useMemo",
+            "count": 63,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "createElement",
+            "count": 14,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "useReducer",
+            "count": 12,
+            "status": "same",
+            "note": "Same reducer and lazy-init semantics; Octane additionally exposes a stable current-state getter at tuple index 2."
+          },
+          {
+            "name": "cloneElement",
+            "count": 9,
+            "status": "partial",
+            "note": "Works on Octane element descriptors only."
+          },
+          {
+            "name": "createContext",
+            "count": 8,
+            "status": "same",
+            "note": "Supported."
+          },
+          {
+            "name": "useLayoutEffect",
+            "count": 6,
+            "status": "same",
+            "note": "Identical: synchronous after DOM mutation."
+          },
+          {
+            "name": "useContext",
+            "count": 6,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "Component",
+            "count": 4,
+            "status": "rewrite",
+            "note": "No class components. Rewrite as a function component."
+          },
+          {
+            "name": "forwardRef",
+            "count": 3,
+            "status": "rewrite",
+            "note": "No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop."
+          },
+          {
+            "name": "isValidElement",
+            "count": 2,
+            "status": "same",
+            "note": "Supported for Octane descriptors."
+          },
+          {
+            "name": "Children",
+            "count": 2,
+            "status": "partial",
+            "note": "Supported for Octane descriptors; React.Children traversal idioms over arbitrary VDOM do not apply."
+          }
+        ],
+        "imports": [
+          "../factory/createRenderProp",
+          "../misc/hookState",
+          "../misc/parseTimeRanges",
+          "../misc/util",
+          "../useEffectOnce",
+          "../useIsomorphicLayoutEffect",
+          "../useKey",
+          "../useSetState",
+          "../useUpdateEffect",
+          "./factory/createBreakpoint",
+          "./factory/createGlobalState",
+          "./factory/createHTMLMediaHook",
+          "./factory/createMemo",
+          "./factory/createReducer",
+          "./factory/createReducerContext",
+          "./factory/createStateContext",
+          "./misc/hookState",
+          "./misc/isDeepEqual",
+          "./misc/util",
+          "./useAsync",
+          "./useAsyncFn",
+          "./useAsyncRetry",
+          "./useAudio",
+          "./useBattery",
+          "./useBeforeUnload",
+          "./useBoolean",
+          "./useClickAway",
+          "./useCookie",
+          "./useCopyToClipboard",
+          "./useCounter",
+          "./useCss",
+          "./useCustomCompareEffect",
+          "./useDebounce",
+          "./useDeepCompareEffect",
+          "./useDefault",
+          "./useDrop",
+          "./useDropArea",
+          "./useEffectOnce",
+          "./useEnsuredForwardedRef",
+          "./useError",
+          "./useEvent",
+          "./useFavicon",
+          "./useFirstMountState",
+          "./useFullscreen",
+          "./useGeolocation",
+          "./useGetSet",
+          "./useGetSetState",
+          "./useHarmonicIntervalFn",
+          "./useHash",
+          "./useHover",
+          "./useHoverDirty",
+          "./useIdle",
+          "./useIntersection",
+          "./useInterval",
+          "./useIsomorphicLayoutEffect",
+          "./useKey",
+          "./useKeyPress",
+          "./useKeyPressEvent",
+          "./useLatest",
+          "./useLifecycles",
+          "./useList",
+          "./useLocalStorage",
+          "./useLocation",
+          "./useLockBodyScroll",
+          "./useLogger",
+          "./useLongPress",
+          "./useMap",
+          "./useMeasure",
+          "./useMedia",
+          "./useMediaDevices",
+          "./useMediatedState",
+          "./useMethods",
+          "./useMotion",
+          "./useMount",
+          "./useMountedState",
+          "./useMouse",
+          "./useMouseHovered",
+          "./useMouseWheel",
+          "./useMultiStateValidator",
+          "./useNetworkState",
+          "./useNumber",
+          "./useObservable",
+          "./useOrientation",
+          "./usePageLeave",
+          "./usePermission",
+          "./usePinchZoom",
+          "./usePrevious",
+          "./usePreviousDistinct",
+          "./usePromise",
+          "./useQueue",
+          "./useRaf",
+          "./useRafLoop",
+          "./useRafState",
+          "./useRendersCount",
+          "./useScratch",
+          "./useScroll",
+          "./useScrollbarWidth",
+          "./useScrolling",
+          "./useSearchParam",
+          "./useSessionStorage",
+          "./useSet",
+          "./useSetState",
+          "./useShallowCompareEffect",
+          "./useSize",
+          "./useSlider",
+          "./useSpeech",
+          "./useStartTyping",
+          "./useStateList",
+          "./useStateValidator",
+          "./useStateWithHistory",
+          "./useThrottle",
+          "./useThrottleFn",
+          "./useTimeout",
+          "./useTimeoutFn",
+          "./useTitle",
+          "./useToggle",
+          "./useTween",
+          "./useUnmount",
+          "./useUnmountPromise",
+          "./useUpdate",
+          "./useUpdateEffect",
+          "./useUpsert",
+          "./useVibrate",
+          "./useVideo",
+          "./useWindowScroll",
+          "./useWindowSize",
+          "@xobotyi/scrollbar-width",
+          "copy-to-clipboard",
+          "fast-deep-equal/react",
+          "fast-shallow-equal",
+          "js-cookie",
+          "keyboardjs",
+          "nano-css",
+          "nano-css/addon/cssom",
+          "nano-css/addon/vcssom",
+          "nano-css/addon/vcssom/cssToTree",
+          "react",
+          "react-universal-interface",
+          "rebound",
+          "resize-observer-polyfill",
+          "screenfull",
+          "set-harmonic-interval",
+          "throttle-debounce",
+          "ts-easing",
+          "tslib"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (14x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "cloneElement (9x): Works on Octane element descriptors only.",
+          "Component (4x): No class components. Rewrite as a function component.",
+          "forwardRef (3x): No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.",
+          "Children (2x): Supported for Octane descriptors; React.Children traversal idioms over arbitrary VDOM do not apply.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "binding": "@octanejs/use",
+      "bindingDirectory": "packages/use",
+      "evidenceFingerprint": "0c20719e37d91ca39594432624b46e0bf8ff121f6621039a582d313c990be0bb",
+      "vanillaCore": null,
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "59ddd4e462257a8ca451e1ded10c17928f2e3cc8831762f110e470a9a5e71444"
+    },
+    "pkg:resize-observer-polyfill": {
+      "id": "pkg:resize-observer-polyfill",
+      "packageName": "resize-observer-polyfill",
+      "constraints": [
+        {
+          "range": "^1.5.1",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "4523d8921dbe8e04a843ade821afe947cbabfe09fa8b0b91e6ed53faaa74b27b",
+      "evidenceFingerprint": "4523d8921dbe8e04a843ade821afe947cbabfe09fa8b0b91e6ed53faaa74b27b"
+    },
+    "pkg:screenfull": {
+      "id": "pkg:screenfull",
+      "packageName": "screenfull",
+      "constraints": [
+        {
+          "range": "^5.1.0",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "290525f12b75d5801293ddd2d9124392851bccce30809ddd73e007439fb51bfa",
+      "evidenceFingerprint": "290525f12b75d5801293ddd2d9124392851bccce30809ddd73e007439fb51bfa"
+    },
+    "pkg:set-harmonic-interval": {
+      "id": "pkg:set-harmonic-interval",
+      "packageName": "set-harmonic-interval",
+      "constraints": [
+        {
+          "range": "^1.0.1",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "d5026bd45fc8f0ce3467d8bb32a5703cae4908d8269ee344123b0b28ccf2d140",
+      "evidenceFingerprint": "d5026bd45fc8f0ce3467d8bb32a5703cae4908d8269ee344123b0b28ccf2d140"
+    },
+    "pkg:spotify-audio-element": {
+      "id": "pkg:spotify-audio-element",
+      "packageName": "spotify-audio-element",
+      "constraints": [
+        {
+          "range": "^1.0.3",
+          "via": "react-player"
+        },
+        {
+          "range": "1.0.4",
+          "via": "spotify-audio-element"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "./react"
+      ],
+      "requested": false,
+      "state": "blocked",
+      "action": "repair-preflight",
+      "blockers": [
+        "Published artifact: No license file was found in the applicable package scope.",
+        "Immutable source: No license file was found in the applicable package scope."
+      ],
+      "repair": "Resolve every identity conflict and supply matching MIT or Unlicense evidence without overriding the policy gate.",
+      "input": "spotify-audio-element@^1.0.3",
+      "version": "1.0.4",
+      "identity": {
+        "packageName": "spotify-audio-element",
+        "version": "1.0.4",
+        "repository": {
+          "owner": "muxinc",
+          "repo": "media-elements",
+          "subdirectory": "packages/spotify-audio-element"
+        },
+        "commit": "5c518f1bb6cf111b737caa2415293de0abf7b1c8",
+        "integrity": "sha512-QdKrJPkYCzaNwwz2vN2eDGyoW0KmQFmnwVprB41mpMzj4qujbqr6pegEchQeTn0b5PceKiLoVu0pp2QDpTcWnw=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "source": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "obligations": [],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "c33b1ae36e788516aed1bc0b7e4ef2004a723a87ca4a07f0c0d577ad0e9356d0",
+        "sourceManifestSha256": "c33b1ae36e788516aed1bc0b7e4ef2004a723a87ca4a07f0c0d577ad0e9356d0",
+        "artifactUrl": "https://registry.npmjs.org/spotify-audio-element/-/spotify-audio-element-1.0.4.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 4,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "createElement",
+            "count": 6,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "useLayoutEffect",
+            "count": 4,
+            "status": "same",
+            "note": "Identical: synchronous after DOM mutation."
+          },
+          {
+            "name": "useRef",
+            "count": 4,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "defaultProps",
+            "count": 4,
+            "status": "rewrite",
+            "note": "Use default parameter values / destructuring defaults."
+          },
+          {
+            "name": "useCallback",
+            "count": 2,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "use",
+            "count": 2,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "forwardRef",
+            "count": 2,
+            "status": "rewrite",
+            "note": "No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop."
+          },
+          {
+            "name": "lazy",
+            "count": 2,
+            "status": "same",
+            "note": "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not)."
+          }
+        ],
+        "imports": [
+          "./spotify-audio-element.js",
+          "react"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (6x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "defaultProps (4x): Use default parameter values / destructuring defaults.",
+          "forwardRef (2x): No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "706003706269502adb7aada9d32456ae2900dcdcc1dd2118e0009359fcc5f36a",
+      "evidenceFingerprint": "706003706269502adb7aada9d32456ae2900dcdcc1dd2118e0009359fcc5f36a"
+    },
+    "pkg:throttle-debounce": {
+      "id": "pkg:throttle-debounce",
+      "packageName": "throttle-debounce",
+      "constraints": [
+        {
+          "range": "^3.0.1",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "ebe6f21e48acf09effe381572c6c6960c6465fd62fcd311406371253407383b0",
+      "evidenceFingerprint": "ebe6f21e48acf09effe381572c6c6960c6465fd62fcd311406371253407383b0"
+    },
+    "pkg:tiktok-video-element": {
+      "id": "pkg:tiktok-video-element",
+      "packageName": "tiktok-video-element",
+      "constraints": [
+        {
+          "range": "^0.1.1",
+          "via": "react-player"
+        },
+        {
+          "range": "0.1.2",
+          "via": "tiktok-video-element"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "./react"
+      ],
+      "requested": false,
+      "state": "blocked",
+      "action": "repair-preflight",
+      "blockers": [
+        "Published artifact: No license file was found in the applicable package scope.",
+        "Immutable source: No license file was found in the applicable package scope."
+      ],
+      "repair": "Resolve every identity conflict and supply matching MIT or Unlicense evidence without overriding the policy gate.",
+      "input": "tiktok-video-element@^0.1.1",
+      "version": "0.1.2",
+      "identity": {
+        "packageName": "tiktok-video-element",
+        "version": "0.1.2",
+        "repository": {
+          "owner": "muxinc",
+          "repo": "media-elements",
+          "subdirectory": "packages/tiktok-video-element"
+        },
+        "commit": "5c518f1bb6cf111b737caa2415293de0abf7b1c8",
+        "integrity": "sha512-w6TboLm236XJKKiIXIhCbYCnUxbixBbaAoty0etaEAZ/2kHkVIdfZdv2oouMU/HGMsWCHI/VjQ3wU3MJ+s192Q=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "source": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "obligations": [],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "3cd8f4344a2bd3d7492e1d5b8b642ca6708573d32cc663214203cd8d801089e7",
+        "sourceManifestSha256": "3cd8f4344a2bd3d7492e1d5b8b642ca6708573d32cc663214203cd8d801089e7",
+        "artifactUrl": "https://registry.npmjs.org/tiktok-video-element/-/tiktok-video-element-0.1.2.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 4,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "useLayoutEffect",
+            "count": 4,
+            "status": "same",
+            "note": "Identical: synchronous after DOM mutation."
+          },
+          {
+            "name": "useRef",
+            "count": 4,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "createElement",
+            "count": 4,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "defaultProps",
+            "count": 4,
+            "status": "rewrite",
+            "note": "Use default parameter values / destructuring defaults."
+          },
+          {
+            "name": "useCallback",
+            "count": 2,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "use",
+            "count": 2,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "forwardRef",
+            "count": 2,
+            "status": "rewrite",
+            "note": "No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop."
+          },
+          {
+            "name": "lazy",
+            "count": 2,
+            "status": "same",
+            "note": "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not)."
+          }
+        ],
+        "imports": [
+          "./tiktok-video-element.js",
+          "react"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (4x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "defaultProps (4x): Use default parameter values / destructuring defaults.",
+          "forwardRef (2x): No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "e25ae55d3386c920d138d09b36975ec20eb7273813dcdf9048c042d49c7d89a9",
+      "evidenceFingerprint": "e25ae55d3386c920d138d09b36975ec20eb7273813dcdf9048c042d49c7d89a9"
+    },
+    "pkg:ts-easing": {
+      "id": "pkg:ts-easing",
+      "packageName": "ts-easing",
+      "constraints": [
+        {
+          "range": "^0.2.0",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "648a32a1fa1330fd4c2e457e591bb1044200d88fb8ee0f7f46bff650e2f465d2",
+      "evidenceFingerprint": "648a32a1fa1330fd4c2e457e591bb1044200d88fb8ee0f7f46bff650e2f465d2"
+    },
+    "pkg:tslib": {
+      "id": "pkg:tslib",
+      "packageName": "tslib",
+      "constraints": [
+        {
+          "range": "^2.1.0",
+          "via": "react-use"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "."
+      ],
+      "requested": false,
+      "state": "verified",
+      "action": "reuse-package",
+      "blockers": [],
+      "repair": null,
+      "disposition": "satisfied",
+      "nodeFingerprint": "918c8968c1ee568d12c369e1608aa5b0ac5374659a924f15d418f7a465f7c848",
+      "evidenceFingerprint": "918c8968c1ee568d12c369e1608aa5b0ac5374659a924f15d418f7a465f7c848"
+    },
+    "pkg:twitch-video-element": {
+      "id": "pkg:twitch-video-element",
+      "packageName": "twitch-video-element",
+      "constraints": [
+        {
+          "range": "^0.1.5",
+          "via": "react-player"
+        },
+        {
+          "range": "0.1.6",
+          "via": "twitch-video-element"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "./react"
+      ],
+      "requested": false,
+      "state": "blocked",
+      "action": "repair-preflight",
+      "blockers": [
+        "Published artifact: No license file was found in the applicable package scope.",
+        "Immutable source: No license file was found in the applicable package scope."
+      ],
+      "repair": "Resolve every identity conflict and supply matching MIT or Unlicense evidence without overriding the policy gate.",
+      "input": "twitch-video-element@^0.1.5",
+      "version": "0.1.6",
+      "identity": {
+        "packageName": "twitch-video-element",
+        "version": "0.1.6",
+        "repository": {
+          "owner": "muxinc",
+          "repo": "media-elements",
+          "subdirectory": "packages/twitch-video-element"
+        },
+        "commit": "5c518f1bb6cf111b737caa2415293de0abf7b1c8",
+        "integrity": "sha512-X7l8gy+DEFKJ/EztUwaVnAYwQN9fUJxPkOVJj2sE62sGvGU4DNLyvmOsmVulM+8Plc5dMg6hYIMNRAPaH+39Uw=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "source": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "obligations": [],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "86b20b60a644f5a178a9d0d45253544d743c705ae3a1c66a58dd7f060653ef7f",
+        "sourceManifestSha256": "86b20b60a644f5a178a9d0d45253544d743c705ae3a1c66a58dd7f060653ef7f",
+        "artifactUrl": "https://registry.npmjs.org/twitch-video-element/-/twitch-video-element-0.1.6.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 4,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "useLayoutEffect",
+            "count": 4,
+            "status": "same",
+            "note": "Identical: synchronous after DOM mutation."
+          },
+          {
+            "name": "useRef",
+            "count": 4,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "createElement",
+            "count": 4,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "defaultProps",
+            "count": 4,
+            "status": "rewrite",
+            "note": "Use default parameter values / destructuring defaults."
+          },
+          {
+            "name": "useCallback",
+            "count": 2,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "use",
+            "count": 2,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "forwardRef",
+            "count": 2,
+            "status": "rewrite",
+            "note": "No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop."
+          },
+          {
+            "name": "lazy",
+            "count": 2,
+            "status": "same",
+            "note": "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not)."
+          }
+        ],
+        "imports": [
+          "./twitch-video-element.js",
+          "react"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (4x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "defaultProps (4x): Use default parameter values / destructuring defaults.",
+          "forwardRef (2x): No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "341680ece16a7a1ccb6bcfad4e20540e4ebf1c7bfc802ddfcca7986cd647bf3a",
+      "evidenceFingerprint": "341680ece16a7a1ccb6bcfad4e20540e4ebf1c7bfc802ddfcca7986cd647bf3a"
+    },
+    "pkg:vimeo-video-element": {
+      "id": "pkg:vimeo-video-element",
+      "packageName": "vimeo-video-element",
+      "constraints": [
+        {
+          "range": "^1.6.1",
+          "via": "react-player"
+        },
+        {
+          "range": "1.7.3",
+          "via": "vimeo-video-element"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "./react"
+      ],
+      "requested": false,
+      "state": "blocked",
+      "action": "repair-preflight",
+      "blockers": [
+        "Published artifact: No license file was found in the applicable package scope.",
+        "Immutable source: No license file was found in the applicable package scope."
+      ],
+      "repair": "Resolve every identity conflict and supply matching MIT or Unlicense evidence without overriding the policy gate.",
+      "input": "vimeo-video-element@^1.6.1",
+      "version": "1.7.3",
+      "identity": {
+        "packageName": "vimeo-video-element",
+        "version": "1.7.3",
+        "repository": {
+          "owner": "muxinc",
+          "repo": "media-elements",
+          "subdirectory": "packages/vimeo-video-element"
+        },
+        "commit": "b5221eee9c52dfa7ddcbc8260f8b079e87d1e12c",
+        "integrity": "sha512-Ed2ZFhe6WCmyvLC8j87UKtppgTP/BOdHe6C6J2xKNVt+KpWw/DrSvZjvZMUt0XD5GkY9hZoEbaNpFo8zk3FgaQ=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "source": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "obligations": [],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "fd582639b55011b14d92930f13f8fef7068abe7f19fdc394b4098366b9069e9e",
+        "sourceManifestSha256": "fd582639b55011b14d92930f13f8fef7068abe7f19fdc394b4098366b9069e9e",
+        "artifactUrl": "https://registry.npmjs.org/vimeo-video-element/-/vimeo-video-element-1.7.3.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 4,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "createElement",
+            "count": 6,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "useLayoutEffect",
+            "count": 4,
+            "status": "same",
+            "note": "Identical: synchronous after DOM mutation."
+          },
+          {
+            "name": "useRef",
+            "count": 4,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "defaultProps",
+            "count": 4,
+            "status": "rewrite",
+            "note": "Use default parameter values / destructuring defaults."
+          },
+          {
+            "name": "useCallback",
+            "count": 2,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "use",
+            "count": 2,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "forwardRef",
+            "count": 2,
+            "status": "rewrite",
+            "note": "No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop."
+          },
+          {
+            "name": "lazy",
+            "count": 2,
+            "status": "same",
+            "note": "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not)."
+          }
+        ],
+        "imports": [
+          "./vimeo-video-element.js",
+          "@vimeo/player/dist/player.es.js",
+          "media-played-ranges-mixin",
+          "react"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (6x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "defaultProps (4x): Use default parameter values / destructuring defaults.",
+          "forwardRef (2x): No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "beb828811c892666aa4043d97818ed1dc089c75e786b31c4ae12afe9bf5ec62c",
+      "evidenceFingerprint": "beb828811c892666aa4043d97818ed1dc089c75e786b31c4ae12afe9bf5ec62c"
+    },
+    "pkg:wistia-video-element": {
+      "id": "pkg:wistia-video-element",
+      "packageName": "wistia-video-element",
+      "constraints": [
+        {
+          "range": "^1.3.5",
+          "via": "react-player"
+        },
+        {
+          "range": "1.4.0",
+          "via": "wistia-video-element"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "./react"
+      ],
+      "requested": false,
+      "state": "blocked",
+      "action": "repair-preflight",
+      "blockers": [
+        "Published artifact: No license file was found in the applicable package scope.",
+        "Immutable source: No license file was found in the applicable package scope."
+      ],
+      "repair": "Resolve every identity conflict and supply matching MIT or Unlicense evidence without overriding the policy gate.",
+      "input": "wistia-video-element@^1.3.5",
+      "version": "1.4.0",
+      "identity": {
+        "packageName": "wistia-video-element",
+        "version": "1.4.0",
+        "repository": {
+          "owner": "muxinc",
+          "repo": "media-elements",
+          "subdirectory": "packages/wistia-video-element"
+        },
+        "commit": "a88988c854a08b7532d5433d6ea5fe9486f391cd",
+        "integrity": "sha512-udI8/yiMZ+KIGwYK1qNOFiXl+s/wffiY+XkwTXlBFICZylFalOS0QYEQqYOmuBsm3jNfGUS4O50tLuN7Ejqm3A=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "source": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "obligations": [],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "75534549fcf9987ebd83a899437a74753b1e61e17b9403ad743f8173a3c9cf94",
+        "sourceManifestSha256": "75534549fcf9987ebd83a899437a74753b1e61e17b9403ad743f8173a3c9cf94",
+        "artifactUrl": "https://registry.npmjs.org/wistia-video-element/-/wistia-video-element-1.4.0.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 4,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "createElement",
+            "count": 10,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "useLayoutEffect",
+            "count": 4,
+            "status": "same",
+            "note": "Identical: synchronous after DOM mutation."
+          },
+          {
+            "name": "useRef",
+            "count": 4,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "defaultProps",
+            "count": 4,
+            "status": "rewrite",
+            "note": "Use default parameter values / destructuring defaults."
+          },
+          {
+            "name": "useCallback",
+            "count": 2,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "use",
+            "count": 2,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "forwardRef",
+            "count": 2,
+            "status": "rewrite",
+            "note": "No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop."
+          }
+        ],
+        "imports": [
+          "./wistia-video-element.js",
+          "react",
+          "super-media-element"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (10x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "defaultProps (4x): Use default parameter values / destructuring defaults.",
+          "forwardRef (2x): No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "b20456207751a0678ac91eac9b90defe8920fa464fceb5c98caf53bd89587068",
+      "evidenceFingerprint": "b20456207751a0678ac91eac9b90defe8920fa464fceb5c98caf53bd89587068"
+    },
+    "pkg:youtube-video-element": {
+      "id": "pkg:youtube-video-element",
+      "packageName": "youtube-video-element",
+      "constraints": [
+        {
+          "range": "^1.8.0",
+          "via": "react-player"
+        },
+        {
+          "range": "1.9.0",
+          "via": "youtube-video-element"
+        }
+      ],
+      "dependsOn": [],
+      "requiredSubpaths": [
+        "./react"
+      ],
+      "requested": false,
+      "state": "blocked",
+      "action": "repair-preflight",
+      "blockers": [
+        "Published artifact: No license file was found in the applicable package scope.",
+        "Immutable source: No license file was found in the applicable package scope."
+      ],
+      "repair": "Resolve every identity conflict and supply matching MIT or Unlicense evidence without overriding the policy gate.",
+      "input": "youtube-video-element@^1.8.0",
+      "version": "1.9.0",
+      "identity": {
+        "packageName": "youtube-video-element",
+        "version": "1.9.0",
+        "repository": {
+          "owner": "muxinc",
+          "repo": "media-elements",
+          "subdirectory": "packages/youtube-video-element"
+        },
+        "commit": "3149cd431e6a01838ab70f95f4ddcc676e1e63ab",
+        "integrity": "sha512-Hh0dbQM+FVlUaYUbpYkZNUvdKxTNcSNvTGzkQKYShltnX+LRHEp2eYvC2Zm43eU8Np+CBZuoNR2i+seCYzzAyg=="
+      },
+      "license": {
+        "policy": "approved-license-v2",
+        "published": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "source": {
+          "status": "blocked",
+          "spdx": null,
+          "reasons": [
+            "No license file was found in the applicable package scope."
+          ],
+          "evidence": [],
+          "notices": [],
+          "obligations": []
+        },
+        "obligations": [],
+        "disclaimer": "Repository policy check only; not legal advice."
+      },
+      "provenance": {
+        "registryManifestSha256": "80c896197476d449108db7697b47946e4dfe850410ec8247184c70b26049a8f1",
+        "sourceManifestSha256": "80c896197476d449108db7697b47946e4dfe850410ec8247184c70b26049a8f1",
+        "artifactUrl": "https://registry.npmjs.org/youtube-video-element/-/youtube-video-element-1.9.0.tgz"
+      },
+      "feasibility": {
+        "verdict": "bridgeable-with-rewrites",
+        "requiresAdaptation": true,
+        "filesScanned": 4,
+        "truncated": false,
+        "hazards": [],
+        "classComponents": false,
+        "apis": [
+          {
+            "name": "createElement",
+            "count": 8,
+            "status": "partial",
+            "note": "Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls."
+          },
+          {
+            "name": "useLayoutEffect",
+            "count": 4,
+            "status": "same",
+            "note": "Identical: synchronous after DOM mutation."
+          },
+          {
+            "name": "useRef",
+            "count": 4,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "defaultProps",
+            "count": 4,
+            "status": "rewrite",
+            "note": "Use default parameter values / destructuring defaults."
+          },
+          {
+            "name": "useCallback",
+            "count": 2,
+            "status": "same",
+            "note": "Identical."
+          },
+          {
+            "name": "use",
+            "count": 2,
+            "status": "same",
+            "note": "Supported for promises and context."
+          },
+          {
+            "name": "forwardRef",
+            "count": 2,
+            "status": "rewrite",
+            "note": "No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop."
+          },
+          {
+            "name": "lazy",
+            "count": 2,
+            "status": "same",
+            "note": "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not)."
+          }
+        ],
+        "imports": [
+          "./youtube-video-element.js",
+          "media-played-ranges-mixin",
+          "react"
+        ],
+        "plan": [
+          "Pin the upstream version you are bridging and copy that release's React binding source into your repository beside the port, keeping the upstream LICENSE and leaving the copy unmodified, then work through it module by module. A bridge written from the README or the type declarations covers the demo path and drops the rest of the API; the copy is also the diff you review on the next upgrade.",
+          "Re-implement the React binding layer (the hooks/components that import react) against Octane hooks of the same names. Most store bindings reduce to useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot).",
+          "createElement (8x): Returns a flat descriptor consumed by compiled templates; not a VDOM tree. Component trees must be authored in .tsrx, not built with nested createElement calls.",
+          "defaultProps (4x): Use default parameter values / destructuring defaults.",
+          "forwardRef (2x): No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.",
+          "Re-author any JSX components shipped by the package in .tsrx: compiled React JSX output cannot run on Octane, and hooks called from non-compiled files need compiler slotting (see the bridge-react-package skill for the subSlot pattern).",
+          "Run the pinned release's own test suite against the bridge where it ships one: framework-neutral suites unmodified against the reused core, React-binding suites ported case by case (fixtures in .tsrx, @octanejs/testing-library for @testing-library/react, upstream case names kept). Note which upstream test files you ran, ported, or left out and why, and triage a failure before touching its assertion.",
+          "Validate the rest with tests that drive real DOM events and compare behavior against the React original where possible."
+        ]
+      },
+      "disposition": "hard-blocked",
+      "nodeFingerprint": "d2c91714212683bfd50f95d07cb6704ecbf9716c519e2138962f327dc7ceb2c7",
+      "evidenceFingerprint": "d2c91714212683bfd50f95d07cb6704ecbf9716c519e2138962f327dc7ceb2c7"
+    }
+  },
+  "baseline": {},
+  "history": [
+    {
+      "nodeId": "pkg:react-hotkeys-hook",
+      "from": "ready",
+      "to": "implementing",
+      "evidenceFingerprint": "de527375926e570030c74e5f6673b71a232e7555fd8a31f8b91105c976d95ffa"
+    }
+  ],
+  "resume": {
+    "invalidated": [
+      "pkg:@mux/mux-player-react",
+      "pkg:@types/js-cookie",
+      "pkg:@types/react",
+      "pkg:@xobotyi/scrollbar-width",
+      "pkg:classnames",
+      "pkg:cloudflare-video-element",
+      "pkg:copy-to-clipboard",
+      "pkg:dash-video-element",
+      "pkg:fast-deep-equal",
+      "pkg:fast-shallow-equal",
+      "pkg:hls-video-element",
+      "pkg:js-cookie",
+      "pkg:nano-css",
+      "pkg:prop-types",
+      "pkg:react-easy-swipe",
+      "pkg:react-player",
+      "pkg:react-responsive-carousel",
+      "pkg:react-universal-interface",
+      "pkg:react-use",
+      "pkg:resize-observer-polyfill",
+      "pkg:screenfull",
+      "pkg:set-harmonic-interval",
+      "pkg:spotify-audio-element",
+      "pkg:throttle-debounce",
+      "pkg:tiktok-video-element",
+      "pkg:ts-easing",
+      "pkg:tslib",
+      "pkg:twitch-video-element",
+      "pkg:vimeo-video-element",
+      "pkg:wistia-video-element",
+      "pkg:youtube-video-element"
+    ],
+    "preserved": [
+      "pkg:react-hotkeys-hook"
+    ]
+  }
+}

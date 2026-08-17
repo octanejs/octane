@@ -478,6 +478,46 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'xstate',
+					include: ['packages/xstate/tests/**/*.test.ts'],
+					exclude: ['packages/xstate/tests/ssr/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+					globalSetup: ['packages/xstate/tests/differential/_setup.ts'],
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/xstate$/,
+							replacement: resolve(import.meta.dirname, 'packages/xstate/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'xstate-ssr',
+					include: ['packages/xstate/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/xstate$/,
+							replacement: resolve(import.meta.dirname, 'packages/xstate/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'better-auth',
 					include: ['packages/better-auth/tests/**/*.test.ts'],
 					exclude: ['packages/better-auth/tests/ssr/**/*.test.ts'],
@@ -2389,10 +2429,7 @@ export default defineConfig({
 				test: {
 					name: 'xyflow',
 					include: ['packages/xyflow/tests/**/*.test.ts'],
-					exclude: [
-						...configDefaults.exclude,
-						'packages/xyflow/tests/differential/**/*.test.ts',
-					],
+					exclude: [...configDefaults.exclude, 'packages/xyflow/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					testTimeout: 30_000,
 					globals: false,
@@ -2488,10 +2525,7 @@ export default defineConfig({
 				test: {
 					name: 'puck',
 					include: ['packages/puck/tests/**/*.test.ts'],
-					exclude: [
-						...configDefaults.exclude,
-						'packages/puck/tests/differential/**/*.test.ts',
-					],
+					exclude: [...configDefaults.exclude, 'packages/puck/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					testTimeout: 30_000,
 					setupFiles: ['packages/puck/tests/_setup.ts'],
@@ -2633,10 +2667,7 @@ export default defineConfig({
 				test: {
 					name: 'interior',
 					include: ['packages/interior/tests/**/*.test.ts'],
-					exclude: [
-						...configDefaults.exclude,
-						'packages/interior/tests/differential/**/*.test.ts',
-					],
+					exclude: [...configDefaults.exclude, 'packages/interior/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					testTimeout: 30_000,
 					globals: false,
