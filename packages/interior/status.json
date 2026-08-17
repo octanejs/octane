@@ -9,7 +9,7 @@
     "Headless hooks extracted for CopyButton; bulk extraction script (scripts/extract-hooks.mjs) ready for remaining 51 components."
   ],
   "ssr": "Not yet evaluated.",
-  "verified": "partial",
+  "verified": "2026-08-17",
   "notes": [
     "CopyButton + useCopyToClipboard fully extracted with manual slot forwarding.",
     "scripts/extract-hooks.mjs automates hook extraction; multiline/lazy-init hook calls need manual slot review.",

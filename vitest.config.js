@@ -478,6 +478,45 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'better-auth',
+					include: ['packages/better-auth/tests/**/*.test.ts'],
+					exclude: ['packages/better-auth/tests/ssr/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/better-auth$/,
+							replacement: resolve(import.meta.dirname, 'packages/better-auth/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'better-auth-ssr',
+					include: ['packages/better-auth/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/better-auth$/,
+							replacement: resolve(import.meta.dirname, 'packages/better-auth/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'valtio',
 					include: ['packages/valtio/tests/**/*.test.ts'],
 					environment: 'jsdom',

@@ -22,7 +22,8 @@
       "@octanejs/tanstack-router",
       "@octanejs/tanstack-router-ssr-query",
       "@octanejs/remix-router",
-      "@octanejs/nuqs"
+      "@octanejs/nuqs",
+      "@octanejs/better-auth"
     ]
   },
   {
@@ -40,7 +41,10 @@
       "@octanejs/shadcn",
       "@octanejs/lucide",
       "@octanejs/tanstack-hotkeys",
-      "@octanejs/tanstack-pacer"
+      "@octanejs/tanstack-pacer",
+      "@octanejs/interior",
+      "@octanejs/thinking-orbs",
+      "@octanejs/xyflow"
     ]
   },
   {
@@ -51,6 +55,8 @@
       "@octanejs/tanstack-form",
       "@octanejs/lexical",
       "@octanejs/tiptap",
+      "@octanejs/blocknote",
+      "@octanejs/puck",
       "@octanejs/mdx",
       "@octanejs/i18next"
     ]

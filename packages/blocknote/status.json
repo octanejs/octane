@@ -9,7 +9,7 @@
     "TipTap/react-dom boundary files flagged CHECKPOINT in port-upstream.mjs."
   ],
   "ssr": "Not yet evaluated.",
-  "verified": "partial",
+  "verified": "2026-08-17",
   "notes": [
     "Full mechanical port (~156 files) via scripts/port-upstream.mjs (2026-08-07).",
     "M1 export conformance test wired; editor mount blocked on @octanejs/tiptap EditorContent checkpoint.",

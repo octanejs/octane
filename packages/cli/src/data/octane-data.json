@@ -46,6 +46,31 @@
       "verified": "2026-07-27"
     },
     {
+      "name": "@octanejs/better-auth",
+      "version": "0.0.1",
+      "category": "AI, data, and routing",
+      "upstream": { "package": "better-auth", "version": "1.6.29" },
+      "surface": "The public framework-agnostic Better Auth client is reused unchanged. `createAuthClient` converts the built-in session atom and plugin-provided atoms into Octane hooks while preserving endpoint actions, `$fetch`, `$store`, `$ERROR_CODES`, `$Infer`, and plugin inference. The upstream-compatible `useStore` helper is also included.",
+      "divergences": [
+        "React-framework server helpers such as `better-auth/tanstack-start` are not re-exported; use Better Auth's standard Fetch API handler or an Octane-specific server integration."
+      ],
+      "ssr": "`useStore` supplies the current Nanostore value as the server snapshot. Better Auth's session atom does not start browser refresh or network activity while rendering on the server.",
+      "verified": "2026-08-17"
+    },
+    {
+      "name": "@octanejs/blocknote",
+      "version": "0.1.0",
+      "category": "Forms and content",
+      "upstream": { "package": "@blocknote/react", "version": "0.53.0" },
+      "surface": "Milestone 1 — useCreateBlockNote, BlockNoteViewRaw, useBlockNoteEditor, BlockNoteContext/useBlockNoteContext (+ full mechanical port scaffold).",
+      "divergences": [
+        "Upstream exports BlockNoteViewRaw; BlockNoteView alias not yet added.",
+        "TipTap/react-dom boundary files flagged CHECKPOINT in port-upstream.mjs."
+      ],
+      "ssr": "Not yet evaluated.",
+      "verified": "2026-08-17"
+    },
+    {
       "name": "@octanejs/cmdk",
       "version": "0.1.1",
       "category": "UI and interaction",
@@ -152,6 +177,19 @@
       "verified": "2026-07-13"
     },
     {
+      "name": "@octanejs/interior",
+      "version": "0.1.0",
+      "category": "UI and interaction",
+      "upstream": { "package": "interior.dev", "version": "github.com/ddoemonn/interior" },
+      "surface": "54 interior.dev micro-interaction components for Octane.",
+      "divergences": [
+        "useReducedMotion provided by @octanejs/interior (src/hooks/reduced-motion.ts) rather than @octanejs/motion.",
+        "Headless hooks extracted for CopyButton; bulk extraction script (scripts/extract-hooks.mjs) ready for remaining 51 components."
+      ],
+      "ssr": "Not yet evaluated.",
+      "verified": "2026-08-17"
+    },
+    {
       "name": "@octanejs/jotai",
       "version": "0.1.15",
       "category": "Shared state",
@@ -226,6 +264,19 @@
       ],
       "ssr": "The server entry (`@octanejs/nuqs/server`) is react-free and usable during SSR for parsing/serialising search params; the client hooks read `location.search` through `useSyncExternalStore` with an empty-search server snapshot (upstream parity). No dedicated SSR hydration tests yet.",
       "verified": "2026-07-20"
+    },
+    {
+      "name": "@octanejs/puck",
+      "version": "0.1.0",
+      "category": "Forms and content",
+      "upstream": { "package": "@measured/puck", "version": "0.20.2" },
+      "surface": "Full @measured/puck@0.20.2 core port — Puck editor, Render, DropZone, hooks, and config types.",
+      "divergences": [
+        "Native onChange on controlled text inputs (ExternalInput search field) — upstream React synthetic onChange; Octane uses onInput for per-edit.",
+        "use-debounce replaced with @octanejs/tanstack-pacer useDebouncer in DragDropContext."
+      ],
+      "ssr": "Not yet evaluated.",
+      "verified": "2026-08-17"
     },
     {
       "name": "@octanejs/radix",
@@ -543,6 +594,16 @@
       "verified": "2026-07-17"
     },
     {
+      "name": "@octanejs/thinking-orbs",
+      "version": "0.1.0",
+      "category": "UI and interaction",
+      "upstream": { "package": "thinking-orbs", "version": "0.2.0" },
+      "surface": "ThinkingOrb component, resolvePreset, MODE_DRAWS, and public types — nine animation states, two tuned size presets, auto/dark/light theme, reduced-motion static frame.",
+      "divergences": [],
+      "ssr": "Canvas is client-only; server render emits the canvas element without animation.",
+      "verified": "2026-08-07"
+    },
+    {
       "name": "@octanejs/three",
       "version": "0.1.11",
       "category": "Web 3D",
@@ -607,6 +668,28 @@
       ],
       "ssr": "Fixed-dimension primitives, wrapped XYChart series, annotations, text, and wordclouds emit complete deterministic SVG on the server. Real hydrateRoot adoption preserves the same SVG/definition/axis/text/series/annotation/wordcloud nodes without warnings, replacement, or post-effect markup changes; generated IDs, measurement fallbacks, portals, and responsive initial sizes are covered.",
       "verified": "2026-07-14"
+    },
+    {
+      "name": "@octanejs/xstate",
+      "version": "0.0.1",
+      "category": "Shared state",
+      "upstream": { "package": "@xstate/react", "version": "6.1.0" },
+      "surface": "Complete @xstate/react 6.1 runtime surface: useActor, useActorRef, deprecated useMachine, useSelector, createActorContext, and shallowEqual. The framework-independent xstate 5.32.5 actor runtime is reused unchanged.",
+      "divergences": [],
+      "ssr": "Supported: machine and actor-context hooks render their initial snapshots on the server; actors start after client mount.",
+      "verified": "2026-08-17"
+    },
+    {
+      "name": "@octanejs/xyflow",
+      "version": "0.1.0",
+      "category": "UI and interaction",
+      "upstream": { "package": "@xyflow/react", "version": "12.11.2" },
+      "surface": "ReactFlow, ReactFlowProvider, Handle, hooks (useReactFlow, useNodes, useEdges, …), change helpers, and node/edge utilities from @xyflow/react@12.11.2.",
+      "divergences": [
+        "Octane components are functions rather than forwardRef objects (ReactFlow, ReactFlowProvider, Handle)."
+      ],
+      "ssr": "Store/provider render on server; canvas interactions are client-driven like upstream.",
+      "verified": "2026-08-07"
     },
     {
       "name": "@octanejs/zustand",
@@ -693,6 +776,7 @@
     "@visx/wordcloud": "@octanejs/visx",
     "@visx/xychart": "@octanejs/visx",
     "@visx/zoom": "@octanejs/visx",
+    "@xstate/react": "@octanejs/xstate",
     "cmdk": "@octanejs/cmdk",
     "dexie-react-hooks": "@octanejs/dexie",
     "framer-motion": "@octanejs/motion",

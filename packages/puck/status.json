@@ -9,7 +9,7 @@
     "use-debounce replaced with @octanejs/tanstack-pacer useDebouncer in DragDropContext."
   ],
   "ssr": "Not yet evaluated.",
-  "verified": "partial",
+  "verified": "2026-08-17",
   "notes": [
     "Source ported from puckeditor/puck packages/core via scripts/port-upstream.mjs.",
     "Render and full Puck editor shell mount pass conformance tests (2026-08-07).",

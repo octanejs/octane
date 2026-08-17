@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**55 publishable package(s), including 43 framework binding(s).**
+**62 publishable package(s), including 50 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -18,6 +18,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/app-core` | [`packages/app-core`](../packages/app-core) | metaframework core | `0.0.14` | 9 |
 | `@octanejs/aria` | [`packages/aria`](../packages/aria) | framework binding | `0.0.12` | 3 |
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.16` | 2 |
+| `@octanejs/better-auth` | [`packages/better-auth`](../packages/better-auth) | framework binding | `0.0.1` | 1 |
+| `@octanejs/blocknote` | [`packages/blocknote`](../packages/blocknote) | framework binding | `0.1.0` | 1 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.0.1` | 2 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.1` | 1 |
 | `@octanejs/devtools` | [`packages/devtools`](../packages/devtools) | framework binding | `0.0.6` | 1 |
@@ -27,6 +29,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.17` | 1 |
 | `@octanejs/hook-form` | [`packages/hook-form`](../packages/hook-form) | framework binding | `0.1.15` | 1 |
 | `@octanejs/i18next` | [`packages/i18next`](../packages/i18next) | framework binding | `0.1.13` | 3 |
+| `@octanejs/interior` | [`packages/interior`](../packages/interior) | framework binding | `0.1.0` | 1 |
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.15` | 7 |
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.1.17` | 42 |
 | `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.13` | 4 |
@@ -34,6 +37,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/mdx` | [`packages/mdx`](../packages/mdx) | framework binding | `0.1.15` | 4 |
 | `@octanejs/motion` | [`packages/motion`](../packages/motion) | framework binding | `0.1.17` | 1 |
 | `@octanejs/nuqs` | [`packages/nuqs`](../packages/nuqs) | framework binding | `0.1.7` | 7 |
+| `@octanejs/puck` | [`packages/puck`](../packages/puck) | framework binding | `0.1.0` | 3 |
 | `@octanejs/radix` | [`packages/radix`](../packages/radix) | framework binding | `0.1.17` | 1 |
 | `@octanejs/recharts` | [`packages/recharts`](../packages/recharts) | framework binding | `0.1.15` | 1 |
 | `@octanejs/redux` | [`packages/redux`](../packages/redux) | framework binding | `0.1.15` | 1 |
@@ -60,11 +64,14 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/tanstack-virtual` | [`packages/tanstack-virtual`](../packages/tanstack-virtual) | framework binding | `0.1.15` | 1 |
 | `@octanejs/tauri` | [`packages/tauri`](../packages/tauri) | framework binding | `0.0.1` | 1 |
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.15` | 2 |
+| `@octanejs/thinking-orbs` | [`packages/thinking-orbs`](../packages/thinking-orbs) | framework binding | `0.1.0` | 1 |
 | `@octanejs/three` | [`packages/three`](../packages/three) | framework binding | `0.1.11` | 7 |
 | `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.12` | 2 |
 | `@octanejs/valtio` | [`packages/valtio`](../packages/valtio) | framework binding | `0.1.1` | 5 |
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.12` | 49 |
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.18` | 3 |
+| `@octanejs/xstate` | [`packages/xstate`](../packages/xstate) | framework binding | `0.0.1` | 1 |
+| `@octanejs/xyflow` | [`packages/xyflow`](../packages/xyflow) | framework binding | `0.1.0` | 3 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.17` | 5 |
 | `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.18` | 19 |
 
