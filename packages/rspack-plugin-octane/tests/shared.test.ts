@@ -78,6 +78,17 @@ describe('declarative options', () => {
 		);
 	});
 
+	it('copies and freezes plugin-only parallel compilation settings', () => {
+		const parallel = { maxWorkers: 2 };
+		const options = normalizePluginOptions({ parallel });
+		parallel.maxWorkers = 8;
+
+		expect(options.parallel).toEqual({ maxWorkers: 2 });
+		expect(Object.isFrozen(options.parallel)).toBe(true);
+		expect(normalizePluginOptions({ parallel: false })).toEqual({ parallel: false });
+		expect(() => normalizeLoaderOptions({ parallel: true })).toThrow(/unknown option `parallel`/);
+	});
+
 	it('preserves explicit Strong-mode choices for the plugin and standalone loader', () => {
 		expect(normalizePluginOptions({ strong: true })).toEqual({ strong: true });
 		expect(normalizeLoaderOptions({ strong: false })).toEqual({ strong: false });

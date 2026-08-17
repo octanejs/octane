@@ -21,6 +21,7 @@ const loaderOptions: OctaneRspackLoaderOptions = {
 
 const pluginOptions: OctaneRspackPluginOptions = {
 	strong: false,
+	parallel: { maxWorkers: 2 },
 	layerSpecializations: {
 		'native:main': {
 			runtime: '@fixture/native-main-runtime',
@@ -28,6 +29,8 @@ const pluginOptions: OctaneRspackPluginOptions = {
 		},
 	},
 };
+
+const serialPluginOptions: OctaneRspackPluginOptions = { parallel: false };
 
 const unsupportedLoaderRuntime: OctaneRspackLoaderOptions = {
 	layerSpecializations: {
@@ -38,6 +41,13 @@ const unsupportedLoaderRuntime: OctaneRspackLoaderOptions = {
 	},
 };
 
+const unsupportedLoaderParallel: OctaneRspackLoaderOptions = {
+	// @ts-expect-error Worker-pool configuration belongs to the plugin, not the standalone loader.
+	parallel: true,
+};
+
 void loaderOptions;
 void pluginOptions;
+void serialPluginOptions;
 void unsupportedLoaderRuntime;
+void unsupportedLoaderParallel;

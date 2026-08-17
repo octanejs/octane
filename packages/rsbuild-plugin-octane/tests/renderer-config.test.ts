@@ -145,6 +145,24 @@ describe('Rsbuild renderer configuration', () => {
 		expect(() => pluginOctane({ strong: 'yes' } as any)).toThrow(/`strong` must be a boolean/);
 	});
 
+	it.each([
+		['parallel compilation', true],
+		['a custom worker limit', { maxWorkers: 2 }],
+		['serial compilation', false],
+	] as const)('forwards %s to the browser and server compilers', async (_label, parallel) => {
+		writeProject(root, true);
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: { plugins: [pluginOctane({ parallel })] },
+		});
+		const plugins = (await instance.initConfigs({ action: 'build' }))
+			.flatMap((config) => config.plugins ?? [])
+			.filter((plugin): plugin is OctaneRspackPlugin => plugin instanceof OctaneRspackPlugin);
+
+		expect(plugins).toHaveLength(2);
+		for (const plugin of plugins) expect(plugin.options.parallel).toEqual(parallel);
+	});
+
 	it('enables Strong mode for compiler-only projects without an app config', async () => {
 		writeProject(root, false);
 		rmSync(join(root, 'octane.config.ts'));

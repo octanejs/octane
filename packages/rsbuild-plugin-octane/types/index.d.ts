@@ -11,6 +11,13 @@ export {
 export interface OctaneRsbuildPluginOptions {
 	/** Override component HMR in the browser environment. */
 	hmr?: boolean;
+	/**
+	 * Compile Octane modules in Rspack worker threads. Enabled by default with
+	 * at most four workers; set `false` to keep compilation on the main thread.
+	 * Provide `maxWorkers` to request a different shared worker-pool limit.
+	 * @default true
+	 */
+	parallel?: boolean | { maxWorkers?: number };
 	/** Enable component profiling in the browser environment. */
 	profile?: boolean;
 	/**

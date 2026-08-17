@@ -18,6 +18,9 @@ const PLUGIN_NAME = 'OctaneRspackPlugin';
 const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
 const PLUGIN_VERSION = createRequire(import.meta.url)('../package.json').version;
 const loaderPath = fileURLToPath(new URL('./loader.js', import.meta.url));
+const finalizeLoaderPath = fileURLToPath(new URL('./finalize-loader.js', import.meta.url));
+const parallelLoaderPath = fileURLToPath(new URL('./parallel-loader.js', import.meta.url));
+const DEFAULT_MAX_WORKERS = 4;
 const OCTANE_RULE = /\.(?:tsrx|tsx|ts|js)$/i;
 const TYPESCRIPT_RULE = /\.(?:tsrx|tsx|ts)$/i;
 
@@ -337,7 +340,22 @@ export class OctaneRspackPlugin {
 			test: OCTANE_RULE,
 			type: 'javascript/auto',
 			enforce: 'pre',
-			use: [{ loader: loaderPath, options: loaderOptions }],
+			use:
+				this.options.parallel === false
+					? [{ loader: loaderPath, options: loaderOptions }]
+					: [
+							{ loader: finalizeLoaderPath, options: loaderOptions },
+							{
+								loader: parallelLoaderPath,
+								options: loaderOptions,
+								parallel: {
+									maxWorkers:
+										typeof this.options.parallel === 'object'
+											? (this.options.parallel.maxWorkers ?? DEFAULT_MAX_WORKERS)
+											: DEFAULT_MAX_WORKERS,
+								},
+							},
+						],
 		});
 		if (this.options.transpile !== false) {
 			compiler.options.module.rules.push({

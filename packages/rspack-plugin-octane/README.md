@@ -26,7 +26,7 @@ export default {
 The plugin:
 
 - adds `.tsrx`, `.tsx`, and `.ts` resolution;
-- installs the Octane pre-loader for local and linked/raw dependency sources;
+- compiles local and linked/raw dependency sources in parallel Rspack workers;
 - selects client or server codegen from Rspack's `target` (or an explicit
   `environment` option);
 - resolves every exact bare `octane` import to one client runtime, or to
@@ -46,6 +46,14 @@ Set `transpile: false` when an existing rule already strips TypeScript. Set
 `hmr: false` to disable Octane HMR codegen even when Rspack HMR is active.
 Set `profile: true` to produce a client profiling build; server compilations
 always keep profiling disabled.
+
+Octane uses up to four Rspack loader workers by default. Set `parallel: false`
+to compile on the main thread, or provide `parallel: { maxWorkers: 2 }` to
+request a different worker-pool limit. Rspack shares one loader worker pool
+per process, so the first parallel loader determines its effective size.
+Source maps, module layers, compiler metadata, and watched package manifests
+are preserved in both modes. Worker startup has a fixed cost, so very small
+builds may be faster with `parallel: false`.
 
 Set `strong: true` to reject state updates during rendering, state updates from
 effects, and ref writes during rendering in your application code:

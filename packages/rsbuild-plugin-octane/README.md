@@ -78,10 +78,16 @@ applications remain responsible for any additional Web API polyfills they use.
 Options are declarative and cache-stable:
 
 - `hmr` controls browser component handoff;
+- `parallel` controls compiler workers; the default uses up to four, `false`
+  compiles on the main thread, and `{ maxWorkers: 2 }` requests a custom limit;
 - `profile` enables component profiling in the browser environment;
 - `strong` overrides the app's `compiler.strong` setting;
 - `exclude` skips path fragments in the plain `.ts`/`.js` hook-slot pass; and
 - `clientEnvironment` / `serverEnvironment` rename the generated environments.
+
+Rspack shares one loader worker pool per process, so the first parallel loader
+determines its effective size. Worker startup has a fixed cost, so very small
+builds may be faster with `parallel: false`.
 
 Enable Strong mode for the whole app in `octane.config.ts`:
 

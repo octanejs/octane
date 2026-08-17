@@ -84,7 +84,13 @@ describe('OctaneRspackPlugin', () => {
 		expect(compiler.options.module.rules[0]).toMatchObject({
 			type: 'javascript/auto',
 			enforce: 'pre',
-			use: [{ options: expect.objectContaining({ root: '/project', environment: 'server' }) }],
+			use: [
+				{ options: expect.objectContaining({ root: '/project', environment: 'server' }) },
+				{
+					options: expect.objectContaining({ root: '/project', environment: 'server' }),
+					parallel: { maxWorkers: 4 },
+				},
+			],
 		});
 		expect(compiler.options.module.rules[1]).toEqual({
 			test: expect.any(RegExp),
@@ -109,6 +115,39 @@ describe('OctaneRspackPlugin', () => {
 			missingDependencies: new Set(),
 		});
 		expect(mocks.discoverSourceDependencies).toHaveBeenCalledTimes(2);
+	});
+
+	it.each([
+		['default settings', undefined, 4],
+		['explicit enablement', true, 4],
+		['empty worker settings', {}, 4],
+		['a custom worker limit', { maxWorkers: 2 }, 2],
+	] as const)('compiles modules in parallel with %s', (_label, parallel, maxWorkers) => {
+		const compiler = createCompiler('web');
+		new OctaneRspackPlugin(parallel === undefined ? {} : { parallel }).apply(compiler as any);
+
+		const use = compiler.options.module.rules[0].use;
+		expect(use).toHaveLength(2);
+		expect(use[0]).toMatchObject({
+			options: expect.objectContaining({ root: '/project', environment: 'client' }),
+		});
+		expect(use[0]).not.toHaveProperty('parallel');
+		expect(use[1]).toMatchObject({
+			options: expect.objectContaining({ root: '/project', environment: 'client' }),
+			parallel: { maxWorkers },
+		});
+	});
+
+	it('retains the standalone loader pipeline when parallel compilation is disabled', () => {
+		const compiler = createCompiler('web');
+		new OctaneRspackPlugin({ parallel: false }).apply(compiler as any);
+
+		expect(compiler.options.module.rules[0].use).toEqual([
+			{
+				loader: expect.any(String),
+				options: expect.objectContaining({ root: '/project', environment: 'client' }),
+			},
+		]);
 	});
 
 	it('honors explicit client mode and serializable loader options', () => {
@@ -411,6 +450,15 @@ describe('OctaneRspackPlugin', () => {
 		expect(() => new OctaneRspackPlugin({ profile: 'yes' } as any)).toThrow(/profile/);
 		expect(() => new OctaneRspackPlugin({ strong: 'yes' } as any)).toThrow(
 			/`strong` must be a boolean/,
+		);
+		expect(() => new OctaneRspackPlugin({ parallel: 'yes' } as any)).toThrow(/parallel/);
+		for (const maxWorkers of [0, -1, 1.5, '2']) {
+			expect(() => new OctaneRspackPlugin({ parallel: { maxWorkers } } as any)).toThrow(
+				/maxWorkers/,
+			);
+		}
+		expect(() => new OctaneRspackPlugin({ parallel: { workers: 2 } } as any)).toThrow(
+			/parallel\.workers/,
 		);
 		expect(() => new OctaneRspackPlugin({ parallelUse: false } as any)).toThrow(
 			/unknown option `parallelUse`/,
