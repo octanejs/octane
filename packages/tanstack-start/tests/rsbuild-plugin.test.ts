@@ -130,14 +130,32 @@ function RootLayout() {
 		);
 		write(
 			root,
-			'src/routes/index.tsx',
-			`/** @jsxImportSource octane */
-import { createFileRoute } from '@octanejs/tanstack-router';
-import { createServerFn } from '@octanejs/tanstack-start';
+			'src/loadMessage.ts',
+			`import { createServerFn } from '@octanejs/tanstack-start';
 
-const loadMessage = createServerFn({ method: 'GET' }).handler(
+export const loadMessage = createServerFn({ method: 'GET' }).handler(
 	() => 'rsbuild-server-function',
 );
+`,
+		);
+		write(
+			root,
+			'src/BrowserOnlyProof.client.tsrx',
+			`if (typeof window === 'undefined') {
+	throw new Error('ClientOnly browser module reached the server');
+}
+
+export function BrowserOnlyProof() @{
+	<span data-client-only-proof="ready">browser only</span>
+}
+`,
+		);
+		write(
+			root,
+			'src/routes/index.tsrx',
+			`import { ClientOnly, createFileRoute } from '@octanejs/tanstack-router';
+import { BrowserOnlyProof } from '../BrowserOnlyProof.client.tsrx';
+import { loadMessage } from '../loadMessage';
 
 export const Route = createFileRoute('/')({
 	loader: () => loadMessage(),
@@ -146,7 +164,14 @@ export const Route = createFileRoute('/')({
 
 function Home() {
 	const message = Route.useLoaderData();
-	return <main data-rsbuild-start="ready">{message as string}</main>;
+	return (
+		<main data-rsbuild-start="ready">
+			<span>{message as string}</span>
+			<ClientOnly fallback={<span data-client-only-fallback="ready">server fallback</span>}>
+				<BrowserOnlyProof />
+			</ClientOnly>
+		</main>
+	);
 }
 `,
 		);
@@ -156,7 +181,7 @@ function Home() {
 		rmSync(root, { recursive: true, force: true });
 	});
 
-	it('serves file routes and server functions through the Rsbuild dev server', async () => {
+	it('serves TSRX routes, server functions, and ClientOnly fallback through Rsbuild dev', async () => {
 		const instance = await createRsbuild({
 			cwd: root,
 			rsbuildConfig: {
@@ -176,12 +201,14 @@ function Home() {
 			expect(response.headers.get('content-type')).toMatch(/text\/html/);
 			expect(html).toContain('data-rsbuild-start="ready"');
 			expect(html).toContain('rsbuild-server-function');
+			expect(html).toContain('data-client-only-fallback="ready"');
+			expect(html).not.toContain('data-client-only-proof="ready"');
 		} finally {
 			await started.server.close();
 		}
 	}, 120_000);
 
-	it('builds file routes, server functions, client assets, and an executable SSR entry', async () => {
+	it('builds client assets and executable SSR without loading ClientOnly browser modules', async () => {
 		const instance = await createRsbuild({
 			cwd: root,
 			rsbuildConfig: {
@@ -224,5 +251,7 @@ console.log(JSON.stringify({
 		expect(rendered.contentType).toMatch(/text\/html/);
 		expect(rendered.html).toContain('data-rsbuild-start="ready"');
 		expect(rendered.html).toContain('rsbuild-server-function');
+		expect(rendered.html).toContain('data-client-only-fallback="ready"');
+		expect(rendered.html).not.toContain('data-client-only-proof="ready"');
 	}, 120_000);
 });

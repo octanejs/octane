@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import {
 	RSBUILD_ENVIRONMENT_NAMES,
 	tanStackStartRsbuild,
@@ -6,6 +7,10 @@ import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
 import { octaneRouteGeneratorPlugin } from '@octanejs/tanstack-router/generator-plugin';
 import { octaneStartDefaultEntryPaths } from './default-entry-paths.js';
 import { validateOctaneCompilerOptions } from './validate-options.js';
+
+const clientOnlyStripLoaderPath = fileURLToPath(
+	new URL('./client-only-server-strip-loader.js', import.meta.url),
+);
 
 export function tanstackStart(options) {
 	const { octane: octaneOptions, ...startOptions } = options ?? {};
@@ -49,6 +54,20 @@ export function tanstackStart(options) {
 								}),
 					}),
 				);
+				if (octaneEnvironment === 'server') {
+					config.plugins.push({
+						name: 'octanejs-tanstack-start:client-only-server-strip',
+						apply(compiler) {
+							compiler.options.module ??= {};
+							compiler.options.module.rules ??= [];
+							compiler.options.module.rules.push({
+								test: /\.tsrx$/,
+								enforce: 'pre',
+								use: [{ loader: clientOnlyStripLoaderPath }],
+							});
+						},
+					});
+				}
 				return config;
 			});
 
