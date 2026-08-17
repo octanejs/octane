@@ -27,6 +27,12 @@
     "dist",
     "README.md"
   ],
+  "imports": {
+    "#octane/compiler-parser": {
+      "node": "./src/compiler/parser.node.js",
+      "default": "./src/compiler/parser.browser.js"
+    }
+  },
   "exports": {
     ".": "./src/index.ts",
     "./jsx-runtime": "./src/jsx-runtime.d.ts",
@@ -61,6 +67,12 @@
     "main": "./dist/index.js",
     "module": "./dist/index.js",
     "types": "./dist/index.d.ts",
+    "imports": {
+      "#octane/compiler-parser": {
+        "node": "./dist/compiler/parser.node.js",
+        "default": "./dist/compiler/parser.browser.js"
+      }
+    },
     "exports": {
       ".": {
         "types": "./dist/index.d.ts",
@@ -160,7 +172,8 @@
     "@types/react": "catalog:default",
     "devalue": "catalog:default",
     "es-module-lexer": "catalog:default",
-    "esrap": "catalog:default"
+    "esrap": "catalog:default",
+    "oxc-tsrx": "catalog:default"
   },
   "peerDependencies": {
     "react": "^19.0.0",

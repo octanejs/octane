@@ -51,6 +51,7 @@ export function App() @{
 		@if (visible.length > 0) {
 			<ul>
 				@for (const row of visible; key row.id) {
+					{/* Parser comments are immutable authored nodes too. */}
 					<Row row={row} onPick={(id) => setRows(rows.filter((r) => r.id !== id))} />
 				} @empty {
 					<li>Empty</li>
