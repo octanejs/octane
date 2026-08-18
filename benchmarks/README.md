@@ -54,6 +54,7 @@ Some suites need no preview servers: **news**, **hydration-interactivity**, and
 the three runtime-stress suites vite-build and time each target themselves (the
 runner loops their per-target invocations and merges them),
 **ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
+**universal-external-store**,
 **lynx-render**, and **lynx-bundle-size** are Node-only,
 **ssr-http** and **tanstack-start** boot (and kill) their own production HTTP
 servers per sample — that spawn/listen/first-byte cycle IS the measurement —
@@ -201,7 +202,7 @@ internally, get their own baseline and guard namespace.
 | `hydration-stress` | hydration-stress | none (builds) | withheld-chunk hydration, keyboard and pointer Send delivery, DOM adoption, and explicit replay/drop diagnostics at 6× CPU throttling |
 | `lifecycle-memory` | lifecycle-memory | none (builds) | 1,000+ effectful mount/update/unmount cycles, real listener/subscription/timer cleanup, post-teardown event probes, and explicitly collected Chromium heap across all six frameworks |
 | `controlled-form` | controlled-form | none (builds) | 512 controlled fields, real typing, DOM identity, focus and caret, validation cancellation, complete submit/reset, and native select/checkbox/radio correctness |
-| `external-store-fanout` | external-store-fanout | none (builds) | 512 subscribers, narrow and broad writes, rapid-write tearing checks, snapshots, notifications, renders, and exact subscription cleanup |
+| `external-store-fanout` | external-store-fanout | none (builds) | 512 subscribers, narrow and broad writes, rapid-write tearing checks, deterministic 100-notification work guards, and balanced subscription removal |
 | `external-store-integrations` | external-store-integrations | none (builds) | real Zustand stores, Jotai atoms, and TanStack Query caches with selector fan-out, query invalidation, and six-framework cleanup gates |
 | `store-selector-fanout` | store-selector-fanout | none (builds) | 512 subscribers reading one store through a `with-selector`-shaped selector, 20 unrelated parent re-renders with the store untouched, and deterministic selector-invocation counts beside render and snapshot counts |
 | `hook-store-composition` | hook-store-composition | none (builds) | matched direct/nested callbacks and actual Octane Zustand traditional/MobX bindings; separate production timings, named-work counts, and observable identity/update/cleanup controls |
@@ -226,6 +227,7 @@ internally, get their own baseline and guard namespace.
 | `async-composition` | async-composition | octane-tsrx, react | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
 | `lynx-list` | lynx-list | none (Node-only) | deterministic 1,000-row native-list physical allocation, reuse, and teardown through a fake Element PAPI |
 | `universal-leaf-update` | universal-leaf-update | none (Node-only) | universal update locality beside 0–4,000 unrelated component siblings through the compiler and native object driver: plain leaf `setState`, keyed `@for` item state, a leaf under an idle `@try`, a structural (insert/remove) update, and compact-row list selection |
+| `universal-external-store` | universal-external-store | none (Node-only) | 128 native universal store subscribers, getter/subscribe identity controls, notification bursts, and deterministic subscription-lifetime and state-projection guards |
 | `lynx-render` | lynx-render | none (Node-only) | dual-thread Lynx render CPU: empty startup, create 1,000 and 10,000 keyed rows through the real background root, transport, and main receiver over a cheap fake Element PAPI, plus a gate that a native tap reaches its background handler via the engine `publishEvent` receiver |
 | `lynx-table` | lynx-table | none (Node-only; separate Chromium harness) | deterministic per-operation wire cost of the cross-framework krausest table (command counts and serialized commit bytes vs a changed-rows floor) through the real dual-thread path and real tap tokens |
 | `lynx-table-web` | lynx-table | none (headless Chromium) | Lynx-for-Web wall clock: the same table app for Octane and the vendored ReactLynx / Vue Lynx reference bundles under one byte-identical page driver; host-bound medians, no ratio guards |

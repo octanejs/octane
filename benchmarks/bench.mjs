@@ -330,7 +330,7 @@ const SUITES = [
 				script: 'run.mjs',
 				args: (n) => [target, String(n)],
 			})),
-			...(name === 'event-delegation'
+			...(name === 'event-delegation' || name === 'external-store-fanout'
 				? [{ label: 'work', script: 'work.mjs', args: () => [] }]
 				: []),
 		],
@@ -602,6 +602,15 @@ const SUITES = [
 		// fixture and measures one stateful leaf beside up to 4,000 unrelated owners.
 		name: 'universal-leaf-update',
 		cwd: 'universal-leaf-update',
+		servers: [],
+		iter: { normal: 5, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Native universal external-store hooks: stable subscription lifetimes and
+		// bounded state-projection work across parent renders and notification bursts.
+		name: 'universal-external-store',
+		cwd: 'universal-external-store',
 		servers: [],
 		iter: { normal: 5, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
