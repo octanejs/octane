@@ -106,13 +106,6 @@ Applications importing `input-otp` should migrate to `@octanejs/input-otp` witho
 
 ### Key Technical Decisions
 
-- KTD1. **Mirror the upstream module layout.** Place Octane modules beside a byte-pinned `upstream/source/packages/input-otp/src` tree so reviewers can compare `input`, regex constants, timeout scheduling, previous-value tracking, password-manager behavior, and public types directly. Governs R1-R3.
-- KTD2. **Keep one real input.** Re-author `OTPInput` as a `.tsrx` component with the same hidden-input and projected-slot architecture. Reject a multi-input rewrite because it changes accessibility, autofill, selection, and package identity. (session-settled: user-approved — chosen over a similar OTP component: the tracker requires equivalent bindings, not alternatives.) Governs R4-R8.
-- KTD3. **Adapt only the host event seam.** Wire the native text host with `onInput` and call the unchanged public `onChange(newValue)` callback after applying upstream filtering and selection logic. Keep consumer `onPaste`, `onFocus`, `onBlur`, `onMouseOver`, and `onMouseLeave` callbacks as native event callbacks. Governs R2, R6, R7, R10.
-- KTD4. **Use browser evidence for browser contracts.** Adapt all upstream Playwright cases to a Vite-hosted Octane fixture and add password-manager, paste-transform, hydration, and cleanup checkpoints. Do not replace selection or geometry proof with jsdom mocks. Governs R6-R9, R11-R12.
-- KTD5. **Make evidence executable and exhaustive.** Register pristine React browser/type evidence, adapted Octane DOM/browser/type evidence, SSR/hydration, and differential checkpoints in `audit/react-parity.json`; use exact inventories and negative controls. A manifest may say `verified` only after every required lane executes successfully. Governs R3, R12.
-- KTD6. **One binding, one PR.** Keep runtime/compiler prerequisites as separate blockers if discovered. This branch contains only `input-otp` package, shared parity registration needed by it, docs/catalog/example integration, and generated artifacts. (session-settled: user-directed — chosen over batching several bindings: independent PRs make the queue reviewable and checkable.) Governs R13.
-
 ### High-Level Technical Design
 
 ```mermaid
@@ -155,13 +148,6 @@ flowchart TB
 
 ### U1. Pin upstream evidence and public contract
 
-- **Goal:** Establish immutable, license-safe source, package, export, type, and test inventories before implementation.
-- **Requirements:** R1-R3, R12.
-- **Files:** `packages/input-otp/upstream/`, `packages/input-otp/UPSTREAM.md`, `packages/input-otp/audit/public-api.json`, `packages/input-otp/audit/test-inventory.json`, `packages/input-otp/audit/verify-provenance.mjs`.
-- **Approach:** Vendor the npm artifact and canonical source/test boundary at the pinned commit. Record hashes, license, package metadata, five runtime exports, three public types, and every Playwright artifact and case.
-- **Test Scenarios:** Modified or missing vendored file fails; removed or extra export fails; missing, renamed, skipped, or unclassified upstream case fails; missing port-authored classification fails.
-- **Verification:** `node packages/input-otp/audit/verify-provenance.mjs --negative-controls`.
-
 ### U2. Port utilities and strict public types
 
 - **Goal:** Port regex constants, timeout scheduling, previous-value tracking, password-manager helper types, and React-free public declarations.
@@ -191,13 +177,6 @@ flowchart TB
 
 ### U5. Register executable parity evidence
 
-- **Goal:** Make the global harness prove the complete pinned contract rather than only validate metadata.
-- **Requirements:** R3, R12.
-- **Files:** `packages/input-otp/audit/react-parity.json`, runtime/type inventories under `packages/input-otp/audit/`, `scripts/react-parity/check.mjs`, `vitest.config.js`, `packages/input-otp/package.json`.
-- **Approach:** Add pristine React, adapted Octane, SSR/hydration, differential, browser, pristine-type, and adapted-type lanes with exact collected/executed identities and hashes. Register the real-Chromium lane as an existing `vitest-full` parity project whose Vitest suite launches Playwright, following the React Resizable Panels binding pattern; do not add a metadata-only browser lane or a new global execution kind.
-- **Test Scenarios:** Every lane runs from package CI and `react-parity:check`; removed, renamed, skipped, duplicated, stale, or unexecuted evidence fails; lockfile and source integrity drift fail.
-- **Verification:** `pnpm react-parity:check` and package negative controls.
-
 ### U6. Integrate package, example, docs, and release metadata
 
 - **Goal:** Make the binding installable, discoverable, demonstrable, and accurately tracked.
@@ -219,7 +198,6 @@ flowchart TB
 | Pristine React | U5 | Every pinned React oracle identity executes once under pinned dependencies and passes. |
 | SSR and hydration | U3-U5 | Node SSR is browser-global-free; hydration adopts nodes and remains interactive without mismatch diagnostics. |
 | Real browser | U3-U5 | All 15 upstream Playwright scenarios plus browser accessibility-tree, password-manager, paste-transform, hydration, and cleanup cases pass in Chromium. Mobile one-time-code support is verified at parity scope by exact `autocomplete="one-time-code"`, `inputmode`, single-input, and intrinsic-attribute markup; this plan does not claim automated carrier/SMS autofill on an iOS device. |
-| Global parity | U1-U5 | `pnpm react-parity:check` executes all required lanes and rejects every negative control. |
 | Repository integration | U6 | `pnpm sync`, scoped formatting, typecheck, package tests, playground build, status/catalog checks, and changeset validation pass. |
 | PR tail | U6 | Isolated PR is open, tracker says `In review`, actionable CI and review are resolved, and human-only residuals are recorded. |
 

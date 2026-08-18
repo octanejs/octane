@@ -108,11 +108,6 @@ Pin provenance and generate the surface inventory first. Run the U2 feasibility 
 
 ### U1. Pin upstream provenance and inventory the public surface
 
-- **Requirements:** R1-R5, R13-R15; KTD1-KTD2, KTD5, KTD7.
-- **Files:** `packages/syntax-highlighter/{package.json,LICENSE,UPSTREAM.md}`, `packages/syntax-highlighter/upstream/`, `packages/syntax-highlighter/audit/`, `packages/syntax-highlighter/scripts/{verify-upstream,generate-entrypoints}.mjs`.
-- **Approach:** Retain byte-exact source/tests/snapshots and a published tarball inventory. Classify root exports, every `dist/esm`/`dist/cjs` build module, 197 Highlight.js languages, 300 Prism languages, 99 Highlight.js styles, 47 Prism styles, aliases, supported-language modules, declarations, and intentional exclusions. Create manifest/crosswalk skeletons before product code.
-- **Test scenarios:** Correct pin passes; altered tarball/source/license/test/snapshot hash fails; missing/extra/colliding/unsorted deep entry fails; unpublished evidence remains absent from the pack; root and deep import counts match both artifacts.
-
 ### U2. Prove the rendering and async feasibility gate
 
 - **Requirements:** R1-R2, R6, R8-R12; KTD3-KTD4, KTD6. Depends on U1.
@@ -142,11 +137,6 @@ Pin provenance and generate the surface inventory first. Run the U2 feasibility 
 - **Test scenarios:** Import every expected path; compare language/style values and keys to upstream; register representative grammars from each family; resolve canonical/alias paths; reject extra/missing/collision/stale output; packed `import` and supported `require` probes.
 
 ### U6. Build complete parity, type, SSR, hydration, and browser evidence
-
-- **Requirements:** R1-R15; KTD6-KTD7.
-- **Files:** `packages/syntax-highlighter/tests/{pristine,differential,ssr,hydration,browser,negative-controls}/`, `typetests/`, `audit/{react-parity,pristine-runtime,adapted-runtime,upstream-crosswalk}.json`, package/vitest configs, root `vitest.config.js`.
-- **Approach:** Execute 51 pristine React identities and one-for-one adapted cases, paired public types, exact differentials, server/adoption lanes, and Chromium/Firefox fixtures. Keep projects non-overlapping and declare parity ownership through current guidance.
-- **Test scenarios:** Requirements R1-R12 across root variants and representative deep imports; every upstream title/snapshot; exact DOM/text/class/style; updates; SSR no-globals; hydration node identity/selection; selection/copy; async race; deleted/renamed/skipped case, stale hash, missing lane, and removed type assertion negative controls.
 
 ### U7. Add repository adoption and packed consumers
 

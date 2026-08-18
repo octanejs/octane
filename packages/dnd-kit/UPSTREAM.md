@@ -36,8 +36,8 @@ pristine/adapted upstream type pair because upstream publishes no dedicated type
 
 The repo-authored differential runs one identical `.tsrx` programmatic manager-action lifecycle
 against both adapters (empty sensors; start/move/stop via `manager.actions`) and compares mount,
-pickup, movement, overlay, and drop output. Audit contracts authenticate the
-pin and keep the two known adaptations explicit: compiled-child handling in `DragOverlay`, and
+pickup, movement, overlay, and drop output. Repo-authored contracts authenticate
+the pin and keep the two known adaptations explicit: compiled-child handling in `DragOverlay`, and
 omission of the default optimistic sorting plugin because it can split renderer-owned keyed ranges.
 The binding remains `recorded-unverified`; jsdom equality is not evidence for real pointer geometry,
 observers, or every browser drag lifecycle.

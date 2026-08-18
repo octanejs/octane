@@ -2,23 +2,6 @@
 
 ## Pin
 
-- React package: `react-alien-signals@0.3.0`
-- Canonical repository: <https://github.com/Rajaniraiyn/react-alien-signals>
-- Immutable commit: `6d883959ddf25a3f486451ff8abff60eb989671c`
-- Advertised compatibility: `react-alien-signals@0.3.0`
-- Reused core: `alien-signals@1.0.4` (the upstream peer range is `~1.0.4`)
-- React oracle suite: the pinned repository's `src/index.test.ts`, authored for React 18+
-- Pristine oracle environment (intentional workspace pin, enforced at run time by
-  [`audit/pristine-oracle-environment.json`](./audit/pristine-oracle-environment.json)):
-  - `react@19.2.7` / `react-dom@19.2.7`
-  - `@testing-library/react@16.3.2`
-  - `@happy-dom/global-registrator@20.11.2`
-  - `@testing-library/jest-dom@6.9.1`
-- Upstream `package.json` at the pin declares looser ranges (`react-dom@^19.0.0`,
-  `@testing-library/react@^16.2.0`, `@happy-dom/global-registrator@^17.1.3`). The pristine lane does
-  **not** silently inherit whatever happens to sit in `node_modules`; it records and verifies the
-  workspace-selected oracle versions above before executing the suite.
-
 The published tarball supplies the built single-entry package. The canonical repository at the
 commit above supplies the TypeScript source, test suite, and MIT license. Those files are vendored
 byte-for-byte under [`upstream/`](./upstream/) and are excluded from the published package by the
@@ -26,9 +9,6 @@ manifest's explicit `files` list.
 
 Run `pnpm --dir packages/alien-signals upstream:verify` to reject removed or modified pinned
 evidence. The checksum ledger covers the source, complete upstream test file, and license.
-
-Parity ownership, inventories, and lane registration live in
-[`audit/react-parity.json`](./audit/react-parity.json).
 
 ## Export crosswalk
 
@@ -52,14 +32,6 @@ The pinned package has one public entry point, `react-alien-signals`.
 shapes that the upstream implementation documents but does not name as exports.
 
 ## Type suite
-
-Upstream ships an executable typecheck: `package.json` defines `typecheck: tsc --noEmit`, and the
-pinned `tsconfig.json` typechecks `src/index.ts` plus `src/index.test.ts` (including the
-`@ts-expect-error` at `src/index.test.ts:392`). Those artifacts are vendored under
-[`upstream/`](./upstream/) and run byte-exact in the `alien-signals-pristine-types` lane.
-`typetests/upstream-typecheck.test-d.ts` keeps the matching adapted assertion group and the full
-accepted public-API call inventory from that suite; supplemental public-api probes remain under
-`audit/type-probes/` and `typetests/`.
 
 ## Test disposition
 

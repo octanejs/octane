@@ -61,16 +61,9 @@ locked under `packages/zag/upstream/`.
 |---|---|---|
 | `tests/machine.test.ts` | Ported one-for-one | `tests/upstream/machine.test.ts` |
 | `tests/nested-states.test.ts` | Ported one-for-one | `tests/upstream/nested-states.test.ts` |
-| `tests/strict-mode.test.tsx` | Out of scope for adapted Octane lane | React StrictMode double-invoke is an intentional Octane non-feature; still executed in the pristine React lane. Exact pristine case IDs and rationale are locked in `audit/runtime-case-dispositions.json` and checked by the pristine→adapted inventory crosswalk. |
 | `tests/render.ts` | Ported helper | `tests/upstream/render.ts` |
 
 Parity evidence:
-
-- pristine full suite: `zag-pristine` Vitest project / `tests/upstream-original.test.ts`
-- adapted full suite: `zag` Vitest project / `tests/upstream/**/*.test.ts`
-- differential (supplementary): `zag-differential` / `tests/differential/*.test.ts`
-- pristine types: `packages/zag/audit/type-probes` via `tsc`
-- adapted types: `packages/zag/typetests` via `tsrx-tsc`
 
 Conformance and SSR tests remain ordinary `zag` / `zag-ssr` package coverage and
 are not counted as adapted upstream-suite identities.

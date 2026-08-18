@@ -34,8 +34,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --project monaco-editor",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
-    "parity:generate": "node ./scripts/generate-parity-manifest.mjs"
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@monaco-editor/loader": "catalog:default"

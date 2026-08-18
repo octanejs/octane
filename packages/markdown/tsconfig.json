@@ -18,5 +18,5 @@
     "strict": true
   },
   "include": ["src", "tests/**/*.tsrx"],
-  "exclude": ["node_modules", "dist", "upstream", "typetests", "audit/type-probes"]
+  "exclude": ["node_modules", "dist", "upstream", "typetests"]
 }

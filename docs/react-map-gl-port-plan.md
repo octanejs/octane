@@ -154,46 +154,7 @@ loads.
 
 The consequences, which have to be settled before phase 4:
 
-1. **A tape lane runner is new infrastructure.** Existing parity lane kinds are
-   `jest-full`, `vitest-full`, and `typescript`. The pristine-upstream lane needs
-   `scripts/react-parity/tape-full-runner.mjs`. This is the single largest new
-   piece of harness work.
-2. **The pristine lane covers the 5 util specs honestly and stops there.** The 7
-   component specs cannot run pristine in CI. That is an environment gap and must
-   be written as one — not silently dropped, and not counted as parity evidence.
-3. **The component-behavior oracle has to be built, not inherited.** Extend the
-   vendored mock into a `Map`-capable double (style load, `addSource`,
-   `addLayer`, `getStyle`, `on/off`, marker/popup/control constructors) so the
-   ported cases assert the same observable behavior without WebGL or a token.
-   The mock is then port-authored evidence and must be classified as such: the
-   same fixture runs against React and Octane in a differential lane so the mock
-   cannot drift into proving only what the port already does.
-4. **Token-gated real-map lanes are optional and skip cleanly** when
-   `VITE_MAPBOX_TOKEN` is unset, so a maintainer with a token can reproduce the
-   upstream claim locally and CI stays green without one.
-
-Beyond upstream, the standard rig applies: Octane-only conformance for effect
-order, map-instance lifetime, `reuseMaps` recycling and `MapProvider`
-registration; SSR/hydration for the container-only server output; type suites
-(pristine + adapted, hashed inventories); and the mutation negative controls
-`react-parity:check` requires.
-
 ## Package shape
-
-```
-packages/react-map-gl/
-  package.json          @octanejs/react-map-gl, exports "." and "./mapbox"
-  UPSTREAM.md           pin, source boundary, export crosswalk, test disposition
-  status.json           surface + divergences, matching the crosswalk
-  LICENSE               MIT, vis.gl copyright retained
-  README.md             compatibility status, token setup, differences
-  upstream/             byte-exact modules/react-mapbox at the pin (unpublished)
-  src/                  mirrors upstream layout module for module
-  tests/                _fixtures/*.tsrx, upstream/, differential/, ssr/,
-                        hydration/, runtime/, harness/
-  typetests/
-  audit/react-parity.json + inventories
-```
 
 Repository integration: Vitest projects in `vitest.config.js` carrying
 `testExecution.group: 'react-parity'`; catalog entries in `pnpm-workspace.yaml`;
@@ -217,19 +178,6 @@ All six phases are complete. The table records what each actually produced.
 | 6 | Close out | `status.json`, README, LICENSE, changeset, `pnpm sync`, registration in the CLI/MCP/website catalogues. |
 
 Four things went differently from the plan, all for the better:
-
-- **No standalone tape runner.** Upstream's specs run under Vitest through a
-  ~60-line assertion adapter, so the spec files stay byte-exact and only the
-  harness is ours. Its negative controls are in `tests/harness/`.
-- **The pristine util lane runs twice, not once.** Running the same byte-exact
-  specs against `upstream/src` *and* `src/` is what actually proves the reuse
-  claim; the pristine lane alone would only prove upstream still works.
-- **The React oracle is the published package**, resolved from `node_modules`,
-  not the vendored tree — which also keeps the Octane compiler away from it.
-- **Type lanes had to be authored.** Upstream ships no type tests, and
-  `react-parity:check` requires both sides, so `typetests/assertions.md` defines
-  one assertion list compiled against upstream's typings with `tsc` and against
-  this package with `tsrx-tsc`.
 
 ## Phase 0 result
 
@@ -292,9 +240,6 @@ vendored source; the double is replaced by the phase-4 oracle.
 | `react-map-gl` | 46 | the 7 ported component specs, hydration adoption, lifecycle conformance, adapter controls |
 | `react-map-gl-differential` | 5 | five fixtures through Octane and published upstream on React |
 | `react-map-gl-ssr` | 2 | container-only server output |
-
-`pnpm react-parity:check` executes all seven declared lanes. Repo-wide
-`pnpm typecheck`, `pnpm format:check` and `pnpm test` (16,439 tests) pass.
 
 ## Risks
 

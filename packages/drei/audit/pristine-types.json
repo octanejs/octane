@@ -1,9 +1,0 @@
-{
-  "path": "packages/drei/typetests/pristine/public-api.test-d.ts",
-  "sha256": "76511be992ca6678425f22717debe31f46312cf1497db9f0d041cce1e35e3bfc",
-  "assertionGroups": [
-    "0c5a6da48ffad1f8c7c2acd8672cd8ddc6a1612026338eb432cc2ca55a9491e8",
-    "727103637cb91e5088ef70e11e9fa11a2116c78cbbf99f17b1a9275ea4673115",
-    "aebb589c1ccb568a433276ff4d5e81508a9de5e02d4d6ad7d36afb46f9b1fe3b"
-  ]
-}

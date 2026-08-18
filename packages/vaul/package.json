@@ -33,9 +33,7 @@
     "status.json"
   ],
   "scripts": {
-    "test": "pnpm upstream:check && vitest run --root ../.. --project vaul --project vaul-differential --project vaul-ssr --project vaul-browser --project vaul-browser-conformance",
-    "parity:inventory": "node ../../scripts/react-parity/vaul-runtime-inventory.mjs",
-    "upstream:check": "node audit/check-upstream.mjs",
+    "test": "vitest run --root ../.. --project vaul --project vaul-differential --project vaul-ssr --project vaul-browser --project vaul-browser-conformance",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

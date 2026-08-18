@@ -1,4 +1,0 @@
-{
-  "extends": "./tsconfig.adapted.json",
-  "include": ["./negative/missing-coordinate.test-d.ts", "../src/**/*.ts", "../src/**/*.tsx"]
-}

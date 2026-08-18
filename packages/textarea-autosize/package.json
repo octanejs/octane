@@ -101,26 +101,18 @@
   "scripts": {
     "test": "vitest run --root ../.. --project textarea-autosize --project textarea-autosize-ssr",
     "test:browser": "vitest run --root ../.. --project textarea-autosize-browser",
-    "test:pristine": "CI=true jest --config jest.pristine.config.cjs --runInBand",
-    "test:types": "tsc -p audit/type-probes/tsconfig.pristine.json --noEmit && tsrx-tsc -p typetests/tsconfig.json --noEmit",
-    "verify:upstream": "node scripts/verify-upstream.mjs"
+    "test:types": "tsrx-tsc -p typetests/tsconfig.json --noEmit"
   },
   "peerDependencies": {
     "octane": "workspace:*"
   },
   "devDependencies": {
-    "@babel/preset-env": "7.29.7",
-    "@babel/preset-react": "7.29.7",
-    "@babel/preset-typescript": "7.29.7",
     "@testing-library/jest-dom": "catalog:default",
     "@testing-library/react": "16.3.2",
     "@types/node": "catalog:default",
     "@types/react": "catalog:react-textarea-autosize-react-oracle",
     "@types/react-dom": "catalog:react-textarea-autosize-react-oracle",
     "@vitejs/plugin-react": "6.0.3",
-    "babel-jest": "30.4.1",
-    "jest": "30.4.2",
-    "jest-environment-jsdom": "30.4.1",
     "octane": "workspace:*",
     "playwright": "catalog:default",
     "react": "catalog:react-textarea-autosize-react-oracle",

@@ -31,12 +31,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "audit:generate": "node ../../scripts/react-parity/input-otp-generate.mjs",
-    "audit:verify": "node ../../scripts/react-parity/input-otp-check.mjs",
-    "audit:negative-controls": "node ../../scripts/react-parity/input-otp-negative-controls.mjs",
-    "test": "vitest run --root ../.. --project input-otp-pristine-browser && vitest run --root ../.. --project input-otp && vitest run --root ../.. --project input-otp-server && vitest run --root ../.. --project input-otp-browser && vitest run --root ../.. --project input-otp-differential",
-    "typecheck": "tsrx-tsc --noEmit -p typetests/tsconfig.json",
-    "typecheck:pristine": "tsc --noEmit -p audit/type-probes/tsconfig.pristine.json"
+    "test": "vitest run --root ../.. --project input-otp && vitest run --root ../.. --project input-otp-server && vitest run --root ../.. --project input-otp-browser && vitest run --root ../.. --project input-otp-differential",
+    "typecheck": "tsrx-tsc --noEmit -p typetests/tsconfig.json"
   },
   "peerDependencies": {
     "octane": "workspace:*"

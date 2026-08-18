@@ -1,12 +1,5 @@
 # Deferred transition commit: closing the shell tear
 
-Last gap in [SUSPENSE_DIVERGENCE.md #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md):
-content a synchronous transition patches OUTSIDE a suspended boundary still
-updates early, so shell markup can run ahead of the held content it describes.
-End state: a held synchronous transition behaves the way an async Action
-already does — the committed screen stays whole, `isPending` turns on, and the
-new values land in one step when the data arrives.
-
 ## The failed attempt, and the corrected diagnosis
 
 The 2026-07-29 whole-drain attempt (documented in the divergence audit; the

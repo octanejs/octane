@@ -36,13 +36,6 @@ git -C react-spectrum-aria-3.50.0 sparse-checkout set --skip-checks \
   packages/react-aria packages/react-aria-components packages/react-stately LICENSE
 ```
 
-`audit/upstream-crosswalk.json` records all 1,294 public entry-point exports and all 185
-test-root artifacts from that checkout. It currently classifies 767 exports as
-`surface-present-unverified`, with per-symbol entry-point evidence, and 527 as explicit gaps.
-Surface presence is not a behavioral parity claim. The upstream suites contain 177 runtime
-test files, one type test, and seven support artifacts. They are present but have not been
-adapted case-by-case, so this binding remains `recorded-unverified`.
-
 ## Executable evidence
 
 The only React-parity-owned executable lane today is the bounded differential project. It
@@ -65,7 +58,3 @@ coverage until those required lanes and inventories exist.
   correcting invalid JavaScript emitted by the pinned upstream algorithm.
 - Server locale direction is derived from the injected locale, including RTL locales, rather
   than being hard-coded to `ltr`.
-
-`native-input-event-wiring` is linked to the differential case in `audit/react-parity.json`.
-The other divergences above remain documented package contracts with ordinary-shard tests; they
-are not counted as completed React-parity suite evidence until adapted upstream lanes exist.

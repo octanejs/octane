@@ -6,31 +6,11 @@ official package tag resolves to Lynx-stack commit
 `b6b809cdbec99d20e51aa9521257644dc9db5272`. The native engine target is Lynx
 SDK `3.9.0` at commit `d7f13487df0d69497148e93b71aded676a8fe243`.
 
-The package versions, npm integrity digests, source commits, SDK assets, and
-compatibility constraints audited for Phase 0 and Milestone 5 are recorded in
-[`audit/toolchain.json`](./audit/toolchain.json). That file is not an integrity
-ledger for every dependency in the later Milestone 9 compatibility lanes. The
-npm tarballs are the dependency authority; tagged source is the behavioral and
-test oracle when tests are not shipped in the tarball.
-
 The probe depends only on published framework-neutral Lynx packages. ReactLynx
 and its Rsbuild plugin are reference-only and must not enter the production
 dependency graph. `dsl: "react_nodiff"` is the only template DSL accepted by
 the pinned encoder for this no-diff PAPI shape; it is encoder metadata, not a
 React runtime dependency.
-
-No Lynx or ReactLynx implementation source has been copied into this directory.
-The generated [`audit/upstream-runner-cases.json`](./audit/upstream-runner-cases.json)
-is the narrow metadata exception: it records test titles, source paths,
-locations, task identities, and Octane classifications from the pinned
-Apache-2.0 checkout, but contains no upstream test bodies. The package's
-`LICENSE-APACHE-2.0` and `NOTICE` record that provenance. The renderer-owned
-code remains original except for the declaration adaptation described below.
-The renderer-owned declarations in `src/native-types.ts` adapt the public
-`types/common/props.d.ts` and `types/common/events.d.ts` contracts from
-`@lynx-js/types@4.0.0` (commit `2f20fed315aaba5f47e14e0f2b0f87c4cb1a64d6`).
-The adapted file retains the upstream copyright/license notice and marks the
-Octane-specific module-scoping change.
 
 ## Milestone 1–5 package boundary
 
@@ -41,17 +21,11 @@ upstream `./props` or `./events` entries. Although those entries appear
 framework-neutral, `./events` imports the main-thread `Element` graph, which
 reaches the same global JSX augmentation as `@lynx-js/types/element` and leaks
 Lynx tags into unrelated React/DOM authoring contexts. `src/native-types.ts`
-therefore adapts the audited standard-prop and event slice into module-scoped
+therefore adapts the reviewed standard-prop and event slice into module-scoped
 Octane declarations. A typetest imports React alongside the renderer namespace
 and proves the two intrinsic maps stay independent.
 
-The `4.0.0` provenance artifact is Apache-2.0 licensed, Copyright 2024–2025 The
-Lynx Authors. Its registry metadata records git commit
-`2f20fed315aaba5f47e14e0f2b0f87c4cb1a64d6`; its exact tarball integrity stays
-recorded in [`audit/toolchain.json`](./audit/toolchain.json). No ReactLynx
-runtime or React JSX declaration is a production dependency of the scaffold.
-
-Milestones 2–4 call only the audited public Element PAPI, list PAPI,
+Milestones 2–4 call only the reviewed public Element PAPI, list PAPI,
 selector-query, background platform, and cross-thread `ContextProxy` surfaces.
 The adapter, host topology, prop/event/list boundary, query handles, transport
 protocol, and root lifecycle are original Octane code; no Lynx or ReactLynx
@@ -60,7 +34,7 @@ implementation source was copied.
 behind the packaged `@octanejs/lynx/testing` facade. It remains a
 JavaScript-only behavioral host and is not imported by the renderer graph.
 
-The app-owned files under `examples/native-capabilities` use the audited
+The app-owned files under `examples/native-capabilities` use the reviewed
 generated-spec seam and the current official native-library Autolink
 registration markers. They are illustrative source, are excluded from package
 files, and have not been compiled against the pinned SDK or run on Android or
@@ -101,42 +75,6 @@ native layout or device claim. The Phase 0 public event hook, reconstructing
 reload, typed data/destroy delivery, Web, and Android/iOS gates remain
 authoritative until later production/device milestones satisfy them.
 
-Milestone 1–4 syntax, built-in, and runtime-ownership assumptions for the exact
-Rspeedy graph are recorded in
-[`audit/runtime-compatibility.json`](./audit/runtime-compatibility.json). That
-evidence is tied to published Lynx scripting-runtime documentation and
-production JavaScript builds for both compiler layers. It does not claim that
-the main-thread bytecode or background program executed on a native device.
-Milestone 5's additional CSS, template, encoding, and development-transport
-pins and integrities are recorded in [`audit/toolchain.json`](./audit/toolchain.json)
-and the repository `pnpm-lock.yaml`.
-
-Milestone 9 keeps the audited Rspack `2.1.3` edge in its atomic minimum
-source/build lane and adds a current lane with Rspack `2.1.5`, the newest patch
-allowed by the same Rspeedy `0.16.0` / Rsbuild `2.1.4` graph. Both live lanes
-install the registry-verified `@lynx-js/types@4.1.0`; the renderer-local
-declarations remain adapted from the audited `4.0.0` artifact. The complete
-exact lane maps live in
-[`toolchain-lanes.js`](../rspeedy-plugin-octane/src/toolchain-lanes.js).
-Required CI jobs pack and install both graphs into external consumers, build
-each twice, and check live registry drift for the current lane. The lane source
-map and registry check do not add committed tarball-integrity provenance to
-`audit/toolchain.json`; in particular, that audit does not record the current
-Rspack `2.1.5` or Lynx types `4.1.0` artifacts. This also does not establish
-minimum/current execution on a Lynx native engine or device.
-
-## Milestone 9 runner inventory
-
-At the exact `@lynx-js/react@0.123.0` tag, Vitest 3.2.4 expands the pinned
-JavaScript/TypeScript suites to 1,725 runnable cases. The committed runner
-artifact classifies every case and records zero unclassified entries. The
-source inventory separately records 89 Rust compiler cases across 11 files as
-out of scope because Octane does not reuse the ReactLynx compiler
-implementation. Every classification, including `port` and `differential`, is
-an audit disposition describing intended handling. Classification counts are
-not evidence that the corresponding Octane behavior is implemented, that the
-tests ran against Octane, that parity passed, or that any suite ran on a native
-engine.
 
 Create a clean detached checkout and generate the three ignored build products
 that the test configs import. These are built from the pinned sources; do not
@@ -190,11 +128,6 @@ pnpm --dir packages/react/transform exec vitest list --config vitest.config.ts -
 ```
 
 Then generate and validate the artifact from the Octane checkout:
-
-```bash
-node packages/lynx/audit/generate-runner-crosswalk.mjs --upstream "$lynx_checkout" --input-directory "$runner_json"
-node packages/lynx/audit/validate-crosswalk.mjs --upstream "$lynx_checkout"
-```
 
 The verified Milestone 9 reproduction generated the committed artifact
 byte-for-byte. Validation also rejects a mismatched upstream commit, missing or

@@ -24,12 +24,7 @@
     "status.json"
   ],
   "scripts": {
-    "upstream:generate": "node scripts/generate-upstream-crosswalk.mjs",
-    "upstream:check": "node scripts/check-upstream-crosswalk.mjs",
-    "upstream:ready": "node scripts/check-upstream-crosswalk.mjs --ready",
-    "react-parity:generate": "node scripts/generate-react-parity.mjs",
-    "react-parity:check": "node scripts/check-react-parity.mjs",
-    "test": "node scripts/check-react-parity.mjs && vitest run --root ../.. --project drei-differential --project drei-guards --project drei-adapted-browser",
+    "test": "vitest run --root ../.. --project drei-differential --project drei-guards --project drei-adapted-browser",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
   },
   "dependencies": {

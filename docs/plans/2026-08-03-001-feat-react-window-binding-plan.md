@@ -146,59 +146,11 @@ sequenceDiagram
 
 ### Output Structure
 
-```text
-packages/window/
-├── audit/
-│   ├── react-parity.json
-│   └── evidence manifests and crosswalks
-├── src/
-│   ├── components/grid/
-│   ├── components/list/
-│   ├── core/
-│   ├── hooks/
-│   ├── utils/
-│   ├── index.ts
-│   └── types.ts
-├── tests/
-│   ├── browser/
-│   ├── differential/
-│   ├── ssr/
-│   ├── types/
-│   └── upstream/
-├── upstream/
-│   ├── lib/
-│   └── LICENSE.md
-├── README.md
-├── status.json
-├── UPSTREAM.md
-├── package.json
-└── tsconfig.json
-```
-
 ---
 
 ## Implementation Units
 
 ### U1. Pin and inventory the upstream contract
-
-- **Goal:** Establish an immutable, legally distributable, fail-closed work list before porting behavior.
-- **Requirements:** R1, R2, R9, R10, R11; KTD1, KTD3, KTD7.
-- **Dependencies:** None.
-- **Files:** `packages/window/upstream/**`, `packages/window/UPSTREAM.md`, `packages/window/audit/**`, `packages/window/tests/audit/**`, `packages/window/package.json`.
-- **Approach:**
-  1. Record npm integrity/file inventory and dereferenced tag commit; vendor the licensed `lib/` source/tests plus license byte-exact and keep it unpublished.
-  2. Inventory every public runtime/type export, source module, upstream test file/case, snapshot or fixture, and upstream type assertion.
-  3. Define crosswalk and transformation-ledger schemas with source-line/case ownership and injective mappings.
-  4. Add negative controls for missing/extra/renamed files, deleted/skipped cases, stale hashes, duplicate mappings, altered allowed transforms, and removed expected type errors.
-- **Execution note:** Establish failing negative controls and immutable hashes before adapting source so later green suites cannot redefine the work list.
-- **Patterns to follow:** `packages/three/UPSTREAM.md`, current exact-port audit manifests, `scripts/react-parity/`, and `docs/react-parity-testing.md`.
-- **Test scenarios:**
-  - A pristine pinned tree passes file, byte, license, export, test-case, and type-assertion inventories.
-  - Deleting or renaming one upstream module or test case fails with its exact missing identity.
-  - Mapping two upstream identities to one adapted identity fails the injectivity gate.
-  - Editing an adapted fixture outside the allowed import/extension/event transformations fails the ledger.
-  - Removing an upstream `@ts-expect-error` or adapted counterpart fails type-evidence parity.
-- **Verification:** The pinned artifacts and all crosswalk inputs are reproducible from immutable upstream coordinates, every expected identity is owned exactly once, and every negative control demonstrably fails.
 
 ### U2. Prove Octane feasibility at the renderer boundary
 
@@ -254,20 +206,6 @@ packages/window/
 
 ### U5. Prove real-browser virtualization and lifecycle parity
 
-- **Goal:** Validate the layout-dependent contract that jsdom and SSR cannot establish.
-- **Requirements:** R5-R8, R10, R11; KTD5; AE1-AE4.
-- **Dependencies:** U4 and merged generic Firefox infrastructure from draft PR #548.
-- **Files:** `packages/window/tests/browser/**`, browser fixture routes under `packages/window/tests/browser/fixtures/**`, `vitest.config.js`, `packages/window/audit/react-parity.json`.
-- **Approach:** Run paired pristine React and adapted Octane journeys in Chromium and Firefox using actual scrolling, geometry, ResizeObserver, focus, and node identity. Register the lanes in the generic parity group and prove the ordinary sharded complement remains correct.
-- **Patterns to follow:** Browser-selector helpers, `packages/tanstack-virtual/tests/`, and current binding browser parity/adoption suites.
-- **Test scenarios:**
-  - A 10,000-item list mounts no more than the visible plus configured overscan range, never invokes row work for the full dataset, scrolls to middle/end, reports exact ranges, and preserves unaffected node identity.
-  - Horizontal and RTL list/grid journeys match visible cells, physical offsets, imperative alignment, and callbacks in both engines.
-  - Resizing the viewport and changing dynamic row measurements updates ranges and total extent without flicker, stale nodes, or leaked observers.
-  - Focused interactive content within a keyed row survives scroll-driven rerenders while mounted and cleans up when it leaves the retained range.
-  - Unmount removes scroll/resize listeners, observers, ref values, and pending callbacks.
-- **Verification:** Both browser engines pass paired journeys on the exact adapted head, manifest execution reports every declared identity once, and the CI-sharded config executes only the intended non-parity complement.
-
 ### U6. Integrate, pack, document, and release the binding
 
 - **Goal:** Make the exact binding discoverable and consumable through every supported migration and release surface.
@@ -295,7 +233,6 @@ packages/window/
 | Focused feasibility | Development/production compiler, DOM, SSR, hydration, and browser boundary probes | U2, R3, R5-R8 |
 | Package runtime and types | Complete local Vitest projects, pristine React suite, adapted Octane suite, differential lanes, pristine/adapted type projects | U3-U4, R2-R10 |
 | Browser parity | Chromium and Firefox paired virtualization, layout, scroll, RTL, resize, identity, focus, and cleanup journeys | U5, R5-R7, R10-R11 |
-| Generic parity harness | `pnpm react-parity:check`, manifest validation, exact identity execution, local/sharded ownership checks | U1-U5, R9-R11 |
 | Repository quality | `pnpm sync`, scoped and repository formatting, typecheck, test-marker and workflow regressions, relevant root tests | U6, R11-R12 |
 | Release consumer | Full package-pack gate plus outside-workspace ESM/CommonJS/type/client/server/SSR/hydration/browser consumer; CommonJS executes only after rebasing onto merged #550 | U6, R12, AE5 |
 | Review and PR state | Independent code review, resolved current-head feedback, terminal CI evidence where drafts allow it, mergeability/base freshness, draft retained | U6, KTD2 |

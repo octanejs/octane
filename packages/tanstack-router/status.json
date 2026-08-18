@@ -1,5 +1,8 @@
 {
-  "upstream": { "package": "@tanstack/react-router", "version": "1.170.18" },
+  "upstream": {
+    "package": "@tanstack/react-router",
+    "version": "1.170.18"
+  },
   "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
   "divergences": [
     "Refs are props — `createLink`'s `forwardRef` becomes a `ref` prop.",
@@ -11,7 +14,7 @@
   "notes": [
     "The framework-neutral runtime dependency is `@tanstack/router-core@1.171.15`.",
     "The TSRX-aware generator plugin is exported from `@octanejs/tanstack-router/generator-plugin` for `@octanejs/tanstack-start`'s package-owned generator.",
-    "React parity provenance is still recorded-unverified until pristine-upstream and one-for-one adapted suite lanes are fetched from the pinned tag; differential harness evidence is landed separately."
+    "The pinned upstream provenance is recorded in UPSTREAM.md, with differential behavior covered by the ordinary package suite."
   ],
-  "docs": ["docs/tanstack-parity-audit.md"]
+  "docs": []
 }

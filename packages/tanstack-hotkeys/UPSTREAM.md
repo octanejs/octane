@@ -21,9 +21,6 @@ The byte-exact tagged adapter directory and root license are vendored under `ups
 nine package/build/documentation files. The runtime suite has 41 cases. Upstream's `test:types` script compiles package source with `tsc`; that lane runs pristine, and an
 Octane `tsrx-tsc` typetest lane covers the adapted surface including the plain target-ref divergence.
 
-`audit/upstream-crosswalk.json` accounts for both published entrypoints, all 22 adapter exports,
-the byte-identical core wildcard re-export, and all four canonical runtime test files. The runtime suite runs pristine and adapted in full under `provenance.verification: verified`.
-
 ## Executable evidence
 
 Executable evidence includes the pristine 41-case upstream Vitest suite, the adapted Octane port of

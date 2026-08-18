@@ -31,12 +31,6 @@ git clone --filter=blob:none --depth 1 --branch v1.6.0 \
   https://github.com/mui/base-ui.git base-ui-v1.6.0
 ```
 
-`audit/upstream-crosswalk.json` records all 43 public component/utility subpaths and 348
-runtime, type, and support artifacts. It classifies 35 subpaths as
-`surface-present-unverified` and eight as explicit gaps: Autocomplete, Combobox, Drawer,
-Navigation Menu, OTP Field, Scroll Area, Select, and Toolbar. Surface presence is not a
-behavioral parity claim.
-
 The canonical package has 273 runtime test files, 35 type-test files, and 40 support
 artifacts. Ten upstream Accordion, Collapsible, and Tabs files have selected cases adapted locally; the
 remaining suite is vendored but not adapted in full, so the binding remains
@@ -63,5 +57,3 @@ pristine type, and one-for-one adapted type lanes are still required before this
 - The shared default Tooltip delay-group refs match the pinned upstream behavior.
 - `NumberField.ScrubArea` and press-and-hold stepping remain gaps; steppers handle single
   presses only.
-
-Structured divergence records and their executing cases live in `audit/react-parity.json`.

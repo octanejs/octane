@@ -42,23 +42,7 @@ runtime export.
 | `Options` | Ported React-free to `src/types.ts` | `typetests/public-api.test-d.ts`, `tests/validation.test.ts` |
 | `UrlTransform` | Ported React-free to `src/types.ts` | `typetests/public-api.test-d.ts`, `tests/differential/url-transform.test.ts` |
 
-`audit/public-api.json` is the machine-readable boundary and export crosswalk.
-`status.json` agrees that the complete root runtime and public type surface is
-ported.
-
 ## Test boundary
-
-The canonical `test.jsx` contains 87 nested `t.test` registrations. They are
-frozen individually in `audit/test-inventory.json`. The pristine lane executes
-that vendored file byte-for-byte with its vendored JSX loader, Node test,
-React/ReactDOM 19.0.0, and the upstream-declared test dependencies. The 87-entry
-`audit/adapted-case-crosswalk.json` binds every pinned source-line identity to a
-concrete adapted test identity and integrity-locks its assertion source.
-
-Every port-authored test under `tests/` has exactly one disposition in
-`audit/test-classifications.json`. Repo-authored type probes live under
-`audit/type-probes/` and `typetests/` and are locked by `audit/type-parity.json`
-with assertion-group inventories and mutation controls.
 
 ## Architecture and adoption evidence
 

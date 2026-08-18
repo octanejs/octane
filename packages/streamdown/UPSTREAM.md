@@ -22,14 +22,6 @@ The pinned repository commit contains an executable suite under
 and `remend`. Published npm tarballs omit those tests; repository presence is
 authoritative, so `upstreamSuites.runtime` is `present`.
 
-Every upstream `__tests__` artifact at the pin is inventoried in
-[`audit/upstream-suite-artifacts.json`](./audit/upstream-suite-artifacts.json).
-This bounded harness currently executes eight exact same-fixture differential
-cases against the pinned published React packages through the
-`streamdown-differential` Vitest project (`testExecution: { group: 'react-parity' }`).
-Native-event delivery and consolidated plugin subpath contracts stay ordinary
-package tests outside parity evidence.
-
 Promoting the inventoried upstream suite into pristine / one-for-one adapted
 lanes (framework-neutral remend unchanged; React-facing suites adapted or given
 specific incompatibility reasons) remains open follow-up work before provenance

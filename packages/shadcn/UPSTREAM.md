@@ -69,5 +69,4 @@ Octane framework contracts.
 
 When updating either pin, fetch both artifacts again, record new SHA-256 values,
 reconcile the complete registry/CLI inventories, refresh every vendored reference
-and its manifest hash, then rerun the exact differential lane and the global React
-parity audit.
+and its manifest hash, then rerun the exact differential and behavioral lanes.

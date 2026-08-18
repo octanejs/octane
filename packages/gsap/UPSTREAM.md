@@ -44,11 +44,6 @@ There are no silent or open export gaps at this pin.
 
 ## Test and type disposition
 
-Upstream `2.1.2` ships no runtime or type test suite in either the canonical tag
-or the published package metadata, so there is no pristine suite to run or adapt.
-Parity evidence is therefore repo-authored and registered in
-`audit/react-parity.json`:
-
 - `gsap-differential` — the same lifecycle fixture through Octane and published
   `@gsap/react` 2.1.2 via the shared differential rig (required runtime oracle)
 - pristine/adapted type lanes under `typetests/{pristine,adapted}/`

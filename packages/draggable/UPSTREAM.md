@@ -1,4 +1,4 @@
-# Upstream react-draggable audit
+# react-draggable upstream provenance
 
 This binding targets exactly `react-draggable@4.7.1`. It does not claim a
 floating compatibility range.
@@ -16,14 +16,6 @@ floating compatibility range.
 - oracle catalog: `catalog:react-draggable-react-oracle` (immutable pin; not
   `catalog:default`)
 
-The npm tarball is the consumer authority for runtime bytes, declarations,
-exports, and package conditions. The annotated Git tag is the source, test,
-fixture, and license authority. The tag object resolves directly to the commit
-above. [`audit/artifact-authorities.json`](./audit/artifact-authorities.json)
-records every npm/tag boundary discrepancy and its disposition. Oracle versions
-are also recorded under `release.oracleVersions` in
-[`audit/upstream-inventory.json`](./audit/upstream-inventory.json).
-
 ## Vendored boundary
 
 `upstream/npm/` is the complete unpacked npm artifact: all 26 published files,
@@ -32,9 +24,6 @@ metadata, README, changelog, and license. `upstream/tag/` contains the relevant
 byte-exact repository boundary: all ten `lib/` source modules; all `test/`
 files and fixtures; the `typings/` consumer program; package metadata; compiler,
 build, and Vitest configuration; and the license.
-
-Vendored evidence is development-only. The binding's `files` allowlist excludes
-`upstream/`, `audit/`, and `tests/audit/`.
 
 ## Public surface
 
@@ -52,11 +41,6 @@ not the source module's convenience exports, is authoritative.
 
 ## Exhaustive work list
 
-[`audit/upstream-inventory.json`](./audit/upstream-inventory.json) is the
-machine-readable crosswalk. It hashes every vendored artifact and gives exactly
-one disposition to every source module, public runtime export, public type
-export, unit/type case, browser case, fixture, and type assertion.
-
 The pinned repository contains exactly 204 non-browser unit/type cases across
 11 test files and 23 browser cases. The type-compatibility fixture contains
 explicit `expectType` assertions plus children/JSX/class probes. Test identities
@@ -66,31 +50,7 @@ include file, source line, and title so same-titled cases in different
 Adapted public unit and browser cases live in
 `tests/upstream/public-root.test.ts` and `tests/browser/parity.browser.test.ts`.
 Each `adaptedCase(identity, …)` identity is the upstream citation
-(`tag/test/…::title`). The audit inventories every adapted callback's
-assertions, scenario steps, and fixture refs (`inventories.adaptedCaseStructures`)
-and every corresponding upstream case structure
-(`inventories.upstreamCaseStructures`). Deleting or weakening an adapted
-`expect(...)` while keeping the title fails closed.
-
-Type parity is governed by [`audit/type-parity.json`](./audit/type-parity.json)
-with file/assertion-group inventories in `audit/pristine-types.json` and
-`audit/adapted-types.json`. React-only children/JSX/`React.Component` probes are
-recorded as `upstreamOnlyAssertionGroups`; adapted `@ts-expect-error` controls
-are required.
-
-Every authored package test is classified in
-[`audit/test-classifications.json`](./audit/test-classifications.json). Discovery
-and the classification ledger must be equal and disjoint.
-
-`node audit/upstream-inventory.mjs` recomputes file hashes, identities, and case
-structures from the vendored/adapted bytes, verifies the crosswalk is bijective,
-rejects duplicate or skip dispositions, checks the exact public subpaths,
-verifies oracle catalog pins, and verifies the root MIT notice.
-`node --test tests/audit/upstream-inventory.test.mjs` proves failures for a
-missing/renamed source, renamed unit case, removed browser case, removed type
-assertion, deleted adapted assertion body, removed `@ts-expect-error`,
-unclassified authored test, duplicate disposition, invented export, invented
-subpath, skip disposition, and stale fixture hash.
+(`tag/test/…::title`).
 
 ## Allowed transforms
 
@@ -103,10 +63,6 @@ current `allowedTransforms` entries are:
 | `native-events` | adapted types | Replace React synthetic `MouseEvent`/`TouchEvent` unions with native events |
 | `function-components` | adapted types | Replace `React.Component` class assignability with Octane function-component types |
 | `nodeRef-prop-surface` | adapted runtime + types | Express consumer refs through Octane `nodeRef` props rather than class-component refs |
-
-Type-lane detail and upstream-only probe dispositions live in
-`audit/type-parity.json` `permittedTransformations` /
-`upstreamOnlyAssertionGroups`.
 
 ## License provenance
 

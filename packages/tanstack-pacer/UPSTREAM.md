@@ -22,24 +22,7 @@ runtime test, fixture, or snapshot artifacts. Upstream's `test:types` script com
 with `tsc` and has no dedicated type-assertion files, so suite presence is `insufficient` while
 compile lanes still run.
 
-`audit/upstream-crosswalk.json` accounts for all 16 published entrypoints and every adapter
-value/type export plus each core `export *` re-export, with a disposition and evidence pointer per
-row. The binding reuses the exact framework-neutral core. With absent upstream runtime tests,
-provenance is `recorded-unverified`: a repo-authored adapted-octane suite plus a React/Octane differential cover a representative scheduler lifecycle, while nearly every export remains `surface-present-unverified`.
-
 ## Type lanes
-
-- Pristine: `typetests/pristine` runs `tsc` over the vendored React adapter source (upstream
-  `test:types`) with pinned React types. Inventory: `audit/upstream-types.json`.
-- Adapted: `typetests/adapted` compiles the complete Octane adapter source through
-  `tsrx-tsc` (one-for-one with upstream `test:types`). Inventory:
-  `audit/adapted-types.json`. Permitted transforms (structurally enforced):
-  `typetests/assertions.md`.
-- Ordinary Octane-only: `typetests/octane-only/setter-types.test-d.ts` holds
-  accept/reject evidence for local `Dispatch` / `SetStateAction` aliases outside
-  required React-parity ownership (no pristine React assertion counterpart). Root
-  `bindings:typecheck` runs `typetests/octane-only/tsconfig.json` so this evidence
-  executes in the always-on ordinary typecheck control plane.
 
 ## Executable evidence
 

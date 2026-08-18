@@ -1,5 +1,8 @@
 {
-  "upstream": { "package": "sonner", "version": "2.0.7" },
+  "upstream": {
+    "package": "sonner",
+    "version": "2.0.7"
+  },
   "provenance": {
     "source": "https://github.com/emilkowalski/sonner/tree/v2.0.7",
     "license": "MIT",
@@ -14,8 +17,6 @@
   ],
   "ssr": "Supported and tested: `Toaster` server-renders without browser globals, hydrates by adopting the server host, and can show the first client-created toast without replacing it.",
   "verified": "2026-08-02",
-  "notes": [
-    "Bounded React parity runs the vendored Playwright suite unchanged against published sonner@2.0.7 plus one exact same-fixture differential lifecycle case. Renderer-divergence authentication stays in ordinary package shards and is not counted as React-parity evidence."
-  ],
+  "notes": [],
   "docs": ["docs/sonner-port-plan.md"]
 }

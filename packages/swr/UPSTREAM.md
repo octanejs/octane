@@ -30,20 +30,6 @@ exercise the intended overlap.
 
 ## Provenance status
 
-`packages/swr/audit/react-parity.json` is `recorded-unverified`. Required lanes
-still execute through the generic harness, but the adapted runtime inventory is a
-selected cited subset (not a one-for-one map of the pristine identities), and the
-adapted type projects are repo-authored export/call probes rather than structural
-ports of the upstream type assertion suite.
-
-Every authored runtime and type evidence file is classified exactly once in
-`packages/swr/audit/test-classifications.json`, including adapted suites under
-`tests/upstream/` and compiler-executed programs under `typetests/`.
-`react-parity:check` discovers those paths and fails closed on any unclassified
-file. Promoting provenance to `verified` still requires the exhaustive two-way
-runtime/type crosswalk with assertion/fixture preservation controls and
-per-upstream dispositions for every applicable pristine identity.
-
 ## U1 gate
 
 U1 is not a partial implementation. Authored source modules currently expose

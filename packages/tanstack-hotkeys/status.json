@@ -3,7 +3,7 @@
     "package": "@tanstack/react-hotkeys",
     "version": "0.10.0"
   },
-  "surface": "Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc.",
+  "surface": "Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. Adapted package tests and a differential lifecycle cover the runtime surface; package type checks cover the Octane source.",
   "divergences": [
     "`target` refs are plain `{ current }` objects (Octane has no `React.RefObject`); the `isRef` guard and behavior are otherwise identical."
   ],
