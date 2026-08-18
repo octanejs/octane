@@ -1,0 +1,219 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/livestorejs/livestore.git",
+    "version": "0.4.0",
+    "commit": "c80acb39066b9472da426a35c81969df4919ae2d",
+    "sourceRoot": "packages/@livestore/react",
+    "testRoot": "packages/@livestore/react/src",
+    "license": "Apache-2.0",
+    "integrity": "sha256:d018c617a63e616aeba211b73ca6b4c126795ebc4f5d873f2296765b60b5e44f",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/livestore/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/livestore/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": [
+        "/tests/ssr/",
+        "/tests/conformance/",
+        "/tests/package-contract\\.test\\.ts$",
+        "/tests/upstream-original\\.test\\.ts$"
+      ]
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 23,
+    "uniqueIdentities": 23,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "livestore-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "livestore-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the byte-exact @livestore/react 0.4.0 Vitest suite against the vendored React binding and checks every passed identity against the committed inventory.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/livestore/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/livestore/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "6e0593fff1f6f96a2e452244ebc8eacee85d2d5b6b6a32c11eff0132132275c7"
+        },
+        {
+          "path": "packages/livestore/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "07e130182b9e0e97c9af127ab36feec437be89c9b45d18828b54355a0dde8809"
+        },
+        {
+          "path": "packages/livestore/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "262df5e6ed4357dca04ea88ddeb05a1c1ad97e91686ce854ec23d0db14c2b58f"
+        },
+        {
+          "path": "scripts/react-parity/livestore-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "1da63bc79c0c7d910a027d6b57668ac25fb074e2be03a8788d68b1febe7c1075"
+        },
+        {
+          "path": "packages/livestore/scripts/run-pristine-upstream.mjs",
+          "role": "support",
+          "sha256": "279a959623caffce2f8be796233f9deed409912a7ba2cf9d12fad4350c0f516e"
+        },
+        {
+          "path": "packages/livestore/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "c88ddacc2bb8fe4c5c7876f3dce6bcac89b25661348e6e91ed74d671448a4a3f"
+        },
+        {
+          "path": "packages/livestore/scripts/verify-upstream.mjs",
+          "role": "support",
+          "sha256": "db37d79eef48654e6cc0b35f748beed7869638c4e740893efe2cf27033b9124b"
+        },
+        {
+          "path": "packages/livestore/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "d018c617a63e616aeba211b73ca6b4c126795ebc4f5d873f2296765b60b5e44f"
+        }
+      ]
+    },
+    {
+      "id": "livestore-adapted-full-suite",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "livestore",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the adapted LiveStore DOM/binding suite with exact test identities for client documents, queries, lifecycle, and LiveList.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/livestore/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/livestore/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "ffc00709cc451e87e56e73c69ea55560d98560021ef6db6cadb330538938e3ac"
+        },
+        {
+          "path": "scripts/react-parity/livestore-runtime-inventory.mjs",
+          "role": "support",
+          "sha256": "236983fbce8bfa11d50fcdf5c6cd5d93e5588a1584192cf8c7c0c6cd7cc93312"
+        }
+      ]
+    },
+    {
+      "id": "livestore-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "livestore-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Repo-authored React declaration probes against the vendored @livestore/react 0.4.0 surface, including negative controls.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/livestore/audit/type-probes/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/livestore/audit/pristine-types.json",
+          "role": "test",
+          "sha256": "1c58647f4bfa89ca19752fb2ead372a8c576a177e481d116652d4aaf9def1934",
+          "cases": [
+            {
+              "id": "types:livestore-pristine",
+              "testName": "pinned React declaration probes",
+              "fullName": "pinned React declaration probes"
+            }
+          ]
+        },
+        {
+          "path": "packages/livestore/audit/type-probes/public-api.test-d.ts",
+          "role": "support",
+          "sha256": "9402332d01afb7f6d5ae702d4bde10b4d42232b13734d7f318ff79f101c110f5"
+        },
+        {
+          "path": "packages/livestore/audit/type-probes/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "62d63a5cab0e1fc17ae87132ef75baa469f60be856b13c09f0b6bf8115b87d7b"
+        },
+        {
+          "path": "packages/livestore/audit/type-parity.json",
+          "role": "support",
+          "sha256": "d09ae354054a7fd6859a184813d23140d30e1016a3b5247eaeef6093b73e842b"
+        }
+      ]
+    },
+    {
+      "id": "livestore-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "livestore-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode→OctaneNode transformation.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/livestore/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/livestore/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "93c1bf7af01a55f3270893048974dae737ce7fca32753db0538692808acdee52",
+          "cases": [
+            {
+              "id": "types:livestore-adapted",
+              "testName": "adapted Octane declaration probes",
+              "fullName": "adapted Octane declaration probes"
+            }
+          ]
+        },
+        {
+          "path": "packages/livestore/typetests/public-api.test-d.ts",
+          "role": "support",
+          "sha256": "1ebe408d35327ceab3e1a4869386535530c984728620e934be021fcb90bd4a0f"
+        },
+        {
+          "path": "packages/livestore/typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "3e5a10a15c7cfc431288f01fe2a1a279724e378d6ab0f154297d6f708dab6417"
+        },
+        {
+          "path": "packages/livestore/audit/type-parity.json",
+          "role": "support",
+          "sha256": "d09ae354054a7fd6859a184813d23140d30e1016a3b5247eaeef6093b73e842b"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

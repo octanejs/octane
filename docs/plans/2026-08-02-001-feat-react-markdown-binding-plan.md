@@ -144,6 +144,14 @@ flowchart TB
 
 ### U1. Pin upstream evidence and prove the async component seam
 
+- **Goal:** Establish immutable source, npm, license, export, type, and test boundaries and prove the load-bearing promise-returning mapped-component seam before the port architecture depends on it.
+- **Requirements:** R1-R3, R15.
+- **Dependencies:** None.
+- **Files:** `packages/markdown/upstream/`, `packages/markdown/UPSTREAM.md`, `packages/markdown/audit/public-api.json`, `packages/markdown/audit/test-inventory.json`, `packages/markdown/audit/verify-provenance.mjs`, `packages/markdown/package.json`, `packages/markdown/tsconfig.json`, `packages/markdown/tests/probes/async-component.tsrx`, `packages/markdown/tests/probes/async-component.server.test.ts`, `packages/markdown/tests/adoption/consumer.tsrx`, `packages/markdown/tests/adoption/consumer.test.ts`, `packages/markdown/tests/adoption/MIGRATION.md`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`.
+- **Approach:** Vendor the 10.1.0 package and canonical source/test boundary byte-exact. Inventory the default export, three named runtime exports, six public types, source modules, artifacts, and all 87 upstream subtests. Create the minimal package exports, scripts, workspace registration, and direct runtime/dev dependency declarations needed to execute U2-U5. Before U2, exercise the proposed HAST-to-Octane adapter shape with a promise-returning mapped component through public-like entry points, including successful SSR, rejection, nested children, and its intended public type; failure triggers the plan stop condition and reopens KTD2-KTD3. Also freeze two adoption inputs before architecture commitment: pinned canonical react-markdown examples and one attribution-compatible public application consumer selected for default/named APIs, public types, plugin tuples, intrinsic/custom mappings, hooks, and async usage. Record every baseline framework-wide and library-specific edit separately. Defer public docs, release metadata, playground, changeset, and generated integration outputs to U6.
+- **Test scenarios:** Missing or modified vendored files fail; altered license or package identity fails; missing/extra runtime or type exports fail; removed, renamed, skipped, duplicated, or unclassified upstream cases fail; the async-component probe resolves nested server output, propagates rejection, and typechecks through the planned mapping surface; the frozen adoption corpus exposes any react-markdown-specific redesign before U2 begins.
+- **Verification:** Provenance and all negative controls pass with exact counts and hashes, and the architecture probe proves the entry condition for U2-U4.
+
 ### U2. Port processor, validation, filtering, and URL behavior
 
 - **Goal:** Preserve framework-neutral Markdown processing and security-sensitive transforms before rendering adaptation.
@@ -175,6 +183,14 @@ flowchart TB
 - **Verification:** Every upstream async/hooks identity plus port-authored race/cleanup identity executes; pristine and adapted outcomes/errors match.
 
 ### U5. Prove SSR, hydration, and executable global parity
+
+- **Goal:** Make every contract lane executable and fail-closed in package and global CI.
+- **Requirements:** R2-R3, R14-R15; KTD5-KTD6.
+- **Dependencies:** U1-U4.
+- **Files:** `packages/markdown/tests/ssr/`, `packages/markdown/tests/hydration/`, `packages/markdown/audit/react-parity.json`, `packages/markdown/audit/runtime-inventory.json`, `scripts/react-parity/react-markdown-*.mjs`, `scripts/react-parity/check.mjs`, `vitest.config.js`.
+- **Approach:** Add pristine React runtime/server/type projects; adapted sync/async/hooks/SSR/hydration/type projects; focused differential projects; and bounded Chromium projects for required browser-only contracts, with exact collected/executed identities, source hashes, and negative controls.
+- **Test scenarios:** Covers AE4. Sync and awaited async SSR without globals; exact server markup; hooks pinned initial/fallback result; default/plugin/filter/URL/component hydration; original-node adoption; no diagnostics; interactive updates; missing, stale, renamed, skipped, duplicated, or unexecuted lane rejection.
+- **Verification:** Package projects and `react-parity:check` execute every required lane; the manifest earns `verified` only after all evidence passes.
 
 ### U6. Integrate package, adoption example, and release metadata
 

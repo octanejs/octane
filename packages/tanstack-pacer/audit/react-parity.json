@@ -1,0 +1,233 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/TanStack/pacer.git",
+    "version": "0.22.1",
+    "commit": "a894009100aeb373965d4121eb92a1af634af012",
+    "sourceRoot": "packages/react-pacer/src",
+    "testRoot": "packages/react-pacer (no runtime test artifacts)",
+    "license": "MIT",
+    "integrity": "sha256:d4055dcec785b5eac078a2c2acde90b80e84e70c0262a174a5065ed92a9be2f0",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "insufficient"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/tanstack-pacer/src"],
+      "include": ["\\.(?:ts|tsx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/tanstack-pacer/tests/adapted"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 6,
+    "uniqueIdentities": 6,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "tanstack-pacer-adapted",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-pacer-adapted",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Repo-authored Octane scheduler lifecycle suite covering debounce, throttle, batching, teardown, latest-label debounce/throttle, and useDebouncedValue; paired against React by the differential lane.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-pacer/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-pacer/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "fec329c6f3b7423e30ecd8a0fdb9b38fef484cb040b07de9dd53454300681739"
+        },
+        {
+          "path": "packages/tanstack-pacer/tests/adapted/scheduler.test.ts",
+          "role": "support",
+          "sha256": "0c87f6ee5af01e3c78b53c3fa91e6ddfcfe2baad170f44729e304cf010491a79"
+        },
+        {
+          "path": "packages/tanstack-pacer/tests/_fixtures/pacer.tsrx",
+          "role": "support",
+          "sha256": "1b74a76b44d543b3b5bf2d0ab55732e1f2c8da63add69c4db0a2972846e99403"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-pacer-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-pacer-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the same authored scheduler fixture against @octanejs/tanstack-pacer and the pinned React adapter for counter debounce/throttle, batching, teardown, latest-label debounce/throttle, and useDebouncedValue; upstream provides no adapter runtime suite.",
+      "files": [
+        {
+          "path": "packages/tanstack-pacer/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "23cafac582371ee392e55b8dd2aa6932150d3334614aad5cb0b98d0c8992f623",
+          "cases": [
+            {
+              "id": "differential:tanstack-pacer-scheduler-lifecycle",
+              "testName": "matches debounce, throttle, batch, and teardown behavior",
+              "fullName": "differential: @octanejs/tanstack-pacer vs @tanstack/react-pacer matches debounce, throttle, batch, and teardown behavior"
+            },
+            {
+              "id": "differential:tanstack-pacer-latest-prop-and-value",
+              "testName": "matches latest-prop debounce/throttle and useDebouncedValue",
+              "fullName": "differential: @octanejs/tanstack-pacer vs @tanstack/react-pacer matches latest-prop debounce/throttle and useDebouncedValue"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-pacer/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "144866a0436ceafb1f8912236f795d22fe4ec50b99112cebd1c1d91dbfae2a01"
+        },
+        {
+          "path": "packages/tanstack-pacer/tests/_fixtures/pacer-diff.tsrx",
+          "role": "support",
+          "sha256": "d7b13248050f8200dabffbc7b7066660f35db65c0a5cb936243a4f825c2860f9"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
+        },
+        {
+          "path": "packages/tanstack-pacer/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "5b1cbeb30ea05ef50105ab689cb34e6f15f3c6eb305756ad5e1caac36916c13b"
+        },
+        {
+          "path": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
+          "role": "support",
+          "sha256": "5292360fa37631b4e0cd91ab6b256e9ecc29e07b8133a003d21393ddb8bbfcfc"
+        },
+        {
+          "path": "packages/tanstack-pacer/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "29cce0187ae4ffbe1698e560aa617ce22601c2280d74891d0b1e7b41ad1b580e"
+        },
+        {
+          "path": "packages/tanstack-pacer/scripts/check-upstream-ledger.mjs",
+          "role": "support",
+          "sha256": "cd0f7c45b0277f7fe35c576bff583e65823744f6c7e096b95b94105e3b4bdf77"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-pacer-controls.test.mjs",
+          "role": "support",
+          "sha256": "1ac38e344273a86774d7e8d1ffd765557b793b996b9a416a70738e0156293f62"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-pacer-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-pacer-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs upstream test:types (tsc over the vendored React adapter source) with pinned React types.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/tanstack-pacer/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-pacer/audit/upstream-types.json",
+          "role": "test",
+          "sha256": "170bb8a48d32e209c2a666d02af6b1c6341e573b4524b15a2543ca3ffd1ac910",
+          "cases": [
+            {
+              "id": "types:pristine-upstream",
+              "testName": "pinned upstream type suite",
+              "fullName": "pinned upstream type suite"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-pacer/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "d385a025c6c78aff7d83adf6550456a9646e3aef59a23486903de43bfb25d129"
+        },
+        {
+          "path": "packages/tanstack-pacer/audit/type-parity.json",
+          "role": "support",
+          "sha256": "ee49816da4a15a51320e8e70c3aab82863c67260992946f0932c848b613fa24d"
+        },
+        {
+          "path": "packages/tanstack-pacer/typetests/assertions.md",
+          "role": "support",
+          "sha256": "285bf3ebd690c64b0f02b156c07a0314da37c94ffd0622a9b0972911be3576bc"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-pacer-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-pacer-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles the complete Octane adapter source through tsrx-tsc (one-for-one with upstream test:types). Ordinary typetests/octane-only holds accept/reject setter probes outside required parity ownership.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-pacer/typetests/adapted/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-pacer/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "14731b2e220c1a33f2a2ca3d7cc2c9ad54dc47aed9eddef2a2c243804f02f488",
+          "cases": [
+            {
+              "id": "types:adapted-octane",
+              "testName": "adapted Octane type suite",
+              "fullName": "adapted Octane type suite"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-pacer/typetests/adapted/tsconfig.json",
+          "role": "support",
+          "sha256": "a8a63fc38c15b755f6b9cfd534032c30d9703fdab6cb4397e5a6565a8fdce3bc"
+        },
+        {
+          "path": "packages/tanstack-pacer/audit/type-parity.json",
+          "role": "support",
+          "sha256": "ee49816da4a15a51320e8e70c3aab82863c67260992946f0932c848b613fa24d"
+        },
+        {
+          "path": "packages/tanstack-pacer/typetests/assertions.md",
+          "role": "support",
+          "sha256": "285bf3ebd690c64b0f02b156c07a0314da37c94ffd0622a9b0972911be3576bc"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

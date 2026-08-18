@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "root": "packages/motion/upstream",
+  "snapshots": 0,
+  "tests": [
+    {
+      "file": "src/value/__tests__/use-motion-value.test.tsx",
+      "fullName": "useMotionValue accepts new motion values",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-motion-value.test.tsx",
+      "fullName": "useMotionValue can be set manually",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-motion-value.test.tsx",
+      "fullName": "useMotionValue fires callbacks",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-motion-value.test.tsx",
+      "fullName": "useMotionValue is typed",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-motion-value.test.tsx",
+      "fullName": "useMotionValue sets initial value",
+      "status": "passed"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "project": "inertia-adapted",
+  "roots": ["packages/inertia/tests/adapted"],
+  "files": ["packages/inertia/tests/adapted/use-page.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:60d9287fa91de952",
+      "file": "packages/inertia/tests/adapted/use-page.test.ts",
+      "fullName": "adapted usePage returns the current page from its provider"
+    },
+    {
+      "id": "runtime:d40bc5231be2fdc5",
+      "file": "packages/inertia/tests/adapted/use-page.test.ts",
+      "fullName": "adapted usePage throws when rendered outside the Inertia page context"
+    }
+  ]
+}

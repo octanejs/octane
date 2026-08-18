@@ -1,0 +1,349 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/airbnb/visx.git",
+    "version": "@visx/visx@4.0.0",
+    "commit": "78839796081beb0370fc928cc922b21908bbabaf",
+    "sourceRoot": "packages",
+    "testRoot": "packages",
+    "license": "MIT",
+    "integrity": "sha256:429a337f2a3c437d40707e59c5c7acf2b10db2e6b0e142f415b01a79ec7dae44",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/visx/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/visx/tests/differential", "packages/visx/tests/conformance"],
+      "include": [
+        "parity\\.test\\.ts$",
+        "wordcloud-parity\\.test\\.ts$",
+        "spring-parity\\.test\\.ts$"
+      ],
+      "exclude": ["setup\\.test\\.ts$"]
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "visx-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "visx-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Pie children/centroid ReactNode returns reject unknown Octane renderables under plain tsc against @visx/visx Shape.Pie. Paired with adapted probes under packages/visx/audit/type-parity.json; oracle React versions are pinned in packages/visx/audit/oracle-environment.json.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/visx/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/visx/typetests/pristine/types.test-d.ts",
+          "role": "test",
+          "sha256": "d00c6f324eab6c18b1722051cf04c99c31339714c7707bdc04ea39445ef04d0c",
+          "cases": [
+            {
+              "id": "types:pristine-reactnode",
+              "testName": "Pie ReactNode returns reject Octane renderables",
+              "fullName": "Pie ReactNode returns reject Octane renderables"
+            }
+          ]
+        },
+        {
+          "path": "packages/visx/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "cb82e03159b832dd6a70589b26cd2a47d7361981f4b9ff8e7550692c2896b46c"
+        },
+        {
+          "path": "packages/visx/typetests/assertions.md",
+          "role": "support",
+          "sha256": "65cdd24e7832ee0d1b1d02df7a8dc04ae3903e6b328ac44a565a707d73c9c141"
+        },
+        {
+          "path": "packages/visx/audit/oracle-environment.json",
+          "role": "support",
+          "sha256": "80c1d46b25a5e7950e4ed848ccabacebd29592fa86e4784f89b56a4daaa52f42"
+        },
+        {
+          "path": "packages/visx/audit/type-parity.json",
+          "role": "support",
+          "sha256": "b00b721969f655109a81e04c4ebd83700a916b3c5f8e68c9f1e989760d2c0f5e"
+        },
+        {
+          "path": "packages/visx/audit/pristine-types.json",
+          "role": "support",
+          "sha256": "45a4ec77976979684ffa103148c53b1aafeec01d8d5b64e7be02382ce81303db"
+        },
+        {
+          "path": "packages/visx/audit/adapted-types.json",
+          "role": "support",
+          "sha256": "bc4ebfdc2d17c21dbf177bbd7beb7dc6a0645acd3ddefde57cf1773e6230d4f3"
+        },
+        {
+          "path": "scripts/react-parity/visx-types-lib.mjs",
+          "role": "support",
+          "sha256": "81ce68b746a4d516c8e1c2d3e9072f0ebbd910c297de09996ee28cf14b6f94ed"
+        },
+        {
+          "path": "scripts/react-parity/visx-types-lib.test.mjs",
+          "role": "support",
+          "sha256": "e367b50ac84aecd26127673e92d77ca214b36b1095da5e34c0c614e6657beb6f"
+        }
+      ]
+    },
+    {
+      "id": "visx-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "visx-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Matching Pie OctaneNode returns accept unknown Octane renderables under tsrx-tsc against PieProps from @octanejs/visx/shape. Mechanical assertion inventory and permitted transforms live in packages/visx/audit/type-parity.json.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/visx/typetests/adapted/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/visx/typetests/adapted/types.test-d.ts",
+          "role": "test",
+          "sha256": "f359616f6752849da18e54bb0493701b4fd6711e66b3cc4183228d9a24170d24",
+          "cases": [
+            {
+              "id": "types:adapted-reactnode",
+              "testName": "Pie OctaneNode returns accept Octane renderables",
+              "fullName": "Pie OctaneNode returns accept Octane renderables"
+            }
+          ]
+        },
+        {
+          "path": "packages/visx/typetests/adapted/tsconfig.json",
+          "role": "support",
+          "sha256": "c9d3b697ce9c3f73b379213a6ba19cfe859fd14d240e262ba87c9d2a54e55cbe"
+        },
+        {
+          "path": "packages/visx/typetests/assertions.md",
+          "role": "support",
+          "sha256": "65cdd24e7832ee0d1b1d02df7a8dc04ae3903e6b328ac44a565a707d73c9c141"
+        },
+        {
+          "path": "packages/visx/audit/oracle-environment.json",
+          "role": "support",
+          "sha256": "80c1d46b25a5e7950e4ed848ccabacebd29592fa86e4784f89b56a4daaa52f42"
+        },
+        {
+          "path": "packages/visx/audit/type-parity.json",
+          "role": "support",
+          "sha256": "b00b721969f655109a81e04c4ebd83700a916b3c5f8e68c9f1e989760d2c0f5e"
+        },
+        {
+          "path": "packages/visx/audit/pristine-types.json",
+          "role": "support",
+          "sha256": "45a4ec77976979684ffa103148c53b1aafeec01d8d5b64e7be02382ce81303db"
+        },
+        {
+          "path": "packages/visx/audit/adapted-types.json",
+          "role": "support",
+          "sha256": "bc4ebfdc2d17c21dbf177bbd7beb7dc6a0645acd3ddefde57cf1773e6230d4f3"
+        },
+        {
+          "path": "scripts/react-parity/visx-types-lib.mjs",
+          "role": "support",
+          "sha256": "81ce68b746a4d516c8e1c2d3e9072f0ebbd910c297de09996ee28cf14b6f94ed"
+        },
+        {
+          "path": "scripts/react-parity/visx-types-lib.test.mjs",
+          "role": "support",
+          "sha256": "e367b50ac84aecd26127673e92d77ca214b36b1095da5e34c0c614e6657beb6f"
+        }
+      ]
+    },
+    {
+      "id": "visx-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "visx-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs exact primitive SVG, render-prop layout, interactive state, Brush controller, and Zoom native-gesture scenarios against @visx/visx@4.0.0 using the React oracle versions pinned in packages/visx/audit/oracle-environment.json.",
+      "files": [
+        {
+          "path": "packages/visx/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "a52462fe3a4a2bdb2daf28eee60235e459196a94f91be01a121453f766814d84",
+          "cases": [
+            {
+              "id": "differential:visx-primitives",
+              "testName": "matches scale, grid, gradient, axis, glyph, bar, and line SVG",
+              "fullName": "@octanejs/visx React differential matches scale, grid, gradient, axis, glyph, bar, and line SVG"
+            },
+            {
+              "id": "differential:visx-layout",
+              "testName": "matches render-prop pie layout and path generation",
+              "fullName": "@octanejs/visx React differential matches render-prop pie layout and path generation"
+            },
+            {
+              "id": "differential:visx-interaction",
+              "testName": "matches state updates while Octane delivers a native click event",
+              "fullName": "@octanejs/visx React differential matches state updates while Octane delivers a native click event"
+            },
+            {
+              "id": "differential:visx-functional-controllers",
+              "testName": "matches functional Brush selection without class-instance controller refs",
+              "fullName": "@octanejs/visx React differential matches functional Brush selection without class-instance controller refs"
+            },
+            {
+              "id": "differential:visx-native-gestures",
+              "testName": "matches Zoom native wheel and pointer gesture listeners",
+              "fullName": "@octanejs/visx React differential matches Zoom native wheel and pointer gesture listeners"
+            }
+          ]
+        },
+        {
+          "path": "packages/visx/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "43fb2a21e8d50f998a38684bd7711059dbcfc9f3ed291337f7e8d12a309f5be0"
+        },
+        {
+          "path": "packages/visx/tests/differential/fixture-compiler.ts",
+          "role": "support",
+          "sha256": "af1785adbd89da07cd17342526dfe87e6ebff26a406ca51207a56144661a4c87"
+        },
+        {
+          "path": "packages/visx/tests/_fixtures/differential.tsrx",
+          "role": "support",
+          "sha256": "bd9d2c727852f5a0059e51575ec665471fc0f5962a9256955b3804c9bed5b0ed"
+        },
+        {
+          "path": "packages/visx/audit/oracle-environment.json",
+          "role": "support",
+          "sha256": "80c1d46b25a5e7950e4ed848ccabacebd29592fa86e4784f89b56a4daaa52f42"
+        }
+      ]
+    }
+  ],
+  "ordinaryEvidence": [
+    {
+      "path": "packages/visx/tests/conformance/wordcloud-parity.test.ts",
+      "sha256": "e103a92cf87b8db7d2de6fb2aa1cb03d7804cec2bba82c2b8b42adb1c118e4dd",
+      "cases": [
+        {
+          "id": "adapted:visx-deterministic-measurement",
+          "testName": "places estimated rotated glyph rectangles within bounds without overlap",
+          "fullName": "@octanejs/visx deterministic wordcloud layout places estimated rotated glyph rectangles within bounds without overlap"
+        }
+      ]
+    },
+    {
+      "path": "packages/visx/tests/conformance/spring-parity.test.ts",
+      "sha256": "35014edb40c6fd289d0680411489e0ce6f925f2c4af4f7910142f5a74ed95e32",
+      "cases": [
+        {
+          "id": "adapted:visx-react-spring-raf",
+          "testName": "interpolates numeric spring targets on a fixed 250ms RAF timeline",
+          "fullName": "@octanejs/visx react-spring RAF interpolator interpolates numeric spring targets on a fixed 250ms RAF timeline"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "visx-native-dom-events",
+      "caseIds": ["differential:visx-interaction"],
+      "upstreamResult": "Interaction callbacks receive React synthetic events.",
+      "octaneResult": "Interaction callbacks receive native DOM events through Octane's delegated event system.",
+      "rationale": "Octane uses native delegated events and does not ship a synthetic event layer.",
+      "classification": "event-model",
+      "consumerImpact": "Handlers observe native event shapes (no React SyntheticEvent wrapper) while public Visx callback contracts stay the same.",
+      "migrationGuidance": "Read native event fields directly; do not rely on SyntheticEvent helpers such as nativeEvent indirection.",
+      "owner": "@octanejs/visx",
+      "reviewCondition": "Review if Octane adds a React-compatible synthetic event layer."
+    },
+    {
+      "id": "visx-functional-controllers-no-class-refs",
+      "caseIds": ["differential:visx-functional-controllers"],
+      "upstreamResult": "Several Visx controllers are React class components and Brush exposes a legacy class-instance innerRef handle.",
+      "octaneResult": "Controllers are native functional TSRX hooks, and Brush intentionally omits upstream's legacy innerRef instance handle.",
+      "rationale": "Octane has no class components and uses refs-as-props rather than class-instance handles.",
+      "classification": "ref-model",
+      "consumerImpact": "Code that inspects Brush via innerRef class methods must use the public callback/props surface instead.",
+      "migrationGuidance": "Drop Brush innerRef usage and drive brush state through the documented Visx props and callbacks.",
+      "owner": "@octanejs/visx",
+      "reviewCondition": "Review if Octane adds class-component or class-instance ref compatibility."
+    },
+    {
+      "id": "visx-native-zoom-gestures",
+      "caseIds": ["differential:visx-native-gestures"],
+      "upstreamResult": "Zoom uses @use-gesture/react listeners for wheel, pointer, and touch interaction.",
+      "octaneResult": "Zoom attaches native wheel/pointer/touch listeners rather than @use-gesture/react at runtime.",
+      "rationale": "Octane avoids the React-only @use-gesture/react runtime while preserving public Zoom props and exports; Zoom imports framework-neutral @use-gesture/core types only.",
+      "classification": "runtime-adapter",
+      "consumerImpact": "Gesture delivery can differ from React Visx even when Zoom props and exported APIs match.",
+      "migrationGuidance": "Assert final Zoom transform state rather than @use-gesture/react internals.",
+      "owner": "@octanejs/visx",
+      "reviewCondition": "Review if Octane ports @use-gesture/react with matching runtime semantics."
+    },
+    {
+      "id": "visx-deterministic-measurement",
+      "caseIds": ["adapted:visx-deterministic-measurement"],
+      "upstreamResult": "Text metrics, annotation bounds, SplitLinePath sampling, and wordcloud packing depend on browser measurement/canvas paths and d3-cloud.",
+      "octaneResult": "Deterministic text metrics and annotation bounds, pure SplitLinePath SVG sampling, and collision-aware estimated wordcloud rectangles replace browser-only measurement/canvas paths.",
+      "rationale": "Fixed-size SSR and first hydration must match without browser layout or canvas measurement.",
+      "classification": "ssr-determinism",
+      "consumerImpact": "Font-specific wrapping, browser-specific path length rounding, and pixel-exact d3-cloud packing can differ from React Visx in the browser.",
+      "migrationGuidance": "Treat fixed-size SSR/hydration snapshots as the contract; do not assert browser-specific glyph packing pixels.",
+      "owner": "@octanejs/visx",
+      "reviewCondition": "Review if Octane gains browser-faithful measurement APIs suitable for SSR parity."
+    },
+    {
+      "id": "visx-react-spring-raf-interpolation",
+      "caseIds": ["adapted:visx-react-spring-raf"],
+      "upstreamResult": "The react-spring entry point uses spring-physics timing for animated axes and related transitions.",
+      "octaneResult": "The react-spring entry point uses a deterministic requestAnimationFrame numeric interpolator on a fixed 250ms timeline rather than spring-physics timing.",
+      "rationale": "Octane avoids the React-only @react-spring/web runtime while preserving public Visx react-spring props and exports.",
+      "classification": "runtime-adapter",
+      "consumerImpact": "Animation frame timing can differ from React Visx even when AnimatedAxis props and exported APIs match.",
+      "migrationGuidance": "Assert intermediate RAF-interpolated values or final animated axis/output state rather than spring-physics frame timing.",
+      "owner": "@octanejs/visx",
+      "reviewCondition": "Review if Octane ports react-spring with matching spring-physics timing."
+    },
+    {
+      "id": "visx-reactnode-to-octane-renderables",
+      "caseIds": ["types:pristine-reactnode", "types:adapted-reactnode"],
+      "upstreamResult": "Child and render-prop positions are typed as React.ReactNode.",
+      "octaneResult": "Those positions accept Octane renderables (OctaneNode = unknown); render-prop parameters are unchanged and return Octane renderables.",
+      "rationale": "Octane elements are nominal, so ReactNode-typed props would reject them.",
+      "classification": "type-model",
+      "consumerImpact": "TypeScript consumers must use Octane renderable types rather than React.ReactNode for Visx children/render props.",
+      "migrationGuidance": "Replace React.ReactNode annotations with OctaneNode/unknown at Visx child and render-prop sites.",
+      "owner": "@octanejs/visx",
+      "reviewCondition": "Review if Octane exposes a ReactNode-compatible public renderable alias."
+    }
+  ]
+}

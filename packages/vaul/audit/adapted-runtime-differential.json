@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "vaul-differential",
+  "roots": ["packages/vaul/tests"],
+  "files": ["packages/vaul/tests/differential/react-oracle.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:a739226076100d42",
+      "file": "packages/vaul/tests/differential/react-oracle.test.ts",
+      "fullName": "vaul v1.1.2 React oracle matches React drawer semantics after opening"
+    }
+  ]
+}

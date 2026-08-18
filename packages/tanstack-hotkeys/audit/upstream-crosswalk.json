@@ -1,0 +1,322 @@
+{
+  "schemaVersion": 1,
+  "publicEntrypoints": [
+    {
+      "path": ".",
+      "disposition": "surface-present",
+      "evidence": "All 22 adapter exports are mapped export-by-export; the 41-case upstream runtime suite runs pristine and adapted."
+    },
+    {
+      "path": "./package.json",
+      "disposition": "metadata-only",
+      "evidence": "Published metadata entrypoint; not a runtime adapter contract."
+    }
+  ],
+  "adapterExports": [
+    {
+      "id": "export:HotkeysProvider",
+      "name": "HotkeysProvider",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/HotkeysProvider.tsx",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public HotkeysProvider contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/_fixtures/hotkeys.tsrx"
+    },
+    {
+      "id": "export:HotkeysProviderOptions",
+      "name": "HotkeysProviderOptions",
+      "kind": "type",
+      "source": {
+        "path": "packages/react-hotkeys/src/HotkeysProvider.tsx",
+        "line": 1
+      },
+      "classification": "type-package",
+      "reason": "Pinned public type export \"HotkeysProviderOptions\" is part of the adapter surface and covered by the Octane type suite.",
+      "evidenceTarget": "packages/tanstack-hotkeys/typetests/exports.test-d.ts"
+    },
+    {
+      "id": "export:HotkeysProviderProps",
+      "name": "HotkeysProviderProps",
+      "kind": "type",
+      "source": {
+        "path": "packages/react-hotkeys/src/HotkeysProvider.tsx",
+        "line": 1
+      },
+      "classification": "type-package",
+      "reason": "Pinned public type export \"HotkeysProviderProps\" is part of the adapter surface and covered by the Octane type suite.",
+      "evidenceTarget": "packages/tanstack-hotkeys/typetests/exports.test-d.ts"
+    },
+    {
+      "id": "export:HotkeyRegistrationsResult",
+      "name": "HotkeyRegistrationsResult",
+      "kind": "type",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkeyRegistrations.ts",
+        "line": 1
+      },
+      "classification": "type-package",
+      "reason": "Pinned public type export \"HotkeyRegistrationsResult\" is part of the adapter surface and covered by the Octane type suite.",
+      "evidenceTarget": "packages/tanstack-hotkeys/typetests/exports.test-d.ts"
+    },
+    {
+      "id": "export:ReactHotkeyRecorder",
+      "name": "ReactHotkeyRecorder",
+      "kind": "type",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkeyRecorder.ts",
+        "line": 1
+      },
+      "classification": "type-package",
+      "reason": "Pinned public type export \"ReactHotkeyRecorder\" is part of the adapter surface and covered by the Octane type suite.",
+      "evidenceTarget": "packages/tanstack-hotkeys/typetests/exports.test-d.ts"
+    },
+    {
+      "id": "export:ReactHotkeySequenceRecorder",
+      "name": "ReactHotkeySequenceRecorder",
+      "kind": "type",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkeySequenceRecorder.ts",
+        "line": 1
+      },
+      "classification": "type-package",
+      "reason": "Pinned public type export \"ReactHotkeySequenceRecorder\" is part of the adapter surface and covered by the Octane type suite.",
+      "evidenceTarget": "packages/tanstack-hotkeys/typetests/exports.test-d.ts"
+    },
+    {
+      "id": "export:UseHotkeyDefinition",
+      "name": "UseHotkeyDefinition",
+      "kind": "type",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkeys.ts",
+        "line": 1
+      },
+      "classification": "type-package",
+      "reason": "Pinned public type export \"UseHotkeyDefinition\" is part of the adapter surface and covered by the Octane type suite.",
+      "evidenceTarget": "packages/tanstack-hotkeys/typetests/exports.test-d.ts"
+    },
+    {
+      "id": "export:UseHotkeyOptions",
+      "name": "UseHotkeyOptions",
+      "kind": "type",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkey.ts",
+        "line": 1
+      },
+      "classification": "type-package",
+      "reason": "Pinned public type export \"UseHotkeyOptions\" is part of the adapter surface and covered by the Octane type suite.",
+      "evidenceTarget": "packages/tanstack-hotkeys/typetests/exports.test-d.ts"
+    },
+    {
+      "id": "export:UseHotkeySequenceDefinition",
+      "name": "UseHotkeySequenceDefinition",
+      "kind": "type",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkeySequences.ts",
+        "line": 1
+      },
+      "classification": "type-package",
+      "reason": "Pinned public type export \"UseHotkeySequenceDefinition\" is part of the adapter surface and covered by the Octane type suite.",
+      "evidenceTarget": "packages/tanstack-hotkeys/typetests/exports.test-d.ts"
+    },
+    {
+      "id": "export:UseHotkeySequenceOptions",
+      "name": "UseHotkeySequenceOptions",
+      "kind": "type",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkeySequence.ts",
+        "line": 1
+      },
+      "classification": "type-package",
+      "reason": "Pinned public type export \"UseHotkeySequenceOptions\" is part of the adapter surface and covered by the Octane type suite.",
+      "evidenceTarget": "packages/tanstack-hotkeys/typetests/exports.test-d.ts"
+    },
+    {
+      "id": "export:useDefaultHotkeysOptions",
+      "name": "useDefaultHotkeysOptions",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/HotkeysProvider.tsx",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public useDefaultHotkeysOptions contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/_fixtures/hotkeys.tsrx"
+    },
+    {
+      "id": "export:useHeldKeyCodes",
+      "name": "useHeldKeyCodes",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHeldKeyCodes.ts",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public useHeldKeyCodes contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/_fixtures/hotkeys.tsrx"
+    },
+    {
+      "id": "export:useHeldKeys",
+      "name": "useHeldKeys",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHeldKeys.ts",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public useHeldKeys contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/_fixtures/hotkeys.tsrx"
+    },
+    {
+      "id": "export:useHotkey",
+      "name": "useHotkey",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkey.ts",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public useHotkey contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/upstream/useHotkey.test.ts"
+    },
+    {
+      "id": "export:useHotkeyRecorder",
+      "name": "useHotkeyRecorder",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkeyRecorder.ts",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public useHotkeyRecorder contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/_fixtures/hotkeys.tsrx"
+    },
+    {
+      "id": "export:useHotkeyRegistrations",
+      "name": "useHotkeyRegistrations",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkeyRegistrations.ts",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public useHotkeyRegistrations contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/upstream/useHotkeyRegistrations.test.ts"
+    },
+    {
+      "id": "export:useHotkeySequence",
+      "name": "useHotkeySequence",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkeySequence.ts",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public useHotkeySequence contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/_fixtures/hotkeys.tsrx"
+    },
+    {
+      "id": "export:useHotkeySequenceRecorder",
+      "name": "useHotkeySequenceRecorder",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkeySequenceRecorder.ts",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public useHotkeySequenceRecorder contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/_fixtures/hotkeys.tsrx"
+    },
+    {
+      "id": "export:useHotkeySequences",
+      "name": "useHotkeySequences",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkeySequences.ts",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public useHotkeySequences contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/upstream/useHotkeySequences.test.ts"
+    },
+    {
+      "id": "export:useHotkeys",
+      "name": "useHotkeys",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/useHotkeys.ts",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public useHotkeys contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/upstream/useHotkeys.test.ts"
+    },
+    {
+      "id": "export:useHotkeysContext",
+      "name": "useHotkeysContext",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/HotkeysProvider.tsx",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public useHotkeysContext contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/_fixtures/hotkeys.tsrx"
+    },
+    {
+      "id": "export:useKeyHold",
+      "name": "useKeyHold",
+      "kind": "value",
+      "source": {
+        "path": "packages/react-hotkeys/src/useKeyHold.ts",
+        "line": 1
+      },
+      "classification": "behavioral",
+      "reason": "Octane provides the same public useKeyHold contract; adapted upstream or local evidence exercises it.",
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/_fixtures/hotkeys.tsrx"
+    }
+  ],
+  "coreReexport": {
+    "package": "@tanstack/hotkeys",
+    "version": "0.8.0",
+    "disposition": "reused-byte-identically"
+  },
+  "upstreamTests": [
+    {
+      "path": "packages/react-hotkeys/tests/useHotkey.test.tsx",
+      "cases": 9,
+      "disposition": "adapted",
+      "pristineEvidence": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
+      "adaptedEvidence": "packages/tanstack-hotkeys/tests/upstream/useHotkey.test.ts"
+    },
+    {
+      "path": "packages/react-hotkeys/tests/useHotkeyRegistrations.test.tsx",
+      "cases": 10,
+      "disposition": "adapted",
+      "pristineEvidence": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
+      "adaptedEvidence": "packages/tanstack-hotkeys/tests/upstream/useHotkeyRegistrations.test.ts"
+    },
+    {
+      "path": "packages/react-hotkeys/tests/useHotkeySequences.test.tsx",
+      "cases": 11,
+      "disposition": "adapted",
+      "pristineEvidence": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
+      "adaptedEvidence": "packages/tanstack-hotkeys/tests/upstream/useHotkeySequences.test.ts"
+    },
+    {
+      "path": "packages/react-hotkeys/tests/useHotkeys.test.tsx",
+      "cases": 11,
+      "disposition": "adapted",
+      "pristineEvidence": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
+      "adaptedEvidence": "packages/tanstack-hotkeys/tests/upstream/useHotkeys.test.ts"
+    }
+  ],
+  "typeSuite": {
+    "disposition": "present",
+    "pristineEvidence": "packages/tanstack-hotkeys/typetests/pristine/tsconfig.json",
+    "adaptedEvidence": "packages/tanstack-hotkeys/typetests/tsconfig.json",
+    "reason": "Pinned upstream test:types (tsc over package source) runs pristine; Octane typetests compile the adapted surface including the plain target-ref divergence."
+  }
+}

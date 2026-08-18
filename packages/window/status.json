@@ -1,9 +1,6 @@
 {
-  "upstream": {
-    "package": "react-window",
-    "version": "2.3.0"
-  },
-  "surface": "Provisional port of the react-window 2.3.0 root surface: List, Grid, getScrollbarSize, useDynamicRowHeight, four imperative-ref hooks, and all eight public types. Adapted runtime, differential, SSR, hydration, browser, and public type tests cover the supported behavior.",
+  "upstream": { "package": "react-window", "version": "2.3.0" },
+  "surface": "Provisional complete exact port of the react-window 2.3.0 root surface: List, Grid, getScrollbarSize, useDynamicRowHeight, four imperative-ref hooks, and all eight public types. The byte-locked pristine React suite and generated Octane adaptation each execute all 14 upstream files and all 117 cases; shared differential, SSR, hydration, and assertion-level public type lanes are required by the React parity manifest. Final Chromium/Firefox browser and executable CommonJS package-condition evidence remain pending shared infrastructure PRs #548 and #550.",
   "divergences": [
     "Octane reserves the second raw function-component invocation argument for its internal block ABI; public props and rendered behavior match, so instrumentation should not assert React's undocumented undefined second argument.",
     "Keyed state and DOM identity are preserved, but sibling effect-log order and equal-prop rerender counts may differ after reordering because Octane schedules moved blocks and memoizes unchanged children differently."
@@ -14,5 +11,6 @@
     "Browser U5 evidence is blocked on draft PR #548; executable require() parity is blocked on draft PR #550. This binding must remain draft and provisional until those shared runners merge and the branch consumes them."
   ],
   "verified": "2026-08-03",
+  "parityEvidence": "packages/window/audit/react-parity.json",
   "docs": ["docs/plans/2026-08-03-001-feat-react-window-binding-plan.md"]
 }

@@ -153,6 +153,20 @@ stateDiagram-v2
 
 ### U1. Pin and inventory the upstream release
 
+- **Goal:** Establish an immutable, legally distributable, fail-closed work list before porting behavior.
+- **Requirements:** R1-R4, R12-R13; KTD1, KTD7.
+- **Dependencies:** None.
+- **Files:** `packages/draggable/upstream/**`, `packages/draggable/UPSTREAM.md`, `packages/draggable/LICENSE`, `packages/draggable/audit/**`, `packages/draggable/tests/audit/**`, `packages/draggable/package.json`.
+- **Approach:** Vendor the tagged `lib/`, `test/`, declarations, fixtures, package metadata, and license byte-exact; record npm and Git coordinates; inventory exports, files, 204 unit/type identities, 23 browser identities, and allowed transformations; keep vendored evidence out of published files.
+- **Execution note:** Establish mutation controls before adapted source so later green tests cannot redefine the work list.
+- **Patterns to follow:** `packages/three/UPSTREAM.md`, `scripts/react-parity/`, and exact-port audit manifests present on current main.
+- **Test scenarios:**
+  - The pristine pinned tree passes file, byte, license, package-condition, export, test-case, and type-assertion inventories.
+  - Removing or renaming one source file, runtime export, unit case, browser case, or type assertion fails with the missing identity.
+  - Mapping two upstream cases to one adapted case or altering a fixture beyond the permitted transform ledger fails validation.
+  - Adding an unapproved public export, source subpath, skipped marker, or stale hash fails validation.
+- **Verification:** Immutable coordinates reproduce the vendored tree, every upstream identity has exactly one disposition, and each mutation control demonstrably fails.
+
 ### U2. Prove the Octane framework seams
 
 - **Goal:** Prove the highest-risk React-to-Octane boundaries before broad transcription.
@@ -207,6 +221,21 @@ stateDiagram-v2
 
 ### U5. Execute SSR, hydration, and real-browser parity
 
+- **Goal:** Prove rendering and native interaction contracts that unit tests cannot establish.
+- **Requirements:** R5-R13; KTD4-KTD7; AE1-AE4.
+- **Dependencies:** U4 and the shared Firefox runner before the final completeness claim.
+- **Files:** `packages/draggable/tests/ssr/**`, `packages/draggable/tests/hydration/**`, `packages/draggable/tests/browser/**`, `packages/draggable/audit/react-parity.json`, `vitest.config.js`.
+- **Approach:** Register non-overlapping pristine, adapted, differential, SSR, hydration, and browser projects in the generic parity group; run paired React/Octane Chromium and Firefox journeys with real geometry, mouse/touch input, owner documents, Shadow DOM, SVG, focus, and teardown.
+- **Patterns to follow:** `docs/react-parity-testing.md`, current-main parity manifests, `packages/dnd-kit/tests/browser/`, and `packages/dnd-kit/tests/hydration/`; revalidate any draft-PR precedent only after its exact head is consumed.
+- **Test scenarios:**
+  - Covers AE4. HTML and SVG children SSR deterministically, hydrate by node adoption, become interactive, and switch to the pinned post-mount transform form without warnings.
+  - Real mouse and touch journeys cover controlled/uncontrolled transitions, axis, object/parent/selector/negative bounds, grid, scale, nested handles/cancel, scroll, input focus, mixed or overlapping input characterization, callback-driven unmount, and unmount during drag.
+  - Iframe and ShadowRoot cases attach listeners and query selectors in the correct root; movement outside the source element still completes.
+  - Native touch events in supported real browser engines prove passive-listener registration and `allowMobileScroll` default-prevention behavior; this is browser-platform parity, not a physical-device or mobile-WebKit claim. User-select style/body state follows every pinned terminal disposition.
+  - A pinned callback, layout, or selector error during an active gesture reproduces React's thrown value and retained-resource disposition; subsequent accepted stop or same-node unmount follows the pinned cleanup behavior, while ref/document replacement preserves the pinned target behavior.
+  - The required-lane runner reports every declared identity exactly once, and the ordinary sharded configuration excludes only parity-owned work.
+- **Verification:** Pristine/adapted suites, SSR/hydration, and both real browser engines pass on the exact head; jsdom results are not used to claim browser-only behavior.
+
 ### U6. Integrate, pack, document, and release the binding
 
 - **Goal:** Make the binding discoverable and consumable through every supported Octane migration and release surface.
@@ -235,6 +264,7 @@ stateDiagram-v2
 | Package runtime and types | Pristine React, adapted Octane, differential, package-authored conformance, and paired type programs | U3-U4, R2-R12 |
 | SSR and hydration | Server-only execution, deterministic markup, node adoption, post-hydration input, SVG transition, and cleanup | U5, R5, R9, R11-R13 |
 | Browser parity | Chromium and Firefox mouse/touch/layout/iframe/Shadow DOM/focus/SVG/user-select journeys | U5, R5-R13 |
+| Generic parity harness | `pnpm react-parity:check`, manifest validation, exact identity execution, and local/sharded ownership checks | U1-U5, R4, R12-R13 |
 | Repository quality | Package tests, `pnpm sync`, scoped and repository formatting, typecheck, marker checks, and workflow regression tests | U6, R13-R14 |
 | Release consumer | Package-pack gate plus outside-workspace ESM/type/client/server/SSR/hydration/browser consumer; CommonJS after the shared prerequisite | U6, R14, AE5 |
 | Review and PR state | Independent review, resolved current-head feedback, terminal draft-available CI, mergeability/base freshness, and draft retained | U6, KTD2 |

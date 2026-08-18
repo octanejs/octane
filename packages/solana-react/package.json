@@ -36,8 +36,11 @@
     "./query": "./src/query.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project solana-react --project solana-react-adapted",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
+    "test": "vitest run --root ../.. --project solana-react --project solana-react-adapted --project solana-react-pristine",
+    "test:upstream": "node scripts/run-pristine-upstream.mjs",
+    "test:type-parity": "node ../../scripts/react-parity/solana-react-types.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json && tsc --noEmit -p audit/upstream-typetests/tsconfig.json",
+    "upstream:verify": "node scripts/verify-upstream.mjs"
   },
   "dependencies": {
     "@solana/kit": "7.0.0",

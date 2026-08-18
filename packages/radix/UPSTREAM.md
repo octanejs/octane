@@ -30,6 +30,10 @@ stays `recorded-unverified`. Vendoring alone is not behavioral evidence.
 
 ## Root export crosswalk
 
+`packages/radix/audit/export-crosswalk.json` (enforced by
+`packages/radix/scripts/check-upstream-ledger.mjs`) maps every unified `radix-ui` root export to its
+Octane binding, disposition, and evidence. Notable root-surface differences:
+
 | Upstream export | Octane mapping | Disposition |
 | --- | --- | --- |
 | `unstable_OneTimePasswordField` | `OneTimePasswordField` | ported-renamed |
@@ -46,8 +50,9 @@ Octane also exposes composition substrates that are not unified root exports (`A
   pinned real `radix-ui` package (byte-identical DOM).
 - Type lanes: repo-authored pristine `tsc` and adapted `tsrx-tsc` root-export smokes (not a
   one-for-one upstream type suite).
-- Repo-authored contracts authenticate the vendored boundary and keep the Slot descriptor /
-  ref-as-prop adaptations explicit; they are not an adapted upstream runtime suite.
+- Ordinary audit contracts: authenticate the vendored boundary and keep the Slot descriptor /
+  ref-as-prop adaptations explicit. Those contracts are repo-authored ledger evidence, not an
+  adapted upstream runtime suite.
 
 The other local tests are Octane framework contracts. They cover additional component behavior but
 are not counted as React parity. The differential suite is bounded jsdom evidence, not exhaustive

@@ -38,7 +38,10 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project draggable --project draggable-ssr --project draggable-hydration --project draggable-differential"
+    "test": "vitest run --root ../.. --project draggable --project draggable-ssr --project draggable-hydration --project draggable-differential --project draggable-pristine",
+    "upstream:verify": "node audit/upstream-inventory.mjs",
+    "test:audit": "node --test tests/audit/upstream-inventory.test.mjs",
+    "test:pristine": "node scripts/run-pristine-upstream.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1"

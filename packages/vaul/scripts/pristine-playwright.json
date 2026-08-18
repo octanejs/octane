@@ -1,0 +1,12 @@
+{
+  "mode": "vaul-next",
+  "packageName": "vaul",
+  "packageVersion": "1.1.2",
+  "dependencyWorkspace": "scripts/react-parity/fixtures/vaul",
+  "dependencySource": {
+    "manifest": "packages/vaul/upstream/test/package.json",
+    "lockfile": "packages/vaul/upstream/pnpm-lock.yaml",
+    "importer": "test",
+    "omit": ["eslint", "eslint-config-next"]
+  }
+}

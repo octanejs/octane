@@ -1,4 +1,4 @@
-# @monaco-editor/react upstream provenance
+# Upstream @monaco-editor/react audit
 
 This port targets `@monaco-editor/react@4.7.0` at git commit
 `eb120e66378471315620fe5339b73ba003f199ad` (recorded in `upstream/COMMIT`).
@@ -9,6 +9,27 @@ This port targets `@monaco-editor/react@4.7.0` at git commit
 - loader: `@monaco-editor/loader@1.7.0` (framework-neutral; imported, not vendored)
 - monaco oracle: `monaco-editor@0.55.1` (catalog / Echo validation pin)
 - license: MIT, Copyright (c) 2018 Suren Atoyan
+
+## Audit artifacts
+
+React-parity evidence lives under `audit/` and is regenerated with:
+
+```bash
+pnpm --filter @octanejs/monaco-editor parity:generate
+```
+
+| File | Role |
+| --- | --- |
+| `audit/react-parity.json` | Bounded parity manifest (lanes, divergences, integrity) |
+| `audit/adapted-runtime.json` | Adapted upstream case inventory |
+| `audit/pristine-runtime.json` | Six vendored upstream RTL spec identities |
+| `audit/pristine-wrapper-runtime.json` | Wrapper identity for `tests/upstream-original.test.ts` |
+| `audit/differential-runtime.json` | React/Octane differential case inventory |
+| `audit/pristine-types.json` / `audit/adapted-types.json` | Per-group type assertion inventories |
+| `audit/type-transformations.json` | Permitted type-lane transforms ledger |
+| `audit/test-classifications.json` | Disposition for every test and typetest file |
+
+Pristine runtime specs run against **React 19.2.7** via `tests/upstream-pristine.vitest.config.ts` and `scripts/run-pristine-upstream.mjs`.
 
 ## Immutable React oracle
 

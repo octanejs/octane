@@ -1,0 +1,277 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/Andarist/react-textarea-autosize.git",
+    "version": "8.5.9",
+    "commit": "ed1894cd8611d99fbea1c47adcf6ee522b1030fd",
+    "sourceRoot": "packages/textarea-autosize/upstream/src",
+    "testRoot": "packages/textarea-autosize/upstream/src/__tests__",
+    "license": "MIT",
+    "integrity": "sha256:648a3eae6d4a8708e215b7272907ba018b5f77430acbb568a2c5aebd238ce945",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "insufficient"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/textarea-autosize/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/textarea-autosize/tests/upstream"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 2,
+    "uniqueIdentities": 2,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "react-textarea-autosize-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-textarea-autosize-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs every byte-exact upstream Jest case and snapshot against the pinned React implementation.",
+      "execution": {
+        "kind": "jest-full",
+        "config": "packages/textarea-autosize/jest.pristine.config.cjs",
+        "root": "packages/textarea-autosize",
+        "inventory": "packages/textarea-autosize/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/textarea-autosize/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "b1bc82c648268b29f28f98fcd762d953862bf77fba80607f5f60845af8494711"
+        },
+        {
+          "path": "packages/textarea-autosize/jest.pristine.config.cjs",
+          "role": "support",
+          "sha256": "02d7e02ae4280fc053158e219e116cf27ffc5ceef07a8530a11d0f7e26e026d8"
+        }
+      ]
+    },
+    {
+      "id": "react-textarea-autosize-adapted-full-suite",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "textarea-autosize",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the two case-for-case Octane adaptations of the pinned upstream suite.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/textarea-autosize/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/textarea-autosize/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "12631a7df7fd5a30272c268a8091ff3e15673cb01e4b0ed9215ebb4b0f455165"
+        }
+      ]
+    },
+    {
+      "id": "react-textarea-autosize-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "textarea-autosize-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compares React and Octane measurement and native edit ordering in one deterministic environment.",
+      "files": [
+        {
+          "path": "packages/textarea-autosize/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "70a0dc2fe1bc13a59d3dc5be850d35885ca4aa201669e6f0bcb8089faf60c1aa",
+          "cases": [
+            {
+              "id": "differential:initial",
+              "testName": "matches initial measurement, row metadata, attributes, and important height",
+              "fullName": "textarea-autosize pristine differential matches initial measurement, row metadata, attributes, and important height"
+            },
+            {
+              "id": "differential:input",
+              "testName": "matches uncontrolled input sizing and callback ordering",
+              "fullName": "textarea-autosize pristine differential matches uncontrolled input sizing and callback ordering"
+            },
+            {
+              "id": "differential:stop-propagation-input",
+              "testName": "matches same-target callbacks when onInput stops propagation",
+              "fullName": "textarea-autosize pristine differential matches same-target callbacks when onInput stops propagation"
+            },
+            {
+              "id": "differential:stop-propagation-capture",
+              "testName": "matches same-target callbacks when onChangeCapture stops propagation",
+              "fullName": "textarea-autosize pristine differential matches same-target callbacks when onChangeCapture stops propagation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "react-textarea-autosize-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-textarea-autosize-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/textarea-autosize/audit/type-probes/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/textarea-autosize/audit/pristine-types.json",
+          "role": "test",
+          "sha256": "16d2e2feed56a6bd3f1898d49009ef840b808d7f68074735f1dee4365cc02035",
+          "cases": [
+            {
+              "id": "types:pristine",
+              "testName": "pristine type contract",
+              "fullName": "pristine type contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/textarea-autosize/audit/type-probes/public-api.test-d.ts",
+          "role": "support",
+          "sha256": "1a6b40998b27dabb1a024807ffc5fb5bc3e6a44f01714f0e850fba9fa8ee89b0"
+        },
+        {
+          "path": "packages/textarea-autosize/audit/type-probes/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "76f149cbf7daefaca713dfe7307b6d3174823267b38cf0b9fd0fda0cb31eeee5"
+        },
+        {
+          "path": "packages/textarea-autosize/audit/type-parity.json",
+          "role": "support",
+          "sha256": "c41003ee12df090b7aac8be96c4f1a3ca9740f2d50dce25564669c6e099698f6"
+        }
+      ],
+      "notes": "Repo-authored React declaration probes against pinned upstream typings, with assertion-group inventories and negative controls."
+    },
+    {
+      "id": "react-textarea-autosize-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-textarea-autosize-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/textarea-autosize/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/textarea-autosize/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "3da75fb1319411ed4b496a89cd23672ff6fa7f1d35b652df3df4cac91c40707f",
+          "cases": [
+            {
+              "id": "types:adapted",
+              "testName": "adapted type contract",
+              "fullName": "adapted type contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/textarea-autosize/typetests/public-api.test-d.ts",
+          "role": "support",
+          "sha256": "f69ccde04fc491a3b512ef2d17f0811d49837de47341a8650d1ad2b58fb5c783"
+        },
+        {
+          "path": "packages/textarea-autosize/typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "9481adc627f29e0ab404aefe089e05041546a92e1a1b008a0beec0229581097e"
+        },
+        {
+          "path": "packages/textarea-autosize/audit/type-parity.json",
+          "role": "support",
+          "sha256": "c41003ee12df090b7aac8be96c4f1a3ca9740f2d50dce25564669c6e099698f6"
+        }
+      ],
+      "notes": "Structurally equivalent Octane public probes after permitted import-root and ref-type transformations."
+    },
+    {
+      "id": "react-textarea-autosize-ssr",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "textarea-autosize-ssr",
+      "notes": "Proves the React-visible server contract. Octane-only browser-global/server assertions stay in the ordinary shards.",
+      "files": [
+        {
+          "path": "packages/textarea-autosize/tests/ssr/react-contract.test.ts",
+          "role": "test",
+          "sha256": "5dae604942e7a8c91920bbf15b0ea31d2333a2b3bf1054d561313d9136232b9b",
+          "cases": [
+            {
+              "id": "ssr:react-contract",
+              "testName": "matches the pristine React server-visible contract",
+              "fullName": "@octanejs/textarea-autosize SSR React contract matches the pristine React server-visible contract"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "react-textarea-autosize-browser",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "textarea-autosize-browser",
+      "notes": "Executes same-process React/Octane Chromium pixel, callback, resize, and reset differential evidence.",
+      "files": [
+        {
+          "path": "packages/textarea-autosize/tests/browser/browser.test.ts",
+          "role": "test",
+          "sha256": "84cacc5b5f04f60b64eb2f25b11a3070a73b4d312cd15a4566f19f90635f9900",
+          "cases": [
+            {
+              "id": "browser:chromium",
+              "testName": "matches React in Chromium",
+              "fullName": "textarea-autosize real-browser parity matches React in Chromium"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "native-input-event",
+      "caseIds": ["differential:input"],
+      "upstreamResult": "onChange receives a React SyntheticEvent produced by React's change plugin.",
+      "octaneResult": "onChange receives the native bubbling InputEvent with textarea target/currentTarget during dispatch.",
+      "rationale": "Octane exposes native DOM events and does not ship React's synthetic event system.",
+      "classification": "framework-event-model",
+      "consumerImpact": "React-only SyntheticEvent fields and post-dispatch currentTarget retention are unavailable; tests assigning value directly must also dispatch input.",
+      "migrationGuidance": "Read value from event.currentTarget during the callback, type shared handlers to the native event surface, and use real keyboard input or a bubbling InputEvent in tests.",
+      "owner": "octanejs",
+      "reviewCondition": "Revisit only if Octane introduces a public synthetic event compatibility layer."
+    }
+  ]
+}

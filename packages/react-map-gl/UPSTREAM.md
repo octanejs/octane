@@ -1,4 +1,4 @@
-# @vis.gl/react-mapbox upstream provenance
+# Upstream @vis.gl/react-mapbox audit
 
 This port targets the immutable release `@vis.gl/react-mapbox@8.1.2`:
 
@@ -173,6 +173,8 @@ lane remains open work.
 
 ## Divergences
 
+Four, two of them recorded in `audit/react-parity.json` and bound to a case:
+
 1. **`react-map-gl-source-id-by-context`** — upstream delivers a `<Source>` id to
    child layers with `cloneElement(child, {source: id})`. Octane cannot clone a
    compiled children block, so the id travels by context. Same override
@@ -207,3 +209,8 @@ lane remains open work.
    React, by `differential:6`.
 
 ## Regenerating
+
+`node scripts/generate-parity-manifest.mjs` rebuilds `audit/react-parity.json`
+and the runtime inventories from actual Vitest runs. Editing a lane file without
+rerunning it fails `pnpm react-parity:check` on the integrity hash, which is the
+point.

@@ -1,0 +1,218 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/pmndrs/react-spring.git",
+    "version": "10.1.2",
+    "commit": "59b1e5306402d3039120e2da464b66e10b1a1aa1",
+    "sourceRoot": "packages/core/src",
+    "testRoot": "packages/core/src",
+    "license": "MIT",
+    "integrity": "sha256:10e6fb1c530efe9409d9f3184488bc7d57bcbae3c92ee97553859e4cd0eda993",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/spring/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/spring/tests/upstream"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 10,
+    "uniqueIdentities": 10,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "react-spring-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "spring-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the byte-exact react-spring 10.1.2 Vitest browser unit suite against the vendored React source and checks every passed identity against the committed inventory.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/spring/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/spring/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "9a0b22ab791f80b7e2fe3b227ef23967fe63a02be0cd910b619d122093919fea"
+        },
+        {
+          "path": "packages/spring/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "4a8102fbd2977b6919fad5e2f8733f09c235cec8544f60f7298df129ff174ee6"
+        },
+        {
+          "path": "packages/spring/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "db021ea0f6df4ed45ca062716f6577d80b0a6c96add11bd72585967b4b12c134"
+        },
+        {
+          "path": "scripts/react-parity/react-spring-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "7ea2302caed866516e5e30a6f0804ff34b792ad202071d396d673c20bb994f1d"
+        },
+        {
+          "path": "packages/spring/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "fb5755ac97ed5842f8393b95df61ff6d8e9bee84bdcaf66bd9c771332445ef80"
+        },
+        {
+          "path": "packages/spring/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "10e6fb1c530efe9409d9f3184488bc7d57bcbae3c92ee97553859e4cd0eda993"
+        }
+      ]
+    },
+    {
+      "id": "react-spring-adapted-full-suite",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "spring",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs one-for-one adapted upstream identities under tests/upstream with exact inventoried names; remaining pristine identities are tracked in upstream-case-dispositions.json.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/spring/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/spring/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "983dfd3637ddc6b5b70398439e425094dba081560300fefa811de46f3a8ad907"
+        },
+        {
+          "path": "packages/spring/audit/upstream-case-dispositions.json",
+          "role": "support",
+          "sha256": "aeb834e551da81abb7eb3aaf142d4e446074c7ecb80527a79b179897d9094dca"
+        }
+      ]
+    },
+    {
+      "id": "react-spring-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "spring-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Same SpringValue settle path through Octane and published @react-spring/web.",
+      "files": [
+        {
+          "path": "packages/spring/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "62cb8c8c8e8e1df585d027ee0e121f445215b666d2a63e17b6398a4903de44da",
+          "cases": [
+            {
+              "id": "differential:spring-value-settle",
+              "testName": "SpringValue: settles an identical numeric goal to the same final value",
+              "fullName": "differential: @octanejs/spring vs @react-spring/web SpringValue: settles an identical numeric goal to the same final value"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "react-spring-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "spring-pristine-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the pinned upstream *.test-d.ts/*.test-d.tsx programs with tsc against the vendored core sources.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/spring/audit/type-probes/tsconfig.pristine-upstream.json"
+      },
+      "files": [
+        {
+          "path": "packages/spring/audit/pristine-types.json",
+          "role": "test",
+          "sha256": "4b5f8ba16f385db6feebcf9cfd776dbcebe5d3a9ec38d3ae3a687043d1778085",
+          "cases": [
+            {
+              "id": "types:pristine-upstream",
+              "testName": "pinned upstream type suite",
+              "fullName": "pinned upstream type suite"
+            }
+          ]
+        },
+        {
+          "path": "packages/spring/audit/type-probes/tsconfig.pristine-upstream.json",
+          "role": "support",
+          "sha256": "823a266ec0d981baa182b100d7393e43b55913ce9952cef32485cae19a9fed14"
+        },
+        {
+          "path": "packages/spring/audit/type-parity.json",
+          "role": "support",
+          "sha256": "dabe490414f8433c195c9abdac7941b3ef69d42df77d67d0392c05ec94036e65"
+        }
+      ]
+    },
+    {
+      "id": "react-spring-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "spring-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "One-for-one adapted upstream type programs under typetests/upstream after permitted import-root transforms.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/spring/typetests/tsconfig.upstream.json"
+      },
+      "files": [
+        {
+          "path": "packages/spring/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "799dfd209afc059a3c8593061e451e588a0d542523ab76080ec67a29aacf8201",
+          "cases": [
+            {
+              "id": "types:adapted-octane",
+              "testName": "adapted Octane type suite",
+              "fullName": "adapted Octane type suite"
+            }
+          ]
+        },
+        {
+          "path": "packages/spring/typetests/tsconfig.upstream.json",
+          "role": "support",
+          "sha256": "5311270748e702e375326c375b3746ba84a62f6abb580db27c6b3294d426d4a8"
+        },
+        {
+          "path": "packages/spring/audit/type-parity.json",
+          "role": "support",
+          "sha256": "dabe490414f8433c195c9abdac7941b3ef69d42df77d67d0392c05ec94036e65"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

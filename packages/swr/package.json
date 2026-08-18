@@ -64,6 +64,7 @@
     "u3:types": "tsrx-tsc --noEmit -p ./typetests/root/tsconfig.json",
     "u4:test": "vitest run ./tests/upstream/specialized ./tests/differential/specialized-exports.test.ts --config ./tests/probes/vitest.config.mjs",
     "u4:types": "tsrx-tsc --noEmit -p ./typetests/specialized/tsconfig.json",
+    "upstream:verify": "node ./audit/verify-provenance.mjs",
     "u6:adoption": "vitest run ./tests/adoption --config ./tests/probes/vitest.config.mjs",
     "u6:types": "tsrx-tsc --noEmit -p ./tests/adoption/tsconfig.json"
   },

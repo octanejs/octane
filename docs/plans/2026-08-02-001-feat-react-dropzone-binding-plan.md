@@ -121,6 +121,16 @@ The implementation must generate this oracle from the npm artifact and canonical
 
 ### Key Technical Decisions
 
+- KTD1. **Mirror the two-module upstream source boundary.** Vendor byte-exact `src/index.tsx` and `src/utils/index.ts`; mirror them under `packages/dropzone/src/`; reuse `attr-accept` and `file-selector`; adapt only React imports, hook slots, component rendering, refs, and event types. Governs R4-R13.
+- KTD2. **Prove hook slotting and prop-getter spreads before porting.** U1 decides whether compiler auto-slotting suffices for the imported plain-TS hook or whether stable `subSlot` forwarding like `packages/floating-ui/src/internal.ts` is required. It also proves dynamic getter-returned spreads carry handlers, attributes, arbitrary props, and refs on root/input in client, SSR, and hydration. Governs R5-R7, R14.
+- KTD3. **Use refs-as-props without changing the API.** Re-author upstream `forwardRef`/`useImperativeHandle` so `Dropzone` accepts a plain Octane `ref` prop exposing `{ open }`; compose consumer and internal host refs with Octane ref arrays while preserving `refKey`. Follow `packages/base-ui/src/button.ts`, `packages/base-ui/src/separator.ts`, and `packages/base-ui/src/toggle.ts`. Governs R5-R7.
+- KTD4. **Keep one native acquisition pipeline.** Input, drop, paste, and File System Access handles feed the pinned extraction, validation, acceptance, state, and callback machinery. Do not create Octane-specific parallel validators or event shims. Governs R8-R13.
+- KTD5. **Make operation ownership explicit and oracle-driven.** Preserve the pin's latest-operation token/supersession behavior for extraction and validation; use controlled promises and explicit task draining, never sleeps. Compare `isProcessing`, state, callbacks, and errors to React across resolve/reject/unmount orders. Governs R13.
+- KTD6. **Separate jsdom adaptation from browser truth.** Exhaustively adapt upstream jsdom cases, then use trusted Chromium for file chooser delivery, native drag/paste event paths, focus/window timing, hydration, and page diagnostics. A jsdom DataTransfer or clipboard shim is not the browser evidence. Follow `packages/octane/tests/browser/native-change/`. Governs R7-R11, R14-R15.
+- KTD7. **Use the bounded global parity harness.** Follow `packages/hook-form/audit/react-parity.json` and `scripts/react-parity/`; require unchanged pristine runtime/types, exact adapted inventories, transformation ledgers, test classifications, and negative controls. Generalize hook-form-specific verifiers where appropriate rather than weakening or bypassing them. Governs R2-R3, R15.
+- KTD8. **Treat package branches and SSR/hydration as U1 architecture gates.** Pack and load ESM, CJS, types, and package metadata before building the full port; server render, stream, hydrate, and interact with the minimal public fixture. Governs R1, R4-R7, R14.
+- KTD9. **One binding, one PR.** Keep framework prerequisites, pin upgrades, and other bindings outside this change. Governs R16.
+
 ### High-Level Technical Design
 
 ```mermaid
@@ -154,11 +164,46 @@ flowchart TB
 
 ### Output Structure
 
+```text
+packages/dropzone/
+├── audit/
+│   ├── react-parity.json
+│   ├── runtime-inventories/
+│   ├── type-inventories/
+│   └── test-classifications.json
+├── src/
+│   ├── index.tsrx
+│   └── utils/index.ts
+├── tests/
+│   ├── adapted/
+│   ├── browser/
+│   ├── differential/
+│   ├── hydration/
+│   ├── pristine/
+│   ├── probes/
+│   └── ssr/
+├── typetests/
+├── upstream/
+├── package.json
+├── README.md
+├── status.json
+├── tsconfig.json
+└── UPSTREAM.md
+```
+
 ---
 
 ## Implementation Units
 
 ### U1. Freeze provenance and falsify the architecture
+
+- **Goal:** Establish immutable npm/source/license/API/test/type boundaries and prove every load-bearing Octane seam before broad port work.
+- **Requirements:** R1-R16.
+- **Dependencies:** None.
+- **Files:** `packages/dropzone/upstream/`, `packages/dropzone/UPSTREAM.md`, `packages/dropzone/package.json`, `packages/dropzone/tsconfig.json`, `packages/dropzone/audit/public-api.json`, `packages/dropzone/audit/npm-files.json`, `packages/dropzone/audit/upstream-files.json`, `packages/dropzone/audit/runtime-inventories/`, `packages/dropzone/audit/type-inventories/`, `packages/dropzone/audit/verify-provenance.mjs`, `packages/dropzone/tests/pristine/upstream-runtime.test.ts`, `packages/dropzone/tests/probes/dropzone.tsrx`, `packages/dropzone/tests/probes/architecture.test.ts`, `packages/dropzone/tests/probes/server.test.ts`, `packages/dropzone/tests/probes/hydration.test.ts`, `packages/dropzone/tests/probes/browser/`, `packages/dropzone/tests/probes/packed-exports.test.mjs`, `packages/dropzone/tests/probes/consumers/`, `packages/dropzone/typetests/pristine/`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `vitest.config.js`.
+- **Approach:** Hash the npm tarball separately from the canonical commit archive; vendor byte-exact source, tests, snapshot, configs, license, and required support. Generate package-condition, runtime/type-export, source/test, static-registration, collection-time, execution, snapshot, and type-program inventories. Run the upstream Vitest suite unchanged with pinned React/Vitest/jsdom and run both upstream TypeScript commands/projects unchanged. Scaffold only enough authored package source to test public prop getters, root/input spreads, arbitrary props, internal/user refs and `refKey`, imperative `open`, hidden-input delivery, browser-created DataTransfer drop, controlled async extraction/validator supersession, global/document listener cleanup, browser-global-free render, stream/hydration adoption, and packed ESM/CJS/types/package-json resolution. Compile the imported hook using both candidate slot strategies only as needed; select the simplest proven strategy. Use `node scripts/scaffold-react-port.mjs` to produce the exhaustive case ledger, but do not commit unresolved todos. For each failing seam, reduce the case until it contains no React Dropzone state-machine logic and verify the same Octane mechanism in the cited working package patterns. Classify it as a framework prerequisite only if that reduced reproduction still fails; otherwise fix the probe within U1. A prerequisite starts from a clean base, this binding branch remains paused until it merges, and the resumed branch rebases onto that merge before U2.
+- **Test scenarios:** Any changed npm/source/license byte, missing/extra package condition or export, deleted/renamed/duplicated/skipped/unexecuted runtime identity, snapshot drift, missing type file/group, removed negative program, or stale inventory fails. Pristine runtime and both type commands pass unchanged. Root/input getters compile and spread working handlers/attributes/refs; internal and user refs receive the correct nodes; `open` reaches the input; one trusted Chromium input selection and one DataTransfer drop reach the callback. Older extraction and validator operations lose to the newer operation exactly as React does. Server render/stream touches no browser global; hydration adopts root/input nodes, makes them interactive, and emits no diagnostics. Packed ESM, CJS, TypeScript NodeNext/Bundler, and `./package.json` consumers resolve the exact namespace without React leakage.
+- **Verification:** Every U1 gate passes. If pristine evidence cannot run unchanged, if any root condition cannot be represented, or if the minimal public fixture requires an Octane core/compiler/server/testing-library change, **STOP**: document the failing observable contract, open a separate prerequisite plan/PR, and do not continue U2-U6 in this binding PR.
 
 ### U2. Port file verdict and accept-option utilities
 
@@ -192,6 +237,14 @@ flowchart TB
 
 ### U5. Prove exhaustive parity, SSR, streaming, hydration, and harness integrity
 
+- **Goal:** Make every compatibility claim executable, classified, and fail-closed in package and repository CI.
+- **Requirements:** R2-R4, R13-R15.
+- **Dependencies:** U1-U4.
+- **Files:** `packages/dropzone/tests/pristine/`, `packages/dropzone/tests/adapted/`, `packages/dropzone/tests/differential/`, `packages/dropzone/tests/ssr/`, `packages/dropzone/tests/hydration/`, `packages/dropzone/tests/browser/`, `packages/dropzone/typetests/`, `packages/dropzone/audit/react-parity.json`, `packages/dropzone/audit/test-classifications.json`, `packages/dropzone/audit/transformation-ledger.json`, `packages/dropzone/audit/runtime-inventories/`, `packages/dropzone/audit/type-inventories/`, `scripts/react-parity/react-dropzone-*.mjs`, `scripts/react-parity/check.mjs`, `scripts/react-parity/harness-lib.test.mjs`, `scripts/react-parity/react-dropzone-*.test.mjs`, `vitest.config.js`.
+- **Approach:** Register unchanged pristine runtime and type lanes, exhaustive adapted runtime and type lanes, differential lanes, SSR/stream/hydration lanes, and required Chromium lanes in `audit/react-parity.json`. Inventory every upstream artifact, static registration, actual collected/executed identity, snapshot, type file, and structural assertion/negative group. Record only permitted transformations such as import roots, `.tsx` fixture conversion to `.tsrx`, React event/renderable type mapping, and forwardRef-to-ref-prop authoring; reject all others. Classify every port-authored test exactly once. Add only React Dropzone manifest registration, inventories, classifications, package-specific fail-closed checks, and negative controls supported by the existing shared harness. If an exact-parity claim requires generalizing shared harness code, U1 must stop and move that prerequisite into a separate plan and PR before this binding continues.
+- **Test scenarios:** Missing/extra/renamed/duplicated/skipped/todo/expected-failure/unexecuted runtime cases fail; missing, duplicate, stale, or unsupported non-applicable rationales fail; stale or fake-title inventories fail; removed snapshots/assertions/type files/negative programs fail; undeclared transformations and fixture/provenance drift fail; a locally runnable lane omitted from global `react-parity:check` fails. SSR renders default/disabled/custom-state fixtures without browser access; streaming settles deterministic async children; hydration adopts exact root/input nodes, preserves permissible pre-hydration focus/value/file state, attaches refs/listeners once, remains interactive, and reports no mismatch. Production/server transform variants and Chromium page diagnostics are included.
+- **Verification:** `pnpm react-parity:test` validates the negative controls and `pnpm react-parity:check` executes, rather than merely validates, every required react-dropzone lane with exact identities and hashes.
+
 ### U6. Integrate the package, playground, documentation, and release metadata
 
 - **Goal:** Make the exact binding installable, discoverable, demonstrable, and honestly tracked in one isolated PR.
@@ -215,10 +268,22 @@ flowchart TB
 | Acquisition and races | U4 | Input, nested/global drag/drop, paste, File System Access, async validation, error localization, `isProcessing`, and latest-operation supersession match in adapted/differential/browser evidence. |
 | Types | U1-U5 | Both pristine upstream compiler commands and all nine adapted files preserve accepted/rejected programs and structural assertion hashes without React leakage. |
 | SSR and browser | U1, U4-U5 | Server/stream output is global-free and deterministic; hydration adopts nodes/state and remains interactive; trusted Chromium file, drag, paste, picker-branch, focus, and cleanup journeys pass without diagnostics. |
+| Harness integrity | U5 | Removed, renamed, skipped, stale, duplicated, fake, unexecuted, or structurally weakened evidence fails closed; every required lane executes through `react-parity:check`. |
 | Integration | U6 | Package, pack, type, test, format, playground, docs, status, catalog, changeset, sync, and generated-inventory gates pass with no unrelated changes. |
 | PR boundary | U6 | Exactly one isolated binding PR contains the complete package and evidence; any Octane prerequisite or future pin remains separate. When a prerequisite was required, the final ancestry and diff prove that it began from a clean base, merged independently, and left no prerequisite implementation or unrelated shared-harness generalization in this binding PR. |
 
 ## Definition of Done
+
+- R1-R15 have direct executable evidence and R16 has package/repository/PR evidence.
+- The exact `react-dropzone@20.0.0` npm artifact, canonical commit, MIT license, Node floor, package conditions, runtime/type namespace, runtime cases, snapshot, nine type files, and support/config artifacts are immutable and verified.
+- The pristine React runtime suite and both pristine TypeScript commands/projects execute unchanged. Every upstream runtime identity and type group is exhaustively adapted or objectively classified; every port-authored test has exactly one classification.
+- Default `Dropzone`, `useDropzone`, `ErrorCode`, all 13 exported type names, root `types`/`import`/`require`, and `./package.json` resolve from the packed binding without React runtime or public-type leakage.
+- Render props, refs-as-props, `refKey`, prop getter composition, input, drag/drop, paste, File System Access, accept/size/count errors, custom/localized errors, async processing, supersession, dialog/focus/listener lifecycle, SSR, streaming, hydration, and trusted Chromium evidence are green.
+- Negative controls prove the harness fails for provenance, source, fixture, case, execution, snapshot, type, transformation, classification, and lane-registration drift.
+- README, `UPSTREAM.md`, status, license, playground, packed consumer, patch changeset, parity manifest, package/catalog/status/parity generators, and generated docs agree.
+- `pnpm format:files:check packages/dropzone scripts/react-parity vitest.config.js package.json pnpm-workspace.yaml scripts/check-package-packs.mjs playground/octane website/src/content/bindings.json`, scoped package tests/typechecks, `pnpm react-parity:test`, `pnpm react-parity:check`, pack checks, playground production build, `pnpm test:markers:check`, `pnpm tsrx-decls:check`, and `pnpm sync` pass, followed by the repository-required CI gates.
+- No skipped/todo/expected-failure case, representative-only parity claim, unpublished upstream behavior, hidden divergence, production upload/network dependency, unrelated binding, bundled framework prerequisite, or abandoned probe remains.
+- One isolated draft PR is opened only after the verification contract is satisfied; all agent-actionable CI and review findings are resolved, while merge remains a maintainer action.
 
 ## Review Record
 

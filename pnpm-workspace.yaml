@@ -1,5 +1,6 @@
 packages:
   - packages/*
+  - scripts/react-parity/fixtures/*
   - benchmarks/news
   - benchmarks/news/*
   - benchmarks/js-framework

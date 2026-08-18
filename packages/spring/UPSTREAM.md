@@ -21,6 +21,10 @@ tag commit. They live under `upstream/`, retain the repository layout, are
 excluded from the published `files`, and are locked file-by-file by
 `upstream/SHA256SUMS`.
 
+Run `pnpm --dir packages/spring upstream:verify` to detect a modified,
+missing, renamed, or unexpected vendored file. The verifier itself has negative
+controls in `scripts/react-parity/react-spring-upstream-lib.test.mjs`.
+
 The reusable runtime boundary is deliberately narrow: the port consumes the
 exact framework-neutral `@react-spring/rafz` package. Source under upstream
 `packages/shared`, `packages/animated`, `packages/core`, `targets/web`, and
@@ -85,3 +89,15 @@ exports.
 The pinned boundary contains the executable unit/type-test files under
 `packages/{animated,core,rafz,shared}` and `targets/web`, plus setup and the
 Parallax demo. The vendored files are the authoritative work list.
+
+Runtime identities are inventoried by the pristine Vitest lane and mapped
+one-for-one in `audit/upstream-case-dispositions.json` to an adapted identity,
+a reused-dependency note, or an explicit `awaiting-adaptation` reason. Negative
+controls reject missing/extra pristine identities, adapted title drift, and
+skipped adapted cases. Repo-authored conformance/hydration/browser suites stay
+in the ordinary shards and are not React-parity ownership.
+
+Type programs under `*.test-d.ts` / `*.test-d.tsx` run pristine via
+`audit/type-probes/tsconfig.pristine-upstream.json`. One-for-one adapted type
+counterparts live under `typetests/upstream/` and still require Octane public
+type-surface work before the adapted-types lane is green.

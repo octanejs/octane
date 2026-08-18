@@ -38,3 +38,5 @@ This package records `upstreamSuites.runtime/types` as **present** (the pin cont
 - repo-authored differential host-rendering lane
 
 The remaining upstream React/SSR/Cypress cases are present at the pin but not yet preserved or adapted here. `packages/motion/upstream/` holds the curated pin artifacts (`upstream:verify`).
+
+React materializes styles for an `initial`-only target while the current Octane binding does not. The bounded differential fixture therefore uses `initial={false}` and the package continues to avoid claiming complete React Motion parity. Known incompatibilities are recorded in `audit/react-parity.json` divergences (`motion-exit-cleanup-before-detach`, `motion-bounded-layout-flip`, `motion-bounded-layoutId`, `motion-initial-only-no-style-materialization`, `motion-zero-transform-serialization`).

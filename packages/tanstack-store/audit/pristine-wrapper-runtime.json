@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-store-pristine",
+  "roots": ["packages/tanstack-store/tests"],
+  "files": ["packages/tanstack-store/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:b68dc9aee5878f33",
+      "file": "packages/tanstack-store/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned @tanstack/react-store 0.11.0 suite unchanged"
+    }
+  ],
+  "snapshots": 0
+}

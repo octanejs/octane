@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "upstreamRoot": "packages/popper/upstream/tag/typings/tests",
+  "adaptedRoot": "packages/popper/typetests",
+  "inventories": {
+    "upstream": "packages/popper/audit/upstream-types.json",
+    "adapted": "packages/popper/audit/adapted-types.json",
+    "adaptedOnly": "packages/popper/audit/adapted-only-types.json"
+  },
+  "lanes": {
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/popper/typetests/tsconfig.pristine.json",
+      "sourcePolicy": "byte-exact pinned upstream typings programs"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/popper/typetests/tsconfig.adapted.json",
+      "sourcePolicy": "structurally equivalent after permitted transformations"
+    }
+  },
+  "adaptedOnly": [
+    {
+      "path": "packages/popper/typetests/public-api.test.ts",
+      "rationale": "Octane public type contract plus @ts-expect-error negative controls; no upstream typings twin."
+    }
+  ],
+  "permittedTransformations": [
+    {
+      "kind": "formatting",
+      "rule": "TypeScript printer output must remain structurally identical"
+    },
+    {
+      "kind": "import-root",
+      "rule": "relative upstream '../..' imports become @octanejs/popper"
+    },
+    {
+      "kind": "react-runtime-import",
+      "rule": "import * as React from 'react' / React.useState become import { useState } from 'octane' / useState"
+    },
+    {
+      "kind": "jsx-pragma",
+      "rule": "optional /** @jsxImportSource octane */ is stripped before structural compare"
+    },
+    {
+      "kind": "negative-control",
+      "rule": "Matching @ts-expect-error controls must reject the same invalid call shapes on both sides when present; adapted-only public-api.test.ts carries Octane-surface controls"
+    }
+  ],
+  "divergences": [
+    {
+      "id": "popper-octane-node-and-ref-types",
+      "caseIds": ["types:popper-adapted-main", "types:popper-adapted-svg"],
+      "upstreamResult": "React.ReactNode / class-component oriented typings.",
+      "octaneResult": "OctaneNode and function-component typings with plain refs/CSS properties.",
+      "rationale": "Documented consumer-visible React-to-Octane type-surface differences.",
+      "classification": "type-surface",
+      "consumerImpact": "Consumers must use OctaneNode instead of React.ReactNode for children/render props.",
+      "migrationGuidance": "Import OctaneNode from octane for children typing.",
+      "owner": "@octanejs/popper",
+      "reviewCondition": "Review if Octane publishes ReactNode compatibility aliases."
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "description": "Allowed textual transforms when adapting the pinned @zag-js/react Vitest suite to Octane. verify-upstream.mjs applies the inverse of these before hashing adapted sources against the pristine originals.",
+  "transforms": [
+    {
+      "id": "file-header",
+      "summary": "Allow a single leading `// Adapted from …` header on adapted files."
+    },
+    {
+      "id": "case-citation",
+      "summary": "Allow `// Per tests/<file>:<line>` comments immediately above each adapted `test(...)`."
+    },
+    {
+      "id": "import-testing-library",
+      "summary": "Rewrite `@testing-library/react` imports to `@octanejs/testing-library`."
+    },
+    {
+      "id": "import-binding",
+      "summary": "Rewrite `../src` (upstream adapter) imports to `@octanejs/zag`."
+    },
+    {
+      "id": "vitest-named-imports",
+      "summary": "Allow explicit `vitest` named imports (`describe`/`expect`/`test`/`vi`) because the adapted Vitest project does not enable globals."
+    },
+    {
+      "id": "formatting",
+      "summary": "Allow Prettier/repo formatting drift: tabs vs spaces, single vs double quotes, and trailing semicolons. Blank-line-only differences are ignored for the hash."
+    }
+  ]
+}

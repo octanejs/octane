@@ -25,7 +25,25 @@ The pin ships four Vitest specs (seven cases). They are preserved byte-exact und
 | `src/menus/BubbleMenu.spec.ts` | pristine + adapted | `tests/upstream/BubbleMenu.test.ts` |
 | `src/menus/FloatingMenu.spec.ts` | pristine + adapted | `tests/upstream/FloatingMenu.test.ts` |
 
+`scripts/react-parity/tiptap-runtime-lib.mjs` crosswalks pristine and adapted
+runtime inventories by `fullName`, checks UPSTREAM citations, and rejects
+renamed/omitted identities plus missing fixtures. It also reads both sources
+for a one-for-one assertion/interaction crosswalk under the permitted
+transformation ledger in `audit/runtime-parity.json` (see
+`tests/upstream/assertions.md`), including negative controls for deleted or
+changed expects and `// Per …:<line>` citation drift. Wired through
+`pnpm react-parity:validate` / `pnpm react-parity:check`.
+
 ## Type suites
+
+Upstream has no dedicated compile-time suite (`upstreamSuites.types:
+insufficient`). Repo-authored one-for-one probes live under
+`typetests/pristine/types.test-d.ts` and `typetests/adapted/types.test-d.ts`,
+with permitted transforms listed in `typetests/assertions.md`. Root
+`typetests/public-api.test-d.ts` and `typetests/menus-api.test-d.ts` are
+Octane-only declaration contracts outside the React-parity type lane. Every
+type probe is classified exactly once in
+`packages/tiptap/audit/test-classifications.json`.
 
 ## Additional evidence
 

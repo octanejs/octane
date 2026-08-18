@@ -1,0 +1,618 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/visgl/react-map-gl.git",
+    "version": "8.1.2",
+    "commit": "b1e46fcfb9d5de9bb179ca54e7d27617caa28c65",
+    "sourceRoot": "modules/react-mapbox/src",
+    "testRoot": "modules/react-mapbox/test",
+    "license": "MIT",
+    "integrity": "sha256:3a2b9b8de9120db2e7f595e4c7e0c0d74ff76a9a41864464207f4e45f632bf8a",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/react-map-gl/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": [
+        "packages/react-map-gl/tests/upstream",
+        "packages/react-map-gl/tests/upstream-util"
+      ],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": ["tests/upstream-util/pristine\\.test\\.ts$"]
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 32,
+    "uniqueIdentities": 32,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "react-map-gl-upstream-pristine",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-map-gl-upstream-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs @vis.gl/react-mapbox 8.1.2's own framework-neutral util specs, byte-exact, against upstream's own source through a tape-to-Vitest adapter.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/react-map-gl/audit/upstream-util-pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/react-map-gl/tests/upstream-util/pristine.test.ts",
+          "role": "test",
+          "sha256": "6634b0baf551cb91088fa908b8cbea9b81436e38351179c994599ea571bf2fba",
+          "cases": [
+            {
+              "id": "upstream-util-pristine:1",
+              "testName": "applyReactStyle",
+              "fullName": "upstream util specs (pristine) applyReactStyle"
+            },
+            {
+              "id": "upstream-util-pristine:2",
+              "testName": "compareClassNames",
+              "fullName": "upstream util specs (pristine) compareClassNames"
+            },
+            {
+              "id": "upstream-util-pristine:3",
+              "testName": "deepEqual",
+              "fullName": "upstream util specs (pristine) deepEqual"
+            },
+            {
+              "id": "upstream-util-pristine:4",
+              "testName": "arePointsEqual",
+              "fullName": "upstream util specs (pristine) arePointsEqual"
+            },
+            {
+              "id": "upstream-util-pristine:5",
+              "testName": "normalizeStyle",
+              "fullName": "upstream util specs (pristine) normalizeStyle"
+            },
+            {
+              "id": "upstream-util-pristine:6",
+              "testName": "applyViewStateToTransform",
+              "fullName": "upstream util specs (pristine) applyViewStateToTransform"
+            },
+            {
+              "id": "upstream-util-pristine:7",
+              "testName": "declares every collected upstream case",
+              "fullName": "upstream util specs (pristine) declares every collected upstream case"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-map-gl/upstream/test/utils/apply-react-style.spec.js",
+          "role": "support",
+          "sha256": "77d8089345bf68c21f8969996f38d793b8bde0277011f07102bc0a4dc572348c"
+        },
+        {
+          "path": "packages/react-map-gl/upstream/test/utils/compare-class-names.spec.js",
+          "role": "support",
+          "sha256": "39881c7eb5b3f92d271061932b10ac2fc1008510d3300fce08c02fb58c47edf1"
+        },
+        {
+          "path": "packages/react-map-gl/upstream/test/utils/deep-equal.spec.js",
+          "role": "support",
+          "sha256": "3cafc3d4c72d2e4fc09957866a606f5ff4abff41cc4725e2b639298e4d1b4128"
+        },
+        {
+          "path": "packages/react-map-gl/upstream/test/utils/style-utils.spec.js",
+          "role": "support",
+          "sha256": "9124137aae6703b3e5c8af8eab0a78630ceae3128da548441244b23d01711192"
+        },
+        {
+          "path": "packages/react-map-gl/upstream/test/utils/transform.spec.js",
+          "role": "support",
+          "sha256": "55db8a1d6cb5ec2041da6e86775378c2457d6d1652b404b203c082ba37b9aed6"
+        },
+        {
+          "path": "packages/react-map-gl/tests/_harness/tape-adapter.ts",
+          "role": "support",
+          "sha256": "05d5c503ae4aa05b0bee8de5795c256b8eae4b5bd0097f1ed427c73067e4ff39"
+        }
+      ]
+    },
+    {
+      "id": "react-map-gl-upstream-adapted",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-map-gl-upstream-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the same byte-exact upstream specs against the modules this port reuses verbatim. Both lanes passing is what backs the reuse claim.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/react-map-gl/audit/upstream-util-adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/react-map-gl/tests/upstream-util/adapted.test.ts",
+          "role": "test",
+          "sha256": "ff9a4edf37a2bc991f6b3ef1212ab695d57e0da55521853e9d3f7935c91ff87b",
+          "cases": [
+            {
+              "id": "upstream-util-adapted:1",
+              "testName": "applyReactStyle",
+              "fullName": "upstream util specs (adapted) applyReactStyle"
+            },
+            {
+              "id": "upstream-util-adapted:2",
+              "testName": "compareClassNames",
+              "fullName": "upstream util specs (adapted) compareClassNames"
+            },
+            {
+              "id": "upstream-util-adapted:3",
+              "testName": "deepEqual",
+              "fullName": "upstream util specs (adapted) deepEqual"
+            },
+            {
+              "id": "upstream-util-adapted:4",
+              "testName": "arePointsEqual",
+              "fullName": "upstream util specs (adapted) arePointsEqual"
+            },
+            {
+              "id": "upstream-util-adapted:5",
+              "testName": "normalizeStyle",
+              "fullName": "upstream util specs (adapted) normalizeStyle"
+            },
+            {
+              "id": "upstream-util-adapted:6",
+              "testName": "applyViewStateToTransform",
+              "fullName": "upstream util specs (adapted) applyViewStateToTransform"
+            },
+            {
+              "id": "upstream-util-adapted:7",
+              "testName": "declares every collected upstream case",
+              "fullName": "upstream util specs (adapted) declares every collected upstream case"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-map-gl/upstream/test/utils/apply-react-style.spec.js",
+          "role": "support",
+          "sha256": "77d8089345bf68c21f8969996f38d793b8bde0277011f07102bc0a4dc572348c"
+        },
+        {
+          "path": "packages/react-map-gl/upstream/test/utils/compare-class-names.spec.js",
+          "role": "support",
+          "sha256": "39881c7eb5b3f92d271061932b10ac2fc1008510d3300fce08c02fb58c47edf1"
+        },
+        {
+          "path": "packages/react-map-gl/upstream/test/utils/deep-equal.spec.js",
+          "role": "support",
+          "sha256": "3cafc3d4c72d2e4fc09957866a606f5ff4abff41cc4725e2b639298e4d1b4128"
+        },
+        {
+          "path": "packages/react-map-gl/upstream/test/utils/style-utils.spec.js",
+          "role": "support",
+          "sha256": "9124137aae6703b3e5c8af8eab0a78630ceae3128da548441244b23d01711192"
+        },
+        {
+          "path": "packages/react-map-gl/upstream/test/utils/transform.spec.js",
+          "role": "support",
+          "sha256": "55db8a1d6cb5ec2041da6e86775378c2457d6d1652b404b203c082ba37b9aed6"
+        },
+        {
+          "path": "packages/react-map-gl/tests/_harness/tape-adapter.ts",
+          "role": "support",
+          "sha256": "05d5c503ae4aa05b0bee8de5795c256b8eae4b5bd0097f1ed427c73067e4ff39"
+        }
+      ]
+    },
+    {
+      "id": "react-map-gl-ported-components",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-map-gl",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Upstream's seven component specs, re-authored in .tsrx against a mapbox-gl double. Upstream drives a real mapbox-gl@3 with a live access token in a browser, which CI cannot do, so these are the ported form of that evidence and each case cites its origin.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/react-map-gl/audit/ported-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/react-map-gl/tests/upstream/controls.test.ts",
+          "role": "test",
+          "sha256": "43eb164105cee970767375a780b1d3388e199dd8e77e55d7903d684321ba952d",
+          "cases": [
+            {
+              "id": "ported:controls:1",
+              "testName": "renders <AttributionControl />",
+              "fullName": "Controls renders <AttributionControl />"
+            },
+            {
+              "id": "ported:controls:2",
+              "testName": "renders <FullscreenControl />",
+              "fullName": "Controls renders <FullscreenControl />"
+            },
+            {
+              "id": "ported:controls:3",
+              "testName": "renders <GeolocateControl /> and exposes it through the ref prop",
+              "fullName": "Controls renders <GeolocateControl /> and exposes it through the ref prop"
+            },
+            {
+              "id": "ported:controls:4",
+              "testName": "renders <NavigationControl />",
+              "fullName": "Controls renders <NavigationControl />"
+            },
+            {
+              "id": "ported:controls:5",
+              "testName": "renders <ScaleControl />",
+              "fullName": "Controls renders <ScaleControl />"
+            },
+            {
+              "id": "ported:controls:6",
+              "testName": "pushes updated ScaleControl options onto the live control",
+              "fullName": "Controls pushes updated ScaleControl options onto the live control"
+            },
+            {
+              "id": "ported:controls:7",
+              "testName": "removes a control from the map when it leaves the tree",
+              "fullName": "Controls removes a control from the map when it leaves the tree"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-map-gl/tests/upstream/map.test.ts",
+          "role": "test",
+          "sha256": "d303b7c2255c7d4acf69f11648cd3b26ad44c644b01ce77eecba84ec78339c06",
+          "cases": [
+            {
+              "id": "ported:map:1",
+              "testName": "creates the map, reports its camera, and updates it from props",
+              "fullName": "Map creates the map, reports its camera, and updates it from props"
+            },
+            {
+              "id": "ported:map:2",
+              "testName": "reports a missing access token through onError",
+              "fullName": "Map reports a missing access token through onError"
+            },
+            {
+              "id": "ported:map:3",
+              "testName": "applies a settings prop that changes after load",
+              "fullName": "Map applies a settings prop that changes after load"
+            },
+            {
+              "id": "ported:map:4",
+              "testName": "keeps a controlled camera pinned to props when the map moves itself",
+              "fullName": "Map keeps a controlled camera pinned to props when the map moves itself"
+            },
+            {
+              "id": "ported:map:5",
+              "testName": "follows the map when onMove writes the view state back into props",
+              "fullName": "Map follows the map when onMove writes the view state back into props"
+            },
+            {
+              "id": "ported:map:6",
+              "testName": "keeps an imperative flyTo/zoom on an uncontrolled map",
+              "fullName": "Map keeps an imperative flyTo/zoom on an uncontrolled map"
+            },
+            {
+              "id": "ported:map:7",
+              "testName": "destroys the map instance when the component unmounts",
+              "fullName": "Map destroys the map instance when the component unmounts"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-map-gl/tests/upstream/marker.test.ts",
+          "role": "test",
+          "sha256": "ab48f3b417acf97728b1e15dfc1b2d961c285418a5f948f645cadc1c34e7fc1b",
+          "cases": [
+            {
+              "id": "ported:marker:1",
+              "testName": "attaches to the DOM, exposes the instance, and updates its props",
+              "fullName": "Marker attaches to the DOM, exposes the instance, and updates its props"
+            },
+            {
+              "id": "ported:marker:2",
+              "testName": "detaches the marker element when the marker leaves the tree",
+              "fullName": "Marker detaches the marker element when the marker leaves the tree"
+            },
+            {
+              "id": "ported:marker:3",
+              "testName": "renders children into a marker-owned element instead of the default pin",
+              "fullName": "Marker renders children into a marker-owned element instead of the default pin"
+            },
+            {
+              "id": "ported:marker:4",
+              "testName": "uses the Mapbox default pin when the marker has no children",
+              "fullName": "Marker uses the Mapbox default pin when the marker has no children"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-map-gl/tests/upstream/popup.test.ts",
+          "role": "test",
+          "sha256": "2cd7553a7bf85a89d903fd46ebfbe0e80a9a5496ac3d384f9aaa8a0528417ba3",
+          "cases": [
+            {
+              "id": "ported:popup:1",
+              "testName": "attaches to the DOM, renders children, and updates its options",
+              "fullName": "Popup attaches to the DOM, renders children, and updates its options"
+            },
+            {
+              "id": "ported:popup:2",
+              "testName": "does not fire onClose when the popup is removed by unmounting",
+              "fullName": "Popup does not fire onClose when the popup is removed by unmounting"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-map-gl/tests/upstream/source-layer.test.ts",
+          "role": "test",
+          "sha256": "08c9f0ef4489ad51b0dac2d402a14971e21b0c6dc2f6e0341700d4333199652d",
+          "cases": [
+            {
+              "id": "ported:source-layer:1",
+              "testName": "adds, updates and removes a source across style changes",
+              "fullName": "Source adds, updates and removes a source across style changes"
+            },
+            {
+              "id": "ported:source-layer:2",
+              "testName": "adds, updates and removes a layer alongside its source",
+              "fullName": "Layer adds, updates and removes a layer alongside its source"
+            },
+            {
+              "id": "ported:source-layer:3",
+              "testName": "gives a nested layer the enclosing source id, overriding an explicit source",
+              "fullName": "Layer gives a nested layer the enclosing source id, overriding an explicit source"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-map-gl/tests/upstream/use-map.test.ts",
+          "role": "test",
+          "sha256": "4f34e9b22b977cab2101d6bfc539e6262e21d5ed1ffa5b1c8ebfc0921d960ad2",
+          "cases": [
+            {
+              "id": "ported:use-map:1",
+              "testName": "publishes every mounted map by id and drops them as they unmount",
+              "fullName": "useMap publishes every mounted map by id and drops them as they unmount"
+            },
+            {
+              "id": "ported:use-map:2",
+              "testName": "exposes the enclosing map as `current` to a child of that map",
+              "fullName": "useMap exposes the enclosing map as `current` to a child of that map"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-map-gl/tests/_helpers.ts",
+          "role": "support",
+          "sha256": "049a7357b97e6bb9bcb6a407458d6e2c0e532a76b34406102ee36b8fb4e5a2f0"
+        },
+        {
+          "path": "packages/react-map-gl/tests/_mocks/mapbox-gl.ts",
+          "role": "support",
+          "sha256": "ba922849c42f4756360689ba772e6d9c484971e61c00ef65d4a3bd0f188dc509"
+        },
+        {
+          "path": "packages/react-map-gl/tests/_fixtures/upstream-apps.tsrx",
+          "role": "support",
+          "sha256": "0370152e58bb2e0de81a639cbaf337b03a9fd8ab8e451c75e9ccae521484a9fc"
+        }
+      ]
+    },
+    {
+      "id": "react-map-gl-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "available": true,
+      "environment": "workspace-node",
+      "project": "react-map-gl-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Type assertions for the public surface, compiled against @vis.gl/react-mapbox 8.1.2 with tsc and pinned React types.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/react-map-gl/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/react-map-gl/typetests/pristine/types.test-d.ts",
+          "role": "test",
+          "sha256": "9726e647309ea919f1749444bc42ccc796fdceee3d2558a0163070a0ea585186",
+          "cases": [
+            {
+              "id": "types:pristine",
+              "testName": "public surface type assertions",
+              "fullName": "public surface type assertions"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-map-gl/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "cb82e03159b832dd6a70589b26cd2a47d7361981f4b9ff8e7550692c2896b46c"
+        },
+        {
+          "path": "packages/react-map-gl/typetests/assertions.md",
+          "role": "support",
+          "sha256": "edff2f0bb5b5a9166abc9bcef8bf9acb28dab597f0ec21b8a1387cb52bfca0b5"
+        }
+      ]
+    },
+    {
+      "id": "react-map-gl-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "available": true,
+      "environment": "workspace-node",
+      "project": "react-map-gl-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "The same assertion groups against @octanejs/react-map-gl with tsrx-tsc. Permitted transformations are listed in typetests/assertions.md; anything else is drift.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/react-map-gl/typetests/adapted/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/react-map-gl/typetests/adapted/types.test-d.ts",
+          "role": "test",
+          "sha256": "fc8b0d1365ea6e2a645d5435faf880558789c7783d67141f8eed2c6db308da0f",
+          "cases": [
+            {
+              "id": "types:adapted",
+              "testName": "public surface type assertions",
+              "fullName": "public surface type assertions"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-map-gl/typetests/adapted/tsconfig.json",
+          "role": "support",
+          "sha256": "880422de2bd96e3931330566edebc3077781615a194b140546801b811342b720"
+        },
+        {
+          "path": "packages/react-map-gl/typetests/assertions.md",
+          "role": "support",
+          "sha256": "edff2f0bb5b5a9166abc9bcef8bf9acb28dab597f0ec21b8a1387cb52bfca0b5"
+        }
+      ]
+    },
+    {
+      "id": "react-map-gl-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-map-gl-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "One fixture through Octane and the published @vis.gl/react-mapbox 8.1.2 on React, sharing the same mapbox-gl double. This is what licenses the double as evidence: it would have to flatter both bindings identically.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/react-map-gl/audit/differential-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/react-map-gl/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "2b23b967ca83fa2bc314bf973730e7e65913c1491550b9bb93b056432609f0a4",
+          "cases": [
+            {
+              "id": "differential:1",
+              "testName": "renders the same map DOM, and updates marker content identically",
+              "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 renders the same map DOM, and updates marker content identically"
+            },
+            {
+              "id": "differential:2",
+              "testName": "drives the same source and layer calls into the map",
+              "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 drives the same source and layer calls into the map"
+            },
+            {
+              "id": "differential:3",
+              "testName": "updates popup options in place and adds and removes controls alike",
+              "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 updates popup options in place and adds and removes controls alike"
+            },
+            {
+              "id": "differential:4",
+              "testName": "reaches the map by id from outside it, and flies it",
+              "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 reaches the map by id from outside it, and flies it"
+            },
+            {
+              "id": "differential:5",
+              "testName": "honours useControl options called straight from a consumer module",
+              "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 honours useControl options called straight from a consumer module"
+            },
+            {
+              "id": "differential:6",
+              "testName": "picks the default pin or a custom element the same way as upstream",
+              "fullName": "differential: @octanejs/react-map-gl vs @vis.gl/react-mapbox 8.1.2 picks the default pin or a custom element the same way as upstream"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-map-gl/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "6243b34d6d98314f8fc888fce4d01175ea10b7807f239c7bacc42bdfd0ab4897"
+        },
+        {
+          "path": "packages/react-map-gl/tests/_fixtures/differential/map-diff.tsrx",
+          "role": "support",
+          "sha256": "22dc434d30277a4e71df593c4b4fcc83a84d074dca7f870c386e3f64a2c95c03"
+        },
+        {
+          "path": "packages/react-map-gl/tests/_fixtures/differential/source-layer-diff.tsrx",
+          "role": "support",
+          "sha256": "25c6034063651d79110ab4db4aea894e5012c8ef407d0f0402d8195d2e0d82c6"
+        },
+        {
+          "path": "packages/react-map-gl/tests/_fixtures/differential/overlay-diff.tsrx",
+          "role": "support",
+          "sha256": "acb27e3657c5ec2b560e4c1c0d102983f10caffdde2116dd3c1d29cbf384de2f"
+        },
+        {
+          "path": "packages/react-map-gl/tests/_fixtures/differential/use-map-diff.tsrx",
+          "role": "support",
+          "sha256": "84b5dcef729f592bf9f64bd2b774a632e917a3402214968f2abd01c2e6b5a539"
+        },
+        {
+          "path": "packages/react-map-gl/tests/_fixtures/differential/use-control-diff.tsrx",
+          "role": "support",
+          "sha256": "ec6c5bf38832663f18f5c9bff3fcd91ac9e9d5981d8dea6850d8cf7c589fbba2"
+        },
+        {
+          "path": "packages/react-map-gl/tests/_fixtures/differential/marker-children-diff.tsrx",
+          "role": "support",
+          "sha256": "08f0546cd077c8a5b317fa74de5ef92af90eca85aaef228248e6977c6ebbd6a1"
+        },
+        {
+          "path": "packages/react-map-gl/tests/_mocks/mapbox-gl.ts",
+          "role": "support",
+          "sha256": "ba922849c42f4756360689ba772e6d9c484971e61c00ef65d4a3bd0f188dc509"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "react-map-gl-source-id-by-context",
+      "caseIds": ["ported:source-layer:3"],
+      "upstreamResult": "<Source> clones its children with cloneElement(child, {source: id}), which reaches direct children only and overrides any explicit source prop.",
+      "octaneResult": "<Source> publishes its id through a context that <Layer> reads, which reaches any descendant layer and likewise overrides an explicit source prop.",
+      "rationale": "Octane's compiler lowers a .tsrx parent's element children to a render function, which cannot be cloned, so the id cannot be injected per child.",
+      "classification": "compiler-model",
+      "consumerImpact": "A <Layer> nested below a wrapper component inside a <Source> inherits that source id, where upstream would have left it unset.",
+      "migrationGuidance": "Set an explicit source on layers that must not belong to an enclosing <Source>, and keep such layers outside it.",
+      "owner": "@octanejs/react-map-gl",
+      "reviewCondition": "Review if Octane gains a way to project props onto a compiled children block."
+    },
+    {
+      "id": "react-map-gl-refs-as-props",
+      "caseIds": ["ported:map:1", "ported:marker:1", "ported:popup:1", "ported:controls:3"],
+      "upstreamResult": "Map, Marker, Popup and GeolocateControl are wrapped in forwardRef and receive their ref through the React ref channel.",
+      "octaneResult": "The same components declare `ref` as an ordinary prop; Octane has no forwardRef.",
+      "rationale": "Octane follows the React 19 refs-as-props model and does not ship forwardRef.",
+      "classification": "ref-model",
+      "consumerImpact": "`<Map ref={mapRef} />` continues to work unchanged; only code that wrapped these components in its own forwardRef needs updating.",
+      "migrationGuidance": "Pass ref as a normal prop and drop any forwardRef wrapper.",
+      "owner": "@octanejs/react-map-gl",
+      "reviewCondition": "Review if Octane adds a forwardRef compatibility shim."
+    }
+  ]
+}

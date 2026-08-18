@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/motion/tests/conformance/config.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane MotionConfig context behavior."
+    },
+    {
+      "path": "packages/motion/tests/conformance/drag.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks pointer drag behavior in the Octane host integration."
+    },
+    {
+      "path": "packages/motion/tests/conformance/effects.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks animation and gesture effect lifecycle with controlled engine observations."
+    },
+    {
+      "path": "packages/motion/tests/conformance/exit.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Documents cleanup-before-detach exit animations versus React deferred deletion.",
+      "divergenceIds": ["motion-exit-cleanup-before-detach"]
+    },
+    {
+      "path": "packages/motion/tests/conformance/fixture-compiler.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks fail-closed React fixture compilation."
+    },
+    {
+      "path": "packages/motion/tests/conformance/inView.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks IntersectionObserver integration."
+    },
+    {
+      "path": "packages/motion/tests/conformance/initial-only.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Documents that an initial-only target does not materialize inline styles on Octane.",
+      "divergenceIds": ["motion-initial-only-no-style-materialization"]
+    },
+    {
+      "path": "packages/motion/tests/conformance/layout.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Documents bounded single-element FLIP versus React's full projection tree.",
+      "divergenceIds": ["motion-bounded-layout-flip"]
+    },
+    {
+      "path": "packages/motion/tests/conformance/layoutGroup.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane-owned framework integration contract outside the React parity lanes."
+    },
+    {
+      "path": "packages/motion/tests/conformance/layoutId.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Documents bounded shared-element crossfade versus React's full projection tree.",
+      "divergenceIds": ["motion-bounded-layoutId"]
+    },
+    {
+      "path": "packages/motion/tests/conformance/layoutRegistry.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane-owned framework integration contract outside the React parity lanes."
+    },
+    {
+      "path": "packages/motion/tests/conformance/lazyMotion.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane-owned framework integration contract outside the React parity lanes."
+    },
+    {
+      "path": "packages/motion/tests/conformance/motionValue.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks direct MotionValue-to-style binding."
+    },
+    {
+      "path": "packages/motion/tests/conformance/reducedMotion.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane-owned framework integration contract outside the React parity lanes."
+    },
+    {
+      "path": "packages/motion/tests/conformance/reducedMotionConfig.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks an Octane-owned framework integration contract outside the React parity lanes."
+    },
+    {
+      "path": "packages/motion/tests/conformance/render.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks initial mount styling and the broader Octane host rendering contract."
+    },
+    {
+      "path": "packages/motion/tests/conformance/rerender.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane child reconciliation."
+    },
+    {
+      "path": "packages/motion/tests/conformance/scroll.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks scroll-linked MotionValues."
+    },
+    {
+      "path": "packages/motion/tests/conformance/stagger.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane variant orchestration timing."
+    },
+    {
+      "path": "packages/motion/tests/conformance/transparent-children.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane descriptor-child transparency."
+    },
+    {
+      "path": "packages/motion/tests/conformance/useAnimate.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks scoped animation cleanup."
+    },
+    {
+      "path": "packages/motion/tests/conformance/useMotionValueEvent.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks subscription timing and cleanup."
+    },
+    {
+      "path": "packages/motion/tests/conformance/useSpring.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks spring frame progression and source following."
+    },
+    {
+      "path": "packages/motion/tests/conformance/useTransform.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks supported transform forms and cleanup."
+    },
+    {
+      "path": "packages/motion/tests/conformance/variantTransition.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks inline variant transition separation."
+    },
+    {
+      "path": "packages/motion/tests/conformance/variants.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane variant resolution and propagation."
+    },
+    {
+      "path": "packages/motion/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the same host-rendering and child-update fixture against motion/react@12.42.2 and @octanejs/motion."
+    },
+    {
+      "path": "packages/motion/tests/production-bundle.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks production-bundle reachability for the public motion entry."
+    },
+    {
+      "path": "packages/motion/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs the curated Motion useMotionValue Jest suite byte-exact against motion/react@12.42.2."
+    },
+    {
+      "path": "packages/motion/typetests/adapted/types.test-d.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Repo-authored adapted public-surface type probes against @octanejs/motion, paired one-for-one with the pristine type lane via packages/motion/typetests/assertions.md."
+    },
+    {
+      "path": "packages/motion/typetests/pristine/types.test-d.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Repo-authored pristine public-surface type probes against motion/react@12.42.2, paired one-for-one with the adapted type lane via packages/motion/typetests/assertions.md."
+    },
+    {
+      "path": "packages/motion/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane binding public type surface; manifest type lanes carry parity evidence."
+    }
+  ]
+}

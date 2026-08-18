@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/lexical/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs every declared scenario against pinned @lexical/react and @octanejs/lexical through the shared differential rig."
+    },
+    {
+      "path": "packages/lexical/tests/unit/composer.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane composer context and lifecycle behavior; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/content-editable-element.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane content-editable element implementation; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/editor.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks representative editor integration on Octane; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/lexical-menu.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane menu primitives and positioning integration; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/nested-composer.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks nested Octane composer behavior; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/node-context-menu.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane node context-menu port; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/node-menu.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane node-menu port; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/phase2-plugins.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks a bounded group of Octane plugin ports; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/phase3-plugins.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks a bounded group of Octane plugin ports; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/plain-rich-text-plugin.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane plain- and rich-text plugin integration; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/smoke.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the local Octane package surface; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/typeahead-menu.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane typeahead menu port; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/use-character-limit.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane character-limit hook; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/use-menu-anchor-ref.shadow.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks shadow-root positioning in the Octane port; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lexical/tests/unit/use-menu-anchor-ref.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks menu-anchor positioning in the Octane port; it is not counted as React parity evidence."
+    }
+  ]
+}

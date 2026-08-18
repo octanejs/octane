@@ -16,6 +16,9 @@ suite backed by the Next.js app under `test/`. npm-tarball absence is therefore
 not evidence that the repository has no tests; `upstreamSuites.runtime` is
 `present`, and the suite is vendored at `packages/sonner/upstream/`.
 
+Bounded required React-parity evidence currently registered in
+`audit/react-parity.json`:
+
 - a pristine Playwright lane that runs the vendored suite unchanged against
   published `sonner@2.0.7` (chromium project) through the generic
   `playwright-full` harness runner;
@@ -32,8 +35,8 @@ full verified evidence set is complete.
 
 When updating the pin, re-vendor `packages/sonner/upstream/` from the matching
 Git tag, fetch and checksum the new npm artifact, refresh every manifest hash,
-revisit each upstream-case disposition, and rerun every required behavioral and
-type lane.
+revisit each upstream-case disposition, and rerun every required lane plus the
+global parity audit.
 
 ## Upstream runtime suite disposition
 

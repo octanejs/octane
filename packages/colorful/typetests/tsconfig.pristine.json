@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "esModuleInterop": true,
+    "jsx": "react",
+    "jsxFactory": "React.createElement",
+    "moduleResolution": "node",
+    "declaration": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "react": ["../node_modules/@types/react-colorful-pristine/index.d.ts"],
+      "react-dom": ["../node_modules/@types/react-dom-colorful-pristine/index.d.ts"]
+    }
+  },
+  "include": ["../upstream/tag/src/**/*"]
+}

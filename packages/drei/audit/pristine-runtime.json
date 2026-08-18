@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "root": "packages/drei/upstream",
+  "tests": [
+    {
+      "file": "test/e2e/snapshot.test.ts",
+      "fullName": "should match previous one",
+      "status": "passed"
+    }
+  ],
+  "snapshots": 1
+}

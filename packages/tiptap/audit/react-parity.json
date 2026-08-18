@@ -1,0 +1,377 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/ueberdosis/tiptap.git",
+    "version": "@tiptap/react@3.28.0",
+    "commit": "c5f4b576eb2d521364bba524616e0702027987d3",
+    "sourceRoot": "packages/react/src",
+    "testRoot": "packages/react/src",
+    "license": "MIT",
+    "integrity": "sha256:92d1d53c119f0e0e6049effd0bba0e94d83508e3a7c7fd8d406e19fe16c49ca5",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "insufficient"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/tiptap/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/tiptap/tests/upstream"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 7,
+    "uniqueIdentities": 7,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "tiptap-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tiptap-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the byte-exact @tiptap/react@3.28.0 Vitest suite from the vendored npm pin against upstream's own React binding after verifyTiptapUpstream checks SHA256SUMS. Source-level scenario pairs and permitted transformations are pinned in audit/runtime-parity.json.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tiptap/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tiptap/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "94603d4fc4bb1764842eef97a48b1023c70eb29ffde69db0466eda8d8db6dfed"
+        },
+        {
+          "path": "packages/tiptap/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "20cd60a54d60da3e0768e825bc98c5d1798e697384459fd9ee424f1194694663"
+        },
+        {
+          "path": "packages/tiptap/scripts/verify-upstream.mjs",
+          "role": "support",
+          "sha256": "b683ee6f75cfe7b15f13c2dfcde34de01a20eeb2f8d886277d810f74420ee6b8"
+        },
+        {
+          "path": "packages/tiptap/tests/_harness/verify-upstream.ts",
+          "role": "support",
+          "sha256": "640b2a24d7ec40b4f72a82ed720c2fb76ad54c65cd0bb232c20f97ab21d98337"
+        },
+        {
+          "path": "packages/tiptap/upstream/LICENSE.md",
+          "role": "support",
+          "sha256": "c96e5ecb55ac593157ad1d21d1f44a611187f494a0f04c235a1ae692c88d6ba9"
+        },
+        {
+          "path": "packages/tiptap/upstream/package.json",
+          "role": "support",
+          "sha256": "2aed9edf82538a76d8696aa248397b160302793bd5081b235359335a688ccf95"
+        },
+        {
+          "path": "packages/tiptap/upstream/src/EditorContent.spec.ts",
+          "role": "support",
+          "sha256": "f676c23f770da71f583d92c0b8e0c34cdd70ad745cee4ac18ef7c2dc5cc98c9d"
+        },
+        {
+          "path": "packages/tiptap/upstream/src/menus/BubbleMenu.spec.ts",
+          "role": "support",
+          "sha256": "1985f9acd85325f9c73d18dbfba9c2db3d717266e6ddabcea5c22c01e20e1381"
+        },
+        {
+          "path": "packages/tiptap/upstream/src/menus/FloatingMenu.spec.ts",
+          "role": "support",
+          "sha256": "c3c97eee056f785002c0355103b00e0cbd22a04755d0d714174ad629778c60d8"
+        },
+        {
+          "path": "packages/tiptap/upstream/src/use-client.spec.ts",
+          "role": "support",
+          "sha256": "d4e2c3db1a642276358d27f138b7f7f35e4c3a02368d8525d7573ec143f36f7e"
+        },
+        {
+          "path": "packages/tiptap/audit/runtime-parity.json",
+          "role": "support",
+          "sha256": "5d675cd756289835f5028d60d567cf3690b079260d2724cf383b8bc273bea5a3"
+        },
+        {
+          "path": "packages/tiptap/tests/upstream/assertions.md",
+          "role": "support",
+          "sha256": "1bd1acf855ab715331a68eccb0acf9b9da6d6983bacead35ccaad72753acc5e3"
+        }
+      ]
+    },
+    {
+      "id": "tiptap-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tiptap-upstream",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "One-for-one Octane adaptation of every upstream React runtime case, including the native-event menu divergence. Permitted transformations are listed in tests/upstream/assertions.md and verified by scripts/react-parity/tiptap-runtime-lib.mjs.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tiptap/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tiptap/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "0fc93e667d800b5fa3583786ee6bd20b56c964bc6101937710ba0b116f544cc0"
+        },
+        {
+          "path": "packages/tiptap/tests/upstream/BubbleMenu.test.ts",
+          "role": "support",
+          "sha256": "72a72496fe24eb9dabce298a5e9fdc721b33c1dea6f668a95cc853c1818f7ad5"
+        },
+        {
+          "path": "packages/tiptap/tests/upstream/EditorContent.test.ts",
+          "role": "support",
+          "sha256": "787092aeb246ae24c18cf2057a93fe777a15cbf74575c1267673fee8c6342285"
+        },
+        {
+          "path": "packages/tiptap/tests/upstream/FloatingMenu.test.ts",
+          "role": "support",
+          "sha256": "4ee67ee938a0b298311638d52f6b93b9598551160979ff3df28ebe0fce39fb63"
+        },
+        {
+          "path": "packages/tiptap/tests/upstream/use-client.test.ts",
+          "role": "support",
+          "sha256": "71b09effe85a54c1af02eb46bc4f7480ed62d1744049f218f97dc905ceaabc8e"
+        },
+        {
+          "path": "packages/tiptap/audit/runtime-parity.json",
+          "role": "support",
+          "sha256": "5d675cd756289835f5028d60d567cf3690b079260d2724cf383b8bc273bea5a3"
+        },
+        {
+          "path": "packages/tiptap/tests/upstream/assertions.md",
+          "role": "support",
+          "sha256": "1bd1acf855ab715331a68eccb0acf9b9da6d6983bacead35ccaad72753acc5e3"
+        }
+      ]
+    },
+    {
+      "id": "tiptap-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tiptap-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs exact editor and custom-view lifecycle fixtures against @tiptap/react@3.28.0.",
+      "files": [
+        {
+          "path": "packages/tiptap/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "375525946b5dd778b68cf738d736ed227e4872884dba8b115f80a9889dff3bcd",
+          "cases": [
+            {
+              "id": "differential:tiptap-editor",
+              "testName": "renders and updates a StarterKit editor identically",
+              "fullName": "differential: @octanejs/tiptap vs @tiptap/react renders and updates a StarterKit editor identically"
+            },
+            {
+              "id": "differential:tiptap-custom-views",
+              "testName": "matches renderer, node-view, and mark-view behavior through their visible lifecycles",
+              "fullName": "differential: @octanejs/tiptap vs @tiptap/react matches renderer, node-view, and mark-view behavior through their visible lifecycles"
+            },
+            {
+              "id": "differential:tiptap-node-view-as-prop",
+              "testName": "consumes NodeViewWrapper as without forwarding the attribute",
+              "fullName": "differential: @octanejs/tiptap vs @tiptap/react consumes NodeViewWrapper as without forwarding the attribute"
+            }
+          ]
+        },
+        {
+          "path": "packages/tiptap/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "ef02c12eaf28e2f8d68770cd8ddcdc288c8724c302fba6ad9df850557471d9a0"
+        },
+        {
+          "path": "packages/tiptap/tests/differential/fixture-compiler.ts",
+          "role": "support",
+          "sha256": "c061012a921df2062e9d0cfc61cc3bb1c97aaeec5022b911439dfd4bdd666595"
+        },
+        {
+          "path": "packages/tiptap/tests/_fixtures/basic-editor.tsrx",
+          "role": "support",
+          "sha256": "92c218dcffa37ede5ab9655249e75b874bf12912803cd56459850c4cdfa0453d"
+        },
+        {
+          "path": "packages/tiptap/tests/_fixtures/custom-views-parity.tsrx",
+          "role": "support",
+          "sha256": "2150de75b00deb207f1ac8270818c39852c4ba5ba1c10cc2cc87ec6cb496fde5"
+        },
+        {
+          "path": "packages/tiptap/tests/_fixtures/custom-views-as-prop-parity.tsrx",
+          "role": "support",
+          "sha256": "5be071a5b39421959ed575061639931631e39f5e8e08057e03ac02c7d5f06796"
+        },
+        {
+          "path": "packages/tiptap/tests/differential/mark-view-portal-cleanup.test.ts",
+          "role": "test",
+          "sha256": "0ad96a5bdcef793e3b5800b69d196b0b3464030a34ee33e8c8ce5b063003fc34",
+          "cases": [
+            {
+              "id": "differential:tiptap-mark-view-portal-cleanup",
+              "testName": "runs mark-view portal teardown on Octane while React retains the tree",
+              "fullName": "differential: @octanejs/tiptap vs @tiptap/react runs mark-view portal teardown on Octane while React retains the tree"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tiptap-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tiptap-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Port-authored React declaration probes against @tiptap/react@3.28.0 with tsc. Structural verification and inventories are owned by scripts/react-parity/tiptap-types-lib.mjs.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/tiptap/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tiptap/audit/pristine-types.json",
+          "role": "test",
+          "sha256": "734449705337d5204b75240ba1ee4237fd960bda12e4b0b0ca8e9d01746ae685",
+          "cases": [
+            {
+              "id": "types:tiptap-pristine",
+              "testName": "public surface type assertions",
+              "fullName": "public surface type assertions"
+            }
+          ]
+        },
+        {
+          "path": "packages/tiptap/typetests/pristine/types.test-d.ts",
+          "role": "support",
+          "sha256": "95238043ead049d67c712416cec693c5c334c1c84374a3f771ed97117b557bf5"
+        },
+        {
+          "path": "packages/tiptap/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "625adac63dfb75c80a49670b8e58122bebf57f8395a4729d8f69e9a26c5c28fb"
+        },
+        {
+          "path": "packages/tiptap/audit/type-parity.json",
+          "role": "support",
+          "sha256": "73f0be2a8160ff05a5dddb0e7a95b7e58f839b70c2a38f69992bb98aedcfeba2"
+        },
+        {
+          "path": "packages/tiptap/typetests/assertions.md",
+          "role": "support",
+          "sha256": "71ef34610923b32f20691c2eb1a1afeba9c3e7d78c712f2d27cc9a53774c3328"
+        }
+      ]
+    },
+    {
+      "id": "tiptap-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tiptap-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Matching Octane public probes against @octanejs/tiptap with tsrx-tsc. Permitted transformations are listed in typetests/assertions.md and verified by scripts/react-parity/tiptap-types-lib.mjs.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tiptap/typetests/adapted/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tiptap/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "273985c8f29e4ac360ae971892e9c376aab8789868092da95aa6aa1f1a8218db",
+          "cases": [
+            {
+              "id": "types:tiptap-adapted",
+              "testName": "public surface type assertions",
+              "fullName": "public surface type assertions"
+            }
+          ]
+        },
+        {
+          "path": "packages/tiptap/typetests/adapted/types.test-d.ts",
+          "role": "support",
+          "sha256": "6eeefe126b9a374246fd4a9e04d7bec9d4471458ccbbc62ac598822f26254091"
+        },
+        {
+          "path": "packages/tiptap/typetests/adapted/tsconfig.json",
+          "role": "support",
+          "sha256": "85342f8f26ac24e2ac20a4f02687b4d82db76a7796c8395a2aa4d6933a398ecd"
+        },
+        {
+          "path": "packages/tiptap/audit/type-parity.json",
+          "role": "support",
+          "sha256": "73f0be2a8160ff05a5dddb0e7a95b7e58f839b70c2a38f69992bb98aedcfeba2"
+        },
+        {
+          "path": "packages/tiptap/typetests/assertions.md",
+          "role": "support",
+          "sha256": "71ef34610923b32f20691c2eb1a1afeba9c3e7d78c712f2d27cc9a53774c3328"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "tiptap-native-menu-events",
+      "caseIds": ["runtime:6b2bf62b801a2b07"],
+      "upstreamResult": "React menu handlers receive synthetic events.",
+      "octaneResult": "Menu handlers receive native MouseEvent instances.",
+      "rationale": "Octane dispatches native browser events.",
+      "classification": "framework-integration",
+      "consumerImpact": "There is no nativeEvent wrapper property.",
+      "migrationGuidance": "Use standard DOM event fields directly.",
+      "owner": "@octanejs/tiptap",
+      "reviewCondition": "Review if Octane introduces synthetic events."
+    },
+    {
+      "id": "tiptap-node-view-as-prop",
+      "caseIds": ["differential:tiptap-node-view-as-prop"],
+      "upstreamResult": "NodeViewWrapper forwards the as prop onto the host DOM node as an invalid attribute.",
+      "octaneResult": "NodeViewWrapper consumes as when selecting the host tag and does not forward it.",
+      "rationale": "Octane treats as as a host-tag selector rather than a passthrough DOM attribute.",
+      "classification": "dom-attribute",
+      "consumerImpact": "Selectors and attribute snapshots must not expect an as attribute on the rendered host.",
+      "migrationGuidance": "Pass as only to choose the host tag; read tagName instead of the as attribute.",
+      "owner": "@octanejs/tiptap",
+      "reviewCondition": "Review if Octane starts forwarding unknown host props differently."
+    },
+    {
+      "id": "tiptap-mark-view-portal-cleanup",
+      "caseIds": ["differential:tiptap-mark-view-portal-cleanup"],
+      "upstreamResult": "ReactMarkView can leave a renderer portal registered after ProseMirror destroys the mark view.",
+      "octaneResult": "ReactMarkView.destroy unregisters and destroys the Octane portal immediately.",
+      "rationale": "Octane closes the known @tiptap/react 3.28.0 mark-view portal leak on destroy.",
+      "classification": "lifecycle",
+      "consumerImpact": "Mark removal must not retain detached portal hosts or stale mark-view refs.",
+      "migrationGuidance": "Rely on destroy-driven portal teardown; do not keep manual mark-view registries for this pin.",
+      "owner": "@octanejs/tiptap",
+      "reviewCondition": "Review if upstream mark-view destroy semantics change."
+    }
+  ]
+}

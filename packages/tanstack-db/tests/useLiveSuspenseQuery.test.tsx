@@ -604,7 +604,10 @@ describe(`useLiveSuspenseQuery`, () => {
 
 	// OCTANE DIVERGENCE: the upstream `StrictMode double-invocation` case is NOT
 	// APPLICABLE. Octane has no StrictMode development double-invoke of component
-	// setup/cleanup, so there is no double-invocation behavior to assert.
+	// setup/cleanup, so there is no double-invocation behavior to assert. Recorded
+	// as not-applicable in UPSTREAM.md and audit/test-classifications.json rather
+	// than committed as a skipped test (which the committed-test-marker gate
+	// forbids).
 
 	it(`renders the Suspense fallback while an async collection loads, then the data`, async () => {
 		// Regression for the raw-promise-throw bug. Octane Suspense only recognizes

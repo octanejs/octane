@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/lucide/tests/bundle.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the generated Octane package bundle and React-runtime exclusion; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lucide/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs every declared scenario against pinned lucide-react and @octanejs/lucide through the shared differential rig."
+    },
+    {
+      "path": "packages/lucide/tests/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the generated Octane namespace against the pinned published surface; it is not itself a same-fixture React differential."
+    },
+    {
+      "path": "packages/lucide/tests/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane server-to-client SVG adoption; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lucide/tests/runtime.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane icon, context, and dynamic-loader behavior; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lucide/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane server rendering; it is not counted as React parity evidence."
+    }
+  ]
+}

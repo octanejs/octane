@@ -19,6 +19,11 @@ typecheck only — no dedicated type-test harness). Provenance stays
 `recorded-unverified` until pristine upstream and one-for-one adapted
 full-suite lanes can execute under `verified` provenance.
 
+Until then, the required differential lane executes four same-fixture
+React/Octane scenarios under `react-parity:check`. Ordinary CI keeps
+Octane-only nested-flush, SSR, and harness-setup contracts. Real-layout
+browser coverage remains an explicit gap pending adapted e2e ownership.
+
 ## Upstream test-suite disposition
 
 Every artifact under `packages/react-virtual/tests` and

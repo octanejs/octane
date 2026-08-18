@@ -1,0 +1,148 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/TanStack/virtual.git",
+    "version": "@tanstack/react-virtual@3.14.5",
+    "commit": "151e9f47abd4ef2d3b11936c04be8908e6bd0607",
+    "sourceRoot": "packages/react-virtual/src",
+    "testRoot": "packages/react-virtual/tests",
+    "license": "MIT",
+    "integrity": "sha256:e93b937aa9cdc910ab9dddae1c342acee8c2d45b5574298383e204b5a94b718e",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/tanstack-virtual/src"],
+      "include": ["\\.ts$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/tanstack-virtual/tests/differential"],
+      "include": ["parity\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "tanstack-virtual-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-virtual-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Required same-fixture React/Octane windowing scenarios. Provenance stays recorded-unverified until pristine upstream and one-for-one adapted full-suite lanes exist; react-parity:check still executes this required lane. Vitest project is wholly react-parity-owned via testExecution.",
+      "files": [
+        {
+          "path": "packages/tanstack-virtual/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "fbbd98059795df792e88a96856db3232fec66d705f76727a2e83e9023ca38cfb",
+          "cases": [
+            {
+              "id": "differential:tanstack-virtual-basic",
+              "testName": "BasicList: scroll windows + count clamp + scrollToIndex, byte-identical",
+              "fullName": "differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtual BasicList: scroll windows + count clamp + scrollToIndex, byte-identical"
+            },
+            {
+              "id": "differential:tanstack-virtual-horizontal",
+              "testName": "HorizontalList: scrollLeft windowing, byte-identical",
+              "fullName": "differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtual HorizontalList: scrollLeft windowing, byte-identical"
+            },
+            {
+              "id": "differential:tanstack-virtual-dynamic",
+              "testName": "DynamicList: measureElement + resizeItem + measure(), byte-identical",
+              "fullName": "differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtual DynamicList: measureElement + resizeItem + measure(), byte-identical"
+            },
+            {
+              "id": "differential:tanstack-virtual-window",
+              "testName": "WindowList: window scroll windowing, byte-identical",
+              "fullName": "differential: @octanejs/tanstack-virtual vs real @tanstack/react-virtual WindowList: window scroll windowing, byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "3864d3736c50302580c27825645fede026ed2cab96d4d287bdbb0cbfdca55fa1"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/differential/fixture-compiler.ts",
+          "role": "support",
+          "sha256": "bc084ffb146b2a6982bf70d7a9b83d57b729297f6b93dd246456909279bdaa93"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/_setup.ts",
+          "role": "support",
+          "sha256": "f2e46ded38b1f54a3493c0587ce519dd4ec3f811fa6412525fcc5cf17efb8d90"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/_fixtures/basic-list-diff.tsrx",
+          "role": "support",
+          "sha256": "cf8296962fa6fb86a07010b4a568e8b674fd71a72dc06a657fc8762e76084664"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/_fixtures/dynamic-measure-diff.tsrx",
+          "role": "support",
+          "sha256": "b980804610c7e7e2a62fd770ce1811e5bc11fff00453b75386e2171d6fcecfd6"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/_fixtures/horizontal-diff.tsrx",
+          "role": "support",
+          "sha256": "7b354c8873feb4dda8ab89a5290a538b0271981aa36a95d44b2b7b7f1d479614"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/_fixtures/window-diff.tsrx",
+          "role": "support",
+          "sha256": "98085e53308052da1ffa7980e533f40b751ca337db51d6ec5e4a00681421ab8e"
+        }
+      ]
+    }
+  ],
+  "ordinaryEvidence": [
+    {
+      "path": "packages/tanstack-virtual/tests/conformance/nested-flush.test.ts",
+      "sha256": "24b49b238ffd6e3aeaf0b377e622be275fd2cc9f9f9a035cb5de00b16cbeac37",
+      "cases": [
+        {
+          "id": "conformance:nested-flush-sync-scroll",
+          "testName": "sync scroll update inside a discrete-event flush still lands (flushSync degradation)",
+          "fullName": "state wiring + scrolling sync scroll update inside a discrete-event flush still lands (flushSync degradation)"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "nested-flushsync-degradation",
+      "caseIds": ["conformance:nested-flush-sync-scroll"],
+      "upstreamResult": "Nested flushSync during a sync scroll notify re-enters React and applies the window update inside the nested flush.",
+      "octaneResult": "Nested flushSync hits Octane's re-entrancy guard and degrades to a plain dispatch drained by the ambient flush; the window still updates once that flush settles.",
+      "rationale": "Octane intentionally refuses nested flushSync; the adapter preserves upstream's flushSync-on-sync-scroll wiring and relies on the ambient flush to land the update.",
+      "classification": "flush-model",
+      "consumerImpact": "Consumer-invisible for normal scroll/input paths; only programs that depend on nested flushSync completing before the outer flush continues can observe timing differences.",
+      "migrationGuidance": "Keep relying on the settled window after the outer event/flush; do not assume nested flushSync mutates DOM before the outer flush returns.",
+      "owner": "@octanejs/tanstack-virtual",
+      "reviewCondition": "Review if Octane gains true nested flushSync or the adapter stops calling flushSync on sync scroll notifies."
+    }
+  ]
+}

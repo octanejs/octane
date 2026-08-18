@@ -76,7 +76,15 @@ Octane-authored conformance stays in `tests/*.test.ts` and is outside
 | `src/swr/__tests__/useSubscriptionSWR-test.browser.tsx` | Out of scope: Octane has no SWR binding. |
 | `src/swr/__tests__/useTrackedDataSWR-test.browser.tsx` | Out of scope: Octane has no SWR binding. |
 
+Omission/rename negative controls for the pristine runtime inventory live in
+`scripts/react-parity/solana-react-parity-controls.test.mjs`.
+
 ### Type files
+
+Machine-checkable dispositions live in
+`packages/solana-react/audit/type-parity.json` (`fileDispositions`). The pristine
+type lane runs every `adapted` and `pristine-only` artifact; the adapted lane
+mirrors every `adapted` file one-for-one.
 
 | Upstream artifact | Disposition |
 |---|---|
@@ -96,6 +104,11 @@ Octane-authored conformance stays in `tests/*.test.ts` and is outside
 | `src/swr/__typetests__/useRequestSWR-typetest.ts` | `out-of-scope` — Octane has no SWR binding. |
 | `src/swr/__typetests__/useSubscriptionSWR-typetest.ts` | `out-of-scope` — Octane has no SWR binding. |
 | `src/swr/__typetests__/useTrackedDataSWR-typetest.ts` | `out-of-scope` — Octane has no SWR binding. |
+
+Type inventories, the permitted-transformation ledger, and skipped-file /
+deleted-assertion / removed-`@ts-expect-error` / omitted-disposition negative
+controls live in `packages/solana-react/audit/type-parity.json` and
+`scripts/react-parity/solana-react-types-lib{,.test}.mjs`.
 
 ## Intentional divergences
 
