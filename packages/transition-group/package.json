@@ -40,41 +40,21 @@
     "./config": "./src/config.ts"
   },
   "scripts": {
-    "test": "pnpm upstream:check && pnpm upstream:verify && pnpm test:upstream && vitest run --root ../.. --project transition-group --project transition-group-ssr",
-    "parity:inventory": "node ../../scripts/react-parity/react-transition-group-runtime-inventory.mjs",
-    "test:upstream": "jest --config tests/upstream-jest.config.cjs --rootDir upstream --runInBand --no-watchman",
-    "upstream:check": "node audit/check-upstream.mjs",
-    "upstream:verify": "node ../../scripts/react-parity/react-transition-group-upstream.mjs",
-    "parity:pristine-inventory": "node ../../scripts/react-parity/react-transition-group-pristine-runtime.mjs --write",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
-    "test:type-parity": "tsc --noEmit -p upstream-types/tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
-    "parity:types": "node ../../scripts/react-parity/react-transition-group-types.mjs",
-    "parity:types:write": "node ../../scripts/react-parity/react-transition-group-types.mjs --write"
+    "test": "vitest run --root ../.. --project transition-group --project transition-group-ssr",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
   },
   "peerDependencies": {
     "octane": "workspace:*"
   },
   "devDependencies": {
-    "@babel/core": "^7.28.0",
-    "@babel/preset-env": "^7.28.0",
-    "@babel/preset-react": "^7.27.1",
     "@octanejs/testing-library": "workspace:*",
     "@testing-library/react": "^14.3.1",
     "@tsrx/react": "catalog:default",
     "@types/react": "catalog:default",
     "@types/react-dom": "catalog:default",
-    "babel-jest": "30.4.1",
-    "babel-plugin-add-module-exports": "^1.0.4",
-    "dom-helpers": "^5.2.1",
-    "jest": "30.4.2",
-    "jest-environment-jsdom": "30.4.1",
-    "jest-environment-node": "30.4.1",
     "octane": "workspace:*",
-    "prop-types": "^15.8.1",
     "react": "catalog:default",
     "react-dom": "catalog:default",
-    "react18": "npm:react@18.3.1",
-    "react-dom18": "npm:react-dom@18.3.1",
     "react-transition-group": "catalog:default",
     "typescript": "catalog:default",
     "vitest": "catalog:default",

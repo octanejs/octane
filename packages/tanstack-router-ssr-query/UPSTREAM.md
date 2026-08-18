@@ -26,12 +26,6 @@ result. The adapted lane mirrors that compile once with `tsrx-tsc` (TypeScript 5
 TypeScript 5.5, 5.6, 5.7, 5.8, and 6.0 are recorded as adapted-lane incompatibilities because
 Octane's typecheck toolchain is a single `tsrx-tsc` version.
 
-The package publishes one runtime entrypoint plus a metadata-only `./package.json` entrypoint. The
-export crosswalk maps `Options` and `setupRouterSsrQueryIntegration` individually. The Octane
-package deliberately omits the metadata subpath; that gap, its consumer impact, and agreement with
-`status.json` are recorded in `audit/upstream-crosswalk.json`. The published `1.167.1` adapter
-depends on core `1.169.1`; the Octane dependency is therefore faithful rather than a version drift.
-
 ## Executable evidence
 
 A repo-authored server differential executes equivalent setup calls against the Octane and pinned

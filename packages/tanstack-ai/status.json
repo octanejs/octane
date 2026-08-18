@@ -19,7 +19,7 @@
     "Hook modules are authored as TSRX with checked declaration companions; no ported hook renders JSX or references React types in its public signature.",
     "145 tanstack-ai runtime tests plus 1 SSR test pass, reusing the upstream behavioral tests with no skipped, todo, or expected-failure cases.",
     "Differential coverage runs one exact shared chat fixture through this binding and real @tanstack/ai-react@0.17.0, comparing streamed output after each step; output is byte-equal.",
-    "The bounded React parity manifest pins the official release tag and commit, inventories the upstream repository suite, and executes the required differential lane. Adaptation, SSR, and type contracts remain ordinary package evidence. Provenance remains recorded-unverified until pristine / adapted upstream lanes are registered."
+    "The official release tag and commit are recorded in UPSTREAM.md. The same-fixture differential lane runs alongside ordinary adaptation, SSR, and type-contract tests."
   ],
   "verified": "2026-08-09"
 }

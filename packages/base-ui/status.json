@@ -3,7 +3,7 @@
     "package": "@base-ui/react",
     "version": "1.6.0"
   },
-  "surface": "Alpha, in progress: 35 of 43 upstream subpaths. The implemented surface has a complete byte-exact upstream inventory, 98 same-fixture React/Octane differential cases, and 49 Accordion, Collapsible, and Tabs adapted cases. This is bounded evidence and remains recorded-unverified because eight public subpaths and most of the canonical runtime/type suite are not yet adapted. Menu covers all 20 upstream parts, Toast all 11 parts, Collapsible all 3 parts, Accordion all 5 parts, and Tabs 4 of 5 parts (Indicator unported); their detailed gaps and evidence are recorded in UPSTREAM.md and audit/react-parity.json.",
+  "surface": "Alpha, in progress: 35 of 43 upstream subpaths. The implemented surface has a complete byte-exact upstream inventory, 98 same-fixture React/Octane differential cases, and 49 Accordion, Collapsible, and Tabs adapted cases. This is bounded evidence and remains recorded-unverified because eight public subpaths and most of the canonical runtime/type suite are not yet adapted. Menu covers all 20 upstream parts, Toast all 11 parts, Collapsible all 3 parts, Accordion all 5 parts, and Tabs 4 of 5 parts (Indicator unported).",
   "divergences": [
     "`native-event-semantics`: Host handlers receive native DOM events rather than React synthetic events; text edits use native `input`, form-facing NumberField commits use native `change`, and propagation reads `cancelBubble`.",
     "`ref-as-prop-class-composition`: React `forwardRef` wrappers become ref-as-prop, and class values use Octane's composition rules.",

@@ -71,7 +71,7 @@
       "version": "0.1.37",
       "category": "UI and interaction",
       "upstream": { "package": "@base-ui/react", "version": "1.6.0" },
-      "surface": "Alpha, in progress: 35 of 43 upstream subpaths. The implemented surface has a complete byte-exact upstream inventory, 98 same-fixture React/Octane differential cases, and 49 Accordion, Collapsible, and Tabs adapted cases. This is bounded evidence and remains recorded-unverified because eight public subpaths and most of the canonical runtime/type suite are not yet adapted. Menu covers all 20 upstream parts, Toast all 11 parts, Collapsible all 3 parts, Accordion all 5 parts, and Tabs 4 of 5 parts (Indicator unported); their detailed gaps and evidence are recorded in UPSTREAM.md and audit/react-parity.json.",
+      "surface": "Alpha, in progress: 35 of 43 upstream subpaths. The implemented surface has a complete byte-exact upstream inventory, 98 same-fixture React/Octane differential cases, and 49 Accordion, Collapsible, and Tabs adapted cases. This is bounded evidence and remains recorded-unverified because eight public subpaths and most of the canonical runtime/type suite are not yet adapted. Menu covers all 20 upstream parts, Toast all 11 parts, Collapsible all 3 parts, Accordion all 5 parts, and Tabs 4 of 5 parts (Indicator unported).",
       "divergences": [
         "`native-event-semantics`: Host handlers receive native DOM events rather than React synthetic events; text edits use native `input`, form-facing NumberField commits use native `change`, and propagation reads `cancelBubble`.",
         "`ref-as-prop-class-composition`: React `forwardRef` wrappers become ref-as-prop, and class values use Octane's composition rules.",
@@ -195,7 +195,7 @@
       "version": "0.0.5",
       "category": "Web 3D",
       "upstream": { "package": "@react-three/drei", "version": "10.7.7" },
-      "surface": "Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 105 test files.",
+      "surface": "Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4), covered by package runtime, type, differential, and browser tests.",
       "divergences": [
         "View: inline Canvas views are ported. Calling View from an Octane DOM root fails with the universal renderer-boundary diagnostic, and View.Port is a callable no-op. Octane components are statically renderer-owned, so one component cannot switch between DOM and Three renderers or transport authored Three children between independent roots as React Drei does with tunnel-rat."
       ],
@@ -207,7 +207,7 @@
       "version": "0.0.5",
       "category": "Forms and content",
       "upstream": { "package": "react-dropzone", "version": "20.0.0" },
-      "surface": "Exact mapped port of the react-dropzone 20.0.0 root runtime and type namespace at canonical commit 01fc05c5996bf615caf812627f7491375e647c7d. The binding preserves the default Dropzone component, useDropzone, ErrorCode, all public types, root package conditions, and ./package.json export. Runtime coverage executes 218 pristine canonical React cases plus 109 adapted, differential, SSR, hydration, browser, and evidence cases.",
+      "surface": "Mapped port of the react-dropzone 20.0.0 root runtime and type namespace at canonical commit 01fc05c5996bf615caf812627f7491375e647c7d. The binding preserves the default Dropzone component, useDropzone, ErrorCode, all public types, root package conditions, and ./package.json export.",
       "divergences": [
         "Consumers import from @octanejs/dropzone and author TSRX instead of importing react-dropzone and authoring React JSX; option names and observable file-acquisition behavior remain mapped to the pinned upstream contract.",
         "The package points its types/import/require conditions at authored Octane source under repository policy; packed-consumer checks prove equivalent ESM, CommonJS, TypeScript, package-json, and public-namespace resolution without React runtime leakage."
@@ -281,10 +281,9 @@
       "version": "0.1.36",
       "category": "Forms and content",
       "upstream": { "package": "react-hook-form", "version": "7.81.0" },
-      "surface": "Complete port of react-hook-form 7.81.0 (tag commit 46b217e034dd92f7aa3cb3a478815556b416b299). The automated parity check runs all 1,193 original tests against the pinned React package as a pristine baseline; the Octane port separately runs byte-locked, unfiltered DOM and server suites with exact collected/executed inventories containing 1,187 entries representing 1,178 unique file/full-name identities. The nine duplicate entries are repeated titles within the DOM inventory; the server inventory is disjoint. Coverage includes `useForm`, `useController`, `useFieldArray`, `useFormState`, `useWatch`, `useFormContext`/`FormProvider`, schema resolvers, and all validation modes.",
+      "surface": "Complete port of react-hook-form 7.81.0 (tag commit 46b217e034dd92f7aa3cb3a478815556b416b299), including useForm, useController, useFieldArray, useFormState, useWatch, useFormContext/FormProvider, schema resolvers, and all validation modes.",
       "divergences": [
-        "`register()` returns `onInput` (octane's native per-keystroke event) instead of React's synthetic `onChange`; mode names and `register` option keys keep the upstream spelling.",
-        "The structured parity ledger records native no-op input delivery, microtask batching, duplicate resolver notification, async act flush, reset render-count, and eager `Object.is` bailout differences with executable case identities, consumer impact, and migration guidance; the suite contains no skipped or expected-failure cases."
+        "`register()` returns `onInput` (octane's native per-keystroke event) instead of React's synthetic `onChange`; mode names and `register` option keys keep the upstream spelling."
       ],
       "ssr": "Supported and tested — the upstream `*.server.test.tsx` suite runs via `octane/server` with byte-identical markup.",
       "verified": "2026-08-01"
@@ -353,7 +352,7 @@
         "source": "https://github.com/thebuilder/react-intersection-observer/tree/v10.1.0",
         "license": "MIT"
       },
-      "surface": "Public runtime surface at react-intersection-observer 10.1.0: useInView, useOnInView, InView, observe, defaultFallbackInView, and test utilities. Pinned upstream unit and browser suites plus one-for-one adapted runtime/type probes are registered with react-parity:check.",
+      "surface": "Public runtime surface at react-intersection-observer 10.1.0: useInView, useOnInView, InView, observe, defaultFallbackInView, and test utilities, covered by ordinary runtime, browser, and type tests.",
       "divergences": [
         "Public node and prop types use Octane structural types and do not import React.",
         "InView is implemented as a function component while preserving the upstream render-prop and wrapper behavior.",
@@ -816,7 +815,7 @@
       "version": "0.0.5",
       "category": "AI, data, and routing",
       "upstream": { "package": "swr", "version": "2.4.2" },
-      "surface": "Mapped port of SWR 2.4.2: root useSWR/config/cache/mutate/preload, infinite, immutable, remote mutation, subscription, _internal, and the published react-server condition branches. The harness executes the pinned pristine React suite plus selected adapted Octane cases, repo-authored adapted type probes, and differential/export oracles. Provenance remains recorded-unverified until the exhaustive adapted crosswalk lands.",
+      "surface": "Mapped port of SWR 2.4.2: root useSWR/config/cache/mutate/preload, infinite, immutable, remote mutation, subscription, _internal, and the published react-server condition branches. Ordinary runtime, differential, type, SSR, hydration, and packed-consumer tests cover the supported surface.",
       "divergences": [
         "The binding exposes window.__SWR_DEVTOOLS_OCTANE__ and deliberately does not claim React's window.__SWR_DEVTOOLS_REACT__ global; React-only devtools that require that identity are incompatible.",
         "SWR 2.4.2 behavior is pinned exactly, including the absence of automatic request abortion on consumer unmount."
@@ -876,7 +875,7 @@
       "version": "0.0.33",
       "category": "Styling, tests, and devtools",
       "upstream": { "package": "@tanstack/react-devtools", "version": "0.10.7" },
-      "surface": "Surface-present for the pinned adapter's runtime entrypoint, with additive framework-neutral core re-exports. A same-fixture differential covers mount, config synchronization, plugin/title/trigger portals, and teardown. Upstream has no runtime suite; its test:types source compile is recorded as present type evidence with required pristine/adapted type lanes. Provenance is verified; core-version drift and Octane-specific type names/core re-exports stay as explicit divergences.",
+      "surface": "Surface-present for the pinned adapter's runtime entrypoint, with additive framework-neutral core re-exports. A same-fixture differential covers mount, config synchronization, plugin/title/trigger portals, and teardown. Upstream has no runtime suite; package type checks cover the adapted source. Core-version drift and Octane-specific type names/core re-exports stay as explicit divergences.",
       "divergences": [
         "Public adapter types use Octane-prefixed names: `TanStackDevtoolsOctanePlugin` and `TanStackDevtoolsOctaneInit` (upstream: `TanStackDevtoolsReactPlugin` / `TanStackDevtoolsReactInit`).",
         "`ref` is the normal React-19-style ref prop and events are native (no synthetic layer), consistent with the rest of the Octane bindings.",
@@ -905,7 +904,7 @@
       "version": "0.0.28",
       "category": "UI and interaction",
       "upstream": { "package": "@tanstack/react-hotkeys", "version": "0.10.0" },
-      "surface": "Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. The pinned 41-case upstream runtime suite runs pristine and adapted as verified vitest-full lanes; type suites compile upstream source with tsc and the Octane surface with tsrx-tsc.",
+      "surface": "Surface-present for all 22 `@tanstack/react-hotkeys@0.10.0` adapter exports plus the byte-identical `@tanstack/hotkeys@0.8.0` core re-export. Adapted package tests and a differential lifecycle cover the runtime surface; package type checks cover the Octane source.",
       "divergences": [
         "`target` refs are plain `{ current }` objects (Octane has no `React.RefObject`); the `isRef` guard and behavior are otherwise identical."
       ],
@@ -1092,7 +1091,7 @@
       "divergences": [
         "Octane does not implement ReactDOM.findDOMNode; DOM-aware callbacks and CSSTransition require nodeRef.",
         "TransitionGroup collections must be supplied as inspectable descriptor values, normally with children={items.map(...)}; compiler-generated opaque children blocks cannot be enumerated.",
-        "The complete pinned upstream suite runs unchanged as the pristine Jest oracle; adapted Octane lanes cover the public export surface, DOM transition behavior, switch and replacement sequencing, keyed groups, nodeRef semantics, mount-on-enter sequencing, and server rendering, and are not yet a one-for-one port of every upstream case."
+        "Adapted Octane tests cover the public export surface, DOM transition behavior, switch and replacement sequencing, keyed groups, nodeRef semantics, mount-on-enter sequencing, and server rendering."
       ],
       "ssr": "Transition state and wrapper markup render on the server; DOM class mutation begins only after client mount and requires nodeRef.",
       "verified": "2026-08-09"
@@ -1180,7 +1179,7 @@
       "version": "0.0.5",
       "category": "Data-heavy screens",
       "upstream": { "package": "react-window", "version": "2.3.0" },
-      "surface": "Provisional complete exact port of the react-window 2.3.0 root surface: List, Grid, getScrollbarSize, useDynamicRowHeight, four imperative-ref hooks, and all eight public types. The byte-locked pristine React suite and generated Octane adaptation each execute all 14 upstream files and all 117 cases; shared differential, SSR, hydration, and assertion-level public type lanes are required by the React parity manifest. Final Chromium/Firefox browser and executable CommonJS package-condition evidence remain pending shared infrastructure PRs #548 and #550.",
+      "surface": "Provisional port of the react-window 2.3.0 root surface: List, Grid, getScrollbarSize, useDynamicRowHeight, four imperative-ref hooks, and all eight public types. Adapted runtime, differential, SSR, hydration, browser, and public type tests cover the supported behavior.",
       "divergences": [
         "Octane reserves the second raw function-component invocation argument for its internal block ABI; public props and rendered behavior match, so instrumentation should not assert React's undocumented undefined second argument.",
         "Keyed state and DOM identity are preserved, but sibling effect-log order and equal-prop rerender counts may differ after reordering because Octane schedules moved blocks and memoizes unchanged children differently."
@@ -1198,7 +1197,7 @@
         "normalizeProps rewrites React-style text-entry onChange to native onInput for input (non-checkbox/radio) and textarea hosts; select and checkbox/radio keep native onChange. Upstream normalizeProps is an identity transform and has no suite coverage for this export.",
         "Portal container refs use Octane's structural `{ current: HTMLElement | null }` ref shape rather than React.RefObject; runtime behavior is unchanged.",
         "Compiled Octane children are portalled as one lazy children block so their component scope is preserved; ordinary value children retain upstream's per-child portal behavior.",
-        "React StrictMode double-invoke suite cases stay pristine-only; Octane does not double-invoke effects, so those identities are not adapted one-for-one."
+        "Octane does not implement React StrictMode effect double-invocation."
       ],
       "ssr": "Supported and tested: useMachine exposes its initial state and bindable context during server rendering, effects remain deferred, and Portal renders children in place without browser globals.",
       "verified": "2026-08-09"

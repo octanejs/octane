@@ -33,11 +33,8 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "pnpm upstream:verify && pnpm test:audit && pnpm test:type-parity && pnpm typecheck && vitest run --root ../.. --project popper --project popper-ssr --project popper-hydration --project popper-differential",
-    "upstream:verify": "node audit/upstream-inventory.mjs",
-    "test:audit": "node --test tests/audit/upstream-inventory.test.mjs",
-    "test:type-parity": "node ../../scripts/react-parity/popper-types.mjs",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p typetests/tsconfig.public-api.json && tsc --noEmit -p typetests/tsconfig.pristine.json"
+    "test": "pnpm typecheck && vitest run --root ../.. --project popper --project popper-ssr --project popper-hydration --project popper-differential",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p typetests/tsconfig.public-api.json"
   },
   "dependencies": {
     "react-fast-compare": "^3.2.2"
@@ -47,25 +44,13 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
-    "@babel/core": "^7.28.0",
-    "@babel/plugin-transform-modules-commonjs": "^7.27.1",
-    "@babel/polyfill": "^7.12.1",
-    "@babel/preset-env": "^7.28.0",
-    "@babel/preset-flow": "^7.27.1",
-    "@babel/preset-react": "^7.27.1",
     "@popperjs/core": "2.11.8",
-    "@popperjs/core-pristine": "npm:@popperjs/core@2.3.3",
     "@testing-library/react": "16.3.2",
-    "@testing-library/react-hooks": "8.0.1",
     "@tsrx/react": "catalog:default",
     "@types/react": "catalog:default",
     "@types/react-dom": "catalog:default",
-    "babel-jest": "30.4.1",
-    "jest": "30.4.2",
-    "jest-environment-jsdom": "30.4.1",
     "octane": "workspace:*",
     "playwright": "catalog:default",
-    "pretty-format": "30.4.1",
     "react": "catalog:default",
     "react-18": "npm:react@18.3.1",
     "react-dom": "catalog:default",

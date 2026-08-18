@@ -16,12 +16,6 @@ while reusing `@popperjs/core` unchanged.
 - Type oracle: `@types/react@19.2.17` and `@types/react-dom@19.2.3`
 - Pristine Jest peer aliases: `react@18.3.1` / `react-dom@18.3.1` (upstream peer is React 16–18)
 
-The pinned tag source, test suites, snapshots, TypeScript programs, package
-metadata, README, and license are vendored under `upstream/tag`. The published
-npm declaration, package metadata, README, and license are vendored under
-`upstream/npm`. `audit/upstream-inventory.json` records their SHA-256 hashes and
-the parity audit fails closed when either authority or its case map changes.
-
 Oracle versions above are the resolved lockfile pins used by the pristine and
 adapted lanes. They must not silently track `catalog:default` drift; bump them
 here and in the lockfile together when the port upgrades its React oracle.
@@ -62,7 +56,3 @@ adapted files.
 | `tag/typings/tests/main-test.tsx` | Pristine + adapted | Pristine lane via `tsc`; adapted `typetests/main-test.tsx` via `tsrx-tsc`; structural type-parity ledger. |
 | `tag/typings/tests/svg-test.tsx` | Pristine + adapted | Pristine lane via `tsc`; adapted `typetests/svg-test.tsx` via `tsrx-tsc`; structural type-parity ledger. |
 | Flow typings under `tag/src/__typings__` | Out of scope | Octane publishes TypeScript; Flow programs are not part of the Octane binding contract. |
-
-Port-authored test classifications (adapted upstream, differential, Octane-only)
-live in `audit/test-classifications.json` and are verified by
-`scripts/react-parity/popper-classifications-lib.mjs`.

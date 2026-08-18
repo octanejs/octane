@@ -10,10 +10,9 @@ import {
 	realpathSync,
 	rmSync,
 	symlinkSync,
-	writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
 
 const packageRoot = resolve(import.meta.dirname, '../..');
@@ -134,36 +133,6 @@ try {
 		assert.equal(result.status, 0, `${config}\n${result.stdout}\n${result.stderr}`);
 	}
 
-	writeFileSync(
-		resolve(packageRoot, 'audit/packed-exports-result.json'),
-		`${JSON.stringify(
-			{
-				schemaVersion: 1,
-				node: process.version,
-				tarball: basename(tarball),
-				esm: Object.fromEntries(
-					Object.entries(esm).map(([key, value]) => [
-						key,
-						new URL(value).pathname.split('/node_modules/')[1],
-					]),
-				),
-				cjs: {
-					...cjs,
-					r: cjs.r.split('/node_modules/')[1],
-					i: cjs.i.split('/node_modules/')[1],
-				},
-				server: Object.fromEntries(
-					Object.entries(server).map(([key, value]) => [
-						key,
-						new URL(value).pathname.split('/node_modules/')[1],
-					]),
-				),
-				typescriptProjects: 3,
-			},
-			null,
-			2,
-		)}\n`,
-	);
 	console.log(
 		'SWR packed export gate passed: ESM, CJS, react-server, NodeNext, Bundler, package.json',
 	);

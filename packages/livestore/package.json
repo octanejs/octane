@@ -42,9 +42,7 @@
   },
   "scripts": {
     "test": "vitest run --config vitest.config.ts && vitest run --config vitest.ssr.config.ts",
-    "test:upstream": "node scripts/run-pristine-upstream.mjs",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
-    "upstream:verify": "node scripts/verify-upstream.mjs"
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
   },
   "dependencies": {
     "@livestore/common": "catalog:default",

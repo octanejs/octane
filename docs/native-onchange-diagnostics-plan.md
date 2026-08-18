@@ -193,10 +193,6 @@ controlled-state correctness bug, not a reason to add React compatibility.
 
 ### 2.3 Pinned upstream and platform evidence
 
-The comparison baseline is React v19.2.7, repository commit
-`6117d7cca4906492c51fe6a03381e35adfd86e7d`, matching
-`packages/octane/audit/react-test-inventory.stable.json`.
-
 Use permanent pinned links in fixture/test comments:
 
 - React [registers synthetic `onChange` dependencies and queues controlled
@@ -830,19 +826,6 @@ both core and the package's current contract.
 Run the new compiler/runtime diagnostic across every binding, but change only
 DOM host wiring. Public APIs/options named `onChange` remain unchanged.
 
-Make this audit a binding-tagged subset of a repository-wide gate rather than
-a one-time grep. Add `pnpm native-events:diagnostics` and
-`pnpm native-events:diagnostics:check`, sourced from the shared classifier's
-non-public audit mode. Generate
-`packages/octane/audit/native-event-diagnostic-sites.json` with every
-first-party candidate's package, authored file/range, classification
-(`warning`, `suppressed-intent`, or `runtime-check`), and reviewed
-disposition. Cover production packages, first-party examples and fixtures,
-website/playground source, website MDX snippets, MCP skill examples, and eval
-starters/references; exclude generated output and clearly label vendored
-upstream React fixtures. The check fails on an unclassified addition, removal,
-or moved range.
-
 **Implemented scope adjustment:** the checked-in artifact records emitted
 static warnings across TSRX/TSX/JSX, where authored ranges and dispositions are
 stable. It does not claim to serialize every `runtime-check` or suppressed host:
@@ -884,19 +867,6 @@ divergence changes. Regenerate `docs/bindings-status.md` with
 `pnpm bindings:status`; never edit the generated table directly.
 
 ### 6.4 React parity ledger
-
-`docs/react-parity-coverage.md` is generated from
-`packages/octane/audit/react-conformance-ledger.json`. Most
-`ChangeEventPlugin` cases correctly remain documented non-goals because they
-assert synthetic extraction or value-tracker deduplication. The evidence wave
-should update case-level rationale/evidence only when a new test proves a
-portable public outcome; it must not relabel synthetic mechanics as Octane
-parity. Regenerate/check with:
-
-```bash
-pnpm react-parity:generate
-pnpm react-parity:check
-```
 
 ### 6.5 Evals and training prompts
 
@@ -1153,21 +1123,6 @@ Octane file, not merely inspect `TSRXVirtualCode.diagnostics`. Record the
 passing Ripple commit and released package versions in the evidence report.
 
 Generated-source checks:
-
-```bash
-pnpm rules:generate
-pnpm rules:check
-pnpm bindings:status
-pnpm bindings:status:check
-pnpm native-events:diagnostics
-pnpm native-events:diagnostics:check
-pnpm react-parity:generate
-pnpm react-parity:check
-pnpm --filter @octanejs/evals corpus:generate
-pnpm --filter @octanejs/evals corpus:check
-pnpm --filter @octanejs/evals test
-pnpm changeset:check
-```
 
 Deterministic production-size gates:
 

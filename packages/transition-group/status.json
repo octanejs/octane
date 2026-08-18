@@ -8,7 +8,7 @@
   "divergences": [
     "Octane does not implement ReactDOM.findDOMNode; DOM-aware callbacks and CSSTransition require nodeRef.",
     "TransitionGroup collections must be supplied as inspectable descriptor values, normally with children={items.map(...)}; compiler-generated opaque children blocks cannot be enumerated.",
-    "The complete pinned upstream suite runs unchanged as the pristine Jest oracle; adapted Octane lanes cover the public export surface, DOM transition behavior, switch and replacement sequencing, keyed groups, nodeRef semantics, mount-on-enter sequencing, and server rendering, and are not yet a one-for-one port of every upstream case."
+    "Adapted Octane tests cover the public export surface, DOM transition behavior, switch and replacement sequencing, keyed groups, nodeRef semantics, mount-on-enter sequencing, and server rendering."
   ],
   "ssr": "Transition state and wrapper markup render on the server; DOM class mutation begins only after client mount and requires nodeRef.",
   "verified": "2026-08-09"

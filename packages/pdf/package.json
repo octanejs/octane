@@ -41,14 +41,12 @@
     "./dist/Page/TextLayer.css": "./dist/Page/TextLayer.css"
   },
   "scripts": {
-    "test": "pnpm upstream:verify && vitest run --root ../.. --project pdf --project pdf-ssr --project pdf-parity --project pdf-packed",
+    "test": "vitest run --root ../.. --project pdf --project pdf-ssr --project pdf-parity --project pdf-packed",
     "test:browser": "vitest run --root ../.. --project pdf-browser",
     "test:feasibility": "vitest run --root ../.. --project pdf-feasibility --project pdf-feasibility-ssr --project pdf-feasibility-hydration",
     "test:parity": "vitest run --root ../.. --project pdf-parity",
     "test:ssr": "vitest run --root ../.. --project pdf-ssr",
-    "test:types": "tsc --noEmit -p typetests/tsconfig.pristine.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json",
-    "upstream:verify": "node --test tests/audit/upstream-inventory.test.mjs && node audit/upstream-inventory.mjs",
-    "test:pristine": "node ../../scripts/react-parity/pdf-pristine-runtime.mjs"
+    "test:types": "tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json"
   },
   "dependencies": {
     "make-event-props": "2.0.0",

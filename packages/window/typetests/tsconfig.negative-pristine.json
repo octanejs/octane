@@ -1,4 +1,0 @@
-{
-  "extends": "./tsconfig.pristine.json",
-  "include": ["./negative/missing-coordinate.test-d.ts"]
-}

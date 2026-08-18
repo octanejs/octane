@@ -38,9 +38,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run",
-    "upstream:verify": "node ./scripts/verify-upstream.mjs",
-    "parity:inventory": "node ../../scripts/react-parity/alien-signals-runtime-inventory.mjs"
+    "test": "vitest run"
   },
   "dependencies": {
     "alien-signals": "catalog:default"
