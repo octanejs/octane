@@ -21,7 +21,9 @@ export function SelectionReader(props: {
 	generation?: number;
 }) @{
 	const selection = useStoreWithEqualityFn(props.api, props.selector, props.equalityFn);
-	<output id="selection" data-generation={String(props.generation ?? 0)}>{String(selection.value) as string}</output>
+	<output id="selection" data-generation={String(props.generation ?? 0)}>{String(
+		selection.value,
+	) as string}</output>
 }
 
 type ErrorState = { value: string | number };
@@ -53,11 +55,14 @@ function EqualityErrorReader(props: { api: ErrorStore }) @{
 
 export function TraditionalErrors(props: { kind: 'selector' | 'equality' }) @{
 	const [api] = useState(() => createStore<ErrorState>(() => ({ value: 'ready' })));
-	const Reader = props.kind === 'selector' ? SelectorErrorReader : EqualityErrorReader;
+	const Reader =
+		props.kind === 'selector' ? SelectorErrorReader : EqualityErrorReader;
 
 	<section>
 		<button id="break-selection" onClick={() => api.setState({ value: 1 })}>break</button>
-		<button id="repair-selection" onClick={() => api.setState({ value: 'recovered' })}>repair</button>
+		<button id="repair-selection" onClick={() => api.setState({ value: 'recovered' })}>
+			repair
+		</button>
 		@try {
 			<Reader api={api} />
 		} @catch (error, reset) {
