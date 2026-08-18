@@ -105,6 +105,29 @@ describe('llms text', () => {
 		}
 	});
 
+	it('documents Strong-mode compiler checks in both agent summaries', () => {
+		for (const text of [LLMS_TXT, LLMS_FULL_TXT]) {
+			const strongGuide = text.split('## Strong mode\n')[1]?.split('\n## ')[0];
+			expect(strongGuide).toBeDefined();
+			for (const marker of [
+				'"use strong"',
+				'compiler: { strong: true }',
+				'OCTANE_STRONG_RENDER_STATE_UPDATE',
+				'OCTANE_STRONG_EFFECT_STATE_UPDATE',
+				'OCTANE_STRONG_RENDER_REF_WRITE',
+				'OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL',
+				'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY',
+				'useLinkedState',
+				'useCallback',
+				'useMemo',
+				'useEffectEvent',
+				'/docs/build-tools#strong-mode',
+			]) {
+				expect(strongGuide, marker).toContain(marker);
+			}
+		}
+	});
+
 	it('documents behavior-only ownership in the summary and full website corpus', () => {
 		const ownershipGuide = LLMS_TXT.split(
 			'## Behavior-only roots and external ownership\n',
