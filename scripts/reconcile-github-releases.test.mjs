@@ -43,7 +43,7 @@ async function createRepositoryFixture() {
 }
 
 describe('GitHub release reconciliation', () => {
-	test('pushes missing tags atomically and creates every missing release sequentially', async () => {
+	test('pushes annotated missing tags atomically without repository identity and creates every missing release sequentially', async () => {
 		const { expectedSha, remote, repository, root } = await createRepositoryFixture();
 		try {
 			const packages = await Promise.all([
@@ -57,6 +57,8 @@ describe('GitHub release reconciliation', () => {
 				'origin',
 				`refs/tags/${releaseTag(packages[0])}:refs/tags/${releaseTag(packages[0])}`,
 			]);
+			await git(repository, ['config', 'user.name', '']);
+			await git(repository, ['config', 'user.email', '']);
 
 			let pushCount = 0;
 			const instrumentedGit = async (args, options = {}) => {
@@ -99,6 +101,8 @@ describe('GitHub release reconciliation', () => {
 			const remoteTags = await listRemoteTags({ cwd: repository });
 			assert.deepEqual([...remoteTags].sort(), packages.map(releaseTag).sort());
 			for (const pkg of packages) {
+				const objectType = await git(remote, ['cat-file', '-t', `refs/tags/${releaseTag(pkg)}`]);
+				assert.equal(objectType.stdout.trim(), 'tag');
 				const target = await git(remote, ['rev-list', '-n', '1', `refs/tags/${releaseTag(pkg)}`]);
 				assert.equal(target.stdout.trim(), expectedSha);
 			}
