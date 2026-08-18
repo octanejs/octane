@@ -1,5 +1,13 @@
 # octane
 
+## 0.1.40
+
+### Patch Changes
+
+- ff9b859: Parse authored TSRX modules through the native `oxc-tsrx` compatibility layer in Node to reduce compiler latency while preserving Octane's existing AST, source-map, stylesheet, and diagnostic contracts. Browser and other non-Node compiler consumers continue to use the pure-JavaScript `@tsrx/core` parser.
+- 14b8b40: Update the bundled TSRX compiler to the latest installable release, including fixes for literal less-than text and tokenizer lookahead handling.
+- cc6e5ea: Extend Strong-mode analysis through statically known `useCallback`, `useEffectEvent`, and memo-returned functions. Reject Effect Event calls during render and Effect Events in explicit hook dependency lists, while preserving supported hook usage and compatibility-mode behavior.
+
 ## 0.1.39
 
 ### Patch Changes

@@ -1,5 +1,21 @@
 # @octanejs/tanstack-start
 
+## 0.1.29
+
+### Patch Changes
+
+- e936b0a: Add native Rsbuild support for TanStack Start, including Octane compilation,
+  file-route generation, server functions, client and server builds, streaming
+  SSR, import protection, and prerendering through the new `plugin/rsbuild`
+  entry.
+- Updated dependencies [ff9b859]
+- Updated dependencies [14b8b40]
+- Updated dependencies [9c00c34]
+- Updated dependencies [cc6e5ea]
+  - octane@0.1.40
+  - @octanejs/rspack-plugin@0.1.35
+  - @octanejs/tanstack-router@0.1.39
+
 ## 0.1.28
 
 ### Patch Changes
