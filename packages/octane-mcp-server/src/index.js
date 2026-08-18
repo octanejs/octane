@@ -82,6 +82,7 @@ export const BENCHMARK_SUITES = [
 	'async-composition',
 	'lynx-list',
 	'universal-leaf-update',
+	'universal-external-store',
 	'lynx-render',
 	'lynx-table',
 	'lynx-table-web',
