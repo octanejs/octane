@@ -3,6 +3,39 @@ import { compileToVolarMappings } from 'octane/compiler/volar';
 import { START_ENVIRONMENT_NAMES } from '#tanstack-start/plugin-core/vite';
 
 /**
+ * Strip children of `<ClientOnly>` from server TSRX source. Returns
+ * `{ code, map }` when a rewrite was applied, or `undefined` when the source
+ * needs no changes. Shared by the Vite and Rsbuild integrations.
+ */
+export function clientOnlyServerStripTransform(code, id) {
+	if (!code.includes('ClientOnly')) return undefined;
+
+	const filename = id.split('?', 1)[0];
+	const { sourceAst } = compileToVolarMappings(code, filename);
+	const childReplacements = stripClientOnlyChildren(sourceAst);
+	if (childReplacements.length === 0) return undefined;
+
+	const prunedImportSpecifiers = findImportsUsedOnlyInRanges(sourceAst, childReplacements);
+	const replacements = [
+		...rewritePrunedImports(code, sourceAst, prunedImportSpecifiers),
+		...childReplacements,
+	];
+	const output = new MagicString(code);
+	for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
+		output.overwrite(replacement.start, replacement.end, replacement.content);
+	}
+
+	return {
+		code: output.toString(),
+		map: output.generateMap({
+			source: filename,
+			includeContent: true,
+			hires: true,
+		}),
+	};
+}
+
+/**
  * Remove the children of the Router ClientOnly binding before Octane compiles
  * server TSRX. This keeps client-only imports out of the server module graph,
  * while preserving fallback content and identically-named local components.
@@ -20,31 +53,7 @@ export function octaneClientOnlyServerStrip() {
 				code: { include: ['ClientOnly'] },
 			},
 			handler(code, id) {
-				if (!code.includes('ClientOnly')) return undefined;
-
-				const filename = id.split('?', 1)[0];
-				const { sourceAst } = compileToVolarMappings(code, filename);
-				const childReplacements = stripClientOnlyChildren(sourceAst);
-				if (childReplacements.length === 0) return undefined;
-
-				const prunedImportSpecifiers = findImportsUsedOnlyInRanges(sourceAst, childReplacements);
-				const replacements = [
-					...rewritePrunedImports(code, sourceAst, prunedImportSpecifiers),
-					...childReplacements,
-				];
-				const output = new MagicString(code);
-				for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
-					output.overwrite(replacement.start, replacement.end, replacement.content);
-				}
-
-				return {
-					code: output.toString(),
-					map: output.generateMap({
-						source: filename,
-						includeContent: true,
-						hires: true,
-					}),
-				};
+				return clientOnlyServerStripTransform(code, id);
 			},
 		},
 	};

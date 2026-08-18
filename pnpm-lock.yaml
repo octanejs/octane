@@ -7691,6 +7691,9 @@ importers:
       '@babel/types':
         specifier: ^7.28.5
         version: 7.29.7
+      '@octanejs/rspack-plugin':
+        specifier: workspace:*
+        version: link:../rspack-plugin-octane
       '@octanejs/tanstack-router':
         specifier: workspace:*
         version: link:../tanstack-router
@@ -7761,6 +7764,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@rsbuild/core':
+        specifier: catalog:default
+        version: 2.1.6(core-js@3.49.0)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3

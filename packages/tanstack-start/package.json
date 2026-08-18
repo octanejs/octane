@@ -1,7 +1,7 @@
 {
   "name": "@octanejs/tanstack-start",
   "version": "0.1.28",
-  "description": "TanStack Start for Octane, including file-route generation, server functions, SSR streaming, hydration, and Vite integration.",
+  "description": "TanStack Start for Octane, including file-route generation, server functions, SSR streaming, hydration, and Vite or Rsbuild integration.",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -43,6 +43,7 @@
     "#tanstack-start/router-plugin/*": "./src/internal/router-plugin/*.js",
     "#tanstack-start/plugin-core": "./src/internal/start-plugin-core/index.js",
     "#tanstack-start/plugin-core/vite": "./src/internal/start-plugin-core/vite/index.js",
+    "#tanstack-start/plugin-core/rsbuild": "./src/internal/start-plugin-core/rsbuild/index.js",
     "#tanstack-start/plugin-core/*": "./src/internal/start-plugin-core/*.js"
   },
   "exports": {
@@ -96,6 +97,11 @@
       "import": "./src/plugin-vite.js",
       "default": "./src/plugin-vite.js"
     },
+    "./plugin/rsbuild": {
+      "types": "./src/plugin-rsbuild.d.ts",
+      "import": "./src/plugin-rsbuild.js",
+      "default": "./src/plugin-rsbuild.js"
+    },
     "./server-entry": {
       "types": "./src/server-entry.d.ts",
       "import": "./src/server-entry.js",
@@ -107,13 +113,14 @@
     "./src/default-entry/client.js"
   ],
   "scripts": {
-    "test": "cd ../.. && vitest run --project tanstack-start"
+    "test": "cd ../.. && vitest run --project tanstack-start --project tanstack-start-rsbuild"
   },
   "dependencies": {
     "@babel/code-frame": "7.27.1",
     "@babel/core": "catalog:default",
     "@babel/template": "^7.27.2",
     "@babel/types": "^7.28.5",
+    "@octanejs/rspack-plugin": "workspace:*",
     "@octanejs/tanstack-router": "workspace:*",
     "@tanstack/router-core": "catalog:default",
     "@tanstack/router-utils": "1.162.2",
@@ -139,15 +146,20 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
+    "@rsbuild/core": "^2.0.0",
     "octane": "workspace:*",
     "vite": ">=7.0.0"
   },
   "peerDependenciesMeta": {
+    "@rsbuild/core": {
+      "optional": true
+    },
     "vite": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@rsbuild/core": "catalog:default",
     "@types/node": "catalog:default",
     "octane": "workspace:*",
     "vite": "catalog:default",
