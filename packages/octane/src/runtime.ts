@@ -6643,6 +6643,27 @@ export function useSyncExternalStore<T>(
 						}
 					: () => scheduleRender(block),
 			onStoreChange: () => {
+				if (block.disposed) return;
+				// An urgent, non-deferred render already queued for this owner will
+				// read every reached store again. Repeated notifications in the same
+				// task need not run selectors merely to rediscover that pending work.
+				// Do not skip transition/deferred upgrades or render-phase diagnostics;
+				// renderBlock also clears pending before the body, so a notification
+				// after its snapshot read can still request a replay. Profiling and
+				// unwrapped-act diagnostics retain the ordinary scheduling path.
+				if (
+					CURRENT_BLOCK === null &&
+					block.pending &&
+					block.pendingMode === 'urgent' &&
+					!block.pendingDeferred &&
+					!(typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) &&
+					(process.env.NODE_ENV === 'production' ||
+						!IS_OCTANE_ACT_ENVIRONMENT ||
+						actScopeDepth !== 0 ||
+						syncFlush)
+				) {
+					return;
+				}
 				if (checkStoreChanged(created)) created.forceUpdate();
 			},
 			block,

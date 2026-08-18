@@ -5138,6 +5138,13 @@ function projectedStateValue<T>(record: UniversalOwnerRecord, slot: unknown, fal
 	const hook = record.hooks.get(slot) as StateHook<T> | undefined;
 	const queue = record.updates.get(slot);
 	if (queue === undefined) return hook?.kind === 'state' ? hook.value : fallback;
+	// A trailing replacement determines the projected value by itself. External
+	// store invalidations use replacement tokens, so replaying every earlier
+	// update here would make a burst of N notifications quadratic.
+	if (queue.length !== 0) {
+		const last = queue[queue.length - 1];
+		if (typeof last !== 'function') return last as T;
+	}
 	let value =
 		queue.batches === undefined
 			? hook?.kind === 'state'
@@ -5157,13 +5164,19 @@ function visibleStateValue<T>(record: UniversalOwnerRecord, slot: unknown, fallb
 	const hook = record.hooks.get(slot) as StateHook<T> | undefined;
 	const queue = record.updates.get(slot);
 	if (queue === undefined) return hook?.kind === 'state' ? hook.value : fallback;
+	// Urgent reads exclude transition lanes. Only the last applicable update
+	// can take the replacement shortcut; a trailing functional updater still
+	// needs the ordinary ordered replay below.
+	let last = queue.length - 1;
+	while (last >= 0 && queue.batches !== undefined && queue.batches[last] !== null) last--;
+	if (last >= 0 && typeof queue[last] !== 'function') return queue[last] as T;
 	let value =
 		queue.batches === undefined
 			? hook?.kind === 'state'
 				? hook.value
 				: fallback
 			: (queue.baseState as T);
-	for (let index = 0; index < queue.length; index++) {
+	for (let index = 0; index <= last; index++) {
 		if (queue.batches !== undefined && queue.batches[index] !== null) continue;
 		const update = queue[index];
 		value = typeof update === 'function' ? (update as (previous: T) => T)(value) : (update as T);
@@ -5685,6 +5698,118 @@ export function useId(slot?: unknown): string {
 	return hook.value;
 }
 
+interface UniversalStoreState<T> {
+	instance: UniversalStoreInstance<T>;
+}
+
+interface UniversalStoreInstance<T> {
+	value: T;
+	getSnapshot: () => T;
+	committedState: UniversalStoreState<T>;
+	notificationState: UniversalStoreState<T>;
+	notificationValue: T;
+	notificationFailed: boolean;
+	forceUpdate: (state: UniversalStoreState<T>) => void;
+}
+
+function enqueueUniversalStoreSnapshot(
+	instance: UniversalStoreInstance<any>,
+	value: unknown,
+): void {
+	if (instance.notificationFailed || !Object.is(instance.notificationValue, value)) {
+		instance.notificationFailed = false;
+		instance.notificationValue = value;
+		instance.notificationState = Object.is(instance.value, value)
+			? instance.committedState
+			: { instance };
+	}
+	// Reuse the token for identical notifications. The state setter then keeps
+	// one ordinary pending update instead of appending and rescanning an
+	// ever-growing queue. A held transition can still require urgent rebases.
+	// Distinct snapshots receive distinct tokens, including while
+	// an earlier transition is held; returning to the committed value uses its
+	// token so the setter can preserve an urgent rebase over a pending transition.
+	instance.forceUpdate(instance.notificationState);
+}
+
+function enqueueUniversalStoreError(instance: UniversalStoreInstance<any>): void {
+	// A snapshot failure belongs to the next render, where the owning boundary
+	// can handle it, rather than escaping through the store notifier.
+	if (!instance.notificationFailed) {
+		instance.notificationFailed = true;
+		instance.notificationState = { instance };
+	}
+	instance.forceUpdate(instance.notificationState);
+}
+
+function notifyUniversalStore(instance: UniversalStoreInstance<any>): void {
+	let value: unknown;
+	try {
+		value = instance.getSnapshot();
+	} catch {
+		enqueueUniversalStoreError(instance);
+		return;
+	}
+	enqueueUniversalStoreSnapshot(instance, value);
+}
+
+function checkUniversalStore(instance: UniversalStoreInstance<any>): void {
+	let value: unknown;
+	try {
+		value = instance.getSnapshot();
+	} catch {
+		enqueueUniversalStoreError(instance);
+		return;
+	}
+	// Unlike an actual notification, an internal consistency read must not
+	// promote an unrelated queued transition when the committed value still fits.
+	if (!Object.is(instance.value, value)) enqueueUniversalStoreSnapshot(instance, value);
+}
+
+// Effect callbacks receive their dependency values as positional arguments.
+// Publish only after host acceptance: an abandoned or rejected draft must not
+// replace the getter used by the still-connected committed subscription.
+function updateUniversalStoreInstance<T>(
+	instance: UniversalStoreInstance<T>,
+	value: T,
+	getSnapshot: () => T,
+	state: UniversalStoreState<T>,
+): void {
+	instance.value = value;
+	instance.getSnapshot = getSnapshot;
+	instance.committedState = state;
+	instance.notificationState = state;
+	instance.notificationValue = value;
+	instance.notificationFailed = false;
+	checkUniversalStore(instance);
+}
+
+function subscribeToUniversalStore<T>(
+	instance: UniversalStoreInstance<T>,
+	subscribe: (onStoreChange: () => void) => () => void,
+): () => void {
+	let activeInstance: UniversalStoreInstance<T> | null = instance;
+	const onStoreChange = () => {
+		if (activeInstance !== null) notifyUniversalStore(activeInstance);
+	};
+	let unsubscribe: (() => void) | null = null;
+	try {
+		unsubscribe = subscribe(onStoreChange);
+	} catch (error) {
+		activeInstance = null;
+		throw error;
+	}
+	// subscribe itself can synchronously mutate the store. Checking after it
+	// returns also closes the interval between the render read and connection.
+	checkUniversalStore(instance);
+	return () => {
+		activeInstance = null;
+		const cleanup = unsubscribe;
+		unsubscribe = null;
+		cleanup?.();
+	};
+}
+
 export function useSyncExternalStore<T>(
 	subscribe: (onStoreChange: () => void) => () => void,
 	getSnapshot: () => T,
@@ -5717,21 +5842,32 @@ export function useSyncExternalStore<T>(
 	const base = resolveHookSlot(slot);
 	return withSlot(base, () => {
 		const snapshot = getSnapshot();
-		const [, invalidate] = useState(0, 'state');
+		const [state, forceUpdate] = useState<UniversalStoreState<T>>(() => {
+			const initial = {} as UniversalStoreState<T>;
+			const instance: UniversalStoreInstance<T> = {
+				value: snapshot,
+				getSnapshot,
+				committedState: initial,
+				notificationState: initial,
+				notificationValue: snapshot,
+				notificationFailed: false,
+				forceUpdate: (next) => forceUpdate(next),
+			};
+			initial.instance = instance;
+			return initial;
+		}, 'state');
+		const instance = state.instance;
+		// Getter/snapshot freshness and connection lifetime are independent. The
+		// first effect commits the fresh read; the second stays connected until
+		// subscribe changes or normal effect teardown hides/removes its owner.
 		useLayoutEffect(
-			() => {
-				let current = snapshot;
-				const check = () => {
-					const next = getSnapshot();
-					if (Object.is(current, next)) return;
-					current = next;
-					invalidate((value) => value + 1);
-				};
-				const unsubscribe = subscribe(check);
-				check();
-				return unsubscribe;
-			},
-			[subscribe, getSnapshot, snapshot],
+			updateUniversalStoreInstance as () => void,
+			[instance, snapshot, getSnapshot, state],
+			'snapshot',
+		);
+		useLayoutEffect(
+			subscribeToUniversalStore as () => () => void,
+			[instance, subscribe],
 			'subscribe',
 		);
 		return snapshot;

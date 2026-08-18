@@ -384,6 +384,46 @@
     "note": "Compact leaf rows driven by their list component's selection state replay only that component (its 100 rows), so unrelated siblings must not change the cost. Rejects the compact-range bail that forced list selection through a whole-root replay."
   },
   {
+    "suite": "universal-external-store",
+    "op": "lifetime_subscribe_calls",
+    "target": "stable-getter",
+    "reference": "subscription-reference",
+    "maxRatio": 1,
+    "note": "A stable subscribe function needs one subscription per universal reader for its mounted lifetime, including unrelated parent renders and store updates. Final host values and listener release are independently checked."
+  },
+  {
+    "suite": "universal-external-store",
+    "op": "lifetime_unsubscribe_calls",
+    "target": "stable-getter",
+    "reference": "subscription-reference",
+    "maxRatio": 1,
+    "note": "A stable universal store subscription should be released only at teardown; repeated renders must not add disconnect/reconnect work."
+  },
+  {
+    "suite": "universal-external-store",
+    "op": "lifetime_subscribe_calls",
+    "target": "inline-getter",
+    "reference": "subscription-reference",
+    "maxRatio": 1,
+    "note": "Fresh snapshot-getter closures must not reconnect a stable universal subscribe function. The subscription must continue to observe current selections and store values."
+  },
+  {
+    "suite": "universal-external-store",
+    "op": "lifetime_unsubscribe_calls",
+    "target": "inline-getter",
+    "reference": "subscription-reference",
+    "maxRatio": 1,
+    "note": "An inline getter changes what is read, not subscription ownership: each mounted universal reader needs one lifetime release."
+  },
+  {
+    "suite": "universal-external-store",
+    "op": "prefix_updater_calls",
+    "target": "state-replacement-burst",
+    "reference": "state-replacement-reference",
+    "maxRatio": 1,
+    "note": "Two thousand direct replacements supersede an earlier functional updater. Public getState observations and the final host value/order are checked independently. The constant three-call budget allows eager enqueue, the first prior-value read, and ordered commit; it rejects repeated replay of the superseded prefix without requiring a particular cheaper implementation. The frozen pre-fix runtime called the updater 4,002 times; the candidate called it three times."
+  },
+  {
     "suite": "lifecycle-memory",
     "op": "cycle",
     "target": "octane-tsrx",
@@ -406,6 +446,54 @@
     "reference": "react",
     "maxRatio": 2,
     "note": "Same-run 512-subscriber useSyncExternalStore fan-out, gated on complete visible updates, rapid-write consistency, and exact listener teardown. A verified quick run measured about 1.01x; 2x leaves real-browser scheduling headroom."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "broad_burst_snapshot_reads",
+    "target": "octane-tsrx-work",
+    "reference": "required-work",
+    "maxRatio": 1,
+    "note": "Deterministic notification-phase work for 100 broad writes: one changed snapshot comparison is enough to schedule each of the 512 readers. Final DOM values, survivor identity, and balanced subscription cleanup gate the optimization."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "unchanged_burst_snapshot_reads",
+    "target": "octane-tsrx-work",
+    "reference": "required-work",
+    "maxRatio": 1,
+    "note": "Unchanged-notification control: compare each reader's snapshot at most once per notification. The separate zero-render guard prevents trading getter work for unnecessary component renders."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "narrow_burst_snapshot_reads",
+    "target": "octane-tsrx-work",
+    "reference": "required-work",
+    "maxRatio": 1,
+    "note": "Narrow-notification control: untouched readers still compare on every notification, while the one changed reader needs only its first comparison before the batched render. The visible final state must differ only at the selected index."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "broad_burst_renders",
+    "target": "octane-tsrx-work",
+    "reference": "required-work",
+    "maxRatio": 1,
+    "note": "The 100-write broad burst must converge with at most one render per changed reader; every subscriber must display the final store value."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "unchanged_burst_renders",
+    "target": "octane-tsrx-work",
+    "reference": "required-work",
+    "maxRatio": 0,
+    "note": "An unchanged snapshot must not cause subscriber render work. The reference is one count so a zero ceiling is expressible without a zero denominator."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "narrow_burst_renders",
+    "target": "octane-tsrx-work",
+    "reference": "required-work",
+    "maxRatio": 1,
+    "note": "Only the reader whose selected value changed should render during the 100-write narrow burst; untouched subscriber DOM and identities must remain intact."
   },
   {
     "suite": "store-selector-fanout",
