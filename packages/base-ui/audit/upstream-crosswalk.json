@@ -1,0 +1,1028 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repository": "https://github.com/mui/base-ui.git",
+    "tag": "v1.6.0",
+    "commit": "b34551d644f2e58ebf8fc1050d949f6654ceca6c"
+  },
+  "surface": [
+    [
+      "./accordion",
+      "surface-present-unverified",
+      "packages/base-ui/src/accordion.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./alert-dialog",
+      "surface-present-unverified",
+      "packages/base-ui/src/alert-dialog.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./autocomplete",
+      "gap",
+      "packages/base-ui/src/autocomplete.ts is not implemented at this pin."
+    ],
+    [
+      "./avatar",
+      "surface-present-unverified",
+      "packages/base-ui/src/avatar.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./button",
+      "surface-present-unverified",
+      "packages/base-ui/src/button.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./checkbox",
+      "surface-present-unverified",
+      "packages/base-ui/src/checkbox.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./checkbox-group",
+      "surface-present-unverified",
+      "packages/base-ui/src/checkbox-group.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./collapsible",
+      "surface-present-unverified",
+      "packages/base-ui/src/collapsible.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    ["./combobox", "gap", "packages/base-ui/src/combobox.ts is not implemented at this pin."],
+    [
+      "./context-menu",
+      "surface-present-unverified",
+      "packages/base-ui/src/context-menu.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./csp-provider",
+      "surface-present-unverified",
+      "packages/base-ui/src/csp-provider.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./dialog",
+      "surface-present-unverified",
+      "packages/base-ui/src/dialog.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./direction-provider",
+      "surface-present-unverified",
+      "packages/base-ui/src/direction-provider.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    ["./drawer", "gap", "packages/base-ui/src/drawer.ts is not implemented at this pin."],
+    [
+      "./field",
+      "surface-present-unverified",
+      "packages/base-ui/src/field.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./fieldset",
+      "surface-present-unverified",
+      "packages/base-ui/src/fieldset.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./form",
+      "surface-present-unverified",
+      "packages/base-ui/src/form.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./input",
+      "surface-present-unverified",
+      "packages/base-ui/src/input.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./menu",
+      "surface-present-unverified",
+      "packages/base-ui/src/menu.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./menubar",
+      "surface-present-unverified",
+      "packages/base-ui/src/menubar.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./merge-props",
+      "surface-present-unverified",
+      "packages/base-ui/src/merge-props.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./meter",
+      "surface-present-unverified",
+      "packages/base-ui/src/meter.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./navigation-menu",
+      "gap",
+      "packages/base-ui/src/navigation-menu.ts is not implemented at this pin."
+    ],
+    [
+      "./number-field",
+      "surface-present-unverified",
+      "packages/base-ui/src/number-field.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    ["./otp-field", "gap", "packages/base-ui/src/otp-field.ts is not implemented at this pin."],
+    [
+      "./popover",
+      "surface-present-unverified",
+      "packages/base-ui/src/popover.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./preview-card",
+      "surface-present-unverified",
+      "packages/base-ui/src/preview-card.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./progress",
+      "surface-present-unverified",
+      "packages/base-ui/src/progress.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./radio",
+      "surface-present-unverified",
+      "packages/base-ui/src/radio.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./radio-group",
+      "surface-present-unverified",
+      "packages/base-ui/src/radio-group.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    ["./scroll-area", "gap", "packages/base-ui/src/scroll-area.ts is not implemented at this pin."],
+    ["./select", "gap", "packages/base-ui/src/select.ts is not implemented at this pin."],
+    [
+      "./separator",
+      "surface-present-unverified",
+      "packages/base-ui/src/separator.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./slider",
+      "surface-present-unverified",
+      "packages/base-ui/src/slider.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./switch",
+      "surface-present-unverified",
+      "packages/base-ui/src/switch.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./tabs",
+      "surface-present-unverified",
+      "packages/base-ui/src/tabs.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./toast",
+      "surface-present-unverified",
+      "packages/base-ui/src/toast.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./toggle",
+      "surface-present-unverified",
+      "packages/base-ui/src/toggle.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./toggle-group",
+      "surface-present-unverified",
+      "packages/base-ui/src/toggle-group.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    ["./toolbar", "gap", "packages/base-ui/src/toolbar.ts is not implemented at this pin."],
+    [
+      "./tooltip",
+      "surface-present-unverified",
+      "packages/base-ui/src/tooltip.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./unstable-use-media-query",
+      "surface-present-unverified",
+      "packages/base-ui/src/unstable-use-media-query.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ],
+    [
+      "./use-render",
+      "surface-present-unverified",
+      "packages/base-ui/src/use-render.ts exists; behavior remains bounded by the recorded-unverified manifest lanes."
+    ]
+  ],
+  "artifactEvidence": {
+    "partially-adapted": "Selected cases are transcribed in the recorded local evidence file.",
+    "not-adapted": "The vendored canonical runtime/type suite is inventoried but is not adapted case-by-case.",
+    "vendored-support": "The byte-exact support artifact is retained under packages/base-ui/upstream."
+  },
+  "upstreamArtifacts": [
+    ["packages/react/src/accordion/header/AccordionHeader.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/accordion/item/AccordionItem.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/accordion/panel/AccordionPanel.test.tsx",
+      "runtime-test",
+      "partially-adapted",
+      "packages/base-ui/tests/upstream/accordion.test.ts"
+    ],
+    ["packages/react/src/accordion/root/AccordionRoot.spec.tsx", "type-test", "not-adapted"],
+    [
+      "packages/react/src/accordion/root/AccordionRoot.test.tsx",
+      "runtime-test",
+      "partially-adapted",
+      "packages/base-ui/tests/upstream/accordion.test.ts"
+    ],
+    [
+      "packages/react/src/accordion/trigger/AccordionTrigger.test.tsx",
+      "runtime-test",
+      "partially-adapted",
+      "packages/base-ui/tests/upstream/accordion.test.ts"
+    ],
+    ["packages/react/src/alert-dialog/root/AlertDialogRoot.spec.tsx", "type-test", "not-adapted"],
+    [
+      "packages/react/src/alert-dialog/root/AlertDialogRoot.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/autocomplete/item/AutocompleteItem.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/autocomplete/root/AutocompleteRoot.spec.tsx", "type-test", "not-adapted"],
+    [
+      "packages/react/src/autocomplete/root/AutocompleteRoot.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/autocomplete/value/AutocompleteValue.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/avatar/Avatar.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/avatar/fallback/AvatarFallback.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/avatar/image/AvatarImage.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/avatar/root/AvatarRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/button/Button.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/button/Button.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/checkbox-group/CheckboxGroup.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/checkbox-group/useCheckboxGroupParent.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/checkbox/indicator/CheckboxIndicator.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/checkbox/root/CheckboxRoot.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/collapsible/panel/CollapsiblePanel.test.tsx",
+      "runtime-test",
+      "partially-adapted",
+      "packages/base-ui/tests/upstream/collapsible.test.ts"
+    ],
+    ["packages/react/src/collapsible/root/CollapsibleRoot.spec.tsx", "type-test", "not-adapted"],
+    [
+      "packages/react/src/collapsible/root/CollapsibleRoot.test.tsx",
+      "runtime-test",
+      "partially-adapted",
+      "packages/base-ui/tests/upstream/collapsible.test.ts"
+    ],
+    [
+      "packages/react/src/collapsible/trigger/CollapsibleTrigger.test.tsx",
+      "runtime-test",
+      "partially-adapted",
+      "packages/base-ui/tests/upstream/collapsible.test.ts"
+    ],
+    ["packages/react/src/combobox/arrow/ComboboxArrow.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/combobox/backdrop/ComboboxBackdrop.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/combobox/chip-remove/ComboboxChipRemove.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/combobox/chip/ComboboxChip.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/combobox/chips/ComboboxChips.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/combobox/clear/ComboboxClear.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/combobox/collection/ComboboxCollection.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/combobox/empty/ComboboxEmpty.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/combobox/group-label/ComboboxGroupLabel.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/combobox/group/ComboboxGroup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/combobox/icon/ComboboxIcon.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/combobox/input-group/ComboboxInputGroup.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/combobox/input/ComboboxInput.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/combobox/item-indicator/ComboboxItemIndicator.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/combobox/item/ComboboxItem.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/combobox/label/ComboboxLabel.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/combobox/list/ComboboxList.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/combobox/popup/ComboboxPopup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/combobox/portal/ComboboxPortal.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/combobox/positioner/ComboboxPositioner.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/combobox/root/ComboboxRoot.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/combobox/root/ComboboxRoot.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/combobox/status/ComboboxStatus.iOS.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/combobox/status/ComboboxStatus.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/combobox/trigger/ComboboxTrigger.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/combobox/value/ComboboxValue.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/context-menu/root/ContextMenuRoot.non-mac.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/context-menu/root/ContextMenuRoot.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/context-menu/trigger/ContextMenuTrigger.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/csp-provider/CSPProvider.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/dialog/backdrop/DialogBackdrop.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/dialog/close/DialogClose.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/dialog/description/DialogDescription.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/dialog/popup/DialogPopup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/dialog/portal/DialogPortal.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/dialog/root/DialogRoot.detached-triggers.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/dialog/root/DialogRoot.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/dialog/root/DialogRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/dialog/title/DialogTitle.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/dialog/trigger/DialogTrigger.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/dialog/viewport/DialogViewport.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/direction-provider/DirectionProvider.spec.tsx",
+      "type-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/direction-provider/DirectionProvider.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/drawer/content/DrawerContent.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/drawer/indent-background/DrawerIndentBackground.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/drawer/indent/DrawerIndent.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/drawer/popup/DrawerPopup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/drawer/root/DrawerRoot.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/drawer/root/DrawerRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/drawer/root/useDrawerSnapPoints.test.ts", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/drawer/swipe-area/DrawerSwipeArea.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/drawer/viewport/DrawerViewport.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/field/control/FieldControl.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/field/control/FieldControl.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/field/description/FieldDescription.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/field/error/FieldError.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/field/item/FieldItem.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/field/label/FieldLabel.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/field/root/FieldRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/field/validity/FieldValidity.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/fieldset/legend/FieldsetLegend.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/fieldset/root/FieldsetRoot.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/floating-ui-react/components/FloatingDelayGroup.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/floating-ui-react/components/FloatingFocusManager.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/floating-ui-react/components/FloatingPortal.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/floating-ui-react/hooks/useClick.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/floating-ui-react/hooks/useClientPoint.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/floating-ui-react/hooks/useDismiss.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/floating-ui-react/hooks/useFloating.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/floating-ui-react/hooks/useHover.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/floating-ui-react/hooks/useHoverReferenceInteraction.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/floating-ui-react/hooks/useListNavigation.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/floating-ui-react/hooks/useTypeahead.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/floating-ui-react/safePolygon.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/floating-ui-react/utils/composite.test.ts", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/floating-ui-react/utils/markOthers.test.ts",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/floating-ui-react/utils/nodes.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/floating-ui-react/utils/tabbable.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/form/Form.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/form/Form.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/index.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/input/Input.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/input/Input.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/internals/clamp.test.ts", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/internals/composite/list/CompositeList.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/internals/composite/root/CompositeRoot.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/internals/createBaseUIEventDetails.spec.ts", "type-test", "not-adapted"],
+    ["packages/react/src/internals/filter.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/internals/getStateAttributesProps.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/internals/RequestQueue.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/internals/resolveValueLabel.test.ts", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/internals/temporal-adapter-date-fns/TemporalAdapterDateFns.test.ts",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/internals/temporal-adapter-luxon/TemporalAdapterLuxon.test.ts",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/internals/TimeoutManager.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/internals/use-button/useButton.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/internals/useRenderElement.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/internals/useRenderElement.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/menu/arrow/MenuArrow.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/menu/backdrop/MenuBackdrop.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/menu/checkbox-item-indicator/MenuCheckboxItemIndicator.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/menu/checkbox-item/MenuCheckboxItem.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/menu/group-label/MenuGroupLabel.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/menu/group/MenuGroup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/menu/item/MenuItem.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/menu/link-item/MenuLinkItem.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/menu/popup/MenuPopup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/menu/portal/MenuPortal.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/menu/positioner/MenuPositioner.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/menu/positioner/MenuPositioner.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/menu/radio-group/MenuRadioGroup.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/menu/radio-item-indicator/MenuRadioItemIndicator.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/menu/radio-item/MenuRadioItem.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/menu/root/MenuRoot.detached-triggers.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/menu/root/MenuRoot.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/menu/submenu-trigger/MenuSubmenuTrigger.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/menu/trigger/MenuTrigger.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/menu/viewport/MenuViewport.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/menubar/Menubar.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/merge-props/mergeProps.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/meter/indicator/MeterIndicator.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/meter/label/MeterLabel.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/meter/root/MeterRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/meter/track/MeterTrack.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/meter/value/MeterValue.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/navigation-menu/arrow/NavigationMenuArrow.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/backdrop/NavigationMenuBackdrop.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/content/NavigationMenuContent.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/icon/NavigationMenuIcon.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/item/NavigationMenuItem.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/link/NavigationMenuLink.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/list/NavigationMenuList.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/popup/NavigationMenuPopup.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/portal/NavigationMenuPortal.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/positioner/NavigationMenuPositioner.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/root/NavigationMenuRoot.spec.tsx",
+      "type-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/root/NavigationMenuRoot.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/root/NavigationMenuRoot.webkit.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/trigger/NavigationMenuTrigger.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/navigation-menu/viewport/NavigationMenuViewport.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/number-field/decrement/NumberFieldDecrement.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/number-field/group/NumberFieldGroup.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/number-field/increment/NumberFieldIncrement.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/number-field/input/NumberFieldInput.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/number-field/root/NumberFieldRoot.spec.tsx", "type-test", "not-adapted"],
+    [
+      "packages/react/src/number-field/root/NumberFieldRoot.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/number-field/scrub-area-cursor/NumberFieldScrubAreaCursor.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/number-field/scrub-area/NumberFieldScrubArea.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/number-field/utils/parse.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/number-field/utils/validate.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/otp-field/input/OTPFieldInput.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/otp-field/input/OTPFieldInput.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/otp-field/root/OTPFieldRoot.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/otp-field/root/OTPFieldRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/otp-field/utils/otp.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/popover/arrow/PopoverArrow.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/popover/backdrop/PopoverBackdrop.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/popover/close/PopoverClose.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/popover/description/PopoverDescription.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/popover/popup/PopoverPopup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/popover/portal/PopoverPortal.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/popover/positioner/PopoverPositioner.spec.tsx",
+      "type-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/popover/positioner/PopoverPositioner.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/popover/root/PopoverRoot.detached-triggers.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/popover/root/PopoverRoot.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/popover/root/PopoverRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/popover/title/PopoverTitle.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/popover/trigger/PopoverTrigger.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/popover/viewport/PopoverViewport.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/preview-card/arrow/PreviewCardArrow.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/preview-card/backdrop/PreviewCardBackdrop.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/preview-card/popup/PreviewCardPopup.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/preview-card/portal/PreviewCardPortal.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/preview-card/positioner/PreviewCardPositioner.spec.tsx",
+      "type-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/preview-card/positioner/PreviewCardPositioner.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/preview-card/root/PreviewCardRoot.detached-triggers.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/preview-card/root/PreviewCardRoot.spec.tsx", "type-test", "not-adapted"],
+    [
+      "packages/react/src/preview-card/root/PreviewCardRoot.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/preview-card/trigger/PreviewCardTrigger.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/preview-card/viewport/PreviewCardViewport.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/progress/indicator/ProgressIndicator.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/progress/label/ProgressLabel.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/progress/root/ProgressRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/progress/track/ProgressTrack.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/progress/value/ProgressValue.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/radio-group/RadioGroup.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/radio-group/RadioGroup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/radio/indicator/RadioIndicator.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/radio/root/RadioRoot.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/radio/root/RadioRoot.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/scroll-area/content/ScrollAreaContent.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/scroll-area/corner/ScrollAreaCorner.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/scroll-area/root/ScrollAreaRoot.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/scroll-area/scrollbar/ScrollAreaScrollbar.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/scroll-area/thumb/ScrollAreaThumb.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/scroll-area/viewport/ScrollAreaViewport.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/select/arrow/SelectArrow.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/select/backdrop/SelectBackdrop.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/select/group-label/SelectGroupLabel.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/select/group/SelectGroup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/select/icon/SelectIcon.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/select/item-indicator/SelectItemIndicator.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/select/item-text/SelectItemText.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/select/item/SelectItem.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/select/label/SelectLabel.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/select/list/SelectList.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/select/popup/SelectPopup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/select/portal/SelectPortal.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/select/positioner/SelectPositioner.spec.tsx", "type-test", "not-adapted"],
+    [
+      "packages/react/src/select/positioner/SelectPositioner.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/select/root/SelectRoot.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/select/root/SelectRoot.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/select/scroll-down-arrow/SelectScrollDownArrow.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/select/scroll-up-arrow/SelectScrollUpArrow.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/select/trigger/SelectTrigger.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/select/value/SelectValue.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/separator/Separator.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/slider/control/SliderControl.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/slider/indicator/SliderIndicator.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/slider/label/SliderLabel.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/slider/root/SliderRoot.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/slider/root/SliderRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/slider/thumb/SliderThumb.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/slider/track/SliderTrack.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/slider/utils/getPushedThumbValues.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/slider/utils/getSliderValue.test.ts", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/slider/utils/resolveThumbCollision.test.ts",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/slider/utils/roundValueToStep.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/slider/value/SliderValue.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/switch/root/SwitchRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/switch/thumb/SwitchThumb.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/tabs/indicator/TabsIndicator.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/tabs/list/TabsList.test.tsx",
+      "runtime-test",
+      "partially-adapted",
+      "packages/base-ui/tests/upstream/tabs.test.ts"
+    ],
+    [
+      "packages/react/src/tabs/panel/TabsPanel.test.tsx",
+      "runtime-test",
+      "partially-adapted",
+      "packages/base-ui/tests/upstream/tabs.test.ts"
+    ],
+    [
+      "packages/react/src/tabs/root/TabsRoot.test.tsx",
+      "runtime-test",
+      "partially-adapted",
+      "packages/base-ui/tests/upstream/tabs.test.ts"
+    ],
+    [
+      "packages/react/src/tabs/tab/TabsTab.test.tsx",
+      "runtime-test",
+      "partially-adapted",
+      "packages/base-ui/tests/upstream/tabs.test.ts"
+    ],
+    ["packages/react/src/toast/action/ToastAction.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toast/arrow/ToastArrow.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toast/close/ToastClose.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toast/content/ToastContent.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toast/createToastManager.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/toast/createToastManager.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/toast/description/ToastDescription.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/toast/portal/ToastPortal.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toast/positioner/ToastPositioner.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toast/root/ToastRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toast/store.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/toast/title/ToastTitle.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toast/useToastManager.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/toast/useToastManager.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toast/viewport/ToastViewport.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toggle-group/ToggleGroup.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/toggle-group/ToggleGroup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toggle/Toggle.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toolbar/button/ToolbarButton.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toolbar/group/ToolbarGroup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toolbar/input/ToolbarInput.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toolbar/link/ToolbarLink.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/toolbar/root/ToolbarRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/tooltip/arrow/TooltipArrow.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/tooltip/popup/TooltipPopup.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/tooltip/portal/TooltipPortal.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/tooltip/positioner/TooltipPositioner.spec.tsx",
+      "type-test",
+      "not-adapted"
+    ],
+    [
+      "packages/react/src/tooltip/positioner/TooltipPositioner.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/tooltip/provider/TooltipProvider.test.tsx", "runtime-test", "not-adapted"],
+    [
+      "packages/react/src/tooltip/root/TooltipRoot.detached-triggers.test.tsx",
+      "runtime-test",
+      "not-adapted"
+    ],
+    ["packages/react/src/tooltip/root/TooltipRoot.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/tooltip/trigger/TooltipTrigger.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/tooltip/trigger/TooltipTrigger.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/tooltip/viewport/TooltipViewport.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/use-render/useRender.spec.tsx", "type-test", "not-adapted"],
+    ["packages/react/src/use-render/useRender.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/utils/formatNumber.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/utils/getPseudoElementBounds.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/utils/popups/inlineRect.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/utils/popups/popupStoreUtils.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/utils/popups/popupTriggerMap.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/utils/popups/store.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/utils/scrollEdges.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/utils/stringifyLocale.test.ts", "runtime-test", "not-adapted"],
+    ["packages/react/src/utils/useIsHydrating.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/src/utils/useSwipeDismiss.test.tsx", "runtime-test", "not-adapted"],
+    ["packages/react/test/addVitestMatchers.ts", "support", "vendored-support"],
+    ["packages/react/test/conformanceTests/className.tsx", "support", "vendored-support"],
+    ["packages/react/test/conformanceTests/propForwarding.tsx", "support", "vendored-support"],
+    ["packages/react/test/conformanceTests/refForwarding.tsx", "support", "vendored-support"],
+    ["packages/react/test/conformanceTests/renderProp.tsx", "support", "vendored-support"],
+    ["packages/react/test/conformanceTests/utils.ts", "support", "vendored-support"],
+    ["packages/react/test/createRenderer.ts", "support", "vendored-support"],
+    ["packages/react/test/describeConformance.tsx", "support", "vendored-support"],
+    [
+      "packages/react/test/describeGregorianAdapter/describeGregorianAdapter.ts",
+      "support",
+      "vendored-support"
+    ],
+    [
+      "packages/react/test/describeGregorianAdapter/describeGregorianAdapter.types.ts",
+      "support",
+      "vendored-support"
+    ],
+    [
+      "packages/react/test/describeGregorianAdapter/describeGregorianAdapter.utils.ts",
+      "support",
+      "vendored-support"
+    ],
+    ["packages/react/test/describeGregorianAdapter/index.ts", "support", "vendored-support"],
+    [
+      "packages/react/test/describeGregorianAdapter/testComputations.ts",
+      "support",
+      "vendored-support"
+    ],
+    ["packages/react/test/describeGregorianAdapter/testFormats.ts", "support", "vendored-support"],
+    [
+      "packages/react/test/describeGregorianAdapter/testLocalization.ts",
+      "support",
+      "vendored-support"
+    ],
+    ["packages/react/test/floating-ui-tests/Button.module.css", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/Button.tsx", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/ComplexGrid.module.css", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/ComplexGrid.tsx", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/EmojiPicker.module.css", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/EmojiPicker.tsx", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/Grid.module.css", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/Grid.tsx", "support", "vendored-support"],
+    [
+      "packages/react/test/floating-ui-tests/gridNavigationWithColumns.ts",
+      "support",
+      "vendored-support"
+    ],
+    ["packages/react/test/floating-ui-tests/ListboxFocus.tsx", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/Menu.module.css", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/Menu.tsx", "support", "vendored-support"],
+    [
+      "packages/react/test/floating-ui-tests/MenuOrientation.module.css",
+      "support",
+      "vendored-support"
+    ],
+    ["packages/react/test/floating-ui-tests/MenuOrientation.tsx", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/Navigation.module.css", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/Navigation.tsx", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/Popover.module.css", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/Popover.tsx", "support", "vendored-support"],
+    ["packages/react/test/floating-ui-tests/renderGridRows.tsx", "support", "vendored-support"],
+    ["packages/react/test/index.ts", "support", "vendored-support"],
+    ["packages/react/test/popupConformanceTests.tsx", "support", "vendored-support"],
+    ["packages/react/test/types.d.ts", "support", "vendored-support"],
+    ["packages/react/test/useTestInteractions.test.tsx", "support", "vendored-support"],
+    ["packages/react/test/useTestInteractions.ts", "support", "vendored-support"],
+    ["packages/react/test/wait.ts", "support", "vendored-support"]
+  ],
+  "summary": {
+    "publicSubpaths": 43,
+    "surfacePresentUnverified": 35,
+    "gapSubpaths": 8,
+    "upstreamArtifacts": 348,
+    "runtimeTests": 273,
+    "typeTests": 35,
+    "supportArtifacts": 40,
+    "partiallyAdaptedArtifacts": 10
+  }
+}

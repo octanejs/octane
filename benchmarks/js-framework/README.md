@@ -263,7 +263,8 @@ octane's compiler optimizes (both dialects compile to the same output):
   — load-bearing for the `swap` row.
 - **Keyed `@for` reconciliation**: `@for (const row of items; key row.id)` drives
   LIS-based reorder; `swap` only mutates the two affected rows.
-- **V8 hidden-class shape**: the `Block` class shape is preserved.
+- **V8 hidden-class shape**: the `Block` class shape is preserved (see
+  [`feedback_inferno_next_perf`](../../packages/octane/audit/) memory).
 
 ## Methodology caveats
 

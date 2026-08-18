@@ -15,6 +15,15 @@ contains the byte-exact license, package/test/type/build configuration, two runt
 specs, snapshot, runtime source, and all nine type programs required by U1. The
 vendored evidence is development-only and excluded from package `files`.
 
+U1 is an architecture gate, not a full parity claim. Its authored `src` is the
+smallest public-shaped implementation needed to prove Octane prop getters, refs,
+native input/drop events, async supersession, SSR/hydration, and package conditions.
+The exhaustive U5 evidence is committed in `audit/react-parity.json`,
+`audit/test-classifications.json`, `audit/transformation-ledger.json`, and the runtime/type
+inventories. Every one of the 218 upstream runtime cases and all nine upstream type programs is
+accounted for, with pristine React, adapted Octane, differential, SSR/hydration, and trusted
+Chromium lanes executed by the repository React-parity harness.
+
 ## U1 public surface boundary
 
 Runtime exports: default `Dropzone`, `useDropzone`, and `ErrorCode`.

@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "target": "esnext",
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "strict": true,
+    "noErrorTruncation": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "paths": {
+      "@octanejs/tiptap": ["../../src/index.ts"],
+      "@octanejs/tiptap/menus": ["../../src/menus/index.ts"],
+      "react": ["../react-types-must-not-be-imported.d.ts"],
+      "react/*": ["../react-types-must-not-be-imported.d.ts"]
+    }
+  },
+  "include": ["./types.test-d.ts"]
+}

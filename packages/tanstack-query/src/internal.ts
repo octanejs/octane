@@ -100,7 +100,7 @@ interface SuspensePromiseCache {
 }
 
 /**
- * Octane suspense divergence:
+ * Octane suspense divergence (see audit/test-classifications.json):
  * Suspend through a stable `use()` occurrence for one query-hook call site.
  *
  * `use()` tracks thenables by dynamic call order. A component with two

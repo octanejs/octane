@@ -1,0 +1,87 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/phosphor-icons/react.git",
+    "version": "2.1.10",
+    "commit": "57424d5f99b793b585f5c6f5cab76f79772510e5",
+    "sourceRoot": "src",
+    "testRoot": "test",
+    "license": "MIT",
+    "integrity": "sha256:08027417baf5fc4818581a63c487c98ad36c80c17816a0069d4fd0805350ee90",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/phosphor-icons/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/phosphor-icons/tests/differential"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "phosphor-svg-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "phosphor-icons-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "One shared fixture compares accessible duotone Camera SVG with real @phosphor-icons/react.",
+      "files": [
+        {
+          "path": "packages/phosphor-icons/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "f7fe458a90a0671f5dde0ca6d9f9efc03a5154acf7b6691d6acad01197d5b2d5",
+          "cases": [
+            {
+              "id": "differential:camera-svg",
+              "testName": "Camera renders byte-identical accessible duotone SVG",
+              "fullName": "differential: @octanejs/phosphor-icons vs real @phosphor-icons/react Camera renders byte-identical accessible duotone SVG"
+            }
+          ]
+        },
+        {
+          "path": "packages/phosphor-icons/tests/_fixtures/parity.tsrx",
+          "role": "support",
+          "sha256": "bc1ae966c15bc002cf281d3e19a02bd07337040fe790c7b0747e1496b2beb8e9"
+        },
+        {
+          "path": "packages/phosphor-icons/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "228c105f2b3781308f964c3395cae260be91b3a1c40962480b7cd2da8e359460"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

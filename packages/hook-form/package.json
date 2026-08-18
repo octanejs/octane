@@ -31,7 +31,10 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project hook-form && vitest run --root ../.. --project hook-form-differential && vitest run --root ../.. --project hook-form-server",
+    "test": "pnpm upstream:verify && pnpm test:type-parity && vitest run --root ../.. --project hook-form && vitest run --root ../.. --project hook-form-differential && vitest run --root ../.. --project hook-form-server && vitest run --root ../.. --project hook-form-pristine",
+    "test:upstream": "jest --config tests/upstream-jest.config.cjs --rootDir upstream --runInBand --no-watchman",
+    "upstream:verify": "node ../../scripts/react-parity/hook-form-upstream.mjs",
+    "test:type-parity": "node ../../scripts/react-parity/hook-form-types.mjs",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
   },
   "peerDependencies": {
@@ -39,17 +42,24 @@
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
+    "@swc/core": "1.15.41",
+    "@swc/jest": "0.2.39",
     "@testing-library/jest-dom": "catalog:default",
     "@testing-library/react": "16.3.2",
     "@types/react": "catalog:default",
     "@types/react-dom": "catalog:default",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
+    "jest": "30.4.2",
+    "jest-environment-jsdom": "30.4.1",
+    "jest-environment-node": "30.4.1",
+    "jest-fixed-jsdom": "0.0.10",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "react-hook-form": "catalog:default",
     "vitest": "catalog:default",
+    "whatwg-fetch": "3.6.20",
     "zod": "catalog:default"
   }
 }

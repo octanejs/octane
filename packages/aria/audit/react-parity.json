@@ -1,0 +1,374 @@
+{
+  "schemaVersion": 1,
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "provenance": {
+    "repo": "https://github.com/adobe/react-spectrum.git",
+    "version": "react-aria@3.50.0; react-aria-components@1.19.0; react-stately@3.48.0",
+    "commit": "1c84a49a1faf50b571c84e00bcf9c60b22ddd03e",
+    "sourceRoot": "packages/react-aria/src; packages/react-aria-components/src; packages/react-stately/src",
+    "testRoot": "packages/react-aria/test; packages/react-aria-components/test; packages/react-stately/test",
+    "license": "Apache-2.0",
+    "integrity": "sha256:dcad3293f0f7438705f72cdd7df03351476aeaba7d0d2743c7ad6d8130aff56f",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/aria/src"],
+      "include": ["\\.(?:ts|tsx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/aria/tests"],
+      "include": ["\\.test\\.(?:ts|tsx|tsrx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "aria-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "aria-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs representative React/Octane differentials against the pinned React Aria packages. This is bounded evidence only; it does not execute the present upstream runtime or type suites.",
+      "files": [
+        {
+          "path": "packages/aria/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "28e6ea15a6c1b0c8c74f469f1d94ec602d8ab0c4a7a846e9f7675d1d9aa84f9a",
+          "cases": [
+            {
+              "id": "differential:aria-interactions-press",
+              "testName": "usePress: pointer press start → pressed state → press sequence, byte-identical",
+              "fullName": "differential: @octanejs/aria vs real react-aria on React usePress: pointer press start → pressed state → press sequence, byte-identical"
+            },
+            {
+              "id": "differential:aria-usehover-pointer-enter-leave-toggles-hover-state",
+              "testName": "useHover: pointer enter/leave toggles hover state, byte-identical",
+              "fullName": "differential: @octanejs/aria vs real react-aria on React useHover: pointer enter/leave toggles hover state, byte-identical"
+            },
+            {
+              "id": "differential:aria-usefocuswithin-focus-inside-sets-focus-outside-clears",
+              "testName": "useFocusWithin: focus inside sets, focus outside clears, byte-identical",
+              "fullName": "differential: @octanejs/aria vs real react-aria on React useFocusWithin: focus inside sets, focus outside clears, byte-identical"
+            },
+            {
+              "id": "differential:aria-usekeyboard-stop-by-default-suppresses-parent-continuepropagation-lets",
+              "testName": "useKeyboard: stop-by-default suppresses the parent; continuePropagation lets it through",
+              "fullName": "differential: @octanejs/aria vs real react-aria on React useKeyboard: stop-by-default suppresses the parent; continuePropagation lets it through"
+            },
+            {
+              "id": "differential:aria-usekeyboard-continuepropagation-latch-across-dispatches-one-wrapper-matches",
+              "testName": "useKeyboard: continuePropagation latch across dispatches of one wrapper matches React",
+              "fullName": "differential: @octanejs/aria vs real react-aria on React useKeyboard: continuePropagation latch across dispatches of one wrapper matches React"
+            },
+            {
+              "id": "differential:aria-useid-mergeprops-merged-ids-converge-consistent-references",
+              "testName": "useId + mergeProps: merged ids converge with consistent references",
+              "fullName": "differential: @octanejs/aria vs real react-aria on React useId + mergeProps: merged ids converge with consistent references"
+            }
+          ]
+        },
+        {
+          "path": "packages/aria/tests/differential/parity-leaf.test.ts",
+          "role": "test",
+          "sha256": "8ee4ca374e0fe00da7ada27df092939e55621a8716bfe3da29d7bc0fe1a708d1",
+          "cases": [
+            {
+              "id": "differential:aria-usebutton-native-button-onpress-click",
+              "testName": "useButton: native button + onPress via click, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria useButton: native button + onPress via click, byte-identical"
+            },
+            {
+              "id": "differential:aria-usebutton-span-elementtype-gets-role-tabindex-presses",
+              "testName": "useButton: span elementType gets role/tabIndex and presses, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria useButton: span elementType gets role/tabIndex and presses, byte-identical"
+            },
+            {
+              "id": "differential:aria-usetogglebutton-aria-pressed-toggles-click",
+              "testName": "useToggleButton: aria-pressed toggles on click, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria useToggleButton: aria-pressed toggles on click, byte-identical"
+            },
+            {
+              "id": "differential:aria-usecheckbox-click-toggles-selection-through-native-input-event",
+              "testName": "useCheckbox: click toggles selection through the native input event, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria useCheckbox: click toggles selection through the native input event, byte-identical"
+            },
+            {
+              "id": "differential:aria-useswitch-role-switch-click-toggles",
+              "testName": "useSwitch: role=switch + click toggles, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria useSwitch: role=switch + click toggles, byte-identical"
+            },
+            {
+              "id": "differential:aria-useradiogroup-useradio-selection-moves-click-shared-group-name",
+              "testName": "useRadioGroup/useRadio: selection moves on click with shared group name, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria useRadioGroup/useRadio: selection moves on click with shared group name, byte-identical"
+            },
+            {
+              "id": "differential:aria-leaf-textfield",
+              "testName": "useTextField: typing updates value through the native input event + field ids, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria useTextField: typing updates value through the native input event + field ids, byte-identical"
+            },
+            {
+              "id": "differential:aria-useprogressbar-aria-value-attributes-formatted-valuetext",
+              "testName": "useProgressBar: aria value attributes + formatted valuetext, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria useProgressBar: aria value attributes + formatted valuetext, byte-identical"
+            },
+            {
+              "id": "differential:aria-usenumberfieldstate-controlled-values-unfinished-edits-match-pinned-react",
+              "testName": "useNumberFieldState: controlled values and unfinished edits match pinned react-stately",
+              "fullName": "differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria useNumberFieldState: controlled values and unfinished edits match pinned react-stately"
+            },
+            {
+              "id": "differential:aria-usenumberfieldstate-locale-formatting-user-selected-numerals-match-react",
+              "testName": "useNumberFieldState: locale, formatting and user-selected numerals match react-stately",
+              "fullName": "differential: @octanejs/aria Phase-1 leaf hooks vs real react-aria useNumberFieldState: locale, formatting and user-selected numerals match react-stately"
+            }
+          ]
+        },
+        {
+          "path": "packages/aria/tests/differential/parity-collections.test.ts",
+          "role": "test",
+          "sha256": "36daa1f51bf96737ec57f6ba4c172b3634341b38882b37d1214b7e4b7ad16b16",
+          "cases": [
+            {
+              "id": "differential:aria-default-selection-roles-aria-wiring",
+              "testName": "default selection + roles + aria wiring, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-2 tabs vs real react-aria default selection + roles + aria wiring, byte-identical"
+            },
+            {
+              "id": "differential:aria-clicking-tab-moves-selection",
+              "testName": "clicking a tab moves selection, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-2 tabs vs real react-aria clicking a tab moves selection, byte-identical"
+            },
+            {
+              "id": "differential:aria-roles-labelling-mount",
+              "testName": "roles + labelling on mount, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-2 listbox vs real react-aria roles + labelling on mount, byte-identical"
+            },
+            {
+              "id": "differential:aria-listbox-selection",
+              "testName": "clicking an option selects it, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-2 listbox vs real react-aria clicking an option selects it, byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/aria/tests/differential/parity-select.test.ts",
+          "role": "test",
+          "sha256": "7d8c921f692f97b051dcd06f2c5b50d9dec849ef0f9856490057dfbf7ab45d65",
+          "cases": [
+            {
+              "id": "differential:aria-closed-mount-hidden-native-select",
+              "testName": "closed on mount with a hidden native select, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-3 select vs real react-aria closed on mount with a hidden native select, byte-identical"
+            },
+            {
+              "id": "differential:aria-select-open",
+              "testName": "pressing the trigger opens the listbox, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-3 select vs real react-aria pressing the trigger opens the listbox, byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/aria/tests/differential/parity-combobox.test.ts",
+          "role": "test",
+          "sha256": "11d029bc8f7177c58c3583e8b431bb4ef6e8fea4a8734293f579ae279cff28ec",
+          "cases": [
+            {
+              "id": "differential:aria-closed-mount",
+              "testName": "closed on mount, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-3 combobox vs real react-aria closed on mount, byte-identical"
+            },
+            {
+              "id": "differential:aria-combobox-filter",
+              "testName": "typing filters + opens the listbox, byte-identical",
+              "fullName": "differential: @octanejs/aria Phase-3 combobox vs real react-aria typing filters + opens the listbox, byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/aria/tests/differential/parity-rac.test.ts",
+          "role": "test",
+          "sha256": "fa33abd04d313669936bb413edb957c17cbaf8025db1c478a0fd88877c13e6de",
+          "cases": [
+            {
+              "id": "differential:aria-rac-button",
+              "testName": "Button: hover + mid-press data attributes + press count, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Phase-4 vs real react-aria-components Button: hover + mid-press data attributes + press count, byte-identical"
+            },
+            {
+              "id": "differential:aria-togglebutton-click-toggles-aria-pressed-data-selected",
+              "testName": "ToggleButton: click toggles aria-pressed + data-selected, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Phase-4 vs real react-aria-components ToggleButton: click toggles aria-pressed + data-selected, byte-identical"
+            },
+            {
+              "id": "differential:aria-checkbox-click-toggles-data-selected-render-prop-classname",
+              "testName": "Checkbox: click toggles data-selected + render-prop className, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Phase-4 vs real react-aria-components Checkbox: click toggles data-selected + render-prop className, byte-identical"
+            },
+            {
+              "id": "differential:aria-textfield-typing-through-native-input-path",
+              "testName": "TextField: typing through the native input path, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Phase-4 vs real react-aria-components TextField: typing through the native input path, byte-identical"
+            },
+            {
+              "id": "differential:aria-disclosure-trigger-press-expands-panel-data-expanded",
+              "testName": "Disclosure: trigger press expands the panel with data-expanded, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Phase-4 vs real react-aria-components Disclosure: trigger press expands the panel with data-expanded, byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/aria/tests/differential/parity-rac-collections.test.ts",
+          "role": "test",
+          "sha256": "55c7d45524e8dd501f0dde2e0a9c341be1d9369e42060a9a0ee06eedde8300fd",
+          "cases": [
+            {
+              "id": "differential:aria-rac-listbox",
+              "testName": "ListBox: dynamic items, click selection, keyed reverse, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Phase-5 collections vs real react-aria-components ListBox: dynamic items, click selection, keyed reverse, byte-identical"
+            },
+            {
+              "id": "differential:aria-tabs-default-selection-click-switch",
+              "testName": "Tabs: default selection + click switch, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Phase-5 collections vs real react-aria-components Tabs: default selection + click switch, byte-identical"
+            },
+            {
+              "id": "differential:aria-taggroup-multiple-selection-toggling",
+              "testName": "TagGroup: multiple-selection toggling, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Phase-5 collections vs real react-aria-components TagGroup: multiple-selection toggling, byte-identical"
+            },
+            {
+              "id": "differential:aria-gridlist-row-selection",
+              "testName": "GridList: row selection, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Phase-5 collections vs real react-aria-components GridList: row selection, byte-identical"
+            },
+            {
+              "id": "differential:aria-breadcrumbs-structure-aria-current",
+              "testName": "Breadcrumbs: structure + aria-current, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Phase-5 collections vs real react-aria-components Breadcrumbs: structure + aria-current, byte-identical"
+            },
+            {
+              "id": "differential:aria-combobox-typing-updates-in-container-combobox-wiring",
+              "testName": "ComboBox: typing updates in-container combobox wiring, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Phase-5 collections vs real react-aria-components ComboBox: typing updates in-container combobox wiring, byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/aria/tests/differential/parity-tree-table.test.ts",
+          "role": "test",
+          "sha256": "56be29a694ca68840671dc28102133f005beddd8aa34b92e5a998a5a48ff79fe",
+          "cases": [
+            {
+              "id": "differential:aria-tree-treegrid-structure-branch-expanded",
+              "testName": "Tree: treegrid structure with a branch expanded, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Tree + Table vs real react-aria-components Tree: treegrid structure with a branch expanded, byte-identical"
+            },
+            {
+              "id": "differential:aria-tree-fully-collapsed-structure",
+              "testName": "Tree: fully collapsed structure, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Tree + Table vs real react-aria-components Tree: fully collapsed structure, byte-identical"
+            },
+            {
+              "id": "differential:aria-tree-nested-expansion-checkbox-selection-state",
+              "testName": "Tree: nested expansion + checkbox selection state, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Tree + Table vs real react-aria-components Tree: nested expansion + checkbox selection state, byte-identical"
+            },
+            {
+              "id": "differential:aria-rac-table",
+              "testName": "Table: grid structure, sort cycling, row selection, byte-identical",
+              "fullName": "differential: @octanejs/aria/components Tree + Table vs real react-aria-components Table: grid structure, sort cycling, row selection, byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/aria/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "1316104ea9caf5dd23a96545a29119a648ed92d2d86d11883d397bc9bf2bc3d4"
+        },
+        {
+          "path": "packages/aria/tests/_fixtures/aria-diff.tsrx",
+          "role": "support",
+          "sha256": "6399e154bb37e27b1d6792fd4e6fe72619521613fbf61a1425654f08a17d08a0"
+        },
+        {
+          "path": "packages/aria/tests/_fixtures/aria-diff-leaf.tsrx",
+          "role": "support",
+          "sha256": "2d7fc4e5c991f47102ca94c9ed1b87862fac29e7418b05f7af52c3dec6a11682"
+        },
+        {
+          "path": "packages/aria/tests/_fixtures/aria-diff-tabs.tsrx",
+          "role": "support",
+          "sha256": "916650dcdc3ecbe6e96c0d5ba63ac615c14adb6b0f384d5c7cdc30a21bde4375"
+        },
+        {
+          "path": "packages/aria/tests/_fixtures/aria-diff-listbox.tsrx",
+          "role": "support",
+          "sha256": "2ca83d65dee60cd9afade57eb4939a2cfd3719d4824b7b3006de66bc88d3fc73"
+        },
+        {
+          "path": "packages/aria/tests/_fixtures/aria-diff-select.tsrx",
+          "role": "support",
+          "sha256": "2dff71cba4187e77cc3acb42f56807278e980f72410d32d0f58e95bba73d5614"
+        },
+        {
+          "path": "packages/aria/tests/_fixtures/aria-diff-combobox.tsrx",
+          "role": "support",
+          "sha256": "13952001ee78ec2936510b80f9863d74d93b33f86b3d665278298ca7630a109d"
+        },
+        {
+          "path": "packages/aria/tests/_fixtures/aria-diff-rac.tsrx",
+          "role": "support",
+          "sha256": "b9702f95ac3d3f72a13828c6a718f85d2ac51c16ca1c837467836bb0a6e9598e"
+        },
+        {
+          "path": "packages/aria/tests/_fixtures/aria-diff-rac-collections.tsrx",
+          "role": "support",
+          "sha256": "91228f1282ae8e409299504653751e7f8c403d18620d9ed803a0a994090f9b08"
+        },
+        {
+          "path": "packages/aria/tests/_fixtures/aria-diff-tree-table.tsrx",
+          "role": "support",
+          "sha256": "aac296ea6fe592c3c69822aad592d209085b577d64f5df485da5b6b1dd5e7344"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "native-input-event-wiring",
+      "caseIds": ["differential:aria-leaf-textfield"],
+      "upstreamResult": "React maps text editing through its synthetic onChange event layer.",
+      "octaneResult": "Octane uses the native input event for per-keystroke DOM wiring while preserving public value callbacks.",
+      "rationale": "Octane does not emulate React's synthetic event layer.",
+      "classification": "framework-integration",
+      "consumerImpact": "Native text host handlers use onInput; library value callbacks keep their documented names.",
+      "migrationGuidance": "Use onInput for raw text host edits and keep React Aria value callbacks unchanged.",
+      "owner": "@octanejs/aria",
+      "reviewCondition": "Review if Octane introduces a synthetic change-event compatibility layer."
+    }
+  ]
+}

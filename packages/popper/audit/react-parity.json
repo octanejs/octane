@@ -1,0 +1,297 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/floating-ui/react-popper.git",
+    "version": "2.3.0",
+    "commit": "b636fa3ceee14245d670a0c438fe4343c31258e5",
+    "sourceRoot": "src",
+    "testRoot": "src",
+    "license": "MIT",
+    "integrity": "sha256:dc36f3a47a18a0a87e83f6488f8c6119ba286b0f9482ce184e8372d245221f04",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/popper/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/popper/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 18,
+    "uniqueIdentities": 18,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "popper-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "popper-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the byte-exact react-popper 2.3.0 Jest suite via jest-full against the vendored React binding and checks every passed identity and snapshot against the committed inventory. No Vitest wrapper.",
+      "execution": {
+        "kind": "jest-full",
+        "config": "packages/popper/tests/upstream-jest.config.cjs",
+        "root": "packages/popper/upstream/tag",
+        "inventory": "packages/popper/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/popper/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "1f58840a667cd039b375edb626fae3ef3bfcaca84de3c002c7fb61da8d30a478"
+        },
+        {
+          "path": "scripts/react-parity/jest-full-runner.mjs",
+          "role": "support",
+          "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
+        },
+        {
+          "path": "packages/popper/tests/upstream-jest.config.cjs",
+          "role": "support",
+          "sha256": "53fb512e6821d7c8c2d77242dc5fb86b5e17fb8455e9d8646c8e9930d7421155"
+        },
+        {
+          "path": "packages/popper/tests/upstream-jest.setup.cjs",
+          "role": "support",
+          "sha256": "bbfe7c0d222dd12306db3b69b0da9c8e2d618d48bfc27e1b81602a8fa249f602"
+        }
+      ]
+    },
+    {
+      "id": "popper-adapted-full-suite",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "popper",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the one-for-one adapted Octane counterparts of the 18 upstream Jest identities.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/popper/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/popper/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "dc3ca16c77b2e3386ce7a978de8e1014127ebc4cc22334c0e89d6274b93064f1"
+        },
+        {
+          "path": "packages/popper/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "171232e1613ba9b251c08147f68667ebc44efca6cb01eae05b50b0cee5073db7"
+        },
+        {
+          "path": "scripts/react-parity/popper-classifications-lib.mjs",
+          "role": "support",
+          "sha256": "df9b1db8b13cee3a15ff3a76284ecef8e9a942aca3882a6f31777b63a91d2860"
+        }
+      ]
+    },
+    {
+      "id": "popper-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "popper-differential",
+      "evidenceOrigin": "repo-authored",
+      "files": [
+        {
+          "path": "packages/popper/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "7370cb00afaa2c7f5e00bbaac893ea162c24c52b647ce8ace782e6da4927378b",
+          "cases": [
+            {
+              "id": "differential:popper-components",
+              "testName": "matches Manager/Reference/Popper markup, placement updates, and lifecycle",
+              "fullName": "differential: @octanejs/popper vs react-popper@2.3.0 matches Manager/Reference/Popper markup, placement updates, and lifecycle"
+            }
+          ]
+        },
+        {
+          "path": "packages/popper/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "171232e1613ba9b251c08147f68667ebc44efca6cb01eae05b50b0cee5073db7"
+        }
+      ]
+    },
+    {
+      "id": "popper-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "popper-pristine-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Typechecks the two upstream typings programs unchanged; assertion-group inventory is shared with the adapted type-parity ledger.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/popper/typetests/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/popper/upstream/tag/typings/tests/main-test.tsx",
+          "role": "test",
+          "sha256": "01a7c18182a94ababe7be342aa4f48dde561d48679e82847186860b1a51ac684",
+          "cases": [
+            {
+              "id": "types:popper-pristine-main",
+              "testName": "upstream main-test.tsx",
+              "fullName": "react-popper 2.3.0 typings/tests/main-test.tsx"
+            }
+          ]
+        },
+        {
+          "path": "packages/popper/upstream/tag/typings/tests/svg-test.tsx",
+          "role": "test",
+          "sha256": "0e84b6ac8cd2372d87288d4cebd5fee6c466077e63b6a095e8cad03a3fd0d68e",
+          "cases": [
+            {
+              "id": "types:popper-pristine-svg",
+              "testName": "upstream svg-test.tsx",
+              "fullName": "react-popper 2.3.0 typings/tests/svg-test.tsx"
+            }
+          ]
+        },
+        {
+          "path": "packages/popper/typetests/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "11f66d3ee6cd77bd17b1f2ec9bb6299d97b9f8e79c9ebe118bb1994e3d73bc21"
+        },
+        {
+          "path": "packages/popper/audit/type-parity.json",
+          "role": "support",
+          "sha256": "4742d3b70db5bb1d52552bf9a99a5757fb4495f84e7938c36ac427abe35b53dc"
+        },
+        {
+          "path": "packages/popper/audit/upstream-types.json",
+          "role": "support",
+          "sha256": "13ec3169c8260cd42b79fe1cba1b761ac964ac6943f91b46d4ca1d794aef8524"
+        }
+      ]
+    },
+    {
+      "id": "popper-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "popper-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "One-for-one adapted Octane typings for every adapted disposition, with file/assertion-group inventory of JSX and typed-usage probes, permitted-transformation ledger, structural compare, program-membership checks, and skipped-file / deleted-probe / tsconfig-exclude negative controls.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/popper/typetests/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/popper/typetests/main-test.tsx",
+          "role": "test",
+          "sha256": "495e2b74e30aadf6e0f39a47344d61efb635a68a368634b0992fc7da11a235d9",
+          "cases": [
+            {
+              "id": "types:popper-adapted-main",
+              "testName": "adapted main-test.tsx",
+              "fullName": "@octanejs/popper typetests/main-test.tsx"
+            }
+          ]
+        },
+        {
+          "path": "packages/popper/typetests/svg-test.tsx",
+          "role": "test",
+          "sha256": "78ef9e4dd3fe0b398e0c2fe2b218f3acabdf134ce5c144f94af8621ba7859aa8",
+          "cases": [
+            {
+              "id": "types:popper-adapted-svg",
+              "testName": "adapted svg-test.tsx",
+              "fullName": "@octanejs/popper typetests/svg-test.tsx"
+            }
+          ]
+        },
+        {
+          "path": "packages/popper/typetests/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "37208c57a988ebb90dad45dc4ee9a8723910b089cd99472b38c9ad2b3c8ec110"
+        },
+        {
+          "path": "packages/popper/audit/type-parity.json",
+          "role": "support",
+          "sha256": "4742d3b70db5bb1d52552bf9a99a5757fb4495f84e7938c36ac427abe35b53dc"
+        },
+        {
+          "path": "packages/popper/audit/upstream-types.json",
+          "role": "support",
+          "sha256": "13ec3169c8260cd42b79fe1cba1b761ac964ac6943f91b46d4ca1d794aef8524"
+        },
+        {
+          "path": "packages/popper/audit/adapted-types.json",
+          "role": "support",
+          "sha256": "8ce4ba7cd82e6d8a445ed7fd7f31b21f5757b064b04cf865d6339884bc7cf893"
+        },
+        {
+          "path": "packages/popper/audit/adapted-only-types.json",
+          "role": "support",
+          "sha256": "7dd99fe389aae3bd045ef2ed2386640ba754bb01e5feb1c47b60de16a2584911"
+        },
+        {
+          "path": "packages/popper/typetests/assertions.md",
+          "role": "support",
+          "sha256": "9540abd1870c44e368a20a7074aacf169d84c2f61212c764a31cea116ad4dc35"
+        },
+        {
+          "path": "scripts/react-parity/popper-types-lib.mjs",
+          "role": "support",
+          "sha256": "3104875c9593670fda5a486f2085aa1d8adbf938b6dd5fd44f7f08ec6c998da1"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "popper-octane-node-and-ref-types",
+      "caseIds": ["types:popper-adapted-main", "types:popper-adapted-svg"],
+      "upstreamResult": "Public props use React.ReactNode, React.Ref, and React.CSSProperties around class components.",
+      "octaneResult": "Public props use OctaneNode, plain Ref callback/object unions, and CSSProperties while Manager/Reference/Popper are function components.",
+      "rationale": "Octane has no class components and represents renderables/refs with its own structural types.",
+      "classification": "type-surface",
+      "consumerImpact": "Type imports that expect React.ReactNode or component classes must switch to OctaneNode and function components.",
+      "migrationGuidance": "Type children and render-prop returns as OctaneNode; keep runtime render-function values unchanged.",
+      "owner": "@octanejs/popper",
+      "reviewCondition": "Review if Octane publishes React-compatible ReactNode/class-component shims for bindings."
+    },
+    {
+      "id": "popper-dev-warning-console",
+      "caseIds": ["runtime:baa5fd0dba1358db"],
+      "upstreamResult": "Reference misuse warnings go through react-popper's warning helper.",
+      "octaneResult": "Reference misuse warnings are emitted with console.error using the same warning text.",
+      "rationale": "The Octane binding avoids depending on the upstream warning helper while preserving the developer-facing message.",
+      "classification": "dev-warning",
+      "consumerImpact": "Tests that mock the upstream warning helper must mock console.error instead.",
+      "migrationGuidance": "Assert console.error for the Reference-outside-Manager warning in development.",
+      "owner": "@octanejs/popper",
+      "reviewCondition": "Review if Octane adopts a shared binding warning helper."
+    }
+  ]
+}

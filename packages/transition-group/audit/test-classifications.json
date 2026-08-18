@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/transition-group/tests/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the published Octane package namespace matches the pinned upstream root exports; it is not used as React-parity evidence."
+    },
+    {
+      "path": "packages/transition-group/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "SSR/server rendering contracts for the Octane binding; parity-owned SSR import evidence lives beside it in upstream-import.test.ts."
+    },
+    {
+      "path": "packages/transition-group/tests/ssr/upstream-import.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted SSR import case from pinned react-transition-group@4.4.5 test/SSR-test.js with // Per path citation and case-crosswalk coverage."
+    },
+    {
+      "path": "packages/transition-group/tests/transition.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Repo-authored Octane lifecycle/DOM guards for nodeRef and compiler children contracts; adapted upstream-suite identities live under tests/upstream/."
+    },
+    {
+      "path": "packages/transition-group/tests/upstream/CSSTransition.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted cases from pinned react-transition-group@4.4.5 test/CSSTransition-test.js with // Per path citations."
+    },
+    {
+      "path": "packages/transition-group/tests/upstream/ChildMapping.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted cases from pinned react-transition-group@4.4.5 test/TransitionGroup-test.js ChildMapping section with // Per path citations."
+    },
+    {
+      "path": "packages/transition-group/tests/upstream/SwitchTransition.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted cases from pinned react-transition-group@4.4.5 test/SwitchTransition-test.js with // Per path citations."
+    },
+    {
+      "path": "packages/transition-group/tests/upstream/Transition.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted cases from pinned react-transition-group@4.4.5 test/Transition-test.js with // Per path citations and explicit findDOMNode not-applicable dispositions."
+    },
+    {
+      "path": "packages/transition-group/tests/upstream/TransitionGroup.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one adapted cases from pinned react-transition-group@4.4.5 test/TransitionGroup-test.js and CSSTransitionGroup-test.js with // Per path citations; StrictMode double-appear is an explicit manifest divergence."
+    },
+    {
+      "path": "packages/transition-group/typetests/react-transition-group-tests.tsx",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "One-for-one Octane adaptation of DefinitelyTyped's react-transition-group-tests.tsx, paired with upstream-types/react-transition-group-tests.tsx via audit/type-parity.json."
+    },
+    {
+      "path": "packages/transition-group/upstream-types/react-transition-group-tests.tsx",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Byte-exact DefinitelyTyped suite at cccd2a9ffecb708ac0606faa7f81f0b7ec535bf9, paired one-for-one with typetests/react-transition-group-tests.tsx via audit/type-parity.json."
+    },
+    {
+      "path": "scripts/react-parity/react-transition-group-classifications-lib.test.mjs",
+      "disposition": "audit-verifier-test",
+      "reason": "Negative controls for the port-authored test classification verifier; not React-parity runtime evidence."
+    },
+    {
+      "path": "scripts/react-parity/react-transition-group-timer-order.test.mjs",
+      "disposition": "audit-verifier-test",
+      "reason": "Regression control for deterministic zero-delay ordering in the pristine upstream Jest harness; not React-parity runtime evidence."
+    },
+    {
+      "path": "scripts/react-parity/react-transition-group-types-lib.test.mjs",
+      "disposition": "audit-verifier-test",
+      "reason": "Negative controls for the type-parity inventory and tsconfig program verifier; not React-parity runtime evidence."
+    },
+    {
+      "path": "scripts/react-parity/react-transition-group-upstream-lib.test.mjs",
+      "disposition": "audit-verifier-test",
+      "reason": "Negative controls for upstream provenance, crosswalk, and semantic adapted-case contracts; not React-parity runtime evidence."
+    }
+  ]
+}

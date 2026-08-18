@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/apollo-client/tests/conformance/client.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane client hook lifecycles, MockedProvider, and Suspense paths; it is not a one-for-one upstream suite adaptation."
+    },
+    {
+      "path": "packages/apollo-client/tests/conformance/exports.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the published adapter export surface against @apollo/client/react without executing upstream scenarios."
+    },
+    {
+      "path": "packages/apollo-client/tests/conformance/upstream-ApolloProvider.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Adapts src/react/context/__tests__/ApolloProvider.test.tsx from the pinned repository into the TSRX fixture."
+    },
+    {
+      "path": "packages/apollo-client/tests/conformance/upstream-useApolloClient.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Adapts src/react/hooks/__tests__/useApolloClient.test.tsx from the pinned repository into the TSRX fixture."
+    },
+    {
+      "path": "packages/apollo-client/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the exact cache-only ApolloProvider/useQuery scenario against @apollo/client@4.2.6."
+    },
+    {
+      "path": "packages/apollo-client/tests/differential/setup.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks fail-closed React fixture compilation for the parity harness itself."
+    },
+    {
+      "path": "packages/apollo-client/tests/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane hydration of SSR cache restoration; it is not compared with React hydration."
+    },
+    {
+      "path": "packages/apollo-client/tests/ssr/prerender.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane prerenderStatic and request isolation; it is not a one-for-one upstream SSR suite adaptation."
+    },
+    {
+      "path": "packages/apollo-client/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only declaration coverage for the published Apollo client/react surface; it is not parity type evidence."
+    }
+  ]
+}

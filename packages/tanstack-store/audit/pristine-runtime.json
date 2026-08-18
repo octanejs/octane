@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-store-pristine",
+  "roots": ["packages/tanstack-store/upstream"],
+  "files": ["packages/tanstack-store/upstream/tests/index.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:1e4c72fad25de946",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "_useStore returns selected state and actions for stores with actions"
+    },
+    {
+      "id": "runtime:37dc21ece251209a",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "_useStore returns selected state and setState for plain stores"
+    },
+    {
+      "id": "runtime:6b0f936e7e2af313",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "atom hooks useAtom returns the current value and setter"
+    },
+    {
+      "id": "runtime:3c9f1b11b3d41605",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "atom hooks useCreateAtom creates a stable atom instance across rerenders"
+    },
+    {
+      "id": "runtime:83cfb641f61dc33a",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "atom hooks useSelector reads mutable atom state and rerenders when updated"
+    },
+    {
+      "id": "runtime:a53d9a97f67fb7f9",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "atom hooks useSelector reads readonly atom state"
+    },
+    {
+      "id": "runtime:70ee0ff734b0f740",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "atom hooks useSelector respects custom compare"
+    },
+    {
+      "id": "runtime:695819eadceab288",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "shallow should return false for objects with different keys"
+    },
+    {
+      "id": "runtime:e5e81f727610eeba",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "shallow should return false for objects with different structures"
+    },
+    {
+      "id": "runtime:ef91c373ab70db8a",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "shallow should return false for objects with different types"
+    },
+    {
+      "id": "runtime:1840749388589217",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "shallow should return false for objects with different values"
+    },
+    {
+      "id": "runtime:a3e638b5a9e57a2a",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "shallow should return false for one object being null"
+    },
+    {
+      "id": "runtime:6c9923aead3f5438",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "shallow should return false for one object being undefined"
+    },
+    {
+      "id": "runtime:6e71f4b65e708c72",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "shallow should return false for shallow different values for symbol keys"
+    },
+    {
+      "id": "runtime:57fa1710615cb8b9",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "shallow should return true for non-enumerable keys"
+    },
+    {
+      "id": "runtime:dc341bf68ebc6907",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "shallow should return true for shallow equal objects with symbol keys"
+    },
+    {
+      "id": "runtime:263e336c05dadc57",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "shallow should return true for shallowly equal objects"
+    },
+    {
+      "id": "runtime:166eb39ac42c29a6",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "shallow should return true for two null objects"
+    },
+    {
+      "id": "runtime:0086a35200f49f52",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "store contexts nested providers override parent values"
+    },
+    {
+      "id": "runtime:89166a2178e3a80f",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "store contexts provides bundled writable atoms and stores"
+    },
+    {
+      "id": "runtime:9059b1233c710473",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "store contexts supports readonly atoms and stores in the same context"
+    },
+    {
+      "id": "runtime:3e82901d54d97f28",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "store contexts throws a clear error when a store provider is missing"
+    },
+    {
+      "id": "runtime:f7c08c8680b3b1be",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "store contexts works with useAtom against contextual atoms"
+    },
+    {
+      "id": "runtime:e955c494b280ea57",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "store hooks useCreateStore creates a stable store instance across rerenders"
+    },
+    {
+      "id": "runtime:fc9d1402ca5577e2",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "store hooks useCreateStore supports actions and keeps them stable"
+    },
+    {
+      "id": "runtime:e15219e9832eb569",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "store hooks useSelector allows specifying a custom equality function"
+    },
+    {
+      "id": "runtime:c954229996ee0e07",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "store hooks useSelector allows us to select state using a selector"
+    },
+    {
+      "id": "runtime:2015c35a017f51f7",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "store hooks useSelector only triggers a re-render when selector state is updated"
+    },
+    {
+      "id": "runtime:28fc3652781e73b0",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "store hooks useSelector reads writable and readonly store state"
+    },
+    {
+      "id": "runtime:a4a5703578aaabb9",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "store hooks useSelector works with mounted derived stores"
+    },
+    {
+      "id": "runtime:c4fda9487a741977",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "useStore is a compatibility alias for useSelector"
+    },
+    {
+      "id": "runtime:97a061708ccacf15",
+      "file": "packages/tanstack-store/upstream/tests/index.test.tsx",
+      "fullName": "useStore supports atom sources through the deprecated alias"
+    }
+  ],
+  "snapshots": 0
+}

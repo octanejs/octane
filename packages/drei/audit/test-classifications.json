@@ -1,0 +1,1131 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/drei/tests/accumulative-shadows.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/adaptive-performance.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/ascii-renderer.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/basic-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/bounds.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/box-projected-env.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/browser/upstream-e2e.browser.test.ts",
+      "disposition": "adapted-octane-upstream-suite",
+      "oracle": "Ports the vendored Playwright gallery scene to Octane; pristine upstream execution is tracked separately."
+    },
+    {
+      "path": "packages/drei/tests/bvh.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/camera-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/camera-shake.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/cameras.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/catalog-textures.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/caustics.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/center.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/clone.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/cloud.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/config.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Validates the Octane renderer-boundary preset, which has no React counterpart."
+    },
+    {
+      "path": "packages/drei/tests/contact-shadows.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/context-bridge.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/core-utilities.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/crosswalk-guard.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Validates repository audit machinery; it is not React behavioral evidence."
+    },
+    {
+      "path": "packages/drei/tests/curve-modifier.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/cycle-raycast.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/decal.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/depth-buffer.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/detect-gpu.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/differential/view.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/drag-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/effects-utils.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/effects.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/environment-components.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/environment.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/example.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/face-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/face-landmarker.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/facemesh.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/fbo.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/fisheye.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/font.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/gizmo-helper.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/gizmo-widgets.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/grid.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/helper.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/hooks.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/html.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/hud.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/image.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/instances.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/keyboard-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/lightformer.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/lines.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/loader.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/marching-cubes.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/mesh-portal-material.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/mesh-reflector-material.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/mesh-refraction-material.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/mesh-transmission-material.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/models.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/motion-materials.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/motion-path.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/ascii-renderer.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/camera-controls.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/cloud.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/core-utilities.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/depth-buffer.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/environment.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/fbo.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/font.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/html.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/instances.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/motion-path.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/performance-monitor.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/pivot-controls.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/points.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/positional-audio.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/progress.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/rounded-box.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/sampler.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/soft-shadows.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/textures.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/trail-texture.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/trail.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/transform-controls.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/octane-contracts/use-cursor.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Octane-only compiler, provider, or lifecycle contract without a paired React scenario."
+    },
+    {
+      "path": "packages/drei/tests/outlines.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/performance-monitor.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/pivot-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/pointer-lock.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/points.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/positional-audio.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/preload.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/presentation-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/progress.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/react-parity-guard.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Validates repository audit machinery; it is not React behavioral evidence."
+    },
+    {
+      "path": "packages/drei/tests/render-textures.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/resize.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/rounded-box.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/sampler.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/scene-helpers.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/scene-motion.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/screen-sizer.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/scroll-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/segments.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/select.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/shadows.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/shapes.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/simple-materials.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/sky.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/soft-shadows.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/sparkles.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/splat.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/spot-light.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/sprite-animator.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/sprite-loader-utils.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/sprite-loader.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/stage.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/stars.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/stats.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/svg.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/text.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/text3d.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/textures.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/trail-texture.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/trail.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/transform-controls.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/use-animations.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/use-cursor.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/video-textures.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/tests/view-renderer-boundary.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Pins the intentional DOM-root View renderer-boundary divergence as ordinary drei-guards evidence; it is not paired React behavioral evidence.",
+      "divergenceId": "view-renderer-boundary"
+    },
+    {
+      "path": "packages/drei/tests/wireframe.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Executes the same observable scenario against pinned @react-three/drei and @octanejs/drei in the test body."
+    },
+    {
+      "path": "packages/drei/typetests/accumulative-shadows.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/adapted/public-api.test-d.ts",
+      "disposition": "repo-authored-type-parity",
+      "oracle": "Matching public-surface type assertions against @octanejs/drei."
+    },
+    {
+      "path": "packages/drei/typetests/adaptive-performance.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/ascii-renderer.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/basic-controls.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/bounds.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/box-projected-env.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/bvh.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/camera-controls.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/camera-shake.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/cameras.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/catalog-textures.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/caustics.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/center.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/clone.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/cloud.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/contact-shadows.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/curve-modifier.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/cycle-raycast.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/decal.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/depth-buffer.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/detect-gpu.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/effects-utils.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/effects.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/environment-components.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/environment.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/example.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/face-controls.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/face-landmarker.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/facemesh.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/fbo.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/fisheye.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/font.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/gizmo-helper.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/grid.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/helper.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/hooks.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/html.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/hud.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/image.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/instances.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/keyboard-controls.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/lightformer.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/lines.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/marching-cubes.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/mesh-portal-material.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/mesh-reflector-material.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/mesh-refraction-material.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/mesh-transmission-material.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/models.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/motion-materials.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/motion-path.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/outlines.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/performance-monitor.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/pivot-controls.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/pointer-lock.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/points.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/positional-audio.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/preload.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/presentation-controls.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/pristine/public-api.test-d.ts",
+      "disposition": "repo-authored-type-parity",
+      "oracle": "Repo-authored public-surface type assertions against pinned @react-three/drei."
+    },
+    {
+      "path": "packages/drei/typetests/progress.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/render-textures.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/resize.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/sampler.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/scene-helpers.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/scene-motion.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/screen-sizer.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/scroll-controls.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/segments.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/select.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/shadows.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/shapes.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/simple-materials.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/sky.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/soft-shadows.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/sparkles.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/splat.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/spot-light.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/sprite-animator.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/sprite-loader-utils.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/stage.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/stars.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/stats.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/svg.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/text.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/text3d.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/textures.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/trail-texture.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/trail.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/transform-controls.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/use-animations.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/use-cursor.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/video-textures.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    },
+    {
+      "path": "packages/drei/typetests/view.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Ordinary Octane-only type coverage executed by package typecheck; outside parity evidence lanes."
+    }
+  ]
+}

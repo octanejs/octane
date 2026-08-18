@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/remix-router/tests/conformance/await.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane Await adapter; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/data-hooks.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane data hooks; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/declarative.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane declarative routing and registration behavior; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/dom-routers.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane DOM-router adapters; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/errors.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane route-error behavior; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/forms.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane form and fetcher adapters; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/guards.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane blocker, prompt, and scroll behavior; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/lazy.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane lazy-route behavior; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/link.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane Link adapter; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/navigation.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane navigation behavior; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/navlink.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane NavLink adapter; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/parity.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks exact pinned export names and identity reuse; it is not a behavioral React differential."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/router.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the Octane RouterProvider adapter; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/search-params.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane search-param behavior; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/server-runtime.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the vendored Octane server runtime and scope stubs; it is not counted as same-fixture React evidence."
+    },
+    {
+      "path": "packages/remix-router/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs nine exact routing scenarios from eight shared fixtures against pinned react-router and @octanejs/remix-router."
+    },
+    {
+      "path": "packages/remix-router/tests/ssr/ssr-static.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs five exact static-render scenarios from one fixture against react-router/react-dom/server and @octanejs/remix-router/octane/server."
+    },
+    {
+      "path": "packages/remix-router/tests/vendored-core/create-path.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Runs a selected vendored router-core suite against the Octane port; the full pristine upstream suite is not executed."
+    },
+    {
+      "path": "packages/remix-router/tests/vendored-core/interruptions.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Runs a selected vendored router-core suite against the Octane port; the full pristine upstream suite is not executed."
+    },
+    {
+      "path": "packages/remix-router/tests/vendored-core/memory.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Runs a selected vendored router-core suite against the Octane port; the full pristine upstream suite is not executed."
+    },
+    {
+      "path": "packages/remix-router/tests/vendored-core/navigation.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Runs a selected vendored router-core suite against the Octane port; the full pristine upstream suite is not executed."
+    },
+    {
+      "path": "packages/remix-router/tests/vendored-core/path-resolution.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Runs a selected vendored router-core suite against the Octane port; the full pristine upstream suite is not executed."
+    },
+    {
+      "path": "packages/remix-router/tests/vendored-core/redirects.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Runs a selected vendored router-core suite against the Octane port; the full pristine upstream suite is not executed."
+    },
+    {
+      "path": "packages/remix-router/tests/vendored-core/route-fallback.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Runs a selected vendored router-core suite against the Octane port; the full pristine upstream suite is not executed."
+    },
+    {
+      "path": "packages/remix-router/tests/vendored-core/router-memory.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Runs a selected vendored router-core suite against the Octane port; the full pristine upstream suite is not executed."
+    },
+    {
+      "path": "packages/remix-router/tests/vendored-core/v8-regressions.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane-authored v8 regression pins; it is not counted as upstream or same-fixture React evidence."
+    }
+  ]
+}

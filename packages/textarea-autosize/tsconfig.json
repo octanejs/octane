@@ -17,5 +17,5 @@
     "allowImportingTsExtensions": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsrx"],
-  "exclude": ["node_modules", "dist", "tests", "upstream", "typetests"]
+  "exclude": ["node_modules", "dist", "tests", "upstream", "typetests", "audit"]
 }

@@ -1,4 +1,7 @@
-// Ordinary Octane-only probe for local Dispatch/SetStateAction aliases.
+// Ordinary Octane-only probe: upstream spells setters as
+// React.Dispatch<React.SetStateAction<T>>; Octane exports structurally identical
+// local Dispatch/SetStateAction aliases. Kept outside required React-parity
+// ownership because there is no pristine React accept/reject counterpart.
 import { useDebouncedState, useThrottledState } from '@octanejs/tanstack-pacer';
 import type { Dispatch, SetStateAction } from '../../src/internal';
 

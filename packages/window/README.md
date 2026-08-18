@@ -71,6 +71,11 @@ match the React package. Two renderer-internal observations differ:
   can differ. Do not depend on sibling effect ordering; keyed state and DOM
   identity are preserved.
 
+The pinned source, npm declaration bundle, license, test inventory, allowed
+adaptations, and executable pristine/adapted/type/differential/SSR/hydration
+lanes are recorded in [`UPSTREAM.md`](./UPSTREAM.md) and
+[`audit/react-parity.json`](./audit/react-parity.json).
+
 ## License
 
 MIT — contains source derived from

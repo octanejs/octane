@@ -508,6 +508,7 @@ export default defineConfig({
 			{
 				// All zustand conformance (including the unstable-selector divergence)
 				// stays in ordinary shards; only differential parity.test.ts is
+				// react-parity-owned.
 				test: {
 					name: 'zustand',
 					include: ['packages/zustand/tests/**/*.test.ts'],
@@ -559,6 +560,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'rxjs-differential',
 					include: ['packages/rxjs/tests/differential/**/*.test.ts'],
@@ -581,6 +583,10 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/valtio/tests/upstream/**/*.test.ts'],
+				},
 				test: {
 					name: 'valtio',
 					include: ['packages/valtio/tests/**/*.test.ts'],
@@ -639,7 +645,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'dexie-browser',
 					include: ['packages/dexie/tests/browser/**/*.test.ts'],
@@ -808,6 +814,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'jotai-differential',
 					include: ['packages/jotai/tests/differential/**/*.test.ts'],
@@ -839,6 +846,7 @@ export default defineConfig({
 			},
 			{
 				// Mixed Octane-only conformance/divergence suite — keep out of the
+				// react-parity group so ordinary shards still own these files.
 				// Parity-owned evidence lives in `nuqs-differential` only.
 				test: {
 					name: 'nuqs',
@@ -903,6 +911,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'inertia-adapted',
 					include: ['packages/inertia/tests/adapted/**/*.test.ts'],
@@ -928,6 +937,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'inertia-differential',
 					include: ['packages/inertia/tests/differential/**/*.test.ts'],
@@ -1007,6 +1017,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'i18next-differential',
 					include: ['packages/i18next/tests/differential/**/*.test.ts'],
@@ -1084,6 +1095,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'usehooks-ts-differential',
 					include: ['packages/usehooks-ts/tests/differential/**/*.test.ts'],
@@ -1120,6 +1132,16 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/usehooks-ts/src/index.ts'),
 						},
 					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-hotkeys-pristine',
+					include: ['packages/tanstack-hotkeys/tests/upstream-original.test.ts'],
+					environment: 'node',
+					sequence: { groupOrder: 1 },
+					globals: false,
 				},
 			},
 			{
@@ -1167,6 +1189,10 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/tanstack-hotkeys/tests/upstream/**/*.test.ts'],
+				},
 				test: {
 					name: 'tanstack-hotkeys',
 					include: ['packages/tanstack-hotkeys/tests/**/*.test.ts'],
@@ -1209,6 +1235,7 @@ export default defineConfig({
 					globalSetup: ['packages/tanstack-hotkeys/tests/differential/_setup.ts'],
 					globals: false,
 				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane()],
 				resolve: {
 					alias: [
@@ -1221,6 +1248,14 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
 						},
 					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-hotkeys-parity-audit',
+					include: ['packages/tanstack-hotkeys/tests/parity/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
 				},
 			},
 			{
@@ -1281,6 +1316,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'solana-react-adapted',
 					include: ['packages/solana-react/tests/upstream/**/*.test.ts'],
@@ -1299,6 +1335,15 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/solana-react/src/query.ts'),
 						},
 					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'solana-react-pristine',
+					include: ['packages/solana-react/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
 				},
 			},
 			{
@@ -1352,6 +1397,24 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'livestore-pristine',
+					include: ['packages/livestore/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/livestore/tests/document-sync.test.ts',
+						'packages/livestore/tests/lifecycle.test.ts',
+						'packages/livestore/tests/query.test.ts',
+					],
+				},
 				test: {
 					name: 'livestore',
 					include: ['packages/livestore/tests/**/*.test.ts'],
@@ -1409,6 +1472,10 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/tanstack-store/tests/conformance/upstream-index.test.ts'],
+				},
 				test: {
 					name: 'tanstack-store',
 					include: [
@@ -1466,6 +1533,15 @@ export default defineConfig({
 				// Faithful adapted upstream wrappers are parity-owned. StrictMode
 				// divergences, repository-only regressions, and other Octane-only
 				// conformance stay in the ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/tanstack-form/tests/conformance/createFormHook.test.ts',
+						'packages/tanstack-form/tests/conformance/useField.test.ts',
+						'packages/tanstack-form/tests/conformance/useForm.test.ts',
+						'packages/tanstack-form/tests/conformance/useFormGroup.test.ts',
+					],
+				},
 				test: {
 					name: 'tanstack-form',
 					include: ['packages/tanstack-form/tests/conformance/**/*.test.ts'],
@@ -1648,6 +1724,12 @@ export default defineConfig({
 			},
 			{
 				// Mixed project: conformance + package tests stay in ordinary shards;
+				// parity-legacy-api is owned by react-parity so it executes once via
+				// react-parity:check (same file-granular pattern as apollo-client/livestore).
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/tanstack-table/tests/conformance/parity-legacy-api.test.ts'],
+				},
 				test: {
 					name: 'tanstack-table',
 					include: ['packages/tanstack-table/tests/**/*.test.ts'],
@@ -1712,6 +1794,7 @@ export default defineConfig({
 				// the binding's plain-.ts hooks run against the server runtime.
 				// Node environment; the React side renders via react-dom/server over
 				// an isolated SSR cache so concurrent client setup cannot delete it.
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'remix-router-ssr',
 					include: ['packages/remix-router/tests/ssr/**/*.test.ts'],
@@ -1751,6 +1834,7 @@ export default defineConfig({
 			{
 				// Ordinary package suite: nested-flush and other Octane-only contracts
 				// stay here. Provenance is recorded-unverified, so nothing is
+				// react-parity-owned until a verified harness can execute it.
 				test: {
 					name: 'tanstack-virtual',
 					include: ['packages/tanstack-virtual/tests/**/*.test.ts'],
@@ -1805,6 +1889,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'wagmi-differential',
 					include: ['packages/wagmi/tests/differential/**/*.test.ts'],
@@ -1870,6 +1955,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'rainbowkit-differential',
 					globalSetup: ['packages/rainbowkit/tests/differential/_setup.ts'],
@@ -1951,7 +2037,15 @@ export default defineConfig({
 				},
 			},
 			{
+				// Adapted upstream wrappers are owned by react-parity; conformance and
 				// hydration stay in ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/apollo-client/tests/conformance/upstream-ApolloProvider.test.ts',
+						'packages/apollo-client/tests/conformance/upstream-useApolloClient.test.ts',
+					],
+				},
 				test: {
 					name: 'apollo-client',
 					include: [
@@ -2023,7 +2117,12 @@ export default defineConfig({
 			},
 			{
 				// Differential lane: precompiles fixtures for the published React oracle.
+				// Only the manifest-backed parity file is owned by react-parity; setup.test.ts
 				// stays in ordinary CI via the project include.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/apollo-client/tests/differential/parity.test.ts'],
+				},
 				test: {
 					name: 'apollo-client-differential',
 					include: ['packages/apollo-client/tests/differential/**/*.test.ts'],
@@ -2122,6 +2221,7 @@ export default defineConfig({
 			},
 			{
 				// Octane-only conformance stays in ordinary shards; differential
+				// parity lives in the react-parity-owned project below.
 				test: {
 					name: 'redux',
 					include: ['packages/redux/tests/**/*.test.ts'],
@@ -2146,8 +2246,10 @@ export default defineConfig({
 				},
 			},
 			{
+				// Parity-owned: packages/redux/audit/react-parity.json requires this
 				// project as the redux-runtime-differential lane. Ordinary Octane-only
 				// redux tests stay in the separate `redux` project above.
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'redux-differential',
 					include: ['packages/redux/tests/differential/**/*.test.ts'],
@@ -2221,6 +2323,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'redux-toolkit-differential',
 					include: ['packages/redux-toolkit/tests/differential/**/*.test.ts'],
@@ -2298,6 +2401,23 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'hook-form-pristine',
+					include: ['packages/hook-form/tests/upstream-original.test.ts'],
+					environment: 'node',
+					sequence: { groupOrder: 1 },
+					globals: false,
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/hook-form/tests/upstream/**/*.test.ts',
+						'packages/hook-form/tests/upstream/**/*.test.tsx',
+					],
+				},
 				test: {
 					name: 'hook-form',
 					include: [
@@ -2349,6 +2469,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'hook-form-differential',
 					include: [
@@ -2384,6 +2505,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				// react-hook-form's own jest config runs `*.server.test.tsx` in a
 				// node environment; same split here — node transform mode also makes
 				// the octane plugin compile in `mode: 'server'`, which the server
@@ -2468,6 +2590,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'recharts-differential',
 					include: ['packages/recharts/tests/differential/**/*.test.ts'],
@@ -2517,6 +2640,19 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/three/tests/public-api.test.ts',
+						'packages/three/tests/root.test.ts',
+						'packages/three/tests/hooks.test.ts',
+						'packages/three/tests/catalogue-props.test.ts',
+						'packages/three/tests/events.test.ts',
+						'packages/three/tests/portal.test.ts',
+						'packages/three/tests/dom-region.test.ts',
+						'packages/three/tests/upstream-crosswalk.test.ts',
+					],
+				},
 				test: {
 					name: 'three',
 					include: ['packages/three/tests/**/*.test.ts'],
@@ -2539,7 +2675,7 @@ export default defineConfig({
 				resolve: { alias: THREE_ALIASES, dedupe: ['react', 'react-dom', 'three'] },
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'three-browser',
 					include:
@@ -2634,6 +2770,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'lucide-differential',
 					include: ['packages/lucide/tests/differential/**/*.test.ts'],
@@ -2706,6 +2843,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'phosphor-icons-differential',
 					include: ['packages/phosphor-icons/tests/differential/**/*.test.ts'],
@@ -2754,6 +2892,7 @@ export default defineConfig({
 			},
 			{
 				// Ordinary package shards: conformance, divergences, and harness negatives.
+				// Only the differential project is react-parity-owned.
 				test: {
 					name: 'tanstack-router',
 					include: ['packages/tanstack-router/tests/**/*.test.ts'],
@@ -2822,6 +2961,7 @@ export default defineConfig({
 					globalSetup: ['packages/tanstack-router-ssr-query/tests/differential/_setup.ts'],
 					globals: false,
 				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane({ ssr: true })],
 				resolve: {
 					alias: [
@@ -2845,6 +2985,14 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
 						},
 					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-router-ssr-query-parity-audit',
+					include: ['packages/tanstack-router-ssr-query/tests/parity/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
 				},
 			},
 			{
@@ -2973,6 +3121,7 @@ export default defineConfig({
 					setupFiles: ['packages/dnd-kit/tests/_setup.ts'],
 					globals: false,
 				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane()],
 				resolve: {
 					alias: [
@@ -3065,6 +3214,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'lexical-differential',
 					include: ['packages/lexical/tests/differential/**/*.test.ts'],
@@ -3268,6 +3418,7 @@ export default defineConfig({
 				},
 			},
 			{
+				// No react-parity lane owns project "shadcn". Divergence/Sonner
 				// authentication stays on ordinary shards as octane-only evidence.
 				test: {
 					name: 'shadcn',
@@ -3302,6 +3453,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'shadcn-differential',
 					include: [
@@ -3327,6 +3479,7 @@ export default defineConfig({
 				},
 			},
 			{
+				// No react-parity lane owns `project: "shadcn-ssr"`, so leave this on ordinary
 				// shards rather than marking the package-authored SSR suite as parity-owned.
 				test: {
 					name: 'shadcn-ssr',
@@ -3494,6 +3647,7 @@ export default defineConfig({
 				// 8.1.2 on real React — resolved from node_modules so the octane
 				// plugin never touches the oracle. Its own project because the
 				// React-side precompile does not belong to the ordinary suite.
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'react-map-gl-differential',
 					include: ['packages/react-map-gl/tests/differential/**/*.test.ts'],
@@ -3515,6 +3669,10 @@ export default defineConfig({
 				// The ported @vis.gl/react-mapbox suite owns tests/upstream/**; the
 				// remaining files are Octane-only conformance for behavior the
 				// upstream suite cannot observe, so they stay in the ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/react-map-gl/tests/upstream/**/*.test.ts'],
+				},
 				test: {
 					name: 'react-map-gl',
 					include: ['packages/react-map-gl/tests/**/*.test.ts'],
@@ -3576,6 +3734,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'sonner-differential',
 					include: ['packages/sonner/tests/differential/**/*.test.ts'],
@@ -3691,6 +3850,10 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/cmdk/tests/ssr/empty-differential.test.ts'],
+				},
 				test: {
 					name: 'cmdk-ssr',
 					include: ['packages/cmdk/tests/ssr/**/*.test.ts'],
@@ -3737,6 +3900,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'styled-components-differential',
 					include: ['packages/styled-components/tests/differential/**/*.test.ts'],
@@ -3780,6 +3944,7 @@ export default defineConfig({
 			},
 			{
 				// Ordinary package tests stay in the Node-version shards. Only the
+				// differential project below is react-parity owned.
 				test: {
 					name: 'testing-library',
 					include: ['packages/testing-library/tests/**/*.test.ts'],
@@ -4037,6 +4202,7 @@ export default defineConfig({
 				resolve: { alias: INK_ALIASES },
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'ink-differential',
 					include: ['packages/ink/tests/differential/**/*.test.ts'],
@@ -4200,6 +4366,10 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/react-error-boundary/tests/differential/parity.test.ts'],
+				},
 				test: {
 					name: 'react-error-boundary-differential',
 					include: ['packages/react-error-boundary/tests/differential/**/*.test.ts'],
@@ -4242,6 +4412,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'gsap-differential',
 					include: ['packages/gsap/tests/differential/**/*.test.ts'],
@@ -4360,6 +4531,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'mobx-differential',
 					include: ['packages/mobx/tests/differential/**/*.test.ts'],
@@ -4422,6 +4594,22 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'spring-pristine',
+					include: ['packages/spring/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+					testTimeout: 180_000,
+					hookTimeout: 180_000,
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/spring/tests/upstream/**/*.test.ts'],
+				},
 				test: {
 					name: 'spring',
 					include: [
@@ -4484,6 +4672,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'spring-differential',
 					include: ['packages/spring/tests/differential/**/*.test.ts'],
@@ -4505,6 +4694,10 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/zag/tests/upstream/**/*.test.ts'],
+				},
 				test: {
 					name: 'zag',
 					include: [
@@ -4534,6 +4727,17 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'zag-pristine',
+					include: ['packages/zag/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'zag-differential',
 					include: ['packages/zag/tests/differential/**/*.test.ts'],
@@ -4576,6 +4780,20 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'alien-signals-pristine',
+					include: ['packages/alien-signals/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/alien-signals/tests/upstream-adapted.test.ts'],
+				},
 				test: {
 					name: 'alien-signals',
 					include: [
@@ -4623,6 +4841,28 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'intersection-observer-pristine',
+					include: ['packages/intersection-observer/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'intersection-observer-pristine-browser',
+					include: ['packages/intersection-observer/tests/upstream-browser-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+					testTimeout: 120_000,
+					hookTimeout: 120_000,
+				},
+			},
+			{
 				test: {
 					name: 'intersection-observer',
 					include: [
@@ -4659,6 +4899,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'intersection-observer-adapted',
 					include: [
@@ -4691,7 +4932,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'intersection-observer-adapted-browser',
 					include: ['packages/intersection-observer/tests/upstream/browser.test.tsx'],
@@ -4726,6 +4967,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'mantine-hooks-differential',
 					include: ['packages/mantine-hooks/tests/differential/**/*.test.ts'],
@@ -4763,6 +5005,26 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'embla-carousel-pristine-utils',
+					include: [
+						'packages/embla-carousel/upstream/embla-carousel-reactive-utils/src/__tests__/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: true,
+				},
+			},
+			{
+				// Audit checks are ordinary package tests, not required parity evidence.
+				test: {
+					name: 'embla-carousel-audit',
+					include: ['packages/embla-carousel/tests/audit/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
 				// Unpaired Octane browser harness. Owned by heavy-browser metadata so
 				// ordinary shards omit it and heavy_integration discovers it without a
 				// package-specific ci.yml path.
@@ -4777,6 +5039,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'embla-carousel-differential',
 					include: ['packages/embla-carousel/tests/differential/**/*.test.ts'],
@@ -4849,6 +5112,10 @@ export default defineConfig({
 				// The one-for-one adapted suite owns tests/upstream/**; exports and
 				// transition integration guards are Octane-authored and stay in the
 				// ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/transition-group/tests/upstream/**/*.test.ts'],
+				},
 				test: {
 					name: 'transition-group',
 					include: [
@@ -4871,6 +5138,10 @@ export default defineConfig({
 			{
 				// Only the upstream SSR import case is parity-owned; the authored
 				// initial-state / wrapper rendering cases stay in ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/transition-group/tests/ssr/upstream-import.test.ts'],
+				},
 				test: {
 					name: 'transition-group-ssr',
 					include: ['packages/transition-group/tests/ssr/**/*.test.ts'],
@@ -4893,6 +5164,7 @@ export default defineConfig({
 			},
 			{
 				// Ordinary ownership: repo-authored Octane-only smoke stays out of
+				// adaptedRuntimeSummary / react-parity evidence.
 				test: {
 					name: 'day-picker',
 					include: [
@@ -4949,6 +5221,7 @@ export default defineConfig({
 			{
 				// Bounded React oracle evidence only — unpaired smoke/SSR/browser
 				// projects stay on ordinary ownership above.
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'day-picker-differential',
 					include: ['packages/day-picker/tests/differential/**/*.test.ts'],
@@ -4966,8 +5239,13 @@ export default defineConfig({
 				},
 			},
 			{
+				// Mixed project: react-parity owns only adapted drawer evidence.
 				// Differential evidence lives in vaul-differential. exports.test.ts stays
 				// in ordinary shards as an Octane package contract.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/vaul/tests/drawer.test.ts'],
+				},
 				test: {
 					name: 'vaul',
 					include: [
@@ -4991,6 +5269,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'vaul-differential',
 					include: ['packages/vaul/tests/differential/**/*.test.ts'],
@@ -5030,7 +5309,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'vaul-browser',
 					include: ['packages/vaul/tests/browser/**/*.test.ts'],
@@ -5042,6 +5321,7 @@ export default defineConfig({
 			},
 			{
 				// Octane-only real-browser contracts (unpaired snap-point drag).
+				// Kept out of react-parity ownership and the vaul-browser inventory.
 				testExecution: { group: 'heavy-browser' },
 				test: {
 					name: 'vaul-browser-conformance',
@@ -5053,6 +5333,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'remix-router-differential',
 					include: ['packages/remix-router/tests/differential/**/*.test.ts'],
@@ -5084,12 +5365,15 @@ export default defineConfig({
 			{
 				// All paired React/Octane characterization (root suite + View canary). Octane-only
 				// contracts stay in drei-guards so differential ownership stays non-overlapping.
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'drei-differential',
 					include: ['packages/drei/tests/**/*.test.ts'],
 					exclude: [
 						...configDefaults.exclude,
 						'packages/drei/tests/config.test.ts',
+						'packages/drei/tests/crosswalk-guard.test.ts',
+						'packages/drei/tests/react-parity-guard.test.ts',
 						'packages/drei/tests/view-renderer-boundary.test.ts',
 						'packages/drei/tests/octane-contracts/**/*.test.ts',
 						'packages/drei/tests/browser/**/*.browser.test.ts',
@@ -5115,6 +5399,8 @@ export default defineConfig({
 					name: 'drei-guards',
 					include: [
 						'packages/drei/tests/config.test.ts',
+						'packages/drei/tests/crosswalk-guard.test.ts',
+						'packages/drei/tests/react-parity-guard.test.ts',
 						'packages/drei/tests/view-renderer-boundary.test.ts',
 						'packages/drei/tests/octane-contracts/**/*.test.ts',
 					],
@@ -5135,6 +5421,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'streamdown-differential',
 					include: ['packages/streamdown/tests/differential/**/*.test.ts'],
@@ -5149,6 +5436,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'tanstack-ai-differential',
 					include: ['packages/tanstack-ai/tests/differential/**/*.test.ts'],
@@ -5192,7 +5480,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'drei-adapted-browser',
 					include: ['packages/drei/tests/browser/**/*.browser.test.ts'],
@@ -5215,11 +5503,24 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'input-otp-pristine-browser',
+					include: ['packages/input-otp/tests/pristine/**/*.browser.test.ts'],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+				testExecution: { group: 'react-parity' },
+			},
+			{
+				test: {
 					name: 'input-otp-differential',
 					include: ['packages/input-otp/tests/differential/**/*.test.tsx'],
 					environment: 'jsdom',
 					globals: false,
 				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane()],
 				resolve: {
 					alias: [
@@ -5240,6 +5541,7 @@ export default defineConfig({
 					environment: 'jsdom',
 					globals: false,
 				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane()],
 				resolve: {
 					alias: [
@@ -5257,6 +5559,7 @@ export default defineConfig({
 					environment: 'node',
 					globals: false,
 				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane({ ssr: true })],
 				resolve: {
 					alias: [
@@ -5284,9 +5587,10 @@ export default defineConfig({
 					testTimeout: 60_000,
 					hookTimeout: 60_000,
 				},
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'tanstack-form-differential',
 					include: ['packages/tanstack-form/tests/differential/**/*.test.ts'],
@@ -5361,6 +5665,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'tanstack-router-differential',
 					include: ['packages/tanstack-router/tests/differential/**/*.test.ts'],
@@ -5412,6 +5717,17 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-store-pristine',
+					include: ['packages/tanstack-store/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'tanstack-store-differential',
 					include: ['packages/tanstack-store/tests/differential/parity.test.ts'],
@@ -5434,8 +5750,10 @@ export default defineConfig({
 				},
 			},
 			{
+				// Isolated differential ownership: react-parity:check runs this lane
 				// via selectHarnessAction while ordinary Vitest shards omit it.
 				// recorded-unverified provenance still blocks a verified parity claim.
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'tanstack-table-differential',
 					include: ['packages/tanstack-table/tests/differential/**/*.test.ts'],
@@ -5466,6 +5784,7 @@ export default defineConfig({
 			},
 			{
 				// Octane-only SSR contract — no React SSR counterpart, so it stays in
+				// ordinary shards rather than react-parity ownership.
 				test: {
 					name: 'tanstack-virtual-ssr',
 					include: ['packages/tanstack-virtual/tests/ssr/**/*.test.ts'],
@@ -5503,6 +5822,7 @@ export default defineConfig({
 			{
 				// Same-fixture React/Octane scenarios — parity-owned regardless of
 				// provenance status. Compiler-control and Octane-only SSR stay ordinary.
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'tanstack-virtual-differential',
 					include: ['packages/tanstack-virtual/tests/differential/parity.test.ts'],
@@ -5538,6 +5858,38 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tiptap-pristine',
+					include: ['packages/tiptap/upstream/src/**/*.spec.ts'],
+					environment: 'jsdom',
+					globals: false,
+					setupFiles: ['packages/tiptap/tests/_harness/verify-upstream.ts'],
+				},
+				oxc: {
+					jsx: {
+						runtime: 'automatic',
+						importSource: 'react',
+					},
+				},
+				resolve: {
+					alias: [
+						{
+							find: /^@tiptap\/react\/menus$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/tiptap/upstream/src/menus/index.ts',
+							),
+						},
+						{
+							find: /^@tiptap\/react$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/upstream/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'tiptap-upstream',
 					include: ['packages/tiptap/tests/upstream/**/*.test.ts'],
@@ -5559,6 +5911,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'tiptap-differential',
 					include: ['packages/tiptap/tests/differential/**/*.test.ts'],
@@ -5581,6 +5934,10 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/valtio/tests/differential/parity.test.ts'],
+				},
 				test: {
 					name: 'valtio-differential',
 					include: ['packages/valtio/tests/differential/**/*.test.ts'],
@@ -5616,6 +5973,10 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/visx/tests/differential/parity.test.ts'],
+				},
 				test: {
 					name: 'visx-differential',
 					include: ['packages/visx/tests/differential/**/*.test.ts'],
@@ -5630,6 +5991,10 @@ export default defineConfig({
 			},
 			{
 				// parity.test.ts is parity-owned; setup.test.ts stays ordinary CI.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/zustand/tests/differential/parity.test.ts'],
+				},
 				test: {
 					name: 'zustand-differential',
 					include: ['packages/zustand/tests/differential/**/*.test.ts'],
@@ -5659,6 +6024,16 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'motion-pristine',
+					include: ['packages/motion/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'motion-upstream',
 					include: ['packages/motion/tests/upstream/**/*.test.ts'],
@@ -5680,6 +6055,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'motion-differential',
 					include: ['packages/motion/tests/differential/**/*.test.ts'],
@@ -5704,6 +6080,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'testing-library-differential',
 					include: ['packages/testing-library/tests/differential.test.ts'],
@@ -5731,6 +6108,10 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/dexie/tests/differential/parity.test.ts'],
+				},
 				test: {
 					name: 'dexie-differential',
 					include: ['packages/dexie/tests/differential/**/*.test.ts'],
@@ -5752,6 +6133,10 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/swr/tests/upstream/**/*.test.ts'],
+				},
 				test: {
 					name: 'swr',
 					include: ['packages/swr/tests/**/*.test.ts'],
@@ -5767,6 +6152,7 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'swr-differential',
 					include: ['packages/swr/tests/differential/**/*.test.ts'],
@@ -5777,8 +6163,13 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				// Mixed project: only the same-fixture parity case is react-parity
 				// owned. setup.test.ts is an Octane-only fail-closed compiler guard
 				// and must stay on ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/nuqs/tests/differential/parity.test.ts'],
+				},
 				test: {
 					name: 'nuqs-differential',
 					include: ['packages/nuqs/tests/differential/**/*.test.ts'],
@@ -5813,6 +6204,7 @@ export default defineConfig({
 				},
 			},
 			{
+				// Octane-only Node server probes — not react-parity group-owned.
 				test: {
 					name: 'nuqs-ssr',
 					include: ['packages/nuqs/tests/ssr/**/*.test.ts'],
@@ -5829,6 +6221,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'three-differential',
 					include: ['packages/three/tests/**/*differential.test.ts'],
@@ -5841,11 +6234,34 @@ export default defineConfig({
 				resolve: { alias: THREE_ALIASES, dedupe: ['react', 'react-dom', 'three'] },
 			},
 			{
-				// Adapted cases plus architecture and hydration probes.
+				// Byte-exact upstream Vitest suite only. Wholly react-parity owned so the
+				// ordinary shards never re-run the pristine oracle. The inventory wrapper
+				// lives in the ordinary react-dropzone project so vitest-full selection of
+				// the two canonical specs is not mixed with a non-upstream file.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'dropzone-pristine',
+					include: ['packages/dropzone/upstream/canonical/src/**/*.spec.{ts,tsx}'],
+					environment: 'jsdom',
+					globals: true,
+					clearMocks: true,
+					setupFiles: ['packages/dropzone/upstream/canonical/test-setup.js'],
+					fileParallelism: false,
+				},
+			},
+			{
+				// Adapted upstream cases are parity-owned; architecture/hydration probes and
+				// the pristine inventory wrapper are Octane-authored evidence checks and stay
+				// in the ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/dropzone/tests/adapted/**/*.spec.ts'],
+				},
 				test: {
 					name: 'dropzone',
 					include: [
 						'packages/dropzone/tests/adapted/**/*.spec.ts',
+						'packages/dropzone/tests/pristine/upstream-runtime.test.ts',
 						'packages/dropzone/tests/probes/architecture.test.ts',
 						'packages/dropzone/tests/probes/hydration.test.ts',
 					],
@@ -5870,6 +6286,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'dropzone-differential',
 					include: ['packages/dropzone/tests/differential/**/*.test.ts'],
@@ -5928,6 +6345,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'aria-differential',
 					include: ['packages/aria/tests/differential/**/*.test.ts'],
@@ -5954,6 +6372,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'base-ui-differential',
 					include: ['packages/base-ui/tests/differential/**/*.test.ts'],
@@ -5982,6 +6401,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'base-ui-upstream-adapted',
 					include: ['packages/base-ui/tests/upstream/**/*.test.ts'],
@@ -6019,6 +6439,7 @@ export default defineConfig({
 					globalSetup: ['packages/cmdk/tests/differential/_setup.ts'],
 					globals: false,
 				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane()],
 				resolve: {
 					alias: [
@@ -6031,6 +6452,22 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'cmdk-parity-audit',
+					include: ['packages/cmdk/tests/parity/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
+					name: 'dnd-kit-parity-audit',
+					include: ['packages/dnd-kit/tests/parity/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'radix-differential',
 					include: ['packages/radix/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
@@ -6039,6 +6476,7 @@ export default defineConfig({
 					globalSetup: ['packages/radix/tests/differential/_setup.ts'],
 					globals: false,
 				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane()],
 				resolve: {
 					alias: [
@@ -6058,12 +6496,22 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'radix-parity-audit',
+					include: ['packages/radix/tests/parity/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
 				test: {
 					name: 'tanstack-pacer-adapted',
 					include: ['packages/tanstack-pacer/tests/adapted/**/*.test.ts'],
 					environment: 'jsdom',
 					globals: false,
 				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane()],
 				resolve: {
 					alias: [
@@ -6091,6 +6539,7 @@ export default defineConfig({
 					globalSetup: ['packages/tanstack-pacer/tests/differential/_setup.ts'],
 					globals: false,
 				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane()],
 				resolve: {
 					alias: [
@@ -6112,12 +6561,21 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tanstack-pacer-parity-audit',
+					include: ['packages/tanstack-pacer/tests/parity/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-devtools-differential',
 					include: ['packages/tanstack-devtools/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					globalSetup: ['packages/tanstack-devtools/tests/differential/_setup.ts'],
 					globals: false,
 				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane()],
 				resolve: {
 					alias: [
@@ -6137,23 +6595,45 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tanstack-devtools-parity-audit',
+					include: ['packages/tanstack-devtools/tests/parity/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/markdown/tests/conformance/public-types.test.ts',
+						'packages/markdown/tests/conformance/sync.server.test.ts',
+						'packages/markdown/tests/async/markdown-async.server.test.ts',
+						'packages/markdown/tests/hooks/markdown-hooks.test.ts',
+						'packages/markdown/tests/validation.test.ts',
+						'packages/markdown/tests/differential/processor.test.ts',
+						'packages/markdown/tests/differential/url-transform.test.ts',
+					],
+				},
+				test: {
 					name: 'markdown',
 					include: ['packages/markdown/tests/**/*.test.ts'],
 					exclude: [
 						...configDefaults.exclude,
+						'packages/markdown/tests/pristine/**/*.test.ts',
 						'packages/markdown/tests/parity/differential.test.ts',
 					],
 					environment: 'node',
 					globals: false,
 					// The public-api conformance probe imports src/index inside the test
 					// body, so the package's first Octane compile counts against the test
-					// timeout and can exceed the 5s default under full-suite contention.
+					// timeout and can exceed the 5s default under parity-batch contention.
 					testTimeout: 30_000,
 					hookTimeout: 30_000,
 				},
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'markdown-differential',
 					include: ['packages/markdown/tests/parity/differential.test.ts'],
@@ -6165,6 +6645,10 @@ export default defineConfig({
 			{
 				// Upstream-adapted inventory owns tests/upstream/**; behavior,
 				// measurement, and hydration stay in the ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/textarea-autosize/tests/upstream/**/*.test.ts'],
+				},
 				test: {
 					name: 'textarea-autosize',
 					include: ['packages/textarea-autosize/tests/**/*.test.ts'],
@@ -6206,6 +6690,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'textarea-autosize-differential',
 					include: ['packages/textarea-autosize/tests/differential/**/*.test.ts'],
@@ -6243,6 +6728,10 @@ export default defineConfig({
 			{
 				// The React server-visible contract is parity evidence; the
 				// Octane-only browser-global/server assertion stays ordinary.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/textarea-autosize/tests/ssr/react-contract.test.ts'],
+				},
 				test: {
 					name: 'textarea-autosize-ssr',
 					include: ['packages/textarea-autosize/tests/ssr/**/*.test.ts'],
@@ -6278,7 +6767,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'textarea-autosize-browser',
 					include: ['packages/textarea-autosize/tests/browser/**/*.test.ts'],
@@ -6291,6 +6780,10 @@ export default defineConfig({
 			{
 				// Adapted upstream suite is parity-owned; feasibility, races, hydration,
 				// and negative controls remain ordinary Octane conformance coverage.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/syntax-highlighter/tests/adapted/**/*.test.ts'],
+				},
 				test: {
 					name: 'syntax-highlighter',
 					fileParallelism: false,
@@ -6306,6 +6799,7 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'syntax-highlighter-differential',
 					include: ['packages/syntax-highlighter/tests/differential/**/*.test.ts'],
@@ -6315,7 +6809,7 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'syntax-highlighter-browser',
 					include: ['packages/syntax-highlighter/tests/browser/**/*.test.ts'],
@@ -6374,6 +6868,20 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'window-pristine',
+					include: ['packages/window/upstream/lib/**/*.test.{ts,tsx}'],
+					environment: 'jsdom',
+					setupFiles: ['packages/window/upstream/vitest.setup.js'],
+					globals: false,
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/window/tests/upstream/**/*.test.{ts,tsx}'],
+				},
 				test: {
 					name: 'window-adapted',
 					include: ['packages/window/tests/upstream/**/*.test.{ts,tsx}'],
@@ -6416,6 +6924,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'window-differential',
 					include: ['packages/window/tests/differential/**/*.test.ts'],
@@ -6460,6 +6969,22 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'draggable-pristine',
+					include: ['packages/draggable/tests/upstream-original.test.ts'],
+					environment: 'node',
+					sequence: { groupOrder: 1 },
+					globals: false,
+					testTimeout: 120_000,
+					hookTimeout: 120_000,
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/draggable/tests/upstream/**/*.test.ts'],
+				},
 				test: {
 					name: 'draggable',
 					include: [
@@ -6476,6 +7001,7 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'draggable-differential',
 					include: ['packages/draggable/tests/differential/**/*.test.ts'],
@@ -6512,7 +7038,7 @@ export default defineConfig({
 			},
 			{
 				testExecution: {
-					group: 'heavy-browser',
+					group: 'react-parity',
 					include: ['packages/draggable/tests/browser/parity.browser.test.ts'],
 				},
 				test: {
@@ -6554,6 +7080,18 @@ export default defineConfig({
 				},
 			},
 			{
+				// Fully parity-owned: omit testExecution.include so the sharded
+				// view drops the whole project instead of retaining an empty one.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'colorful-upstream',
+					include: ['packages/colorful/tests/upstream/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+			},
+			{
 				test: {
 					name: 'colorful',
 					include: ['packages/colorful/tests/runtime/**/*.test.ts'],
@@ -6563,6 +7101,7 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-differential',
 					include: ['packages/colorful/tests/differential/**/*.test.ts'],
@@ -6610,6 +7149,13 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/popper/tests/upstream/**/*.test.ts',
+						'packages/popper/tests/upstream/**/*.test.tsx',
+					],
+				},
 				test: {
 					name: 'popper',
 					include: [
@@ -6649,6 +7195,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'popper-differential',
 					include: ['packages/popper/tests/differential/**/*.test.ts'],
@@ -6761,6 +7308,10 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/pdf/tests/runtime/private-evidence.test.ts'],
+				},
 				test: {
 					name: 'pdf',
 					include: [
@@ -6771,6 +7322,18 @@ export default defineConfig({
 					globals: false,
 				},
 				plugins: [octane()],
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'pdf-pristine',
+					include: ['packages/pdf/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+					testTimeout: 180_000,
+					hookTimeout: 180_000,
+				},
 			},
 			{
 				test: {
@@ -6785,6 +7348,7 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'pdf-parity',
 					include: ['packages/pdf/tests/parity/**/*.test.ts'],
@@ -6822,11 +7386,26 @@ export default defineConfig({
 				},
 			},
 			{
-				// Adapted upstream snapshot ports and hydration.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'monaco-editor-pristine',
+					include: ['packages/monaco-editor/tests/upstream-original.test.ts'],
+					environment: 'node',
+					sequence: { groupOrder: 1 },
+					globals: false,
+				},
+			},
+			{
+				// Adapted upstream snapshot ports + harness negatives + hydration.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/monaco-editor/tests/upstream/**/*.test.ts'],
+				},
 				test: {
 					name: 'monaco-editor-adapted',
 					include: [
 						'packages/monaco-editor/tests/upstream/**/*.test.ts',
+						'packages/monaco-editor/tests/harness/**/*.test.ts',
 						'packages/monaco-editor/tests/hydration/**/*.test.ts',
 					],
 					environment: 'jsdom',
@@ -6853,6 +7432,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'monaco-editor-differential',
 					include: ['packages/monaco-editor/tests/differential/**/*.test.ts'],
@@ -6917,7 +7497,8 @@ export default defineConfig({
 					hookTimeout: 60_000,
 				},
 			},
-			...['adapted'].map((lane) => ({
+			...['pristine', 'adapted'].map((lane) => ({
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: `react-map-gl-upstream-${lane}`,
 					include: [`packages/react-map-gl/tests/upstream-util/${lane}.test.ts`],
@@ -6935,7 +7516,13 @@ export default defineConfig({
 						},
 						{
 							find: /^@vis\.gl\/react-mapbox\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/react-map-gl/src') + '/$1.ts',
+							replacement:
+								resolve(
+									import.meta.dirname,
+									lane === 'pristine'
+										? 'packages/react-map-gl/upstream/src'
+										: 'packages/react-map-gl/src',
+								) + '/$1.ts',
 						},
 					],
 				},

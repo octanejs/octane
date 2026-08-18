@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "project": "valtio",
+  "roots": ["packages/valtio/tests/upstream"],
+  "files": ["packages/valtio/tests/upstream/use-hooks.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:ff21e2c8dbd380f3",
+      "file": "packages/valtio/tests/upstream/use-hooks.test.ts",
+      "fullName": "adapted useSnapshot / useProxy renders a snapshot and updates after proxy mutations"
+    },
+    {
+      "id": "runtime:da70aae8c0e37cd3",
+      "file": "packages/valtio/tests/upstream/use-hooks.test.ts",
+      "fullName": "adapted useSnapshot / useProxy supports synchronous subscriptions"
+    },
+    {
+      "id": "runtime:d8e5ebc6be94d9e7",
+      "file": "packages/valtio/tests/upstream/use-hooks.test.ts",
+      "fullName": "adapted useSnapshot / useProxy useProxy reads snapshots during render and mutates the source in callbacks"
+    }
+  ]
+}

@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "project": "zag-pristine",
+  "roots": ["packages/zag/upstream"],
+  "files": [
+    "packages/zag/upstream/tests/machine.test.ts",
+    "packages/zag/upstream/tests/nested-states.test.ts",
+    "packages/zag/upstream/tests/strict-mode.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:bba5e03485fedafc",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic action order"
+    },
+    {
+      "id": "runtime:50ea5a93ba83347b",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic computed"
+    },
+    {
+      "id": "runtime:92bdcfe8c188533c",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic context: controlled"
+    },
+    {
+      "id": "runtime:8cea80eb28563f9c",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic current state and context"
+    },
+    {
+      "id": "runtime:75f9c84782743972",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic effects"
+    },
+    {
+      "id": "runtime:24db6c1b26831d76",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic guard: basic"
+    },
+    {
+      "id": "runtime:d26c3e16859aa2ad",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic guard: composition"
+    },
+    {
+      "id": "runtime:3aaaa95a47471b0f",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic initial entry action"
+    },
+    {
+      "id": "runtime:b24a0ef009b86f89",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic initial state"
+    },
+    {
+      "id": "runtime:96154a5d4cb432fa",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic reenter transition"
+    },
+    {
+      "id": "runtime:567703533a85d393",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic send event"
+    },
+    {
+      "id": "runtime:ffc28c5c5bc5be6c",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic state tags"
+    },
+    {
+      "id": "runtime:d0a710deeacd37fb",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "basic watch"
+    },
+    {
+      "id": "runtime:6b7d2a9c8ea8db01",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "edge cases event previous/current tracking"
+    },
+    {
+      "id": "runtime:ec6694ee6f868c1d",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "edge cases reactive props updates"
+    },
+    {
+      "id": "runtime:74b68c98e41aa8bd",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "edge cases reenter transition action order"
+    },
+    {
+      "id": "runtime:21e0a831348c9f90",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "edge cases same-state transitions with actions"
+    },
+    {
+      "id": "runtime:4d04cba9d72b2552",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "edge cases state.matches() helper"
+    },
+    {
+      "id": "runtime:79065cb1e45f8818",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "uniform coverage all guards false results in no transition and no actions"
+    },
+    {
+      "id": "runtime:d9b80ea2639b5a9e",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "uniform coverage effect setup and cleanup stay balanced during state churn"
+    },
+    {
+      "id": "runtime:124729b1a6c133d0",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "uniform coverage event baseline before first send"
+    },
+    {
+      "id": "runtime:58b6e0265ef26c0a",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "uniform coverage guard fallback selects the next passing transition"
+    },
+    {
+      "id": "runtime:723d91f6dd5f43e9",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "uniform coverage internal transition without target runs actions without reentry"
+    },
+    {
+      "id": "runtime:f3e735727ada5ceb",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "uniform coverage multi-action transition order is deterministic"
+    },
+    {
+      "id": "runtime:25e9897db3af272f",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "uniform coverage rapid sends in same tick are processed deterministically"
+    },
+    {
+      "id": "runtime:b14c57c9590ae98a",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "uniform coverage reenter restarts state effects exactly once per reenter"
+    },
+    {
+      "id": "runtime:1f3dfecf0887074a",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "uniform coverage reenter transition works without explicit target"
+    },
+    {
+      "id": "runtime:8c40abcb33b10805",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "uniform coverage root lifecycle runs entry, exit and effect cleanup"
+    },
+    {
+      "id": "runtime:7abad4293aae2c35",
+      "file": "packages/zag/upstream/tests/machine.test.ts",
+      "fullName": "uniform coverage unknown events are no-ops"
+    },
+    {
+      "id": "runtime:8991f91fdd89f1e2",
+      "file": "packages/zag/upstream/tests/nested-states.test.ts",
+      "fullName": "nested states ancestor matches and parent transition fallback"
+    },
+    {
+      "id": "runtime:3391d9e4ad2f9ab3",
+      "file": "packages/zag/upstream/tests/nested-states.test.ts",
+      "fullName": "nested states basic nested transitions and actions"
+    },
+    {
+      "id": "runtime:500e084abb46524f",
+      "file": "packages/zag/upstream/tests/nested-states.test.ts",
+      "fullName": "nested states deeply nested state smoke (3 levels)"
+    },
+    {
+      "id": "runtime:8ed201a7fbecfff2",
+      "file": "packages/zag/upstream/tests/nested-states.test.ts",
+      "fullName": "nested states effects run per nested state"
+    },
+    {
+      "id": "runtime:45d45425acb96311",
+      "file": "packages/zag/upstream/tests/nested-states.test.ts",
+      "fullName": "nested states exit/enter order for deep sibling transition"
+    },
+    {
+      "id": "runtime:24130ad7c8d96893",
+      "file": "packages/zag/upstream/tests/nested-states.test.ts",
+      "fullName": "nested states supports #id targets for explicit cross-level transitions"
+    },
+    {
+      "id": "runtime:f92572a3e8ecf61a",
+      "file": "packages/zag/upstream/tests/nested-states.test.ts",
+      "fullName": "nested states supports relative nested targets from the transition source state"
+    },
+    {
+      "id": "runtime:7ca29359152100de",
+      "file": "packages/zag/upstream/tests/strict-mode.test.tsx",
+      "fullName": "React Strict Mode entry-effect cleanups are composed, not overwritten, across the double mount"
+    },
+    {
+      "id": "runtime:73c4c310e9d3a7d4",
+      "file": "packages/zag/upstream/tests/strict-mode.test.tsx",
+      "fullName": "React Strict Mode mutations made by entry effects are fully reverted on close"
+    },
+    {
+      "id": "runtime:30a31980907fbc37",
+      "file": "packages/zag/upstream/tests/strict-mode.test.tsx",
+      "fullName": "React Strict Mode root-level (machine.effects) cleanups also compose under Strict Mode"
+    },
+    {
+      "id": "runtime:1cd9805f005abbb5",
+      "file": "packages/zag/upstream/tests/strict-mode.test.tsx",
+      "fullName": "React Strict Mode unmount under Strict Mode also fires every entry-effect cleanup"
+    }
+  ],
+  "snapshots": 0
+}

@@ -32,8 +32,11 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "pnpm typecheck && vitest run --root ../.. --project colorful --project colorful-ssr --project colorful-hydration --project colorful-differential",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json"
+    "test": "pnpm upstream:verify && pnpm typecheck && vitest run --root ../.. --project colorful --project colorful-upstream --project colorful-ssr --project colorful-hydration --project colorful-differential",
+    "upstream:verify": "node audit/upstream-inventory.mjs",
+    "test:type-parity": "node ../../scripts/react-parity/react-colorful-types.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsc --noEmit -p typetests/tsconfig.pristine.json && tsc --noEmit -p audit/type-probes/tsconfig.pristine.json",
+    "test:pristine": "node ../../scripts/react-parity/jest-full-runner.mjs --config packages/colorful/tests/upstream-jest.config.cjs --root packages/colorful/upstream/tag"
   },
   "peerDependencies": {
     "octane": "workspace:*"
@@ -49,6 +52,12 @@
     "react-dom": "catalog:react-colorful-react-oracle",
     "vite": "catalog:default",
     "vitest": "catalog:default",
-    "@testing-library/react": "16.3.2"
+    "@testing-library/react": "16.3.2",
+    "jest": "30.4.2",
+    "jest-environment-jsdom": "30.4.1",
+    "@swc/jest": "0.2.39",
+    "@swc/core": "1.15.41",
+    "@types/react-colorful-pristine": "npm:@types/react@17.0.83",
+    "@types/react-dom-colorful-pristine": "npm:@types/react-dom@17.0.26"
   }
 }

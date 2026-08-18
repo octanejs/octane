@@ -1,0 +1,102 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/reduxjs/redux-toolkit.git",
+    "version": "2.12.0",
+    "commit": "576a02f8056fbee2dcaddb4d2e4d2da3b7937c58",
+    "sourceRoot": "packages/toolkit/src",
+    "testRoot": "packages/toolkit/src",
+    "license": "MIT",
+    "integrity": "sha256:8cd62ba6cf128a4c7f13c304625ee8a3cadd9383f8e0c97e081dfa0d72718d68",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/redux-toolkit/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/redux-toolkit/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "redux-toolkit-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "redux-toolkit-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs one RTK Query fixture against @reduxjs/toolkit/query/react 2.12.0 on React and @octanejs/redux-toolkit/query/react on Octane, comparing exact query outcomes, lazy/mutation initial and fulfilled outcomes, and infinite-query results.",
+      "files": [
+        {
+          "path": "packages/redux-toolkit/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "513300427acae5fb4fd35f32ee1e13e5c06b24c8ae644d09a112e0b683efe9fe",
+          "cases": [
+            {
+              "id": "differential:redux-toolkit-query",
+              "testName": "query mount, fulfillment, and argument swap are byte-identical",
+              "fullName": "differential: @octanejs/redux-toolkit vs @reduxjs/toolkit/react query mount, fulfillment, and argument swap are byte-identical"
+            },
+            {
+              "id": "differential:redux-toolkit-lazy-mutation",
+              "testName": "lazy query and mutation initial and fulfilled outcomes are byte-identical",
+              "fullName": "differential: @octanejs/redux-toolkit vs @reduxjs/toolkit/react lazy query and mutation initial and fulfilled outcomes are byte-identical"
+            },
+            {
+              "id": "differential:redux-toolkit-infinite-query",
+              "testName": "infinite query pagination is byte-identical",
+              "fullName": "differential: @octanejs/redux-toolkit vs @reduxjs/toolkit/react infinite query pagination is byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/redux-toolkit/tests/_fixtures/rtk-query.tsrx",
+          "role": "support",
+          "sha256": "d2cadcd184f9d6021001b0d910c93cf2ddc8bac95323fd8587ba17859a470bfe"
+        },
+        {
+          "path": "packages/redux-toolkit/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "f27e83bcca6dea4aa8ddf69c291d46cb00f2313d891bbc11ec99a19d24b49596"
+        },
+        {
+          "path": "packages/redux-toolkit/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "c648fd35d1f7cc4dde77fd9fb498835bdb5ba9cbbdd2457eb84fb19a32c13870"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

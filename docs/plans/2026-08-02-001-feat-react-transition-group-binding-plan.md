@@ -140,6 +140,12 @@ U1 establishes immutable evidence and package scaffolding before behavior is aut
 
 ### U1. Pin upstream evidence and scaffold the package
 
+- **Goal:** Create the reviewable source, license, integrity, package, documentation, status, and test skeleton for R1, R6, R7, and R10.
+- **Files:** `packages/transition-group/package.json`, `packages/transition-group/README.md`, `packages/transition-group/UPSTREAM.md`, `packages/transition-group/LICENSE`, `packages/transition-group/status.json`, `packages/transition-group/tsconfig.json`, `packages/transition-group/upstream/**`, `packages/transition-group/audit/**`.
+- **Patterns:** Follow `packages/three/UPSTREAM.md`, the complete parity manifest in `packages/hook-form/audit/`, and current publishable binding manifests.
+- **Test scenarios:** Verify the upstream checkout commit and version; verify byte hashes for every vendored source, test, and license artifact; fail on missing, extra, or modified evidence; verify upstream files are absent from packed output.
+- **Verification:** The package metadata and evidence validators pass before implementation claims exist.
+
 ### U2. Port the Transition state machine
 
 - **Goal:** Implement the foundational transition lifecycle for R2 and R3 using Octane function components and cleanup-safe hooks, governed by KTD4 and KTD6.
@@ -165,6 +171,13 @@ U1 establishes immutable evidence and package scaffolding before behavior is aut
 - **Verification:** Utility cases run unchanged where framework-neutral, component cases run as adapted or differential evidence, and node identity assertions cover keyed survivors.
 
 ### U5. Complete export, test, type, and parity crosswalks
+
+- **Goal:** Make every compatibility claim auditable for R1, R6, R8, and R9.
+- **Files:** `packages/transition-group/src/index.ts`, `packages/transition-group/tests/exports.test.ts`, `packages/transition-group/tests/parity-controls.test.ts`, `packages/transition-group/typetests/**`, `packages/transition-group/audit/react-parity.json`, `packages/transition-group/audit/test-classifications.json`, `packages/transition-group/audit/*.json`.
+- **Patterns:** Follow existing exhaustive export tests and the registered pristine/adapted manifest lanes; keep package-specific logic inside the package unless the harness needs a reusable extension.
+- **Test scenarios:** Verify all six root exports and documented per-component entry points; exercise public prop types and rejected misuse; fail controls for removed upstream files, deleted adapted cases, skipped markers, stale hashes, unclassified tests, and a required lane that validates but does not execute.
+- **Verification:** `react-parity:check` both validates metadata and executes every required runtime/type lane.
+- **Execution note:** If registration exposes a missing shared parity-harness capability, stop this unit, land the reusable harness extension in a separate prerequisite PR, then rebase and consume it here.
 
 ### U6. Integrate package inventory and release evidence
 

@@ -1,0 +1,282 @@
+{
+  "$schema": "./react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/react-dropzone/react-dropzone.git",
+    "version": "20.0.0",
+    "commit": "01fc05c5996bf615caf812627f7491375e647c7d",
+    "sourceRoot": "src",
+    "testRoot": "src",
+    "license": "MIT",
+    "integrity": "sha256:e76faa61389e085518b0d8492a7970e9ce4c060e4a2e9181b1eb089805afb95d",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/dropzone/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/dropzone/tests/adapted"],
+      "include": ["\\.(?:test|spec)\\.(?:ts|tsx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 91,
+    "uniqueIdentities": 91,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "react-dropzone-pristine-runtime",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dropzone-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 218 byte-exact canonical Vitest cases directly against React.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/dropzone/audit/runtime-inventories/pristine-harness.json"
+      },
+      "files": [
+        {
+          "path": "packages/dropzone/audit/runtime-inventories/pristine-harness.json",
+          "role": "support",
+          "sha256": "06143733ea005a0b021850de9e21b7d3516f742a7395130dcae18153c4c934f4"
+        },
+        {
+          "path": "scripts/react-parity/react-dropzone-runtime-inventory.mjs",
+          "role": "support",
+          "sha256": "98888f898d83370370872f8646933e517ef375cffd20b08388ce202670f2d9a9"
+        }
+      ]
+    },
+    {
+      "id": "react-dropzone-adapted-dom",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dropzone",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the one-for-one Octane adaptation of upstream DOM cases.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/dropzone/audit/runtime-inventories/adapted-dom.json"
+      },
+      "files": [
+        {
+          "path": "packages/dropzone/audit/runtime-inventories/adapted-dom.json",
+          "role": "support",
+          "sha256": "fa910521d0c96f4b8286b3c33b778c9d38d388763bab8e72d4fe320297b8ff04"
+        },
+        {
+          "path": "packages/dropzone/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "69d456d061f9db5d9235702c4d28831717df353ed389d3a4e1bfa3dbcaa8d282"
+        },
+        {
+          "path": "packages/dropzone/audit/transformation-ledger.json",
+          "role": "support",
+          "sha256": "e0e4e5e2444be8e2165c78893b4620705d77068cdba2754a1aeebd0f7ca316f1"
+        },
+        {
+          "path": "scripts/react-parity/react-dropzone-evidence.mjs",
+          "role": "support",
+          "sha256": "32f91fd0d01db8622649ef219c34a55ef5359a0b3b8fe9c69e18ed6763637951"
+        },
+        {
+          "path": "scripts/react-parity/react-dropzone-evidence-lib.mjs",
+          "role": "support",
+          "sha256": "4431fa6146d063df711dcce05823787e291c81599cf91be629cd221d76be20e4"
+        }
+      ]
+    },
+    {
+      "id": "react-dropzone-pristine-build-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dropzone-pristine-build-types",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/dropzone/upstream/canonical/tsconfig.build.json"
+      },
+      "files": [
+        {
+          "path": "packages/dropzone/audit/type-inventories/parity.json",
+          "role": "test",
+          "sha256": "f125aa45b88bfbe131e07ebf368d3cd9cbd1e25916b95a482de9991e6a6d569f",
+          "cases": [
+            {
+              "id": "types:pristine-build",
+              "testName": "pinned upstream build type project",
+              "fullName": "pinned upstream build type project"
+            }
+          ]
+        },
+        {
+          "path": "packages/dropzone/upstream/canonical/tsconfig.build.json",
+          "role": "support",
+          "sha256": "bc4b0a77fbc089cb0eea51861450702c134595671defed4ec3922525a579908e"
+        }
+      ]
+    },
+    {
+      "id": "react-dropzone-pristine-type-tests",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dropzone-pristine-type-tests",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/dropzone/upstream/canonical/tsconfig.type-tests.json"
+      },
+      "files": [
+        {
+          "path": "packages/dropzone/audit/type-inventories/parity.json",
+          "role": "test",
+          "sha256": "f125aa45b88bfbe131e07ebf368d3cd9cbd1e25916b95a482de9991e6a6d569f",
+          "cases": [
+            {
+              "id": "types:pristine-programs",
+              "testName": "nine pinned upstream type programs",
+              "fullName": "nine pinned upstream type programs"
+            }
+          ]
+        },
+        {
+          "path": "packages/dropzone/upstream/canonical/tsconfig.type-tests.json",
+          "role": "support",
+          "sha256": "0e709729044f1224882d1c303d86595e88c9bdfd9c4ccc04286b21a9e9f06eb0"
+        }
+      ]
+    },
+    {
+      "id": "react-dropzone-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dropzone-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/dropzone/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/dropzone/audit/type-inventories/parity.json",
+          "role": "test",
+          "sha256": "f125aa45b88bfbe131e07ebf368d3cd9cbd1e25916b95a482de9991e6a6d569f",
+          "cases": [
+            {
+              "id": "types:adapted-programs",
+              "testName": "nine adapted Octane type programs",
+              "fullName": "nine adapted Octane type programs"
+            }
+          ]
+        },
+        {
+          "path": "packages/dropzone/typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "fb490e66885e61b1db63f58a53a209205d0f9b63df536ebaa2e68685e86369cc"
+        }
+      ]
+    },
+    {
+      "id": "react-dropzone-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dropzone-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs shared inputs against pinned React Dropzone and the Octane binding.",
+      "files": [
+        {
+          "path": "packages/dropzone/tests/differential/utils.test.ts",
+          "role": "test",
+          "sha256": "e20fb393cc1d402d200a79563e3af44954737ad5f64ca5b5a28b5e91a01ec875",
+          "cases": [
+            {
+              "id": "differential:utils-validation",
+              "testName": "matches accept flattening, picker filters, and input serialization tables",
+              "fullName": "react-dropzone U2 pure utility differential matches accept flattening, picker filters, and input serialization tables"
+            },
+            {
+              "id": "differential:utils-errors",
+              "testName": "matches type, size, quantity, and drag verdict tables",
+              "fullName": "react-dropzone U2 pure utility differential matches type, size, quantity, and drag verdict tables"
+            },
+            {
+              "id": "differential:utils-events",
+              "testName": "matches event, exception, propagation, and thenable classification",
+              "fullName": "react-dropzone U2 pure utility differential matches event, exception, propagation, and thenable classification"
+            }
+          ]
+        },
+        {
+          "path": "packages/dropzone/tests/differential/root-u3.test.ts",
+          "role": "test",
+          "sha256": "7f4b11cb8ca0a75f1a4a582e5b574a59b7da45dd0f648e862dcefc0e6c65b631",
+          "cases": [
+            {
+              "id": "differential:root-getters",
+              "testName": "matches default and overridden getter attributes",
+              "fullName": "react-dropzone U3 React/Octane differential matches default and overridden getter attributes"
+            },
+            {
+              "id": "differential:root-interaction",
+              "testName": "matches click, keyboard, focus, and blur callbacks",
+              "fullName": "react-dropzone U3 React/Octane differential matches click, keyboard, focus, and blur callbacks"
+            },
+            {
+              "id": "differential:root-selection",
+              "testName": "matches native input selection state and callback payloads",
+              "fullName": "react-dropzone U3 React/Octane differential matches native input selection state and callback payloads"
+            }
+          ]
+        },
+        {
+          "path": "packages/dropzone/tests/differential/acquisition-u4.test.ts",
+          "role": "test",
+          "sha256": "a1136ccd74410a2ec2a670625462b13f4494132167be158f4be986efdadd52d0",
+          "cases": [
+            {
+              "id": "differential:acquisition-selection",
+              "testName": "matches accepted/rejected callback payloads for input selection",
+              "fullName": "react-dropzone U4 React/Octane differential matches accepted/rejected callback payloads for input selection"
+            },
+            {
+              "id": "differential:acquisition-max-files",
+              "testName": "matches drag/drop max-files validation",
+              "fullName": "react-dropzone U4 React/Octane differential matches drag/drop max-files validation"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

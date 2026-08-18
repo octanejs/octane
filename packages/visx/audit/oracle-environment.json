@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "react": {
+    "package": "react",
+    "version": "19.2.7",
+    "catalog": "default",
+    "range": "^19.2.7"
+  },
+  "reactDom": {
+    "package": "react-dom",
+    "version": "19.2.7",
+    "catalog": "default",
+    "range": "^19.2.7"
+  },
+  "typesReact": {
+    "package": "@types/react",
+    "version": "19.2.17",
+    "catalog": "default",
+    "range": "^19.2.17"
+  },
+  "typesReactDom": {
+    "package": "@types/react-dom",
+    "version": "19.2.3",
+    "catalog": "default",
+    "range": "^19.2.3"
+  },
+  "notes": "Exact lockfile-resolved versions used by the Visx differential and pristine/adapted type lanes. Catalog ranges are the claimed compatibility window."
+}

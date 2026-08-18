@@ -1,0 +1,388 @@
+{
+  "$schema": "./react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/vercel/swr.git",
+    "version": "2.4.2",
+    "commit": "f1c1fd855f1e9e7c85755e4232ea4b03c7f81910",
+    "sourceRoot": "src",
+    "testRoot": "test",
+    "license": "MIT",
+    "integrity": "sha256:948ad899c51e73ca9555e8182946978f367410406fe6c2acb4d1012c509c9982",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/swr/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/swr/tests/upstream"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 19,
+    "uniqueIdentities": 19,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5fc6b5e2a0ebd2a47d298a55edb963997b94f1d07b1c9d30bb8eaa75c7782cd8"
+    }
+  },
+  "lanes": [
+    {
+      "id": "swr-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "swr-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the byte-exact SWR 2.4.2 Jest suite. A testing-library harness holds initial request completion in two mutation race cases until the competing mutation starts or the shared in-flight state is observed, preserving the upstream assertions without wall-clock ordering.",
+      "execution": {
+        "kind": "jest-full",
+        "config": "packages/swr/audit/jest-pristine.config.mjs",
+        "root": "packages/swr/upstream",
+        "inventory": "packages/swr/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/swr/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "3d314e9a9a164827b295565875f17eabe668e27492a838150a45959404f7f094"
+        },
+        {
+          "path": "packages/swr/audit/jest-pristine.config.mjs",
+          "role": "support",
+          "sha256": "cd9ca9ac112cafe7bcbc354d1c98a405c5d1c917443b21a069017ef60b7fe86a"
+        },
+        {
+          "path": "packages/swr/audit/upstream-testing-library.cjs",
+          "role": "support",
+          "sha256": "374d3a59054ffd0e8ccf3b235086ca2bf73a3587e00b8f89d86de5c384fd80da"
+        },
+        {
+          "path": "packages/swr/audit/upstream-timer-gate.cjs",
+          "role": "support",
+          "sha256": "0c87828c172fe2a2ef69993f7242ec2383146f24a27df95c39b68d30bb113db4"
+        },
+        {
+          "path": "packages/swr/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "727042f4176dc726c3a3879877a7b4a3846a2b84f8adab9c8e38d2536eea3d1a"
+        },
+        {
+          "path": "scripts/react-parity/jest-full-runner.mjs",
+          "role": "support",
+          "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
+        },
+        {
+          "path": "scripts/react-parity/swr-runtime-inventory.mjs",
+          "role": "support",
+          "sha256": "185d862650fd217503e440f7c781367ed726df26839b67296709b2b6bcaf31e8"
+        },
+        {
+          "path": "scripts/react-parity/swr-upstream-timer-gate.test.mjs",
+          "role": "support",
+          "sha256": "ca6abd0cd93fcb95c050db71e0152214451710352191d65d974e8052ccc3f916"
+        }
+      ]
+    },
+    {
+      "id": "swr-pristine-runtime-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "swr-pristine-runtime-types",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/swr/audit/tsconfig-pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/swr/audit/type-inventory.json",
+          "role": "test",
+          "sha256": "28300b8b0ff8cb50abe51a4eb5a3a2bcc80c686b78feef43ca92bfea88bd0865",
+          "cases": [
+            {
+              "id": "types:pristine-runtime",
+              "testName": "pinned upstream runtime TypeScript project",
+              "fullName": "pinned upstream runtime TypeScript project"
+            }
+          ]
+        },
+        {
+          "path": "packages/swr/audit/tsconfig-pristine-runtime.json",
+          "role": "support",
+          "sha256": "715416bb88eb9d8246af618fbaea85a0186538be31a5a0acdba64addccc1b712"
+        }
+      ]
+    },
+    {
+      "id": "swr-pristine-public-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "swr-pristine-public-types",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/swr/audit/tsconfig-pristine-types.json"
+      },
+      "files": [
+        {
+          "path": "packages/swr/audit/type-inventory.json",
+          "role": "test",
+          "sha256": "28300b8b0ff8cb50abe51a4eb5a3a2bcc80c686b78feef43ca92bfea88bd0865",
+          "cases": [
+            {
+              "id": "types:pristine-public",
+              "testName": "pinned upstream public TypeScript project",
+              "fullName": "pinned upstream public TypeScript project"
+            }
+          ]
+        },
+        {
+          "path": "packages/swr/audit/tsconfig-pristine-types.json",
+          "role": "support",
+          "sha256": "1602a810cabf76d02fd0fa12e1740e95ef36d9356f5071602ac7764669ea7448"
+        }
+      ]
+    },
+    {
+      "id": "swr-pristine-suspense-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "swr-pristine-suspense-types",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/swr/audit/tsconfig-pristine-suspense.json"
+      },
+      "files": [
+        {
+          "path": "packages/swr/audit/type-inventory.json",
+          "role": "test",
+          "sha256": "28300b8b0ff8cb50abe51a4eb5a3a2bcc80c686b78feef43ca92bfea88bd0865",
+          "cases": [
+            {
+              "id": "types:pristine-suspense",
+              "testName": "pinned upstream Suspense TypeScript project",
+              "fullName": "pinned upstream Suspense TypeScript project"
+            }
+          ]
+        },
+        {
+          "path": "packages/swr/audit/tsconfig-pristine-suspense.json",
+          "role": "support",
+          "sha256": "6284c9078cdf6163616faa754fe40527828634dd474e96effe937b5ede6e25ea"
+        }
+      ]
+    },
+    {
+      "id": "swr-adapted-internal-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "swr-adapted-internal-types",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/swr/typetests/internal/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/swr/audit/type-inventory.json",
+          "role": "test",
+          "sha256": "28300b8b0ff8cb50abe51a4eb5a3a2bcc80c686b78feef43ca92bfea88bd0865",
+          "cases": [
+            {
+              "id": "types:adapted-internal",
+              "testName": "adapted Octane internal TypeScript project",
+              "fullName": "adapted Octane internal TypeScript project"
+            }
+          ]
+        },
+        {
+          "path": "packages/swr/typetests/internal/tsconfig.json",
+          "role": "support",
+          "sha256": "3db77c7db8c823e96c01d3503e131717a6324c0ebc5eb5f1cae5d299a01b42f4"
+        }
+      ]
+    },
+    {
+      "id": "swr-adapted-root-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "swr-adapted-root-types",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/swr/typetests/root/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/swr/audit/type-inventory.json",
+          "role": "test",
+          "sha256": "28300b8b0ff8cb50abe51a4eb5a3a2bcc80c686b78feef43ca92bfea88bd0865",
+          "cases": [
+            {
+              "id": "types:adapted-root",
+              "testName": "adapted Octane root TypeScript project",
+              "fullName": "adapted Octane root TypeScript project"
+            }
+          ]
+        },
+        {
+          "path": "packages/swr/typetests/root/tsconfig.json",
+          "role": "support",
+          "sha256": "03c0289e25335042723c5c4d87e453c097267a850dbceb23a4f98376625a16de"
+        }
+      ]
+    },
+    {
+      "id": "swr-adapted-specialized-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "swr-adapted-specialized-types",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/swr/typetests/specialized/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/swr/audit/type-inventory.json",
+          "role": "test",
+          "sha256": "28300b8b0ff8cb50abe51a4eb5a3a2bcc80c686b78feef43ca92bfea88bd0865",
+          "cases": [
+            {
+              "id": "types:adapted-specialized",
+              "testName": "adapted Octane specialized TypeScript project",
+              "fullName": "adapted Octane specialized TypeScript project"
+            }
+          ]
+        },
+        {
+          "path": "packages/swr/typetests/specialized/tsconfig.json",
+          "role": "support",
+          "sha256": "03c0289e25335042723c5c4d87e453c097267a850dbceb23a4f98376625a16de"
+        }
+      ]
+    },
+    {
+      "id": "swr-adapted-selected-cases",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "swr",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Selected adapted Octane cases with upstream citations; not a one-for-one map of the 367 pristine identities. Exhaustive dispositions remain required before verified provenance.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/swr/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/swr/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "7647f2b0bfd94c795f294e029e3e89e1409db0f9ae49653a00f9557d5f92f519"
+        },
+        {
+          "path": "scripts/react-parity/swr-runtime-inventory.mjs",
+          "role": "support",
+          "sha256": "185d862650fd217503e440f7c781367ed726df26839b67296709b2b6bcaf31e8"
+        }
+      ]
+    },
+    {
+      "id": "swr-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "swr-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Direct Octane-vs-pinned-upstream traces and export oracles for U2–U4; kept in a dedicated Vitest project so they do not share ownership with the adapted selected-case suite. Octane-only request-state oracles live under tests/unit/.",
+      "files": [
+        {
+          "path": "packages/swr/tests/differential/cache.test.ts",
+          "role": "test",
+          "sha256": "84892c610b38a3697a3641953d5c8a68f79051a3c3b8ac8ae60dc61c9dca676a",
+          "cases": [
+            {
+              "id": "differential:cache-serialize",
+              "testName": "matches the pinned serialization and config oracle",
+              "fullName": "SWR U2 React/Octane differential traces matches the pinned serialization and config oracle"
+            },
+            {
+              "id": "differential:cache-trace",
+              "testName": "matches cache snapshots and callback logs",
+              "fullName": "SWR U2 React/Octane differential traces matches cache snapshots and callback logs"
+            }
+          ]
+        },
+        {
+          "path": "packages/swr/tests/differential/root.test.ts",
+          "role": "test",
+          "sha256": "8ed056d9f68c1fd15c17a78deab2e09499fa62b4964eb354609bc57084e2378c",
+          "cases": [
+            {
+              "id": "differential:root-surface",
+              "testName": "preserves the exact pinned root runtime surface",
+              "fullName": "SWR U3 pinned React/Octane root surface preserves the exact pinned root runtime surface"
+            }
+          ]
+        },
+        {
+          "path": "packages/swr/tests/differential/specialized-exports.test.ts",
+          "role": "test",
+          "sha256": "32287a9476a05f81201c4cf4c4f3a3b3429c761dd6baf7b4cc87090ace1f97d8",
+          "cases": [
+            {
+              "id": "differential:specialized-exports",
+              "testName": "matches every pinned specialized runtime name",
+              "fullName": "SWR U4 exact specialized runtime oracles matches every pinned specialized runtime name"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "swr-devtools-global",
+      "caseIds": ["runtime:c00d484f4ecc81a0"],
+      "upstreamResult": "window.__SWR_DEVTOOLS_REACT__ is assigned the React package reference for React-only SWR DevTools.",
+      "octaneResult": "window.__SWR_DEVTOOLS_OCTANE__ identifies the Octane binding; __SWR_DEVTOOLS_REACT__ is not claimed.",
+      "rationale": "Octane is not React. Claiming the React identity would mislead React-only SWR DevTools about the host runtime.",
+      "classification": "devtools-host-identity",
+      "consumerImpact": "React-only SWR DevTools that require window.__SWR_DEVTOOLS_REACT__ do not attach to this binding.",
+      "migrationGuidance": "Prefer Octane-aware tooling that reads window.__SWR_DEVTOOLS_OCTANE__, or treat React-only SWR DevTools as unsupported.",
+      "owner": "@octanejs/swr",
+      "reviewCondition": "Review if Octane ships a shared SWR DevTools bridge that can safely advertise a host-compatible identity."
+    }
+  ]
+}

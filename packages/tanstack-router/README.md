@@ -69,7 +69,7 @@ layout, per TanStack's fuzzy/root boundary rules), plus the full
 types). The typed route factories, route-bound hooks, and `Link` surface preserve
 TanStack Router's registered-route inference.
 
-The 2026-07-06 gap-closure sweep additionally
+The 2026-07-06 gap-closure sweep (see `docs/tanstack-parity-audit.md`) additionally
 landed the full Match pipeline (per-route Suspense/CatchBoundary/CatchNotFound,
 pending/error/redirected/notFound statuses), router lifecycle events, `useBlocker`/
 `Block`, the complete read-hook family (`useMatch`, `useRouteContext`,

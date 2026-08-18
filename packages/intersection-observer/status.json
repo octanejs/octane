@@ -5,7 +5,7 @@
     "source": "https://github.com/thebuilder/react-intersection-observer/tree/v10.1.0",
     "license": "MIT"
   },
-  "surface": "Public runtime surface at react-intersection-observer 10.1.0: useInView, useOnInView, InView, observe, defaultFallbackInView, and test utilities, covered by ordinary runtime, browser, and type tests.",
+  "surface": "Public runtime surface at react-intersection-observer 10.1.0: useInView, useOnInView, InView, observe, defaultFallbackInView, and test utilities. Pinned upstream unit and browser suites plus one-for-one adapted runtime/type probes are registered with react-parity:check.",
   "inventory": {
     "supported": ["useInView", "useOnInView", "InView", "observe", "defaultFallbackInView"],
     "subpaths": ["test-utils"]
