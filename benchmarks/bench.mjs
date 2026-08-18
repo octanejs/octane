@@ -351,6 +351,19 @@ const SUITES = [
 		})),
 	},
 	{
+		// Matched direct/nested callback work plus the shipped store bindings.
+		// The fixture builds itself; named production calls are observed in a
+		// separate unminified build so instrumentation stays out of timings.
+		name: 'hook-store-composition',
+		cwd: 'hook-store-composition',
+		servers: [],
+		iter: { normal: 8, quick: 2 },
+		runs: [
+			{ script: 'run.mjs', args: (n) => [String(n)] },
+			{ label: 'work', script: 'work.mjs', args: () => [] },
+		],
+	},
+	{
 		name: 'effectful-list',
 		cwd: 'effectful-list',
 		servers: [
