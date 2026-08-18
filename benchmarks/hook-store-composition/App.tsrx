@@ -51,9 +51,10 @@ function NestedCallbackRow(props: RowProps) @{
 function RawStoreRow(props: RowProps) @{
 	const read = props.model.rawReaders[props.index];
 	const value = useSyncExternalStore(props.model.api.subscribe, read, read);
-	<output data-row-index={String(props.index)} data-generation={String(props.generation)}>
-		{String(value) as string}
-	</output>
+	<output
+		data-row-index={String(props.index)}
+		data-generation={String(props.generation)}
+	>{String(value) as string}</output>
 }
 
 function ZustandRow(props: RowProps) @{
@@ -63,16 +64,18 @@ function ZustandRow(props: RowProps) @{
 		selectors[props.index],
 		props.model.equalSelection,
 	);
-	<output data-row-index={String(props.index)} data-generation={String(props.generation)}>
-		{String(selection.value) as string}
-	</output>
+	<output
+		data-row-index={String(props.index)}
+		data-generation={String(props.generation)}
+	>{String(selection.value) as string}</output>
 }
 
 function MobxRowBody(props: RowProps) @{
 	const selection = props.model.mobxSelections[props.index].get();
-	<output data-row-index={String(props.index)} data-generation={String(props.generation)}>
-		{String(selection.value) as string}
-	</output>
+	<output
+		data-row-index={String(props.index)}
+		data-generation={String(props.generation)}
+	>{String(selection.value) as string}</output>
 }
 const MobxRow = observer(MobxRowBody);
 
@@ -107,11 +110,16 @@ function StoreReady(props: { model: BenchmarkModel }) @{
 export type AppProps = Omit<RowProps, 'index'> & { lane: Lane };
 
 export function App(props: AppProps) @{
-	const Row = props.lane === 'callback-direct' ? DirectCallbackRow
-		: props.lane === 'callback-nested' ? NestedCallbackRow
-		: props.lane === 'raw-store' ? RawStoreRow
-		: props.lane === 'zustand-traditional' ? ZustandRow
-		: MobxRow;
+	const Row =
+		props.lane === 'callback-direct'
+			? DirectCallbackRow
+			: props.lane === 'callback-nested'
+				? NestedCallbackRow
+				: props.lane === 'raw-store'
+					? RawStoreRow
+					: props.lane === 'zustand-traditional'
+						? ZustandRow
+						: MobxRow;
 	<main>
 		@for (const index of ROW_INDICES; key index) {
 			<Row

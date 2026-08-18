@@ -65,6 +65,7 @@ export const BENCHMARK_SUITES = [
 	'application-composition',
 	'scaling-curves',
 	'store-selector-fanout',
+	'hook-store-composition',
 	'effectful-list',
 	'list-clear',
 	'memo-wall',

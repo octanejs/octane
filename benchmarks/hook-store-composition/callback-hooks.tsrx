@@ -7,7 +7,10 @@ function useCallbackLeaf(
 	value: number,
 	dependencies: number[],
 ): Callback {
-	const callback: Callback = useCallback(() => report(index, value + index, callback), dependencies);
+	const callback: Callback = useCallback(
+		() => report(index, value + index, callback),
+		dependencies,
+	);
 	return callback;
 }
 
