@@ -56,6 +56,14 @@ export const replacementMachine = setup({
 
 export const CounterContext = createActorContext(counterMachine);
 
+// Model an opaque third-party wrapper that Octane cannot rewrite internally.
+// The wrapper call itself gets an ambient slot path, but its member-expression
+// call intentionally does not forward a compiler-injected slot to useActor.
+const opaqueBinding = { useActor };
+function useSlotlessActor() {
+	return opaqueBinding['useActor'](counterMachine);
+}
+
 export function ActorApp() @{
 	const [snapshot, send, actorRef] = useActor(counterMachine);
 	const selected = useSelector(actorRef, (state) => ({ count: state.context.count }), shallowEqual);
@@ -71,6 +79,14 @@ export function ActivityActorApp(props: { mode: 'visible' | 'hidden' }) @{
 	<Activity mode={props.mode}>
 		<ActorApp />
 	</Activity>
+}
+
+export function SlotlessActorApp() @{
+	const [snapshot, send] = useSlotlessActor();
+	<button
+		id="slotless-actor"
+		onClick={() => send({ type: 'increment' })}
+	>{snapshot.context.count as string}</button>
 }
 
 export function SelectedExternalActorApp(props: {

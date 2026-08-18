@@ -11,6 +11,7 @@ import {
 	RefApp,
 	ReplacementApp,
 	SelectedExternalActorApp,
+	SlotlessActorApp,
 	TwoActorsApp,
 	counterMachine,
 	lifecycle,
@@ -115,6 +116,17 @@ describe('actors', () => {
 		await flush();
 		expect(result.find('#left').textContent).toBe('1');
 		expect(result.find('#right').textContent).toBe('2');
+		result.unmount();
+	});
+
+	it('runs through opaque wrappers that do not forward compiler slots', async () => {
+		const result = mount(SlotlessActorApp);
+		await flush();
+		expect(result.find('#slotless-actor').textContent).toBe('0');
+
+		result.click('#slotless-actor');
+		await flush();
+		expect(result.find('#slotless-actor').textContent).toBe('1');
 		result.unmount();
 	});
 });

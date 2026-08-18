@@ -4,6 +4,8 @@ export function splitSlot<T extends unknown[]>(args: T): [unknown[], symbol | un
 	return [args, undefined];
 }
 
-export function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-	return slot === undefined ? undefined : Symbol.for(`${slot.description ?? ''}:xstate:${tag}`);
+export function subSlot(slot: symbol | undefined, tag: string): symbol {
+	return slot === undefined
+		? Symbol.for(`:xstate:${tag}`)
+		: Symbol.for(`${slot.description ?? ''}:xstate:${tag}`);
 }
