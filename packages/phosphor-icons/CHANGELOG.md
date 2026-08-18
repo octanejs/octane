@@ -1,5 +1,14 @@
 # @octanejs/phosphor-icons
 
+## 0.0.20
+
+### Patch Changes
+
+- Updated dependencies [ff9b859]
+- Updated dependencies [14b8b40]
+- Updated dependencies [cc6e5ea]
+  - octane@0.1.40
+
 ## 0.0.19
 
 ### Patch Changes

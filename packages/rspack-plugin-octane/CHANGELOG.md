@@ -1,5 +1,19 @@
 # @octanejs/rspack-plugin
 
+## 0.1.35
+
+### Patch Changes
+
+- 9c00c34: Compile Octane modules in parallel Rspack loader workers by default while
+  preserving compiler source maps, module layers, build metadata, diagnostics,
+  and watched package manifests. Both integrations accept `parallel: false` to
+  disable worker compilation or `parallel: { maxWorkers }` to configure the
+  worker-pool limit.
+- Updated dependencies [ff9b859]
+- Updated dependencies [14b8b40]
+- Updated dependencies [cc6e5ea]
+  - octane@0.1.40
+
 ## 0.1.34
 
 ### Patch Changes

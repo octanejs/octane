@@ -1,5 +1,14 @@
 # @octanejs/redux
 
+## 0.1.37
+
+### Patch Changes
+
+- Updated dependencies [ff9b859]
+- Updated dependencies [14b8b40]
+- Updated dependencies [cc6e5ea]
+  - octane@0.1.40
+
 ## 0.1.36
 
 ### Patch Changes
