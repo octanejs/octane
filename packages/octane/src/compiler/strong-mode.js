@@ -1,3 +1,5 @@
+import { collectReassignedBindings } from './hook-deps.js';
+
 const STATE_HOOKS = new Set(['useState', 'useReducer', 'useLinkedState']);
 const EFFECT_HOOKS = new Set(['useEffect', 'useLayoutEffect', 'useInsertionEffect']);
 const FUNCTION_TYPES = new Set([
@@ -14,11 +16,16 @@ const TRANSPARENT_EXPRESSIONS = new Set([
 	'TSSatisfiesExpression',
 	'TSTypeAssertion',
 ]);
-const NULLISH_VALUE = 1;
-const FALSY_VALUE = 2;
-const TRUTHY_VALUE = 4;
+const UNDEFINED_VALUE = 1;
+const NULL_VALUE = 2;
+const NULLISH_VALUE = UNDEFINED_VALUE | NULL_VALUE;
+const FALSY_VALUE = 4;
+const TRUTHY_VALUE = 8;
 const UNKNOWN_VALUE = NULLISH_VALUE | FALSY_VALUE | TRUTHY_VALUE;
 const UNKNOWN_PRIMITIVE = Symbol('unknown primitive');
+const NO_RETURN_VALUE = Symbol('no return value');
+const OTHER_BINDING = { kind: 'other' };
+const UNDEFINED_BINDING = { kind: 'constant', value: UNDEFINED_VALUE, primitive: undefined };
 const SKIP_KEYS = new Set([
 	'type',
 	'start',
@@ -37,7 +44,19 @@ const SKIP_KEYS = new Set([
 export const STRONG_RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 export const STRONG_EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 export const STRONG_RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
+export const STRONG_RENDER_EFFECT_EVENT_CALL = 'OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL';
+export const STRONG_EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
 export const STRONG_DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
+
+function primitiveValueMask(value) {
+	return value === undefined
+		? UNDEFINED_VALUE
+		: value === null
+			? NULL_VALUE
+			: value
+				? TRUTHY_VALUE
+				: FALSY_VALUE;
+}
 
 function unwrap(node) {
 	let value = node;
@@ -61,24 +80,28 @@ function optionalChainCanSkip(node) {
 	return false;
 }
 
-function addPatternNames(pattern, bindings, value) {
+function addPatternNames(pattern, bindings, value, overwrite = true) {
 	if (pattern == null) return;
 	switch (pattern.type) {
 		case 'Identifier':
-			bindings.set(pattern.name, value);
+			if (overwrite || !bindings.has(pattern.name)) bindings.set(pattern.name, value);
 			break;
 		case 'RestElement':
-			addPatternNames(pattern.argument, bindings, value);
+			addPatternNames(pattern.argument, bindings, value, overwrite);
 			break;
 		case 'AssignmentPattern':
-			addPatternNames(pattern.left, bindings, value);
+			addPatternNames(pattern.left, bindings, value, overwrite);
+			break;
+		case 'TSParameterProperty':
+			addPatternNames(pattern.parameter, bindings, value, overwrite);
 			break;
 		case 'ArrayPattern':
-			for (const element of pattern.elements ?? []) addPatternNames(element, bindings, value);
+			for (const element of pattern.elements ?? [])
+				addPatternNames(element, bindings, value, overwrite);
 			break;
 		case 'ObjectPattern':
 			for (const property of pattern.properties ?? []) {
-				addPatternNames(property.argument ?? property.value, bindings, value);
+				addPatternNames(property.argument ?? property.value, bindings, value, overwrite);
 			}
 	}
 }
@@ -100,6 +123,38 @@ function declarationScope(scope, kind) {
 	return kind === 'var' ? nearestFunctionScope(scope) : scope;
 }
 
+class BindingMap extends Map {
+	constructor(clock) {
+		super();
+		this.clock = clock;
+		this.revision = 0;
+	}
+
+	set(name, value) {
+		if (!super.has(name) || super.get(name) !== value) this.revision = ++this.clock.value;
+		return super.set(name, value);
+	}
+
+	delete(name) {
+		const deleted = super.delete(name);
+		if (deleted) this.revision = ++this.clock.value;
+		return deleted;
+	}
+
+	clear() {
+		if (this.size !== 0) this.revision = ++this.clock.value;
+		super.clear();
+	}
+}
+
+function scopeRevision(scope) {
+	let revision = 0;
+	for (let current = scope; current; current = current.parent) {
+		revision = Math.max(revision, current.bindings.revision);
+	}
+	return revision;
+}
+
 function predeclareStatements(statements, scope) {
 	for (const original of statements ?? []) {
 		const node = declarationOf(original);
@@ -119,7 +174,7 @@ function predeclareStatements(statements, scope) {
 		} else if (node?.type === 'VariableDeclaration') {
 			const target = declarationScope(scope, node.kind);
 			for (const declaration of node.declarations ?? []) {
-				addPatternNames(declaration.id, target.bindings, { kind: 'other' });
+				addPatternNames(declaration.id, target.bindings, OTHER_BINDING, node.kind !== 'var');
 			}
 		} else if (node?.type === 'FunctionDeclaration' && node.id?.name) {
 			scope.bindings.set(node.id.name, { kind: 'callback', node, scope });
@@ -129,16 +184,38 @@ function predeclareStatements(statements, scope) {
 	}
 }
 
-function createScope(parent, kind, statements = [], params = []) {
-	const scope = { parent, kind, bindings: new Map() };
-	predeclareStatements(statements, scope);
+function createScope(
+	parent,
+	kind,
+	statements = [],
+	params = [],
+	isReassigned = parent?.isReassigned,
+) {
+	const scope = {
+		parent,
+		kind,
+		bindings: new BindingMap(parent?.bindings.clock ?? { value: 0 }),
+		isReassigned,
+	};
 	for (const param of params) addPatternNames(param, scope.bindings, { kind: 'other' });
+	predeclareStatements(statements, scope);
 	return scope;
 }
 
 function resolve(scope, name) {
 	for (let current = scope; current; current = current.parent) {
-		if (current.bindings.has(name)) return current.bindings.get(name);
+		if (!current.bindings.has(name)) continue;
+		const binding = current.bindings.get(name);
+		// Function declarations are writable, unlike const callback aliases.
+		// The source-binding proof is shared by every lexical activation.
+		if (
+			binding?.kind === 'callback' &&
+			binding.node.type === 'FunctionDeclaration' &&
+			current.isReassigned?.(binding.node.id)
+		) {
+			return OTHER_BINDING;
+		}
+		return binding;
 	}
 	return null;
 }
@@ -250,9 +327,66 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	const enabled = options.strong === true || directives.enabled;
 	if (!enabled) return { enabled: false, diagnostics };
 
-	const moduleScope = createScope(null, 'module', ast.body ?? []);
+	let reassignedBindings;
+	function isReassigned(identifier) {
+		reassignedBindings ??= collectReassignedBindings(ast);
+		return reassignedBindings.has(identifier);
+	}
+	const moduleScope = createScope(null, 'module', ast.body ?? [], [], isReassigned);
 	const activeCallbacks = new Set();
+	const activeReturnCallbacks = new Set();
+	const callResults = new WeakMap();
+	const reportedDiagnostics = new WeakMap();
+	const hoistedVarNames = new WeakMap();
+	const mayHaveHoistedVars = source.includes('var');
+	let returnCycles = 0;
 	let currentFunctionIsAsync = false;
+
+	function predeclareHoistedVars(node, scope) {
+		if (!mayHaveHoistedVars || node == null) return;
+		let names = hoistedVarNames.get(node);
+		if (names === undefined) {
+			names = new Map();
+			function collect(value) {
+				if (value == null || typeof value !== 'object') return;
+				if (Array.isArray(value)) {
+					for (const child of value) collect(child);
+					return;
+				}
+				if (
+					FUNCTION_TYPES.has(value.type) ||
+					value.type === 'ClassDeclaration' ||
+					value.type === 'ClassExpression' ||
+					value.type === 'StaticBlock' ||
+					(value.type?.startsWith('TS') && !TRANSPARENT_EXPRESSIONS.has(value.type))
+				) {
+					return;
+				}
+				if (value.type === 'VariableDeclaration' && value.kind === 'var') {
+					for (const declaration of value.declarations ?? []) {
+						addPatternNames(declaration.id, names, OTHER_BINDING);
+					}
+				}
+				for (const key in value) {
+					if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) collect(value[key]);
+				}
+			}
+			collect(node);
+			hoistedVarNames.set(node, names);
+		}
+		for (const name of names.keys()) {
+			if (!scope.bindings.has(name)) scope.bindings.set(name, OTHER_BINDING);
+		}
+	}
+	predeclareHoistedVars(ast, moduleScope);
+
+	function report(code, node, message, suggestions = []) {
+		let codes = reportedDiagnostics.get(node);
+		if (codes?.has(code)) return;
+		if (codes === undefined) reportedDiagnostics.set(node, (codes = new Set()));
+		codes.add(code);
+		diagnostics.push(diagnostic(code, filename, node, message, suggestions));
+	}
 
 	function reportSetter(node, phase) {
 		const effect = phase === 'effect';
@@ -260,17 +394,22 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const message = effect
 			? 'Strong mode does not allow synchronous state updates inside effect setup. Derive the value during render or use useLinkedState when state follows another value.'
 			: 'Strong mode does not allow state updates during render. Use useLinkedState when state needs to reset or change with another value.';
-		diagnostics.push(diagnostic(code, filename, node, message, [{ hook: 'useLinkedState' }]));
+		report(code, node, message, [{ hook: 'useLinkedState' }]);
 	}
 
 	function reportRef(node) {
-		diagnostics.push(
-			diagnostic(
-				STRONG_RENDER_REF_WRITE,
-				filename,
-				node,
-				'Strong mode does not allow writing to useRef.current during render. Move the write to an event or effect, or express the value as state.',
-			),
+		report(
+			STRONG_RENDER_REF_WRITE,
+			node,
+			'Strong mode does not allow writing to useRef.current during render. Move the write to an event or effect, or express the value as state.',
+		);
+	}
+
+	function reportEffectEventCall(node) {
+		report(
+			STRONG_RENDER_EFFECT_EVENT_CALL,
+			node,
+			'Strong mode does not allow calling an Effect Event during render. Call it from an effect or a later event or subscription callback.',
 		);
 	}
 
@@ -580,6 +719,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		for (const statement of statements ?? []) {
 			visit(statement, scope, executionPhase);
 			if (
+				statement.type === 'ReturnStatement' ||
+				statement.type === 'ThrowStatement' ||
+				statement.type === 'BreakStatement' ||
+				statement.type === 'ContinueStatement'
+			) {
+				break;
+			}
+			if (
 				currentFunctionIsAsync &&
 				executionPhase !== 'deferred' &&
 				statementAlwaysAwaits(statement)
@@ -590,17 +737,94 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return executionPhase;
 	}
 
-	function visitFunction(node, parentScope, phase) {
+	function createFunctionScope(node, parentScope, args = null) {
+		const body = node.body;
+		const statements =
+			body?.type === 'BlockStatement' || body?.type === 'JSXCodeBlock' ? body.body : [];
+		const scope = createScope(parentScope, 'function', statements, node.params ?? []);
+		predeclareHoistedVars(body, scope);
+		if (node.type === 'FunctionExpression' && node.id?.name && !scope.bindings.has(node.id.name)) {
+			scope.bindings.set(node.id.name, { kind: 'callback', node, scope: parentScope });
+		}
+		if (args !== null) {
+			for (let index = 0; index < (node.params?.length ?? 0); index++) {
+				const parameter = node.params[index];
+				if (parameter.type === 'Identifier' && !isReassigned(parameter)) {
+					scope.bindings.set(parameter.name, args[index] ?? UNDEFINED_BINDING);
+				}
+			}
+		}
+		return scope;
+	}
+
+	function definitelyDefined(value) {
+		if (value?.kind === 'constant' && value.primitive !== UNKNOWN_PRIMITIVE) {
+			return value.primitive !== undefined;
+		}
+		if (isCallableValue(value)) return (callableTruthiness(value) & UNDEFINED_VALUE) === 0;
+		return (
+			value?.kind === 'ref' ||
+			value?.kind === 'state-tuple' ||
+			(value?.kind === 'constant' && (value.value & UNDEFINED_VALUE) === 0)
+		);
+	}
+
+	function visitParameters(node, parentScope, phase, args) {
+		const parameters = node.params ?? [];
+		const parameterScope = createScope(parentScope, 'function', [], parameters);
+		if (
+			node.type === 'FunctionExpression' &&
+			node.id?.name &&
+			!parameterScope.bindings.has(node.id.name)
+		) {
+			parameterScope.bindings.set(node.id.name, { kind: 'callback', node, scope: parentScope });
+		}
+		for (let index = 0; index < parameters.length; index++) {
+			let parameter = parameters[index];
+			if (parameter.type === 'TSParameterProperty') parameter = parameter.parameter;
+			let value = args === null ? OTHER_BINDING : (args[index] ?? UNDEFINED_BINDING);
+			if (parameter.type === 'AssignmentPattern') {
+				visitPatternExpressions(parameter.left, parameterScope, phase);
+				if (!definitelyDefined(value)) visit(parameter.right, parameterScope, phase);
+				value =
+					value.kind === 'constant' && value.primitive === undefined
+						? expressionBinding(parameter.right, parameterScope)
+						: definitelyDefined(value)
+							? value
+							: OTHER_BINDING;
+				parameter = parameter.left;
+			} else {
+				visitPatternExpressions(parameter, parameterScope, phase);
+			}
+			if (parameter.type === 'Identifier' && !isReassigned(parameter)) {
+				parameterScope.bindings.set(parameter.name, value);
+			}
+		}
+		return parameterScope;
+	}
+
+	function visitFunction(node, parentScope, phase, args = null) {
 		const enclosingFunctionIsAsync = currentFunctionIsAsync;
 		currentFunctionIsAsync = node.async === true;
 		try {
 			const body = node.body;
-			const statements =
-				body?.type === 'BlockStatement' || body?.type === 'JSXCodeBlock' ? body.body : [];
-			const functionScope = createScope(parentScope, 'function', statements, node.params ?? []);
-			if (node.id?.name) functionScope.bindings.set(node.id.name, { kind: 'other' });
-			for (const parameter of node.params ?? []) {
-				visitPatternExpressions(parameter, functionScope, phase);
+			let functionScope;
+			if ((node.params ?? []).every((parameter) => parameter.type === 'Identifier')) {
+				functionScope = createFunctionScope(node, parentScope, args);
+			} else {
+				// Defaults run before the body environment exists. In particular,
+				// body var/function declarations cannot shadow an outer default read.
+				const parameterScope = visitParameters(node, parentScope, phase, args);
+				functionScope = createScope(parameterScope, 'function');
+				const names = new Map();
+				for (const parameter of node.params ?? []) addPatternNames(parameter, names, OTHER_BINDING);
+				for (const name of names.keys()) {
+					functionScope.bindings.set(name, parameterScope.bindings.get(name));
+				}
+				if (body?.type === 'BlockStatement' || body?.type === 'JSXCodeBlock') {
+					predeclareStatements(body.body, functionScope);
+				}
+				predeclareHoistedVars(body, functionScope);
 			}
 			if (body?.type === 'BlockStatement' || body?.type === 'JSXCodeBlock') {
 				const executionPhase = visitStatements(body.body, functionScope, phase);
@@ -615,7 +839,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 
 	function visitPatternExpressions(pattern, scope, phase) {
 		let executionPhase = phase;
-		if (pattern?.type === 'AssignmentPattern') {
+		if (pattern?.type === 'TSParameterProperty') {
+			return visitPatternExpressions(pattern.parameter, scope, phase);
+		} else if (pattern?.type === 'AssignmentPattern') {
 			executionPhase = visitPatternExpressions(pattern.left, scope, executionPhase);
 			visit(pattern.right, scope, executionPhase);
 		} else if (pattern?.type === 'ArrayPattern') {
@@ -640,9 +866,16 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return executionPhase;
 	}
 
-	function bindDeclaration(declaration, declarationKind, scope, phase) {
+	function bindDeclarationValue(declaration, declarationKind, scope) {
 		const target = declarationScope(scope, declarationKind);
 		const initial = unwrap(declaration.init);
+		function bind(identifier, value) {
+			if (identifier?.type !== 'Identifier') return;
+			target.bindings.set(
+				identifier.name,
+				declarationKind === 'const' || !isReassigned(identifier) ? value : OTHER_BINDING,
+			);
+		}
 		const stateTuple =
 			(initial?.type === 'CallExpression' &&
 				STATE_HOOKS.has(importedHook(initial.callee, scope))) ||
@@ -650,7 +883,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (declaration.id?.type === 'ArrayPattern' && stateTuple) {
 			const element = declaration.id.elements?.[1];
 			const setter = element?.type === 'AssignmentPattern' ? element.left : element;
-			if (setter?.type === 'Identifier') target.bindings.set(setter.name, { kind: 'setter' });
+			bind(setter, { kind: 'setter' });
 		} else if (declaration.id?.type === 'ObjectPattern' && stateTuple) {
 			for (const property of declaration.id.properties ?? []) {
 				if (property.type !== 'Property') continue;
@@ -662,17 +895,17 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				const value = property.value;
 				const setter = value?.type === 'AssignmentPattern' ? value.left : value;
 				if ((key === 1 || key === '1') && setter?.type === 'Identifier') {
-					target.bindings.set(setter.name, { kind: 'setter' });
+					bind(setter, { kind: 'setter' });
 				}
 			}
 		} else if (declaration.id?.type === 'Identifier') {
 			if (stateTuple) {
-				target.bindings.set(declaration.id.name, { kind: 'state-tuple' });
+				bind(declaration.id, { kind: 'state-tuple' });
 			} else if (
 				initial?.type === 'CallExpression' &&
 				importedHook(initial.callee, scope) === 'useRef'
 			) {
-				target.bindings.set(declaration.id.name, { kind: 'ref' });
+				bind(declaration.id, { kind: 'ref' });
 			} else if (declarationKind === 'const' && stateTupleUpdater(initial, scope)) {
 				target.bindings.set(declaration.id.name, { kind: 'setter' });
 			} else if (declarationKind === 'const' && initial?.type === 'Identifier') {
@@ -682,17 +915,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					value?.kind === 'ref' ||
 					value?.kind === 'callback' ||
 					value?.kind === 'callback-choice' ||
+					value?.kind === 'effect-event' ||
 					value?.kind === 'linked-options' ||
 					value?.kind === 'linked-key' ||
 					value?.kind === 'constant'
 				) {
 					target.bindings.set(declaration.id.name, value);
 				} else if (value == null && initial.name === 'undefined') {
-					target.bindings.set(declaration.id.name, {
-						kind: 'constant',
-						value: NULLISH_VALUE,
-						primitive: undefined,
-					});
+					target.bindings.set(declaration.id.name, UNDEFINED_BINDING);
 				}
 			} else if (declarationKind === 'const' && FUNCTION_TYPES.has(initial?.type)) {
 				target.bindings.set(declaration.id.name, { kind: 'callback', node: initial, scope });
@@ -717,23 +947,16 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					node: initial,
 					scope,
 				});
-			} else if (
-				declarationKind === 'const' &&
-				(initial?.type === 'ConditionalExpression' ||
-					initial?.type === 'LogicalExpression' ||
-					initial?.type === 'SequenceExpression') &&
-				synchronousCallbackExpression(initial, scope)
-			) {
-				target.bindings.set(declaration.id.name, {
-					kind: 'callback-choice',
-					node: initial,
-					scope,
-				});
 			} else if (declarationKind === 'const') {
-				const primitive = staticPrimitiveValue(initial, scope);
-				let value = staticExpressionValue(initial, scope);
+				const result = returnedExpression(initial, scope);
+				if (result.callback !== null) {
+					target.bindings.set(declaration.id.name, result.callback);
+					return;
+				}
+				const primitive = result.primitive;
+				let value = result.value;
 				if (value === UNKNOWN_VALUE && primitive !== UNKNOWN_PRIMITIVE) {
-					value = primitive == null ? NULLISH_VALUE : primitive ? TRUTHY_VALUE : FALSY_VALUE;
+					value = primitiveValueMask(primitive);
 				}
 				if (value !== UNKNOWN_VALUE) {
 					target.bindings.set(declaration.id.name, {
@@ -744,15 +967,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 			}
 		}
+	}
+
+	function bindDeclaration(declaration, declarationKind, scope, phase) {
+		bindDeclarationValue(declaration, declarationKind, scope);
 		visit(declaration.init, scope, phase);
 		return visitPatternExpressions(declaration.id, scope, phaseAfter(declaration.init, phase));
 	}
 
-	function visitCallback(node, parentScope, phase) {
-		if (activeCallbacks.has(node)) return;
+	function visitCallback(node, parentScope, phase, args = null) {
+		// Calling a generator creates an iterator; its body has not run yet.
+		if (node.generator === true || activeCallbacks.has(node)) return;
 		activeCallbacks.add(node);
 		try {
-			visitFunction(node, parentScope, phase);
+			visitFunction(node, parentScope, phase, args);
 		} finally {
 			activeCallbacks.delete(node);
 		}
@@ -771,6 +999,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 
 	function staticPrimitiveValue(value, scope) {
 		const expression = unwrap(value);
+		if (expression?.type === 'CallExpression') {
+			const result = callResult(expression, scope);
+			return result === null ? UNKNOWN_PRIMITIVE : result.primitive;
+		}
 		if (expression?.type === 'Literal') return expression.value;
 		if (expression?.type === 'Identifier') {
 			const binding = resolve(scope, expression.name);
@@ -881,12 +1113,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 
 	function staticExpressionValue(value, scope) {
 		const expression = unwrap(value);
+		if (expression?.type === 'CallExpression') {
+			return callResult(expression, scope)?.value ?? UNKNOWN_VALUE;
+		}
 		if (expression?.type === 'Literal') {
-			return expression.value == null
-				? NULLISH_VALUE
-				: expression.value
-					? TRUTHY_VALUE
-					: FALSY_VALUE;
+			return primitiveValueMask(expression.value);
 		} else if (
 			FUNCTION_TYPES.has(expression?.type) ||
 			expression?.type === 'ObjectExpression' ||
@@ -901,19 +1132,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				(expression.operator === '+' || expression.operator === '-' || expression.operator === '~'))
 		) {
 			const primitive = staticPrimitiveValue(expression, scope);
-			return primitive === UNKNOWN_PRIMITIVE
-				? UNKNOWN_VALUE
-				: primitive == null
-					? NULLISH_VALUE
-					: primitive
-						? TRUTHY_VALUE
-						: FALSY_VALUE;
+			return primitive === UNKNOWN_PRIMITIVE ? UNKNOWN_VALUE : primitiveValueMask(primitive);
 		} else if (expression?.type === 'Identifier') {
 			const binding = resolve(scope, expression.name);
-			if (binding == null && expression.name === 'undefined') return NULLISH_VALUE;
+			if (binding == null && expression.name === 'undefined') return UNDEFINED_VALUE;
 			if (binding?.kind === 'constant') return binding.value;
 			if (
 				binding?.kind === 'callback' ||
+				binding?.kind === 'effect-event' ||
 				binding?.kind === 'setter' ||
 				binding?.kind === 'ref' ||
 				binding?.kind === 'state-tuple' ||
@@ -923,7 +1149,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			) {
 				return TRUTHY_VALUE;
 			}
-			if (binding?.kind === 'callback-choice' || binding?.kind === 'linked-options') {
+			if (binding?.kind === 'callback-choice') return binding.value;
+			if (binding?.kind === 'linked-options') {
 				if (activeCallbacks.has(binding.node)) return UNKNOWN_VALUE;
 				activeCallbacks.add(binding.node);
 				try {
@@ -966,7 +1193,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					: 0)
 			);
 		} else if (expression?.type === 'UnaryExpression' && expression.operator === 'void') {
-			return NULLISH_VALUE;
+			return UNDEFINED_VALUE;
 		} else if (expression?.type === 'UnaryExpression' && expression.operator === '!') {
 			const argument = staticExpressionValue(expression.argument, scope);
 			return (
@@ -1007,76 +1234,422 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return 3;
 	}
 
-	function visitSynchronousHookCallback(value, scope, phase) {
-		const callback = unwrap(value);
-		if (FUNCTION_TYPES.has(callback?.type)) {
-			visitCallback(callback, scope, phase);
-			return true;
-		} else if (callback?.type === 'SequenceExpression') {
-			const expressions = callback.expressions ?? [];
-			return visitSynchronousHookCallback(expressions[expressions.length - 1], scope, phase);
-		} else if (callback?.type === 'ConditionalExpression') {
-			const branches = conditionalExpressionBranches(callback, scope);
-			if ((branches & 1) !== 0) visitSynchronousHookCallback(callback.consequent, scope, phase);
-			if ((branches & 2) !== 0) visitSynchronousHookCallback(callback.alternate, scope, phase);
-			return true;
-		} else if (callback?.type === 'LogicalExpression') {
-			const branches = logicalExpressionBranches(callback, scope);
-			if ((branches & 1) !== 0 && callback.operator !== '&&') {
-				visitSynchronousHookCallback(callback.left, scope, phase);
+	function isCallableValue(value) {
+		return (
+			value?.kind === 'callback' ||
+			value?.kind === 'callback-choice' ||
+			value?.kind === 'effect-event' ||
+			value?.kind === 'setter'
+		);
+	}
+
+	function callableTruthiness(value) {
+		return value?.kind === 'callback-choice' ? value.value : TRUTHY_VALUE;
+	}
+
+	function callableChoice(values, value, complete) {
+		// Keep the truthiness of non-callable alternatives too. `complete` says
+		// there is no unknown callable alternative, which matters when this value
+		// is itself invoked as a factory and we inspect its return value.
+		const callbacks = [];
+		const seen = new Set();
+		const functions = new Map();
+		function add(callback) {
+			if (callback === null) return;
+			if (callback.kind === 'callback-choice') {
+				for (const child of callback.values) add(child);
+				return;
 			}
-			if ((branches & 2) !== 0) visitSynchronousHookCallback(callback.right, scope, phase);
-			return true;
-		} else if (callback?.type === 'Identifier') {
-			const binding = resolve(scope, callback.name);
-			if (binding?.kind === 'callback') visitCallback(binding.node, binding.scope, phase);
-			else if (binding?.kind === 'callback-choice') {
-				if (activeCallbacks.has(binding.node)) return true;
-				activeCallbacks.add(binding.node);
-				try {
-					visitSynchronousHookCallback(binding.node, binding.scope, phase);
-				} finally {
-					activeCallbacks.delete(binding.node);
-				}
-			} else if (binding?.kind === 'setter' && (phase === 'render' || phase === 'effect')) {
-				reportSetter(callback, phase);
+			if (callback.kind === 'callback') {
+				let scopes = functions.get(callback.node);
+				if (scopes?.has(callback.scope)) return;
+				if (scopes === undefined) functions.set(callback.node, (scopes = new Set()));
+				scopes.add(callback.scope);
+			} else {
+				const identity = callback.kind === 'setter' ? 'setter' : callback;
+				if (seen.has(identity)) return;
+				seen.add(identity);
 			}
-			return true;
-		} else if (stateTupleUpdater(callback, scope)) {
-			if (phase === 'render' || phase === 'effect') reportSetter(callback, phase);
-			return true;
+			callbacks.push(callback);
+		}
+		for (const callback of values) add(callback);
+		if (callbacks.length === 0) return null;
+		if (callbacks.length === 1 && value === TRUTHY_VALUE && complete) return callbacks[0];
+		return { kind: 'callback-choice', values: callbacks, value, complete };
+	}
+
+	function knownNonCallable(expression, scope) {
+		const node = unwrap(expression);
+		return (
+			staticPrimitiveValue(node, scope) !== UNKNOWN_PRIMITIVE ||
+			node?.type === 'ObjectExpression' ||
+			node?.type === 'ArrayExpression' ||
+			node?.type === 'ClassExpression' ||
+			(node?.type === 'Identifier' &&
+				(resolve(scope, node.name)?.kind === 'ref' ||
+					resolve(scope, node.name)?.kind === 'state-tuple'))
+		);
+	}
+
+	function returnedExpression(expression, scope) {
+		const node = unwrap(expression);
+		if (node?.type === 'CallExpression') {
+			const result = callResult(node, scope);
+			if (result !== null) return result;
+			return {
+				callback: null,
+				value: UNKNOWN_VALUE,
+				primitive: UNKNOWN_PRIMITIVE,
+				complete: false,
+			};
+		}
+		const callback = callableValue(expression, scope);
+		return {
+			callback,
+			value:
+				expression == null
+					? UNDEFINED_VALUE
+					: callback === null
+						? staticExpressionValue(expression, scope)
+						: callableTruthiness(callback),
+			primitive: expression == null ? undefined : staticPrimitiveValue(expression, scope),
+			complete:
+				callback === null
+					? expression == null || knownNonCallable(expression, scope)
+					: callback.kind !== 'callback-choice' || callback.complete,
+		};
+	}
+
+	// Values and execution are separate. In particular, useMemo executes its
+	// factory now, but a function returned by that factory is only a value.
+	function callableValue(expression, scope) {
+		const node = unwrap(expression);
+		if (FUNCTION_TYPES.has(node?.type)) return { kind: 'callback', node, scope };
+		if (node?.type === 'Identifier') {
+			const binding = resolve(scope, node.name);
+			return isCallableValue(binding) ? binding : null;
+		}
+		if (stateTupleUpdater(node, scope)) return { kind: 'setter' };
+		if (node?.type === 'SequenceExpression') {
+			return callableValue(node.expressions?.[node.expressions.length - 1], scope);
+		}
+		if (node?.type === 'ConditionalExpression' || node?.type === 'LogicalExpression') {
+			const logical = node.type === 'LogicalExpression';
+			const branches = logical
+				? logicalExpressionBranches(node, scope)
+				: conditionalExpressionBranches(node, scope);
+			const values = [];
+			if ((branches & 1) !== 0) {
+				values.push(
+					logical && node.operator === '&&'
+						? { callback: null, complete: true }
+						: returnedExpression(logical ? node.left : node.consequent, scope),
+				);
+			}
+			if ((branches & 2) !== 0) {
+				values.push(returnedExpression(logical ? node.right : node.alternate, scope));
+			}
+			return callableChoice(
+				values.map((value) => value.callback),
+				staticExpressionValue(node, scope),
+				values.every((value) => value.complete),
+			);
+		}
+		return node?.type === 'CallExpression' ? (callResult(node, scope)?.callback ?? null) : null;
+	}
+
+	function optionalCallCanSkip(node, scope) {
+		let current = node;
+		while (current != null) {
+			if (current.type === 'ChainExpression') return false;
+			if (TRANSPARENT_EXPRESSIONS.has(current.type)) {
+				current = current.expression;
+				continue;
+			}
+			if (current.type !== 'CallExpression' && current.type !== 'MemberExpression') return false;
+			const target = current.type === 'CallExpression' ? current.callee : current.object;
+			if (
+				current.optional === true &&
+				(staticExpressionValue(target, scope) & NULLISH_VALUE) !== 0
+			) {
+				return true;
+			}
+			current = target;
 		}
 		return false;
 	}
 
-	function synchronousCallbackExpression(value, scope) {
-		const callback = unwrap(value);
-		if (FUNCTION_TYPES.has(callback?.type) || stateTupleUpdater(callback, scope)) return true;
-		if (callback?.type === 'Identifier') {
-			const kind = resolve(scope, callback.name)?.kind;
-			return kind === 'callback' || kind === 'callback-choice' || kind === 'setter';
+	function callResult(node, scope) {
+		const revision = scopeRevision(scope);
+		let cached = callResults.get(scope);
+		const previous = cached?.get(node);
+		if (previous?.revision === revision) return previous.result;
+		const cycles = returnCycles;
+		const result = resolveCallResult(node, scope);
+		// A call result belongs to this source call and lexical activation, not
+		// merely its function AST. Ancestor bindings can become known later in a
+		// statement list; a shared monotonic clock invalidates exactly those
+		// results without invalidating callers when a new child scope is built.
+		if (cycles === returnCycles && revision === scopeRevision(scope)) {
+			if (cached === undefined) callResults.set(scope, (cached = new WeakMap()));
+			cached.set(node, { revision, result });
 		}
-		if (callback?.type === 'SequenceExpression') {
-			const expressions = callback.expressions ?? [];
-			return synchronousCallbackExpression(expressions[expressions.length - 1], scope);
+		return result;
+	}
+
+	function resolveCallResult(node, scope) {
+		const hook = importedHook(node.callee, scope);
+		let result;
+		if (hook === 'useCallback') {
+			result = returnedExpression(node.arguments?.[0], scope);
+		} else if (hook === 'useEffectEvent') {
+			result = {
+				callback: { kind: 'effect-event', callback: callableValue(node.arguments?.[0], scope) },
+				value: TRUTHY_VALUE,
+				primitive: UNKNOWN_PRIMITIVE,
+				complete: true,
+			};
+		} else if (hook === 'useMemo') {
+			// Octane's client invokes a memo factory with positional dependencies;
+			// SSR does not. Do not invent arguments for a parameterized hook factory.
+			result = returnedCallable(callableValue(node.arguments?.[0], scope), null);
+		} else {
+			if (hook !== null) return null;
+			const callback = callableValue(node.callee, scope);
+			if (callback === null) return null;
+			result = returnedCallable(callback, argumentValues(node.arguments, scope));
 		}
-		if (callback?.type === 'ConditionalExpression') {
-			const branches = conditionalExpressionBranches(callback, scope);
-			return (
-				((branches & 1) !== 0 && synchronousCallbackExpression(callback.consequent, scope)) ||
-				((branches & 2) !== 0 && synchronousCallbackExpression(callback.alternate, scope))
-			);
+		if (result === null) return null;
+		if (!optionalCallCanSkip(node, scope)) return result;
+		const value = result.value | UNDEFINED_VALUE;
+		return {
+			callback: callableChoice([result.callback], value, result.complete),
+			value,
+			primitive: result.primitive === undefined ? undefined : UNKNOWN_PRIMITIVE,
+			complete: result.complete,
+		};
+	}
+
+	function expressionBinding(expression, scope) {
+		const node = unwrap(expression);
+		if (node?.type === 'Identifier') {
+			const binding = resolve(scope, node.name);
+			if (
+				isCallableValue(binding) ||
+				binding?.kind === 'ref' ||
+				binding?.kind === 'state-tuple' ||
+				binding?.kind === 'constant' ||
+				binding?.kind === 'linked-key'
+			) {
+				return binding;
+			}
 		}
-		if (callback?.type === 'LogicalExpression') {
-			const branches = logicalExpressionBranches(callback, scope);
-			return (
-				((branches & 1) !== 0 &&
-					callback.operator !== '&&' &&
-					synchronousCallbackExpression(callback.left, scope)) ||
-				((branches & 2) !== 0 && synchronousCallbackExpression(callback.right, scope))
-			);
+		const result = returnedExpression(node, scope);
+		if (result.callback !== null) return result.callback;
+		return result.value === UNKNOWN_VALUE && result.primitive === UNKNOWN_PRIMITIVE
+			? OTHER_BINDING
+			: { kind: 'constant', primitive: result.primitive, value: result.value };
+	}
+
+	function argumentValues(args, scope) {
+		if (args?.some((argument) => argument.type === 'SpreadElement')) return null;
+		return (args ?? []).map((argument) => expressionBinding(argument, scope));
+	}
+
+	function mergePrimitive(left, right) {
+		return left === NO_RETURN_VALUE || Object.is(left, right) ? right : UNKNOWN_PRIMITIVE;
+	}
+
+	function returnedCallable(value, args) {
+		if (value?.kind === 'effect-event') return returnedCallable(value.callback, args);
+		if (value?.kind === 'callback-choice') {
+			if (!value.complete) return null;
+			const results = value.values.map((callback) => returnedCallable(callback, args));
+			if (results.some((result) => result === null)) return null;
+			const truthiness = results.reduce((mask, result) => mask | result.value, 0);
+			const complete = results.every((result) => result.complete);
+			return {
+				callback: callableChoice(
+					results.map((result) => result.callback),
+					truthiness,
+					complete,
+				),
+				value: truthiness,
+				primitive: results.reduce(
+					(primitive, result) => mergePrimitive(primitive, result.primitive),
+					NO_RETURN_VALUE,
+				),
+				complete,
+			};
 		}
-		return false;
+		if (value?.kind !== 'callback') return null;
+		const node = value.node;
+		if (activeReturnCallbacks.has(node)) {
+			returnCycles++;
+			return null;
+		}
+		if (
+			node.async === true ||
+			node.generator === true ||
+			(args === null && (node.params?.length ?? 0) !== 0) ||
+			(node.params ?? []).some((parameter) => parameter.type !== 'Identifier')
+		) {
+			return null;
+		}
+		activeReturnCallbacks.add(node);
+		try {
+			// Each call owns its parameter environment. Caching by function AST
+			// would conflate make(setState) with make(noop).
+			const scope = createFunctionScope(node, value.scope, args);
+			if (node.body?.type !== 'BlockStatement') return returnedExpression(node.body, scope);
+			const result = factoryReturns(node.body.body, scope);
+			if (result === null) return null;
+			const truthiness = result.value | (result.fallsThrough ? UNDEFINED_VALUE : 0);
+			const primitive = result.fallsThrough
+				? mergePrimitive(result.primitive, undefined)
+				: result.primitive;
+			return {
+				callback: callableChoice(result.callbacks, truthiness, result.complete),
+				value: truthiness,
+				primitive: primitive === NO_RETURN_VALUE ? UNKNOWN_PRIMITIVE : primitive,
+				complete: result.complete,
+			};
+		} finally {
+			activeReturnCallbacks.delete(node);
+		}
+	}
+
+	function factoryReturns(statements, scope) {
+		const result = {
+			callbacks: [],
+			value: 0,
+			primitive: NO_RETURN_VALUE,
+			complete: true,
+			fallsThrough: true,
+		};
+		function merge(branch) {
+			result.callbacks.push(...branch.callbacks);
+			result.value |= branch.value;
+			if (branch.primitive !== NO_RETURN_VALUE) {
+				result.primitive = mergePrimitive(result.primitive, branch.primitive);
+			}
+			result.complete &&= branch.complete;
+		}
+		for (const statement of statements ?? []) {
+			if (!result.fallsThrough) break;
+			switch (statement.type) {
+				case 'EmptyStatement':
+				case 'FunctionDeclaration':
+					break;
+				case 'VariableDeclaration':
+					if (statement.kind !== 'const') return null;
+					for (const declaration of statement.declarations ?? []) {
+						bindDeclarationValue(declaration, statement.kind, scope);
+					}
+					break;
+				case 'ReturnStatement': {
+					const returned = returnedExpression(statement.argument, scope);
+					if (returned.callback !== null) result.callbacks.push(returned.callback);
+					result.value |= statement.argument == null ? UNDEFINED_VALUE : returned.value;
+					result.primitive = mergePrimitive(result.primitive, returned.primitive);
+					result.complete &&= returned.complete;
+					result.fallsThrough = false;
+					break;
+				}
+				case 'ThrowStatement':
+					result.fallsThrough = false;
+					break;
+				case 'BlockStatement': {
+					const block = createScope(scope, 'block', statement.body);
+					const branch = factoryReturns(statement.body, block);
+					if (branch === null) return null;
+					merge(branch);
+					result.fallsThrough = branch.fallsThrough;
+					break;
+				}
+				case 'IfStatement': {
+					const branches = conditionalExpressionBranches(statement, scope);
+					let fallsThrough = false;
+					let exits = false;
+					for (const [flag, child] of [
+						[1, statement.consequent],
+						[2, statement.alternate],
+					]) {
+						if ((branches & flag) === 0) continue;
+						const branch = factoryReturns(child == null ? [] : [child], scope);
+						if (branch === null) return null;
+						merge(branch);
+						fallsThrough ||= branch.fallsThrough;
+						exits ||= !branch.fallsThrough;
+					}
+					// Continuing only one unknown branch requires path predicates in
+					// every returned closure. Do not invent an impossible later return.
+					if (fallsThrough && exits) return null;
+					result.fallsThrough = fallsThrough;
+					break;
+				}
+				case 'ExpressionStatement':
+					if (typeof statement.directive === 'string') break;
+					return null;
+				default:
+					// Loops, mutations, and try/finally need a fuller completion model.
+					// An unknown result is safer than inventing an overridden return.
+					return null;
+			}
+		}
+		return result;
+	}
+
+	function visitCallable(value, origin, phase, args = null) {
+		if (value?.kind === 'callback') {
+			visitCallback(value.node, value.scope, phase, args);
+		} else if (value?.kind === 'callback-choice') {
+			for (const callback of value.values) visitCallable(callback, origin, phase, args);
+		} else if (value?.kind === 'effect-event') {
+			if (phase === 'render') reportEffectEventCall(origin);
+			else if (phase === 'effect') visitCallable(value.callback, origin, phase, args);
+		} else if (value?.kind === 'setter' && (phase === 'render' || phase === 'effect')) {
+			reportSetter(origin, phase);
+		}
+	}
+
+	function visitSynchronousHookCallback(value, scope, phase) {
+		visitCallable(callableValue(value, scope), unwrap(value), phase);
+	}
+
+	function containsEffectEvent(value) {
+		return (
+			value?.kind === 'effect-event' ||
+			(value?.kind === 'callback-choice' && value.values.some(containsEffectEvent))
+		);
+	}
+
+	function visitExplicitDependencies(value, scope) {
+		const node = unwrap(value);
+		if (node?.type === 'ArrayExpression') {
+			for (const element of node.elements ?? []) {
+				if (element?.type === 'SpreadElement') {
+					visitExplicitDependencies(element.argument, scope);
+				} else if (containsEffectEvent(callableValue(element, scope))) {
+					report(
+						STRONG_EFFECT_EVENT_DEPENDENCY,
+						unwrap(element),
+						'Strong mode does not allow Effect Events in explicit hook dependency arrays. Effect Events are non-reactive; remove this dependency.',
+					);
+				}
+			}
+		} else if (node?.type === 'SequenceExpression') {
+			visitExplicitDependencies(node.expressions?.[node.expressions.length - 1], scope);
+		} else if (node?.type === 'ConditionalExpression' || node?.type === 'LogicalExpression') {
+			const logical = node.type === 'LogicalExpression';
+			const branches = logical
+				? logicalExpressionBranches(node, scope)
+				: conditionalExpressionBranches(node, scope);
+			if ((branches & 1) !== 0)
+				visitExplicitDependencies(logical ? node.left : node.consequent, scope);
+			if ((branches & 2) !== 0)
+				visitExplicitDependencies(logical ? node.right : node.alternate, scope);
+		}
 	}
 
 	function linkedStateComparatorName(property, scope) {
@@ -1240,18 +1813,25 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'IfStatement': {
 				visit(node.test, scope, phase);
 				const branchPhase = phaseAfter(node.test, phase);
-				visit(node.consequent, scope, branchPhase);
-				visit(node.alternate, scope, branchPhase);
+				const branches = conditionalExpressionBranches(node, scope);
+				if ((branches & 1) !== 0) visit(node.consequent, scope, branchPhase);
+				if ((branches & 2) !== 0) visit(node.alternate, scope, branchPhase);
 				return;
 			}
 			case 'ConditionalExpression': {
 				visit(node.test, scope, phase);
 				const branchPhase = phaseAfter(node.test, phase);
-				visit(node.consequent, scope, branchPhase);
-				visit(node.alternate, scope, branchPhase);
+				const branches = conditionalExpressionBranches(node, scope);
+				if ((branches & 1) !== 0) visit(node.consequent, scope, branchPhase);
+				if ((branches & 2) !== 0) visit(node.alternate, scope, branchPhase);
 				return;
 			}
 			case 'LogicalExpression':
+				visit(node.left, scope, phase);
+				if ((logicalExpressionBranches(node, scope) & 2) !== 0) {
+					visit(node.right, scope, phaseAfter(node.left, phase));
+				}
+				return;
 			case 'BinaryExpression':
 				visit(node.left, scope, phase);
 				visit(node.right, scope, phaseAfter(node.left, phase));
@@ -1347,8 +1927,6 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			case 'CallExpression': {
 				const hook = importedHook(node.callee, scope);
 				const callee = unwrap(node.callee);
-				const calleeBinding = callee?.type === 'Identifier' ? resolve(scope, callee.name) : null;
-				const tupleUpdater = stateTupleUpdater(callee, scope);
 				if (!FUNCTION_TYPES.has(callee?.type)) {
 					visit(node.callee, scope, phase);
 				}
@@ -1368,11 +1946,19 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					}
 					executionPhase = phaseAfter(argument, executionPhase);
 				}
+				const dependencyIndex =
+					hook === 'useImperativeHandle'
+						? 2
+						: EFFECT_HOOKS.has(hook) || hook === 'useMemo' || hook === 'useCallback'
+							? 1
+							: -1;
 				if (
-					(executionPhase === 'render' || executionPhase === 'effect') &&
-					(calleeBinding?.kind === 'setter' || tupleUpdater)
+					dependencyIndex !== -1 &&
+					!node.arguments
+						?.slice(0, dependencyIndex + 1)
+						.some((argument) => argument.type === 'SpreadElement')
 				) {
-					reportSetter(callee, executionPhase);
+					visitExplicitDependencies(node.arguments?.[dependencyIndex], scope);
 				}
 				if (EFFECT_HOOKS.has(hook)) {
 					visitSynchronousHookCallback(node.arguments?.[0], scope, 'effect');
@@ -1391,21 +1977,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					visitLinkedStateComparators(node.arguments?.[2], scope, executionPhase);
 					return;
 				}
-				if (FUNCTION_TYPES.has(callee?.type)) {
-					visitCallback(callee, scope, executionPhase);
-				} else if (
-					(executionPhase === 'render' || executionPhase === 'effect') &&
-					calleeBinding?.kind === 'callback'
+				if (
+					executionPhase === 'render' ||
+					executionPhase === 'effect' ||
+					FUNCTION_TYPES.has(callee?.type)
 				) {
-					visitCallback(calleeBinding.node, calleeBinding.scope, executionPhase);
-				} else if (
-					(executionPhase === 'render' || executionPhase === 'effect') &&
-					(calleeBinding?.kind === 'callback-choice' ||
-						callee?.type === 'SequenceExpression' ||
-						callee?.type === 'ConditionalExpression' ||
-						callee?.type === 'LogicalExpression')
-				) {
-					visitSynchronousHookCallback(callee, scope, executionPhase);
+					const callback = callableValue(callee, scope);
+					if (callback !== null) {
+						visitCallable(
+							callback,
+							callee,
+							executionPhase,
+							callback.kind === 'setter' ? null : argumentValues(node.arguments, scope),
+						);
+					}
 				}
 				return;
 			}
@@ -1423,7 +2008,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					phaseAfter(node.callee, phase),
 				);
 				if (inlineConstructor) {
-					visitCallback(callee, scope, executionPhase);
+					visitCallback(callee, scope, executionPhase, argumentValues(node.arguments, scope));
 				} else if (
 					(executionPhase === 'render' || executionPhase === 'effect') &&
 					binding?.kind === 'callback' &&
@@ -1432,29 +2017,38 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					binding.node.async !== true &&
 					binding.node.generator !== true
 				) {
-					visitCallback(binding.node, binding.scope, executionPhase);
+					visitCallback(
+						binding.node,
+						binding.scope,
+						executionPhase,
+						argumentValues(node.arguments, scope),
+					);
 				}
 				return;
 			}
 			case 'TaggedTemplateExpression': {
 				const tag = unwrap(node.tag);
-				const binding = tag?.type === 'Identifier' ? resolve(scope, tag.name) : null;
 				if (!FUNCTION_TYPES.has(tag?.type)) visit(node.tag, scope, phase);
 				const tagPhase = phaseAfter(node.tag, phase, true);
 				visit(node.quasi, scope, tagPhase);
 				const executionPhase = phaseAfter(node.quasi, tagPhase);
 				if (
-					(executionPhase === 'render' || executionPhase === 'effect') &&
-					binding?.kind === 'setter'
+					executionPhase === 'render' ||
+					executionPhase === 'effect' ||
+					FUNCTION_TYPES.has(tag?.type)
 				) {
-					reportSetter(tag, executionPhase);
-				} else if (FUNCTION_TYPES.has(tag?.type)) {
-					visitCallback(tag, scope, executionPhase);
-				} else if (
-					(executionPhase === 'render' || executionPhase === 'effect') &&
-					binding?.kind === 'callback'
-				) {
-					visitCallback(binding.node, binding.scope, executionPhase);
+					const substitutions = argumentValues(node.quasi?.expressions, scope);
+					visitCallable(
+						callableValue(tag, scope),
+						tag,
+						executionPhase,
+						substitutions === null
+							? null
+							: [
+									{ kind: 'constant', value: TRUTHY_VALUE, primitive: UNKNOWN_PRIMITIVE },
+									...substitutions,
+								],
+					);
 				}
 				return;
 			}
@@ -1486,7 +2080,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					const target = declarationScope(loop, node.init.kind);
 					const binding = { kind: 'other' };
 					for (const declaration of node.init.declarations ?? []) {
-						addPatternNames(declaration.id, target.bindings, binding);
+						addPatternNames(declaration.id, target.bindings, binding, node.init.kind !== 'var');
 					}
 				}
 				let executionPhase = phase;

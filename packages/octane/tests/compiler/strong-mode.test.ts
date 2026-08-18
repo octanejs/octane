@@ -6,6 +6,8 @@ import { compileToVolarMappings } from '../../src/compiler/volar.js';
 const RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 const EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 const RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
+const RENDER_EFFECT_EVENT_CALL = 'OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL';
+const EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
 const DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
 
 function stateComponent(setup: string, imports = 'useState'): string {
@@ -2742,5 +2744,697 @@ export function useCounter() {
 		expect(
 			compileToVolarMappings(source, '/src/Counter.tsrx', { strong: true } as any).diagnostics,
 		).toContainEqual(expect.objectContaining({ code: RENDER_STATE_UPDATE, severity: 'error' }));
+	});
+});
+
+describe('Strong mode returned callbacks and Effect Events', () => {
+	const imports =
+		'useState, useRef, useCallback, useMemo, useEffectEvent, useEffect, useLayoutEffect, useInsertionEffect, useImperativeHandle';
+
+	function component(setup: string, hookImports = imports): string {
+		return `import { ${hookImports} } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  const ref = useRef(0);
+  ${setup}
+  <button onClick={() => setCount(count + 1)}>{count as string}</button>
+}`;
+	}
+
+	it.each([
+		['useCallback result', 'const update = useCallback(() => setCount(1), []); update();'],
+		['memoized setter', 'const update = useCallback(setCount, []); update(1);'],
+		['immediately called useCallback result', 'useCallback(() => setCount(1), [])();'],
+		[
+			'immutable callback aliases',
+			'const update = useCallback(() => setCount(1), []); const alias = update; alias();',
+		],
+		[
+			'local callback helpers',
+			'const update = useCallback(() => setCount(1), []); function apply() { update(); } apply();',
+		],
+		[
+			'conditional callback choices',
+			'const update = useCallback(() => setCount(1), []); const selected = props.enabled ? update : () => {}; selected();',
+		],
+		['useMemo result', 'const update = useMemo(() => () => setCount(1), []); update();'],
+		['memo-returned setter', 'const update = useMemo(() => setCount, []); update(1);'],
+		[
+			'named memo factories',
+			'function makeUpdate() { return () => setCount(1); } const update = useMemo(makeUpdate, []); update();',
+		],
+		[
+			'block-bodied memo factories',
+			'const update = useMemo(() => { const apply = () => setCount(1); return apply; }, []); update();',
+		],
+		[
+			'conditionally returned callbacks',
+			'const update = useMemo(() => props.enabled ? () => setCount(1) : () => {}, [props.enabled]); update();',
+		],
+		[
+			'factory parameters receiving a setter',
+			'function makeUpdate(apply) { return () => apply(1); } const update = useMemo(() => makeUpdate(setCount), []); update();',
+		],
+	])('rejects render state updates through %s', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_STATE_UPDATE,
+		);
+	});
+
+	it.each([
+		['useCallback', 'useCallback(() => setCount(1), [])'],
+		['useEffectEvent', 'useEffectEvent(() => setCount(1))'],
+		['useMemo returned callback', 'useMemo(() => () => setCount(1), [])'],
+	])('rejects synchronous effect updates through %s', (_label, initializer) => {
+		for (const effect of ['useEffect', 'useLayoutEffect', 'useInsertionEffect']) {
+			for (const callback of ['() => update()', 'update']) {
+				const setup = `const update = ${initializer}; ${effect}(${callback}, []);`;
+				expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+					EFFECT_STATE_UPDATE,
+				);
+			}
+		}
+	});
+
+	it.each([
+		[
+			'aliased callback imports',
+			'useState, useRef, useCallback as callback, useEffect as effect',
+			'const update = callback(() => setCount(1), []); const alias = update; effect(alias, []);',
+		],
+		[
+			'aliased Effect Event imports',
+			'useState, useRef, useEffectEvent as effectEvent, useEffect as effect',
+			'const update = effectEvent(() => setCount(1)); function apply() { update(); } effect(apply, []);',
+		],
+		[
+			'aliased memo imports',
+			'useState, useRef, useMemo as memo, useEffect as effect',
+			'const update = memo(() => () => setCount(1), []); const selected = props.enabled ? update : () => {}; effect(selected, []);',
+		],
+	])('recognizes synchronous effect updates through %s', (_label, hookImports, setup) => {
+		expect(() =>
+			compile(`"use strong";\n${component(setup, hookImports)}`, '/src/App.tsrx'),
+		).toThrow(EFFECT_STATE_UPDATE);
+	});
+
+	it('recognizes returned callbacks from namespace hook imports', () => {
+		const source = `"use strong";
+import * as Octane from 'octane';
+export function App(props) @{
+  const [, setCount] = Octane.useState(0);
+  const update = Octane['useCallback' as const](() => setCount(1), []);
+  const selected = props.enabled ? update : () => {};
+  Octane.useEffect(selected, []);
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(EFFECT_STATE_UPDATE);
+	});
+
+	it.each([
+		['useCallback', 'useCallback(() => { ref.current = 1; }, [])'],
+		['useMemo returned callback', 'useMemo(() => () => { ref.current = 1; }, [])'],
+	])('rejects render ref writes through %s', (_label, initializer) => {
+		const setup = `const write = ${initializer}; const alias = write; alias();`;
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_REF_WRITE,
+		);
+	});
+
+	it.each([
+		['direct calls', 'const read = useEffectEvent(() => count); read();'],
+		['immediate hook results', 'useEffectEvent(() => count)();'],
+		['immutable aliases', 'const read = useEffectEvent(() => count); const alias = read; alias();'],
+		[
+			'local helpers',
+			'const read = useEffectEvent(() => count); function readNow() { return read(); } readNow();',
+		],
+		[
+			'conditional choices',
+			'const read = useEffectEvent(() => count); const selected = props.enabled ? read : () => count; selected();',
+		],
+		['memo factories', 'const read = useEffectEvent(() => count); useMemo(read, []);'],
+		['state initializers', 'const read = useEffectEvent(() => count); useState(read);'],
+		[
+			'memoized Effect Events',
+			'const read = useEffectEvent(() => count); const alias = useCallback(read, []); alias();',
+		],
+	])('rejects render-time Effect Event invocation through %s', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_EFFECT_EVENT_CALL,
+		);
+	});
+
+	it.each([
+		['useEffect', 'useEffect(() => {}, [event]);'],
+		['useLayoutEffect', 'useLayoutEffect(() => {}, [event]);'],
+		['useInsertionEffect', 'useInsertionEffect(() => {}, [event]);'],
+		['useMemo', 'useMemo(() => count, [event]);'],
+		['useCallback', 'useCallback(() => count, [event]);'],
+		['useImperativeHandle', 'useImperativeHandle(props.handle, () => ({}), [event]);'],
+	])('rejects explicit Effect Event dependencies in %s', (_label, hook) => {
+		const setup = `const event = useEffectEvent(() => count); ${hook}`;
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			EFFECT_EVENT_DEPENDENCY,
+		);
+	});
+
+	it('recognizes aliases and namespace imports in Effect Event dependencies', () => {
+		const source = `"use strong";
+import { useEffectEvent as effectEvent } from 'octane';
+import * as Octane from 'octane';
+export function App(props) @{
+  const event = effectEvent(() => props.value);
+  const alias = event;
+  Octane['useLayoutEffect' as const](() => {}, [alias as typeof alias]);
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).toThrow(EFFECT_EVENT_DEPENDENCY);
+	});
+
+	it('keeps callback creation, event handlers, cleanup, and deferred invocation legal', () => {
+		const source = `"use strong";
+import { ${imports} } from 'octane';
+export function App(props) @{
+  const [count, setCount] = useState(0);
+  const ref = useRef(0);
+  const update = useCallback(() => setCount(count + 1), [count]);
+  const event = useEffectEvent(() => setCount(count + 1));
+  const memoized = useMemo(() => () => setCount(count + 1), [count]);
+  useEffect(() => {
+    setTimeout(update, 0);
+    Promise.resolve().then(event);
+    queueMicrotask(memoized);
+    return () => { update(); event(); memoized(); };
+  }, []);
+  useLayoutEffect(() => { ref.current = count; }, [count]);
+  <button ref={props.buttonRef} onClick={event}>{count as string}</button>
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps returned callbacks legal after asynchronous work has yielded', () => {
+		const setup = `const update = useCallback(() => setCount(1), []);
+  const event = useEffectEvent(() => setCount(1));
+  const memoized = useMemo(() => () => setCount(1), []);
+  (async () => { await Promise.resolve(); update(); event(); memoized(); })();
+  useEffect(() => {
+    (async () => { await Promise.resolve(); update(); event(); memoized(); })();
+  }, []);`;
+
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('does not execute a memo-returned callback until the result is invoked', () => {
+		const setup = `function makeUpdate(apply) { return () => apply(1); }
+  const update = useMemo(() => makeUpdate(setCount), []);
+  const event = useEffectEvent(update);
+  useEffect(() => () => event(), []);`;
+
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		[
+			'separate factory captures',
+			`function makeUpdate(apply) { return () => apply(1); }
+  const deferred = useMemo(() => makeUpdate(setCount), []);
+  const safe = useMemo(() => makeUpdate(() => {}), []);
+  safe();
+  useEffect(() => deferred, []);`,
+		],
+		[
+			'reassigned factory parameters',
+			`function makeUpdate(apply) { apply = () => {}; return () => apply(1); }
+  const safe = useMemo(() => makeUpdate(setCount), []);
+  safe();`,
+		],
+		[
+			'overridden factory returns',
+			`const safe = useMemo(() => {
+    try { return () => setCount(1); }
+    finally { return () => {}; }
+  }, []);
+  safe();`,
+		],
+		[
+			'asynchronous factory results',
+			`const pending = useMemo(async () => () => setCount(1), []);
+  useEffect(() => { pending.then((update) => update()); }, []);`,
+		],
+		[
+			'generator factory results',
+			`const iterator = useMemo(function* () { return () => setCount(1); }, []);
+  useEffect(() => () => { iterator.next().value?.(); }, []);`,
+		],
+	])('does not invent synchronous writes from %s', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps shadowed hooks and opaque callback results legal', () => {
+		const source = `"use strong";
+import { useState, useRef, useMemo, useEffect, useEffectEvent as octaneEvent } from 'octane';
+import { makeCallback } from './external';
+function useCallback(callback) { return () => {}; }
+function useEffectEvent(callback) { return () => {}; }
+export function App(props) @{
+  const [, setCount] = useState(0);
+  const ref = useRef(0);
+  const ignored = useCallback(() => setCount(1));
+  const unrelated = useEffectEvent(() => { ref.current = 1; });
+  ignored();
+  unrelated();
+  const external = useMemo(props.makeCallback, []);
+  const unknown = makeCallback(() => setCount(1));
+  external();
+  unknown();
+  function makeUpdate(setCount) { return () => setCount(1); }
+  const safe = useMemo(() => makeUpdate(props.onUpdate), [props.onUpdate]);
+  safe();
+  const event = octaneEvent(() => props.value);
+  useEffect(() => { props.register(event); }, props.dependencies);
+  <div />
+}`;
+
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps inferred dependencies, ordinary callbacks, and deferred ref writes legal', () => {
+		const setup = `const event = useEffectEvent(() => count);
+  const callback = useCallback(() => props.value, [props.value]);
+  const write = useMemo(() => () => { ref.current = count; }, [count]);
+  useEffect(() => { props.register(event); });
+  useEffect(() => { write(); }, [callback]);
+  useMemo(() => callback, [callback]);`;
+
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['a return', 'const update = useCallback(() => { return; setCount(1); }, []); update();'],
+		[
+			'a false branch',
+			'const update = useCallback(() => { if (false) setCount(1); }, []); update();',
+		],
+		['short-circuiting', 'const update = useCallback(() => false && setCount(1), []); update();'],
+	])('does not report callback writes made unreachable by %s', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['a later return', 'const update = useCallback(() => { setCount(1); return; }, []); update();'],
+		[
+			'a possible branch',
+			'const update = useCallback(() => { if (props.enabled) setCount(1); }, []); update();',
+		],
+		['a true operand', 'const update = useCallback(() => true && setCount(1), []); update();'],
+	])('still reports callback writes reachable before %s', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_STATE_UPDATE,
+		);
+	});
+
+	it.each([
+		[
+			'reassigned function declarations',
+			'function update() { setCount(1); } update = () => {}; update();',
+		],
+		[
+			'initialized function/var redeclarations',
+			'function run() { function update() { setCount(1); } var update = () => {}; update(); } run();',
+		],
+		[
+			'reassigned call parameters',
+			'function invoke(apply) { apply = () => {}; apply(); } invoke(setCount);',
+		],
+		[
+			'parameter/function redeclarations',
+			'function invoke(apply) { function apply() {} apply(); } invoke(setCount);',
+		],
+		[
+			'for-of writes to a function',
+			'function update() { setCount(1); } for (update of [() => {}]) {} update();',
+		],
+		[
+			'for-of var writes to a parameter',
+			'function invoke(apply) { for (var apply of [() => {}]) {} apply(); } invoke(setCount);',
+		],
+	])('does not retain stale callable proofs across %s', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		[
+			'uninitialized block vars sharing a parameter',
+			'function invoke(apply) { { var apply; } apply(1); } invoke(setCount);',
+		],
+		[
+			'uninitialized vars sharing a function declaration',
+			'function run() { function update() { setCount(1); } var update; update(); } run();',
+		],
+		[
+			'writes to a shadowing iteration binding',
+			'function invoke(apply) { for (let apply of [() => {}]) { apply = () => {}; } apply(1); } invoke(setCount);',
+		],
+		[
+			'writes to a shadowing block binding',
+			'function update() { setCount(1); } { let update = () => {}; update = () => {}; } update();',
+		],
+	])('preserves callable proofs through %s', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_STATE_UPDATE,
+		);
+	});
+
+	it("follows conditional factory returns using each call's arguments", () => {
+		const make = `function make(enabled, apply) {
+    if (enabled) return () => apply(1);
+    return () => {};
+  }`;
+		const unsafe = `${make} const update = useMemo(() => make(true, setCount), []); update();`;
+		const safe = `${make} const update = useMemo(() => make(false, setCount), []); update();`;
+
+		expect(() => compile(`"use strong";\n${component(unsafe)}`, '/src/App.tsrx')).toThrow(
+			RENDER_STATE_UPDATE,
+		);
+		expect(() => compile(`"use strong";\n${component(safe)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps the fallback of an optional factory call reachable', () => {
+		const setup = `const factory = props.enabled ? () => () => {} : null;
+  const selected = factory?.();
+  const update = selected ?? setCount;
+  update(1);`;
+
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_STATE_UPDATE,
+		);
+	});
+
+	it('preserves a known non-callable memo result when selecting a callback', () => {
+		const setup = `const disabled = useMemo(() => false, []);
+  const update = useCallback(disabled ? setCount : () => {}, []);
+  update(1);`;
+
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('respects function-hoisted vars that shadow an outer setter', () => {
+		const setup = `const outer = setCount;
+  function make() {
+    if (false) { var outer; }
+    return () => outer?.(1);
+  }
+  const update = make();
+  update();`;
+
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		[
+			'vars hoisted from a body branch',
+			'const outer = setCount; function run(value = outer(1)) { if (false) { var outer; } } run();',
+		],
+		[
+			'uninitialized body vars',
+			'const outer = setCount; function run(value = outer(1)) { var outer; } run();',
+		],
+		[
+			'explicitly undefined arguments',
+			'const outer = setCount; function run(value = outer(1)) { var outer; } run(undefined);',
+		],
+	])('resolves executing parameter defaults outside %s', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_STATE_UPDATE,
+		);
+	});
+
+	it.each([
+		[
+			'a supplied non-undefined argument',
+			'const outer = setCount; function run(value = outer(1)) { var outer; } run(0);',
+		],
+		[
+			'an earlier supplied parameter',
+			'const outer = setCount; function run(outer, value = outer(1)) {} run(() => {});',
+		],
+		[
+			'an earlier defaulted parameter',
+			'const outer = setCount; function run(outer = () => {}, value = outer(1)) {} run();',
+		],
+		[
+			'a body var redeclaring a supplied parameter',
+			'const outer = setCount; function run(outer, value = outer(1)) { var outer; } run(() => {});',
+		],
+	])('does not invent parameter-default writes with %s', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('skips a parameter default for a null-or-callback argument', () => {
+		const setup = `const value = props.enabled ? null : () => {};
+  function run(value = setCount(1)) {}
+  run(value);`;
+
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('keeps a parameter default reachable for an undefined-or-callback argument', () => {
+		const setup = `const value = props.enabled ? undefined : () => {};
+  function run(value = setCount(1)) {}
+  run(value);`;
+
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_STATE_UPDATE,
+		);
+	});
+
+	it.each(['{}', '[]'])(
+		'preserves the truthiness of %s passed to a callback factory',
+		(argument) => {
+			const setup = `function make(value) { return value ? () => {} : setCount; }
+  const update = make(${argument});
+  update(1);`;
+
+			expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+		},
+	);
+
+	it('does not invent a factory return after complementary branches both return', () => {
+		const setup = `const noop = () => {};
+  const bad = () => setCount(1);
+  function make(enabled) {
+    if (enabled) return noop;
+    if (!enabled) return noop;
+    return bad;
+  }
+  const update = make(props.enabled);
+  update();`;
+
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['optional calls', 'const event = useEffectEvent(() => count); event?.();'],
+		['tagged calls', 'const event = useEffectEvent(() => count); event`value`;'],
+	])('rejects render-time Effect Events used in %s', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(
+			RENDER_EFFECT_EVENT_CALL,
+		);
+	});
+
+	it.each([
+		[
+			'render callbacks',
+			'const tag = useCallback((strings, apply) => apply(1), []); tag`${setCount}`;',
+			RENDER_STATE_UPDATE,
+		],
+		[
+			'Effect Events during effect setup',
+			'const tag = useEffectEvent((strings, apply) => apply(1)); useEffect(() => { tag`${setCount}`; }, []);',
+			EFFECT_STATE_UPDATE,
+		],
+	])('tracks tagged-template arguments passed to %s', (_label, setup, code) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).toThrow(code);
+	});
+
+	it('distinguishes Effect Event dependency values from ordinary callback wrappers', () => {
+		const actual = `const event = useEffectEvent(() => count);
+  function identity(value) { return value; }
+  const selected = useMemo(() => identity(event), []);
+  useEffect(() => {}, [selected]);`;
+		const wrapped = `const event = useEffectEvent(() => count);
+  const wrapper = useMemo(() => () => event(), []);
+  useEffect(() => {}, [wrapper, () => event(), false ? event : wrapper]);`;
+
+		expect(() => compile(`"use strong";\n${component(actual)}`, '/src/App.tsrx')).toThrow(
+			EFFECT_EVENT_DEPENDENCY,
+		);
+		expect(() => compile(`"use strong";\n${component(wrapped)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		[
+			'generator callback creation',
+			'const make = useCallback(function* () { setCount(1); }, []); const iterator = make(); useEffect(() => () => { iterator.next(); }, []);',
+		],
+		[
+			'asynchronous callbacks after yielding',
+			'const update = useCallback(async () => { await Promise.resolve(); setCount(1); }, []); useEffect(() => { update(); }, []);',
+		],
+		[
+			'optional calls after yielding',
+			'const event = useEffectEvent(() => count); (async () => { event?.(await Promise.resolve()); })();',
+		],
+		[
+			'tagged calls after yielding',
+			'const event = useEffectEvent(() => count); (async () => { event`${await Promise.resolve()}`; })();',
+		],
+		[
+			'recursive factory returns',
+			'function make(recur) { if (recur) return make(false); return () => {}; } const update = useMemo(() => make(true), []); update();',
+		],
+		[
+			'mutually recursive factory returns',
+			'function first(recur) { if (recur) return second(false); return () => {}; } function second(recur) { if (recur) return first(false); return () => {}; } const update = useMemo(() => first(true), []); update();',
+		],
+	])('keeps %s legal without inventing synchronous execution', (_label, setup) => {
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it('finishes repeated optional self-return calls and still checks later writes', () => {
+		const setup = `function next() { return next; }
+  const result = next${'?.()'.repeat(8)};
+  result?.();`;
+		const valid = compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx');
+
+		expect(valid.diagnostics).toEqual([]);
+		expect(() =>
+			compile(`"use strong";\n${component(`${setup}\n  setCount(1);`)}`, '/src/App.tsrx'),
+		).toThrow(RENDER_STATE_UPDATE);
+	});
+
+	it.each([
+		[
+			'returned state updater',
+			'const update = useCallback(() => setCount(1), []); update();',
+			RENDER_STATE_UPDATE,
+		],
+		[
+			'Effect Event invocation',
+			'const event = useEffectEvent(() => count); event();',
+			RENDER_EFFECT_EVENT_CALL,
+		],
+		[
+			'Effect Event dependency',
+			'const event = useEffectEvent(() => count); useEffect(() => {}, [event]);',
+			EFFECT_EVENT_DEPENDENCY,
+		],
+	])('preserves compatibility behavior for %s until opted in', (_label, setup, code) => {
+		const source = component(setup);
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+		expect(() => compile(source, '/src/App.tsrx', { strong: false } as any)).not.toThrow();
+		expect(() => compile(source, '/src/App.tsrx', { strong: true } as any)).toThrow(code);
+		expect(() =>
+			compile(`"use strong";\n${source}`, '/src/App.tsrx', { strong: false } as any),
+		).toThrow(code);
+	});
+
+	it.each([
+		[
+			'returned callback render writes',
+			'const update = useCallback(() => setCount(1), []); update();',
+			RENDER_STATE_UPDATE,
+		],
+		[
+			'memo-returned effect callbacks',
+			'const update = useMemo(() => () => setCount(1), []); useEffect(update, []);',
+			EFFECT_STATE_UPDATE,
+		],
+		[
+			'Effect Event render calls',
+			'const event = useEffectEvent(() => count); event();',
+			RENDER_EFFECT_EVENT_CALL,
+		],
+		[
+			'Effect Event dependencies',
+			'const event = useEffectEvent(() => count); useEffect(() => {}, [event]);',
+			EFFECT_EVENT_DEPENDENCY,
+		],
+	])('publishes matching plain TypeScript and editor errors for %s', (_label, setup, code) => {
+		const source = `"use strong";
+import { ${imports} } from 'octane';
+export function useCounter(props) {
+  const [count, setCount] = useState(0);
+  const ref = useRef(0);
+  ${setup}
+  return count;
+}`;
+		const editorSource = `"use strong";\n${component(setup)}`;
+		const result = compileToVolarMappings(editorSource, '/src/App.tsrx');
+
+		expect(() => slotHooks(source, '/src/useCounter.ts')).toThrow(code);
+		expect(result.diagnostics).toContainEqual(
+			expect.objectContaining({ code, severity: 'error', filename: '/src/App.tsrx' }),
+		);
+		expect(result.errors).toContainEqual(
+			expect.objectContaining({ code, type: 'usage', fileName: '/src/App.tsrx' }),
+		);
+	});
+
+	it.each([
+		{ mode: 'client', dev: true },
+		{ mode: 'client', dev: false },
+		{ mode: 'server', dev: true },
+		{ mode: 'server', dev: false },
+	])('enforces Effect Event diagnostics in $mode compilation with dev=$dev', (options) => {
+		const render = component('const event = useEffectEvent(() => count); event();');
+		const dependency = component(
+			'const event = useEffectEvent(() => count); useEffect(() => {}, [event]);',
+		);
+
+		expect(() => compile(`"use strong";\n${render}`, '/src/App.tsrx', options)).toThrow(
+			RENDER_EFFECT_EVENT_CALL,
+		);
+		expect(() => compile(`"use strong";\n${dependency}`, '/src/App.tsrx', options)).toThrow(
+			EFFECT_EVENT_DEPENDENCY,
+		);
+	});
+
+	it.each([
+		['alias();', RENDER_EFFECT_EVENT_CALL],
+		['useEffect(() => {}, [alias]);', EFFECT_EVENT_DEPENDENCY],
+	])('locates %s at the authored use, not its declaration', (statement, code) => {
+		const source = `"use strong";
+import { useEffect, useEffectEvent } from 'octane';
+export function App(props) @{
+  const event = useEffectEvent(() => props.value);
+  const alias = event;
+  ${statement}
+  <div />
+}`;
+		const start = source.lastIndexOf('alias');
+		let failure: unknown;
+		try {
+			compile(source, '/src/App.tsrx');
+		} catch (error) {
+			failure = error;
+		}
+		expect(failure).toMatchObject({
+			code,
+			filename: '/src/App.tsrx',
+			pos: start,
+			end: start + 'alias'.length,
+		});
+		expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toContainEqual(
+			expect.objectContaining({
+				code,
+				start: expect.objectContaining({ offset: start, line: 6 }),
+				end: expect.objectContaining({ offset: start + 'alias'.length, line: 6 }),
+			}),
+		);
 	});
 });

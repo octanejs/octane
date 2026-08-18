@@ -144,8 +144,9 @@ syntax but does not supply application-specific Web API polyfills.
 
 <h2 id="strong-mode">Strong mode</h2>
 
-Strong mode asks the compiler to reject a few state and ref patterns that make a
-component harder to follow. It is off by default, so you can try it in one file:
+Strong mode asks the compiler to reject state, ref, and Effect Event patterns
+that make a component harder to follow. It is off by default, so you can try it
+in one file:
 
 ```tsx
 'use strong';
@@ -198,13 +199,28 @@ does not change installed dependencies; a dependency can opt in with its own
 A Strong module cannot:
 
 - Call a state setter or reducer dispatcher while rendering.
-- Call one directly while an effect is being set up.
+- Call one synchronously while an effect is being set up.
 - Assign to a ref's `current` value while rendering.
+- Call a statically known `useEffectEvent` result during render
+  (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
+- Include a statically known Effect Event in explicit hook dependencies
+  (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`).
+
+These checks follow provable synchronous calls through local helpers,
+`useCallback` and `useEffectEvent` results, and functions returned by analyzable
+`useMemo` factories. The hooks themselves remain supported. Effect Events are
+non-reactive; leave them out of dependency lists. Other explicit dependency
+arrays retain their existing meaning and are never rewritten.
+
+Factories with unknown return values or complex control flow remain opaque.
+Dependency checks follow literal arrays, including statically selected or spread
+literals; they do not assume an aliased or externally produced array is unchanged.
 
 Use `useLinkedState` when state should reset or adjust after an input changes.
-Event handlers may update state normally. Effects that connect to external
-systems and refs for DOM nodes, timers, or event callbacks are still useful and
-remain allowed. Values such as `Date.now()` and `Math.random()` are not banned.
+Event handlers may update state normally. Genuinely deferred callbacks, effect
+cleanup, effects that connect to external systems, and refs for DOM nodes, timers,
+or event callbacks remain allowed. Values such as `Date.now()` and `Math.random()`
+are not banned.
 
 <h2 id="mixed-toolchains">Mixed toolchains and file ownership</h2>
 
