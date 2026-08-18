@@ -14,7 +14,7 @@
     {
       "path": "packages/zustand/tests/conformance/traditional.test.ts",
       "disposition": "octane-only-framework-contract",
-      "reason": "Checks equality-function render bailouts that cannot be observed through differential DOM output."
+      "reason": "Checks equality-function bailouts, selector and equality changes, store-swap subscriptions, and error recovery beyond the bounded differential lane."
     },
     {
       "path": "packages/zustand/tests/conformance/unstable-selectors.test.ts",
