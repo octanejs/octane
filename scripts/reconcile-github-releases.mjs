@@ -10,6 +10,8 @@ import {
 import { getPublishablePackages, REPO_ROOT } from './workspace-packages.mjs';
 
 const DEFAULT_GITHUB_API_URL = 'https://api.github.com';
+const RELEASE_TAGGER_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
+const RELEASE_TAGGER_NAME = 'github-actions[bot]';
 
 function identity(pkg) {
 	return `${pkg.name}@${pkg.version}`;
@@ -207,7 +209,20 @@ async function ensureLocalTag(tag, expectedSha, { cwd, git }) {
 	if (existing.status !== 1) {
 		throw new Error(`could not inspect local tag ${tag}: ${existing.stderr || existing.stdout}`);
 	}
-	await git(['tag', tag, '-m', tag, expectedSha], { cwd });
+	await git(
+		[
+			'-c',
+			`user.name=${RELEASE_TAGGER_NAME}`,
+			'-c',
+			`user.email=${RELEASE_TAGGER_EMAIL}`,
+			'tag',
+			tag,
+			'-m',
+			tag,
+			expectedSha,
+		],
+		{ cwd },
+	);
 }
 
 async function releaseBody(pkg) {
