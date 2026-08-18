@@ -51,6 +51,10 @@ beforeAll(async () => {
 		configFile: false,
 		root: HERE,
 		logLevel: 'error',
+		// The full Vitest matrix starts several in-process Vite servers at once.
+		// Keep this app's optimizer URLs stable while those servers prebundle
+		// different dependency graphs in parallel.
+		cacheDir: resolve(HERE, '../../../../../node_modules/.vite/octane-native-change'),
 		plugins: [reactFixturePlugin(), octane()],
 		server: { host: '127.0.0.1', port: 0 },
 	});

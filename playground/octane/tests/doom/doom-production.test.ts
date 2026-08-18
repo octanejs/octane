@@ -186,7 +186,6 @@ async function enterDoomLevel(page: {
 	goto: (url: string, options?: { waitUntil?: 'load' }) => Promise<unknown>;
 	waitForSelector: (selector: string) => Promise<unknown>;
 	click: (selector: string) => Promise<unknown>;
-	locator: (selector: string) => { count: () => Promise<number> };
 	evaluate: (fn: () => unknown) => Promise<any>;
 }): Promise<void> {
 	await page.waitForSelector('[data-doom-landing="ready"]');
@@ -209,12 +208,9 @@ async function enterDoomLevel(page: {
 				};
 	});
 	requireDoomProof(descriptor);
+	const loading = page.waitForSelector('[data-doom-loading="true"]');
 	await page.click('[data-doom-start="true"]');
-	await expect
-		.poll(function loadingVisible() {
-			return page.locator('[data-doom-loading="true"]').count();
-		})
-		.toBe(1);
+	await loading;
 	await page.waitForSelector('[data-doom-shell="playing"]');
 	await expect
 		.poll(async function pointerLocked() {
@@ -385,8 +381,9 @@ describe('Doom production playground evidence', () => {
 			});
 			requireDoomProof(descriptor);
 
+			const loading = page.waitForSelector('[data-doom-loading="true"]');
 			await page.click('[data-doom-start="true"]');
-			await expect.poll(() => page.locator('[data-doom-loading="true"]').count()).toBe(1);
+			await loading;
 			await page.waitForSelector('[data-doom-shell="playing"]');
 			const started = await page.evaluate(() => ({
 				shell: (globalThis as any).__OCTANE_DOOM_PROOF__.getShell(),
