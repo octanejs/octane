@@ -76,11 +76,12 @@ declare module 'vitest' {
 const WEBSITE = fileURLToPath(new URL('../..', import.meta.url));
 const OUTPUT_DIR = join(WEBSITE, '.vercel/output');
 const PRODUCTION_ENV = { NODE_ENV: 'production', NITRO_PRESET: 'vercel' };
-// The consolidated binding graph pushes the cold Vercel build beyond four
-// minutes on GitHub's shared runners while it is still emitting chunks. This
+// The consolidated binding graph pushes the cold Vercel build just beyond five
+// minutes on GitHub's shared runners while Nitro is still transforming. This
 // is one shared build (not a retry or a second wait), so retain a finite guard
-// with enough headroom for the observed successful phase.
-const BUILD_TIMEOUT_MS = 300_000;
+// with enough headroom for the observed successful phase. The surrounding
+// readiness and Vitest hook budgets include the preview server's 30s startup.
+const BUILD_TIMEOUT_MS = 420_000;
 
 let server: ChildProcess | undefined;
 let build: ChildProcess | undefined;
