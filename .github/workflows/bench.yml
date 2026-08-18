@@ -37,6 +37,9 @@ jobs:
           node-version: 24
           cache: "pnpm"
 
+      - name: Test benchmark work collector
+        run: node --test benchmarks/lib/precise-work.test.mjs
+
       - name: Install dependencies
         run: pnpm install --prod false --frozen-lockfile
 
