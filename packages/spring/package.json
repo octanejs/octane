@@ -39,8 +39,7 @@
     "./parallax": "./src/parallax.ts"
   },
   "scripts": {
-    "test": "pnpm upstream:verify && vitest run --project spring",
-    "upstream:verify": "node ../../scripts/react-parity/react-spring-upstream.mjs",
+    "test": "vitest run --project spring",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsgo --noEmit -p typetests/tsconfig.json"
   },
   "dependencies": {

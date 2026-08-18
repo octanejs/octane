@@ -331,11 +331,18 @@ Alternatively, enable it across application-owned modules with
 `compiler: { strong: true }` in `octane.config.ts`. Installed dependencies stay
 in compatibility mode unless their own source opts in.
 
-A Strong module cannot call a state updater during render or directly while
-setting up an effect, and it cannot assign to `ref.current` during render.
-Event handlers, effects that synchronize an external system, and normal DOM or
-timer refs remain supported. Replace prop-driven state resets with
-`useLinkedState` instead of calling a setter during render.
+A Strong module cannot call a state updater during render or synchronously while
+setting up an effect, and it cannot assign to `ref.current` during render. The
+checks follow provable synchronous calls through `useCallback`, `useEffectEvent`,
+and functions returned by analyzable `useMemo` factories. Calling a statically
+known Effect Event during render or including it in an explicit hook dependency
+list is also a compile error. The hooks themselves remain supported, and other
+explicit dependency lists retain their existing meaning.
+
+Event handlers, genuinely deferred callbacks, effect cleanup, effects that
+synchronize an external system, and normal DOM or timer refs remain supported.
+Replace prop-driven state resets with `useLinkedState` instead of calling a
+setter during render.
 
 ## JSX values follow the represented render scope
 
@@ -687,8 +694,7 @@ Other consequences:
 - Fallback-visible boundaries whose retries fully stage reveal together,
   including refs and layout effects.
 - Same-identity synchronous rendering remains per-swap rather than using a
-  global React-style work-in-progress tree. See
-  [Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md).
+  global React-style work-in-progress tree.
 - Multiple unhandled root errors in one flush throw an `AggregateError`; an
   unhandled error unmounts its root's whole tree (both match React).
 - `useSyncExternalStore` skips React's commit-time getSnapshot re-read for
@@ -777,9 +783,8 @@ refetches over the network) until the resume/warm work in
 floor. Both need the transition to become a deferred commit — a keyed
 removal disposes blocks and runs their cleanups, which cannot be undone, and
 reverting content outside a boundary needs the reveal to re-render where the
-transition began rather than just the boundary. See
-[Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md). The
-benchmark pins the exposed-state count at zero.
+transition began rather than just the boundary. The benchmark pins the exposed-state
+count at zero.
 
 ## Root component entry points and container ownership
 

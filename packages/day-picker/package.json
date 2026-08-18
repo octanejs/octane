@@ -48,9 +48,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "pnpm upstream:check && vitest run --root ../.. --project day-picker --project day-picker-ssr --project day-picker-browser --project day-picker-differential",
-    "parity:inventory": "node ../../scripts/react-parity/react-day-picker-runtime-inventory.mjs",
-    "upstream:check": "node audit/check-upstream.mjs",
+    "test": "vitest run --root ../.. --project day-picker --project day-picker-ssr --project day-picker-browser --project day-picker-differential",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

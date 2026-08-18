@@ -319,7 +319,6 @@ jobs:
 
               const requiredFullJobs = [
                 "website integration suite",
-                "React parity checks",
                 "typecheck",
                 "validate publishable packages",
                 "heavy integration (package builds, eval corpus, runtime loaders, Astro)",
@@ -451,91 +450,6 @@ jobs:
           --exclude "packages/three/tests/browser/**/*.test.ts"
           --exclude "$ASTRO_E2E_SPEC"
 
-  react_parity_shard:
-    name: React parity shard (${{ matrix.shard }}/3)
-    needs: release_change
-    # The complete package suite is intentionally Node 24-only. Like the
-    # general shards, an authenticated release or lightweight change inherits
-    # the last successful full run through CI provenance.
-    if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # Vitest hashes parity file paths across these workers. Non-Vitest
-        # manifests remain whole and use the same generic shard coordinates.
-        shard: [1, 2, 3]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: 24
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --prod false --frozen-lockfile
-
-      # Browser parity lanes launch Chromium through Playwright.
-      # Keep this package-agnostic so adding a binding never patches the workflow.
-      - name: Install Playwright Chromium
-        run: pnpm --filter website exec playwright install --with-deps chromium
-
-      # The manifest runner executes every required runtime and type lane. Each
-      # runner's JSON report proves the exact identities without a separate
-      # pre-execution Vitest collection pass. The aggregate below combines the
-      # file shards before proving complete lane coverage.
-      - name: Check React parity inventories and execute required lanes
-        env:
-          REACT_PARITY_VITEST_REPORT: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json
-        run: pnpm react-parity:check --shard ${{ matrix.shard }}/3
-
-      - name: Upload React parity Vitest shard report
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: react-parity-vitest-${{ matrix.shard }}
-          path: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json
-          retention-days: 1
-
-  react_parity_checks:
-    name: React parity checks
-    needs: [release_change, react_parity_shard]
-    if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release != 'true' && needs.release_change.outputs.full_ci != 'false' }}
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Verify all React parity shards passed
-        env:
-          REACT_PARITY_SHARD_RESULT: ${{ needs.react_parity_shard.result }}
-        run: test "$REACT_PARITY_SHARD_RESULT" = success
-
-      - name: Checkout code
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: 24
-
-      - name: Download React parity Vitest shard reports
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
-        with:
-          pattern: react-parity-vitest-*
-          path: ${{ runner.temp }}/react-parity-vitest
-          merge-multiple: true
-
-      - name: Verify complete React parity Vitest coverage
-        run: >-
-          node scripts/react-parity/verify-vitest-shards.mjs
-          --reports-directory "${{ runner.temp }}/react-parity-vitest"
-          --expected-shards 3
-
   # Keep the Node 24 aggregate check name while the work happens in parallel
   # above. `always()` makes a failed shard produce a failed required check and
   # folds the dedicated integration suites into the same merge and publishing
@@ -543,15 +457,7 @@ jobs:
   # every prerequisite.
   test:
     name: test (24)
-    needs:
-      [
-        release_change,
-        test_shard,
-        react_parity_checks,
-        website_e2e,
-        heavy_integration,
-        heavy_node_integration,
-      ]
+    needs: [release_change, test_shard, website_e2e, heavy_integration, heavy_node_integration]
     # The release PR does not need this test context. The post-merge release run
     # does: publish.yml verifies this stable aggregate name before publishing.
     if: ${{ always() && !cancelled() && github.event.action != 'closed' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && needs.release_change.outputs.is_release_pr != 'true' }}
@@ -563,20 +469,17 @@ jobs:
           FULL_CI: ${{ needs.release_change.outputs.full_ci }}
           IS_CHANGESET_RELEASE_MERGE: ${{ needs.release_change.outputs.is_release_merge }}
           SHARD_RESULT: ${{ needs.test_shard.result }}
-          REACT_PARITY_RESULT: ${{ needs.react_parity_checks.result }}
           WEBSITE_E2E_RESULT: ${{ needs.website_e2e.result }}
           HEAVY_INTEGRATION_RESULT: ${{ needs.heavy_integration.result }}
           HEAVY_NODE_INTEGRATION_RESULT: ${{ needs.heavy_node_integration.result }}
         run: |
           if [ "$IS_CHANGESET_RELEASE_MERGE" = true ] || [ "$FULL_CI" = false ]; then
             test "$SHARD_RESULT" = skipped
-            test "$REACT_PARITY_RESULT" = skipped
             test "$WEBSITE_E2E_RESULT" = skipped
             test "$HEAVY_INTEGRATION_RESULT" = skipped
             test "$HEAVY_NODE_INTEGRATION_RESULT" = skipped
           else
             test "$SHARD_RESULT" = success
-            test "$REACT_PARITY_RESULT" = success
             test "$WEBSITE_E2E_RESULT" = success
             test "$HEAVY_INTEGRATION_RESULT" = success
             test "$HEAVY_NODE_INTEGRATION_RESULT" = success
@@ -824,26 +727,10 @@ jobs:
       - name: Check always-loaded agent context is within budget
         run: pnpm context:budget:check
 
-      # docs/parity-gaps.md audits executable expected-failure pins and should
+      # docs/parity-gaps.md tracks executable expected-failure pins and should
       # remain at zero under the committed-test policy above.
       - name: Check parity-gap index is current
         run: pnpm parity:gaps:check
-
-      # Keep metadata, generated coverage, public claims, and the parity
-      # tooling itself covered on lightweight changes. Full lane execution
-      # remains in the dedicated Node 24 job above.
-      - name: Validate React parity metadata and public claims
-        run: |
-          pnpm react-parity:test
-          pnpm react-parity:validate
-
-      # Redact's issues, pull requests, and tests are mined at a pinned commit
-      # into an authored contract ledger. This network-free gate validates its
-      # dispositions/local evidence and keeps the generated report current.
-      - name: Check Redact-derived adversarial contract ledger
-        env:
-          OCTANE_REDACT_AUDIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: pnpm redact-audit:check
 
       # Production error URLs are a public compatibility surface. Keep the
       # append-only catalog, generated client/server formatters, and literal

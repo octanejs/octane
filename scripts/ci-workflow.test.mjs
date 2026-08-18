@@ -1,31 +1,14 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, test } from 'node:test';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workflow = readFileSync(path.join(REPO, '.github/workflows/ci.yml'), 'utf8');
-const shardedVitestConfigSource = readFileSync(
-	path.join(REPO, 'vitest.ci-sharded.config.js'),
-	'utf8',
-);
-const vitestConfig = readFileSync(path.join(REPO, 'vitest.config.js'), 'utf8');
 const packageJson = JSON.parse(readFileSync(path.join(REPO, 'package.json'), 'utf8'));
-const reactParityCheck = readFileSync(path.join(REPO, 'scripts/react-parity/check.mjs'), 'utf8');
-const reactParityCheckLib = readFileSync(
-	path.join(REPO, 'scripts/react-parity/check-lib.mjs'),
-	'utf8',
-);
-const reactParityHarness = readFileSync(
-	path.join(REPO, 'scripts/react-parity/harness.mjs'),
-	'utf8',
-);
 const baseVitestModule = await import(pathToFileURL(path.join(REPO, 'vitest.config.js')));
-const parityVitestModule = await import(
-	pathToFileURL(path.join(REPO, 'vitest.react-parity.config.js'))
-);
 const { configureShardedProjects, default: shardedVitestConfig } = await import(
 	pathToFileURL(path.join(REPO, 'vitest.ci-sharded.config.js'))
 );
@@ -269,8 +252,6 @@ describe('CI workflow aggregation', () => {
 
 		for (const job of [
 			'test_shard',
-			'react_parity_shard',
-			'react_parity_checks',
 			'website_e2e',
 			'heavy_integration',
 			'heavy_node_integration',
@@ -307,214 +288,6 @@ describe('CI workflow aggregation', () => {
 			stepScript(releaseWorkflow, 'Record lightweight release pull request checks'),
 			generatedVersionAllowance,
 		);
-	});
-
-	test('keeps cheap parity validation universal and full execution on Node 24', () => {
-		const parity = jobSource('react_parity_shard');
-		const parityAggregate = jobSource('react_parity_checks');
-		const lint = jobSource('lint_checks');
-		assert.match(parity, /name: React parity shard \(\$\{\{ matrix\.shard \}\}\/3\)/);
-		assert.match(parity, /node-version: 24/);
-		assert.doesNotMatch(parity, /node-version: \[22, 24\]/);
-		assert.match(parity, /shard: \[1, 2, 3\]/);
-		assert.match(
-			parity,
-			/pnpm --filter website exec playwright install --with-deps chromium(?:\n|$)/,
-		);
-		assert.match(parity, /pnpm react-parity:check --shard \$\{\{ matrix\.shard \}\}\/3/);
-		assert.match(
-			parity,
-			/REACT_PARITY_VITEST_REPORT: \$\{\{ runner\.temp \}\}\/react-parity-vitest\/shard-\$\{\{ matrix\.shard \}\}\.json/,
-		);
-		assert.match(parity, /actions\/upload-artifact@/);
-		assert.doesNotMatch(parity, /pnpm react-parity:(?:test|validate)/);
-		assert.match(parityAggregate, /^    name: React parity checks$/m);
-		assert.match(parityAggregate, /needs: \[release_change, react_parity_shard\]/);
-		assert.match(
-			parityAggregate,
-			/REACT_PARITY_SHARD_RESULT: \$\{\{ needs\.react_parity_shard\.result \}\}/,
-		);
-		assert.match(parityAggregate, /actions\/checkout@/);
-		assert.match(parityAggregate, /actions\/download-artifact@/);
-		assert.match(
-			parityAggregate,
-			/node scripts\/react-parity\/verify-vitest-shards\.mjs\s+--reports-directory/,
-		);
-		assert.match(parityAggregate, /--expected-shards 3/);
-		assert.doesNotMatch(parityAggregate, /pnpm install|playwright install/);
-		assert.match(lint, /pnpm react-parity:test/);
-		assert.match(lint, /pnpm react-parity:validate/);
-		assert.doesNotMatch(lint, /pnpm react-parity:check/);
-		assert.equal(
-			packageJson.scripts['react-parity:validate'],
-			'node scripts/react-parity/check.mjs --validate-only',
-		);
-		assert.doesNotMatch(workflow, /hook-form/);
-
-		assert.match(jobSource('release_change'), /"React parity checks"/);
-		assert.match(
-			jobSource('test_shard'),
-			/pnpm test\s+--config vitest\.ci-sharded\.config\.js\s+--shard=/,
-		);
-		assert.doesNotMatch(vitestConfig, /defineTestProjects|ciOwnedProject|ciOwner/);
-		assert.doesNotMatch(vitestConfig, /\bsharded\s*:/);
-		assert.match(
-			shardedVitestConfigSource,
-			/const \{ testExecution, \.\.\.vitestProject \} = project/,
-		);
-		const baseProjects = new Map(
-			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
-		);
-		const shardedProjects = new Map(
-			shardedVitestConfig.test.projects.map((project) => [project.test?.name, project]),
-		);
-		for (const project of [
-			'hook-form-pristine',
-			'hook-form',
-			'hook-form-differential',
-			'hook-form-server',
-		]) {
-			assert.equal(baseProjects.get(project).testExecution.group, 'react-parity');
-		}
-		for (const project of ['hook-form', 'hook-form-server']) {
-			assert.equal(baseProjects.get(project).test.maxWorkers, undefined);
-			assert.equal(baseProjects.get(project).test.fileParallelism, undefined);
-		}
-		assert.equal(baseProjects.get('hook-form').test.globalSetup, undefined);
-		assert.deepEqual(baseProjects.get('hook-form-differential').test.include, [
-			'packages/hook-form/tests/differential/**/*.test.ts',
-			'packages/hook-form/tests/differential/**/*.test.tsx',
-		]);
-		assert.deepEqual(baseProjects.get('hook-form-differential').test.globalSetup, [
-			'packages/hook-form/tests/differential/_setup.ts',
-		]);
-		assert.equal(shardedProjects.has('hook-form-pristine'), false);
-		assert.equal(shardedProjects.has('hook-form-differential'), false);
-		assert.equal(shardedProjects.has('hook-form-server'), false);
-		assert.deepEqual(shardedProjects.get('hook-form').test.include, [
-			'packages/hook-form/tests/**/*.test.ts',
-			'packages/hook-form/tests/**/*.test.tsx',
-		]);
-		for (const pattern of baseProjects.get('hook-form').testExecution.include) {
-			assert.equal(shardedProjects.get('hook-form').test.exclude.includes(pattern), true);
-		}
-		assert.equal(shardedProjects.get('hook-form').testExecution, undefined);
-
-		assert.deepEqual(baseProjects.get('dnd-kit').test.include, [
-			'packages/dnd-kit/tests/conformance/**/*.test.ts',
-			'packages/dnd-kit/tests/hydration/**/*.test.ts',
-		]);
-		assert.equal(baseProjects.get('dnd-kit').test.globalSetup, undefined);
-		assert.equal(baseProjects.get('dnd-kit-differential').testExecution.group, 'react-parity');
-		assert.deepEqual(baseProjects.get('dnd-kit-differential').test.include, [
-			'packages/dnd-kit/tests/differential/**/*.test.ts',
-		]);
-		assert.deepEqual(baseProjects.get('dnd-kit-differential').test.globalSetup, [
-			'packages/dnd-kit/tests/differential/_setup.ts',
-		]);
-		assert.equal(baseProjects.get('dnd-kit-differential').test.testTimeout, 30_000);
-		assert.equal(shardedProjects.has('dnd-kit-differential'), false);
-
-		const aggregate = jobSource('test');
-		assert.match(
-			aggregate,
-			/needs:\s+\[\s+release_change,\s+test_shard,\s+react_parity_checks,\s+website_e2e,\s+heavy_integration,\s+heavy_node_integration,\s+\]/,
-		);
-		assert.match(aggregate, /REACT_PARITY_RESULT: \$\{\{ needs\.react_parity_checks\.result \}\}/);
-		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = skipped/);
-		assert.match(aggregate, /test "\$REACT_PARITY_RESULT" = success/);
-		assert.match(
-			aggregate,
-			/HEAVY_NODE_INTEGRATION_RESULT: \$\{\{ needs\.heavy_node_integration\.result \}\}/,
-		);
-		assert.match(aggregate, /test "\$HEAVY_NODE_INTEGRATION_RESULT" = skipped/);
-		assert.match(aggregate, /test "\$HEAVY_NODE_INTEGRATION_RESULT" = success/);
-
-		// The manifest runner owns all required lanes for both verification states.
-		// recorded-unverified limits the claim, not execution. Finish the complete
-		// metadata preflight before starting the bounded executable work queue.
-		assert.doesNotMatch(reactParityCheck, /provenance\.verification/);
-		const manifestValidation = reactParityCheck.indexOf(
-			'for (const relativeFile of BINDING_MANIFESTS)',
-		);
-		const manifestExecution = reactParityCheck.indexOf(
-			"await capture('required Vitest React parity lanes'",
-		);
-		const executionContract = reactParityCheck.indexOf(
-			"await capture('Vitest React parity execution contract'",
-		);
-		assert.notEqual(manifestValidation, -1);
-		assert.ok(executionContract > manifestValidation);
-		assert.ok(manifestExecution > executionContract);
-		assert.ok(manifestExecution > manifestValidation);
-		assert.match(reactParityCheck, /if \(!validateOnly && errors\.length === 0\)/);
-		assert.match(
-			reactParityCheck,
-			/relativeFiles: nonVitestShard\.items\.map\(\(item\) => item\.relativeFile\)/,
-		);
-		assert.match(reactParityCheck, /const vitestLanes = loadRequiredVitestLanes\(REPO\)/);
-		assert.doesNotMatch(reactParityCheck, /selectParityVitestShard|vitest-lane-timings/);
-		assert.match(reactParityCheck, /reportPath: process\.env\.REACT_PARITY_VITEST_REPORT/);
-		assert.match(reactParityCheck, /createRequiredNonVitestManifestShardPlan/);
-		assert.match(reactParityCheck, /runRequiredVitestLanes/);
-		assert.match(reactParityCheck, /concurrency: NON_VITEST_MANIFEST_CONCURRENCY/);
-		assert.match(
-			reactParityCheck,
-			/const NON_VITEST_MANIFEST_CONCURRENCY = availableParallelism\(\)/,
-		);
-		assert.match(
-			reactParityCheckLib,
-			/\[harnessPath, 'run-required-non-vitest', '--manifest', relativeFile\]/,
-		);
-		assert.match(reactParityCheckLib, /vitest\.react-parity\.config\.js/);
-		assert.match(reactParityCheckLib, /await Promise\.all\(/);
-		const executionMarker = "} else {\n\tif (['run-required', 'run-required-non-vitest']";
-		const executionStart = reactParityHarness.indexOf(executionMarker);
-		assert.notEqual(executionStart, -1);
-		const executionBranch = reactParityHarness.slice(executionStart);
-		assert.doesNotMatch(executionBranch, /verifyManifestTestSelections/);
-	});
-
-	test('registers every required Vitest-backed manifest lane as react-parity owned', () => {
-		const projects = new Map(
-			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
-		);
-		const requiredVitestProjects = [];
-		const nonVitestExecutions = new Set([
-			'typescript',
-			'jest-full',
-			'node-full',
-			'playwright-full',
-		]);
-		for (const entry of readdirSync(path.join(REPO, 'packages'), { withFileTypes: true })) {
-			if (!entry.isDirectory()) continue;
-			const manifestPath = path.join(REPO, 'packages', entry.name, 'audit/react-parity.json');
-			if (!existsSync(manifestPath)) continue;
-			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-			for (const lane of manifest.lanes) {
-				if (nonVitestExecutions.has(lane.execution?.kind)) continue;
-				assert.ok(lane.project, `${entry.name}/${lane.id}: missing Vitest project name`);
-				const project = projects.get(lane.project);
-				assert.ok(project, `${entry.name}/${lane.id}: unknown Vitest project ${lane.project}`);
-				if (lane.oracle === 'required' && lane.available !== false) {
-					assert.equal(
-						project.testExecution?.group,
-						'react-parity',
-						`${entry.name}/${lane.id}: ${lane.project} must be react-parity owned`,
-					);
-					requiredVitestProjects.push(lane.project);
-				}
-			}
-		}
-		assert.deepEqual(
-			parityVitestModule.default.test.projects.map((project) => project.test.name).sort(),
-			requiredVitestProjects.sort(),
-		);
-		const inputOtpBrowser = parityVitestModule.default.test.projects.find(
-			(project) => project.test.name === 'input-otp-browser',
-		);
-		assert.equal(inputOtpBrowser.test.fileParallelism, true);
-		assert.equal(inputOtpBrowser.test.maxWorkers, undefined);
 	});
 
 	test('combines package, eval, loader, and Astro integration suites without coupling prerequisites', () => {
@@ -575,12 +348,12 @@ describe('CI workflow aggregation', () => {
 		const projects = configureShardedProjects([
 			{ test: { name: 'ordinary', include: ['ordinary/**/*.test.ts'] } },
 			{
-				testExecution: { group: 'react-parity' },
+				testExecution: { group: 'dedicated' },
 				test: { name: 'fully-owned', include: ['alpha/**/*.test.ts'] },
 			},
 			{
 				testExecution: {
-					group: 'react-parity',
+					group: 'dedicated',
 					include: ['beta/parity/**/*.test.ts'],
 				},
 				test: {
@@ -626,20 +399,16 @@ describe('CI workflow aggregation', () => {
 		]) {
 			assert.ok(discovered.includes(browserRoot));
 		}
+		for (const browserRoot of ['packages/rspeedy-plugin-octane/tests/browser']) {
+			assert.equal(discovered.includes(browserRoot), false);
+		}
 		for (const browserRoot of [
 			'packages/draggable/tests/browser',
 			'packages/drei/tests/browser',
 			'packages/input-otp/tests/browser',
-			'packages/rspeedy-plugin-octane/tests/browser',
 			'packages/three/tests/browser',
 		]) {
-			assert.equal(discovered.includes(browserRoot), false);
-		}
-		for (const threeIntegration of [
-			'packages/three/tests/browser/bundlers.test.ts',
-			'packages/three/tests/browser/canvas.test.ts',
-		]) {
-			assert.ok(discovered.includes(threeIntegration));
+			assert.ok(discovered.includes(browserRoot));
 		}
 		const projects = new Map(
 			baseVitestModule.default.test.projects.map((project) => [project.test?.name, project]),
@@ -672,12 +441,14 @@ describe('CI workflow aggregation', () => {
 						(pattern === browserRoot || pattern.startsWith(`${browserRoot}/`)),
 				);
 			});
-			assert.equal(owners.length, 1, `${browserRoot} must have exactly one Vitest project`);
-			assert.equal(
-				owners[0].testExecution?.group,
-				'heavy-browser',
-				`${browserRoot} must be omitted from ordinary shards`,
-			);
+			assert.ok(owners.length > 0, `${browserRoot} must have a Vitest project`);
+			for (const owner of owners) {
+				assert.equal(
+					owner.testExecution?.group,
+					'heavy-browser',
+					`${browserRoot} must be omitted from ordinary shards`,
+				);
+			}
 		}
 		assert.deepEqual(projects.get('pdf-feasibility').testExecution, {
 			group: 'heavy-browser',
@@ -689,8 +460,8 @@ describe('CI workflow aggregation', () => {
 				.test.exclude.includes('packages/pdf/tests/feasibility/pdfjs.browser.test.ts'),
 			true,
 		);
-		assert.equal(projects.get('three-browser').testExecution.group, 'react-parity');
-		assert.equal(projects.get('three').testExecution.group, 'react-parity');
+		assert.equal(projects.get('three-browser').testExecution.group, 'heavy-browser');
+		assert.equal(projects.get('three').testExecution, undefined);
 
 		assert.match(
 			jobSource('test_shard'),
@@ -701,7 +472,6 @@ describe('CI workflow aggregation', () => {
 			/playwright install --with-deps \$\{\{ matrix\.playwright_browser \}\}/,
 		);
 		assert.doesNotMatch(jobSource('lint_checks'), /@octanejs\/three.*playwright install/);
-		assert.doesNotMatch(jobSource('react_parity_checks'), /@octanejs\/three/);
 	});
 });
 

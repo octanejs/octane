@@ -1,4 +1,4 @@
-# Upstream React Three Fiber audit
+# React Three Fiber upstream provenance
 
 This port targets the immutable React Three Fiber release `v9.6.1`:
 

@@ -54,11 +54,6 @@ implementation/test support and are not added to the public namespace.
 The pinned React binding contains four runtime test files, one shared fixture,
 and two snapshots. The source artifacts are all present under `upstream/`.
 
-Parity-owned adapted cases live only in `tests/document-sync.test.ts`,
-`tests/lifecycle.test.ts`, and `tests/query.test.ts`. Octane-only unpaired
-cases live under `tests/conformance/` and are classified outside React-parity
-ownership in `audit/test-classifications.json`.
-
 | Upstream artifact | Disposition |
 |---|---|
 | `src/useRcResource.test.tsx` | Adapted by `tests/lifecycle.test.ts`; stable reuse, last-consumer cleanup, key replacement, scope replacement, and rapid replacement are covered. React StrictMode double-invoke is not applicable because Octane has no StrictMode double-invoke. |

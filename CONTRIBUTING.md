@@ -128,8 +128,6 @@ own implementation will not think to check.
   use [`@octanejs/testing-library`](./packages/testing-library) in place of
   `@testing-library/react`, keep the upstream case name, and cite the origin
   (`// Per <upstream path>:<line>`), the way the React conformance suite does.
-  `node scripts/scaffold-react-port.mjs <react-test-file>` turns a React test
-  file into a triage checklist to start from.
 - Record the disposition of every upstream test file in `UPSTREAM.md`: run as-is,
   ported and where it now lives, or out of scope with the reason (React
   internals, `react-test-renderer`, StrictMode double-invoke, an API Octane does
@@ -139,30 +137,12 @@ own implementation will not think to check.
   Octane's behavior with an `// OCTANE DIVERGENCE:` rationale. Skipped and todo
   markers are not a tracking mechanism here: `pnpm test:markers:check` rejects
   them, so an unported case lives in the crosswalk instead.
-- Add negative controls for the parity harness itself: removing, renaming,
-  skipping, or failing to execute a recorded case, and changing pinned evidence,
-  must make validation fail. The tests need tests too; otherwise a green harness
-  can be a stale evidence collector.
 
-### Configure parity execution
+### Configure test execution
 
-Follow [the React parity test-execution contract](./docs/react-parity-testing.md)
-when a binding adds executable parity lanes. Keep the complete local project in
-`vitest.config.js`, then declare which work belongs to the generic parity runner:
-
-```js
-testExecution: {
-	group: 'react-parity',
-	include: ['packages/example/tests/upstream/**/*.test.ts'],
-}
-```
-
-Omit `testExecution.include` when the runner owns the complete project. When it
-is present, it contains parity-owned patterns only;
-`vitest.ci-sharded.config.js` derives the complement for ordinary shards. Do not
-put package paths in `ci.yml`, create package-specific parity jobs, or encode
-shard/Node/job details in the base project metadata. Package manifests under
-`packages/*/audit/react-parity.json` are discovered automatically.
+Keep binding tests in the ordinary Vitest projects. Use
+`testExecution: { group: 'heavy-browser' }` only for projects that need the
+dedicated real-browser job.
 
 Fill the remaining gaps (DOM output over event sequences, render counts, effect
 ordering, ref lifecycle, keyed reorder identity) with differential and
@@ -208,7 +188,6 @@ run the generator instead of hand-editing the output:
 | `docs/bindings-status.md` | each binding's `status.json` | `pnpm bindings:status` |
 | `docs/parity-gaps.md` | test pins | `pnpm parity:gaps` |
 | `docs/binding-parity-gaps.md` | binding parity data | `pnpm binding-parity:gaps` |
-| `docs/react-parity-coverage.md` | the React parity ledger | `pnpm react-parity:generate` |
 | Production error catalog and formatters | `octane` error-code sources | `pnpm error-codes:generate` |
 | `@octanejs/cli` data snapshot | binding and error-code catalogs | `pnpm cli:data` |
 | Lucide and Phosphor icon sources | upstream icon sets | `pnpm lucide:generate`, `pnpm phosphor-icons:generate` |

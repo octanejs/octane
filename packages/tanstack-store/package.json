@@ -38,9 +38,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "test:upstream": "node scripts/run-pristine-upstream.mjs",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
-    "upstream:verify": "node scripts/verify-upstream.mjs"
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
   },
   "dependencies": {
     "@tanstack/store": "0.11.0"

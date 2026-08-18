@@ -143,13 +143,6 @@ Pin and verify provenance before writing product code. Prove the load-bearing hy
 
 ### U1. Pin upstream provenance and public inventory
 
-- **Goal:** Establish immutable, fail-closed inputs for the exact release.
-- **Requirements:** R1-R4, the upstream-input portion of R14, and the upstream-inventory portion of R15; KTD1, KTD6.
-- **Files:** `packages/textarea-autosize/package.json`, `packages/textarea-autosize/LICENSE`, `packages/textarea-autosize/UPSTREAM.md`, `packages/textarea-autosize/upstream/`, `packages/textarea-autosize/audit/`, `packages/textarea-autosize/scripts/`, `packages/textarea-autosize/src/conditions/`.
-- **Approach:** Retain byte-exact npm and source/test/license inputs, source-boundary hashes, export/package-condition/type/test inventories, the initial crosswalk, and a parity-manifest skeleton. Identify the existing Octane textarea host, ref composition, lifecycle listener, provenance, and browser-harness helpers; record which are reused and which exact parity constraint requires direct host logic. U4 and U7 own adapted evidence inventories and verified lane status; U6 owns final-head hashes.
-- **Test scenarios:** Correct pin passes; altered tarball/source/license hash fails; omitted export, condition, test, type assertion, or evidence file fails; vendored inputs remain unpublished; condition resolution selects browser/development, browser/production, and non-browser modules for worker, workerd, edge-light, import, module, and default combinations.
-- **Verification:** Provenance, inventory, marker, and React parity manifest validation identify the exact counts and hashes.
-
 ### U2. Port calculation and measurement modules
 
 - **Goal:** Match upstream pixel-height calculation independently of the component wrapper.
@@ -223,7 +216,6 @@ Pin and verify provenance before writing product code. Prove the load-bearing hy
 | Pristine and adapted runtime suites | U3-U4 | Every pinned upstream runtime case executes in both classifications. |
 | Paired `tsc` and `tsrx-tsc` projects | U1, U3-U4 | Equivalent public accept/reject programs pass with documented event/renderable adaptations only. |
 | Server, hydration, Chromium, and focused Firefox projects | U2-U4, U7-U8 | SSR safety, host adoption, real layout, lifecycle, cache, cleanup, and the Firefox double-read regression match the React oracle. |
-| `pnpm react-parity:check` and manifest lanes | U1-U6 | All required lanes execute with no stale, skipped, duplicate, or missing evidence. |
 | Package, declarations, format, and test gates | U1-U6 | Targeted checks and the applicable root gates pass from the final branch head. |
 | Playground, CLI/MCP, generated, and pack checks | U5-U6 | Migration surfaces build and generated files are current; packed external consumers resolve without React. |
 | Draft PR and current-head review | U6 | PR opens draft and stays draft until CI, Cursor/Bugbot, mergeability, and feedback gates are explicitly complete. |

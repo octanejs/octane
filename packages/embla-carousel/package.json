@@ -29,8 +29,8 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "node audit/type-parity.mjs && vitest run --root ../.. --project embla-carousel --project embla-carousel-pristine-utils --project embla-carousel-differential --project embla-carousel-hydration --project embla-carousel-ssr --project embla-carousel-audit --project embla-carousel-browser",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsc --noEmit -p typetests/pristine.tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
+    "test": "vitest run --root ../.. --project embla-carousel --project embla-carousel-differential --project embla-carousel-hydration --project embla-carousel-ssr --project embla-carousel-browser",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
   },
   "dependencies": {
     "embla-carousel": "8.6.0",

@@ -41,7 +41,7 @@
   },
   "peerDependencies": {
     "octane": "workspace:*",
-		"xstate": "^5.28.0"
+    "xstate": "^5.28.0"
   },
   "devDependencies": {
     "@xstate/react": "6.1.0",

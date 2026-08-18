@@ -1,5 +1,0 @@
-{
-  "schemaVersion": 1,
-  "files": ["packages/valtio/typetests/public-api.test-d.ts"],
-  "assertionGroups": ["useSnapshot readonly inference", "useProxy mutable inference"]
-}

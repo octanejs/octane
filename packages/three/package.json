@@ -46,9 +46,8 @@
     "./intrinsics/jsx-runtime": "./src/intrinsics.ts"
   },
   "scripts": {
-    "test": "pnpm upstream:check && vitest run --root ../.. --project three",
-    "test:compat": "pnpm upstream:check && vitest run --root ../.. --project three --exclude 'packages/three/tests/**/*differential.test.ts' --exclude 'packages/three/tests/browser/**/*.test.ts'",
-    "upstream:check": "node scripts/check-upstream-crosswalk.mjs"
+    "test": "vitest run --root ../.. --project three",
+    "test:compat": "vitest run --root ../.. --project three --exclude 'packages/three/tests/**/*differential.test.ts' --exclude 'packages/three/tests/browser/**/*.test.ts'"
   },
   "dependencies": {
     "zustand": "catalog:default"

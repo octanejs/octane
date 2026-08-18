@@ -28,6 +28,4 @@ The npm artifact supplies the published distribution and package-condition bound
 | `src/__tests__/index.test.js` | Run pristine with React and adapted case-for-case under `tests/upstream/` |
 | `src/__tests__/__snapshots__/index.test.js.snap` | Retained pristine; equivalent adapted DOM assertions avoid framework snapshot internals |
 
-Port-authored runtime and type tests are classified fail-closed in `audit/test-classifications.json`. The pristine→adapted case map and negative controls live in `audit/upstream-crosswalk.json` and `scripts/react-parity/react-textarea-autosize-controls.test.mjs`. Paired type evidence is recorded in `audit/type-parity.json` with assertion-group inventories.
-
 The public callback remains named `onChange`, but Octane supplies a native input event rather than a React SyntheticEvent. The binding guarantees per-edit timing, target/currentTarget value during dispatch, bubbling, cancellation, and callback ordering. React-only event identity and fields are documented divergences.

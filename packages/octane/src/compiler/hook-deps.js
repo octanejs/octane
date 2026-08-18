@@ -118,12 +118,14 @@ function unwrapExport(node) {
 	return node;
 }
 
-function predeclareDirect(statements, scope, hookRuntimeModules) {
+function predeclareDirect(statements, scope, hookRuntimeModules, bindingsOnly = false) {
 	for (const original of statements || []) {
 		if (original.type === 'ImportDeclaration') {
+			if (bindingsOnly && original.importKind === 'type') continue;
 			const isHookRuntime = hookRuntimeModules.has(original.source?.value);
 			const isOctane = original.source?.value === 'octane';
 			for (const specifier of original.specifiers || []) {
+				if (bindingsOnly && specifier.importKind === 'type') continue;
 				const imported = specifier.imported?.name;
 				declareName(scope, specifier.local.name, {
 					imported: true,
@@ -156,19 +158,29 @@ function predeclareDirect(statements, scope, hookRuntimeModules) {
 	}
 }
 
-function collectHoistedVars(node, functionScope, root = true) {
+function collectHoistedVars(node, functionScope, root = true, bindingsOnly = false) {
 	if (!node || typeof node !== 'object') return;
 	if (Array.isArray(node)) {
-		for (const child of node) collectHoistedVars(child, functionScope, false);
+		for (const child of node) collectHoistedVars(child, functionScope, false, bindingsOnly);
 		return;
 	}
 	if (!root && isFunction(node)) return;
+	if (
+		bindingsOnly &&
+		(isFunction(node) ||
+			(!root && node.type === 'StaticBlock') ||
+			node.type === 'ClassDeclaration' ||
+			node.type === 'ClassExpression' ||
+			node.type === 'TSModuleDeclaration')
+	) {
+		return;
+	}
 	if (node.type === 'VariableDeclaration' && node.kind === 'var') {
 		for (const decl of node.declarations || []) declarePattern(decl.id, functionScope);
 	}
 	for (const key in node) {
 		if (AST_META_KEYS.has(key)) continue;
-		collectHoistedVars(node[key], functionScope, false);
+		collectHoistedVars(node[key], functionScope, false, bindingsOnly);
 	}
 }
 
@@ -277,7 +289,7 @@ function markReassignedPattern(pattern, scope) {
 	}
 }
 
-function buildScopes(ast, onlyImported, hookRuntimeModules) {
+function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false) {
 	nextBindingId = 0;
 	const moduleScope = createScope(null, 'module');
 	const nodeScopes = new WeakMap();
@@ -289,8 +301,35 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 	const functionRecords = new WeakMap();
 	const trustedHookNames = new WeakMap();
 	const callAnnotations = new Map();
-	predeclareDirect(ast.body, moduleScope, hookRuntimeModules);
-	collectHoistedVars(ast, moduleScope);
+	const declarationBindings = bindingsOnly ? new Map() : null;
+	const firstDefinitions = bindingsOnly ? new Map() : null;
+	predeclareDirect(ast.body, moduleScope, hookRuntimeModules, bindingsOnly);
+	collectHoistedVars(ast, moduleScope, true, bindingsOnly);
+
+	function rememberBindings(bindings, definesValue = true) {
+		if (declarationBindings === null || firstDefinitions === null) return;
+		for (const { pattern, binding } of bindings) {
+			declarationBindings.set(pattern, binding);
+			if (!definesValue) continue;
+			const previous = firstDefinitions.get(binding);
+			if (previous !== undefined && previous !== pattern) binding.reassigned = true;
+			else firstDefinitions.set(binding, pattern);
+		}
+	}
+
+	function rememberPattern(pattern, scope, definesValue = true) {
+		if (!bindingsOnly) return;
+		if (pattern?.type === 'TSParameterProperty') pattern = pattern.parameter;
+		const bindings = [];
+		collectPatternBindings(pattern, scope, bindings);
+		rememberBindings(bindings, definesValue);
+	}
+
+	function invalidateVisibleBindings(scope) {
+		for (let current = scope; current !== null; current = current.parent) {
+			for (const binding of current.bindings.values()) binding.reassigned = true;
+		}
+	}
 
 	function walk(node, scope) {
 		if (!node || typeof node !== 'object') return;
@@ -298,34 +337,103 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 			for (const child of node) walk(child, scope);
 			return;
 		}
-		nodeScopes.set(node, scope);
+		if (!bindingsOnly) nodeScopes.set(node, scope);
+		if (
+			bindingsOnly &&
+			(node.type === 'TSInstantiationExpression' || node.type === 'TSExportAssignment')
+		) {
+			walk(node.expression, scope);
+			return;
+		}
 
 		if (isFunction(node)) {
 			const fnScope = createScope(scope, 'function');
-			functionScopes.set(node, fnScope);
-			const record = {
-				node,
-				scope: fnScope,
-				binding:
-					node.type === 'FunctionDeclaration' && node.id
-						? resolveBinding(scope, node.id.name)
-						: null,
-				parameters: null,
-				stableDefinition: node.type === 'FunctionDeclaration',
-			};
-			functions.push(record);
-			functionRecords.set(node, record);
+			const record = bindingsOnly
+				? null
+				: {
+						node,
+						scope: fnScope,
+						binding:
+							node.type === 'FunctionDeclaration' && node.id
+								? resolveBinding(scope, node.id.name)
+								: null,
+						parameters: null,
+						stableDefinition: node.type === 'FunctionDeclaration',
+					};
+			if (record !== null) {
+				functionScopes.set(node, fnScope);
+				functions.push(record);
+				functionRecords.set(node, record);
+			}
+			if (bindingsOnly && node.type === 'FunctionDeclaration' && node.id) {
+				rememberPattern(node.id, scope);
+			}
 			if (node.type === 'FunctionExpression' && node.id) {
 				declareName(fnScope, node.id.name);
+				if (bindingsOnly) rememberPattern(node.id, fnScope);
 			}
 			if (node.type !== 'ArrowFunctionExpression') declareName(fnScope, 'arguments');
-			for (const param of node.params || []) declarePattern(param, fnScope);
-			record.parameters = (node.params || []).map((param) =>
-				directParameterBinding(param, fnScope),
-			);
-			collectHoistedVars(node.body, fnScope);
-			for (const param of node.params || []) walkPatternDefaults(param, fnScope);
-			walk(node.body, fnScope);
+			for (const param of node.params || []) {
+				declarePattern(
+					bindingsOnly && param.type === 'TSParameterProperty' ? param.parameter : param,
+					fnScope,
+				);
+			}
+			if (record !== null) {
+				record.parameters = (node.params || []).map((param) =>
+					directParameterBinding(param, fnScope),
+				);
+			}
+			if (bindingsOnly) {
+				for (const param of node.params || []) rememberPattern(param, fnScope);
+				// Parameter defaults cannot see declarations in the function body.
+				// Afterwards, share the direct body with the parameters so legal var
+				// and function redeclarations count as competing value definitions.
+				for (const param of node.params || []) walkPatternDefaults(param, fnScope);
+				collectHoistedVars(node.body, fnScope, true, true);
+				if (node.body?.type === 'BlockStatement' || node.body?.type === 'JSXCodeBlock') {
+					predeclareDirect(node.body.body, fnScope, hookRuntimeModules, true);
+					for (const statement of node.body.body || []) walk(statement, fnScope);
+					if (node.body.type === 'JSXCodeBlock') walk(node.body.render, fnScope);
+				} else {
+					walk(node.body, fnScope);
+				}
+			} else {
+				collectHoistedVars(node.body, fnScope);
+				for (const param of node.params || []) walkPatternDefaults(param, fnScope);
+				walk(node.body, fnScope);
+			}
+			return;
+		}
+
+		if (bindingsOnly && node.type === 'ImportDeclaration') {
+			if (node.importKind !== 'type') {
+				for (const specifier of node.specifiers || []) {
+					if (specifier.importKind !== 'type') rememberPattern(specifier.local, scope);
+				}
+			}
+			return;
+		}
+
+		if (
+			bindingsOnly &&
+			node.declare !== true &&
+			((node.type === 'TSModuleDeclaration' && node.kind !== 'global') ||
+				node.type === 'TSEnumDeclaration')
+		) {
+			// The dependency walk deliberately skips TypeScript-only syntax. Runtime
+			// namespaces and enum initializers can still write their enclosing scope.
+			invalidateVisibleBindings(scope);
+			return;
+		}
+
+		if (bindingsOnly && (node.type === 'ClassDeclaration' || node.type === 'ClassExpression')) {
+			if (node.type === 'ClassDeclaration' && node.id) rememberPattern(node.id, scope);
+			const classScope = createScope(scope, 'block');
+			if (node.id) declarePattern(node.id, classScope);
+			for (const decorator of node.decorators || []) walk(decorator, scope);
+			walk(node.superClass, classScope);
+			walk(node.body, classScope);
 			return;
 		}
 
@@ -334,8 +442,14 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 			node.type === 'StaticBlock' ||
 			node.type === 'JSXCodeBlock'
 		) {
-			const blockScope = createScope(scope, 'block');
-			predeclareDirect(node.body, blockScope, hookRuntimeModules);
+			const blockScope = createScope(
+				scope,
+				bindingsOnly && node.type === 'StaticBlock' ? 'function' : 'block',
+			);
+			if (bindingsOnly && node.type === 'StaticBlock') {
+				collectHoistedVars(node, blockScope, true, true);
+			}
+			predeclareDirect(node.body, blockScope, hookRuntimeModules, bindingsOnly);
 			for (const statement of node.body || []) walk(statement, blockScope);
 			// TSRX's final render node lives beside the setup-statement list.
 			if (node.type === 'JSXCodeBlock') walk(node.render, blockScope);
@@ -345,12 +459,17 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 		if (node.type === 'CatchClause') {
 			const catchScope = createScope(scope, 'block');
 			declarePattern(node.param, catchScope);
+			if (bindingsOnly) rememberPattern(node.param, catchScope);
+			if (bindingsOnly && node.resetParam) {
+				declarePattern(node.resetParam, catchScope);
+				rememberPattern(node.resetParam, catchScope);
+			}
 			walkPatternDefaults(node.param, catchScope);
 			walk(node.body, catchScope);
 			return;
 		}
 
-		if (node.type === 'SwitchStatement') {
+		if (node.type === 'SwitchStatement' || (bindingsOnly && node.type === 'JSXSwitchExpression')) {
 			// A switch body is one lexical scope shared by every unbraced case.
 			// Predeclare the direct case statements together so let/const/function
 			// captures resolve even when their declaration appears in a case list
@@ -360,10 +479,10 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 			for (const switchCase of node.cases || []) {
 				statements.push(...(switchCase.consequent || []));
 			}
-			predeclareDirect(statements, switchScope, hookRuntimeModules);
+			predeclareDirect(statements, switchScope, hookRuntimeModules, bindingsOnly);
 			walk(node.discriminant, scope);
 			for (const switchCase of node.cases || []) {
-				nodeScopes.set(switchCase, switchScope);
+				if (!bindingsOnly) nodeScopes.set(switchCase, switchScope);
 				walk(switchCase.test, switchScope);
 				for (const statement of switchCase.consequent || []) walk(statement, switchScope);
 			}
@@ -373,32 +492,45 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 		if (
 			node.type === 'ForStatement' ||
 			node.type === 'ForInStatement' ||
-			node.type === 'ForOfStatement'
+			node.type === 'ForOfStatement' ||
+			(bindingsOnly && node.type === 'JSXForExpression')
 		) {
 			const loopScope = createScope(scope, 'block');
-			const declaration = node.type === 'ForStatement' ? node.init : node.left;
+			const loopType = node.type === 'JSXForExpression' ? node.statementType : node.type;
+			const declaration = loopType === 'ForStatement' ? node.init : node.left;
 			if (declaration?.type === 'VariableDeclaration' && declaration.kind !== 'var') {
 				for (const decl of declaration.declarations || []) declarePattern(decl.id, loopScope);
 			}
-			if (node.type === 'ForStatement') {
+			if (loopType === 'ForStatement') {
 				walk(node.init, loopScope);
 				walk(node.test, loopScope);
 				walk(node.update, loopScope);
 			} else {
 				walk(node.left, loopScope);
 				if (node.left?.type !== 'VariableDeclaration') markReassignedPattern(node.left, loopScope);
-				walk(node.right, loopScope);
+				else if (bindingsOnly && node.left.kind === 'var') {
+					for (const decl of node.left.declarations || [])
+						markReassignedPattern(decl.id, loopScope);
+				}
+				walk(node.right, node.type === 'JSXForExpression' ? scope : loopScope);
+			}
+			if (bindingsOnly && node.type === 'JSXForExpression') {
+				declarePattern(node.index, loopScope);
+				rememberPattern(node.index, loopScope);
+				walk(node.key, loopScope);
 			}
 			walk(node.body, loopScope);
+			if (bindingsOnly && node.type === 'JSXForExpression') walk(node.empty, scope);
 			return;
 		}
 
 		if (node.type === 'VariableDeclaration') {
 			for (const decl of node.declarations || []) {
-				nodeScopes.set(decl, scope);
+				if (!bindingsOnly) nodeScopes.set(decl, scope);
 				const bindings = [];
 				collectPatternBindings(decl.id, scope, bindings);
-				declarators.push({ decl, bindings, kind: node.kind });
+				if (bindingsOnly) rememberBindings(bindings, node.kind !== 'var' || decl.init != null);
+				else declarators.push({ decl, bindings, kind: node.kind });
 				walkPatternDefaults(decl.id, scope);
 				walk(decl.init, scope);
 			}
@@ -411,7 +543,21 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 			markReassignedPattern(node.argument, scope);
 		}
 
-		if (node.type === 'CallExpression') {
+		if (bindingsOnly && node.type === 'CallExpression') {
+			let callee = unwrapValue(node.callee);
+			while (callee?.type === 'TSInstantiationExpression') {
+				callee = unwrapValue(callee.expression);
+			}
+			if (
+				node.optional !== true &&
+				callee?.type === 'Identifier' &&
+				callee.name === 'eval' &&
+				resolveBinding(scope, callee.name) === null
+			) {
+				// Direct eval can reassign any lexically reachable writable binding.
+				invalidateVisibleBindings(scope);
+			}
+		} else if (node.type === 'CallExpression') {
 			// Preserve lexical import identity for the later slotting pass. A module-
 			// level name map is insufficient: a component can shadow either a named
 			// alias or an Octane namespace inside any nested scope. The annotation is
@@ -471,6 +617,9 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 	function walkPatternDefaults(pattern, scope) {
 		if (!pattern) return;
 		switch (pattern.type) {
+			case 'TSParameterProperty':
+				if (bindingsOnly) walkPatternDefaults(pattern.parameter, scope);
+				return;
 			case 'AssignmentPattern':
 				walkPatternDefaults(pattern.left, scope);
 				walk(pattern.right, scope);
@@ -513,7 +662,9 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 		functions,
 		trustedHookNames,
 		callAnnotations,
+		declarationBindings,
 	};
+	if (bindingsOnly) return analysis;
 	// The surgical plain-TS pass slots base hooks only; without a custom-hook
 	// withSlot boundary, two local wrapper calls would share their inner slots.
 	// Restrict custom-call inference to the full TSRX/TSX compiler, which emits
@@ -1250,6 +1401,25 @@ function analyzeInternal(ast, options) {
 		});
 	}
 	return { analysis, inferred };
+}
+
+/**
+ * Return authored declaration identifiers whose bindings have a write or a
+ * competing value definition. This is a read-only, scope-aware proof for callers
+ * that recreate lexical scopes per invocation. Absence from the set does not
+ * make a mutable declaration kind immutable by itself.
+ *
+ * @param {any} ast
+ * @returns {WeakSet<import('estree').Identifier>}
+ */
+export function collectReassignedBindings(ast) {
+	const { declarationBindings } = buildScopes(ast, true, new Set(), true);
+	/** @type {WeakSet<import('estree').Identifier>} */
+	const reassigned = new WeakSet();
+	for (const [node, binding] of declarationBindings ?? []) {
+		if (binding.reassigned) reassigned.add(node);
+	}
+	return reassigned;
 }
 
 /**

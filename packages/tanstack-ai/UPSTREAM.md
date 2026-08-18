@@ -16,13 +16,5 @@ The pinned repository commit contains an executable Vitest suite under
 Published npm tarballs omit those tests; repository presence is authoritative,
 so `upstreamSuites.runtime` is `present`.
 
-Every upstream `packages/ai-react/tests` artifact at the pin is inventoried in
-[`audit/upstream-suite-artifacts.json`](./audit/upstream-suite-artifacts.json).
-This bounded harness currently executes one exact same-fixture differential
-chat scenario against the pinned published React package through the
-`tanstack-ai-differential` Vitest project (`testExecution: { group: 'react-parity' }`).
-Octane adaptation, SSR, and repository-authored type contracts stay ordinary
-package tests outside parity evidence.
-
 Promoting the inventoried upstream suite into pristine / one-for-one adapted
 lanes remains open follow-up work before provenance can move to `verified`.

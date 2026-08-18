@@ -46,8 +46,7 @@
     "./menus": "./src/menus/index.ts"
   },
   "scripts": {
-    "test": "vitest run",
-    "upstream:verify": "node ./scripts/verify-upstream.mjs"
+    "test": "vitest run"
   },
   "dependencies": {
     "@tiptap/core": "catalog:default",
