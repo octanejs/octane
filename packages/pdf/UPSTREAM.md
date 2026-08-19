@@ -11,8 +11,8 @@
 
 | Oracle | Pinned version | Evidence lanes |
 | --- | --- | --- |
-| React runtime | `react@19.2.3` | differential tests |
-| ReactDOM runtime | `react-dom@19.2.3` | differential tests |
+| React runtime | `react@19.2.3` | `pristine-runtime`, `differential` |
+| ReactDOM runtime | `react-dom@19.2.3` | `pristine-runtime`, `differential` |
 | React types | `@types/react@19.2.7` | type lanes |
 | ReactDOM types | `@types/react-dom@19.2.3` | type lanes |
 
@@ -23,3 +23,8 @@ README, TypeScript programs, and license are vendored under `upstream/tag`.
 The complete published npm artifact is vendored under `upstream/npm`.
 Monorepo-root test fixtures (`test-utils.ts`, `__mocks__/`) are vendored under
 `upstream/support` and linked into the package root for relative imports.
+
+`audit/upstream-inventory.json` records SHA-256 hashes for both authorities.
+`audit/case-map.json` accounts for every upstream runtime identity with either a
+one-for-one adapted counterpart or an explicit `pending-adaptation` disposition.
+`audit/pristine-runtime.json` records the executed pristine Vitest identities.

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "compiler": "tsc",
+  "project": "packages/tanstack-hotkeys/typetests/pristine/tsconfig.json",
+  "tests": [
+    {
+      "id": "types:pristine-upstream",
+      "name": "pinned upstream type suite"
+    }
+  ]
+}

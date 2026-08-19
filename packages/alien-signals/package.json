@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/alien-signals",
-  "version": "0.0.5",
+  "version": "0.0.7",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -38,7 +38,9 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "upstream:verify": "node ./scripts/verify-upstream.mjs",
+    "parity:inventory": "node ../../scripts/react-parity/alien-signals-runtime-inventory.mjs"
   },
   "dependencies": {
     "alien-signals": "catalog:default"

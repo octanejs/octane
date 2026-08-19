@@ -1,4 +1,4 @@
-# Electron upstream provenance
+# Upstream Electron audit
 
 This binding targets Electron's process-split consumer layout, pinned for types
 and local development at:

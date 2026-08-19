@@ -694,7 +694,8 @@ Other consequences:
 - Fallback-visible boundaries whose retries fully stage reveal together,
   including refs and layout effects.
 - Same-identity synchronous rendering remains per-swap rather than using a
-  global React-style work-in-progress tree.
+  global React-style work-in-progress tree. See
+  [Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md).
 - Multiple unhandled root errors in one flush throw an `AggregateError`; an
   unhandled error unmounts its root's whole tree (both match React).
 - `useSyncExternalStore` skips React's commit-time getSnapshot re-read for
@@ -783,8 +784,9 @@ refetches over the network) until the resume/warm work in
 floor. Both need the transition to become a deferred commit — a keyed
 removal disposes blocks and runs their cleanups, which cannot be undone, and
 reverting content outside a boundary needs the reveal to re-render where the
-transition began rather than just the boundary. The benchmark pins the exposed-state
-count at zero.
+transition began rather than just the boundary. See
+[Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md). The
+benchmark pins the exposed-state count at zero.
 
 ## Root component entry points and container ownership
 

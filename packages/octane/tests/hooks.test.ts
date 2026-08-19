@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { mount, nextPaint } from './_helpers';
+import { act, mount, nextPaint } from './_helpers';
+import { flushSync, startTransition } from '../src/index.js';
 import {
 	LazyInit,
 	TwoStates,
+	StateValueProbe,
 	Tally,
 	MemoTest,
 	CustomMemoDeps,
@@ -12,6 +14,8 @@ import {
 	StableResultLookalikes,
 	CustomSelectorCallback,
 	CbTest,
+	ForwardedCallbackPair,
+	CallbackRenderPass,
 	RefTest,
 	EffectMount,
 	EffectDeps,
@@ -39,6 +43,94 @@ describe('useState', () => {
 		expect(r.find('#a').textContent).toBe('2');
 		expect(r.find('#b').textContent).toBe('14');
 		r.unmount();
+	});
+
+	it('rebases functional Action updates while retaining later replacement values', async () => {
+		let setValue!: (next: number | ((previous: number) => number)) => void;
+		let getValue!: () => number;
+		let releaseFirst!: () => void;
+		let releaseFinal!: () => void;
+		const first = new Promise<void>((resolve) => (releaseFirst = resolve));
+		const final = new Promise<void>((resolve) => (releaseFinal = resolve));
+		const r = mount(StateValueProbe, {
+			initial: 1,
+			display: String,
+			expose: (set: typeof setValue, get: typeof getValue) => {
+				setValue = set;
+				getValue = get;
+			},
+		});
+		try {
+			flushSync(() =>
+				startTransition(async () => {
+					setValue((value) => value + 10);
+					await first;
+					setValue(40);
+					setValue((value) => value + 2);
+					await final;
+				}),
+			);
+			expect(r.find('span').textContent).toBe('1');
+			expect(getValue()).toBe(11);
+			flushSync(() => setValue(5));
+			expect(r.find('span').textContent).toBe('5');
+			expect(getValue()).toBe(15);
+
+			await act(() => releaseFirst());
+			expect(r.find('span').textContent).toBe('5');
+			expect(getValue()).toBe(42);
+			flushSync(() => setValue(9));
+			expect(r.find('span').textContent).toBe('9');
+			expect(getValue()).toBe(42);
+
+			await act(() => releaseFinal());
+			expect(r.find('span').textContent).toBe('42');
+			expect(getValue()).toBe(42);
+		} finally {
+			releaseFirst();
+			releaseFinal();
+			await act(() => {});
+			r.unmount();
+		}
+	});
+
+	it('retains function-valued state through urgent and staged replacements', async () => {
+		type Value = () => string;
+		let setValue!: (next: Value | ((previous: Value) => Value)) => void;
+		let getValue!: () => Value;
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		const initial = () => 'initial';
+		const staged = () => 'staged';
+		const urgent = () => 'urgent';
+		const r = mount(StateValueProbe, {
+			initial,
+			display: (value: Value) => value(),
+			expose: (set: typeof setValue, get: typeof getValue) => {
+				setValue = set;
+				getValue = get;
+			},
+		});
+		try {
+			flushSync(() =>
+				startTransition(async () => {
+					setValue(() => staged);
+					await gate;
+				}),
+			);
+			expect(r.find('span').textContent).toBe('initial');
+			expect(getValue()).toBe(staged);
+			flushSync(() => setValue(() => urgent));
+			expect(r.find('span').textContent).toBe('urgent');
+			expect(getValue()).toBe(staged);
+			await act(() => release());
+			expect(r.find('span').textContent).toBe('staged');
+			expect(getValue()).toBe(staged);
+		} finally {
+			release();
+			await act(() => {});
+			r.unmount();
+		}
 	});
 });
 
@@ -133,6 +225,78 @@ describe('useCallback', () => {
 		r.update(CbTest, { label: 'bye' });
 		expect(r.find('span').textContent).toBe('bye');
 		r.unmount();
+	});
+
+	it('preserves each custom-hook callback value without invoking it while comparing dependencies', () => {
+		const first = vi.fn(() => 'first');
+		const second = vi.fn(() => 'second');
+		const nextFirst = vi.fn(() => 'next-first');
+		const nextSecond = vi.fn(() => 'next-second');
+		const observed: Array<[() => string, () => string]> = [];
+		const observe = (left: () => string, right: () => string) => {
+			observed.push([left, right]);
+		};
+		const root = mount(ForwardedCallbackPair, {
+			first,
+			second,
+			dependencies: [NaN, 0],
+			observe,
+			label: 'initial',
+		});
+		expect(observed.at(-1)).toEqual([first, second]);
+		expect(first).not.toHaveBeenCalled();
+		expect(second).not.toHaveBeenCalled();
+
+		root.update(ForwardedCallbackPair, {
+			first: nextFirst,
+			second: nextSecond,
+			dependencies: [NaN, 0],
+			observe,
+			label: 'same',
+		});
+		expect(root.find('span').textContent).toBe('same');
+		expect(observed.at(-1)).toEqual([first, second]);
+		expect(nextFirst).not.toHaveBeenCalled();
+		expect(nextSecond).not.toHaveBeenCalled();
+
+		root.update(ForwardedCallbackPair, {
+			first: nextFirst,
+			second: nextSecond,
+			dependencies: [NaN, -0],
+			observe,
+			label: 'changed',
+		});
+		expect(observed.at(-1)).toEqual([nextFirst, nextSecond]);
+		expect(observed.at(-1)?.[0]()).toBe('next-first');
+		expect(observed.at(-1)?.[1]()).toBe('next-second');
+
+		root.update(ForwardedCallbackPair, {
+			first,
+			second,
+			dependencies: null,
+			observe,
+			label: 'always',
+		});
+		expect(observed.at(-1)).toEqual([first, second]);
+		root.update(ForwardedCallbackPair, {
+			first: nextFirst,
+			second: nextSecond,
+			dependencies: null,
+			observe,
+			label: 'always-again',
+		});
+		expect(observed.at(-1)).toEqual([nextFirst, nextSecond]);
+		root.unmount();
+	});
+
+	it('keeps a custom-hook callback across a render-phase state retry', () => {
+		const observed: Array<() => number> = [];
+		const root = mount(CallbackRenderPass, {
+			observe: (callback: () => number) => observed.push(callback),
+		});
+		expect(root.find('span').textContent).toBe('step=1 callback=0');
+		expect(observed.at(-1)).toBe(observed[0]);
+		root.unmount();
 	});
 });
 

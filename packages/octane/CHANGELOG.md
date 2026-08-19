@@ -1,5 +1,25 @@
 # octane
 
+## 0.1.41
+
+### Patch Changes
+
+- 489a886: Remove memo factory and dependency-array allocations from more production
+  client cache hits, including nested expressions, returned JSX, custom hooks,
+  plain TypeScript modules, and explicit hook slots. Preserve factory scope,
+  declaration timing, callback identity, and held-transition rollback/promotion,
+  and avoid the extra `useCallback` wrapper closure in every runtime.
+- 922b2d4: Avoid redundant external-store snapshot checks when an urgent DOM render is already queued. Keep universal-renderer subscriptions connected across snapshot and getter changes while preserving committed selectors, cleanup, and error handling. Avoid quadratic projection work for universal state-update queues that end in a replacement value.
+- 814a3c1: Recognize unshadowed String conversions as template text and add an opt-in Node-only TypeScript project adapter for string-child inference. Keep conversion calls intact, reject stale source facts, omit uncertain type proofs, and share the same text classification across client compilation, SSR, and hydration. Publish declarations for the compiler and adapter APIs.
+
+## 0.1.40
+
+### Patch Changes
+
+- ff9b859: Parse authored TSRX modules through the native `oxc-tsrx` compatibility layer in Node to reduce compiler latency while preserving Octane's existing AST, source-map, stylesheet, and diagnostic contracts. Browser and other non-Node compiler consumers continue to use the pure-JavaScript `@tsrx/core` parser.
+- 14b8b40: Update the bundled TSRX compiler to the latest installable release, including fixes for literal less-than text and tokenizer lookahead handling.
+- cc6e5ea: Extend Strong-mode analysis through statically known `useCallback`, `useEffectEvent`, and memo-returned functions. Reject Effect Event calls during render and Effect Events in explicit hook dependency lists, while preserving supported hook usage and compatibility-mode behavior.
+
 ## 0.1.39
 
 ### Patch Changes

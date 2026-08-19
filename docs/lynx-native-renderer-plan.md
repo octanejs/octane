@@ -320,6 +320,43 @@ does not turn thrown scheduler callbacks into Promise rejections.
 
 ### Proposed package layout
 
+```text
+packages/lynx/
+  README.md
+  UPSTREAM.md
+  status.json
+  audit/upstream-crosswalk.json
+  src/
+    index.ts
+    config.ts
+    intrinsics.ts
+    renderer.ts
+    main-renderer.ts
+    root.ts
+    first-screen.ts
+    main-thread.ts
+    platform.ts
+    testing.ts
+    core/
+      client-driver.ts
+      host-driver.ts
+      papi.ts
+      protocol.ts
+      transport.ts
+      props.ts
+      styles.ts
+      events.ts
+      refs.ts
+      lists.ts
+      lifecycle.ts
+      first-screen.ts
+      worklets.ts
+  tests/
+    _fixtures/
+    differential/
+    rspeedy/
+  typetests/
+
 packages/rspeedy-plugin-octane/
   README.md
   src/
@@ -622,6 +659,28 @@ should include:
 ## Delivery milestones and exit gates
 
 ### Milestone 0 — upstream pin and real-engine spike (1–2 engineer-weeks)
+
+- Pin one exact, published Lynx SDK, Rspeedy, template plugin, types package,
+  and `@rsbuild/core` compatibility set plus its source commit.
+- Create `packages/lynx/audit/upstream-crosswalk.json` covering ReactLynx public
+  exports and executable behavioral tests. Classify each as port, differential,
+  intentional divergence, deferred milestone, or out of scope with a durable
+  reason.
+- Confirm the public framework hooks for:
+  - installing a custom main-thread lifecycle receiver;
+  - creating/mutating/flushing Element PAPI nodes;
+  - sending a background commit and returning an acknowledgement;
+  - registering a native event handler token and delivering its payload back to
+    the background runtime; and
+  - page destroy, reload, init data, and global props.
+- Produce a throwaway or committed probe that renders `view > text`, applies one
+  background state update, handles one tap, and tears down.
+- Encode a production `.lynx.bundle` and run it in the official JavaScript test
+  environment, Lynx Web/Explorer, Android, and iOS.
+- Record ReactLynx and imperative-PAPI baselines for first paint, background
+  update, patch bytes, one commit flush, minimal bundle bytes, and teardown.
+  Ratify numeric regression budgets from evidence rather than guessing them in
+  this document.
 
 Exit: the engine accepts an Octane-owned PAPI tree and one acknowledged
 background patch without importing React/Preact; Android and iOS display and
@@ -952,6 +1011,49 @@ observable behavioral tests; stale work/resources are released across both
 runtimes.
 
 ### Milestone 9 — parity and release stabilization (2–3 engineer-weeks)
+
+> **Progress (2026-07-22): repository-side stabilization implemented; formal
+> exit blocked.** The exact `@lynx-js/react@0.123.0` / `b6b809cd` oracle now has
+> a generated, validated Vitest runner crosswalk for all 1,725 runnable
+> JavaScript/TypeScript cases with zero unclassified entries. The source
+> inventory separately classifies all 89 source-defined Rust compiler cases as out of scope;
+> every classification, including `port` and `differential`, is a disposition
+> describing intended handling. Classification counts do not prove that the
+> corresponding Octane behavior is implemented, that tests ran against Octane,
+> or that parity passed. Octane permanently keeps `defer` boolean only: the
+> ReactLynx `defer.unmountRecycled` object form is rejected, physical cell
+> recycling detaches refs, and the logical item retains state and effects until
+> logical removal. A deterministic pinned-Rspeedy benchmark builds the
+> same semantic-checksummed app in background-preview and dual-thread IFR
+> shapes, verifies thread ownership and identical background semantics, and
+> records decoded/encoded raw, gzip, and Brotli bytes. It requires exact
+> background raw/gzip/Brotli metrics and guards whole-artifact gzip plus
+> decoded-main gzip ratios. This is source/build size evidence, not native
+> timing or first-paint evidence. Required `Lynx compatibility (minimum)` and
+> `Lynx compatibility (current)` CI lanes pack the Octane packages into strict
+> external consumers and perform two deterministic builds. They keep the
+> atomic Rspeedy `0.16.0` / Rsbuild `2.1.4` graph while covering Rspack `2.1.3`
+> and `2.1.5`; the current lane also checks live registry drift. The immutable
+> `audit/toolchain.json` provenance covers the Phase 0/Milestone 5 subset,
+> including the minimum Rspack edge, while the complete Milestone 9 lane maps
+> live in plugin source. It does not record every lane dependency or the current
+> Rspack artifact's integrity. These are source/build lanes, not native-engine
+> runs. The package surface, provenance, status, pack boundary, and experimental
+> universal ABI were reviewed for this private phase; both Lynx packages remain
+> `0.0.0` and `private` rather than becoming a technical preview.
+>
+> Formal exit still requires a public framework-neutral native string-event
+> receiver and reconstructing-reload contract; native verification of context,
+> delivery, ordering, and payload completeness for the source-integrated typed
+> data and page/background-destroy paths; a working Lynx Web transport;
+> Explorer, Android, and iOS execution;
+> minimum/current toolchain execution on native engines; native proof of first
+> bootstrap/first paint and node identity adoption, worklet/ref/call execution, list allocation
+> and lifecycle, lazy-chunk execution, portal placement, Native Modules/custom
+> elements, source maps, and reconstructing reload cleanup; and comparable
+> native semantic performance baselines. Until those gates exist, the
+> universal renderer ABI remains experimental and Milestone 9 has no formal
+> release exit.
 
 - Complete the upstream export/test crosswalk with zero unclassified cases.
 - Run minimum and current supported Lynx/Rspeedy/engine lanes.

@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/spring",
-  "version": "0.0.5",
+  "version": "0.0.7",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -39,7 +39,8 @@
     "./parallax": "./src/parallax.ts"
   },
   "scripts": {
-    "test": "vitest run --project spring",
+    "test": "pnpm upstream:verify && vitest run --project spring",
+    "upstream:verify": "node ../../scripts/react-parity/react-spring-upstream.mjs",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsgo --noEmit -p typetests/tsconfig.json"
   },
   "dependencies": {

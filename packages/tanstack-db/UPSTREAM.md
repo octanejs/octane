@@ -30,6 +30,16 @@ adapter over the same core, so the two adapters read side by side under
 - React oracle: `@tanstack/react-db@0.1.96` on `react`/`react-dom` (the upstream
   adapter this port mirrors)
 
+The npm archive publishes the adapter source and declarations but NOT the
+repository test suite, so the pinned runtime and type suites have not been
+vendored or adapted one-for-one. The manifest is therefore `recorded-unverified`
+(see `audit/react-parity.json`): bounded evidence is the shared `@tanstack/db`
+live-query conformance suite run against the Octane adapter plus local hook
+coverage. The adapter source IS vendored byte-exact under
+`upstream/react-db/src` (with `upstream/SHA256SUMS`) so an upstream bump is a
+reviewable diff there; it is `.prettierignore`d and excluded from the published
+`files`.
+
 ## Public surface crosswalk
 
 Every export of the pinned `@tanstack/react-db` root entry:
@@ -60,6 +70,7 @@ local hook coverage. Their disposition:
 | `useLiveSuspenseQuery.test.tsx` | Not adapted one-for-one; local `tests/useLiveSuspenseQuery.test.tsx` covers suspend/fallback (async), error, and stale-while-revalidate. |
 | `useLiveQueryEffect.test.tsx` | Not adapted one-for-one; local `tests/useLiveQueryEffect.test.tsx` covers create/dispose/deps. |
 | `usePacedMutations.test.tsx` | Not adapted one-for-one; local `tests/usePacedMutations.test.tsx`. |
+| StrictMode double-invocation case | NOT APPLICABLE — Octane has no StrictMode development double-invoke; recorded in `audit/test-classifications.json` and pinned by an `// OCTANE DIVERGENCE:` note in the suspense suite rather than a skipped test. |
 | Upstream type tests (`*.test-d.tsx`) | Not adapted one-for-one; local `typetests/useLiveQuery.test-d.tsx` covers the overload families. Exhaustive type parity remains open. |
 
 ## Bounded evidence

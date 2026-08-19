@@ -480,6 +480,7 @@ class OctaneBundlerCompiler {
 			hmr: normalizeHmrDialect(options.hmr),
 			dev: options.dev,
 			profile: options.profile === true,
+			inlineHookMemo: options.inlineHookMemo !== false,
 			strong: options.strong === true,
 			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
@@ -990,6 +991,7 @@ class OctaneBundlerCompiler {
 		// of both HMR and dev hydration diagnostics. Server transforms stay byte-for-
 		// byte identical even when a shared client/server bundler configuration opts in.
 		const profile = environment === 'client' && (options.profile ?? this.defaults.profile) === true;
+		const inlineHookMemo = (options.inlineHookMemo ?? this.defaults.inlineHookMemo) !== false;
 		// An application's global policy never leaks into installed or linked
 		// compatibility packages, including workspace packages nested inside the
 		// project root. Modules may still opt themselves in with their own
@@ -1087,6 +1089,7 @@ class OctaneBundlerCompiler {
 				dev,
 				profile,
 				profileFilename,
+				...(inlineHookMemo ? null : { inlineHookMemo: false }),
 				...(strong ? { strong: true } : null),
 				...(universalRuntime === undefined ? null : { universalRuntime }),
 				// Keep the established DOM compiler call byte-for-byte equivalent. A
@@ -1170,7 +1173,16 @@ class OctaneBundlerCompiler {
 				this._warnUnmarkedOctaneImport(code, filename);
 				return passThrough();
 			}
-			if (this._hasManualHookSlots(file, collected)) {
+			const manualSlots = this._hasManualHookSlots(file, collected);
+			const inlinePlainMemo =
+				inlineHookMemo &&
+				environment === 'client' &&
+				hmr === false &&
+				dev === false &&
+				profile === false &&
+				renderer.target === 'dom' &&
+				universalRuntime === undefined;
+			if (manualSlots && !inlinePlainMemo) {
 				// Hand-slotted bindings still own their authored policy. Opting one
 				// module in must not require changing its established slot ABI.
 				if (strong || code.includes('use strong')) {
@@ -1183,12 +1195,19 @@ class OctaneBundlerCompiler {
 			}
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const specializeVoidRoot =
-				environment === 'client' && hmr === false && dev === false && profile === false;
+				!manualSlots &&
+				environment === 'client' &&
+				hmr === false &&
+				dev === false &&
+				profile === false;
 			const out = slotHooks(code, filename, {
 				environment,
 				hmr: !!hmr,
+				dev,
 				profile,
 				profileFilename,
+				inlineHookMemo: inlinePlainMemo,
+				...(manualSlots ? { manualSlots: true } : null),
 				...(strong ? { strong: true } : null),
 				...(specializeVoidRoot
 					? {

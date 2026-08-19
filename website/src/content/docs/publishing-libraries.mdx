@@ -19,6 +19,8 @@ import { PackageManagerCommand } from '../../components/PackageInstall.tsrx';
 An Octane library is a **source package**. Its public exports resolve to authored
 source, not to JavaScript previously emitted by the Octane compiler. The application’s
 Vite, Rspack, or Rsbuild integration compiles that source alongside the application.
+This also works in JavaScript applications: consumers do not need a `tsconfig.json`
+to use a library authored in `.ts` or `.tsrx`; TypeScript is only needed for static type checking.
 
 This is required because compiled Octane output is coupled to the compiler/runtime
 contract and to the build target. Compiling in the application gives the library the

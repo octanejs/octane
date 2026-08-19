@@ -6,7 +6,14 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(here, '../..');
+const repoRoot = resolve(packageRoot, '../..');
 const cacheDirectory = join(here, '.react-cache');
+const manifest = JSON.parse(readFileSync(join(packageRoot, 'audit/react-parity.json'), 'utf8')) as {
+	lanes: Array<{
+		id: string;
+		files: Array<{ path: string }>;
+	}>;
+};
 
 function hashString(value: string): string {
 	let hash = 5381;
@@ -39,10 +46,27 @@ function compileFixture(sourcePath: string): void {
 	writeFileSync(join(cacheDirectory, `${slug}-${hashString(sourcePath)}.js`), rewritten);
 }
 
+function differentialFixtures(): string[] {
+	const lane = manifest.lanes.find(function find(entry) {
+		return entry.id === 'tanstack-pacer-differential';
+	});
+	if (!lane) throw new Error('missing tanstack-pacer-differential lane in react-parity.json');
+	return lane.files
+		.map(function toPath(entry) {
+			return entry.path;
+		})
+		.filter(function keepTsrx(path) {
+			return path.endsWith('.tsrx');
+		})
+		.map(function absolute(path) {
+			return resolve(repoRoot, path);
+		});
+}
+
 export async function setup(): Promise<void> {
 	rmSync(cacheDirectory, { recursive: true, force: true });
 	mkdirSync(cacheDirectory, { recursive: true });
-	compileFixture(resolve(packageRoot, 'tests/_fixtures/pacer-diff.tsrx'));
+	for (const fixture of differentialFixtures()) compileFixture(fixture);
 }
 
 export async function teardown(): Promise<void> {}

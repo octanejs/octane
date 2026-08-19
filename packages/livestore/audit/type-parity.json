@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "upstreamRoot": "packages/livestore/audit/type-probes",
+  "adaptedRoot": "packages/livestore/typetests",
+  "inventories": {
+    "upstream": "packages/livestore/audit/pristine-types.json",
+    "adapted": "packages/livestore/audit/adapted-types.json"
+  },
+  "lanes": {
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/livestore/audit/type-probes/tsconfig.pristine.json",
+      "sourcePolicy": "repo-authored React declaration probes against vendored @livestore/react 0.4.0"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/livestore/typetests/tsconfig.json",
+      "sourcePolicy": "structurally equivalent Octane public probes after permitted transformations"
+    }
+  },
+  "permittedTransformations": [
+    {
+      "kind": "import-root",
+      "rule": "React probes import vendored upstream/src; Octane probes import the package public entry"
+    },
+    {
+      "kind": "renderable-type",
+      "rule": "ReactNode children become OctaneNode children"
+    },
+    {
+      "kind": "negative-control",
+      "rule": "Matching @ts-expect-error controls must reject the same invalid call shapes on both sides"
+    }
+  ],
+  "divergences": []
+}

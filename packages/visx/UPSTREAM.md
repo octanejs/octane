@@ -1,4 +1,4 @@
-# Visx upstream provenance
+# Upstream Visx audit
 
 ## Pin and oracle environment
 
@@ -7,11 +7,15 @@
 | Package | `@visx/visx` |
 | Version | `4.0.0` |
 | Canonical release commit | `78839796081beb0370fc928cc922b21908bbabaf` |
-| Current-master comparison commit | `485c0359664ee8e612992defb16e1f035ed40b23` |
+| Current-master audit commit | `485c0359664ee8e612992defb16e1f035ed40b23` |
 | React oracle | `react@19.2.7` and `react-dom@19.2.7` |
 | React types oracle | `@types/react@19.2.17` and `@types/react-dom@19.2.3` |
 | Claimed compatibility range | workspace `catalog:default` (`react`/`react-dom` `^19.2.7`, `@types/react` `^19.2.17`) |
 | License | MIT |
+
+Exact lockfile-resolved oracle versions are also recorded as immutable audit
+metadata in [`audit/oracle-environment.json`](./audit/oracle-environment.json)
+and hashed into the parity manifest lanes that inherit them.
 
 ## Public package inventory
 

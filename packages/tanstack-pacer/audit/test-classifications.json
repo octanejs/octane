@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/tanstack-pacer/tests/adapted/scheduler.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Repo-authored Octane scheduler lifecycle suite. Differential packages/tanstack-pacer/tests/differential/parity.test.ts pairs the same observable scenarios against pinned @tanstack/react-pacer: counter debounce/throttle, batching, teardown, latest-label debounce/throttle, and useDebouncedValue."
+    },
+    {
+      "path": "packages/tanstack-pacer/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the same authored scheduler fixture and interactions against @octanejs/tanstack-pacer and pinned @tanstack/react-pacer, including latest-label debounce/throttle and useDebouncedValue."
+    },
+    {
+      "path": "packages/tanstack-pacer/tests/pacer.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks framework-neutral core re-exports and is not counted as React parity."
+    },
+    {
+      "path": "packages/tanstack-pacer/tests/parity/contracts.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates upstream evidence and status notes for local setter-type aliases without claiming React behavior parity."
+    },
+    {
+      "path": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Accept/reject evidence for local Dispatch/SetStateAction aliases; kept in an ordinary typecheck project because upstream test:types is compile-only and has no assertion counterpart. Executed by root bindings:typecheck via typetests/octane-only/tsconfig.json."
+    }
+  ]
+}

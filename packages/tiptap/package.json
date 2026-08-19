@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tiptap",
-  "version": "0.0.33",
+  "version": "0.0.35",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -46,7 +46,8 @@
     "./menus": "./src/menus/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "upstream:verify": "node ./scripts/verify-upstream.mjs"
   },
   "dependencies": {
     "@tiptap/core": "catalog:default",

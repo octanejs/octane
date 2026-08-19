@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/tanstack-hotkeys/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the same authored keyboard fixture against both adapters with target-local registrations and independent per-runtime keydown drives."
+    },
+    {
+      "path": "packages/tanstack-hotkeys/tests/hotkeys.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane hooks and document integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/tanstack-hotkeys/tests/parity/contracts.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Authenticates upstream evidence and the structured target-ref adaptation without claiming React behavior parity.",
+      "divergenceIds": ["plain-ref-target"]
+    },
+    {
+      "path": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
+      "disposition": "pristine-upstream-suite",
+      "oracle": "Spawns the pinned upstream Vitest suite unchanged, captures the child JSON report, and requires the exact 41 declared identities to pass once."
+    },
+    {
+      "path": "packages/tanstack-hotkeys/tests/upstream/useHotkey.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted port of packages/react-hotkeys/tests/useHotkey.test.tsx."
+    },
+    {
+      "path": "packages/tanstack-hotkeys/tests/upstream/useHotkeyRegistrations.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted port of packages/react-hotkeys/tests/useHotkeyRegistrations.test.tsx."
+    },
+    {
+      "path": "packages/tanstack-hotkeys/tests/upstream/useHotkeySequences.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted port of packages/react-hotkeys/tests/useHotkeySequences.test.tsx."
+    },
+    {
+      "path": "packages/tanstack-hotkeys/tests/upstream/useHotkeys.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapted port of packages/react-hotkeys/tests/useHotkeys.test.tsx."
+    }
+  ]
+}

@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { createElement, useState, withSlot, flushSync, template, clone } from 'octane';
+import { createElement, useState, useCallback, withSlot, flushSync, template, clone } from 'octane';
 import { mount } from './_helpers';
-import { ReuseApp, NestedApp } from './_fixtures/custom-hooks.tsrx';
+import {
+	ReuseApp,
+	NestedApp,
+	CallbackReuseApp,
+	type CallbackReuseProps,
+	type CallbackSnapshot,
+} from './_fixtures/custom-hooks.tsrx';
 
 // "Hooks everywhere": Octane base hooks are slotted in ANY function, and custom
 // (`use[A-Z]`) hook calls are wrapped in withSlot so reuse stays independent.
@@ -28,6 +34,80 @@ describe('custom hooks', () => {
 		r.click('.b');
 		expect(r.find('.a').textContent).toBe('1');
 		expect(r.find('.b').textContent).toBe('101');
+		r.unmount();
+	});
+
+	it('preserves callback dependencies independently through nested custom hooks', () => {
+		let callbacks!: CallbackSnapshot;
+		const results: string[] = [];
+		let props: CallbackReuseProps = {
+			left: 'a',
+			right: 'b',
+			revision: 0,
+			showLeft: true,
+			observe: (next) => (callbacks = next),
+			onResult: (value) => results.push(value),
+		};
+		const r = mount(CallbackReuseApp, props);
+		const first = callbacks;
+		r.click('.left-callback');
+		r.click('.right-callback');
+		expect(results.splice(0)).toEqual(['a|a|a:0|a', 'b|b|b:0|b']);
+
+		props = { ...props, revision: 1 };
+		r.update(CallbackReuseApp, props);
+		expect(callbacks.left!.explicit).toBe(first.left!.explicit);
+		expect(callbacks.left!.inferred).toBe(first.left!.inferred);
+		expect(callbacks.left!.initial).toBe(first.left!.initial);
+		expect(callbacks.left!.always).not.toBe(first.left!.always);
+		expect(callbacks.right.explicit).toBe(first.right.explicit);
+		expect(callbacks.right.inferred).toBe(first.right.inferred);
+		r.click('.left-callback');
+		r.click('.right-callback');
+		expect(results.splice(0)).toEqual(['a|a|a:1|a', 'b|b|b:1|b']);
+
+		props = { ...props, left: 'c', revision: 2 };
+		r.update(CallbackReuseApp, props);
+		expect(callbacks.left!.explicit).not.toBe(first.left!.explicit);
+		expect(callbacks.left!.inferred).not.toBe(first.left!.inferred);
+		expect(callbacks.left!.initial).toBe(first.left!.initial);
+		expect(callbacks.right.explicit).toBe(first.right.explicit);
+		expect(callbacks.right.inferred).toBe(first.right.inferred);
+		r.click('.left-callback');
+		r.click('.right-callback');
+		expect(results).toEqual(['c|c|c:2|a', 'b|b|b:2|b']);
+		r.unmount();
+	});
+
+	it('preserves later callbacks when an earlier custom hook is skipped', () => {
+		let callbacks!: CallbackSnapshot;
+		const results: string[] = [];
+		let props: CallbackReuseProps = {
+			left: 'a',
+			right: 'b',
+			revision: 0,
+			showLeft: true,
+			observe: (next) => (callbacks = next),
+			onResult: (value) => results.push(value),
+		};
+		const r = mount(CallbackReuseApp, props);
+		const first = callbacks;
+
+		props = { ...props, showLeft: false, right: 'c', revision: 1 };
+		r.update(CallbackReuseApp, props);
+		expect(callbacks.left).toBeNull();
+		expect(callbacks.right.initial).toBe(first.right.initial);
+		r.click('.right-callback');
+		expect(results.splice(0)).toEqual(['c|c|c:1|b']);
+
+		props = { ...props, showLeft: true, revision: 2 };
+		r.update(CallbackReuseApp, props);
+		expect(callbacks.left!.explicit).toBe(first.left!.explicit);
+		expect(callbacks.left!.inferred).toBe(first.left!.inferred);
+		expect(callbacks.left!.initial).toBe(first.left!.initial);
+		r.click('.left-callback');
+		r.click('.right-callback');
+		expect(results).toEqual(['a|a|a:2|a', 'c|c|c:2|b']);
 		r.unmount();
 	});
 });
@@ -67,6 +147,56 @@ describe('manual withSlot (hand-written, no compiler)', () => {
 
 		expect(api.an).toBe(1); // A advanced
 		expect(api.bn).toBe(0); // B untouched → distinct call-path slots
+		r.unmount();
+	});
+
+	it('supports callbacks with an ambient path and a trailing omitted-deps slot', () => {
+		const leftSlot = Symbol('manual-callback-left');
+		const rightSlot = Symbol('manual-callback-right');
+		const innerSlot = Symbol('manual-callback-inner');
+		const singleSlot = Symbol('manual-callback-single');
+		const omittedSlot = Symbol('manual-callback-omitted');
+		const ownSlot = Symbol('manual-callback-own');
+		type Snapshot = {
+			left: () => string;
+			right: () => string;
+			single: () => string;
+			omitted: () => string;
+		};
+		type Props = {
+			left: string;
+			right: string;
+			observe: (next: Snapshot) => void;
+		};
+		function readNestedCallback(value: string): () => string {
+			return withSlot(innerSlot, useCallback, () => value, [value]);
+		}
+		function ManualCallbacks(props: Props) {
+			const left = withSlot(leftSlot, readNestedCallback, props.left);
+			const right = withSlot(rightSlot, readNestedCallback, props.right);
+			const single = withSlot(singleSlot, useCallback, () => props.left, [props.left]);
+			const omitted = withSlot(omittedSlot, useCallback, () => props.left, ownSlot);
+			props.observe({ left, right, single, omitted });
+			return createElement('span', {}, left() + '/' + right() + '/' + omitted());
+		}
+		let callbacks!: Snapshot;
+		const observe = (next: Snapshot) => (callbacks = next);
+		const r = mount(ManualCallbacks, { left: 'a', right: 'b', observe });
+		const first = callbacks;
+		expect(r.find('span').textContent).toBe('a/b/a');
+
+		r.update(ManualCallbacks, { left: 'a', right: 'b', observe });
+		expect(callbacks.left).toBe(first.left);
+		expect(callbacks.right).toBe(first.right);
+		expect(callbacks.single).toBe(first.single);
+		expect(callbacks.omitted()).toBe('a');
+
+		r.update(ManualCallbacks, { left: 'c', right: 'b', observe });
+		expect(r.find('span').textContent).toBe('c/b/c');
+		expect(callbacks.left).not.toBe(first.left);
+		expect(callbacks.right).toBe(first.right);
+		expect(callbacks.single()).toBe('c');
+		expect(callbacks.omitted()).toBe('c');
 		r.unmount();
 	});
 });

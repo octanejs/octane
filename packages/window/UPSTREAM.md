@@ -17,7 +17,13 @@
 
 The byte-exact tagged `lib/` tree, published npm declaration bundle, repository
 package metadata, and license are vendored under `upstream/` for provenance and
-must remain excluded from the published package.
+parity evidence. They are audit inputs only and must remain excluded from the
+published package.
+
+Run `pnpm --dir packages/window upstream:verify` to verify all 58 vendored
+artifacts, the exact file set, the published declaration bundle, the 14 upstream
+test artifacts and their 117 test registrations, package metadata, and the
+complete root export inventory.
 
 ## Public v2.3.0 surface
 
@@ -34,9 +40,21 @@ the binding contract.
 
 ## Source boundary and module disposition
 
+The immutable boundary is every file under upstream `lib/`, plus `src/constants.ts`,
+`vitest.setup.js`, `package.json`, and the MIT license. Production modules are
+ported source-correspondently under `src/`; test modules are either executed
+byte-exact in the pristine lane or generated into `tests/upstream/` using the
+audited transformations in `audit/adapted-transformations.json`. Upstream test
+utilities remain byte-locked inputs and are mapped to the adapted utilities by
+the generator. No vendored file is published.
+
 | Upstream module class | Octane disposition | Evidence |
 | --- | --- | --- |
+| `lib/components/**`, `lib/core/**`, `lib/hooks/**`, `lib/utils/**` production files | Source-correspondent port in `src/**`; React imports and renderer syntax are the only framework adaptations | `audit/adapted-transformations.json`, `tests/audit/adapted.test.mjs` |
+| `lib/**/*.test.{ts,tsx}` | Unchanged pristine execution and generated adapted execution | `audit/pristine-runtime.json`, `audit/adapted-runtime.json` |
 | `lib/utils/test/**`, `vitest.setup.js` | Unchanged pristine support; source-correspondent adapted support | `upstream/SHA256SUMS`, `tests/generate-adapted-tests.mjs` |
+| Published declaration bundle | Unchanged pristine oracle; identical shared assertion program targets Octane source | `audit/type-contract.json`, `typetests/**` |
+| Repository metadata and license | Vendored provenance only | `tests/audit/upstream.test.mjs` |
 
 ## Export crosswalk
 
@@ -61,10 +79,11 @@ the binding contract.
 
 ## Upstream test crosswalk
 
-The adapted suite is generated from these upstream files and runs in the
-`window-adapted` project.
+Every row runs unchanged in `react-window-pristine` and as a generator-produced,
+audited adaptation in `react-window-adapted`; the inventories prove all 117
+registered cases are unique and executed.
 
-| Upstream test file | Upstream source | Adapted disposition |
+| Upstream test file | Pristine disposition | Adapted disposition |
 | --- | --- | --- |
 | `components/grid/Grid.test.tsx` | byte-exact | generated framework adaptation |
 | `components/list/List.test.tsx` | byte-exact | generated framework adaptation |
@@ -89,4 +108,9 @@ The adapted suite is generated from these upstream files and runs in the
 | `tests/differential/parity.test.ts` | Differential | One shared TSX fixture is compiled for React and Octane; the rig compares serialized DOM after native scrolling |
 | `tests/ssr/ssr.test.ts` | Adapted SSR | Exercises the same public `List`/`Grid` defaults pinned by the declaration and upstream component suites |
 | `tests/hydration.test.ts` | Adapted hydration | Adopts nodes emitted by the SSR fixture, then proves live ResizeObserver and scrolling behavior |
+| `typetests/parity.test-d.ts` | Paired type oracle | Identical assertion groups compile against the npm declaration and Octane source; `audit/type-contract.json` forbids source transforms |
+| `typetests/negative/missing-coordinate.test-d.ts` | Paired negative type control | Both compilers reject the same incomplete Grid coordinate |
+| `tests/audit/upstream.test.mjs` | Provenance audit | Pins the exact file/export/test inventory in both directions |
+| `tests/audit/adapted.test.mjs` | Adaptation audit | Regenerates and byte-compares every adapted upstream test/source mapping with mutation controls |
+| `tests/audit/types.test.mjs` | Type-evidence audit | Accounts for every assertion group and proves skipped/deleted/unauthorized mutations fail |
 | `tests/feasibility/renderer-boundary.test.ts` | Framework-boundary characterization | Documents the two reviewed renderer ABI/scheduling divergences recorded in the manifest |

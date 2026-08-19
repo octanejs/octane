@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "project": "hook-form-server",
+  "roots": ["packages/hook-form/tests/upstream"],
+  "files": [
+    "packages/hook-form/tests/upstream/controller.server.test.tsx",
+    "packages/hook-form/tests/upstream/formStateSubscribe.server.test.tsx",
+    "packages/hook-form/tests/upstream/useForm.server.test.tsx",
+    "packages/hook-form/tests/upstream/useFormContext.server.test.tsx",
+    "packages/hook-form/tests/upstream/watch.server.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:f17ecfcd4cbb9ad8",
+      "file": "packages/hook-form/tests/upstream/controller.server.test.tsx",
+      "fullName": "Controller with SSR should render correctly with as with component"
+    },
+    {
+      "id": "runtime:80ab8fcf6bd8e9f6",
+      "file": "packages/hook-form/tests/upstream/formStateSubscribe.server.test.tsx",
+      "fullName": "FormStateSubscribe with SSR should render correctly"
+    },
+    {
+      "id": "runtime:58e0a78702f6ec7d",
+      "file": "packages/hook-form/tests/upstream/useForm.server.test.tsx",
+      "fullName": "useForm with SSR should display error with errors prop"
+    },
+    {
+      "id": "runtime:e62dfbdafab1585b",
+      "file": "packages/hook-form/tests/upstream/useForm.server.test.tsx",
+      "fullName": "useForm with SSR should not output error"
+    },
+    {
+      "id": "runtime:a46baf7071311627",
+      "file": "packages/hook-form/tests/upstream/useForm.server.test.tsx",
+      "fullName": "useForm with SSR should not pass down constrained API for server side rendering"
+    },
+    {
+      "id": "runtime:f4aece54c6aa6167",
+      "file": "packages/hook-form/tests/upstream/useForm.server.test.tsx",
+      "fullName": "useForm with SSR should pass down constrained API for server side rendering"
+    },
+    {
+      "id": "runtime:dfb53eff82869eac",
+      "file": "packages/hook-form/tests/upstream/useForm.server.test.tsx",
+      "fullName": "useForm with SSR should support progress enhancement for form"
+    },
+    {
+      "id": "runtime:f845e674eaf124f4",
+      "file": "packages/hook-form/tests/upstream/useFormContext.server.test.tsx",
+      "fullName": "FormProvider should work correctly with Controller, useWatch, useFormState."
+    },
+    {
+      "id": "runtime:990b800380949946",
+      "file": "packages/hook-form/tests/upstream/watch.server.test.tsx",
+      "fullName": "Watch with SSR should be rendered correctly"
+    }
+  ]
+}

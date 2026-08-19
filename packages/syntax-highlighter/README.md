@@ -40,6 +40,7 @@ source text cannot unwrap:
 + <SyntaxHighlighter children={source} />
 ```
 
-See [`UPSTREAM.md`](UPSTREAM.md) for immutable provenance. Ordinary runtime,
-type, SSR, hydration, differential, and real-browser tests cover the supported
-surface.
+See [`UPSTREAM.md`](UPSTREAM.md) for immutable provenance. The fail-closed
+parity audit runs all 19 upstream suites and 51 test identities, 40 snapshots,
+paired type contracts, SSR/hydration, a React differential, and real Chromium
+and Firefox rendering.

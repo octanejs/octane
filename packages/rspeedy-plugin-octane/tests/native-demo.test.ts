@@ -36,6 +36,16 @@ import {
 } from '../scripts/run-lynx-explorer-demo.mjs';
 
 const temporaryRoots: string[] = [];
+const toolchain = JSON.parse(
+	readFileSync(new URL('../../lynx/audit/toolchain.json', import.meta.url), 'utf8'),
+) as {
+	readonly nativeSdk: {
+		readonly selectedAssets: readonly {
+			readonly name: string;
+			readonly sha256: string;
+		}[];
+	};
+};
 
 afterEach(() => {
 	for (const root of temporaryRoots.splice(0)) rmSync(root, { force: true, recursive: true });
@@ -59,6 +69,16 @@ describe('macOS Lynx Explorer native demo', () => {
 		);
 		expect(() => selectExplorerAsset({ arch: 'ia32', platform: 'darwin' })).toThrow(
 			/supports macOS arm64 and x64/,
+		);
+		expect(
+			toolchain.nativeSdk.selectedAssets
+				.filter(({ name }) => name.startsWith('LynxExplorer-macos-'))
+				.map(({ name, sha256 }) => ({ name, sha256 })),
+		).toEqual(
+			Object.values(LYNX_EXPLORER_ASSETS).map(({ archiveName: name, sha256 }) => ({
+				name,
+				sha256,
+			})),
 		);
 	});
 

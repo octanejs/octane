@@ -1,0 +1,33 @@
+{
+    "compilerOptions": {
+        "target": "es5",
+        "module": "node16",
+        "lib": [
+            "es6",
+            "dom"
+        ],
+        "noImplicitAny": true,
+        "noImplicitThis": true,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true,
+        "jsx": "react",
+        "types": [],
+        "noEmit": true,
+        "forceConsistentCasingInFileNames": true,
+        "baseUrl": "..",
+        "paths": {
+            "react-transition-group": [
+                "node_modules/@types/react-transition-group"
+            ],
+            "react-transition-group/SwitchTransition": [
+                "node_modules/@types/react-transition-group/SwitchTransition.d.ts"
+            ],
+            "react-transition-group/Transition": [
+                "node_modules/@types/react-transition-group/Transition.d.ts"
+            ]
+        }
+    },
+    "files": [
+        "react-transition-group-tests.tsx"
+    ]
+}

@@ -152,6 +152,19 @@ Ownership is file-based. If one file contains parity and ordinary tests, split t
 
 A full-suite lane gets its file and identity sets from its inventory:
 
+```json
+{
+  "id": "example-adapted-full-suite",
+  "type": "adapted-octane",
+  "oracle": "required",
+  "project": "example",
+  "execution": {
+    "kind": "vitest-full",
+    "inventory": "packages/example/audit/adapted-runtime.json"
+  }
+}
+```
+
 The inventory supplies every expected `(file, fullName)` pair. The runner report must match that multiset exactly.
 
 ### Direct runners
@@ -169,9 +182,16 @@ The parity job runs the direct runner. Ordinary CI does not run the wrapper agai
 
 ## Semantic validation logic
 
+Add `scripts/react-parity/vitest-contract.mjs`. This module builds and checks one repository-wide execution model.
+
 ### 1. Load the inputs once
 
 The validator loads these inputs:
+
+- every discovered `packages/*/audit/react-parity.json` manifest;
+- the base projects from `vitest.config.js`;
+- the derived projects from `vitest.ci-sharded.config.js`;
+- every referenced full-suite inventory.
 
 The validator rejects duplicate Vitest project names before it checks lanes.
 
@@ -293,6 +313,8 @@ Remove the redundant `hook-form-adapted-controller` lane during migration. Bind 
 
 ### 8. Use execution as the final check
 
+`react-parity:check` must not run a separate Vitest collection before each lane.
+
 The current runner already supplies explicit files and test names. It also reads Vitest's JSON report.
 
 Keep that flow and strengthen its repository-wide checks:
@@ -321,6 +343,8 @@ That behavior is intentional. The result matters; the config file version does n
 
 ## Command behavior
 
+### `pnpm react-parity:validate`
+
 Keep this command cheap. It performs no test execution and no Vitest collection.
 
 It checks:
@@ -333,6 +357,8 @@ It checks:
 - the derived sharded view;
 - cross-lane identity overlap.
 
+### `pnpm react-parity:check`
+
 Run the same static checks first. Then execute every required, available lane once.
 
 Use the runner report as both collection evidence and execution evidence. Do not add a second full run.
@@ -341,11 +367,28 @@ Use the runner report as both collection evidence and execution evidence. Do not
 
 Keep explicit Vitest collection for local diagnosis. A developer can inspect one lane without running it:
 
+```bash
+node scripts/react-parity/harness.mjs validate \
+  --manifest packages/rxjs/audit/react-parity.json \
+  --lane rxjs-bind-differential
+```
+
 ## Implementation units
 
 ### U1. Add the execution-contract model
 
+- **Files:** `scripts/react-parity/vitest-contract.mjs` and `scripts/react-parity/vitest-contract.test.mjs`.
+- **Goal:** Build claimed files, owned files, sharded files, and expected identities from repository data.
+- **Tests:** Use small temporary fixtures. Do not hard-code current package names as the main regression test.
+- **Negative cases:** Missing project, excluded evidence, missing ownership, broad ownership, orphan ownership, duplicate lane identity, and stale sharded output.
+- **Controls:** Cover full ownership, scoped ownership, full inventories, direct-runner wrappers, and harmless config changes.
+
 ### U2. Connect validation to the parity commands
+
+- **Files:** `scripts/react-parity/check.mjs`, `scripts/react-parity/harness-lib.mjs`, and focused tests.
+- **Goal:** Run the semantic check once before validation or execution.
+- **Approach:** Pass loaded manifests and configs into one validator. Do not reload the root config for each package.
+- **Failure format:** Report the manifest path, lane ID, project, file, and failed rule.
 
 ### U3. Enforce one execution for each identity
 
@@ -355,6 +398,13 @@ Keep explicit Vitest collection for local diagnosis. A developer can inspect one
 - **Boundary:** Preserve valid duplicate titles inside one lane as a counted multiset.
 
 ### U4. Remove the broad config hashes
+
+- **Files:** The 24 affected `packages/*/audit/react-parity.json` manifests.
+- **Goal:** Remove all 28 `vitest.config.js` support entries.
+- **Preserve:** Keep hashes for test files, fixtures, setup files, rigs, inventories, upstream snapshots, and classification records.
+- **Cleanup:** Remove the stale RxJS note that says the lane stays outside `testExecution` until provenance is verified.
+- **Schema:** No schema change is required because config support entries are optional today.
+- **Generation:** Do not add a config-hash generator to `pnpm sync`.
 
 ### U5. Update the contract documentation
 
@@ -367,7 +417,24 @@ Keep explicit Vitest collection for local diagnosis. A developer can inspect one
 
 Run focused checks during implementation:
 
+```bash
+node --test scripts/react-parity/vitest-contract.test.mjs
+node --test --test-name-pattern='derives sharded projects generically' scripts/ci-workflow.test.mjs
+pnpm react-parity:validate
+pnpm react-parity:test
+```
+
 Run representative lane checks for each execution shape:
+
+```bash
+node scripts/react-parity/harness.mjs run \
+  --manifest packages/rxjs/audit/react-parity.json \
+  --lane rxjs-bind-differential
+
+node scripts/react-parity/harness.mjs run \
+  --manifest packages/react-error-boundary/audit/react-parity.json \
+  --lane react-error-boundary-reset-differential
+```
 
 Also run the ordinary React Error Boundary shard. It must keep its non-parity oracle test:
 
@@ -381,7 +448,26 @@ Do not run the complete local Vitest suite for this change. Let CI execute all r
 
 Before push, run the repository-required generation and focused formatting commands:
 
+```bash
+pnpm sync
+pnpm format:files scripts/react-parity docs/react-parity-testing.md packages/*/audit/react-parity.json
+git diff --check
+```
+
 ## Acceptance criteria
+
+- No parity manifest hashes `vitest.config.js`.
+- Every required, available Vitest lane names one live project.
+- Every claimed file is selected by its base project.
+- Claimed files and owned files are equal for every `react-parity` project.
+- Fully owned projects disappear from the ordinary sharded config.
+- Scoped projects keep all non-parity files in ordinary sharded CI.
+- No two required Vitest lanes execute the same `(project, file, fullName)` identity.
+- Every executed lane returns the exact expected identities with `passed` status.
+- TypeScript, Jest, and Playwright lanes retain direct execution.
+- `react-parity:validate` remains metadata-only and fast.
+- `react-parity:check` does not add a second collection or execution pass.
+- CI reports semantic failures with the owning lane and file.
 
 ## Definition of done
 

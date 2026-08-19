@@ -1,0 +1,1109 @@
+{
+  "schemaVersion": 1,
+  "assertions": [
+    {
+      "file": "type/config.tsx",
+      "line": 3,
+      "source": "import { expectType } from './utils'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 8,
+      "source": "expectType<Cache<any>>(useSWRConfig().cache)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 13,
+      "source": "// @ts-expect-error",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 15,
+      "source": "// @ts-expect-error",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 34,
+      "source": "// @ts-expect-error",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 47,
+      "source": "expectType<IData | Promise<IData> | undefined>(config.fallbackData)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 52,
+      "source": "expectType<Equal<FilledData, string>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 59,
+      "source": "expectType<Equal<FilledConditionalData, string | number>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 67,
+      "source": "expectType<string>(data1)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 73,
+      "source": "expectType<any>(data2)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 83,
+      "source": "expectType<string | undefined>(data3)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 90,
+      "source": "expectType<string>(data4)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 101,
+      "source": "expectType<string>(data1)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 109,
+      "source": "expectType<string | number>(data2)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 116,
+      "source": "expectType<{ value: string }>(data3)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 122,
+      "source": "expectType<any>(data4)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 132,
+      "source": "expectType<string | undefined>(data5)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 139,
+      "source": "expectType<string>(data6)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 149,
+      "source": "expectType<string>(data7)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 157,
+      "source": "expectType<string>(data8)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 158,
+      "source": "expectType<string>(data9)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 164,
+      "source": "expectType<Equal<typeof data, { value: string } | undefined>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 174,
+      "source": "expectType<Equal<typeof data, { value: string } | undefined>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 175,
+      "source": "expectType<Equal<typeof error, Error | undefined>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 176,
+      "source": "expectType<Equal<typeof isLoading, boolean>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 184,
+      "source": "expectType<Equal<typeof data, { value: string }>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/config.tsx",
+      "line": 185,
+      "source": "expectType<Equal<typeof isLoading, boolean>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 3,
+      "source": "import { expectType, truthy } from './utils'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 13,
+      "source": "expectType<Equal<number, typeof index>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 14,
+      "source": "expectType<Equal<string[] | null, typeof previousPageData>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 21,
+      "source": "expectType<Equal<number, typeof index>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 22,
+      "source": "expectType<Equal<{ id: number }[] | null, typeof previousPageData>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 31,
+      "source": "expectType<Equal<'/api/user', typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 36,
+      "source": "expectType<Equal<'/api/user', typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 41,
+      "source": "expectType<Equal<'/api/user', typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 48,
+      "source": "expectType<Equal<{ a: string; b: { c: string; d: number } }, typeof key>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 55,
+      "source": "expectType<Equal<{ a: string; b: { c: string; d: number } }, typeof key>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 62,
+      "source": "expectType<Equal<{ a: string; b: { c: string; d: number } }, typeof key>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 71,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 77,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 85,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 98,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 117,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 137,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 160,
+      "source": "expectType<Equal<string, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 167,
+      "source": "expectType<Equal<'/api/user', typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 175,
+      "source": "expectType<Equal<'/api/user', typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 185,
+      "source": "expectType<Equal<string, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 195,
+      "source": "expectType<Equal<string, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 204,
+      "source": "expectType<Equal<string, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 214,
+      "source": "expectType<Equal<{ a: string; b: { c: string; d: number } }, typeof key>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 223,
+      "source": "expectType<Equal<{ a: string; b: { c: string; d: number } }, typeof key>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 233,
+      "source": "expectType<Equal<{ a: string; b: { c: string; d: number } }, typeof key>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 246,
+      "source": "expectType<Equal<{ index: number; endPoint: string }, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 260,
+      "source": "expectType<Equal<{ index: number; endPoint: string }, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 274,
+      "source": "expectType<Equal<{ index: number; endPoint: string }, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 284,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 296,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 309,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 322,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 336,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 350,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 365,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 386,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 408,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 429,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 450,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/fetcher.ts",
+      "line": 472,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/helper-types.tsx",
+      "line": 2,
+      "source": "import { expectType } from './utils'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/helper-types.tsx",
+      "line": 5,
+      "source": "expectType<BlockingData<string, { fallbackData: string }>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/helper-types.tsx",
+      "line": 6,
+      "source": "expectType<BlockingData<any, { suspense: true }>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/helper-types.tsx",
+      "line": 7,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/helper-types.tsx",
+      "line": 10,
+      "source": "expectType<BlockingData<false, { suspense: false; revalidate: boolean }>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/internal.tsx",
+      "line": 2,
+      "source": "import { expectType } from './utils'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/internal.tsx",
+      "line": 5,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/mutate.ts",
+      "line": 12,
+      "source": "import { expectType } from './utils'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/mutate.ts",
+      "line": 67,
+      "source": "// @ts-expect-error",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/mutate.ts",
+      "line": 69,
+      "source": "// @ts-expect-error",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/mutate.ts",
+      "line": 78,
+      "source": "expectType<Arguments>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/mutate.ts",
+      "line": 82,
+      "source": "expectType<number | undefined>(data)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/mutate.ts",
+      "line": 90,
+      "source": "expectType<string | undefined>(data)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/mutate.ts",
+      "line": 98,
+      "source": "expectType<Arguments>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/mutate.ts",
+      "line": 102,
+      "source": "expectType<number | undefined>(data)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/mutate.ts",
+      "line": 110,
+      "source": "expectType<string | undefined>(data)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/mutate.ts",
+      "line": 116,
+      "source": "expectType<string | undefined>(data)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/mutation.ts",
+      "line": 2,
+      "source": "import { expectType } from './utils'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/mutation.ts",
+      "line": 6,
+      "source": "expectType<TriggerWithoutArgs<'key', any, string, never>>(trigger)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 3,
+      "source": "import { expectType, truthy } from './utils'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 15,
+      "source": "expectType<Equal<'/api/user', typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 21,
+      "source": "expectType<Equal<'/api/user', typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 27,
+      "source": "expectType<Equal<'/api/user', typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 38,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 48,
+      "source": "expectType<Equal<{ a: string; b: { c: string; d: number } }, typeof key>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 57,
+      "source": "expectType<Equal<{ a: string; b: { c: string; d: number } }, typeof key>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 68,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 79,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 90,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 104,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 125,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 147,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 170,
+      "source": "expectType<Equal<string, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 176,
+      "source": "expectType<Equal<'/api/user', typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 183,
+      "source": "expectType<Equal<'/api/user', typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 194,
+      "source": "expectType<Equal<string, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 206,
+      "source": "expectType<Equal<string, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 217,
+      "source": "expectType<Equal<string, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 227,
+      "source": "expectType<Equal<{ a: string; b: { c: string; d: number } }, typeof key>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 235,
+      "source": "expectType<Equal<{ a: string; b: { c: string; d: number } }, typeof key>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 244,
+      "source": "expectType<Equal<{ a: string; b: { c: string; d: number } }, typeof key>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 258,
+      "source": "expectType<Equal<{ index: number; endPoint: string }, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 274,
+      "source": "expectType<Equal<{ index: number; endPoint: string }, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 290,
+      "source": "expectType<Equal<{ index: number; endPoint: string }, typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 300,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 311,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 325,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 340,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 356,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 372,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 387,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 409,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 433,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 454,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 476,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/option-fetcher.ts",
+      "line": 500,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/preload.ts",
+      "line": 2,
+      "source": "import { expectType } from './utils'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/preload.ts",
+      "line": 7,
+      "source": "expectType<Equal<Promise<'value'>, typeof data1>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/preload.ts",
+      "line": 13,
+      "source": "expectType<Equal<'value', typeof data2>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/preload.ts",
+      "line": 20,
+      "source": "expectType<Equal<'value' | Promise<'value'>, typeof data3>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/preload.ts",
+      "line": 23,
+      "source": "expectType<Equal<'key', typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/preload.ts",
+      "line": 29,
+      "source": "// @ts-expect-error -- infered any implicitly",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/preload.ts",
+      "line": 37,
+      "source": "expectType<Equal<[string, number], typeof keys>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/preload.ts",
+      "line": 43,
+      "source": "expectType<Equal<'key', typeof key>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 3,
+      "source": "import { expectType, truthy } from './utils'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 9,
+      "source": "expectType<'key'>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 16,
+      "source": "expectType<'key'>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 23,
+      "source": "expectType<[string, number]>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 30,
+      "source": "expectType<[string, number]>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 37,
+      "source": "expectType<{ foo: string }>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 44,
+      "source": "expectType<{ foo: string }>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 52,
+      "source": "expectType<string>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 59,
+      "source": "expectType<'key'>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 66,
+      "source": "expectType<[string, number]>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 73,
+      "source": "expectType<[string, number]>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 80,
+      "source": "expectType<{ foo: string }>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 87,
+      "source": "expectType<{ foo: string }>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 96,
+      "source": "expectType<string | undefined>(data2)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/subscription.ts",
+      "line": 97,
+      "source": "expectType<Error | undefined>(error2)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/suspense/helper-types.tsx",
+      "line": 2,
+      "source": "import { expectType } from '../utils'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/suspense/helper-types.tsx",
+      "line": 11,
+      "source": "expectType<BlockingData<string, { fallbackData: string }>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/suspense/helper-types.tsx",
+      "line": 12,
+      "source": "expectType<BlockingData<any, { suspense: true }>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/suspense/helper-types.tsx",
+      "line": 13,
+      "source": "expectType<",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/suspense/helper-types.tsx",
+      "line": 16,
+      "source": "expectType<BlockingData<false, { suspense: false; revalidate: boolean }>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/suspense/suspense.ts",
+      "line": 2,
+      "source": "import { expectType } from '../utils'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/suspense/suspense.ts",
+      "line": 12,
+      "source": "expectType<string>(data)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 4,
+      "source": "const expectType: ExpectType = () => {}",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 13,
+      "source": "expectType<Equal<number, string>>(false) // should be false",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 17,
+      "source": "expectType<string>(key)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 20,
+      "source": "expectType<Equal<typeof opts, Readonly<{ arg: never }>>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 31,
+      "source": "expectType<Equal<Parameters<typeof trigger>[0], number>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 32,
+      "source": "expectType<Promise<string>>(trigger(1))",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 35,
+      "source": "expectType<Equal<typeof reset, () => void>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 36,
+      "source": "expectType<Equal<typeof data, string | undefined>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 37,
+      "source": "expectType<Equal<typeof error, any>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 41,
+      "source": "expectType<Equal<Omit<Ret, 'mutate' | 'isValidating'>, Ret>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 48,
+      "source": "expectType<Equal<typeof opts, Readonly<{ arg: number }>>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 54,
+      "source": "expectType<Equal<Parameters<typeof trigger>[0], number>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 55,
+      "source": "expectType<Promise<string>>(trigger(1))",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 56,
+      "source": "expectType<Promise<string | undefined>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 67,
+      "source": "expectType<Equal<typeof opts, Readonly<{ arg: number }>>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 76,
+      "source": "expectType<Equal<Parameters<typeof trigger>[0], number>>(true)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 77,
+      "source": "expectType<Promise<string | undefined>>(trigger(1))",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 78,
+      "source": "expectType<Promise<string>>(",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 97,
+      "source": "// @ts-expect-error `arg` should be 'foo'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 100,
+      "source": "// @ts-expect-error `arg` should be 'foo'",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 103,
+      "source": "expectType<string[] | undefined>(current)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 107,
+      "source": "expectType<string>(added)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 108,
+      "source": "expectType<typeof data>(current)",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 114,
+      "source": "test()",
+      "kind": "generic-helper"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 126,
+      "source": "expectType<Promise<string | undefined>>(trigger('foo'))",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 127,
+      "source": "expectType<Promise<string | undefined>>(trigger(undefined))",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 128,
+      "source": "expectType<Promise<string | undefined>>(trigger())",
+      "kind": "type-assertion"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 130,
+      "source": "test()",
+      "kind": "generic-helper"
+    },
+    {
+      "file": "type/trigger.ts",
+      "line": 154,
+      "source": "test()",
+      "kind": "generic-helper"
+    },
+    {
+      "file": "type/utils.ts",
+      "line": 2,
+      "source": "export const expectType: ExpectType = () => {}",
+      "kind": "type-assertion"
+    }
+  ]
+}

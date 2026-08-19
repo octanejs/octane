@@ -25,6 +25,12 @@ export function TwoStates() @{
 	</div>
 }
 
+export function StateValueProbe(props) @{
+	const [value, setValue, getValue] = octaneUseState(() => props.initial);
+	props.expose(setValue, getValue);
+	<span>{props.display(value) as string}</span>
+}
+
 // useReducer
 export function Tally() @{
 	const [n, dispatch] = useReducer((s, a) => s + a, 0);
@@ -106,6 +112,40 @@ export function CustomSelectorCallback(props) @{
 export function CbTest(props) @{
 	const cb = useCallback(() => props.label);
 	<span>{props.label as string}</span>
+}
+
+function useForwardedCallback<T extends (...args: any[]) => any>(
+	callback: T,
+	dependencies: unknown[] | null,
+): T {
+	return useCallback(callback, dependencies);
+}
+
+export function ForwardedCallbackPair({
+	first,
+	second,
+	dependencies,
+	observe,
+	label,
+}: {
+	first: () => string;
+	second: () => string;
+	dependencies: unknown[] | null;
+	observe: (first: () => string, second: () => string) => void;
+	label: string;
+}) @{
+	const firstCallback = useForwardedCallback(first, dependencies);
+	const secondCallback = useForwardedCallback(second, dependencies);
+	observe(firstCallback, secondCallback);
+	<span>{label}</span>
+}
+
+export function CallbackRenderPass({ observe }: { observe: (callback: () => number) => void }) @{
+	const [step, setStep] = octaneUseState(0);
+	const callback = useForwardedCallback(() => step, []);
+	observe(callback);
+	if (step === 0) setStep(1);
+	<span>{'step=' + step + ' callback=' + callback()}</span>
 }
 
 // useRef — survives across renders, mutations don't trigger re-render.

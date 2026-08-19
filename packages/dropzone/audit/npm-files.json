@@ -1,0 +1,48 @@
+{
+  "files": [
+    {
+      "path": "upstream/npm/dist/index.cjs",
+      "sha256": "7df35c8515c46a494f0da376086621c10243ac5168addd70a71fd35d27d936d3"
+    },
+    {
+      "path": "upstream/npm/dist/index.cjs.map",
+      "sha256": "f40db5bdee269126a78bf3ff8ed9301181d4142ca859dd39bcc14f88607a6117"
+    },
+    {
+      "path": "upstream/npm/dist/index.d.cts",
+      "sha256": "7cc47601ffcfb8eef6678c620df7cf806d3346b4314b77a6092dbcd6e768b9c4"
+    },
+    {
+      "path": "upstream/npm/dist/index.d.ts",
+      "sha256": "b15b7a8a40b99a7d3ad2a4fb1ebbd53fe0896ee74fe0eceac6324ecafcf139e6"
+    },
+    {
+      "path": "upstream/npm/dist/index.js",
+      "sha256": "dc06444ba35ea72fd241edba808cbaeeb7afebf6e155ed700cc057eaa066568c"
+    },
+    {
+      "path": "upstream/npm/dist/index.js.map",
+      "sha256": "dac85e838f35b24492d08552c639e3f0880b29d6d50c526c353ba0838893f661"
+    },
+    {
+      "path": "upstream/npm/LICENSE",
+      "sha256": "7b93b62069ec28d00cc7cf3696b5d243ad9887517f8e709dce4811747f0e2dc2"
+    },
+    {
+      "path": "upstream/npm/package.json",
+      "sha256": "5073847f3d99f337e099a330dded1e1f59ca607b57baaba94eee73a88464188e"
+    },
+    {
+      "path": "upstream/npm/README.md",
+      "sha256": "e90569986f8190b3a62f636b900a2b40983902758d637e44148918195757a815"
+    },
+    {
+      "path": "upstream/npm/src/index.tsx",
+      "sha256": "4fc4ce4feb05906e4362ef35b927f13c750134b1d1605ec038c0cc7395fc3d41"
+    },
+    {
+      "path": "upstream/npm/src/utils/index.ts",
+      "sha256": "100fc1599de1ca93cf2ea9b1eb1c850cd410f0ef1313fef8ad7b6ff340ff4b98"
+    }
+  ]
+}

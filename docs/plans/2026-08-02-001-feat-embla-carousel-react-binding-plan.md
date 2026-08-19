@@ -91,6 +91,8 @@ flowchart LR
 
 **Goal:** Create the package shell, immutable upstream record, full export/source/test crosswalk, and parity manifest before implementing compatibility claims.
 
+**Files:** `packages/embla-carousel/package.json`, `tsconfig.json`, `status.json`, `README.md`, `UPSTREAM.md`, `upstream/`, `audit/react-parity.json`, package tests, root parity configuration.
+
 **Approach:** Follow the current `react-library-port` skill. Vendor MIT-permitted source/tests, record npm and Git pins, classify every export and upstream artifact, and register applicable runtime/type/differential/SSR/browser lanes.
 
 **Test scenarios:** Missing source/test dispositions fail the audit; deleting a required lane or adapted assertion fails parity validation; the package exports only the planned root surface.
@@ -134,6 +136,11 @@ flowchart LR
 **Verification:** Targeted gates, parity check, pack check, generated checks, typecheck, formatting, and the full required repository suite pass.
 
 ## Verification Contract
+
+- Package-local conformance, differential, type, SSR/hydration, and browser lanes pass.
+- The parity manifest executes under repository CI and fails when required evidence is removed.
+- `pnpm react-parity:check`, binding/status/inventory generation checks, pack checks, changeset check, typecheck, format check, and tests pass as required by current repository guidance.
+- The PR records every validation command, non-applicable lane, divergence, and browser limitation.
 
 ## Definition of Done
 

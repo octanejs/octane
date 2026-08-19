@@ -209,7 +209,8 @@ generated inventory; the shape of it is:
 - [`octane`](./packages/octane) is the runtime and the compiler together:
   rendering, the hook API, the server (SSR) and client (hydration) entry points,
   and the compiler itself, exposed at `octane/compiler` with bundler adapters at
-  `octane/compiler/vite` and `octane/compiler/bundler`.
+  `octane/compiler/vite` and `octane/compiler/bundler`. Custom Node build pipelines
+  can opt into [type-aware text compilation](./docs/compiler-text-inference.md).
 - The app layer: [`@octanejs/app-core`](./packages/app-core) holds the
   bundler-neutral config, routing, SSR, hydration codegen, and production
   handler, and the [Vite](./packages/vite-plugin-octane),
@@ -238,6 +239,17 @@ partial or alpha, and
 [`docs/bindings-status.md`](./docs/bindings-status.md) is the generated table of
 record: upstream version, supported surface, known divergences, SSR/hydration
 coverage, and when the evidence was last checked.
+
+## Sponsors
+
+<a href="https://blacksmith.sh">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./website/src/assets/blacksmith-ci-on-dark.svg">
+    <img width="352" height="96" alt="CI powered by Blacksmith" src="./website/src/assets/blacksmith-ci-on-light.svg">
+  </picture>
+</a>
+
+**BlackSmith** - fast and efficient platform for running GitHub Actions, helping teams build, test, and deploy code faster while reducing CI costs. We thank Blacksmith for supporting our community as a sponsor!
 
 ## Contributing
 

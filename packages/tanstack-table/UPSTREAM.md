@@ -22,3 +22,11 @@ and run or explicitly scoped out.
 | --- | --- | --- |
 | React example Playwright smokes | `examples/react/*/tests/e2e/smoke.spec.ts` (58 specs) | Root and per-example `test:e2e` scripts; render `@tanstack/react-table` via example apps |
 | Framework-neutral table-core | `packages/table-core/tests` (54 `*.test.ts` files) | Unit/implementation/performance baseline shared across adapters |
+
+`audit/react-parity.json` therefore records `upstreamSuites.runtime: present`
+(suites exist in the tagged workspaces) and `upstreamSuites.types: insufficient`
+(adapter typecheck only compiles source). Current parity evidence is
+repo-authored differential scenarios plus paired pristine/adapted public type
+contracts with executable per-group inventories. Ordinary framework-contract
+checks for the legacy subpath omission and plain-function component cells stay
+outside the parity group until they carry same-scenario React observations.

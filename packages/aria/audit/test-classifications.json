@@ -1,0 +1,255 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/aria/tests/aria-table-hooks.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/collection-host-spikes.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/collections-engine-rac.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/collections-engine.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/combobox.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/dialog.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/differential/parity-collections.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "The same fixture is compiled for Octane and the pinned React Aria oracle and compared after identical interactions."
+    },
+    {
+      "path": "packages/aria/tests/differential/parity-combobox.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "The same fixture is compiled for Octane and the pinned React Aria oracle and compared after identical interactions."
+    },
+    {
+      "path": "packages/aria/tests/differential/parity-leaf.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "The same fixture is compiled for Octane and the pinned React Aria oracle and compared after identical interactions."
+    },
+    {
+      "path": "packages/aria/tests/differential/parity-rac-collections.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "The same fixture is compiled for Octane and the pinned React Aria oracle and compared after identical interactions."
+    },
+    {
+      "path": "packages/aria/tests/differential/parity-rac.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "The same fixture is compiled for Octane and the pinned React Aria oracle and compared after identical interactions."
+    },
+    {
+      "path": "packages/aria/tests/differential/parity-select.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "The same fixture is compiled for Octane and the pinned React Aria oracle and compared after identical interactions."
+    },
+    {
+      "path": "packages/aria/tests/differential/parity-tree-table.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "The same fixture is compiled for Octane and the pinned React Aria oracle and compared after identical interactions."
+    },
+    {
+      "path": "packages/aria/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "The same fixture is compiled for Octane and the pinned React Aria oracle and compared after identical interactions."
+    },
+    {
+      "path": "packages/aria/tests/focus-interactions.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/focus-scope.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/foundation.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins Octane ref-as-prop foundation behavior; remains ordinary-shard coverage until one-for-one adapted upstream lanes exist."
+    },
+    {
+      "path": "packages/aria/tests/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/i18n-server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins Octane i18n serializer identifier validity; remains ordinary-shard coverage until one-for-one adapted upstream lanes exist."
+    },
+    {
+      "path": "packages/aria/tests/leaf-behaviors.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/listbox-menu-tabs.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/overlay-behaviors.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/overlays-foundation.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/package-boundary.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Guards the published Aria package boundary and production-bundle side effects; it is not used as React-parity evidence."
+    },
+    {
+      "path": "packages/aria/tests/press.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-autocomplete.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-checkable.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-fields.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-listbox.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-menu.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-overlays.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-primitives.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-select-combobox.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-support.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-table.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-tabs-breadcrumbs.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-taggroup-gridlist.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-toggle-meter.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-tree.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/rac-utils.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/select.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/selectable-collection.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/slider-numberfield-gridlist.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/ssr/ssr.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Pins Octane SSR locale-direction behavior; remains ordinary-shard coverage until one-for-one adapted upstream lanes exist."
+    },
+    {
+      "path": "packages/aria/tests/stately-collections-states.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/stately-states.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/stately-table.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/stately-utils.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/tooltip.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane-specific compiler, DOM, hydration, focus, scheduling, or component integration and is not counted as React parity."
+    },
+    {
+      "path": "packages/aria/tests/upstream-crosswalk.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks repository-authored crosswalk integrity; it is inventory evidence and does not claim execution of an upstream suite."
+    }
+  ]
+}

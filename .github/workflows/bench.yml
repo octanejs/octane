@@ -22,7 +22,7 @@ on:
 
 jobs:
   bench:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     steps:
       - name: Checkout code
@@ -36,6 +36,9 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
+
+      - name: Test benchmark work collector
+        run: node --test benchmarks/lib/precise-work.test.mjs
 
       - name: Install dependencies
         run: pnpm install --prod false --frozen-lockfile

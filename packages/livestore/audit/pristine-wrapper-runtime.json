@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "livestore-pristine",
+  "roots": ["packages/livestore/tests"],
+  "files": ["packages/livestore/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:abb7def049a7051d",
+      "file": "packages/livestore/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned @livestore/react 0.4.0 suite unchanged"
+    }
+  ]
+}

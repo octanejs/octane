@@ -1,5 +1,24 @@
 # @octanejs/swr
 
+## 0.0.7
+
+### Patch Changes
+
+- 61230d2: Remove a stale type-error suppression that breaks strict packed TSRX consumers.
+- Updated dependencies [489a886]
+- Updated dependencies [922b2d4]
+- Updated dependencies [814a3c1]
+  - octane@0.1.41
+
+## 0.0.6
+
+### Patch Changes
+
+- Updated dependencies [ff9b859]
+- Updated dependencies [14b8b40]
+- Updated dependencies [cc6e5ea]
+  - octane@0.1.40
+
 ## 0.0.5
 
 ### Patch Changes

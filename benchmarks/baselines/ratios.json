@@ -384,6 +384,46 @@
     "note": "Compact leaf rows driven by their list component's selection state replay only that component (its 100 rows), so unrelated siblings must not change the cost. Rejects the compact-range bail that forced list selection through a whole-root replay."
   },
   {
+    "suite": "universal-external-store",
+    "op": "lifetime_subscribe_calls",
+    "target": "stable-getter",
+    "reference": "subscription-reference",
+    "maxRatio": 1,
+    "note": "A stable subscribe function needs one subscription per universal reader for its mounted lifetime, including unrelated parent renders and store updates. Final host values and listener release are independently checked."
+  },
+  {
+    "suite": "universal-external-store",
+    "op": "lifetime_unsubscribe_calls",
+    "target": "stable-getter",
+    "reference": "subscription-reference",
+    "maxRatio": 1,
+    "note": "A stable universal store subscription should be released only at teardown; repeated renders must not add disconnect/reconnect work."
+  },
+  {
+    "suite": "universal-external-store",
+    "op": "lifetime_subscribe_calls",
+    "target": "inline-getter",
+    "reference": "subscription-reference",
+    "maxRatio": 1,
+    "note": "Fresh snapshot-getter closures must not reconnect a stable universal subscribe function. The subscription must continue to observe current selections and store values."
+  },
+  {
+    "suite": "universal-external-store",
+    "op": "lifetime_unsubscribe_calls",
+    "target": "inline-getter",
+    "reference": "subscription-reference",
+    "maxRatio": 1,
+    "note": "An inline getter changes what is read, not subscription ownership: each mounted universal reader needs one lifetime release."
+  },
+  {
+    "suite": "universal-external-store",
+    "op": "prefix_updater_calls",
+    "target": "state-replacement-burst",
+    "reference": "state-replacement-reference",
+    "maxRatio": 1,
+    "note": "Two thousand direct replacements supersede an earlier functional updater. Public getState observations and the final host value/order are checked independently. The constant three-call budget allows eager enqueue, the first prior-value read, and ordered commit; it rejects repeated replay of the superseded prefix without requiring a particular cheaper implementation. The frozen pre-fix runtime called the updater 4,002 times; the candidate called it three times."
+  },
+  {
     "suite": "lifecycle-memory",
     "op": "cycle",
     "target": "octane-tsrx",
@@ -406,6 +446,54 @@
     "reference": "react",
     "maxRatio": 2,
     "note": "Same-run 512-subscriber useSyncExternalStore fan-out, gated on complete visible updates, rapid-write consistency, and exact listener teardown. A verified quick run measured about 1.01x; 2x leaves real-browser scheduling headroom."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "broad_burst_snapshot_reads",
+    "target": "octane-tsrx-work",
+    "reference": "required-work",
+    "maxRatio": 1,
+    "note": "Deterministic notification-phase work for 100 broad writes: one changed snapshot comparison is enough to schedule each of the 512 readers. Final DOM values, survivor identity, and balanced subscription cleanup gate the optimization."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "unchanged_burst_snapshot_reads",
+    "target": "octane-tsrx-work",
+    "reference": "required-work",
+    "maxRatio": 1,
+    "note": "Unchanged-notification control: compare each reader's snapshot at most once per notification. The separate zero-render guard prevents trading getter work for unnecessary component renders."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "narrow_burst_snapshot_reads",
+    "target": "octane-tsrx-work",
+    "reference": "required-work",
+    "maxRatio": 1,
+    "note": "Narrow-notification control: untouched readers still compare on every notification, while the one changed reader needs only its first comparison before the batched render. The visible final state must differ only at the selected index."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "broad_burst_renders",
+    "target": "octane-tsrx-work",
+    "reference": "required-work",
+    "maxRatio": 1,
+    "note": "The 100-write broad burst must converge with at most one render per changed reader; every subscriber must display the final store value."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "unchanged_burst_renders",
+    "target": "octane-tsrx-work",
+    "reference": "required-work",
+    "maxRatio": 0,
+    "note": "An unchanged snapshot must not cause subscriber render work. The reference is one count so a zero ceiling is expressible without a zero denominator."
+  },
+  {
+    "suite": "external-store-fanout",
+    "op": "narrow_burst_renders",
+    "target": "octane-tsrx-work",
+    "reference": "required-work",
+    "maxRatio": 1,
+    "note": "Only the reader whose selected value changed should render during the 100-write narrow burst; untouched subscriber DOM and identities must remain intact."
   },
   {
     "suite": "store-selector-fanout",
@@ -754,6 +842,30 @@
     "minRatio": 1.0,
     "maxRatio": 1.0,
     "note": "Gzipped production sentinel output must retain zero diagnostic codegen cost."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "raw",
+    "target": "text-types-inferred",
+    "reference": "text-types-explicit",
+    "maxRatio": 1.0,
+    "note": "Opt-in TypeScript string-child inference must retain the raw-code size guarantee of explicit string assertions; both candidates execute the same SSR semantic controls."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "text-types-inferred",
+    "reference": "text-types-explicit",
+    "maxRatio": 1.0,
+    "note": "Inferred string children must not exceed the minified output of the equivalent explicit-string sentinel."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "text-types-inferred",
+    "reference": "text-types-explicit",
+    "maxRatio": 1.0,
+    "note": "Inferred string children must not exceed the gzipped output of the equivalent explicit-string sentinel."
   },
   {
     "suite": "bundle-size",
@@ -2413,5 +2525,101 @@
     "reference": "solid",
     "maxRatio": 1.2,
     "note": "Protects the existing mount win: 32-leaf teardown + 1024-leaf mount measured 0.94x solid (1.70 vs 1.80) on 2026-08-09. Octane mounts faster than the fine-grained peers despite marker traffic; a breach means the compiled mount path grew per-node cost."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "eligible_hit_functions",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "All compiler-eligible dependency-hit scenarios must evaluate zero application or Octane-runtime function expressions. Counts are observed after production tree-shaking, not heap-allocation estimates."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "eligible_hit_application_array_literals",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "The eligible hit paths must not recreate authored dependency arrays or replacement application array literals. Per-case counters and clean semantic controls live in the result metadata."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "eligible_hit_arrays",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 1,
+    "note": "Bounds all observed application/runtime array literals, constructors, and rest arrays. The fixture-derived budget permits only the 352 existing custom-hook/JSX caller arrays across 32 renders of each eligible scenario."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "eligible_miss_functions",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 1,
+    "note": "Dependency misses may create the 448 semantically required fresh callbacks (14 callback results times 32 renders), but must not add memo-factory or runtime-wrapper closures."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "declaration_miss_arrays",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "Protects the established flat-cache declaration tier: one-dependency memo/callback misses must not create dependency or publisher rest arrays."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "identifier_deps_hit_runtime_functions",
+    "target": "runtime-form",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "An identifier dependency array deliberately keeps the runtime fallback. Its cache-hit path must not recreate an internal useCallback factory wrapper."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "identifier_deps_miss_runtime_functions",
+    "target": "runtime-form",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "The runtime fallback must not allocate an internal useCallback factory wrapper on dependency misses either."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "null_deps_hit_functions",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 1,
+    "note": "Explicit null runs every render: the fresh returned callback is required, while the useMemo factory closure is avoidable."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "null_deps_hit_arrays",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "Explicit-null inline memo/callback calls have no dependency array and must not introduce a replacement array."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "callback_name_mismatches",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "The clean optimized callbacks must preserve the observable function names of the runtime-form control, including anonymous explicit-null callbacks."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "code_gzip",
+    "target": "inline",
+    "reference": "runtime-form",
+    "maxRatio": 1.4,
+    "note": "Same-input production compiler output-size guard for the closure-removal fixture. Allows the inlined checks' intentional code-size tradeoff without hiding further growth in the full runtime bundle."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "bundle_gzip",
+    "target": "inline",
+    "reference": "runtime-form",
+    "maxRatio": 1.02,
+    "note": "Same-run clean tree-shaken application plus Octane runtime: closure-free lowering must stay within 2% gzip of the runtime-form control. No instrumentation contributes to these bytes."
   }
 ]

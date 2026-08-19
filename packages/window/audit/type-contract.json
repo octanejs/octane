@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "sharedProgram": "packages/window/typetests/parity.test-d.ts",
+  "transformationPolicy": {
+    "allowedSourceTransformations": [],
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/window/typetests/tsconfig.pristine.json",
+      "moduleAlias": "packages/window/upstream/npm/dist/react-window.d.ts"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/window/typetests/tsconfig.adapted.json",
+      "moduleAlias": "packages/window/src/index.ts"
+    }
+  },
+  "assertionGroups": [
+    {
+      "id": "component-props",
+      "sha256": "f8d8e387f7c41eb2bacd468e2d7d70f2ac47b97fb3fb8dd2a3e6f7646e355c4a"
+    },
+    {
+      "id": "list-grid-props",
+      "sha256": "e9594d5a39813ef46210b578fbe731e30588f6585c6c8d7c23fa019e95067a5e"
+    },
+    {
+      "id": "components",
+      "sha256": "f724ddb1bafc87548b367e6d2f09a084c52142a1003e658f905f93954b2112bd"
+    },
+    {
+      "id": "utilities",
+      "sha256": "407daea58e305d112aebe33b3770d3f13485db774f0e572399a81b0667d1aa35"
+    },
+    {
+      "id": "dynamic-height",
+      "sha256": "701eb7bce86c1aad9cb0dc0d45c21488d580740a5013e95b6403d794ba735ad6"
+    },
+    {
+      "id": "ref-hooks",
+      "sha256": "9b044b6f36fab7b18595a2bde677d8143f93d4a14791d4a7ac07a04947e34da1"
+    },
+    {
+      "id": "imperative-api",
+      "sha256": "a2dc2d196e96441573c2c397e070202f35aa0aae792ccd2e867251eaeacc787d"
+    },
+    {
+      "id": "forbidden-generated-props",
+      "sha256": "f7ce8e9eaa16a37e0066ea598f6f6686fd0f1c9bebc17ac9c5046d1b19fd2998"
+    },
+    {
+      "id": "missing-grid-coordinate",
+      "sha256": "62f2393bd6590283d18587788ac6d1dc12330392ab1d84a60bd3849348f9bcf4"
+    },
+    {
+      "id": "absent-v1-api",
+      "sha256": "4e7607ed0cb2cfb0e22cc9b62865ffe97fb89bb1d18b744b4985b9ac0705eb9e"
+    }
+  ]
+}

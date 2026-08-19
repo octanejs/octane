@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/tanstack-devtools/audit/type-probes/public-api.test-d.ts",
+      "disposition": "octane-only-audit-contract",
+      "reason": "Repo-authored pristine public-API probe paired with the adapted typetest; supplementary control, not a substitute for the upstream test:types source compile."
+    },
+    {
+      "path": "packages/tanstack-devtools/tests/conformance/devtools.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane adapter behavior and is not counted as React parity."
+    },
+    {
+      "path": "packages/tanstack-devtools/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the same TSRX fixture against the Octane adapter and pinned React adapter public entrypoint."
+    },
+    {
+      "path": "packages/tanstack-devtools/tests/parity/contracts.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Authenticates the vendored upstream ledger and requires a disposition row for every pinned public export; it is not React-parity evidence."
+    },
+    {
+      "path": "packages/tanstack-devtools/tests/parity/divergences.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Observes documented public-surface divergences via installed package metadata and source checks; not React-parity evidence.",
+      "divergenceIds": ["core-version", "octane-type-names", "extra-core-reexports"]
+    },
+    {
+      "path": "packages/tanstack-devtools/tests/ssr/server.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises Octane server rendering and is not counted as React parity."
+    },
+    {
+      "path": "packages/tanstack-devtools/tests/types-devtools.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Package-local Vitest expectTypeOf checks for the Octane adapter; not React-parity evidence."
+    },
+    {
+      "path": "packages/tanstack-devtools/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-audit-contract",
+      "reason": "One-for-one adapted public-API probe paired with audit/type-probes; supplementary control beside the upstream-suite source compile."
+    },
+    {
+      "path": "scripts/react-parity/tanstack-devtools-controls.test.mjs",
+      "disposition": "octane-only-audit-contract",
+      "reason": "Negative controls for classification completeness, differential identity matching, and type-suite provenance."
+    },
+    {
+      "path": "scripts/react-parity/tanstack-devtools-types-lib.test.mjs",
+      "disposition": "octane-only-audit-contract",
+      "reason": "Negative controls for source-program membership/export-surface pairing and supplementary public-API probe inventories."
+    }
+  ]
+}

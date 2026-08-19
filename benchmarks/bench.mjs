@@ -330,7 +330,7 @@ const SUITES = [
 				script: 'run.mjs',
 				args: (n) => [target, String(n)],
 			})),
-			...(name === 'event-delegation'
+			...(name === 'event-delegation' || name === 'external-store-fanout'
 				? [{ label: 'work', script: 'work.mjs', args: () => [] }]
 				: []),
 		],
@@ -349,6 +349,19 @@ const SUITES = [
 			script: 'run.mjs',
 			args: (n) => [target, String(n)],
 		})),
+	},
+	{
+		// Matched direct/nested callback work plus the shipped store bindings.
+		// The fixture builds itself; named production calls are observed in a
+		// separate unminified build so instrumentation stays out of timings.
+		name: 'hook-store-composition',
+		cwd: 'hook-store-composition',
+		servers: [],
+		iter: { normal: 8, quick: 2 },
+		runs: [
+			{ script: 'run.mjs', args: (n) => [String(n)] },
+			{ label: 'work', script: 'work.mjs', args: () => [] },
+		],
 	},
 	{
 		name: 'effectful-list',
@@ -594,6 +607,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Native universal external-store hooks: stable subscription lifetimes and
+		// bounded state-projection work across parent renders and notification bursts.
+		name: 'universal-external-store',
+		cwd: 'universal-external-store',
+		servers: [],
+		iter: { normal: 5, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Compiled Octane and pinned ReactLynx dual-thread render cost (Node-only)
 		// on the same cheap Element PAPI. Both visible trees and real native taps
 		// must match; three quick samples keep same-run ratio guards stable.
@@ -655,6 +677,16 @@ const SUITES = [
 		// codegen-size regression signal. Deterministic; the iteration knob is unused.
 		name: 'codegen-size',
 		cwd: 'codegen-size',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		// Hook memoization's production compiler A/B: execute identical clean
+		// programs, then count function/array creation expressions in separate
+		// observed bundles. Deterministic; no timing or browser server required.
+		name: 'hook-memo',
+		cwd: 'hook-memo',
 		servers: [],
 		iter: { normal: 1, quick: 1 },
 		runs: [{ script: 'run.mjs', args: () => [] }],

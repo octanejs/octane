@@ -1040,24 +1040,27 @@ function stagedTransitionValue<T>(slot: TransitionActionSlot<T>): T {
 function stageTransitionValue<T>(
 	slot: TransitionActionSlot<T>,
 	block: Block,
-	operation: (value: T) => T,
+	operation: T | ((value: T) => T),
 	value: T,
 	forceRender = false,
 ): boolean {
 	const batch = transitionActionBatchForUpdate();
 	if (batch === null) return false;
+	// Replacement values need a replay closure only when an Action actually
+	// stages the update. Ordinary useState setters stay allocation-free here.
+	const replay = typeof operation === 'function' ? (operation as (value: T) => T) : () => operation;
 	const current = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
 	if (current === undefined) {
 		batch.updates.set(slot, {
 			slot,
 			block,
-			operations: [operation],
+			operations: [replay],
 			baseValue: slot.value,
 			value,
 			forceRender,
 		});
 	} else {
-		current.operations.push(operation);
+		current.operations.push(replay);
 		current.value = value;
 		current.forceRender ||= forceRender;
 	}
@@ -1163,7 +1166,7 @@ let deferringStagedRevealEffects = false;
 // same render patched on the way past. The attempt makes the render undoable:
 // journal window over the origin's whole render, live-queue checkpoints for the
 // work it enqueued, the flushed cells reverted to the recorded baseValues, and
-// the parallel-use entries it replaced swapped back.
+// the hook-map and inline memo entries it replaced swapped back.
 //
 // The pending cue needs no special treatment: `slotRef.isPending` was flipped
 // by the listener pass and survives the unwind. Re-rendering the origin at
@@ -1171,7 +1174,7 @@ let deferringStagedRevealEffects = false;
 // bindings — every other binding no-ops on its restored bag guard, and old
 // cells render previously committed (cached) content, so it cannot suspend.
 //
-// On settle the hold PROMOTES: parallel-use entries swap forward, cells write
+// On settle the hold PROMOTES: memo entries swap forward, cells write
 // forward, and an ordinary transition drain commits the whole screen in one
 // flush — or suspends on a later dependency and goes around again. Warm-walk
 // creations are carried on the hold as an episode-agnostic HARVEST, because
@@ -1184,6 +1187,10 @@ let deferringStagedRevealEffects = false;
 // store — falls back to today's per-boundary behavior untouched.
 // ─────────────────────────────────────────────────────────────────────────────
 
+type TransitionMemoSwap =
+	| [kind: 0, hooks: Map<HookSlot, unknown>, slot: HookSlot, previous: unknown, next: unknown]
+	| [kind: 1, cells: any[], base: number, previous: any[], next: any[]];
+
 interface TransitionAttempt {
 	origin: Block;
 	journalCheckpoint: number;
@@ -1195,8 +1202,8 @@ interface TransitionAttempt {
 	refDetach: number;
 	effectDeps: EffectDepsSnapshot;
 	heldSlots: Set<TrySlot> | null;
-	/** [hooksMap, slot, previousEntry, nextEntry] — undone on hold, redone on promotion. */
-	puSwaps: Array<[Map<HookSlot, unknown>, HookSlot, unknown, unknown]> | null;
+	/** Hook-map entries and inline memo-cell ranges: undone on hold, redone on promotion. */
+	memoSwaps: TransitionMemoSwap[] | null;
 }
 
 let ACTIVE_TRANSITION_ATTEMPT: TransitionAttempt | null = null;
@@ -1215,7 +1222,7 @@ interface WarmHarvestEntry {
 let HELD_SYNC_TRANSITION: {
 	origin: Block;
 	entries: Array<TransitionActionUpdate<any>>;
-	puSwaps: Array<[Map<HookSlot, unknown>, HookSlot, unknown, unknown]> | null;
+	memoSwaps: TransitionMemoSwap[] | null;
 	/** Values the attempt's warm walk created, adoptable in ANY later round's
 	 * episode. `taken` resets on each re-revert so every round can adopt. */
 	warmHarvest: WarmHarvestEntry[] | null;
@@ -1225,12 +1232,12 @@ let HELD_SYNC_TRANSITION: {
 /**
  * Swaps a promotion applied forward, pending the promoted round's outcome. A
  * held transition can take several rounds — each settle promotes, renders, and
- * may suspend on a LATER dependency. The next round's unwind must swap back
- * everything promoted so far, not just that round's own publishes, or the cue
- * re-render dep-misses the earlier slots and re-creates old-version requests.
+ * may suspend on a LATER dependency. Earlier publications remain available to
+ * the continuing rounds, which do not need another old-input cue render. This
+ * carrier both retains those values and identifies a continuing attempt.
  * Cleared when a promoted round commits or the transition is discarded.
  */
-let PROMOTED_PU_SWAPS: Array<[Map<HookSlot, unknown>, HookSlot, unknown, unknown]> | null = null;
+let PROMOTED_MEMO_SWAPS: TransitionMemoSwap[] | null = null;
 /** The harvest survives promotion the same way, for the round after next. */
 let PROMOTED_WARM_HARVEST: WarmHarvestEntry[] | null = null;
 
@@ -1254,7 +1261,7 @@ function beginTransitionAttempt(block: Block): TransitionAttempt | null {
 		refDetach: refDetachQueue.length,
 		effectDeps: snapshotSubtreeEffectDeps(block),
 		heldSlots: null,
-		puSwaps: null,
+		memoSwaps: null,
 	};
 	ACTIVE_TRANSITION_ATTEMPT = attempt;
 	return attempt;
@@ -1266,7 +1273,7 @@ function endTransitionAttempt(attempt: TransitionAttempt | null): void {
 	const held = attempt.heldSlots;
 	// A promoted round that ran to commit makes its forward state canon.
 	if (held === null || held.size === 0) {
-		PROMOTED_PU_SWAPS = null;
+		PROMOTED_MEMO_SWAPS = null;
 		PROMOTED_WARM_HARVEST = null;
 	}
 	// The unwind is only sound when the driving cells can be reverted with it:
@@ -1308,26 +1315,23 @@ function endTransitionAttempt(attempt: TransitionAttempt | null): void {
 		refAttachQueue.length = attempt.refAttach;
 		refDetachQueue.length = attempt.refDetach;
 		restoreSubtreeEffectDeps(attempt.origin, attempt.effectDeps);
-		// FIRST hold of a transition: swap the parallel-use entries back so the
+		// FIRST hold of a transition: swap the memo entries back so the
 		// cue re-render dep-hits the old creations instead of re-fetching them,
 		// and schedule that cue re-render below. A CONTINUING round (a promoted
 		// render suspending on a later dependency) needs neither: the old screen
 		// and the cue bindings were re-established in round one and the journal
-		// rollback above just restored them — so the parallel-use entries stay
+		// rollback above just restored them — so the memo entries stay
 		// monotonically FORWARD, and every later round dep-hits them outright.
-		const continuing = PROMOTED_PU_SWAPS !== null || PROMOTED_WARM_HARVEST !== null;
-		let puSwaps = attempt.puSwaps;
+		const continuing = PROMOTED_MEMO_SWAPS !== null || PROMOTED_WARM_HARVEST !== null;
+		let memoSwaps = attempt.memoSwaps;
 		if (continuing) {
-			if (PROMOTED_PU_SWAPS !== null) {
-				puSwaps = puSwaps === null ? PROMOTED_PU_SWAPS : PROMOTED_PU_SWAPS.concat(puSwaps);
-				PROMOTED_PU_SWAPS = null;
+			if (PROMOTED_MEMO_SWAPS !== null) {
+				memoSwaps =
+					memoSwaps === null ? PROMOTED_MEMO_SWAPS : PROMOTED_MEMO_SWAPS.concat(memoSwaps);
+				PROMOTED_MEMO_SWAPS = null;
 			}
-		} else if (puSwaps !== null) {
-			for (let i = puSwaps.length - 1; i >= 0; i--) {
-				const [hooks, slot, prev] = puSwaps[i];
-				if (prev === undefined) hooks.delete(slot);
-				else hooks.set(slot, prev);
-			}
+		} else if (memoSwaps !== null) {
+			for (let i = memoSwaps.length - 1; i >= 0; i--) applyTransitionMemoSwap(memoSwaps[i], false);
 		}
 		for (let i = 0; i < entries.length; i++) {
 			entries[i].slot.value = entries[i].baseValue;
@@ -1365,7 +1369,7 @@ function endTransitionAttempt(attempt: TransitionAttempt | null): void {
 		HELD_SYNC_TRANSITION = {
 			origin: attempt.origin,
 			entries,
-			puSwaps,
+			memoSwaps,
 			warmHarvest,
 			holders: new Set(held),
 		};
@@ -1383,7 +1387,7 @@ function endTransitionAttempt(attempt: TransitionAttempt | null): void {
 }
 
 /**
- * Record a parallel-use memo entry the attempt replaces, with both directions.
+ * Record a hook-map memo entry the attempt replaces, with both directions.
  * The cue re-render renders the OLD inputs and must dep-hit the old entries —
  * a miss would re-create old-version requests against data sources that have
  * moved on. The PROMOTED render renders the NEW inputs and must dep-hit the
@@ -1392,11 +1396,30 @@ function endTransitionAttempt(attempt: TransitionAttempt | null): void {
  * Attempt-owned: the per-boundary journal windows predate this and keep their
  * pinned replay behavior.
  */
-function journalPuEntry(scope: Scope, slot: HookSlot, next: unknown): void {
+function journalMemoEntry(scope: Scope, slot: HookSlot, next: unknown): void {
 	const attempt = ACTIVE_TRANSITION_ATTEMPT;
 	if (attempt === null) return;
 	const hooks = ensureHooks(scope);
-	(attempt.puSwaps ??= []).push([hooks, slot, hooks.get(slot), next]);
+	(attempt.memoSwaps ??= []).push([0, hooks, slot, hooks.get(slot), next]);
+}
+
+/** Inline memos publish immediately too, but hold/promotion must restore each
+ * complete entry rather than leaving its deps and value from different renders. */
+function journalHookMemoCells(cells: any[], base: number, next: any[]): void {
+	const attempt = ACTIVE_TRANSITION_ATTEMPT;
+	if (attempt === null) return;
+	(attempt.memoSwaps ??= []).push([1, cells, base, cells.slice(base, base + next.length), next]);
+}
+
+function applyTransitionMemoSwap(swap: TransitionMemoSwap, forward: boolean): void {
+	if (swap[0] === 0) {
+		const value = forward ? swap[4] : swap[3];
+		if (!forward && value === undefined) swap[1].delete(swap[2]);
+		else swap[1].set(swap[2], value);
+		return;
+	}
+	const values = forward ? swap[4] : swap[3];
+	for (let i = 0; i < values.length; i++) swap[1][swap[2] + i] = values[i];
 }
 
 /** True while the held cells are untouched — an in-place boundary success under
@@ -1416,15 +1439,13 @@ function promoteHeldSyncTransition(): boolean {
 	const held = HELD_SYNC_TRANSITION;
 	if (held === null) return false;
 	HELD_SYNC_TRANSITION = null;
-	// Swap the attempt's parallel-use creations forward BEFORE the renders run,
+	// Swap the attempt's memo entries forward BEFORE the renders run,
 	// so the promoted pass dep-hits everything the attempt already started.
-	const puSwaps = held.puSwaps;
-	if (puSwaps !== null) {
-		for (let i = 0; i < puSwaps.length; i++) {
-			const [hooks, slot, , next] = puSwaps[i];
-			hooks.set(slot, next);
-		}
-		PROMOTED_PU_SWAPS = PROMOTED_PU_SWAPS === null ? puSwaps : PROMOTED_PU_SWAPS.concat(puSwaps);
+	const memoSwaps = held.memoSwaps;
+	if (memoSwaps !== null) {
+		for (let i = 0; i < memoSwaps.length; i++) applyTransitionMemoSwap(memoSwaps[i], true);
+		PROMOTED_MEMO_SWAPS =
+			PROMOTED_MEMO_SWAPS === null ? memoSwaps : PROMOTED_MEMO_SWAPS.concat(memoSwaps);
 	}
 	// The harvest stays adoptable for this round's renders and, via the
 	// carrier, for the round after a re-suspend.
@@ -1459,7 +1480,7 @@ function discardHeldSyncTransition(state: TrySlot): void {
 	if (held === null || !held.holders.delete(state)) return;
 	if (held.holders.size === 0) {
 		HELD_SYNC_TRANSITION = null;
-		PROMOTED_PU_SWAPS = null;
+		PROMOTED_MEMO_SWAPS = null;
 		PROMOTED_WARM_HARVEST = null;
 	}
 }
@@ -3016,6 +3037,12 @@ interface FocusSelectionSnapshot {
 function activeElementForDocument(doc: Document): Element | null {
 	try {
 		let focused = doc.activeElement;
+		// Unfocused documents usually report body. It can itself host an open
+		// shadow tree, so only skip the descent when that tree has no focus.
+		if (focused === doc.body) {
+			focused = focused?.shadowRoot?.activeElement ?? null;
+			if (focused === null) return null;
+		}
 		while (focused !== null) {
 			if (focused.localName === 'iframe') {
 				let nested: Document | null;
@@ -5661,10 +5688,9 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 			value: initVal,
 			setter: (next) => {
 				const previous = stagedTransitionValue(s!);
-				const operation = typeof next === 'function' ? (next as (p: T) => T) : () => next;
-				const computed = operation(previous);
+				const computed = typeof next === 'function' ? (next as (p: T) => T)(previous) : next;
 				if (Object.is(computed, previous)) return;
-				if (stageTransitionValue(s!, block, operation, computed)) {
+				if (stageTransitionValue(s!, block, next, computed)) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						const update = s!.pendingActionBatch?.updates.get(s!) as
 							TransitionActionUpdate<T> | undefined;
@@ -6300,8 +6326,7 @@ function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, ph
 // normally supplies an inferred or explicit deps array before it. Keep the
 // trailing-symbol reinterpret for direct/uncompiled calls and normalize the
 // public `null` escape hatch to undefined; internally undefined means "run or
-// recompute on every commit/render". Shared by the effect hooks AND useMemo;
-// useCallback keeps its own reinterpret fork (it must forward the RAW slot).
+// recompute on every commit/render". Shared by the effect and memo hooks.
 function resolveHookArgs(
 	name: string,
 	deps: any[] | null | symbol | undefined,
@@ -6333,6 +6358,66 @@ export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: Hoo
 	enqueueEffect(s, fn, d, INSERTION);
 }
 
+interface MemoHookEntry<T = any> {
+	deps: any[] | undefined;
+	value: T;
+	warmEpisode?: number;
+}
+
+function memoEntryHit<T>(slot: HookSlot, entry: MemoHookEntry<T>): MemoHookEntry<T> {
+	if (
+		entry.warmEpisode !== CURRENT_WARM_EPISODE &&
+		recordRealWarmMemo(slot, entry.deps as any[], entry)
+	) {
+		entry.warmEpisode = CURRENT_WARM_EPISODE;
+	}
+	return entry;
+}
+
+function adoptMemoEntry<T>(scope: Scope, slot: HookSlot, deps: any[]): MemoHookEntry<T> | null {
+	const adopted = adoptWarmValue(slot, deps);
+	if (adopted === WARM_MISS) return null;
+	const entry: MemoHookEntry<T> = {
+		deps,
+		value: adopted as T,
+		warmEpisode: CURRENT_WARM_EPISODE,
+	};
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalMemoEntry(scope, slot, entry);
+	ensureHooks(scope).set(slot, entry);
+	return entry;
+}
+
+function readMemoEntry<T>(
+	scope: Scope,
+	slot: HookSlot,
+	deps: any[] | undefined,
+): MemoHookEntry<T> | null {
+	const prev = scope.hooks?.get(slot) as MemoHookEntry<T> | undefined;
+	// deps === undefined → recompute every render (`null` at the public API;
+	// direct/uncompiled omitted calls also retain this runtime fallback).
+	if (prev && deps !== undefined && !depsChanged(prev.deps, deps)) {
+		return memoEntryHit(slot, prev);
+	}
+	// Parallel-use warming: before recomputing, adopt a prefetched creation for
+	// this slot (started by warmMemo during a suspended ancestor's warm walk) —
+	// the fetch is already in flight. Only compiler-warmed slots can hit;
+	// WARM_EVER keeps the ancestor walk off apps that never warm.
+	return WARM_EVER && deps !== undefined ? adoptMemoEntry(scope, slot, deps) : null;
+}
+
+function publishMemoEntry<T>(scope: Scope, slot: HookSlot, deps: any[] | undefined, value: T): T {
+	const entry: MemoHookEntry<T> = { deps, value };
+	// The attempt records the replacement both ways: the cue re-render must
+	// dep-hit the old entry (never re-create old-version requests), and the
+	// promoted render must dep-hit this one (never create twice).
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalMemoEntry(scope, slot, entry);
+	ensureHooks(scope).set(slot, entry);
+	if (deps !== undefined && recordRealWarmMemo(slot, deps, entry)) {
+		entry.warmEpisode = CURRENT_WARM_EPISODE;
+	}
+	return value;
+}
+
 export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[] | null, slot?: symbol): T;
 export function useMemo<T>(
 	compute: (...deps: any[]) => T,
@@ -6341,48 +6426,14 @@ export function useMemo<T>(
 ): T {
 	const [d, s] = resolveHookArgs('useMemo', deps, slot);
 	const scope = CURRENT_SCOPE!;
-	const prev = scope.hooks?.get(s) as
-		{ deps: any[] | undefined; value: T; warmEpisode?: number } | undefined;
-	// deps === undefined → recompute every render (`null` at the public API;
-	// direct/uncompiled omitted calls also retain this runtime fallback).
-	if (prev && d !== undefined && !depsChanged(prev.deps, d)) {
-		if (prev.warmEpisode !== CURRENT_WARM_EPISODE && recordRealWarmMemo(s, d, prev)) {
-			prev.warmEpisode = CURRENT_WARM_EPISODE;
-		}
-		return prev.value;
-	}
-	// Parallel-use warming: before recomputing, adopt a prefetched creation for
-	// this slot (started by warmMemo during a suspended ancestor's warm walk) —
-	// the fetch is already in flight. Only compiler-warmed slots can hit;
-	// WARM_EVER keeps the ancestor walk off apps that never warm.
-	if (WARM_EVER && d !== undefined) {
-		const adopted = adoptWarmValue(s, d);
-		if (adopted !== WARM_MISS) {
-			const adoptedEntry = {
-				deps: d,
-				value: adopted as T,
-				warmEpisode: CURRENT_WARM_EPISODE,
-			};
-			if (ACTIVE_TRANSITION_ATTEMPT !== null) journalPuEntry(scope, s, adoptedEntry);
-			ensureHooks(scope).set(s, adoptedEntry);
-			return adopted as T;
-		}
-	}
+	const entry = readMemoEntry<T>(scope, s, d);
+	if (entry !== null) return entry.value;
 	// Spread deps as positional args (superset of React — see PendingEffect.args):
 	// a factory written as a pure function of its deps is hoistable. Zero-arg
 	// React-style factories ignore the extra args.
 	// eslint-disable-next-line prefer-spread
 	const value = compute.apply(null, (d ?? []) as []);
-	const entry: { deps: any[] | undefined; value: T; warmEpisode?: number } = { deps: d, value };
-	// The attempt records the replacement both ways: the cue re-render must
-	// dep-hit the old entry (never re-create old-version requests), and the
-	// promoted render must dep-hit this one (never create twice).
-	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalPuEntry(scope, s, entry);
-	ensureHooks(scope).set(s, entry);
-	if (d !== undefined && recordRealWarmMemo(s, d, entry)) {
-		entry.warmEpisode = CURRENT_WARM_EPISODE;
-	}
-	return value;
+	return publishMemoEntry(scope, s, d, value);
 }
 
 export function useCallback<F extends (...args: any[]) => any>(
@@ -6395,21 +6446,106 @@ export function useCallback<F extends (...args: any[]) => any>(
 	deps?: any[] | null,
 	slot?: HookSlot,
 ): F {
-	// Trailing-symbol ABI (see resolveHookArgs): `useCallback(fn)` arrives as
-	// `useCallback(fn, slot)`. Reinterpret the omitted-deps case HERE so the slot Symbol
-	// can't leak into useMemo's `deps` array (it would in a custom-hook context, where
-	// resolveSlot turns the otherwise-undefined slot into the path prefix, defeating
-	// useMemo's own reinterpret guard). Forward the RAW slot — useMemo does the single
-	// resolveSlot; resolving here too and passing the result would double-combine the
-	// custom-hook path prefix into the wrong slot.
-	if (slot === undefined && typeof deps === 'symbol') {
-		slot = deps as unknown as symbol;
-		deps = undefined;
+	// Resolve the raw slot exactly once, including the omitted-deps Symbol ABI
+	// and a custom hook's path. The callback is a value: never invoke it or
+	// allocate another closure merely to return it on a cache miss.
+	const [d, s] = resolveHookArgs('useCallback', deps, slot);
+	const scope = CURRENT_SCOPE!;
+	const entry = readMemoEntry<F>(scope, s, d);
+	return entry === null ? publishMemoEntry(scope, s, d, fn) : entry.value;
+}
+
+/** Compiler-owned intrinsics cannot be shadowed by bindings in an authored body. */
+export const hookMemoEqual = Object.is;
+
+export function hookMemoCreate(size: number): any[] {
+	return new Array(size).fill(undefined);
+}
+
+/** Compiler ABI: publish a successful inline memo computation immediately.
+ * History is needed only while an attempt can hold the prior screen; ordinary
+ * suspend/replay continues to see the just-published cells. Fixed arities keep
+ * ordinary cache misses free of a rest-parameter dependency array. */
+export function hookMemoPublish0<T>(cells: any[], base: number, value: T): T {
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalHookMemoCells(cells, base, [true, value]);
+	cells[base + 1] = value;
+	cells[base] = true;
+	return value;
+}
+
+export function hookMemoPublish1<T>(cells: any[], base: number, value: T, d0: any): T {
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalHookMemoCells(cells, base, [true, d0, value]);
+	cells[base + 2] = value;
+	cells[base + 1] = d0;
+	cells[base] = true;
+	return value;
+}
+
+export function hookMemoPublish2<T>(cells: any[], base: number, value: T, d0: any, d1: any): T {
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalHookMemoCells(cells, base, [true, d0, d1, value]);
+	cells[base + 3] = value;
+	cells[base + 1] = d0;
+	cells[base + 2] = d1;
+	cells[base] = true;
+	return value;
+}
+
+export function hookMemoPublish3<T>(
+	cells: any[],
+	base: number,
+	value: T,
+	d0: any,
+	d1: any,
+	d2: any,
+): T {
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) {
+		journalHookMemoCells(cells, base, [true, d0, d1, d2, value]);
 	}
-	// Guard here (rather than letting useMemo throw) so the diagnostic names useCallback.
-	// resolveSlot is a read-only peek at the path stack, so this doesn't disturb useMemo's.
-	if (resolveSlot(slot) === undefined) missingSlot('useCallback');
-	return (useMemo as any)(() => fn, deps, slot) as F;
+	cells[base + 4] = value;
+	cells[base + 1] = d0;
+	cells[base + 2] = d1;
+	cells[base + 3] = d2;
+	cells[base] = true;
+	return value;
+}
+
+export function hookMemoPublish4<T>(
+	cells: any[],
+	base: number,
+	value: T,
+	d0: any,
+	d1: any,
+	d2: any,
+	d3: any,
+): T {
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) {
+		journalHookMemoCells(cells, base, [true, d0, d1, d2, d3, value]);
+	}
+	cells[base + 5] = value;
+	cells[base + 1] = d0;
+	cells[base + 2] = d1;
+	cells[base + 3] = d2;
+	cells[base + 4] = d3;
+	cells[base] = true;
+	return value;
+}
+
+/** Larger dependency lists retain the compact variadic publication fallback. */
+export function hookMemoPublish<T>(cells: any[], base: number, value: T, ...deps: any[]): T {
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) {
+		journalHookMemoCells(cells, base, [true, ...deps, value]);
+	}
+	cells[base + deps.length + 1] = value;
+	for (let i = 0; i < deps.length; i++) cells[base + i + 1] = deps[i];
+	cells[base] = true;
+	return value;
+}
+
+/** One-cell form for compiler-owned lifetime-invariant callback values. */
+export function hookMemoPublishInvariant<T>(cells: any[], base: number, value: T): T {
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalHookMemoCells(cells, base, [value]);
+	cells[base] = value;
+	return value;
 }
 
 export function useRef<T>(initial: T, slot?: symbol): { current: T };
@@ -6643,6 +6779,27 @@ export function useSyncExternalStore<T>(
 						}
 					: () => scheduleRender(block),
 			onStoreChange: () => {
+				if (block.disposed) return;
+				// An urgent, non-deferred render already queued for this owner will
+				// read every reached store again. Repeated notifications in the same
+				// task need not run selectors merely to rediscover that pending work.
+				// Do not skip transition/deferred upgrades or render-phase diagnostics;
+				// renderBlock also clears pending before the body, so a notification
+				// after its snapshot read can still request a replay. Profiling and
+				// unwrapped-act diagnostics retain the ordinary scheduling path.
+				if (
+					CURRENT_BLOCK === null &&
+					block.pending &&
+					block.pendingMode === 'urgent' &&
+					!block.pendingDeferred &&
+					!(typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) &&
+					(process.env.NODE_ENV === 'production' ||
+						!IS_OCTANE_ACT_ENVIRONMENT ||
+						actScopeDepth !== 0 ||
+						syncFlush)
+				) {
+					return;
+				}
 				if (checkStoreChanged(created)) created.forceUpdate();
 			},
 			block,
@@ -9444,35 +9601,17 @@ function adoptWarmValue(slot: HookSlot, deps: any[]): any {
 
 export const puMiss: unique symbol = Symbol('octane.pu.miss');
 
-type PuMemoEntry = { deps: any[] | undefined; value: any; warmEpisode?: number };
-
-function puHit(slot: HookSlot, entry: PuMemoEntry): any {
-	if (
-		entry.warmEpisode !== CURRENT_WARM_EPISODE &&
-		recordRealWarmMemo(slot, entry.deps as any[], entry)
-	) {
-		entry.warmEpisode = CURRENT_WARM_EPISODE;
-	}
-	return entry.value;
-}
+type PuMemoEntry = MemoHookEntry;
 
 function puAdopt(slot: HookSlot, deps: any[]): any {
-	const adopted = adoptWarmValue(slot, deps);
-	if (adopted === WARM_MISS) return puMiss;
-	const adoptedEntry: PuMemoEntry = {
-		deps,
-		value: adopted,
-		warmEpisode: CURRENT_WARM_EPISODE,
-	};
-	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalPuEntry(CURRENT_SCOPE!, slot, adoptedEntry);
-	ensureHooks(CURRENT_SCOPE!).set(slot, adoptedEntry);
-	return adopted;
+	const entry = adoptMemoEntry(CURRENT_SCOPE!, slot, deps);
+	return entry === null ? puMiss : entry.value;
 }
 
 export function puTake0(slot: HookSlot): any {
 	const prev = CURRENT_SCOPE!.hooks?.get(slot) as PuMemoEntry | undefined;
 	if (prev !== undefined && prev.deps !== undefined && prev.deps.length === 0) {
-		return puHit(slot, prev);
+		return memoEntryHit(slot, prev).value;
 	}
 	if (WARM_EVER) return puAdopt(slot, []);
 	return puMiss;
@@ -9482,7 +9621,9 @@ export function puTake1(slot: HookSlot, d0: any): any {
 	const prev = CURRENT_SCOPE!.hooks?.get(slot) as PuMemoEntry | undefined;
 	if (prev !== undefined) {
 		const pd = prev.deps;
-		if (pd !== undefined && pd.length === 1 && Object.is(pd[0], d0)) return puHit(slot, prev);
+		if (pd !== undefined && pd.length === 1 && Object.is(pd[0], d0)) {
+			return memoEntryHit(slot, prev).value;
+		}
 	}
 	if (WARM_EVER) return puAdopt(slot, [d0]);
 	return puMiss;
@@ -9493,7 +9634,7 @@ export function puTake2(slot: HookSlot, d0: any, d1: any): any {
 	if (prev !== undefined) {
 		const pd = prev.deps;
 		if (pd !== undefined && pd.length === 2 && Object.is(pd[0], d0) && Object.is(pd[1], d1)) {
-			return puHit(slot, prev);
+			return memoEntryHit(slot, prev).value;
 		}
 	}
 	if (WARM_EVER) return puAdopt(slot, [d0, d1]);
@@ -9511,7 +9652,7 @@ export function puTake3(slot: HookSlot, d0: any, d1: any, d2: any): any {
 			Object.is(pd[1], d1) &&
 			Object.is(pd[2], d2)
 		) {
-			return puHit(slot, prev);
+			return memoEntryHit(slot, prev).value;
 		}
 	}
 	if (WARM_EVER) return puAdopt(slot, [d0, d1, d2]);
@@ -9530,7 +9671,7 @@ export function puTake4(slot: HookSlot, d0: any, d1: any, d2: any, d3: any): any
 			Object.is(pd[2], d2) &&
 			Object.is(pd[3], d3)
 		) {
-			return puHit(slot, prev);
+			return memoEntryHit(slot, prev).value;
 		}
 	}
 	if (WARM_EVER) return puAdopt(slot, [d0, d1, d2, d3]);
@@ -9538,11 +9679,102 @@ export function puTake4(slot: HookSlot, d0: any, d1: any, d2: any, d3: any): any
 }
 
 export function puPub(slot: HookSlot, value: any, ...deps: any[]): any {
-	const entry: PuMemoEntry = { deps, value };
-	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalPuEntry(CURRENT_SCOPE!, slot, entry);
-	ensureHooks(CURRENT_SCOPE!).set(slot, entry);
-	if (recordRealWarmMemo(slot, deps, entry)) entry.warmEpisode = CURRENT_WARM_EPISODE;
-	return value;
+	return publishMemoEntry(CURRENT_SCOPE!, slot, deps, value);
+}
+
+// General closure-free memo ABI for authored helpers/custom hooks. Resolve the
+// custom-hook path once, then retain the resolved slot through take + publish.
+// Unlike parallel-use's value sentinel, a nullable ENTRY handles every authored
+// memo value, including undefined, null, and puMiss itself. Dependency hits do
+// not construct a callback or dependency array.
+export function memoSlot(slot: HookSlot | undefined, name: 'useMemo' | 'useCallback'): HookSlot {
+	const resolved = resolveSlot(slot);
+	if (resolved === undefined) missingSlot(name);
+	return resolved;
+}
+
+export function memoTake0(slot: HookSlot): MemoHookEntry | null {
+	const scope = CURRENT_SCOPE!;
+	const prev = scope.hooks?.get(slot) as MemoHookEntry | undefined;
+	if (prev !== undefined && prev.deps !== undefined && prev.deps.length === 0) {
+		return memoEntryHit(slot, prev);
+	}
+	return WARM_EVER ? adoptMemoEntry(scope, slot, []) : null;
+}
+
+export function memoTake1(slot: HookSlot, d0: any): MemoHookEntry | null {
+	const scope = CURRENT_SCOPE!;
+	const prev = scope.hooks?.get(slot) as MemoHookEntry | undefined;
+	if (prev !== undefined) {
+		const pd = prev.deps;
+		if (pd !== undefined && pd.length === 1 && Object.is(pd[0], d0)) {
+			return memoEntryHit(slot, prev);
+		}
+	}
+	return WARM_EVER ? adoptMemoEntry(scope, slot, [d0]) : null;
+}
+
+export function memoTake2(slot: HookSlot, d0: any, d1: any): MemoHookEntry | null {
+	const scope = CURRENT_SCOPE!;
+	const prev = scope.hooks?.get(slot) as MemoHookEntry | undefined;
+	if (prev !== undefined) {
+		const pd = prev.deps;
+		if (pd !== undefined && pd.length === 2 && Object.is(pd[0], d0) && Object.is(pd[1], d1)) {
+			return memoEntryHit(slot, prev);
+		}
+	}
+	return WARM_EVER ? adoptMemoEntry(scope, slot, [d0, d1]) : null;
+}
+
+export function memoTake3(slot: HookSlot, d0: any, d1: any, d2: any): MemoHookEntry | null {
+	const scope = CURRENT_SCOPE!;
+	const prev = scope.hooks?.get(slot) as MemoHookEntry | undefined;
+	if (prev !== undefined) {
+		const pd = prev.deps;
+		if (
+			pd !== undefined &&
+			pd.length === 3 &&
+			Object.is(pd[0], d0) &&
+			Object.is(pd[1], d1) &&
+			Object.is(pd[2], d2)
+		) {
+			return memoEntryHit(slot, prev);
+		}
+	}
+	return WARM_EVER ? adoptMemoEntry(scope, slot, [d0, d1, d2]) : null;
+}
+
+export function memoTake4(
+	slot: HookSlot,
+	d0: any,
+	d1: any,
+	d2: any,
+	d3: any,
+): MemoHookEntry | null {
+	const scope = CURRENT_SCOPE!;
+	const prev = scope.hooks?.get(slot) as MemoHookEntry | undefined;
+	if (prev !== undefined) {
+		const pd = prev.deps;
+		if (
+			pd !== undefined &&
+			pd.length === 4 &&
+			Object.is(pd[0], d0) &&
+			Object.is(pd[1], d1) &&
+			Object.is(pd[2], d2) &&
+			Object.is(pd[3], d3)
+		) {
+			return memoEntryHit(slot, prev);
+		}
+	}
+	return WARM_EVER ? adoptMemoEntry(scope, slot, [d0, d1, d2, d3]) : null;
+}
+
+export function memoPublish<T>(slot: HookSlot, value: T, ...deps: any[]): T {
+	return publishMemoEntry(CURRENT_SCOPE!, slot, deps, value);
+}
+
+export function memoPublishAlways<T>(slot: HookSlot, value: T): T {
+	return publishMemoEntry(CURRENT_SCOPE!, slot, undefined, value);
 }
 
 // ---------------------------------------------------------------------------
@@ -25312,6 +25544,7 @@ export function keyedForBlock<T>(
 	emptyBody?: ComponentBody | null,
 	anchor?: Node | null,
 	ownEnd?: boolean,
+	selectionBody?: ComponentBody<T, any[]>,
 ): void {
 	const state = parentScope.slots[slotKey] as ForSlot | undefined;
 	if (TRANSITION_JOURNAL !== null) {
@@ -25328,7 +25561,15 @@ export function keyedForBlock<T>(
 		state !== undefined &&
 		activeHydration() === null &&
 		state.cachedDeps !== null &&
-		tryUpdateKeyedSelection(state, items, itemBody, state.cachedDeps, deps, flags >>> 6)
+		tryUpdateKeyedSelection(
+			state,
+			items,
+			itemBody,
+			state.cachedDeps,
+			deps,
+			flags >>> 6,
+			selectionBody,
+		)
 	) {
 		return;
 	}
@@ -25518,6 +25759,7 @@ export function fastKeyedForBlock<T>(
 	emptyBody?: ComponentBody | null,
 	anchor?: Node | null,
 	ownEnd?: boolean,
+	selectionBody?: ComponentBody<T, any[]>,
 ): void {
 	const state = parentScope.slots[slotKey] as ForSlot | undefined;
 	const parent = fastHostListParent(state, items, flags);
@@ -25534,6 +25776,7 @@ export function fastKeyedForBlock<T>(
 			emptyBody,
 			anchor,
 			ownEnd,
+			selectionBody,
 		);
 		return;
 	}
@@ -25659,6 +25902,7 @@ function tryUpdateKeyedSelection<T>(
 	previousDeps: any[],
 	deps: any[],
 	selectionIndex: number,
+	selectionBody: ComponentBody<T, any[]> | undefined,
 ): boolean {
 	if (
 		state.selectionItems !== items ||
@@ -25691,12 +25935,24 @@ function tryUpdateKeyedSelection<T>(
 	if (first !== undefined) {
 		first.body = itemBody as ComponentBody;
 		first.extra = deps;
-		(itemBody as any)(first.props, first, deps);
+		// A separately certified host row can update just its class binding. Raw
+		// object/function children register child slots, however, and must still
+		// reconcile on the ordinary body path even when their identity is stable.
+		// Primitive-only child holes retain no slots, so they pay no extra cache.
+		if (selectionBody !== undefined && first._slots === null) {
+			selectionBody(first.props, first, deps);
+		} else {
+			(itemBody as any)(first.props, first, deps);
+		}
 	}
 	if (second !== undefined) {
 		second.body = itemBody as ComponentBody;
 		second.extra = deps;
-		(itemBody as any)(second.props, second, deps);
+		if (selectionBody !== undefined && second._slots === null) {
+			selectionBody(second.props, second, deps);
+		} else {
+			(itemBody as any)(second.props, second, deps);
+		}
 	}
 	return true;
 }

@@ -1,0 +1,13 @@
+[
+  {
+    "path": "public-api.test.ts",
+    "sha256": "56094c2f06d1129589268c670b637bc80a64f5b02602b702e271b7e4b0de8934",
+    "assertionGroups": [
+      "8158683361e057e6a65e40a399bad6da1f734fa986e8ad9f80007fc5500d7dc8",
+      "bb9c7b7dd8b4e9cab595848b068620a3f2b0e28f4a4dcc5ad95dbee222ce44d9",
+      "f321e22506f84aa3f7ee999402c38b3c0577edcdb8a00ab8b7e97e59a3a32b1f",
+      "20ab29fb67bf2a492c2ede29200ed3f391ef86e31e562c6f429bdb92d80a5630",
+      "67986afb77c8a4229d3eb54ad31f5059ef25678deaf856634b5ba7475300660e"
+    ]
+  }
+]

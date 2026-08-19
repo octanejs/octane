@@ -282,7 +282,6 @@ export const useSWRHandler = <Data = any, Error = any>(
 	const hydrationRef = useRef<boolean | null>(null);
 	// Note: the conditionally hook call is fine because the environment
 	// `IS_SERVER` never changes.
-	// @ts-expect-error -- use hydrationRef directly
 	const _ =
 		!IS_SERVER &&
 			// getServerSnapshot is only called during hydration
