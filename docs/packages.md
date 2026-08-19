@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**96 publishable package(s), including 82 framework binding(s) and 3 framework integration(s).**
+**97 publishable package(s), including 83 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -21,6 +21,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/aria` | [`packages/aria`](../packages/aria) | framework binding | `0.0.34` | 3 |
 | `@octanejs/astro` | [`packages/astro`](../packages/astro) | framework integration | `0.0.19` | 5 |
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.38` | 2 |
+| `@octanejs/better-auth` | [`packages/better-auth`](../packages/better-auth) | framework binding | `0.0.1` | 1 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.0.8` | 2 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.23` | 1 |
 | `@octanejs/colorful` | [`packages/colorful`](../packages/colorful) | framework binding | `0.0.6` | 1 |

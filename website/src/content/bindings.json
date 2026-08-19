@@ -29,7 +29,8 @@
       "@octanejs/tanstack-router-ssr-query",
       "@octanejs/remix-router",
       "@octanejs/inertia",
-      "@octanejs/nuqs"
+      "@octanejs/nuqs",
+      "@octanejs/better-auth"
     ]
   },
   {
