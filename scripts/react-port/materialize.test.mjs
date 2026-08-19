@@ -367,6 +367,30 @@ describe('materialize CLI lifecycle', () => {
 		assert.match(blocked.stderr, /license evidence is not approved/i);
 	});
 
+	test('ensureMaterializedUpstream spawns only for absent or stale trees', async () => {
+		const { ensureMaterializedUpstream } = await import('./ensure-materialized.mjs');
+		const context = scenario();
+		await runCli(LOCK_ARGUMENTS(context));
+		await runCli(['run', '--package-dir', context.packageDirectory]);
+		const calls = [];
+		const spawn = (...spawnArguments) => {
+			calls.push(spawnArguments);
+			return { status: 0 };
+		};
+		assert.deepEqual(ensureMaterializedUpstream(context.root, { spawn }), []);
+		assert.equal(calls.length, 0);
+
+		rmSync(path.join(context.packageDirectory, 'tests', 'upstream'), { recursive: true });
+		assert.deepEqual(ensureMaterializedUpstream(context.root, { spawn }), ['packages/mit-widget']);
+		assert.equal(calls.length, 1);
+
+		await runCli(['run', '--package-dir', context.packageDirectory]);
+		const markerPath = path.join(context.packageDirectory, 'upstream', '.octane-materialize.json');
+		writeFileSync(markerPath, JSON.stringify({ lockFingerprint: 'stale', schemaVersion: 1 }));
+		assert.deepEqual(ensureMaterializedUpstream(context.root, { spawn }), ['packages/mit-widget']);
+		assert.equal(calls.length, 2);
+	});
+
 	test('lock refuses nodes without approved source-license evidence', async () => {
 		const context = scenario();
 		const manifestPath = path.join(context.workRoot, 'fixture-batch', 'manifest.json');

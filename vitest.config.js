@@ -12,6 +12,14 @@ import { lynxRspeedyRenderers } from './packages/lynx/src/config.runtime.js';
 import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.ts';
 import { inkRenderers as INK_RENDERERS } from './packages/ink/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
+import { ensureMaterializedUpstream } from './scripts/react-port/ensure-materialized.mjs';
+
+// Lock-pinned packages regenerate their pristine/adapted upstream trees from
+// audit/upstream.lock.json instead of committing the bytes. Test-file globs
+// resolve at config load — before any globalSetup — so the trees must exist
+// now or their suites are silently dropped from collection. Near-free when
+// already materialized from the current lock.
+ensureMaterializedUpstream(import.meta.dirname);
 
 const requireReactTextareaAutosize = createRequire(
 	resolve(import.meta.dirname, 'packages/textarea-autosize/package.json'),
