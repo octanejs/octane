@@ -240,6 +240,11 @@ partial or alpha, and
 record: upstream version, supported surface, known divergences, SSR/hydration
 coverage, and when the evidence was last checked.
 
+## Sponsors
+[<img width="736" height="252" alt="image" src="https://github.com/user-attachments/assets/aa1347d4-a7a5-4aa9-8dbd-e4fdca2cd103" />](https://blacksmith.sh)
+
+**BlackSmith** - fast and efficient platform for running GitHub Actions, helping teams build, test, and deploy code faster while reducing CI costs. We thank Blacksmith for supporting our community as a sponsor!
+
 ## Contributing
 
 Bug reports, regression tests, docs, bindings, and core fixes are all welcome.
