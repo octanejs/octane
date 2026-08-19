@@ -25985,14 +25985,17 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
  * snapshot remain unchanged.
  *
  * This recognizes `selected === item.id` (or its reverse) under `key item.id`,
- * and the same proof for any other explicit, noncomputed item property.
+ * optionally through one preceding `const id = item.id`, and the same proof
+ * for any other explicit, noncomputed item property. The authored declaration
+ * stays in the full item body, preserving its read position and event captures.
  * Dynamic ternary arms, extra references to
  * `selected` anywhere in the row (including deferred event callbacks), spreads,
  * and anything other than one direct host root all fail closed.
  */
 function keyedSelectionDepIndex(itemName, keyBody, subStmts, runtimeDepNames, ctx) {
-	if (subStmts.length !== 1 || !isPlainHostRoot(subStmts[0])) return -1;
-	const root = subStmts[0];
+	if (subStmts.length !== 1 && subStmts.length !== 2) return -1;
+	const root = subStmts[subStmts.length - 1];
+	if (!isPlainHostRoot(root)) return -1;
 	const attrs = root.attributes || root.openingElement?.attributes || [];
 	if (attrs.some((attr) => attr.type !== 'Attribute' && attr.type !== 'JSXAttribute')) {
 		return -1;
@@ -26044,12 +26047,33 @@ function keyedSelectionDepIndex(itemName, keyBody, subStmts, runtimeDepNames, ct
 			member.property.name === keyProperty
 		);
 	};
+	let keyAlias = null;
+	if (subStmts.length === 2) {
+		const declaration = subStmts[0];
+		const binding = declaration.declarations?.[0];
+		if (
+			declaration.type !== 'VariableDeclaration' ||
+			declaration.kind !== 'const' ||
+			declaration.declare === true ||
+			declaration.declarations?.length !== 1 ||
+			binding?.id?.type !== 'Identifier' ||
+			binding.id.name === itemName ||
+			!isItemKey(binding.init)
+		) {
+			return -1;
+		}
+		keyAlias = binding.id.name;
+	}
+	const isComparedKey = (expression) =>
+		isItemKey(expression) ||
+		(keyAlias !== null && expression?.type === 'Identifier' && expression.name === keyAlias);
 	const left = unwrapTsExpr(test.left);
 	const right = unwrapTsExpr(test.right);
-	const selected = isItemKey(left) ? right : isItemKey(right) ? left : null;
+	const selected = isComparedKey(left) ? right : isComparedKey(right) ? left : null;
 	if (
 		selected?.type !== 'Identifier' ||
 		selected.name === itemName ||
+		selected.name === keyAlias ||
 		!ctx.currentComponentLocals?.has(selected.name)
 	) {
 		return -1;
