@@ -14,7 +14,10 @@
 //
 // Run:  node benchmarks/codegen-size/run.mjs
 import { compile } from 'octane/compiler';
-import { transformSync } from 'esbuild';
+import { createTextTypeProject } from 'octane/compiler/typescript';
+import { build, transformSync } from 'esbuild';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { gzipSync, constants as zc } from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -109,6 +112,111 @@ for (const op of ['raw', 'minified', 'gzip']) {
 		);
 	}
 }
+
+// Keep the opt-in TypeScript sentinel separate from the fixed corpus. Its
+// reference spells out the same text guarantees with explicit `as string`
+// assertions, so a missed proof cannot hide in the aggregate expansion ratio.
+const textTypesFile = path.join(__dirname, 'text-types.tsrx');
+const textTypesSource = fs.readFileSync(textTypesFile, 'utf8');
+const textTypesControlSource = fs.readFileSync(
+	path.join(__dirname, 'text-types-control.tsrx'),
+	'utf8',
+);
+const textTypeProject = createTextTypeProject({
+	tsconfig: path.join(__dirname, 'text-types.tsconfig.json'),
+});
+let textTypes;
+try {
+	const textTypeFacts = textTypeProject.snapshot(textTypesFile, textTypesSource);
+	const inferred = compiledSize(textTypesSource, textTypesFile, { textTypeFacts });
+	const explicit = compiledSize(textTypesControlSource, textTypesFile);
+	const syntax = compiledSize(textTypesSource, textTypesFile);
+	const semanticInputs = [
+		{
+			props: {
+				title: 'First & <title>',
+				rows: [
+					{ id: 'a', label: 'Row <A>' },
+					{ id: 'b', label: 'Row & B' },
+				],
+				count: 2,
+				labels: ['tail'],
+			},
+			contains: [
+				'<h1>First &amp; &lt;title&gt;</h1>',
+				'<p class="text-title">FIRST &amp; &lt;TITLE&gt;</p>',
+				'<span class="text-count">2</span>',
+				'<li data-id="a">Row &lt;A&gt;</li>',
+				'<li data-id="b">Row &amp; B</li>',
+				'<footer>tail</footer>',
+			],
+		},
+		{
+			props: { title: 'Empty', rows: [], count: 0, labels: [] },
+			contains: ['<h1>Empty</h1>', '<span class="text-count">0</span>', '<li>empty</li>'],
+		},
+	];
+	const renderCandidate = async (source, options) => {
+		const bundle = await build({
+			entryPoints: [path.join(__dirname, 'text-types-entry.ts')],
+			bundle: true,
+			write: false,
+			format: 'esm',
+			platform: 'node',
+			target: 'node22',
+			logLevel: 'silent',
+			define: { 'process.env.NODE_ENV': '"production"' },
+			plugins: [
+				{
+					name: 'text-types-semantic-control',
+					setup(bundler) {
+						bundler.onLoad({ filter: /\.tsrx$/ }, ({ path: filename }) => {
+							assert.equal(filename, textTypesFile);
+							return {
+								contents: compile(source, filename, {
+									mode: 'server',
+									hmr: false,
+									dev: false,
+									...options,
+								}).code,
+								loader: 'js',
+								resolveDir: path.dirname(filename),
+							};
+						});
+					},
+				},
+			],
+		});
+		const code = bundle.outputFiles[0].text;
+		const module = await import(
+			`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
+		);
+		const results = [];
+		for (const { props, contains } of semanticInputs) {
+			const html = await module.render(props);
+			for (const expected of contains) assert.ok(html.includes(expected), expected);
+			results.push(html);
+		}
+		return results;
+	};
+	const inferredHtml = await renderCandidate(textTypesSource, { textTypeFacts });
+	const explicitHtml = await renderCandidate(textTypesControlSource, {});
+	assert.deepEqual(
+		inferredHtml,
+		explicitHtml,
+		'inferred and explicit text must render identically',
+	);
+	const semanticChecksum = createHash('sha256').update(JSON.stringify(inferredHtml)).digest('hex');
+	textTypes = {
+		inferred,
+		explicit,
+		syntax,
+		meta: { semanticChecksum, stringChildren: textTypeFacts.stringChildRanges.length },
+	};
+} finally {
+	textTypeProject.dispose();
+}
+
 const payload = {
 	suite: 'codegen-size',
 	iterations: 1,
@@ -121,6 +229,9 @@ const payload = {
 		},
 		{ name: 'native-change-control', ops: diagnosticControl },
 		{ name: 'native-change-diagnostic', ops: diagnostic },
+		{ name: 'text-types-syntax', ops: textTypes.syntax },
+		{ name: 'text-types-explicit', ops: textTypes.explicit, meta: textTypes.meta },
+		{ name: 'text-types-inferred', ops: textTypes.inferred, meta: textTypes.meta },
 	],
 };
 
@@ -131,6 +242,9 @@ console.log(
 );
 console.log(
 	`native-change production sentinel  raw ${diagnostic.raw.median}  min ${diagnostic.minified.median}  gz ${diagnostic.gzip.median}`,
+);
+console.log(
+	`TypeScript text sentinel  inferred ${textTypes.inferred.raw.median}/${textTypes.inferred.minified.median}/${textTypes.inferred.gzip.median}  explicit ${textTypes.explicit.raw.median}/${textTypes.explicit.minified.median}/${textTypes.explicit.gzip.median}  syntax ${textTypes.syntax.raw.median}/${textTypes.syntax.minified.median}/${textTypes.syntax.gzip.median}`,
 );
 
 if (process.env.BENCH_JSON) {

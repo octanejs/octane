@@ -685,7 +685,7 @@ function createLexicalScope(parent, isFunction = false) {
 	return scope;
 }
 
-function createLexicalAnalysis(ast) {
+export function createLexicalAnalysis(ast) {
 	const bindingNodes = new WeakSet();
 	const nonReferenceNodes = new WeakSet();
 	const nodeScopes = new WeakMap();

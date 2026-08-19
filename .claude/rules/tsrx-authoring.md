@@ -28,8 +28,12 @@ Dynamic text uses a cast: `{expr as string}`.
 
 The cast is optional when the expression is provably a string: a string or
 template literal, a `+`-concatenation involving a string (`{'Count: ' + count}`),
-or a local `const`/param the compiler tracks back to a string. It is required
-otherwise.
+an unshadowed built-in `String(value)` call, or a local `const`/param the compiler
+tracks back to a string. Use `String(value)` when conversion is intended;
+asserting a number `as string` can produce a TypeScript error. Custom Node build
+pipelines can also supply project-aware string proofs through
+`octane/compiler/typescript`; see `docs/compiler-text-inference.md`. Without
+such a proof, retain the explicit string assertion for text intent.
 
 A bare `{expr}` that is not provably a string is a renderable hole: a component,
 an element descriptor, or a coerced primitive.

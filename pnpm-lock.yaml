@@ -499,6 +499,12 @@ catalogs:
     '@vitest/coverage-v8':
       specifier: 4.1.10
       version: 4.1.10
+    '@volar/language-core':
+      specifier: 2.4.28
+      version: 2.4.28
+    '@volar/typescript':
+      specifier: 2.4.28
+      version: 2.4.28
     '@vue/runtime-dom':
       specifier: 3.6.0-rc.1
       version: 3.6.0-rc.1
@@ -6066,6 +6072,12 @@ importers:
       '@types/react':
         specifier: catalog:default
         version: 19.2.17
+      '@volar/language-core':
+        specifier: catalog:default
+        version: 2.4.28
+      '@volar/typescript':
+        specifier: catalog:default
+        version: 2.4.28
       devalue:
         specifier: catalog:default
         version: 5.8.2
@@ -6103,6 +6115,9 @@ importers:
       react-dom:
         specifier: catalog:default
         version: 19.2.7(react@19.2.7)
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
       viem:
         specifier: catalog:default
         version: 2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)

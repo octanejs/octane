@@ -6,8 +6,8 @@
 //   1. The `.ts` runtime → ESM `.js`, transpiled PER FILE (no bundling) so the module
 //      structure and generated package-version literal remain intact for a plain Node
 //      ESM consumer.
-//   2. The compiler is already plain `.js` (its only deps are `@tsrx/core`,
-//      `es-module-lexer`, and `esrap`) — copy it verbatim.
+//   2. The compiler and its separately imported Node adapters are already plain
+//      `.js` — copy them and their hand-written declarations verbatim.
 //   3. Type declarations (`tsc --emitDeclarationOnly`) alongside the JS.
 //
 // Entry points are GLOBBED from `src/`, not hand-listed — a hand-maintained list

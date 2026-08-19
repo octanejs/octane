@@ -52,10 +52,17 @@
     "./profiling": "./src/profiling.ts",
     "./universal": "./src/universal.ts",
     "./universal/native": "./src/universal-native.ts",
-    "./compiler": "./src/compiler/index.js",
+    "./compiler": {
+      "types": "./src/compiler/index.d.ts",
+      "default": "./src/compiler/index.js"
+    },
     "./compiler/bundler": "./src/compiler/bundler.js",
     "./compiler/register": "./src/compiler/register.js",
     "./compiler/renderers": "./src/compiler/renderers.js",
+    "./compiler/typescript": {
+      "types": "./src/compiler/typescript.d.ts",
+      "default": "./src/compiler/typescript.js"
+    },
     "./compiler/vite": {
       "types": "./src/compiler/vite.d.ts",
       "default": "./src/compiler/vite.js"
@@ -150,10 +157,17 @@
         "types": "./dist/universal-native.d.ts",
         "default": "./dist/universal-native.js"
       },
-      "./compiler": "./dist/compiler/index.js",
+      "./compiler": {
+        "types": "./dist/compiler/index.d.ts",
+        "default": "./dist/compiler/index.js"
+      },
       "./compiler/bundler": "./dist/compiler/bundler.js",
       "./compiler/register": "./dist/compiler/register.js",
       "./compiler/renderers": "./dist/compiler/renderers.js",
+      "./compiler/typescript": {
+        "types": "./dist/compiler/typescript.d.ts",
+        "default": "./dist/compiler/typescript.js"
+      },
       "./compiler/vite": {
         "types": "./dist/compiler/vite.d.ts",
         "default": "./dist/compiler/vite.js"
@@ -170,6 +184,8 @@
   "dependencies": {
     "@tsrx/core": "catalog:default",
     "@types/react": "catalog:default",
+    "@volar/language-core": "catalog:default",
+    "@volar/typescript": "catalog:default",
     "devalue": "catalog:default",
     "es-module-lexer": "catalog:default",
     "esrap": "catalog:default",
@@ -178,6 +194,7 @@
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "typescript": "^5.9.3",
     "vite": "^8.0.16"
   },
   "peerDependenciesMeta": {
@@ -185,6 +202,9 @@
       "optional": true
     },
     "react-dom": {
+      "optional": true
+    },
+    "typescript": {
       "optional": true
     },
     "vite": {
@@ -200,6 +220,7 @@
     "playwright": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "typescript": "catalog:default",
     "viem": "catalog:default",
     "vite": "catalog:default",
     "vitest": "catalog:default"

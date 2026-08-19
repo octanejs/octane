@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 const OCTANE_PACKAGE_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
 describe('octane/compiler browser bundle', () => {
-	it('uses the pure-JavaScript parser instead of the Node-native parser', async () => {
+	it('keeps native parsing and optional TypeScript project analysis out of the browser graph', async () => {
 		const result = await build({
 			absWorkingDir: OCTANE_PACKAGE_ROOT,
 			stdin: {
@@ -30,5 +30,9 @@ describe('octane/compiler browser bundle', () => {
 		const inputs = Object.keys(result.metafile.inputs).map((input) => input.replaceAll('\\', '/'));
 		expect(inputs.some((input) => input.includes('/@tsrx/core/'))).toBe(true);
 		expect(inputs.some((input) => input.includes('/oxc-tsrx/'))).toBe(false);
+		expect(inputs.some((input) => input.endsWith('/compiler/typescript.js'))).toBe(false);
+		expect(inputs.some((input) => input.includes('/node_modules/typescript/'))).toBe(false);
+		expect(inputs.some((input) => input.includes('/@volar/'))).toBe(false);
+		expect(inputs.some((input) => input.includes('/@tsrx/typescript-plugin/'))).toBe(false);
 	});
 });
