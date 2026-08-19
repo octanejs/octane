@@ -9,6 +9,7 @@ import { ReactCompat } from './sections/ReactCompat.tsrx';
 import { Lynx } from './sections/Lynx.tsrx';
 import { Spin } from './sections/Spin.tsrx';
 import { Explorer } from './sections/Explorer.tsrx';
+import { Sponsor } from './sections/Sponsor.tsrx';
 
 export function Home() @{
 	<div class="home">
@@ -20,6 +21,7 @@ export function Home() @{
 		<Lynx />
 		<Spin />
 		<Explorer />
+		<Sponsor />
 		<style>
 			.home {
 				max-width: 1420px;

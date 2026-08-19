@@ -308,8 +308,8 @@ describe('website routes', () => {
 		}
 
 		// The home composes its sections in a fixed order: hero, features, proven, why,
-		// compat, lynx, spin, explorer. (Each section carries a compiler-added scoped
-		// class after its semantic one.)
+		// compat, lynx, spin, explorer, sponsor. (Each section carries a compiler-added
+		// scoped class after its semantic one.)
 		const homeSections = Array.from(container.querySelectorAll('main .home > section')).map(
 			(section) => section.classList[0],
 		);
@@ -322,6 +322,7 @@ describe('website routes', () => {
 			'lynx',
 			'spin',
 			'explorer',
+			'sponsor',
 		]);
 
 		// The Lynx section is the entry point to /docs/lynx: its own link, plus one
@@ -352,6 +353,27 @@ describe('website routes', () => {
 			if (!bx.querySelector('.bx-plot')) throw new Error('explorer plot missing');
 		});
 		expect(bx.querySelectorAll('.bx-heat tbody tr')).toHaveLength(HOME_SUMMARY.rows.length);
+
+		// The homepage closes by acknowledging the infrastructure sponsor with a
+		// descriptive, externally linked lockup rather than an unexplained logo.
+		const sponsor = container.querySelector<HTMLElement>(
+			'section.sponsor[aria-labelledby="sponsor-heading"]',
+		)!;
+		expect(sponsor.querySelector('#sponsor-heading')?.textContent?.trim()).toBe(
+			'Faster CI for a faster framework.',
+		);
+		expect(sponsor.querySelector('.sponsor-lead')?.textContent).toContain(
+			'Blacksmith supports Octane',
+		);
+		const sponsorLink = findLink(sponsor, 'https://blacksmith.sh')!;
+		expect(sponsorLink.getAttribute('target')).toBe('_blank');
+		expect(sponsorLink.getAttribute('rel')?.split(/\s+/)).toEqual(
+			expect.arrayContaining(['noopener', 'noreferrer']),
+		);
+		expect(sponsorLink.getAttribute('aria-label')).toBe(
+			'Visit Blacksmith, Octane’s infrastructure sponsor',
+		);
+		expect(sponsorLink.querySelector('img')?.getAttribute('alt')).toBe('CI powered by Blacksmith');
 
 		// Section links sit with the wordmark on the left; search and the social
 		// icons form the right cluster.
