@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "TanStack DB bindings for Octane — reuses @tanstack/db's framework-agnostic core with Octane live-query hooks.",
+  "description": "TanStack DB bindings for Octane \u2014 reuses @tanstack/db's framework-agnostic core with Octane live-query hooks.",
   "author": "Kyle Mathews",
   "publishConfig": {
     "access": "public"
@@ -36,7 +36,8 @@
   "files": [
     "src",
     "skills",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts"
