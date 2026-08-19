@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as ServerRuntime from 'octane/server';
+import type { ClassValue } from 'octane/jsx-runtime';
 import { flushSync, hydrateRoot } from '../src/index.js';
 import { mount } from './_helpers';
 import {
 	DeoptNamespaceSlots,
 	DescriptorNamespaceDocument,
 	SvgViaCreateElement,
+	TemplateClassNamespaces,
 	TemplateNamespaceDestinations,
 } from './_fixtures/svg-deopt.tsrx';
 import { loadServerFixture } from './_server-fixture.js';
@@ -98,6 +100,51 @@ function captureTemplateNodes(root: ParentNode): Map<string, Element> {
 function expectTemplateNodeIdentity(root: ParentNode, before: Map<string, Element>): void {
 	for (const [selector, node] of before) {
 		expect(root.querySelector(selector), selector).toBe(node);
+	}
+}
+
+const CLASS_NAMESPACE_CASES: Array<[string, string]> = [
+	['#class-html-root', HTML_NS],
+	['#class-html-nested', HTML_NS],
+	['#class-html-fragment-first', HTML_NS],
+	['#class-html-fragment-second', HTML_NS],
+	['#class-html-ambiguous', HTML_NS],
+	['#class-foreign-html', HTML_NS],
+	['#class-svg-ambiguous', SVG_NS],
+	['#class-svg-mixed-anchor', SVG_NS],
+	['#class-svg-mixed-group', SVG_NS],
+	['#class-svg-fixed', SVG_NS],
+	['#class-math-ambiguous', MATHML_NS],
+	['#class-math-fixed', MATHML_NS],
+	['#class-math-mixed-anchor', MATHML_NS],
+	['#class-math-mixed-group', MATHML_NS],
+];
+
+const INITIAL_CLASS: ClassValue = ['first', { active: true, absent: false }];
+const CLASS_UPDATES: Array<[ClassValue, string | null]> = [
+	[['next', { active: false, visible: true }], 'next visible'],
+	[false, null],
+	['', ''],
+	[null, null],
+	[INITIAL_CLASS, 'first active'],
+];
+
+function captureClassNodes(root: ParentNode): Map<string, Element> {
+	return new Map(
+		CLASS_NAMESPACE_CASES.map(([selector]) => [selector, root.querySelector(selector)!]),
+	);
+}
+
+function expectNamespaceClasses(
+	root: ParentNode,
+	value: string | null,
+	before?: Map<string, Element>,
+): void {
+	for (const [selector, namespace] of CLASS_NAMESPACE_CASES) {
+		const node = root.querySelector(selector);
+		expect(node?.namespaceURI, selector).toBe(namespace);
+		expect(node?.getAttribute('class'), selector).toBe(value);
+		if (before !== undefined) expect(node, selector).toBe(before.get(selector));
 	}
 }
 
@@ -214,9 +261,50 @@ describe('component template namespace inheritance', () => {
 
 		mounted.unmount();
 	});
+
+	it('composes and removes classes in fixed and destination-selected namespaces', () => {
+		const mounted = mount(TemplateClassNamespaces, { value: INITIAL_CLASS });
+		try {
+			expectNamespaceClasses(mounted.container, 'first active');
+			const before = captureClassNodes(mounted.container);
+			for (const [value, expected] of CLASS_UPDATES) {
+				mounted.update(TemplateClassNamespaces, { value });
+				expectNamespaceClasses(mounted.container, expected, before);
+			}
+		} finally {
+			mounted.unmount();
+		}
+	});
 });
 
 describe('namespace inheritance across server rendering', () => {
+	it('adopts namespace-specific classes and updates them without replacing server elements', async () => {
+		const props = { value: INITIAL_CLASS };
+		const { html } = await ServerRuntime.renderToString(server.TemplateClassNamespaces, props);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const recoveries: unknown[] = [];
+		let root: ReturnType<typeof hydrateRoot> | null = null;
+		try {
+			container.innerHTML = html;
+			expectNamespaceClasses(container, 'first active');
+			const before = captureClassNodes(container);
+			root = hydrateRoot(container, TemplateClassNamespaces, props, {
+				onRecoverableError: (error) => recoveries.push(error),
+			});
+			flushSync(() => {});
+			expectNamespaceClasses(container, 'first active', before);
+			for (const [value, expected] of CLASS_UPDATES) {
+				flushSync(() => root!.render(TemplateClassNamespaces, { value }));
+				expectNamespaceClasses(container, expected, before);
+			}
+			expect(recoveries).toEqual([]);
+		} finally {
+			root?.unmount();
+			container.remove();
+		}
+	});
+
 	it('hydrates component-selected template namespaces in place with live updates', async () => {
 		const props = { label: 'server label' };
 		const { html } = await ServerRuntime.renderToString(

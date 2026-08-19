@@ -274,6 +274,32 @@ export function KeyedSelectionList(props: {
 	</ul>
 }
 
+export function KeyedSelectionControlledList(props: {
+	items: SelectionRow[];
+	selected: number | null;
+}) @{
+	const selected = props.selected;
+	<ul id="keyed-selection-controlled-list">
+		@for (const row of props.items; key row.id) {
+			<li class={selected === row.id ? 'selected' : ''}>
+				<input value={row.label} readOnly={true} />
+			</li>
+		}
+	</ul>
+}
+
+export function KeyedSelectionRenderableList(props: {
+	items: Array<{ id: number; content: OctaneNode }>;
+	selected: number | null;
+}) @{
+	const selected = props.selected;
+	<ul id="keyed-selection-renderable-list">
+		@for (const row of props.items; key row.id) {
+			<li class={selected === row.id ? 'selected' : ''}>{row.content}</li>
+		}
+	</ul>
+}
+
 export function KeyedSelectionUuidList(props: {
 	items: Array<{ uuid: string; label: string }>;
 	selected: string | null;
