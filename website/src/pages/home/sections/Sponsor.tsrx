@@ -1,7 +1,7 @@
 // The sponsor acknowledgement closes the homepage without interrupting its
 // product narrative. The supplied lockup says what the relationship is, while
 // the copy gives it enough context to remain clear outside the image.
-import blacksmithBannerUrl from '../../../assets/blacksmith-ci.png';
+import blacksmithBannerUrl from '../../../assets/blacksmith-ci.webp';
 
 export function Sponsor() @{
 	<section class="sponsor" aria-labelledby="sponsor-heading">
@@ -26,8 +26,8 @@ export function Sponsor() @{
 			>
 				<img
 					src={blacksmithBannerUrl}
-					width={736}
-					height={252}
+					width={600}
+					height={150}
 					loading="lazy"
 					decoding="async"
 					alt="CI powered by Blacksmith"
