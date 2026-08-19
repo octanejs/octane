@@ -36,6 +36,9 @@ For the full story, see the
 
 ## Browser compatibility
 
+See the [browser support guide](https://octanejs.dev/docs/browser-support) for
+recommended targets, required browser APIs, and optional fallbacks.
+
 Configure your application's build target for the browser engines you support.
 The Rsbuild integration's `modules` target includes Chromium 87 and Samsung
 Internet 14; Samsung Internet can also be selected directly with targets such as

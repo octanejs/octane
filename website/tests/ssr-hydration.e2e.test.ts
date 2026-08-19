@@ -64,6 +64,7 @@ const ROUTES = [
 	'/docs/lynx',
 	'/docs/react-compat',
 	'/docs/profiling',
+	'/docs/browser-support',
 	'/docs/bindings',
 	'/errors',
 	'/errors/3?args%5B%5D=%22quoted%22',

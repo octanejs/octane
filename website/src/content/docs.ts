@@ -13,6 +13,7 @@ import DifferencesFromReact from './docs/differences-from-react.mdx';
 import Lynx from './docs/lynx.mdx';
 import ReactCompat from './docs/react-compat.mdx';
 import PublishingLibraries from './docs/publishing-libraries.mdx';
+import BrowserSupport from './docs/browser-support.mdx';
 import Bindings from './docs/bindings.mdx';
 import Profiling from './docs/profiling.mdx';
 import { docsMeta, type DocMeta, type DocSection } from './docs-meta.ts';
@@ -35,6 +36,7 @@ const components: Record<string, DocEntry['component']> = {
 	'react-compat': ReactCompat,
 	profiling: Profiling,
 	'publishing-libraries': PublishingLibraries,
+	'browser-support': BrowserSupport,
 	bindings: Bindings,
 };
 
