@@ -844,6 +844,30 @@
     "note": "Gzipped production sentinel output must retain zero diagnostic codegen cost."
   },
   {
+    "suite": "codegen-size",
+    "op": "raw",
+    "target": "text-types-inferred",
+    "reference": "text-types-explicit",
+    "maxRatio": 1.0,
+    "note": "Opt-in TypeScript string-child inference must retain the raw-code size guarantee of explicit string assertions; both candidates execute the same SSR semantic controls."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "text-types-inferred",
+    "reference": "text-types-explicit",
+    "maxRatio": 1.0,
+    "note": "Inferred string children must not exceed the minified output of the equivalent explicit-string sentinel."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "text-types-inferred",
+    "reference": "text-types-explicit",
+    "maxRatio": 1.0,
+    "note": "Inferred string children must not exceed the gzipped output of the equivalent explicit-string sentinel."
+  },
+  {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",

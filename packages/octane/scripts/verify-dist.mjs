@@ -525,6 +525,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'normalizeRendererConfig',
 		'resolveRendererForFile',
 	],
+	'./compiler/typescript': ['createTextTypeProject'],
 	'./compiler/vite': ['discoverOctaneSourceDependencies', 'octane'],
 	'./compiler/volar': ['compileToVolarMappings'],
 	'./tsrx-iterable': ['map_iterable'],
