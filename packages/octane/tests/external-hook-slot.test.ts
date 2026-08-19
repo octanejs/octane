@@ -760,6 +760,7 @@ describe('manifest-declared manual hook slots', () => {
 			'vaul',
 			'wagmi',
 			'window',
+			'xstate',
 			'zag',
 			'zustand',
 		]);
