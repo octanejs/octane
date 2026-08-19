@@ -89,6 +89,7 @@ export const BENCHMARK_SUITES = [
 	'lynx-table-web',
 	'lynx-bundle-size',
 	'codegen-size',
+	'hook-memo',
 	'compiler-throughput',
 	'bundle-size',
 	'bundle-reachability',
