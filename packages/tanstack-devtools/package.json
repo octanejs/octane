@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "TanStack Devtools bindings for Octane — reuses @tanstack/devtools and ports the React adapter's TanStackDevtools component.",
+  "description": "TanStack Devtools bindings for Octane \u2014 reuses @tanstack/devtools and ports the React adapter's TanStackDevtools component.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -24,7 +24,8 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts"
