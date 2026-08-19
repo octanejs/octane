@@ -17,6 +17,10 @@ wrapper is narrower: the wrapper must be locally declared in a fully compiled
 parameter to a supported hook. This package ships both the runtime and compiler,
 with the compiler exposed at `octane/compiler`.
 
+Custom Node build pipelines can opt into project-aware string-child inference
+through `octane/compiler/typescript`. See the
+[type-aware text compilation guide](https://github.com/octanejs/octane/blob/main/docs/compiler-text-inference.md).
+
 Direct Node or Bun server scripts can preload `octane/compiler/register` to
 compile imported Octane components without going through Vite. See the
 [SSR guide](https://github.com/octanejs/octane/blob/main/docs/ssr.md#run-an-ssg-script-directly).
@@ -31,6 +35,9 @@ For the full story, see the
 [main README](https://github.com/octanejs/octane#readme).
 
 ## Browser compatibility
+
+See the [browser support guide](https://octanejs.dev/docs/browser-support) for
+recommended targets, required browser APIs, and optional fallbacks.
 
 Configure your application's build target for the browser engines you support.
 The Rsbuild integration's `modules` target includes Chromium 87 and Samsung

@@ -18,7 +18,7 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
       cancel-in-progress: false
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     # `pull_request_target` loads this script from the trusted base branch. It
     # never checks out or executes pull request code; contents:write only creates

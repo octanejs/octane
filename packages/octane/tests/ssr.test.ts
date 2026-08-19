@@ -321,6 +321,46 @@ describe.each([
 });
 
 describe('SSR Phase 1 — semantics', () => {
+	it('preserves callback values and custom-hook identity across server render retries', () => {
+		const callbacks = evalServer(
+			`
+				import { useCallback, useState } from 'octane';
+				function useForwarded(callback, dependencies) {
+					return useCallback(callback, dependencies);
+				}
+				export function Callbacks(props) @{
+					const [updated, setUpdated] = useState(false);
+					const first = useForwarded(updated ? props.nextFirst : props.first, []);
+					const second = useForwarded(updated ? props.nextSecond : props.second, []);
+					props.observe(first, second);
+					if (!updated) setUpdated(true);
+					<output>{updated ? 'ready' : 'initial'}</output>
+				}
+			`,
+			'server-callback-value.tsrx',
+		);
+		const first = vi.fn(() => 'first');
+		const second = vi.fn(() => 'second');
+		const nextFirst = vi.fn(() => 'next-first');
+		const nextSecond = vi.fn(() => 'next-second');
+		const observed: Array<[() => string, () => string]> = [];
+		expect(
+			RT.renderToString(callbacks.Callbacks, {
+				first,
+				second,
+				nextFirst,
+				nextSecond,
+				observe(left: () => string, right: () => string) {
+					observed.push([left, right]);
+				},
+			}).html,
+		).toBe('<output>ready</output>');
+		expect(observed.at(-1)).toEqual([first, second]);
+		for (const callback of [first, second, nextFirst, nextSecond]) {
+			expect(callback).not.toHaveBeenCalled();
+		}
+	});
+
 	it('compares server memo dependencies with Object.is across render-phase retries', () => {
 		const memo = evalServer(
 			`
