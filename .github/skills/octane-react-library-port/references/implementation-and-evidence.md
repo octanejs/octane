@@ -47,39 +47,47 @@ Inspect both the verified npm artifact and the canonical repository at the
 preflight commit. The registry may omit source, tests, fixtures, or build
 configuration; record which immutable artifact supplies each boundary.
 
-Upstream bytes are pinned by content address and materialized on demand; they
-are never committed. For a new or upgraded port:
+The pinned upstream tree is committed byte-exact and verified offline against
+its own content addresses; the adapted suite is regenerated, never committed.
+For a new or upgraded port:
 
 - derive the committed pin from the preflighted batch node:
 
   ```bash
   pnpm react-port:materialize lock --batch <id> --node pkg:<name> \
     --package-dir packages/<binding> \
-    --adapted-map <pinned-test-root>=tests/upstream
+    --adapted-map <pinned-test-root>=tests/upstream \
+    [--adapted-rewrite <find>=<replace> ...]
   ```
 
   This writes `packages/<binding>/audit/upstream.lock.json`: the exact package
-  identity, approved-license evidence hashes, and the git blob sha and size of
-  every file in the pinned source subtree. The lock is the durable provenance
-  artifact; commit it, and it fails closed on any fingerprint drift.
+  identity, approved-license evidence hashes, the git blob sha and size of
+  every file in the pinned source subtree, and the ordered mechanical
+  `adaptedRewrites` (import repointing and similar package-wide conversions).
+  The lock is the durable provenance artifact; commit it, and it fails closed
+  on any fingerprint drift.
 
-- regenerate the pristine tree and the adapted suite whenever they are needed:
+- commit the pristine tree under `packages/<binding>/upstream/`, byte-exact.
+  Its integrity is machine-checked against the lock's git blob shas — the same
+  hashes `git ls-tree -r <commit>` reports in the upstream repository — so
+  verification never needs the network and any reviewer can audit the copy
+  against `github.com/<owner>/<repo>/blob/<commit>/<path>`. On first
+  materialization (`run` with no committed tree) the CLI fetches the pinned
+  commit archive, verifies every byte before writing, and the result is what
+  you commit. Keep the tree prettier-ignored and outside published `files`.
+
+- regenerate the adapted suite whenever it is needed:
 
   ```bash
   pnpm react-port:materialize run --package-dir packages/<binding>
   ```
 
-  This fetches the pinned commit archive (falling back to the content-addressed
-  blob endpoint per file), verifies every byte against the lock before writing,
-  rebuilds `packages/<binding>/upstream/` (pristine, unmodified), and rebuilds
-  the `tests/upstream` targets by copying each mapped pristine file and applying
-  its committed patch from `audit/upstream-patches/`. `run --check` verifies an
-  existing tree offline. Run materialization before the pristine/adapted suites
-  execute, for example as the leading segment of the package `test` script.
-
-- keep the regenerated trees out of version control: add a package `.gitignore`
-  with `/upstream/` and `/tests/upstream/`. Only the lock, the patches, `.skip`
-  rationale markers, and port-authored tests are committed.
+  With a committed pristine tree this is fully offline: it verifies the tree
+  against the lock, then rebuilds the `tests/upstream` targets by copying each
+  mapped pristine file, applying the lock's mechanical rewrites, and applying
+  its committed divergence patch from `audit/upstream-patches/`. `run --check`
+  verifies without writing. Add a package `.gitignore` with `/tests/upstream/`;
+  the regenerated adapted suite is never committed.
 
 - author the adaptation by editing the regenerated `tests/upstream` files, then
   record it:
@@ -88,12 +96,17 @@ are never committed. For a new or upgraded port:
   pnpm react-port:materialize diff --package-dir packages/<binding>
   ```
 
-  This regenerates `audit/upstream-patches/` with one patch per adapted file.
-  The patch set is the reviewable divergence record: every byte that differs
-  from the pinned upstream test is visible in the committed diff, and nothing
-  else can drift. A pinned upstream case that must not run in the adapted lane
-  gets a `<target>.skip` marker beside its patch path whose content is the
-  durable rationale; a silently missing adapted file fails `diff`.
+  This regenerates `audit/upstream-patches/` with one patch per diverging file.
+  Keep patches minimal: express every mechanical conversion as a lock
+  `adaptedRewrite` or project configuration (Vitest `globals`, `setupFiles`,
+  resolver aliases) so a mapped file with no behavioral divergence needs no
+  patch at all, and the remaining hunks read as exactly the intentional
+  divergences with their `// OCTANE DIVERGENCE[...]` rationale. Do not add
+  per-case citation comments, renamed functions, or reformatting to adapted
+  files; provenance lives in the lock and the patch. A pinned upstream case
+  that must not run in the adapted lane gets a `<target>.skip` marker beside
+  its patch path whose content is the durable rationale; a silently missing
+  adapted file fails `diff`.
 
 - mirror the upstream module layout in `src/` so source-to-port review and the
   next pinned upgrade have a mechanical crosswalk, and work module by module
@@ -110,12 +123,12 @@ gate: committing a patch is committing an adaptation. If immutable pin evidence
 cannot be established, block the port instead of silently reducing its claimed
 surface. Never point the pristine or adapted lanes at an unpinned checkout.
 
-Existing bindings that predate materialization keep their committed
-`packages/<binding>/upstream/` and `tests/upstream/` trees as valid evidence;
-`materialize run` refuses to overwrite git-tracked trees. Migrate a legacy
-binding to the lock-and-patches model when you next touch its pin. Many
-published pins lack the registry `gitHead` preflight requires; for those,
-derive the lock from the binding's existing reviewed `UPSTREAM.md` pin:
+Existing bindings that predate the lock keep their committed
+`packages/<binding>/upstream/` and `tests/upstream/` trees plus ledger
+machinery as valid evidence. Migrate a legacy binding to the lock model when
+you next touch its pin. Many published pins lack the registry `gitHead`
+preflight requires; for those, derive the lock from the binding's existing
+reviewed `UPSTREAM.md` pin:
 
 ```bash
 pnpm react-port:materialize lock --package-dir packages/<binding> \
@@ -125,13 +138,15 @@ pnpm react-port:materialize lock --package-dir packages/<binding> \
 
 Pin mode still fails closed: the pinned commit's own manifest must declare
 exactly the pinned name and version, and the pinned tree must carry
-recognizable approved-license evidence. A migration must prove the regenerated
-trees byte-match the vendored ones before deleting them, retain the upstream
-license as a hash-matched `LICENSE.upstream`, generate patches from the
-existing adapted suite with `materialize diff`, and swap the parity manifest's
-vendored-ledger support files for the lock and patches.
-`scripts/react-parity/check.mjs` materializes every package that commits an
-`audit/upstream.lock.json` before its verifiers and lanes run.
+recognizable approved-license evidence. A migration keeps (or completes) the
+committed pristine tree so it verifies against the new lock, retains the
+upstream license as a hash-matched `LICENSE.upstream`, re-derives the adapted
+suite as pristine bytes plus lock rewrites plus minimal divergence patches
+(the pristine/adapted identity inventories are the safety net while
+rewriting), deletes the superseded per-package SHA-ledger machinery, and swaps
+the parity manifest's ledger support files for the lock and patches.
+`scripts/react-parity/check.mjs` regenerates and verifies every package that
+commits an `audit/upstream.lock.json` before its verifiers and lanes run.
 
 ## Package contract
 
@@ -145,10 +160,12 @@ A completed publishable binding normally has:
 - source and public type exports with no published `declare module '*.tsrx'`;
 - README, `status.json`, tests, and strict authored/public/packed-consumer type
   programs;
-- a committed `audit/upstream.lock.json` pin plus `audit/upstream-patches/`
-  patches and `.skip` rationales for the adapted suite, with the regenerated
-  `upstream/` and `tests/upstream` trees git-ignored (a legacy byte-exact
-  vendored tree remains valid evidence until the binding migrates);
+- a committed byte-exact `upstream/` pristine tree pinned by
+  `audit/upstream.lock.json` (offline-verified against upstream git blob shas),
+  plus `audit/upstream-patches/` divergence patches and `.skip` rationales for
+  the adapted suite, with the regenerated `tests/upstream` tree git-ignored
+  (a legacy ledger-verified tree remains valid evidence until the binding
+  migrates);
 - `UPSTREAM.md` naming package, version/tag, immutable commit, source boundary,
   adapted/copied paths, excluded React shell, and behavioral oracle;
 - the binding's primary MIT `LICENSE`, plus a separately named, byte-exact root

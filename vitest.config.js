@@ -14,11 +14,11 @@ import { inkRenderers as INK_RENDERERS } from './packages/ink/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
 import { ensureMaterializedUpstream } from './scripts/react-port/ensure-materialized.mjs';
 
-// Lock-pinned packages regenerate their pristine/adapted upstream trees from
-// audit/upstream.lock.json instead of committing the bytes. Test-file globs
-// resolve at config load — before any globalSetup — so the trees must exist
-// now or their suites are silently dropped from collection. Near-free when
-// already materialized from the current lock.
+// Lock-pinned packages regenerate their adapted tests/upstream suites from the
+// committed pristine tree plus audit/upstream-patches/. Test-file globs resolve
+// at config load — before any globalSetup — so the trees must exist now or
+// their suites are silently dropped from collection. Near-free when already
+// present; fully offline for a committed pristine tree.
 ensureMaterializedUpstream(import.meta.dirname);
 
 const requireReactTextareaAutosize = createRequire(
@@ -4718,7 +4718,9 @@ export default defineConfig({
 						'packages/zag/tests/upstream-original.test.ts',
 					],
 					environment: 'jsdom',
-					globals: false,
+					// The adapted upstream suite regenerates from the pinned bytes, which
+					// register through Vitest globals exactly as upstream runs them.
+					globals: true,
 				},
 				plugins: [octane()],
 				resolve: {
@@ -4916,12 +4918,20 @@ export default defineConfig({
 					],
 					exclude: ['packages/intersection-observer/tests/upstream/browser.test.tsx'],
 					environment: 'jsdom',
-					globals: false,
+					globals: true,
 					setupFiles: ['packages/intersection-observer/tests/upstream-adapted.setup.ts'],
 				},
 				plugins: [octane()],
 				resolve: {
 					alias: [
+						{
+							find: /^vitest\/browser$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/intersection-observer/tests/_harness/vitest-browser-stub.ts',
+							),
+						},
+
 						{
 							find: /^@octanejs\/intersection-observer$/,
 							replacement: resolve(
@@ -4944,7 +4954,7 @@ export default defineConfig({
 				test: {
 					name: 'intersection-observer-adapted-browser',
 					include: ['packages/intersection-observer/tests/upstream/browser.test.tsx'],
-					globals: false,
+					globals: true,
 					testTimeout: 60_000,
 					hookTimeout: 60_000,
 					browser: {

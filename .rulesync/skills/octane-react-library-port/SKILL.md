@@ -119,9 +119,11 @@ authority.
    regression, retaining the binding scenario as integration evidence.
 
 7. **Complete artifacts and evidence.** Pin the upstream boundary with
-   `pnpm react-port:materialize lock`, regenerate the pristine and adapted trees
-   with `materialize run`, and record every adaptation as a committed patch with
-   `materialize diff`; upstream bytes are never committed. Inventory and
+   `pnpm react-port:materialize lock`, commit the byte-exact pristine tree it
+   verifies offline, regenerate the adapted suite with `materialize run`, and
+   record every genuine divergence as a minimal committed patch with
+   `materialize diff` (mechanical conversions belong in the lock's
+   `adaptedRewrites`, never in patches). Inventory and
    crosswalk every upstream
    runtime/type case, register pristine/adapted lanes, and prove direct authored
    source, precise public declarations, and packed Node plus browser/no-Node type

@@ -17,10 +17,14 @@
 Repository: `https://github.com/chakra-ui/zag.git`. The npm artifact publishes
 compiled `dist/` output. The framework adapter source and its Vitest suite at
 this pin live under `packages/frameworks/react` in the canonical repository.
-They are pinned by content address in `audit/upstream.lock.json` and
-regenerated on demand into `packages/zag/upstream/` (pristine, git-ignored) by
-`pnpm react-port:materialize run --package-dir packages/zag`; the adapted suite
-regenerates into `tests/upstream/` from the committed patches in
+They are committed byte-exact under `packages/zag/upstream/` and pinned by
+`audit/upstream.lock.json`, which records each file's git blob sha — its
+content address in the upstream repository — so the committed copy verifies
+offline against the pinned commit (`pnpm react-port:materialize run --check`).
+The adapted suite regenerates into `tests/upstream/` (git-ignored) from the
+pristine bytes plus the lock's mechanical `adaptedRewrites`; every mapped file
+currently needs no divergence patch, and the pinned StrictMode suite is
+dispositioned out via its committed `.skip` rationale in
 `audit/upstream-patches/`. Framework-agnostic
 `@zag-js/core`, `@zag-js/store`, `@zag-js/types`, and `@zag-js/utils` at the same
 version are reused unchanged and are not reimplemented here.

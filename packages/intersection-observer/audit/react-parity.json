@@ -110,37 +110,22 @@
         {
           "path": "packages/intersection-observer/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "3e042d0a1f05a3b996ebe8d859265e1d57aaed8f1592ebc3de2a33be4c8bfd81"
+          "sha256": "54d33756b66c05d9f338a9c22b1abd6a377768eab1e6f162b7b2a6326ee869f7"
         },
         {
           "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/InView.test.tsx.patch",
           "role": "support",
-          "sha256": "0194a395c6d4acbceae496435fc00f5653877c8f72d6832eb42d4c620856f606"
-        },
-        {
-          "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/browser.test.tsx.patch",
-          "role": "support",
-          "sha256": "3ab14b1011b88a65ede057dee69006d33bd6aa5b8eb977ce0ea25cb257ba92b2"
-        },
-        {
-          "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/observe.test.ts.patch",
-          "role": "support",
-          "sha256": "9ce012dd23182ae3fbc16859350c7636b566466d5f0a332a225e8e8010e65ca0"
+          "sha256": "22e2fc5983b1d15e0e415599eeae515a34e2962e18cd8f34d8821e828804f3a5"
         },
         {
           "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/setup.test.ts.patch",
           "role": "support",
-          "sha256": "24e885a84582a6fad0b75c11267e704e6e1f367c03a545bb6a3406d70989faf0"
+          "sha256": "a8bdca9c04e604c1096983dfe16b2e366731902e5f5c9ec190538d6500d9b00f"
         },
         {
           "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/useInView.test.tsx.patch",
           "role": "support",
-          "sha256": "5298f1e8ece99b7df937b0e354096d0ceff9e01c5e1a0e8f6f7f6886bda2f4e0"
-        },
-        {
-          "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/useOnInView.test.tsx.patch",
-          "role": "support",
-          "sha256": "21ed878f8f7c84c2e7c3a65c6fd957186eac0ec59f1d3042e3e7e2730eec144a"
+          "sha256": "2ef74de2387219fa89b98cb39168ec788f2e7791b367c382770fad7ffb316441"
         }
       ]
     },
@@ -175,37 +160,22 @@
         {
           "path": "packages/intersection-observer/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "3e042d0a1f05a3b996ebe8d859265e1d57aaed8f1592ebc3de2a33be4c8bfd81"
+          "sha256": "54d33756b66c05d9f338a9c22b1abd6a377768eab1e6f162b7b2a6326ee869f7"
         },
         {
           "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/InView.test.tsx.patch",
           "role": "support",
-          "sha256": "0194a395c6d4acbceae496435fc00f5653877c8f72d6832eb42d4c620856f606"
-        },
-        {
-          "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/browser.test.tsx.patch",
-          "role": "support",
-          "sha256": "3ab14b1011b88a65ede057dee69006d33bd6aa5b8eb977ce0ea25cb257ba92b2"
-        },
-        {
-          "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/observe.test.ts.patch",
-          "role": "support",
-          "sha256": "9ce012dd23182ae3fbc16859350c7636b566466d5f0a332a225e8e8010e65ca0"
+          "sha256": "22e2fc5983b1d15e0e415599eeae515a34e2962e18cd8f34d8821e828804f3a5"
         },
         {
           "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/setup.test.ts.patch",
           "role": "support",
-          "sha256": "24e885a84582a6fad0b75c11267e704e6e1f367c03a545bb6a3406d70989faf0"
+          "sha256": "a8bdca9c04e604c1096983dfe16b2e366731902e5f5c9ec190538d6500d9b00f"
         },
         {
           "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/useInView.test.tsx.patch",
           "role": "support",
-          "sha256": "5298f1e8ece99b7df937b0e354096d0ceff9e01c5e1a0e8f6f7f6886bda2f4e0"
-        },
-        {
-          "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/useOnInView.test.tsx.patch",
-          "role": "support",
-          "sha256": "21ed878f8f7c84c2e7c3a65c6fd957186eac0ec59f1d3042e3e7e2730eec144a"
+          "sha256": "2ef74de2387219fa89b98cb39168ec788f2e7791b367c382770fad7ffb316441"
         }
       ]
     },
@@ -250,37 +220,22 @@
         {
           "path": "packages/intersection-observer/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "3e042d0a1f05a3b996ebe8d859265e1d57aaed8f1592ebc3de2a33be4c8bfd81"
+          "sha256": "54d33756b66c05d9f338a9c22b1abd6a377768eab1e6f162b7b2a6326ee869f7"
         },
         {
           "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/InView.test.tsx.patch",
           "role": "support",
-          "sha256": "0194a395c6d4acbceae496435fc00f5653877c8f72d6832eb42d4c620856f606"
-        },
-        {
-          "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/browser.test.tsx.patch",
-          "role": "support",
-          "sha256": "3ab14b1011b88a65ede057dee69006d33bd6aa5b8eb977ce0ea25cb257ba92b2"
-        },
-        {
-          "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/observe.test.ts.patch",
-          "role": "support",
-          "sha256": "9ce012dd23182ae3fbc16859350c7636b566466d5f0a332a225e8e8010e65ca0"
+          "sha256": "22e2fc5983b1d15e0e415599eeae515a34e2962e18cd8f34d8821e828804f3a5"
         },
         {
           "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/setup.test.ts.patch",
           "role": "support",
-          "sha256": "24e885a84582a6fad0b75c11267e704e6e1f367c03a545bb6a3406d70989faf0"
+          "sha256": "a8bdca9c04e604c1096983dfe16b2e366731902e5f5c9ec190538d6500d9b00f"
         },
         {
           "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/useInView.test.tsx.patch",
           "role": "support",
-          "sha256": "5298f1e8ece99b7df937b0e354096d0ceff9e01c5e1a0e8f6f7f6886bda2f4e0"
-        },
-        {
-          "path": "packages/intersection-observer/audit/upstream-patches/tests/upstream/useOnInView.test.tsx.patch",
-          "role": "support",
-          "sha256": "21ed878f8f7c84c2e7c3a65c6fd957186eac0ec59f1d3042e3e7e2730eec144a"
+          "sha256": "2ef74de2387219fa89b98cb39168ec788f2e7791b367c382770fad7ffb316441"
         }
       ]
     },

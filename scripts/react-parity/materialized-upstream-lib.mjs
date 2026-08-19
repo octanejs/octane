@@ -77,7 +77,43 @@ export function verifyMaterializedUpstreamEvidence(root, packagePath) {
 		const drift = verifyPristineTree(lock, pristineRoot);
 		if (drift.missing.length > 0 || drift.mismatched.length > 0 || drift.unexpected.length > 0) {
 			throw new Error(
-				`${packagePath}: materialized upstream tree drifted from the lock (missing: ${drift.missing.length}, mismatched: ${drift.mismatched.length}, unexpected: ${drift.unexpected.length})`,
+				`${packagePath}: upstream tree drifted from the lock (missing: ${drift.missing.length}, mismatched: ${drift.mismatched.length}, unexpected: ${drift.unexpected.length})`,
+			);
+		}
+	}
+	// A committed pristine tree must also be byte-exact in git's object store:
+	// eol/filter attributes can rewrite bytes at add time, which working-tree
+	// verification alone cannot see. Tracked blob shas are compared directly to
+	// the lock's upstream content addresses.
+	const tracked = spawnSync(
+		'git',
+		['ls-files', '-s', '--', join(packagePath, PRISTINE_RELATIVE_PATH)],
+		{
+			cwd: root,
+			encoding: 'utf8',
+		},
+	);
+	if (tracked.status === 0 && tracked.stdout.trim()) {
+		const staged = new Map(
+			tracked.stdout
+				.trim()
+				.split('\n')
+				.map((line) => {
+					const [meta, file] = line.split('\t');
+					return [file, meta.split(' ')[1]];
+				}),
+		);
+		const mangled = lock.files.filter(
+			(file) =>
+				staged.has(`${packagePath}/${PRISTINE_RELATIVE_PATH}/${file.path}`) &&
+				staged.get(`${packagePath}/${PRISTINE_RELATIVE_PATH}/${file.path}`) !== file.gitBlob,
+		);
+		if (mangled.length > 0) {
+			throw new Error(
+				`${packagePath}: committed upstream blobs do not match the lock's upstream content addresses (an eol or filter attribute may have rewritten bytes at add time): ${mangled
+					.slice(0, 5)
+					.map((file) => file.path)
+					.join(', ')}`,
 			);
 		}
 	}

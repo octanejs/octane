@@ -176,7 +176,7 @@ describe('materialize CLI lifecycle', () => {
 		assert.equal(JSON.parse(checked.stdout).status, 'passed');
 	});
 
-	test('check fails on pristine drift and run refuses tracked vendored trees', async () => {
+	test('check fails on pristine drift and committed trees verify offline', async () => {
 		const context = scenario();
 		await runCli(LOCK_ARGUMENTS(context));
 		await runCli(['run', '--package-dir', context.packageDirectory]);
@@ -185,15 +185,79 @@ describe('materialize CLI lifecycle', () => {
 		assert.equal(checked.exitCode, 2);
 		assert.deepEqual(JSON.parse(checked.stdout).mismatched, ['src/index.js']);
 
-		const tracked = scenario();
-		await runCli(LOCK_ARGUMENTS(tracked));
-		const legacyPath = path.join(tracked.packageDirectory, 'upstream', 'legacy.txt');
-		mkdirSync(path.dirname(legacyPath), { recursive: true });
-		writeFileSync(legacyPath, 'legacy vendored bytes\n');
-		execFileSync('git', ['-C', tracked.root, 'add', '--force', 'packages/mit-widget/upstream']);
-		const refused = await runCli(['run', '--package-dir', tracked.packageDirectory]);
-		assert.equal(refused.exitCode, 2);
-		assert.match(refused.stderr, /git-tracked files/);
+		// A committed pristine tree that matches the lock runs fully offline.
+		const committed = scenario();
+		await runCli(LOCK_ARGUMENTS(committed));
+		for (const [relativePath, content] of FIXTURE_SOURCES) {
+			const absolutePath = path.join(
+				committed.packageDirectory,
+				'upstream',
+				...relativePath.split('/'),
+			);
+			mkdirSync(path.dirname(absolutePath), { recursive: true });
+			writeFileSync(absolutePath, content);
+		}
+		execFileSync('git', ['-C', committed.root, 'add', '--force', 'packages/mit-widget/upstream']);
+		const offline = await runCli(['run', '--package-dir', committed.packageDirectory], {
+			fetchImpl: async () => {
+				throw new Error('network must not be used for a committed pristine tree');
+			},
+		});
+		assert.equal(offline.exitCode, 0, offline.stderr);
+		assert.equal(JSON.parse(offline.stdout).mode, 'committed');
+		assert.equal(
+			existsSync(path.join(committed.packageDirectory, 'tests', 'upstream', 'index.test.js')),
+			true,
+		);
+
+		// A committed tree that stops matching the lock is corruption, not input.
+		writeFileSync(
+			path.join(committed.packageDirectory, 'upstream', 'src', 'index.js'),
+			'tampered\n',
+		);
+		const corrupted = await runCli(['run', '--package-dir', committed.packageDirectory], {
+			fetchImpl: async () => {
+				throw new Error('network must not be used for a committed pristine tree');
+			},
+		});
+		assert.equal(corrupted.exitCode, 2);
+		assert.match(corrupted.stderr, /must stay byte-exact to the pinned upstream commit/);
+	});
+
+	test('adapted rewrites apply mechanically and stay out of patches', async () => {
+		const context = scenario();
+		const locked = await runCli([
+			...LOCK_ARGUMENTS(context),
+			'--adapted-rewrite',
+			"from 'node:test'=from 'node:test/reporters'",
+		]);
+		assert.equal(locked.exitCode, 0, locked.stderr);
+		await runCli(['run', '--package-dir', context.packageDirectory]);
+		const adaptedTest = path.join(context.packageDirectory, 'tests', 'upstream', 'index.test.js');
+		assert.match(readFileSync(adaptedTest, 'utf8'), /node:test\/reporters/);
+		const clean = await runCli(['diff', '--package-dir', context.packageDirectory]);
+		assert.equal(clean.exitCode, 0, clean.stderr);
+		assert.deepEqual(JSON.parse(clean.stdout).patchesWritten, []);
+
+		writeFileSync(
+			adaptedTest,
+			readFileSync(adaptedTest, 'utf8').replace("'widget'", "'octane widget'"),
+		);
+		const diffed = await runCli(['diff', '--package-dir', context.packageDirectory]);
+		assert.equal(diffed.exitCode, 0, diffed.stderr);
+		const patch = readFileSync(
+			path.join(
+				context.packageDirectory,
+				'audit',
+				'upstream-patches',
+				'tests',
+				'upstream',
+				'index.test.js.patch',
+			),
+			'utf8',
+		);
+		assert.match(patch, /octane widget/);
+		assert.doesNotMatch(patch, /^[+-].*node:test\/reporters/m);
 	});
 
 	test('archive drift falls back to content-addressed blobs and forged blobs fail', async () => {

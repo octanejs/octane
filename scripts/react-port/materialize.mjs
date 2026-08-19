@@ -10,6 +10,7 @@ import {
 	PRISTINE_RELATIVE_PATH,
 	UPSTREAM_LOCK_RELATIVE_PATH,
 	UPSTREAM_PATCHES_RELATIVE_PATH,
+	applyAdaptedRewrites,
 	buildUpstreamLock,
 	extractPristineFromArchive,
 	gitBlobSha1,
@@ -33,14 +34,17 @@ const DIFF_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
 function usage() {
 	return `Usage: node scripts/react-port/materialize.mjs <command> [options]
 
-Materialize pinned upstream evidence for a binding from its committed
-audit/upstream.lock.json instead of vendored upstream bytes. The pristine tree
-regenerates under packages/<binding>/upstream/ and the adapted suite under the
-lock's tests/upstream targets by applying committed audit/upstream-patches/.
+Manage pinned upstream evidence for a binding through its committed
+audit/upstream.lock.json. The committed packages/<binding>/upstream/ tree is
+verified offline against the lock's git blob shas (the files' content
+addresses in the upstream repository), and the adapted suite regenerates under
+the lock's tests/upstream targets by applying the lock's mechanical rewrites
+plus committed audit/upstream-patches/. A package without a committed pristine
+tree fetches and hash-verifies it from the pinned commit instead.
 
 Commands:
-  lock   Derive audit/upstream.lock.json from a preflighted batch node
-  run    Fetch, hash-verify, and regenerate the pristine and adapted trees
+  lock   Derive audit/upstream.lock.json from a preflighted batch node or --pin
+  run    Verify the pristine tree and regenerate the adapted suite
   diff   Regenerate audit/upstream-patches/ from the current adapted tree
 
 Options:
@@ -56,6 +60,8 @@ Options:
   --work-root <dir>          Batch state root (default: .react-port-work)
   --adapted-map <from=to>    Map a pinned source root onto a tests/upstream
                              target (lock; repeatable)
+  --adapted-rewrite <f=r>    Mechanical source rewrite applied to every mapped
+                             file before its patch (lock; repeatable, ordered)
   --check                    Verify without network or writes (run)
   -h, --help                 Show this help
 `;
@@ -64,6 +70,7 @@ Options:
 function parseArguments(argumentsList) {
 	const options = {
 		adaptedMappings: [],
+		adaptedRewrites: [],
 		batch: null,
 		check: false,
 		commit: null,
@@ -135,6 +142,16 @@ function parseArguments(argumentsList) {
 				toRoot: value.slice(separator + 1),
 			});
 			index += 1;
+		} else if (argument === '--adapted-rewrite') {
+			const separator = value?.indexOf('=') ?? -1;
+			if (separator <= 0) {
+				throw new Error('--adapted-rewrite requires <find>=<replace>');
+			}
+			options.adaptedRewrites.push({
+				find: value.slice(0, separator),
+				replace: value.slice(separator + 1),
+			});
+			index += 1;
 		} else if (argument === '--check') {
 			options.check = true;
 		} else {
@@ -156,19 +173,23 @@ function readLock(packageDirectory) {
 	return validateUpstreamLock(JSON.parse(readFileSync(lockPath, 'utf8')));
 }
 
-function assertNoTrackedFiles(packageDirectory, relativeRoot, execFile) {
+function hasTrackedFiles(packageDirectory, relativeRoot, execFile) {
 	try {
 		const output = execFile('git', ['-C', packageDirectory, 'ls-files', '--', relativeRoot], {
 			encoding: 'utf8',
 		});
-		if (output.trim()) {
-			throw new Error(
-				`${relativeRoot} contains git-tracked files; migrate the legacy vendored tree (git rm) before materializing over it`,
-			);
-		}
-	} catch (error) {
-		if (error?.message?.includes('git-tracked files')) throw error;
-		// Outside a git worktree the tracked-file guard cannot apply.
+		return Boolean(output.trim());
+	} catch {
+		// Outside a git worktree the tracked-file distinction cannot apply.
+		return false;
+	}
+}
+
+function assertNoTrackedFiles(packageDirectory, relativeRoot, execFile) {
+	if (hasTrackedFiles(packageDirectory, relativeRoot, execFile)) {
+		throw new Error(
+			`${relativeRoot} contains git-tracked files; regenerated trees must stay untracked`,
+		);
 	}
 }
 
@@ -266,6 +287,9 @@ function regenerateAdaptedTree(lock, packageDirectory, pristineDirectory, execFi
 				continue;
 			}
 			let bytes = readFileSync(path.join(pristineDirectory, ...sourcePath.split('/')));
+			if (!bytes.includes(0)) {
+				bytes = Buffer.from(applyAdaptedRewrites(bytes.toString('utf8'), lock.adaptedRewrites));
+			}
 			if (existsSync(patchPath)) {
 				const scratchPath = writeTreeFile(scratch, targetPath, bytes);
 				execFile('git', ['-c', 'core.autocrlf=false', 'apply', '--whitespace=nowarn', patchPath], {
@@ -378,6 +402,7 @@ async function commandLockFromBatch(options) {
 		},
 		treeEntries,
 		adaptedMappings: options.adaptedMappings,
+		adaptedRewrites: options.adaptedRewrites,
 	});
 	return writeLockFile(options, lock);
 }
@@ -472,6 +497,7 @@ async function commandLockFromPin(options) {
 		},
 		treeEntries,
 		adaptedMappings: options.adaptedMappings,
+		adaptedRewrites: options.adaptedRewrites,
 	});
 	return writeLockFile(options, lock);
 }
@@ -502,7 +528,38 @@ async function commandRun(options) {
 			...verification,
 		};
 	}
-	assertNoTrackedFiles(options.packageDirectory, PRISTINE_RELATIVE_PATH, options.execFile);
+	// Committed-pristine mode: the pinned upstream tree is tracked in this
+	// repository and verified offline against the lock's git blob shas — its
+	// content addresses in the upstream repository — so no network is ever
+	// needed. Only the adapted suite regenerates.
+	if (hasTrackedFiles(options.packageDirectory, PRISTINE_RELATIVE_PATH, options.execFile)) {
+		const verification = verifyPristineTree(lock, pristineDirectory);
+		if (
+			verification.missing.length > 0 ||
+			verification.mismatched.length > 0 ||
+			verification.unexpected.length > 0
+		) {
+			throw new Error(
+				`${pristineDirectory} does not match audit/upstream.lock.json (missing: ${verification.missing.length}, mismatched: ${verification.mismatched.length}, unexpected: ${verification.unexpected.length}); the committed pristine tree must stay byte-exact to the pinned upstream commit`,
+			);
+		}
+		const adapted = regenerateAdaptedTree(
+			lock,
+			options.packageDirectory,
+			pristineDirectory,
+			options.execFile,
+		);
+		return {
+			command: 'run',
+			mode: 'committed',
+			status: 'passed',
+			pristineFileCount: lock.files.length,
+			blobFallbackCount: 0,
+			adaptedWritten: adapted.written.length,
+			adaptedSkipped: adapted.skipped,
+			lockFingerprint: lock.fingerprint,
+		};
+	}
 	if (existsSync(pristineDirectory) && !existsSync(statePath)) {
 		throw new Error(
 			`${pristineDirectory} exists without a materialize state marker; remove or migrate it first`,
@@ -647,7 +704,12 @@ async function commandDiff(options) {
 				`Adapted file is missing for pinned upstream case ${sourcePath}; adapt it or add a rationale .skip marker at ${path.relative(options.packageDirectory, skipPath)}`,
 			);
 		}
-		const pristineBytes = readFileSync(path.join(pristineDirectory, ...sourcePath.split('/')));
+		let pristineBytes = readFileSync(path.join(pristineDirectory, ...sourcePath.split('/')));
+		if (!pristineBytes.includes(0)) {
+			pristineBytes = Buffer.from(
+				applyAdaptedRewrites(pristineBytes.toString('utf8'), lock.adaptedRewrites),
+			);
+		}
 		const adaptedBytes = readFileSync(adaptedPath);
 		const patch = pristineBytes.equals(adaptedBytes)
 			? null

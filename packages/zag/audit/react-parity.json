@@ -100,7 +100,7 @@
         {
           "path": "packages/zag/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "1e05599283b715eb62555a44afe426a7b9b1ad112e1737c6137aae37dc59be5b"
+          "sha256": "8241115c7b6af6d0a701e643aa08ddb31fdb114deca390ad27441fcb79482431"
         }
       ]
     },
@@ -145,22 +145,7 @@
         {
           "path": "packages/zag/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "1e05599283b715eb62555a44afe426a7b9b1ad112e1737c6137aae37dc59be5b"
-        },
-        {
-          "path": "packages/zag/audit/upstream-patches/tests/upstream/machine.test.ts.patch",
-          "role": "support",
-          "sha256": "3d3f969a02888f0b7d7371975a96cc5c29753734bf585b1dd2f673a7ebc8743f"
-        },
-        {
-          "path": "packages/zag/audit/upstream-patches/tests/upstream/nested-states.test.ts.patch",
-          "role": "support",
-          "sha256": "d96e8d9a7515dd66347946fa328c23d51da0a547c886bbe0cff951269cfeeda6"
-        },
-        {
-          "path": "packages/zag/audit/upstream-patches/tests/upstream/render.ts.patch",
-          "role": "support",
-          "sha256": "3b505a6ffdef96439aa9dadb1abe8a26d7a12ebd8afe882dee8aed9d899f314f"
+          "sha256": "8241115c7b6af6d0a701e643aa08ddb31fdb114deca390ad27441fcb79482431"
         },
         {
           "path": "packages/zag/audit/upstream-patches/tests/upstream/strict-mode.test.tsx.skip",

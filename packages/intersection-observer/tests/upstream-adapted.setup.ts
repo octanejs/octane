@@ -1,4 +1,4 @@
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 
 /**
  * Install a non-mock IntersectionObserver before test-utils captures
@@ -29,8 +29,16 @@ if (typeof window !== 'undefined') {
 (globalThis as { vi?: typeof vi }).vi = vi;
 
 const { cleanup } = await import('@octanejs/testing-library');
-const { destroyIntersectionMocking } = await import('../src/test-utils');
+const { destroyIntersectionMocking, setupIntersectionMocking } = await import('../src/test-utils');
 const { defaultFallbackInView } = await import('../src/observe');
+
+// Upstream's test-utils auto-registers its mocking beforeEach when test
+// globals exist; the Octane port intentionally does not (documented
+// divergence), so the adapted suite installs the same baseline here instead of
+// editing every regenerated upstream file.
+beforeEach(function installMocks() {
+	setupIntersectionMocking(vi.fn);
+});
 
 afterEach(function teardownMocks() {
 	destroyIntersectionMocking();

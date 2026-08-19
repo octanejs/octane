@@ -91,6 +91,33 @@ function validateAdaptedMappings(adaptedMappings) {
 	}
 }
 
+function validateAdaptedRewrites(adaptedRewrites) {
+	if (!Array.isArray(adaptedRewrites)) {
+		throw new Error('Upstream lock adaptedRewrites must be an array');
+	}
+	for (const rewrite of adaptedRewrites) {
+		if (
+			!rewrite ||
+			typeof rewrite.find !== 'string' ||
+			!rewrite.find ||
+			typeof rewrite.replace !== 'string'
+		) {
+			throw new Error('Upstream lock adapted rewrite must map a nonempty find to a replace string');
+		}
+	}
+}
+
+// Ordered, mechanical source rewrites applied to every mapped pristine file
+// before its patch: import repointing and similar package-wide conversions are
+// declared once here so committed patches carry only genuine divergences.
+export function applyAdaptedRewrites(text, adaptedRewrites = []) {
+	let rewritten = text;
+	for (const { find, replace } of adaptedRewrites) {
+		rewritten = rewritten.split(find).join(replace);
+	}
+	return rewritten;
+}
+
 export function validateUpstreamLock(lock) {
 	if (!lock || typeof lock !== 'object') throw new Error('Upstream lock must be an object');
 	if (lock.schemaVersion !== UPSTREAM_LOCK_SCHEMA_VERSION) {
@@ -103,6 +130,7 @@ export function validateUpstreamLock(lock) {
 		throw new Error('Upstream lock must record the approved license spdx identifier');
 	}
 	validateAdaptedMappings(lock.adaptedMappings ?? []);
+	validateAdaptedRewrites(lock.adaptedRewrites ?? []);
 	if (!Array.isArray(lock.files) || lock.files.length === 0) {
 		throw new Error('Upstream lock must record at least one pinned file');
 	}
@@ -140,11 +168,18 @@ export function upstreamLockFingerprint(lock) {
 		identity: lock.identity,
 		license: lock.license,
 		adaptedMappings: lock.adaptedMappings ?? [],
+		adaptedRewrites: lock.adaptedRewrites ?? [],
 		files: lock.files,
 	});
 }
 
-export function buildUpstreamLock({ identity, license, treeEntries, adaptedMappings = [] }) {
+export function buildUpstreamLock({
+	identity,
+	license,
+	treeEntries,
+	adaptedMappings = [],
+	adaptedRewrites = [],
+}) {
 	validateIdentity(identity);
 	if (!Array.isArray(treeEntries)) throw new Error('Upstream tree entries are required');
 	const subdirectory = identity.repository.subdirectory ?? null;
@@ -179,6 +214,7 @@ export function buildUpstreamLock({ identity, license, treeEntries, adaptedMappi
 		},
 		license,
 		adaptedMappings,
+		adaptedRewrites,
 		files,
 	};
 	lock.fingerprint = upstreamLockFingerprint(lock);

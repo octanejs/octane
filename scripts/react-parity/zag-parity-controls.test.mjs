@@ -122,15 +122,29 @@ test('committed zag lock and patch set cover the pinned adapted surface', functi
 			'tests/upstream/strict-mode.test.tsx',
 		],
 	);
+	// The lock's mechanical rewrites cover zag's whole adaptation, so a mapped
+	// file normally carries no patch at all: it regenerates as pristine bytes
+	// plus rewrites. A file may carry a divergence patch or a skip rationale,
+	// never both, and the pinned StrictMode suite must stay dispositioned out.
 	const patchesRoot = resolve(REPO, 'packages/zag/audit/upstream-patches');
 	for (const entry of planned) {
 		const hasPatch = existsSync(resolve(patchesRoot, `${entry.targetPath}.patch`));
 		const hasSkip = existsSync(resolve(patchesRoot, `${entry.targetPath}.skip`));
 		assert.ok(
-			hasPatch !== hasSkip,
-			`${entry.targetPath} must have exactly one committed patch or skip rationale`,
+			!(hasPatch && hasSkip),
+			`${entry.targetPath} cannot have both a patch and a skip rationale`,
 		);
 	}
+	assert.ok(
+		existsSync(resolve(patchesRoot, 'tests/upstream/strict-mode.test.tsx.skip')),
+		'the StrictMode suite must keep its committed skip rationale',
+	);
+	assert.deepEqual(
+		lock.adaptedRewrites.map(function findOf(rewrite) {
+			return rewrite.find;
+		}),
+		['"@testing-library/react"', 'from "../src"'],
+	);
 });
 
 test('tampering the committed zag lock fails validation', function lockTamperRejected() {

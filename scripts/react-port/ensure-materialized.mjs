@@ -6,12 +6,16 @@ const LOCK_RELATIVE_PATH = path.join('audit', 'upstream.lock.json');
 const MARKER_RELATIVE_PATH = path.join('upstream', '.octane-materialize.json');
 
 function treesPresent(packageDirectory) {
-	const markerPath = path.join(packageDirectory, MARKER_RELATIVE_PATH);
-	if (!existsSync(markerPath)) return false;
+	// A committed pristine tree has no marker (byte drift is caught by the
+	// verifiers); a materialized one must carry a marker from the current lock.
+	if (!existsSync(path.join(packageDirectory, 'upstream'))) return false;
 	try {
 		const lock = JSON.parse(readFileSync(path.join(packageDirectory, LOCK_RELATIVE_PATH), 'utf8'));
-		const marker = JSON.parse(readFileSync(markerPath, 'utf8'));
-		if (marker.lockFingerprint !== lock.fingerprint) return false;
+		const markerPath = path.join(packageDirectory, MARKER_RELATIVE_PATH);
+		if (existsSync(markerPath)) {
+			const marker = JSON.parse(readFileSync(markerPath, 'utf8'));
+			if (marker.lockFingerprint !== lock.fingerprint) return false;
+		}
 		return (lock.adaptedMappings ?? []).every((mapping) =>
 			existsSync(path.join(packageDirectory, ...mapping.toRoot.split('/'))),
 		);
