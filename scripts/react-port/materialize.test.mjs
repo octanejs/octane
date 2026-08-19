@@ -6,6 +6,7 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
 	FIXTURE_SOURCES,
+	PIN_FIXTURE_SOURCES,
 	fixtureArchive,
 	fixtureIdentity,
 	fixtureTreeEntries,
@@ -18,7 +19,11 @@ const NODE_ID = 'pkg:mit-widget';
 const COMMIT = 'a'.repeat(40);
 const TREE_SHA = 'b'.repeat(40);
 
-function fixtureFetch({ sources = FIXTURE_SOURCES, blobs = new Map() } = {}) {
+function fixtureFetch({ sources = FIXTURE_SOURCES, blobs = new Map(), registry = null } = {}) {
+	const contentBlobs = new Map(blobs);
+	for (const content of sources.values()) {
+		contentBlobs.set(gitBlobSha1(Buffer.from(content)), content);
+	}
 	return async (url) => {
 		const href = url.toString();
 		if (href === `https://api.github.com/repos/acme/mit-widget/commits/${COMMIT}`) {
@@ -30,11 +35,14 @@ function fixtureFetch({ sources = FIXTURE_SOURCES, blobs = new Map() } = {}) {
 		if (href === `https://codeload.github.com/acme/mit-widget/tar.gz/${COMMIT}`) {
 			return new Response(fixtureArchive(sources));
 		}
+		if (registry && href === 'https://registry.npmjs.org/mit-widget/1.0.0') {
+			return Response.json(registry);
+		}
 		const blobMatch = /git\/blobs\/([0-9a-f]{40})$/.exec(href);
-		if (blobMatch && blobs.has(blobMatch[1])) {
+		if (blobMatch && contentBlobs.has(blobMatch[1])) {
 			return Response.json({
 				encoding: 'base64',
-				content: Buffer.from(blobs.get(blobMatch[1])).toString('base64'),
+				content: Buffer.from(contentBlobs.get(blobMatch[1])).toString('base64'),
 			});
 		}
 		return new Response('not found', { status: 404 });
@@ -296,6 +304,67 @@ describe('materialize CLI lifecycle', () => {
 				if (environment[key] !== undefined) process.env[key] = environment[key];
 			}
 		}
+	});
+
+	test('lock --pin derives the lock from a reviewed pin with full cross-checks', async () => {
+		const context = scenario();
+		const registry = {
+			name: 'mit-widget',
+			version: '1.0.0',
+			license: 'MIT',
+			dist: { integrity: 'sha512-registry-fixture' },
+		};
+		const pinArguments = [
+			'lock',
+			'--pin',
+			'mit-widget@1.0.0',
+			'--repo',
+			'acme/mit-widget',
+			'--commit',
+			COMMIT,
+			'--package-dir',
+			context.packageDirectory,
+			'--adapted-map',
+			'tests=tests/upstream',
+		];
+		const locked = await runCli(pinArguments, {
+			fetchImpl: fixtureFetch({ sources: PIN_FIXTURE_SOURCES, registry }),
+		});
+		assert.equal(locked.exitCode, 0, locked.stderr);
+		const lock = JSON.parse(
+			readFileSync(path.join(context.packageDirectory, UPSTREAM_LOCK_RELATIVE_PATH), 'utf8'),
+		);
+		assert.equal(lock.identity.integrity, 'sha512-registry-fixture');
+		assert.equal(lock.license.spdx, 'MIT');
+		assert.equal(lock.files.length, 4);
+		const ran = await runCli(['run', '--package-dir', context.packageDirectory], {
+			fetchImpl: fixtureFetch({ sources: PIN_FIXTURE_SOURCES }),
+		});
+		assert.equal(ran.exitCode, 0, ran.stderr);
+
+		const mismatched = scenario();
+		const wrongManifest = new Map(PIN_FIXTURE_SOURCES);
+		wrongManifest.set('package.json', '{"name":"mit-widget","version":"2.0.0","license":"MIT"}\n');
+		const refused = await runCli(
+			pinArguments.map((argument) =>
+				argument === context.packageDirectory ? mismatched.packageDirectory : argument,
+			),
+			{ fetchImpl: fixtureFetch({ sources: wrongManifest, registry }) },
+		);
+		assert.equal(refused.exitCode, 2);
+		assert.match(refused.stderr, /does not correspond to this commit/);
+
+		const unlicensed = scenario();
+		const badLicense = new Map(PIN_FIXTURE_SOURCES);
+		badLicense.set('LICENSE', 'All rights reserved.\n');
+		const blocked = await runCli(
+			pinArguments.map((argument) =>
+				argument === context.packageDirectory ? unlicensed.packageDirectory : argument,
+			),
+			{ fetchImpl: fixtureFetch({ sources: badLicense, registry }) },
+		);
+		assert.equal(blocked.exitCode, 2);
+		assert.match(blocked.stderr, /license evidence is not approved/i);
 	});
 
 	test('lock refuses nodes without approved source-license evidence', async () => {

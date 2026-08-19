@@ -80,7 +80,7 @@
         {
           "path": "scripts/react-parity/zag-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "9fcb626a447149790233037c99d54cb9a79d4894af6c22f82d29f85fd7fd24ae"
+          "sha256": "ec982085164b59c832c40b92466c13cfbe73b96817b94eaed9ce37659afda637"
         },
         {
           "path": "scripts/react-parity/zag-runtime-crosswalk.mjs",
@@ -98,14 +98,9 @@
           "sha256": "15d603d0095c5e417ee548c517cbe012a5a5c942536b3ee006abdb3d7ee0d4dc"
         },
         {
-          "path": "packages/zag/scripts/verify-upstream.mjs",
+          "path": "packages/zag/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "15845612c0d55117aaf84da53413dceb46d28a8ff71fca1e28dbce6e908b3b06"
-        },
-        {
-          "path": "packages/zag/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "037f857d00462559b9790acc2214c818678eb9d61970d6c394dc26dcfcd1516d"
+          "sha256": "1e05599283b715eb62555a44afe426a7b9b1ad112e1737c6137aae37dc59be5b"
         }
       ]
     },
@@ -146,6 +141,31 @@
           "path": "packages/zag/audit/test-classifications.json",
           "role": "support",
           "sha256": "8097add882252cae7fff541f68cf49c1ad7917b4c9f3d022534aec8eb4563855"
+        },
+        {
+          "path": "packages/zag/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "1e05599283b715eb62555a44afe426a7b9b1ad112e1737c6137aae37dc59be5b"
+        },
+        {
+          "path": "packages/zag/audit/upstream-patches/tests/upstream/machine.test.ts.patch",
+          "role": "support",
+          "sha256": "3d3f969a02888f0b7d7371975a96cc5c29753734bf585b1dd2f673a7ebc8743f"
+        },
+        {
+          "path": "packages/zag/audit/upstream-patches/tests/upstream/nested-states.test.ts.patch",
+          "role": "support",
+          "sha256": "d96e8d9a7515dd66347946fa328c23d51da0a547c886bbe0cff951269cfeeda6"
+        },
+        {
+          "path": "packages/zag/audit/upstream-patches/tests/upstream/render.ts.patch",
+          "role": "support",
+          "sha256": "3b505a6ffdef96439aa9dadb1abe8a26d7a12ebd8afe882dee8aed9d899f314f"
+        },
+        {
+          "path": "packages/zag/audit/upstream-patches/tests/upstream/strict-mode.test.tsx.skip",
+          "role": "support",
+          "sha256": "761cabdd92c889edd2a4375a37377a1876b846f2ab475cabe607ecb9ae1cc52b"
         }
       ]
     },

@@ -57,6 +57,29 @@ export const FIXTURE_SOURCES = new Map([
 	['tests/index.test.js', "import { test } from 'node:test';\ntest('widget', () => {});\n"],
 ]);
 
+export const RECOGNIZABLE_MIT_TEXT = `MIT License
+
+Copyright (c) 2020 Acme
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction.
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY.
+`;
+
+export const PIN_FIXTURE_SOURCES = new Map([
+	['package.json', '{"name":"mit-widget","version":"1.0.0","license":"MIT"}\n'],
+	['LICENSE', RECOGNIZABLE_MIT_TEXT],
+	['src/index.js', 'export const widget = () => 1;\n'],
+	['tests/index.test.js', "import { test } from 'node:test';\ntest('widget', () => {});\n"],
+]);
+
 export function fixtureTreeEntries(sources = FIXTURE_SOURCES, prefix = '') {
 	return [...sources.entries()].map(([relativePath, content]) => ({
 		path: `${prefix}${relativePath}`,

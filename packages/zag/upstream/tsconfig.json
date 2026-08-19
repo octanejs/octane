@@ -1,8 +1,0 @@
-{
-  "extends": "../../../tsconfig.json",
-  "include": ["src", "tests"],
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "tsBuildInfoFile": "node_modules/.cache/.tsbuildinfo"
-  }
-}

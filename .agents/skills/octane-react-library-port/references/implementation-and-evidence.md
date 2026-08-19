@@ -113,7 +113,25 @@ surface. Never point the pristine or adapted lanes at an unpinned checkout.
 Existing bindings that predate materialization keep their committed
 `packages/<binding>/upstream/` and `tests/upstream/` trees as valid evidence;
 `materialize run` refuses to overwrite git-tracked trees. Migrate a legacy
-binding to the lock-and-patches model when you next touch its pin.
+binding to the lock-and-patches model when you next touch its pin. Many
+published pins lack the registry `gitHead` preflight requires; for those,
+derive the lock from the binding's existing reviewed `UPSTREAM.md` pin:
+
+```bash
+pnpm react-port:materialize lock --package-dir packages/<binding> \
+  --pin <name>@<exact-version> --repo <owner>/<repo> --commit <40-sha> \
+  [--subdir <path>] --adapted-map <pinned-test-root>=tests/upstream
+```
+
+Pin mode still fails closed: the pinned commit's own manifest must declare
+exactly the pinned name and version, and the pinned tree must carry
+recognizable approved-license evidence. A migration must prove the regenerated
+trees byte-match the vendored ones before deleting them, retain the upstream
+license as a hash-matched `LICENSE.upstream`, generate patches from the
+existing adapted suite with `materialize diff`, and swap the parity manifest's
+vendored-ledger support files for the lock and patches.
+`scripts/react-parity/check.mjs` materializes every package that commits an
+`audit/upstream.lock.json` before its verifiers and lanes run.
 
 ## Package contract
 

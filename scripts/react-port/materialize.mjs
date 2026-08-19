@@ -17,7 +17,12 @@ import {
 	validateUpstreamLock,
 	verifyPristineTree,
 } from './materialize-lib.mjs';
-import { fetchBounded, fetchJson, githubHeaders } from './preflight-lib.mjs';
+import {
+	evaluateApprovedLicense,
+	fetchBounded,
+	fetchJson,
+	githubHeaders,
+} from './preflight-lib.mjs';
 import { credentialValuesFromEnvironment, sanitizeForReport } from './report-lib.mjs';
 import { validateBatchManifest } from './state-lib.mjs';
 
@@ -42,6 +47,12 @@ Options:
   --package-dir <dir>        Binding package directory (required)
   --batch <id>               Preflight batch identifier (lock)
   --node <pkg:name>          Graph node identifier (lock)
+  --pin <name@version>       Lock from an existing reviewed pin instead of a
+                             preflight batch (lock; requires --repo, --commit)
+  --repo <owner/repo>        Pinned GitHub repository (lock with --pin)
+  --commit <sha>             Pinned 40-character commit (lock with --pin)
+  --subdir <path>            Package subdirectory in the repository (lock
+                             with --pin)
   --work-root <dir>          Batch state root (default: .react-port-work)
   --adapted-map <from=to>    Map a pinned source root onto a tests/upstream
                              target (lock; repeatable)
@@ -55,8 +66,12 @@ function parseArguments(argumentsList) {
 		adaptedMappings: [],
 		batch: null,
 		check: false,
+		commit: null,
 		node: null,
 		packageDirectory: null,
+		pin: null,
+		repo: null,
+		subdirectory: null,
 		workRoot: path.join(process.cwd(), '.react-port-work'),
 	};
 	const [command, ...rest] = argumentsList;
@@ -86,6 +101,30 @@ function parseArguments(argumentsList) {
 			if (!value) throw new Error('--work-root requires a directory');
 			options.workRoot = path.resolve(value);
 			index += 1;
+		} else if (argument === '--pin') {
+			const separator = value?.lastIndexOf('@') ?? -1;
+			if (separator <= 0 || separator === value.length - 1) {
+				throw new Error('--pin requires <package-name>@<exact-version>');
+			}
+			options.pin = { packageName: value.slice(0, separator), version: value.slice(separator + 1) };
+			index += 1;
+		} else if (argument === '--repo') {
+			const parts = value?.split('/') ?? [];
+			if (parts.length !== 2 || !parts[0] || !parts[1]) {
+				throw new Error('--repo requires <owner>/<repository>');
+			}
+			options.repo = { owner: parts[0], repo: parts[1] };
+			index += 1;
+		} else if (argument === '--commit') {
+			if (!/^[0-9a-f]{40}$/i.test(value ?? '')) {
+				throw new Error('--commit requires a 40-character git commit sha');
+			}
+			options.commit = value.toLowerCase();
+			index += 1;
+		} else if (argument === '--subdir') {
+			if (!value) throw new Error('--subdir requires a repository-relative path');
+			options.subdirectory = value;
+			index += 1;
 		} else if (argument === '--adapted-map') {
 			const separator = value?.indexOf('=') ?? -1;
 			if (separator <= 0 || separator === value.length - 1) {
@@ -103,6 +142,9 @@ function parseArguments(argumentsList) {
 		}
 	}
 	if (!options.packageDirectory) throw new Error('--package-dir is required');
+	if (options.pin && (!options.repo || !options.commit)) {
+		throw new Error('--pin requires --repo and --commit');
+	}
 	return { command, options };
 }
 
@@ -178,25 +220,13 @@ async function fetchPristineFiles(lock, options) {
 	const byPath = new Map(lock.files.map((file) => [file.path, file]));
 	for (const relativePath of fallbackPaths) {
 		const pinned = byPath.get(relativePath);
-		if (pinned.size > BLOB_MAX_BYTES) {
-			throw new Error(`Pinned upstream file is too large to fetch as a blob: ${relativePath}`);
-		}
-		const blob = await fetchJson(
-			`https://api.github.com/repos/${owner}/${repo}/git/blobs/${pinned.gitBlob}`,
-			{
-				fetchImpl: options.fetchImpl,
-				allowedHosts: new Set(['api.github.com']),
-				maxBytes: Math.ceil((BLOB_MAX_BYTES * 4) / 3) + 4096,
-				headers: githubHeaders(options),
-				requestTimeoutMs: options.requestTimeoutMs,
-			},
-		);
-		if (blob.encoding !== 'base64' || typeof blob.content !== 'string') {
-			throw new Error(`GitHub blob is not inline base64 evidence: ${relativePath}`);
-		}
-		const bytes = Buffer.from(blob.content.replace(/\s/g, ''), 'base64');
-		if (gitBlobSha1(bytes) !== pinned.gitBlob) {
-			throw new Error(`GitHub blob bytes do not match the pinned lock: ${relativePath}`);
+		let bytes;
+		try {
+			bytes = await fetchGitBlob(owner, repo, pinned.gitBlob, pinned.size, options);
+		} catch (error) {
+			throw new Error(
+				`${error instanceof Error ? error.message : String(error)} (${relativePath})`,
+			);
 		}
 		extracted.files.set(relativePath, bytes);
 	}
@@ -253,10 +283,68 @@ function regenerateAdaptedTree(lock, packageDirectory, pristineDirectory, execFi
 	return { written, skipped };
 }
 
-async function commandLock(options) {
-	if (!options.batch || !options.node) {
-		throw new Error('lock requires --batch and --node from a completed preflight');
+async function fetchPinnedTree(owner, repo, commit, options) {
+	const apiRoot = `https://api.github.com/repos/${owner}/${repo}`;
+	const fetchOptions = {
+		fetchImpl: options.fetchImpl,
+		allowedHosts: new Set(['api.github.com']),
+		headers: githubHeaders(options),
+		requestTimeoutMs: options.requestTimeoutMs,
+	};
+	const commitResponse = await fetchJson(`${apiRoot}/commits/${commit}`, fetchOptions);
+	if (commitResponse.sha?.toLowerCase() !== commit.toLowerCase()) {
+		throw new Error('GitHub commit does not match the pinned immutable commit');
 	}
+	const treeSha = commitResponse.commit?.tree?.sha?.toLowerCase();
+	if (!/^[0-9a-f]{40}$/.test(treeSha ?? '')) {
+		throw new Error('GitHub commit has no immutable root tree');
+	}
+	const treeResponse = await fetchJson(`${apiRoot}/git/trees/${treeSha}?recursive=1`, fetchOptions);
+	if (treeResponse.truncated) throw new Error('GitHub returned truncated source-tree evidence');
+	if (treeResponse.sha?.toLowerCase() !== treeSha || !Array.isArray(treeResponse.tree)) {
+		throw new Error('GitHub source tree does not match the resolved commit');
+	}
+	return treeResponse.tree;
+}
+
+async function fetchGitBlob(owner, repo, gitBlob, size, options) {
+	if (size > BLOB_MAX_BYTES) {
+		throw new Error(`Pinned upstream file is too large to fetch as a blob: ${gitBlob}`);
+	}
+	const blob = await fetchJson(
+		`https://api.github.com/repos/${owner}/${repo}/git/blobs/${gitBlob}`,
+		{
+			fetchImpl: options.fetchImpl,
+			allowedHosts: new Set(['api.github.com']),
+			maxBytes: Math.ceil((BLOB_MAX_BYTES * 4) / 3) + 4096,
+			headers: githubHeaders(options),
+			requestTimeoutMs: options.requestTimeoutMs,
+		},
+	);
+	if (blob.encoding !== 'base64' || typeof blob.content !== 'string') {
+		throw new Error(`GitHub blob is not inline base64 evidence: ${gitBlob}`);
+	}
+	const bytes = Buffer.from(blob.content.replace(/\s/g, ''), 'base64');
+	if (gitBlobSha1(bytes) !== gitBlob) {
+		throw new Error(`GitHub blob bytes do not match the pinned lock: ${gitBlob}`);
+	}
+	return bytes;
+}
+
+function writeLockFile(options, lock) {
+	const lockPath = path.join(options.packageDirectory, UPSTREAM_LOCK_RELATIVE_PATH);
+	mkdirSync(path.dirname(lockPath), { recursive: true });
+	writeFileSync(lockPath, `${JSON.stringify(lock, null, '\t')}\n`);
+	return {
+		command: 'lock',
+		status: 'passed',
+		lockPath: path.relative(process.cwd(), lockPath),
+		fileCount: lock.files.length,
+		fingerprint: lock.fingerprint,
+	};
+}
+
+async function commandLockFromBatch(options) {
 	const manifestPath = path.join(options.workRoot, options.batch, 'manifest.json');
 	if (!existsSync(manifestPath)) {
 		throw new Error(`Batch manifest does not exist: ${manifestPath}`);
@@ -274,29 +362,7 @@ async function commandLock(options) {
 		);
 	}
 	const { owner, repo } = node.identity.repository;
-	const apiRoot = `https://api.github.com/repos/${owner}/${repo}`;
-	const fetchOptions = {
-		fetchImpl: options.fetchImpl,
-		allowedHosts: new Set(['api.github.com']),
-		headers: githubHeaders(options),
-		requestTimeoutMs: options.requestTimeoutMs,
-	};
-	const commitResponse = await fetchJson(
-		`${apiRoot}/commits/${node.identity.commit}`,
-		fetchOptions,
-	);
-	if (commitResponse.sha?.toLowerCase() !== node.identity.commit.toLowerCase()) {
-		throw new Error('GitHub commit does not match the preflighted immutable commit');
-	}
-	const treeSha = commitResponse.commit?.tree?.sha?.toLowerCase();
-	if (!/^[0-9a-f]{40}$/.test(treeSha ?? '')) {
-		throw new Error('GitHub commit has no immutable root tree');
-	}
-	const treeResponse = await fetchJson(`${apiRoot}/git/trees/${treeSha}?recursive=1`, fetchOptions);
-	if (treeResponse.truncated) throw new Error('GitHub returned truncated source-tree evidence');
-	if (treeResponse.sha?.toLowerCase() !== treeSha || !Array.isArray(treeResponse.tree)) {
-		throw new Error('GitHub source tree does not match the resolved commit');
-	}
+	const treeEntries = await fetchPinnedTree(owner, repo, node.identity.commit, options);
 	const lock = buildUpstreamLock({
 		identity: node.identity,
 		license: {
@@ -310,19 +376,112 @@ async function commandLock(options) {
 				sha256,
 			})),
 		},
-		treeEntries: treeResponse.tree,
+		treeEntries,
 		adaptedMappings: options.adaptedMappings,
 	});
-	const lockPath = path.join(options.packageDirectory, UPSTREAM_LOCK_RELATIVE_PATH);
-	mkdirSync(path.dirname(lockPath), { recursive: true });
-	writeFileSync(lockPath, `${JSON.stringify(lock, null, '\t')}\n`);
-	return {
-		command: 'lock',
-		status: 'passed',
-		lockPath: path.relative(process.cwd(), lockPath),
-		fileCount: lock.files.length,
-		fingerprint: lock.fingerprint,
-	};
+	return writeLockFile(options, lock);
+}
+
+const LICENSE_FILE_PATTERN = /^(?:licen[cs]e|copying)(?:\..*)?$/i;
+const NOTICE_FILE_PATTERN = /^notice(?:\..*)?$/i;
+
+// Legacy migration mode: many published pins lack the registry gitHead that
+// preflight requires, but a vendored binding already carries a reviewed
+// UPSTREAM.md pin. The explicit pin is accepted only when the pinned commit's
+// own package manifest declares exactly the pinned name and version and the
+// pinned tree carries recognizable approved-license evidence.
+async function commandLockFromPin(options) {
+	const { packageName, version } = options.pin;
+	const { owner, repo } = options.repo;
+	const subdirectory = options.subdirectory ?? null;
+	const registryMetadata = await fetchJson(
+		`https://registry.npmjs.org/${encodeURIComponent(packageName)}/${encodeURIComponent(version)}`,
+		{
+			fetchImpl: options.fetchImpl,
+			allowedHosts: new Set(['registry.npmjs.org']),
+			requestTimeoutMs: options.requestTimeoutMs,
+		},
+	);
+	if (registryMetadata.name !== packageName || registryMetadata.version !== version) {
+		throw new Error('Registry metadata contradicts the pinned package identity');
+	}
+	if (typeof registryMetadata.dist?.integrity !== 'string' || !registryMetadata.dist.integrity) {
+		throw new Error('Registry metadata lacks tarball integrity evidence for the pin');
+	}
+	const treeEntries = await fetchPinnedTree(owner, repo, options.commit, options);
+	const manifestPath = subdirectory ? `${subdirectory}/package.json` : 'package.json';
+	const manifestEntry = treeEntries.find(
+		(entry) => entry.path === manifestPath && entry.type === 'blob' && entry.mode !== '120000',
+	);
+	if (!manifestEntry) throw new Error(`Pinned commit has no ${manifestPath}`);
+	const manifest = JSON.parse(
+		(await fetchGitBlob(owner, repo, manifestEntry.sha, manifestEntry.size ?? 0, options)).toString(
+			'utf8',
+		),
+	);
+	if (manifest.name !== packageName || manifest.version !== version) {
+		throw new Error(
+			`Pinned commit manifest declares ${manifest.name}@${manifest.version}, not ${packageName}@${version}; the pin does not correspond to this commit`,
+		);
+	}
+	if (manifest.license !== registryMetadata.license) {
+		throw new Error('Pinned commit license metadata contradicts the registry artifact');
+	}
+	const licenseFiles = [];
+	const noticeFiles = [];
+	for (const entry of treeEntries) {
+		if (entry.type !== 'blob' || entry.mode === '120000') continue;
+		const directory = path.posix.dirname(entry.path);
+		if (directory !== '.' && directory !== (subdirectory ?? '.')) continue;
+		const basename = path.posix.basename(entry.path);
+		const isLicense = LICENSE_FILE_PATTERN.test(basename);
+		const isNotice = NOTICE_FILE_PATTERN.test(basename);
+		if (!isLicense && !isNotice) continue;
+		const file = {
+			path: entry.path,
+			scope: directory === (subdirectory ?? '.') ? 'package' : 'root',
+			content: (await fetchGitBlob(owner, repo, entry.sha, entry.size ?? 0, options)).toString(
+				'utf8',
+			),
+		};
+		if (isNotice) noticeFiles.push(file);
+		else licenseFiles.push(file);
+	}
+	const verdict = evaluateApprovedLicense({
+		manifestLicense: manifest.license,
+		licenseFiles,
+		noticeFiles,
+	});
+	if (verdict.status !== 'passed') {
+		throw new Error(
+			`Pinned source license evidence is not approved: ${verdict.reasons.join('; ')}`,
+		);
+	}
+	const lock = buildUpstreamLock({
+		identity: {
+			packageName,
+			version,
+			repository: { owner, repo, subdirectory },
+			commit: options.commit.toLowerCase(),
+			integrity: registryMetadata.dist.integrity,
+		},
+		license: {
+			spdx: verdict.spdx,
+			evidence: verdict.evidence.map(({ path: filePath, sha256 }) => ({ path: filePath, sha256 })),
+			notices: verdict.notices.map(({ path: filePath, sha256 }) => ({ path: filePath, sha256 })),
+		},
+		treeEntries,
+		adaptedMappings: options.adaptedMappings,
+	});
+	return writeLockFile(options, lock);
+}
+
+async function commandLock(options) {
+	if (options.pin) return commandLockFromPin(options);
+	if (!options.batch || !options.node) {
+		throw new Error('lock requires --batch and --node from a completed preflight, or --pin');
+	}
+	return commandLockFromBatch(options);
 }
 
 async function commandRun(options) {
@@ -348,6 +507,37 @@ async function commandRun(options) {
 		throw new Error(
 			`${pristineDirectory} exists without a materialize state marker; remove or migrate it first`,
 		);
+	}
+	// A pristine tree already materialized from this exact lock needs no
+	// network: verify it in place and regenerate only the adapted suite, so
+	// repeated test runs stay offline and fast.
+	if (existsSync(statePath)) {
+		const marker = JSON.parse(readFileSync(statePath, 'utf8'));
+		if (marker.lockFingerprint === lock.fingerprint) {
+			const existing = verifyPristineTree(lock, pristineDirectory);
+			if (
+				existing.missing.length === 0 &&
+				existing.mismatched.length === 0 &&
+				existing.unexpected.length === 0
+			) {
+				const adapted = regenerateAdaptedTree(
+					lock,
+					options.packageDirectory,
+					pristineDirectory,
+					options.execFile,
+				);
+				return {
+					command: 'run',
+					mode: 'reuse',
+					status: 'passed',
+					pristineFileCount: lock.files.length,
+					blobFallbackCount: 0,
+					adaptedWritten: adapted.written.length,
+					adaptedSkipped: adapted.skipped,
+					lockFingerprint: lock.fingerprint,
+				};
+			}
+		}
 	}
 	const { files, blobFallbackCount, archiveFallbackReason } = await fetchPristineFiles(
 		lock,
