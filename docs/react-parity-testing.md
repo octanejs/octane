@@ -72,14 +72,16 @@ environments, transforms, or preparation, such as pristine Jest evidence,
 adapted DOM tests, differential tests, and server-mode compilation. Mark each
 fully group-owned project with the same `testExecution.group`.
 
-A package that commits `audit/upstream.lock.json` does not commit its pinned
-upstream bytes. `scripts/react-parity/check.mjs` materializes its pristine
-`upstream/` tree and patch-derived adapted `tests/upstream/` suite (via
-`pnpm react-port:materialize run`) before any verifier, contract walk, or lane
-reads those paths; an already materialized tree verifies and reuses offline.
-Manifest lanes for such a package cite only committed artifacts (the lock,
-patches, skip rationales, inventories, and wrapper tests), never regenerated
-files.
+A package that commits `audit/upstream.lock.json` commits its pinned pristine
+`upstream/` tree byte-exact; the lock records each file's upstream git blob
+sha, so the committed copy verifies offline against the pinned upstream
+commit. Its adapted `tests/upstream/` suite is regenerated, never committed:
+`scripts/react-parity/check.mjs` runs `pnpm react-port:materialize run`
+(verify pristine, then rebuild adapted from the lock's mechanical rewrites
+plus the committed divergence patches) before any verifier, contract walk, or
+lane reads those paths. The whole flow is offline. Manifest lanes for such a
+package cite only committed artifacts (the lock, patches, skip rationales,
+inventories, and wrapper tests), never regenerated files.
 
 Differential tests must have their own project because their React-side fixture
 compilation and cache preparation do not belong to the full adapted suite:
