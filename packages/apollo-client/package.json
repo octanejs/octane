@@ -7,7 +7,7 @@
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "Apollo Client bindings for the octane renderer — reuses Apollo's framework-neutral core and ports its React adapter onto octane.",
+  "description": "Apollo Client bindings for the octane renderer \u2014 reuses Apollo's framework-neutral core and ports its React adapter onto octane.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -25,7 +25,8 @@
   "types": "src/index.d.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": {
