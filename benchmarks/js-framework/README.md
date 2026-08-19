@@ -24,6 +24,8 @@ benchmarks/js-framework/
 ├── preact/         # Vite app, dev server on :5260 — native Preact hooks
 ├── svelte/         # Vite app, dev server on :5271 — Svelte 5 runes + keyed #each
 ├── run.mjs             # Playwright harness — the canonical krausest ops
+├── selection-work.mjs  # deterministic class-only keyed-selection work guard
+├── selection-work/     # production fixture + external label-read observer
 ├── run-reorder.mjs     # Playwright harness — the keyed-reorder matrix (see below)
 ├── package.json        # umbrella; depends on playwright
 ├── results/            # output / scratch
@@ -124,6 +126,35 @@ count, insertion position and order, survivor DOM identity, connectivity,
 delegated events, and selection, then uses precise production call coverage in
 a separate `--jitless` browser to guard reduced per-row framework work without
 depending on minified helper names or contaminating wall-clock measurements.
+
+### Class-only selection work
+
+```bash
+node benchmarks/bench.mjs --ratios js-framework-selection-work
+BENCH_JSON=/tmp/selection-work.json node benchmarks/js-framework/selection-work.mjs
+```
+
+This separate, untimed Chromium suite production-compiles the small table from
+[Pyreon PR 2985](https://github.com/pyreon/pyreon/pull/2985), including its two
+`useState` cells and raw `{row.id}` / `{row.label}` holes. A literal selected
+class is compared with the same class supplied through a dynamic prop, which
+keeps the ordinary row-body path as a same-run control. The external browser
+driver installs benign label getters only after compilation, so observation
+does not alter the compiler's purity proof. Clean data-property rows and
+observed rows must produce identical semantic snapshots.
+
+Both arms verify every visible class and label, keyed DOM identity, first
+selection, equal-value reselection, alternating selection, reset, a label
+replacement, reorder, and clear/refill. The 10-row and 1,000-row count guards
+require zero unrelated label reads from literal-class selection and validate a
+nonzero ordinary-row control. They make no absolute-time or allocation claim.
+
+`OCTANE_SELECTION_ROOT` can select another source checkout, and
+`OCTANE_SELECTION_EXTERNAL_ROOT` can select the checkout supplying installed
+dependencies. Keep the fixture, driver, parser, printer, and bundler identical
+for before/after evidence; source and toolchain hashes are recorded in the JSON.
+`--build-only` checks the production bundle without launching Chromium. Disclose
+any nonstandard parser loader alongside the result.
 
 ## Keyed-reorder matrix (`run-reorder.mjs`)
 

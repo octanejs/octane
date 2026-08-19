@@ -6,6 +6,7 @@
   "description": "js-framework-benchmark umbrella that drives Octane and reference framework fixtures via Playwright.",
   "scripts": {
     "bench": "node run.mjs",
+    "bench:selection-work": "node selection-work.mjs",
     "bench:style-work": "node style-work.mjs",
     "bench:long": "node run.mjs 16",
     "bench:reorder": "node run-reorder.mjs",

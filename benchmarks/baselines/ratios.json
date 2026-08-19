@@ -520,6 +520,22 @@
     "note": "Same-run production Chromium controlled-input hydration under real 6x CPU throttling: Octane measured about 0.4x React and must preserve the complete pre-hydration draft, focus, and caret."
   },
   {
+    "suite": "js-framework-selection-work",
+    "op": "selection_label_reads_10",
+    "target": "literal-class-work",
+    "reference": "dynamic-class-work",
+    "maxRatio": 0,
+    "note": "Compiler-proven literal-class selection must not re-read unrelated row labels. The same-run dynamic-class arm performs ordinary row work and supplies a validated nonzero denominator. Both production browser arms verify classes, labels, keyed identity, reset/reselect/alternate operations, data changes, reorder, and clear/refill. Ten rows also exercise the small-list path."
+  },
+  {
+    "suite": "js-framework-selection-work",
+    "op": "selection_label_reads_1000",
+    "target": "literal-class-work",
+    "reference": "dynamic-class-work",
+    "maxRatio": 0,
+    "note": "The PR2985-shaped 1,000-row table must update only its selected classes, with zero unrelated label reads. Benign label getters are installed by the external browser driver after compilation; the semantically identical dynamic-class control prevents a missing observer from making this zero-work guard pass."
+  },
+  {
     "suite": "js-framework",
     "op": "run",
     "target": "octane-tsrx",

@@ -85,6 +85,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Untimed compiler-proven keyed selection against an ordinary-row control.
+		// The harness production-bundles its own tiny fixture and drives Chromium.
+		name: 'js-framework-selection-work',
+		cwd: 'js-framework',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'selection-work.mjs', args: () => [] }],
+	},
+	{
 		name: 'js-framework-reorder',
 		cwd: 'js-framework',
 		servers: [

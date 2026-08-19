@@ -186,6 +186,7 @@ internally, get their own baseline and guard namespace.
 | manifest name | dir | servers | notes |
 | --- | --- | --- | --- |
 | `js-framework` | js-framework | Octane + reference frameworks | krausest ops incl. `add` |
+| `js-framework-selection-work` | js-framework | none (builds) | deterministic unrelated-label-read guard for compiler-proven class-only keyed selection |
 | `js-framework-reorder` | js-framework | same fixtures | keyed reorder matrix (LIS vs lastPlacedIndex) |
 | `todomvc` | todomvc | Octane + reference frameworks | Speedometer-style TodoMVC interactions |
 | `weather-app` | weather-app | octane-tsrx, react, preact, solid, svelte, vue | upstream weather UI: cold ready, keyed forecast churn, async search/error/recovery |
