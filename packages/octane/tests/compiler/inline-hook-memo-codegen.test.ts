@@ -185,6 +185,39 @@ describe('inline hook-memo tier — compile-mode and shape routing', () => {
 		expect(dev).toMatch(/useMemo\(/);
 	});
 
+	it('keeps universal renderer memo hooks on the renderer runtime', () => {
+		const source = `
+			import { useCallback, useMemo } from 'octane';
+			export function Scene({ value }) @{
+				const callback = useCallback(() => value, [value]);
+				const memoized = useMemo(() => value + 1, [value]);
+				<node value={memoized} onTap={callback} />
+			}
+		`;
+		const renderer = {
+			id: 'object',
+			module: 'octane/universal',
+			target: 'universal' as const,
+		};
+		const enabled = compile(source, 'inline-memo-universal.tsrx', {
+			...PROD,
+			autoMemo: false,
+			inlineHookMemo: true,
+			renderer,
+		}).code;
+		const disabled = compile(source, 'inline-memo-universal.tsrx', {
+			...PROD,
+			autoMemo: false,
+			inlineHookMemo: false,
+			renderer,
+		}).code;
+
+		expect(enabled).toBe(disabled);
+		expect(enabled).toMatch(/useCallback/);
+		expect(enabled).toMatch(/useMemo/);
+		expect(enabled).not.toMatch(/octane\/internal\/client|memo(?:Slot|Take|Publish)/);
+	});
+
 	it('lowers parallel-use creations to the take/publish ABI with no dead import', () => {
 		const code = compile(
 			`

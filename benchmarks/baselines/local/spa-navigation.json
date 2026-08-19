@@ -6,64 +6,84 @@
       "name": "octane-tsrx",
       "ops": {
         "nav_deep": {
-          "score": 2.350000023841858,
-          "median": 2.3000001907348633,
-          "min": 2.1999998092651367,
-          "mean": 2.3050000190734865,
-          "p95": 2.4000000953674316,
-          "sd": 0.0759154707413413,
-          "rme": 1.541393724700211,
-          "scoreRme": 1.9018832279350182,
-          "warmupRatio": 0.9680851371431844,
+          "score": 1.4124999642372131,
+          "median": 1.4000000953674316,
+          "min": 1.299999713897705,
+          "mean": 1.4299999713897704,
+          "p95": 1.5,
+          "sd": 0.057124099234320894,
+          "rme": 1.8695520751919623,
+          "scoreRme": 3.7937446572032547,
+          "warmupRatio": 1.008849549306588,
           "samples": 20
         },
         "nav_teardown": {
-          "score": 1.1749999523162842,
-          "median": 1.1999998092651367,
-          "min": 1.0999999046325684,
-          "mean": 1.1849999666213988,
-          "p95": 1.3000001907348633,
-          "sd": 0.058714362824102695,
-          "rme": 2.3188905173671603,
-          "scoreRme": 5.031920582187853,
-          "warmupRatio": 1.0106383388859501,
+          "score": 0.612500011920929,
+          "median": 0.5999999046325684,
+          "min": 0.5,
+          "mean": 0.6099999666213989,
+          "p95": 0.7000002861022949,
+          "sd": 0.07181847556054893,
+          "rme": 5.510114222380374,
+          "scoreRme": 11.392479204883184,
+          "warmupRatio": 0.959183615875563,
           "samples": 20
         },
         "nav_mount": {
-          "score": 1.5250000357627869,
-          "median": 1.5,
-          "min": 1.3000001907348633,
-          "mean": 1.515000057220459,
-          "p95": 1.700000286102295,
-          "sd": 0.11367082230720085,
-          "rme": 3.511483103333949,
-          "scoreRme": 5.675423244199865,
-          "warmupRatio": 1.0163934656895153,
+          "score": 1.2499999403953552,
+          "median": 1.1999998092651367,
+          "min": 1.0999999046325684,
+          "mean": 1.2149999618530274,
+          "p95": 1.4000000953674316,
+          "sd": 0.08127278367602538,
+          "rme": 3.1305677086543637,
+          "scoreRme": 5.056587157660212,
+          "warmupRatio": 0.9499999976158141,
           "samples": 20
         },
         "nav_nested": {
-          "score": 0.18750005960464478,
-          "median": 0.20000028610229492,
-          "min": 0.09999990463256836,
-          "mean": 0.2450000286102295,
-          "p95": 0.40000009536743164,
-          "sd": 0.09445134167596735,
-          "rme": 18.04247976320705,
-          "scoreRme": 28.579545125738864,
-          "warmupRatio": 0.9333334181043568,
+          "score": 0.11249995231628418,
+          "median": 0.09999990463256836,
+          "min": 0,
+          "mean": 0.11499998569488526,
+          "p95": 0.20000028610229492,
+          "sd": 0.0670819903156356,
+          "rme": 27.29998345084515,
+          "scoreRme": 62.02569452706518,
+          "warmupRatio": 1.0000010596385784,
           "samples": 20
         },
         "nav_deep_6x": {
-          "score": 14.812499940395355,
-          "median": 14.900000095367432,
-          "min": 13.699999809265137,
-          "mean": 14.965000009536743,
-          "p95": 17.600000381469727,
-          "sd": 0.8664962991002072,
-          "rme": 2.7098435695359324,
-          "scoreRme": 3.511503492084769,
-          "warmupRatio": 0.984810132959463,
+          "score": 9.76250010728836,
+          "median": 9.699999809265137,
+          "min": 9,
+          "mean": 9.615000009536743,
+          "p95": 10.400000095367432,
+          "sd": 0.42707698556465545,
+          "rme": 2.078792351169454,
+          "scoreRme": 3.717554782565576,
+          "warmupRatio": 0.9756722019441609,
           "samples": 20
+        },
+        "nodes_deep": {
+          "median": 3078,
+          "min": 3078,
+          "samples": 1
+        },
+        "elements_deep": {
+          "median": 2052,
+          "min": 2052,
+          "samples": 1
+        },
+        "text_deep": {
+          "median": 1025,
+          "min": 1025,
+          "samples": 1
+        },
+        "comments_deep": {
+          "median": 1,
+          "min": 1,
+          "samples": 1
         }
       },
       "meta": {
@@ -71,10 +91,10 @@
         "dom": {
           "deep": {
             "root": "#main",
-            "total": 7170,
+            "total": 3078,
             "elements": 2052,
             "text": 1025,
-            "comments": 4093,
+            "comments": 1,
             "emptyText": 0,
             "whitespaceText": 0,
             "hydrationMarkersPhysical": 0,
@@ -84,21 +104,18 @@
             "leadingHydrationStartsPhysical": 0,
             "leadingHydrationStartsLogical": 0,
             "commentsByData": {
-              "/comp": 2046,
-              "comp": 2046,
               "": 1
             },
             "commentParents": {
-              "div.n": 4092,
               "div.outlet": 1
             }
           },
           "nested": {
             "root": "#main",
-            "total": 229,
+            "total": 105,
             "elements": 70,
             "text": 33,
-            "comments": 126,
+            "comments": 2,
             "emptyText": 0,
             "whitespaceText": 0,
             "hydrationMarkersPhysical": 0,
@@ -108,12 +125,9 @@
             "leadingHydrationStartsPhysical": 0,
             "leadingHydrationStartsLogical": 0,
             "commentsByData": {
-              "/comp": 62,
-              "comp": 62,
               "": 2
             },
             "commentParents": {
-              "div.n": 124,
               "div.outlet": 1,
               "div.outlet-inner": 1
             }
@@ -125,64 +139,84 @@
       "name": "octane-jsx",
       "ops": {
         "nav_deep": {
-          "score": 7.662500023841858,
-          "median": 7.5,
-          "min": 7.099999904632568,
-          "mean": 7.560000014305115,
-          "p95": 8.199999809265137,
-          "sd": 0.34853072222399645,
-          "rme": 2.157612752906655,
-          "scoreRme": 2.9706106074353715,
-          "warmupRatio": 0.9575856460596628,
+          "score": 1.6875000596046448,
+          "median": 1.6999998092651367,
+          "min": 1.5999999046325684,
+          "mean": 1.6800000667572021,
+          "p95": 1.8000001907348633,
+          "sd": 0.06958524316481707,
+          "rme": 1.9384833750660782,
+          "scoreRme": 3.175500644510877,
+          "warmupRatio": 0.977777764434187,
           "samples": 20
         },
         "nav_teardown": {
-          "score": 3.237499952316284,
-          "median": 3.299999713897705,
-          "min": 3.0999999046325684,
-          "mean": 3.2899999618530273,
-          "p95": 3.5,
-          "sd": 0.11192103016932171,
-          "rme": 1.5920988788761077,
-          "scoreRme": 2.3660857808066913,
-          "warmupRatio": 1.0308880387072477,
+          "score": 0.7375001311302185,
+          "median": 0.7000002861022949,
+          "min": 0.5999999046325684,
+          "mean": 0.7150000333786011,
+          "p95": 0.8000001907348633,
+          "sd": 0.058714302983027385,
+          "rme": 3.843191967527335,
+          "scoreRme": 5.867810499793269,
+          "warmupRatio": 0.9322031432614961,
           "samples": 20
         },
         "nav_mount": {
-          "score": 4.112499952316284,
-          "median": 4.199999809265137,
-          "min": 4,
-          "mean": 4.13999993801117,
-          "p95": 4.300000190734863,
-          "sd": 0.08207824492881119,
-          "rme": 0.9278589415183924,
-          "scoreRme": 1.6967524821532889,
-          "warmupRatio": 1.015197568565271,
+          "score": 1.3500001430511475,
+          "median": 1.3999996185302734,
+          "min": 1.299999713897705,
+          "mean": 1.390000009536743,
+          "p95": 1.5999999046325684,
+          "sd": 0.11192097635269159,
+          "rme": 3.7683472634273443,
+          "scoreRme": 3.3106853017453948,
+          "warmupRatio": 1.0925923620232092,
           "samples": 20
         },
         "nav_nested": {
-          "score": 0.47499996423721313,
-          "median": 0.5,
-          "min": 0.3000001907348633,
-          "mean": 0.49499998092651365,
-          "p95": 0.8000001907348633,
-          "sd": 0.13945381390477404,
-          "rme": 13.184979064276595,
-          "scoreRme": 22.56277724947946,
-          "warmupRatio": 0.9473684672833844,
+          "score": 0.1750001311302185,
+          "median": 0.19999980926513672,
+          "min": 0.09999990463256836,
+          "mean": 0.1900000810623169,
+          "p95": 0.40000009536743164,
+          "sd": 0.07181848953858172,
+          "rme": 17.690361641552503,
+          "scoreRme": 33.785714285871066,
+          "warmupRatio": 1.0714281091888154,
           "samples": 20
         },
         "nav_deep_6x": {
-          "score": 46.425000071525574,
-          "median": 46.5,
-          "min": 45.30000019073486,
-          "mean": 46.41000008583069,
-          "p95": 47.200000286102295,
-          "sd": 0.6137888938119116,
-          "rme": 0.6189587219758892,
-          "scoreRme": 1.0966142484282948,
-          "warmupRatio": 1.0013462586862327,
+          "score": 10.637500047683716,
+          "median": 10.699999809265137,
+          "min": 9.599999904632568,
+          "mean": 10.599999976158141,
+          "p95": 11.299999713897705,
+          "sd": 0.4052290209788345,
+          "rme": 1.7891588728955639,
+          "scoreRme": 1.828411978051828,
+          "warmupRatio": 1.0129259570626015,
           "samples": 20
+        },
+        "nodes_deep": {
+          "median": 3077,
+          "min": 3077,
+          "samples": 1
+        },
+        "elements_deep": {
+          "median": 2052,
+          "min": 2052,
+          "samples": 1
+        },
+        "text_deep": {
+          "median": 1025,
+          "min": 1025,
+          "samples": 1
+        },
+        "comments_deep": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
         }
       },
       "meta": {
@@ -190,10 +224,10 @@
         "dom": {
           "deep": {
             "root": "#main",
-            "total": 11261,
+            "total": 3077,
             "elements": 2052,
             "text": 1025,
-            "comments": 8184,
+            "comments": 0,
             "emptyText": 0,
             "whitespaceText": 0,
             "hydrationMarkersPhysical": 0,
@@ -202,22 +236,15 @@
             "hydrationMarkerMaxMultiplicity": 0,
             "leadingHydrationStartsPhysical": 0,
             "leadingHydrationStartsLogical": 0,
-            "commentsByData": {
-              "": 4092,
-              "/it": 2046,
-              "it": 2046
-            },
-            "commentParents": {
-              "div.n": 8182,
-              "div.page": 2
-            }
+            "commentsByData": {},
+            "commentParents": {}
           },
           "nested": {
             "root": "#main",
-            "total": 351,
+            "total": 103,
             "elements": 70,
             "text": 33,
-            "comments": 248,
+            "comments": 0,
             "emptyText": 0,
             "whitespaceText": 0,
             "hydrationMarkersPhysical": 0,
@@ -226,15 +253,8 @@
             "hydrationMarkerMaxMultiplicity": 0,
             "leadingHydrationStartsPhysical": 0,
             "leadingHydrationStartsLogical": 0,
-            "commentsByData": {
-              "": 124,
-              "/it": 62,
-              "it": 62
-            },
-            "commentParents": {
-              "div.n": 246,
-              "div.section": 2
-            }
+            "commentsByData": {},
+            "commentParents": {}
           }
         }
       }
@@ -243,64 +263,84 @@
       "name": "react",
       "ops": {
         "nav_deep": {
-          "score": 1.5250000357627869,
-          "median": 1.5,
-          "min": 1.4000000953674316,
-          "mean": 1.525,
-          "p95": 1.6000003814697266,
-          "sd": 0.05501194217393903,
-          "rme": 1.6882679061116426,
-          "scoreRme": 3.877049353519166,
-          "warmupRatio": 0.9918032476127363,
+          "score": 1.5874999165534973,
+          "median": 1.5999999046325684,
+          "min": 1.5,
+          "mean": 1.5999999284744262,
+          "p95": 1.700000286102295,
+          "sd": 0.056195139763006705,
+          "rme": 1.6437396185701434,
+          "scoreRme": 3.375529678540751,
+          "warmupRatio": 1.015748054851595,
           "samples": 20
         },
         "nav_teardown": {
-          "score": 0.8125000596046448,
+          "score": 0.800000011920929,
           "median": 0.8000001907348633,
           "min": 0.6999998092651367,
-          "mean": 0.7999999761581421,
+          "mean": 0.8000000238418579,
           "p95": 0.9000000953674316,
-          "sd": 0.04588315771411993,
-          "rme": 2.684216583641461,
-          "scoreRme": 3.6384429306487824,
-          "warmupRatio": 0.984615106977675,
+          "sd": 0.05619513976339002,
+          "rme": 3.2874789922264283,
+          "scoreRme": 7.900912230063617,
+          "warmupRatio": 1.0000001490116097,
           "samples": 20
         },
         "nav_mount": {
-          "score": 1.2874999642372131,
+          "score": 1.2750000953674316,
           "median": 1.299999713897705,
-          "min": 1.0999999046325684,
-          "mean": 1.2799999475479127,
-          "p95": 1.4000000953674316,
-          "sd": 0.08335088016451263,
-          "rme": 3.047575467302738,
-          "scoreRme": 4.162064214162104,
-          "warmupRatio": 0.999999953705129,
+          "min": 1.1999998092651367,
+          "mean": 1.3,
+          "p95": 1.5,
+          "sd": 0.08583945490205318,
+          "rme": 3.090279986631547,
+          "scoreRme": 4.637246973815458,
+          "warmupRatio": 1.058823422164661,
           "samples": 20
         },
         "nav_nested": {
-          "score": 0.2250000238418579,
-          "median": 0.3000001907348633,
+          "score": 0.1375001072883606,
+          "median": 0.19999980926513672,
           "min": 0.09999990463256836,
-          "mean": 0.3000000238418579,
-          "p95": 0.40000009536743164,
-          "sd": 0.1025978352087341,
-          "rme": 16.005569761061906,
-          "scoreRme": 38.46673602763499,
-          "warmupRatio": 1,
+          "mean": 0.18499999046325682,
+          "p95": 0.3000001907348633,
+          "sd": 0.07451594633702925,
+          "rme": 18.85088507589534,
+          "scoreRme": 31.472762800337435,
+          "warmupRatio": 1.5454531661745856,
           "samples": 20
         },
         "nav_deep_6x": {
-          "score": 9.875,
-          "median": 9.700000286102295,
-          "min": 8.799999713897705,
-          "mean": 9.974999952316285,
-          "p95": 13.199999809265137,
-          "sd": 0.9898830413784994,
-          "rme": 4.64435290163078,
-          "scoreRme": 5.407581479543588,
-          "warmupRatio": 1.0443037853965276,
+          "score": 10.550000011920929,
+          "median": 10.699999809265137,
+          "min": 9.900000095367432,
+          "mean": 10.754999995231628,
+          "p95": 11.799999713897705,
+          "sd": 0.5124501794440575,
+          "rme": 2.2299517464237426,
+          "scoreRme": 2.54185537244847,
+          "warmupRatio": 1.052132691193381,
           "samples": 20
+        },
+        "nodes_deep": {
+          "median": 3077,
+          "min": 3077,
+          "samples": 1
+        },
+        "elements_deep": {
+          "median": 2052,
+          "min": 2052,
+          "samples": 1
+        },
+        "text_deep": {
+          "median": 1025,
+          "min": 1025,
+          "samples": 1
+        },
+        "comments_deep": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
         }
       },
       "meta": {
@@ -347,64 +387,84 @@
       "name": "solid",
       "ops": {
         "nav_deep": {
-          "score": 1.8125,
-          "median": 1.8000001907348633,
-          "min": 1.700000286102295,
-          "mean": 1.825,
-          "p95": 1.9000000953674316,
-          "sd": 0.055011896553910714,
-          "rme": 1.4107432448009563,
-          "scoreRme": 1.6310362604814586,
-          "warmupRatio": 1.027586213473616,
+          "score": 1.9750000834465027,
+          "median": 2,
+          "min": 1.8999996185302734,
+          "mean": 1.9700000286102295,
+          "p95": 2.1000003814697266,
+          "sd": 0.06569468228604473,
+          "rme": 1.5606956311991391,
+          "scoreRme": 2.9936730027973595,
+          "warmupRatio": 0.993670832020145,
           "samples": 20
         },
         "nav_teardown": {
-          "score": 0.5375000238418579,
+          "score": 0.550000011920929,
           "median": 0.5,
           "min": 0.5,
-          "mean": 0.5349999904632569,
+          "mean": 0.5350000143051148,
           "p95": 0.6000003814697266,
-          "sd": 0.04893603515904906,
-          "rme": 4.280842363005176,
-          "scoreRme": 8.05118036353177,
-          "warmupRatio": 0.9999998891076426,
+          "sd": 0.04893606849415651,
+          "rme": 4.280845088331994,
+          "scoreRme": 8.126237931047248,
+          "warmupRatio": 0.9545454988794869,
           "samples": 20
         },
         "nav_mount": {
-          "score": 1.8125,
-          "median": 1.8000001907348633,
-          "min": 1.6999998092651367,
-          "mean": 1.8199999570846557,
-          "p95": 2,
-          "sd": 0.07677720790043112,
-          "rme": 1.974309190415909,
-          "scoreRme": 3.8498709458376252,
-          "warmupRatio": 1.0206896683265423,
+          "score": 1.7374999523162842,
+          "median": 1.799999713897705,
+          "min": 1.5999999046325684,
+          "mean": 1.7549999952316284,
+          "p95": 1.9000000953674316,
+          "sd": 0.07591554181755097,
+          "rme": 2.0244535047965027,
+          "scoreRme": 2.490654680571434,
+          "warmupRatio": 1.035971292618437,
           "samples": 20
         },
         "nav_nested": {
-          "score": 0.23750007152557373,
-          "median": 0.2999997138977051,
+          "score": 0.13750004768371582,
+          "median": 0.19999980926513672,
           "min": 0.09999990463256836,
-          "mean": 0.25000007152557374,
-          "p95": 0.40000009536743164,
-          "sd": 0.07608856793714878,
-          "rme": 14.244050604201721,
-          "scoreRme": 18.221064553276857,
-          "warmupRatio": 0.9473684870965394,
+          "mean": 0.17500002384185792,
+          "p95": 0.3000001907348633,
+          "sd": 0.06386669434461657,
+          "rme": 17.080105971330806,
+          "scoreRme": 31.47280645810064,
+          "warmupRatio": 1.181817945370086,
           "samples": 20
         },
         "nav_deep_6x": {
-          "score": 12.849999964237213,
-          "median": 12.699999809265137,
-          "min": 11.900000095367432,
-          "mean": 12.684999942779541,
-          "p95": 13.700000286102295,
-          "sd": 0.4648429634799915,
-          "rme": 1.7150232900944529,
-          "scoreRme": 3.9809314473481408,
-          "warmupRatio": 0.9892996117928602,
+          "score": 13.4375,
+          "median": 13.599999904632568,
+          "min": 12.599999904632568,
+          "mean": 13.524999976158142,
+          "p95": 14.200000286102295,
+          "sd": 0.44233236722643193,
+          "rme": 1.5306139849663403,
+          "scoreRme": 3.4395268215568917,
+          "warmupRatio": 1.0213953461757925,
           "samples": 20
+        },
+        "nodes_deep": {
+          "median": 5123,
+          "min": 5123,
+          "samples": 1
+        },
+        "elements_deep": {
+          "median": 2052,
+          "min": 2052,
+          "samples": 1
+        },
+        "text_deep": {
+          "median": 1025,
+          "min": 1025,
+          "samples": 1
+        },
+        "comments_deep": {
+          "median": 2046,
+          "min": 2046,
+          "samples": 1
         }
       },
       "meta": {
@@ -459,64 +519,84 @@
       "name": "vue-vapor",
       "ops": {
         "nav_deep": {
-          "score": 2.6125000715255737,
-          "median": 2.6999998092651367,
-          "min": 2.5,
-          "mean": 2.6450000286102293,
-          "p95": 2.8000001907348633,
-          "sd": 0.07591548727069007,
-          "rme": 1.3432564461214773,
-          "scoreRme": 2.051164546906465,
-          "warmupRatio": 1.0239234443210954,
+          "score": 2.799999952316284,
+          "median": 2.8000001907348633,
+          "min": 2.6999998092651367,
+          "mean": 2.7849999904632567,
+          "p95": 2.9000000953674316,
+          "sd": 0.058714352138262746,
+          "rme": 0.986673140029248,
+          "scoreRme": 2.25740625741528,
+          "warmupRatio": 0.9910714582216988,
           "samples": 20
         },
         "nav_teardown": {
-          "score": 0.75,
-          "median": 0.7000002861022949,
-          "min": 0.5999999046325684,
-          "mean": 0.7400000333786011,
-          "p95": 0.8000001907348633,
-          "sd": 0.05982431423022856,
-          "rme": 3.7835564692235555,
-          "scoreRme": 5.959234174672567,
-          "warmupRatio": 0.9500000476837158,
+          "score": 0.8000001311302185,
+          "median": 0.7999997138977051,
+          "min": 0.6999998092651367,
+          "mean": 0.7899999856948853,
+          "p95": 0.9000000953674316,
+          "sd": 0.07181852448315193,
+          "rme": 4.254647901540931,
+          "scoreRme": 7.900901634101612,
+          "warmupRatio": 0.999999701976825,
           "samples": 20
         },
         "nav_mount": {
-          "score": 2.5625000596046448,
-          "median": 2.5,
-          "min": 2.3000001907348633,
-          "mean": 2.5200000286102293,
-          "p95": 2.700000286102295,
-          "sd": 0.11050120395886698,
-          "rme": 2.0522047792183025,
-          "scoreRme": 2.4277816351020243,
-          "warmupRatio": 0.9756097334045379,
+          "score": 2.400000035762787,
+          "median": 2.4000000953674316,
+          "min": 2.200000286102295,
+          "mean": 2.3850000381469725,
+          "p95": 2.5,
+          "sd": 0.08750938766729839,
+          "rme": 1.7171984394516628,
+          "scoreRme": 3.724523523622099,
+          "warmupRatio": 0.9895833434226611,
           "samples": 20
         },
         "nav_nested": {
-          "score": 0.3125000596046448,
+          "score": 0.16250008344650269,
           "median": 0.3000001907348633,
-          "min": 0.19999980926513672,
-          "mean": 0.33500003814697266,
+          "min": 0.09999990463256836,
+          "mean": 0.2600001096725464,
           "p95": 0.5,
-          "sd": 0.09333015850016448,
-          "rme": 13.03861246568523,
-          "scoreRme": 22.329222655896647,
-          "warmupRatio": 1.0399997634888147,
+          "sd": 0.10462964493230605,
+          "rme": 18.833691437308993,
+          "scoreRme": 26.63080639667609,
+          "warmupRatio": 1,
           "samples": 20
         },
         "nav_deep_6x": {
-          "score": 17.737499952316284,
-          "median": 17.200000286102295,
-          "min": 16.600000381469727,
-          "mean": 17.375000071525573,
-          "p95": 18.799999713897705,
-          "sd": 0.671898227136122,
-          "rme": 1.8098096960840793,
-          "scoreRme": 4.062506781421228,
-          "warmupRatio": 0.9689922573877063,
+          "score": 18.637500047683716,
+          "median": 19.09999990463257,
+          "min": 18,
+          "mean": 19.23499999046326,
+          "p95": 21,
+          "sd": 0.7915840112046747,
+          "rme": 1.9260122880326878,
+          "scoreRme": 1.8720041054638485,
+          "warmupRatio": 1.0697518384646874,
           "samples": 20
+        },
+        "nodes_deep": {
+          "median": 5125,
+          "min": 5125,
+          "samples": 1
+        },
+        "elements_deep": {
+          "median": 2052,
+          "min": 2052,
+          "samples": 1
+        },
+        "text_deep": {
+          "median": 3073,
+          "min": 3073,
+          "samples": 1
+        },
+        "comments_deep": {
+          "median": 0,
+          "min": 0,
+          "samples": 1
         }
       },
       "meta": {
@@ -831,8 +911,8 @@
       "name": "octane-jsx-work",
       "ops": {
         "nav_deep_renderBlock": {
-          "median": 7169,
-          "min": 7169,
+          "median": 6147,
+          "min": 6147,
           "samples": 1
         },
         "nav_deep_componentSlot": {
@@ -841,8 +921,8 @@
           "samples": 1
         },
         "nav_deep_componentSlotVoid": {
-          "median": 0,
-          "min": 0,
+          "median": 2046,
+          "min": 2046,
           "samples": 1
         },
         "nav_deep_componentSlotLite": {
@@ -851,23 +931,23 @@
           "samples": 1
         },
         "nav_deep_childSlot": {
-          "median": 4094,
-          "min": 4094,
+          "median": 2,
+          "min": 2,
           "samples": 1
         },
         "nav_deep_createElement": {
-          "median": 4099,
-          "min": 4099,
+          "median": 1029,
+          "min": 1029,
           "samples": 1
         },
         "nav_deep_hostElementBody": {
-          "median": 1023,
-          "min": 1023,
+          "median": 0,
+          "min": 0,
           "samples": 1
         },
         "nav_deep_deoptItemBody": {
-          "median": 2046,
-          "min": 2046,
+          "median": 0,
+          "min": 0,
           "samples": 1
         },
         "nav_deep_reconcileKeyed": {
@@ -886,18 +966,18 @@
           "samples": 1
         },
         "nav_deep_unmountBlock": {
-          "median": 7166,
-          "min": 7166,
+          "median": 6144,
+          "min": 6144,
           "samples": 1
         },
         "nav_deep_unmountScope": {
-          "median": 7166,
-          "min": 7166,
+          "median": 6144,
+          "min": 6144,
           "samples": 1
         },
         "nav_teardown_renderBlock": {
-          "median": 227,
-          "min": 227,
+          "median": 197,
+          "min": 197,
           "samples": 1
         },
         "nav_teardown_componentSlot": {
@@ -906,8 +986,8 @@
           "samples": 1
         },
         "nav_teardown_componentSlotVoid": {
-          "median": 0,
-          "min": 0,
+          "median": 62,
+          "min": 62,
           "samples": 1
         },
         "nav_teardown_componentSlotLite": {
@@ -916,23 +996,23 @@
           "samples": 1
         },
         "nav_teardown_childSlot": {
-          "median": 127,
-          "min": 127,
+          "median": 3,
+          "min": 3,
           "samples": 1
         },
         "nav_teardown_createElement": {
-          "median": 133,
-          "min": 133,
+          "median": 39,
+          "min": 39,
           "samples": 1
         },
         "nav_teardown_hostElementBody": {
-          "median": 31,
-          "min": 31,
+          "median": 0,
+          "min": 0,
           "samples": 1
         },
         "nav_teardown_deoptItemBody": {
-          "median": 62,
-          "min": 62,
+          "median": 0,
+          "min": 0,
           "samples": 1
         },
         "nav_teardown_reconcileKeyed": {
@@ -951,18 +1031,18 @@
           "samples": 1
         },
         "nav_teardown_unmountBlock": {
-          "median": 7166,
-          "min": 7166,
+          "median": 6144,
+          "min": 6144,
           "samples": 1
         },
         "nav_teardown_unmountScope": {
-          "median": 7166,
-          "min": 7166,
+          "median": 6144,
+          "min": 6144,
           "samples": 1
         },
         "nav_mount_renderBlock": {
-          "median": 7169,
-          "min": 7169,
+          "median": 6147,
+          "min": 6147,
           "samples": 1
         },
         "nav_mount_componentSlot": {
@@ -971,8 +1051,8 @@
           "samples": 1
         },
         "nav_mount_componentSlotVoid": {
-          "median": 0,
-          "min": 0,
+          "median": 2046,
+          "min": 2046,
           "samples": 1
         },
         "nav_mount_componentSlotLite": {
@@ -981,23 +1061,23 @@
           "samples": 1
         },
         "nav_mount_childSlot": {
-          "median": 4094,
-          "min": 4094,
+          "median": 2,
+          "min": 2,
           "samples": 1
         },
         "nav_mount_createElement": {
-          "median": 4099,
-          "min": 4099,
+          "median": 1029,
+          "min": 1029,
           "samples": 1
         },
         "nav_mount_hostElementBody": {
-          "median": 1023,
-          "min": 1023,
+          "median": 0,
+          "min": 0,
           "samples": 1
         },
         "nav_mount_deoptItemBody": {
-          "median": 2046,
-          "min": 2046,
+          "median": 0,
+          "min": 0,
           "samples": 1
         },
         "nav_mount_reconcileKeyed": {
@@ -1016,18 +1096,18 @@
           "samples": 1
         },
         "nav_mount_unmountBlock": {
-          "median": 224,
-          "min": 224,
+          "median": 194,
+          "min": 194,
           "samples": 1
         },
         "nav_mount_unmountScope": {
-          "median": 224,
-          "min": 224,
+          "median": 194,
+          "min": 194,
           "samples": 1
         },
         "nav_nested_renderBlock": {
-          "median": 227,
-          "min": 227,
+          "median": 197,
+          "min": 197,
           "samples": 1
         },
         "nav_nested_componentSlot": {
@@ -1036,8 +1116,8 @@
           "samples": 1
         },
         "nav_nested_componentSlotVoid": {
-          "median": 0,
-          "min": 0,
+          "median": 62,
+          "min": 62,
           "samples": 1
         },
         "nav_nested_componentSlotLite": {
@@ -1046,23 +1126,23 @@
           "samples": 1
         },
         "nav_nested_childSlot": {
-          "median": 127,
-          "min": 127,
+          "median": 3,
+          "min": 3,
           "samples": 1
         },
         "nav_nested_createElement": {
-          "median": 133,
-          "min": 133,
+          "median": 39,
+          "min": 39,
           "samples": 1
         },
         "nav_nested_hostElementBody": {
-          "median": 31,
-          "min": 31,
+          "median": 0,
+          "min": 0,
           "samples": 1
         },
         "nav_nested_deoptItemBody": {
-          "median": 62,
-          "min": 62,
+          "median": 0,
+          "min": 0,
           "samples": 1
         },
         "nav_nested_reconcileKeyed": {
@@ -1081,13 +1161,13 @@
           "samples": 1
         },
         "nav_nested_unmountBlock": {
-          "median": 222,
-          "min": 222,
+          "median": 192,
+          "min": 192,
           "samples": 1
         },
         "nav_nested_unmountScope": {
-          "median": 222,
-          "min": 222,
+          "median": 192,
+          "min": 192,
           "samples": 1
         }
       },

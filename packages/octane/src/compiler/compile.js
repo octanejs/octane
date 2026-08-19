@@ -8188,6 +8188,7 @@ function compileInternal(
 		!hmrEnabled &&
 		!devEnabled &&
 		!profileEnabled &&
+		options?.__universal == null &&
 		!((source.includes('eval') || source.includes('\\u')) && hasInlineMemoDirectEval(ast));
 	// Same production-only gate as the tiers above, and for the same reason: a
 	// lifted callback has left the component, which dev tooling, HMR boundaries,
