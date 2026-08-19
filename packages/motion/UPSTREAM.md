@@ -8,7 +8,17 @@
 - Annotated tag object: `af50633857b1d58e890a47c03114c3d07dcffd32`
 - Commit: `40e8756c63b258c9dd07de9501cb788410eefb02`
 - npm tarball SHA-256: `d99821507dace914ef6924e95c25beb2d618438fc925517569dd6b083a4df793`
-- License: MIT
+- License: MIT (retained byte-exact as `LICENSE.upstream`, hash-matched to the lock)
+- Pinned bytes: `audit/upstream.lock.json` records each committed `upstream/`
+  file's git blob sha in the `packages/framer-motion` subtree at the tag
+  commit; `pnpm react-port:materialize run --check --package-dir
+  packages/motion` verifies the copy offline. The pin identity is
+  `framer-motion@12.42.2`, the member the vendored subtree belongs to;
+  `motion@12.42.2` is the re-export wrapper published from the same tag.
+- Pristine runner shims: `tests/_pristine-shims/` holds the port-authored
+  files that resolve the suite's relative library imports onto the published
+  `motion/react` pin. They are overlaid onto a scratch copy of the pinned
+  bytes at run time and are not upstream evidence.
 - Supported upstream range: exactly `12.42.2`
 - React oracle: `react@19.2.7`, `react-dom@19.2.7`, `@types/react@19.2.17`, and `@types/react-dom@19.2.3`
 

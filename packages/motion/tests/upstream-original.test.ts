@@ -1,11 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, parse, relative, resolve } from 'node:path';
 import { expect, it } from 'vitest';
-
-import { verifyMotionUpstream } from '../scripts/verify-upstream.mjs';
 
 function findRepoRoot(start: string): string {
 	let directory = resolve(start);
@@ -38,23 +36,50 @@ const jestBin = createRequire(resolve(repoRoot, 'packages/motion/package.json'))
 
 // @parity-case pristine:motion-use-motion-value-original-suite
 it('runs the curated Motion useMotionValue Jest suite unchanged', function () {
-	verifyMotionUpstream(resolve(repoRoot, 'packages/motion'));
-	const report = join(tmpdir(), `octane-motion-pristine-${process.pid}.json`);
-	const result = spawnSync(
+	// The pinned bytes verify offline against audit/upstream.lock.json before
+	// the suite can run; the lane can only ever execute the pinned commit.
+	const check = spawnSync(
 		process.execPath,
 		[
-			jestBin,
-			'--config',
-			resolve(repoRoot, 'packages/motion/tests/upstream-jest.config.cjs'),
-			'--rootDir',
-			upstreamRoot,
-			'--runInBand',
-			'--no-watchman',
-			'--json',
-			`--outputFile=${report}`,
+			resolve(repoRoot, 'scripts/react-port/materialize.mjs'),
+			'run',
+			'--check',
+			'--package-dir',
+			resolve(repoRoot, 'packages/motion'),
 		],
 		{ cwd: repoRoot, encoding: 'utf8' },
 	);
+	expect(check.status, `${check.stdout}\n${check.stderr}`).toBe(0);
+	// The pristine test resolves its library imports through relative paths;
+	// port-authored shims map those onto the published motion/react pin. The
+	// suite runs from a scratch root assembled from the pinned bytes plus the
+	// shims so neither set can masquerade as the other.
+	const runRoot = realpathSync(mkdtempSync(join(tmpdir(), 'octane-motion-pristine-root-')));
+	cpSync(join(upstreamRoot, 'src'), join(runRoot, 'src'), { recursive: true });
+	cpSync(resolve(repoRoot, 'packages/motion/tests/_pristine-shims'), runRoot, {
+		recursive: true,
+	});
+	const report = join(tmpdir(), `octane-motion-pristine-${process.pid}.json`);
+	let result;
+	try {
+		result = spawnSync(
+			process.execPath,
+			[
+				jestBin,
+				'--config',
+				resolve(repoRoot, 'packages/motion/tests/upstream-jest.config.cjs'),
+				'--rootDir',
+				runRoot,
+				'--runInBand',
+				'--no-watchman',
+				'--json',
+				`--outputFile=${report}`,
+			],
+			{ cwd: repoRoot, encoding: 'utf8' },
+		);
+	} finally {
+		rmSync(runRoot, { recursive: true, force: true });
+	}
 	const output = `${result.stdout}\n${result.stderr}`;
 	expect(result.status, output).toBe(0);
 	expect(output).toMatch(/Tests:\s+5 passed, 5 total/);
@@ -72,7 +97,7 @@ it('runs the curated Motion useMotionValue Jest suite unchanged', function () {
 				status: string;
 			}) {
 				return {
-					file: relative(upstreamRoot, suite.name).split('\\').join('/'),
+					file: relative(runRoot, suite.name).split('\\').join('/'),
 					fullName: test.fullName,
 					status: test.status,
 				};

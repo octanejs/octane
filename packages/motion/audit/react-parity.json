@@ -62,7 +62,7 @@
         {
           "path": "packages/motion/tests/upstream-original.test.ts",
           "role": "support",
-          "sha256": "062ac469737dd974b4a65e678c0e946df475e56df333a438c9c7a7fd2c312eea"
+          "sha256": "36e29c07918a3165c16e8619220e3e1253efce7de73407b890e4b03c0e364609"
         },
         {
           "path": "packages/motion/audit/pristine-runtime.json",
@@ -75,27 +75,17 @@
           "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
         },
         {
-          "path": "packages/motion/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "82bea0b9b535d78ebf27976bdc826480f6481c7bfea6e0abdb0c3f0bbf756afc"
-        },
-        {
           "path": "packages/motion/tests/upstream-jest.config.cjs",
           "role": "support",
           "sha256": "7284a19f8c8310628796865c53bc3bffea16e87bfb575fc2eff6a9a7cbde5fdb"
         },
         {
-          "path": "packages/motion/scripts/verify-upstream.mjs",
-          "role": "support",
-          "sha256": "56311d68b15292ebdcb4fc46dc1296cb63b29eec06097af980a09d4961326bb9"
-        },
-        {
-          "path": "packages/motion/upstream/LICENSE.md",
+          "path": "packages/motion/LICENSE.upstream",
           "role": "support",
           "sha256": "5ff46083b88563822b0560dd6221ab89d2f74bc97a52d4c97a75020fd62c6f32"
         },
         {
-          "path": "packages/motion/upstream/package.json",
+          "path": "packages/motion/tests/_pristine-shims/package.json",
           "role": "support",
           "sha256": "b89dbd2ecda49863338123e0232ff32c0390918ca7f86943c7b327c4f099abef"
         },
@@ -110,14 +100,14 @@
           "sha256": "b3a4efce5810f0f4a83d9cdb5581b66de0746819d3d618ccb8e10070ae01a9dd"
         },
         {
-          "path": "packages/motion/upstream/src/jest.setup.upstream.tsx",
-          "role": "support",
-          "sha256": "b3a4efce5810f0f4a83d9cdb5581b66de0746819d3d618ccb8e10070ae01a9dd"
-        },
-        {
           "path": "packages/motion/upstream/src/gestures/__tests__/utils.ts",
           "role": "support",
           "sha256": "ee0d589731d082978838a05748c9a9166711932241c6ed0df9419555e2f3e5e6"
+        },
+        {
+          "path": "packages/motion/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "da1d742cc27f22b753e2c73843f9ef987ebbe5de7f8227e8f6238f8ed19432d1"
         }
       ]
     },
