@@ -226,12 +226,13 @@ identity uniqueness. It does not collect or execute Vitest, Jest, or type-test
 lanes.
 
 The generic React parity workers run the complete package suites on Node 24. CI
-currently requests three native Vitest file shards:
+currently requests four native Vitest file shards:
 
 ```bash
-pnpm react-parity:check --shard 1/3
-pnpm react-parity:check --shard 2/3
-pnpm react-parity:check --shard 3/3
+pnpm react-parity:check --shard 1/4
+pnpm react-parity:check --shard 2/4
+pnpm react-parity:check --shard 3/4
+pnpm react-parity:check --shard 4/4
 ```
 
 `pnpm react-parity:check` without `--shard` retains the complete single-runner
