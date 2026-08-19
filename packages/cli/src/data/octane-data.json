@@ -1321,6 +1321,7 @@
     "@visx/zoom": "@octanejs/visx",
     "@zag-js/react": "@octanejs/zag",
     "animejs": "@octanejs/animejs",
+    "better-auth/react": "@octanejs/better-auth",
     "cmdk": "@octanejs/cmdk",
     "dexie-react-hooks": "@octanejs/dexie",
     "embla-carousel-react": "@octanejs/embla-carousel",
