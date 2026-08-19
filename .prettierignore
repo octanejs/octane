@@ -10,6 +10,9 @@ packages/shadcn/registry/
 # Vendored pinned upstream sources a port is written against (byte-exact
 # provenance; do not reformat)
 packages/*/upstream/
+# Pinned npm-artifact evidence retained beside a lock-pinned source tree
+# (tarballs, artifact manifests, artifact declarations); byte-exact by hash.
+packages/*/upstream-artifact/
 # Adapted upstream suites mirror pinned upstream bytes plus committed patches
 # (react-port:materialize regenerates them for lock-based ports); reformatting
 # would drift the mirror away from its patch or hash evidence.

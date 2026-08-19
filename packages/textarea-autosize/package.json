@@ -22,7 +22,8 @@
     "src",
     "README.md",
     "UPSTREAM.md",
-    "LICENSE"
+    "LICENSE",
+    "LICENSE.upstream"
   ],
   "sideEffects": false,
   "exports": {
