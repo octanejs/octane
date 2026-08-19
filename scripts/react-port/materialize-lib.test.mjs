@@ -76,6 +76,39 @@ describe('lock construction and validation', () => {
 		assert.equal(validateUpstreamLock(structuredClone(lock)).fingerprint, lock.fingerprint);
 	});
 
+	test('scopes narrow the pin to a reviewed subset and change the fingerprint', () => {
+		const scoped = buildUpstreamLock({
+			identity: fixtureIdentity(),
+			license: { spdx: 'MIT', evidence: [], notices: [] },
+			treeEntries: fixtureTreeEntries(),
+			scopes: ['tests'],
+			adaptedMappings: [],
+		});
+		assert.deepEqual(
+			scoped.files.map((file) => file.path),
+			['tests/index.test.js'],
+		);
+		const full = buildUpstreamLock({
+			identity: fixtureIdentity(),
+			license: { spdx: 'MIT', evidence: [], notices: [] },
+			treeEntries: fixtureTreeEntries(),
+			adaptedMappings: [],
+		});
+		assert.notEqual(scoped.fingerprint, full.fingerprint);
+		// An out-of-scope symlink cannot block a scoped pin; an in-scope one must.
+		const link = { path: 'link', type: 'blob', mode: '120000', sha: 'a'.repeat(40), size: 3 };
+		assert.equal(
+			buildUpstreamLock({
+				identity: fixtureIdentity(),
+				license: { spdx: 'MIT', evidence: [], notices: [] },
+				treeEntries: [...fixtureTreeEntries(), link],
+				scopes: ['tests'],
+				adaptedMappings: [],
+			}).files.length,
+			1,
+		);
+	});
+
 	test('rejects symlinks in the pinned tree', () => {
 		assert.throws(
 			() =>

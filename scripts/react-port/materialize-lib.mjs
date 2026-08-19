@@ -131,6 +131,9 @@ export function validateUpstreamLock(lock) {
 	}
 	validateAdaptedMappings(lock.adaptedMappings ?? []);
 	validateAdaptedRewrites(lock.adaptedRewrites ?? []);
+	for (const scope of lock.scopes ?? []) {
+		assertSafeLockPath(scope, 'Upstream lock scope');
+	}
 	if (!Array.isArray(lock.files) || lock.files.length === 0) {
 		throw new Error('Upstream lock must record at least one pinned file');
 	}
@@ -167,6 +170,7 @@ export function upstreamLockFingerprint(lock) {
 		schemaVersion: lock.schemaVersion,
 		identity: lock.identity,
 		license: lock.license,
+		scopes: lock.scopes ?? [],
 		adaptedMappings: lock.adaptedMappings ?? [],
 		adaptedRewrites: lock.adaptedRewrites ?? [],
 		files: lock.files,
@@ -177,6 +181,7 @@ export function buildUpstreamLock({
 	identity,
 	license,
 	treeEntries,
+	scopes = [],
 	adaptedMappings = [],
 	adaptedRewrites = [],
 }) {
@@ -184,11 +189,18 @@ export function buildUpstreamLock({
 	if (!Array.isArray(treeEntries)) throw new Error('Upstream tree entries are required');
 	const subdirectory = identity.repository.subdirectory ?? null;
 	const scopePrefix = subdirectory ? `${subdirectory}/` : '';
+	// Scopes narrow the pin to a reviewed subset of the subtree (for example the
+	// specific upstream test files a retrofit cites) so a monorepo pin does not
+	// force the whole repository into the tree. An empty list pins everything.
+	const inScope = (relativePath) =>
+		scopes.length === 0 ||
+		scopes.some((scope) => relativePath === scope || relativePath.startsWith(`${scope}/`));
 	const files = [];
 	for (const entry of treeEntries) {
 		if (entry.type !== 'blob') continue;
 		if (subdirectory && !entry.path.startsWith(scopePrefix)) continue;
 		const relativePath = subdirectory ? entry.path.slice(scopePrefix.length) : entry.path;
+		if (!inScope(relativePath)) continue;
 		if (entry.mode === SYMLINK_TREE_MODE) {
 			throw new Error(`Pinned upstream tree contains a symlink: ${entry.path}`);
 		}
@@ -213,6 +225,7 @@ export function buildUpstreamLock({
 			integrity: identity.integrity,
 		},
 		license,
+		scopes: [...scopes].sort(),
 		adaptedMappings,
 		adaptedRewrites,
 		files,

@@ -58,6 +58,8 @@ Options:
   --subdir <path>            Package subdirectory in the repository (lock
                              with --pin)
   --work-root <dir>          Batch state root (default: .react-port-work)
+  --scope <path>             Narrow the pin to this subtree-relative path
+                             (lock; repeatable; default pins the whole subtree)
   --adapted-map <from=to>    Map a pinned source root onto a tests/upstream
                              target (lock; repeatable)
   --adapted-rewrite <f=r>    Mechanical source rewrite applied to every mapped
@@ -72,6 +74,7 @@ function parseArguments(argumentsList) {
 		adaptedMappings: [],
 		adaptedRewrites: [],
 		batch: null,
+		scopes: [],
 		check: false,
 		commit: null,
 		node: null,
@@ -131,6 +134,10 @@ function parseArguments(argumentsList) {
 		} else if (argument === '--subdir') {
 			if (!value) throw new Error('--subdir requires a repository-relative path');
 			options.subdirectory = value;
+			index += 1;
+		} else if (argument === '--scope') {
+			if (!value) throw new Error('--scope requires a subtree-relative path');
+			options.scopes.push(value);
 			index += 1;
 		} else if (argument === '--adapted-map') {
 			const separator = value?.indexOf('=') ?? -1;
@@ -401,6 +408,7 @@ async function commandLockFromBatch(options) {
 			})),
 		},
 		treeEntries,
+		scopes: options.scopes,
 		adaptedMappings: options.adaptedMappings,
 		adaptedRewrites: options.adaptedRewrites,
 	});
@@ -496,6 +504,7 @@ async function commandLockFromPin(options) {
 			notices: verdict.notices.map(({ path: filePath, sha256 }) => ({ path: filePath, sha256 })),
 		},
 		treeEntries,
+		scopes: options.scopes,
 		adaptedMappings: options.adaptedMappings,
 		adaptedRewrites: options.adaptedRewrites,
 	});
