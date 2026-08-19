@@ -9,9 +9,14 @@
 - React oracle: `react-intersection-observer@10.1.0` with React `19.2.7` / ReactDOM `19.2.7` (`catalog:default`; keep immutable for this pin)
 
 The npm package publishes compiled output and declarations rather than its
-authored source and tests. `upstream/` therefore contains the byte-exact `src/`
-tree (including tests), package metadata, and license from the canonical tag.
-It is development evidence and is excluded from the published `files`.
+authored source and tests. The canonical tag's tree is therefore pinned by
+content address in `audit/upstream.lock.json` (fingerprint recorded per file as
+git blob shas) and regenerated on demand into `upstream/` (pristine,
+git-ignored) by `pnpm react-port:materialize run --package-dir
+packages/intersection-observer`; the adapted suite regenerates into
+`tests/upstream/` from the committed patches in `audit/upstream-patches/`. The
+upstream MIT license is retained byte-exact as `LICENSE.upstream`,
+hash-matched to the lock.
 
 ## Export crosswalk
 

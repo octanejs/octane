@@ -4917,7 +4917,7 @@ export default defineConfig({
 					exclude: ['packages/intersection-observer/tests/upstream/browser.test.tsx'],
 					environment: 'jsdom',
 					globals: false,
-					setupFiles: ['packages/intersection-observer/tests/upstream/_setup.ts'],
+					setupFiles: ['packages/intersection-observer/tests/upstream-adapted.setup.ts'],
 				},
 				plugins: [octane()],
 				resolve: {

@@ -81,6 +81,7 @@ import { parseShard } from './shard-lib.mjs';
 import { loadRequiredVitestLanes } from './vitest-batch-lib.mjs';
 import { validateVitestContracts } from './vitest-contract.mjs';
 import {
+	discoverMaterializedUpstreamPackages,
 	materializeUpstreamEvidence,
 	verifyMaterializedUpstreamEvidence,
 } from './materialized-upstream-lib.mjs';
@@ -214,9 +215,11 @@ await capture('@octanejs/colorful type evidence', () => verifyReactColorfulTypes
 await capture('@octanejs/colorful test classifications', () =>
 	verifyReactColorfulTestClassifications(REPO),
 );
-await capture('zag upstream evidence', () =>
-	verifyMaterializedUpstreamEvidence(REPO, 'packages/zag'),
-);
+for (const materializedPackage of discoverMaterializedUpstreamPackages(REPO)) {
+	await capture(`${materializedPackage} materialized upstream evidence`, () =>
+		verifyMaterializedUpstreamEvidence(REPO, materializedPackage),
+	);
+}
 await capture('zag type evidence', () => verifyZagTypes(REPO));
 await capture('zag test classifications', () => verifyZagTestClassifications(REPO));
 await capture('zag runtime inventory crosswalk', () => verifyZagRuntimeCrosswalk(REPO));

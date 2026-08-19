@@ -29,8 +29,8 @@ if (typeof window !== 'undefined') {
 (globalThis as { vi?: typeof vi }).vi = vi;
 
 const { cleanup } = await import('@octanejs/testing-library');
-const { destroyIntersectionMocking } = await import('../../src/test-utils');
-const { defaultFallbackInView } = await import('../../src/observe');
+const { destroyIntersectionMocking } = await import('../src/test-utils');
+const { defaultFallbackInView } = await import('../src/observe');
 
 afterEach(function teardownMocks() {
 	destroyIntersectionMocking();

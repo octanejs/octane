@@ -22,15 +22,18 @@
     "src",
     "README.md",
     "UPSTREAM.md",
-    "status.json"
+    "status.json",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts",
     "./test-utils": "./src/test-utils.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --config vitest.config.js --project intersection-observer",
-    "typecheck": "tsrx-tsc --noEmit"
+    "test": "pnpm upstream:materialize && vitest run --root ../.. --config vitest.config.js --project intersection-observer",
+    "typecheck": "tsrx-tsc --noEmit",
+    "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "peerDependencies": {
     "octane": "workspace:*"
