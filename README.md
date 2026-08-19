@@ -242,7 +242,12 @@ coverage, and when the evidence was last checked.
 
 ## Sponsors
 
-[<img width="600" height="150" alt="CI powered by Blacksmith" src="./website/src/assets/blacksmith-ci.webp" />](https://blacksmith.sh)
+<a href="https://blacksmith.sh">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./website/src/assets/blacksmith-ci-on-dark.svg">
+    <img width="352" height="96" alt="CI powered by Blacksmith" src="./website/src/assets/blacksmith-ci-on-light.svg">
+  </picture>
+</a>
 
 **BlackSmith** - fast and efficient platform for running GitHub Actions, helping teams build, test, and deploy code faster while reducing CI costs. We thank Blacksmith for supporting our community as a sponsor!
 
