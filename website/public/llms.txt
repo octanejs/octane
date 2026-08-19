@@ -23,6 +23,7 @@ Key facts for answering questions about Octane:
 - `<Hydrate>` can leave initial server HTML visible but inert until `load()`, idle time, visibility, a media query, interaction, an application condition, or never. Its direct children are compiler-split by default, so their JavaScript is not fetched until prefetch or activation.
 - `attachBehaviorRoot` from `octane/behavior` attaches abortable, delegated behavior to existing server-rendered or independently streamed DOM without hydrating, rendering, replacing nodes, or taking reconciliation ownership. Nested external owners, asynchronous readiness, genuine native interactions, and exactly-once cleanup have explicit lifecycle contracts.
 - No class components, no Server Components, no StrictMode double-invoke.
+- Octane targets current evergreen browsers. Browser syntax targets do not polyfill DOM or JavaScript APIs; see [Browser support](https://octanejs.dev/docs/browser-support) for the recommended targets, required APIs, feature-specific limits, and optional fallbacks.
 - Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work, but APIs can still change. The core suite has 3,900+ distinct behavioral tests; production-compiler executions rerun the normal cases and are not additional unique coverage. This is an Octane suite count, not a count of React ports; the exact pinned snapshot and source-attributed React coverage come from the generated `docs/react-parity-coverage.md` ledger report.
 
 ## Text input events: per-edit versus commit
@@ -54,9 +55,22 @@ An uncontrolled field that intentionally saves only when the browser commits the
 - [Core APIs](https://octanejs.dev/docs/core-apis): Roots, components, state and effect hooks, current-state getters, context, Suspense, deferred hydration and code splitting, behavior-only roots and external DOM ownership, transitions, actions, events, and SSR/static rendering.
 - [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): When to author in `.tsrx` versus standard `.tsx`/`.jsx`, and what each dialect unlocks (compiled collections, template control flow, the `@{ … }` shorthand, text holes).
 - [Publishing libraries](https://octanejs.dev/docs/publishing-libraries): Ship the complete authored source graph, including `.tsrx`, `.tsx`, `.ts`, and `.js`, point package exports at that source, and let the consuming application compile it. Do not publish precompiled Octane output.
+- [Browser support](https://octanejs.dev/docs/browser-support): Recommended browser targets, required core APIs, optional fallbacks, and polyfills.
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): The deliberate divergences from React — everything else matching React is the point.
 - [Bindings](https://octanejs.dev/docs/bindings): The `@octanejs/*` ports of the React ecosystem.
 - [Playground](https://octanejs.dev/playground): Write TSRX or TSX in the browser and see the compiled octane output and the live rendered result side by side.
+
+## Browser support
+
+See the [Browser support guide](https://octanejs.dev/docs/browser-support). This covers Octane core and its build integrations, not a compatibility matrix for ecosystem bindings.
+
+- Start with current evergreen browsers. The website's playground runtime uses Chrome/Edge 111, Firefox 114, and Safari/iOS 16.4, matching Vite 8's default build target.
+- The ordinary DOM runtime calls `Element.replaceChildren()` (Chrome/Edge 86, Firefox 78, Safari 14), `String.prototype.replaceAll()` (Chrome/Edge 85, Firefox 77, Safari 13.1), and `queueMicrotask()` directly. These establish known API lower bounds, not a guarantee that every Octane feature works in those versions. An older Chromium engine can fail on a later hydration or cleanup path even when initial loading succeeded.
+- These requirements and fallbacks describe current Octane. Releases 0.1.9–0.1.34 also used `Object.hasOwn()` in ordinary component capability checks; 0.1.35 removed that dependency and added browser scheduling, observer, media-query, and mobile-input compatibility fixes. Check the installed version and changelog before applying current guidance to an older release.
+- Function form actions need `SubmitEvent.submitter` for button-level actions and submitted button data; Safari needs 15.4 for full support. Core `module server` RPC uses `fetch` and a serializer that requires `Object.hasOwn()` (Chrome/Edge 93, Firefox 92, Safari 15.4). Rich RPC values require their corresponding constructors in the receiving browser.
+- Deferred hydration and behavior roots use `AbortController` and, for streamed-DOM observation, `MutationObserver`. Preserving custom abort reasons needs `AbortSignal.reason` (Chrome/Edge 98, Firefox 97, Safari 15.4). Native HTML features such as `inert` can need their own polyfills.
+- View-transition animation and `Element.moveBefore()` are feature-detected. `idle()` falls back to a timer without `requestIdleCallback`; `visible()` activates immediately without `IntersectionObserver`; `media()` supports legacy media-query listeners. Browser-side Web Streams are not an unconditional hydration requirement: `ReadableStream` and `TextEncoder` are needed where `renderToReadableStream` executes, normally the server.
+- The core package publishes modern ESM. Configure the consuming application's final syntax target and load missing API polyfills before the application. Rsbuild's `modules` target maps to Chrome 87, Edge 88, Firefox 78, Safari/iOS 14, and Samsung Internet 14; this does not certify RPC, form actions, or application dependencies on those browsers.
 
 ## Authoring TSRX
 
