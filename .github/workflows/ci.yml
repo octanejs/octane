@@ -452,7 +452,7 @@ jobs:
           --exclude "$ASTRO_E2E_SPEC"
 
   react_parity_shard:
-    name: React parity shard (${{ matrix.shard }}/3)
+    name: React parity shard (${{ matrix.shard }}/4)
     needs: release_change
     # The complete package suite is intentionally Node 24-only. Like the
     # general shards, an authenticated release or lightweight change inherits
@@ -464,7 +464,7 @@ jobs:
       matrix:
         # Vitest hashes parity file paths across these workers. Non-Vitest
         # manifests remain whole and use the same generic shard coordinates.
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
 
     steps:
       - name: Checkout code
@@ -494,7 +494,7 @@ jobs:
       - name: Check React parity inventories and execute required lanes
         env:
           REACT_PARITY_VITEST_REPORT: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json
-        run: pnpm react-parity:check --shard ${{ matrix.shard }}/3
+        run: pnpm react-parity:check --shard ${{ matrix.shard }}/4
 
       - name: Upload React parity Vitest shard report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -534,7 +534,7 @@ jobs:
         run: >-
           node scripts/react-parity/verify-vitest-shards.mjs
           --reports-directory "${{ runner.temp }}/react-parity-vitest"
-          --expected-shards 3
+          --expected-shards 4
 
   # Keep the Node 24 aggregate check name while the work happens in parallel
   # above. `always()` makes a failed shard produce a failed required check and
