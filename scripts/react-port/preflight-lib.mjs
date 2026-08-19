@@ -551,7 +551,7 @@ async function readBoundedBody(response, maxBytes) {
 	return Buffer.concat(chunks, totalBytes);
 }
 
-async function fetchBounded(
+export async function fetchBounded(
 	initialUrl,
 	{
 		fetchImpl,
@@ -601,7 +601,7 @@ async function fetchBounded(
 	throw new Error('Remote redirect limit exceeded');
 }
 
-async function fetchJson(url, options) {
+export async function fetchJson(url, options) {
 	const { bytes } = await fetchBounded(url, {
 		...options,
 		maxBytes: options.maxBytes ?? REMOTE_LIMITS.jsonBytes,
@@ -1194,7 +1194,7 @@ async function resolveRegistryArtifact(packageName, selector, options) {
 	};
 }
 
-function githubHeaders(options) {
+export function githubHeaders(options) {
 	const headers = { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' };
 	if (options.githubToken) headers.authorization = `Bearer ${options.githubToken}`;
 	return headers;

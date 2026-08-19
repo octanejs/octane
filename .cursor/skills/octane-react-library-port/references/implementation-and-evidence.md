@@ -41,28 +41,79 @@ Do not estimate portability from rewrite volume. Re-author the complete pinned
 surface, then use the pristine/adapted runtime and type lanes plus the upstream
 crosswalk to prove one-for-one observable functionality.
 
-## Pin and mirror the upstream boundary
+## Pin and materialize the upstream boundary
 
 Inspect both the verified npm artifact and the canonical repository at the
 preflight commit. The registry may omit source, tests, fixtures, or build
 configuration; record which immutable artifact supplies each boundary.
 
-For a new or upgraded port:
+Upstream bytes are pinned by content address and materialized on demand; they
+are never committed. For a new or upgraded port:
 
-- vendor the approved-license React-facing source and tests byte-exact under
-  `packages/<binding>/upstream/`, preserving paths, license, and copyright
-  headers; keep it prettier-ignored and outside published `files`;
+- derive the committed pin from the preflighted batch node:
+
+  ```bash
+  pnpm react-port:materialize lock --batch <id> --node pkg:<name> \
+    --package-dir packages/<binding> \
+    --adapted-map <pinned-test-root>=tests/upstream
+  ```
+
+  This writes `packages/<binding>/audit/upstream.lock.json`: the exact package
+  identity, approved-license evidence hashes, and the git blob sha and size of
+  every file in the pinned source subtree. The lock is the durable provenance
+  artifact; commit it, and it fails closed on any fingerprint drift.
+
+- regenerate the pristine tree and the adapted suite whenever they are needed:
+
+  ```bash
+  pnpm react-port:materialize run --package-dir packages/<binding>
+  ```
+
+  This fetches the pinned commit archive (falling back to the content-addressed
+  blob endpoint per file), verifies every byte against the lock before writing,
+  rebuilds `packages/<binding>/upstream/` (pristine, unmodified), and rebuilds
+  the `tests/upstream` targets by copying each mapped pristine file and applying
+  its committed patch from `audit/upstream-patches/`. `run --check` verifies an
+  existing tree offline. Run materialization before the pristine/adapted suites
+  execute, for example as the leading segment of the package `test` script.
+
+- keep the regenerated trees out of version control: add a package `.gitignore`
+  with `/upstream/` and `/tests/upstream/`. Only the lock, the patches, `.skip`
+  rationale markers, and port-authored tests are committed.
+
+- author the adaptation by editing the regenerated `tests/upstream` files, then
+  record it:
+
+  ```bash
+  pnpm react-port:materialize diff --package-dir packages/<binding>
+  ```
+
+  This regenerates `audit/upstream-patches/` with one patch per adapted file.
+  The patch set is the reviewable divergence record: every byte that differs
+  from the pinned upstream test is visible in the committed diff, and nothing
+  else can drift. A pinned upstream case that must not run in the adapted lane
+  gets a `<target>.skip` marker beside its patch path whose content is the
+  durable rationale; a silently missing adapted file fails `diff`.
+
 - mirror the upstream module layout in `src/` so source-to-port review and the
-  next pinned upgrade have a mechanical crosswalk;
-- work module by module from the pinned source, not declarations, README prose,
-  or memory;
+  next pinned upgrade have a mechanical crosswalk, and work module by module
+  from the materialized pinned source, not declarations, README prose, or
+  memory;
+
 - record every published React entry-point export in `UPSTREAM.md` as ported,
   reused from a framework-neutral core, intentional divergence, inapplicable,
   or an explicit gap with evidence.
 
-Do not vendor bytes outside the approved-license boundary. If immutable source
-or test evidence cannot be retained, block the port instead of silently reducing
-its claimed surface.
+Materialization does not move the license boundary. The lock and especially the
+patches are derived from upstream bytes, so they stay inside the approved-license
+gate: committing a patch is committing an adaptation. If immutable pin evidence
+cannot be established, block the port instead of silently reducing its claimed
+surface. Never point the pristine or adapted lanes at an unpinned checkout.
+
+Existing bindings that predate materialization keep their committed
+`packages/<binding>/upstream/` and `tests/upstream/` trees as valid evidence;
+`materialize run` refuses to overwrite git-tracked trees. Migrate a legacy
+binding to the lock-and-patches model when you next touch its pin.
 
 ## Package contract
 
@@ -76,8 +127,10 @@ A completed publishable binding normally has:
 - source and public type exports with no published `declare module '*.tsrx'`;
 - README, `status.json`, tests, and strict authored/public/packed-consumer type
   programs;
-- a byte-exact, unpublished `upstream/` evidence tree for the pinned source and
-  tests when those bytes are adapted or used as parity evidence;
+- a committed `audit/upstream.lock.json` pin plus `audit/upstream-patches/`
+  patches and `.skip` rationales for the adapted suite, with the regenerated
+  `upstream/` and `tests/upstream` trees git-ignored (a legacy byte-exact
+  vendored tree remains valid evidence until the binding migrates);
 - `UPSTREAM.md` naming package, version/tag, immutable commit, source boundary,
   adapted/copied paths, excluded React shell, and behavioral oracle;
 - the binding's primary MIT `LICENSE`, plus a separately named, byte-exact root
@@ -413,6 +466,7 @@ prove. Do not weaken assertions to match a buggy implementation.
 Run the narrow package commands first, then the applicable repository gates:
 
 ```bash
+pnpm react-port:materialize run --check --package-dir packages/<binding>
 pnpm react-port:test
 pnpm react-parity:check
 pnpm react-parity:test

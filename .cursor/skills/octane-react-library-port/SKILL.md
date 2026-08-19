@@ -116,7 +116,11 @@ authority.
    Repair runtime/compiler/SSR/tooling defects in their owning package with a
    regression, retaining the binding scenario as integration evidence.
 
-7. **Complete artifacts and evidence.** Inventory and crosswalk every upstream
+7. **Complete artifacts and evidence.** Pin the upstream boundary with
+   `pnpm react-port:materialize lock`, regenerate the pristine and adapted trees
+   with `materialize run`, and record every adaptation as a committed patch with
+   `materialize diff`; upstream bytes are never committed. Inventory and
+   crosswalk every upstream
    runtime/type case, register pristine/adapted lanes, and prove direct authored
    source, precise public declarations, and packed Node plus browser/no-Node type
    consumers. Run the applicable matrix commands and fix discovery or command

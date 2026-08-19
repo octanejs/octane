@@ -85,6 +85,7 @@
     "react-parity:harness:list": "node scripts/react-parity/harness.mjs list",
     "react-parity:harness:run": "node scripts/react-parity/harness.mjs run",
     "react-port:evidence": "node scripts/react-port/evidence.mjs",
+    "react-port:materialize": "node scripts/react-port/materialize.mjs",
     "react-port:preflight": "node scripts/react-port/preflight.mjs",
     "react-port:terminal": "node scripts/react-port/terminal.mjs",
     "react-port:test": "node --test scripts/react-port/*.test.mjs",
