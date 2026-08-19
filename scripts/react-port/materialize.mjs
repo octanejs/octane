@@ -57,6 +57,9 @@ Options:
   --commit <sha>             Pinned 40-character commit (lock with --pin)
   --subdir <path>            Package subdirectory in the repository (lock
                              with --pin)
+  --manifest <path>          Subtree-relative package.json that proves the
+                             pin's commit correspondence (lock with --pin;
+                             default: package.json)
   --work-root <dir>          Batch state root (default: .react-port-work)
   --scope <path>             Narrow the pin to this subtree-relative path
                              (lock; repeatable; default pins the whole subtree)
@@ -77,6 +80,7 @@ function parseArguments(argumentsList) {
 		scopes: [],
 		check: false,
 		commit: null,
+		manifestPath: null,
 		node: null,
 		packageDirectory: null,
 		pin: null,
@@ -134,6 +138,10 @@ function parseArguments(argumentsList) {
 		} else if (argument === '--subdir') {
 			if (!value) throw new Error('--subdir requires a repository-relative path');
 			options.subdirectory = value;
+			index += 1;
+		} else if (argument === '--manifest') {
+			if (!value) throw new Error('--manifest requires a subtree-relative package.json path');
+			options.manifestPath = value;
 			index += 1;
 		} else if (argument === '--scope') {
 			if (!value) throw new Error('--scope requires a subtree-relative path');
@@ -442,7 +450,13 @@ async function commandLockFromPin(options) {
 		throw new Error('Registry metadata lacks tarball integrity evidence for the pin');
 	}
 	const treeEntries = await fetchPinnedTree(owner, repo, options.commit, options);
-	const manifestPath = subdirectory ? `${subdirectory}/package.json` : 'package.json';
+	// A pin whose subtree spans sibling monorepo packages proves its
+	// commit correspondence through one named member manifest instead of
+	// <subdir>/package.json.
+	const manifestRelativePath = options.manifestPath ?? 'package.json';
+	const manifestPath = subdirectory
+		? `${subdirectory}/${manifestRelativePath}`
+		: manifestRelativePath;
 	const manifestEntry = treeEntries.find(
 		(entry) => entry.path === manifestPath && entry.type === 'blob' && entry.mode !== '120000',
 	);
