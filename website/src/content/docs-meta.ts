@@ -334,8 +334,7 @@ export const docsMeta: DocMeta[] = [
 	{
 		slug: 'browser-support',
 		title: 'Browser support',
-		description:
-			'Choose browser targets, understand required Web APIs and optional fallbacks, and test older engines.',
+		description: 'Choose browser targets and understand required Web APIs and optional fallbacks.',
 		group: 'Explore',
 		searchTerms: [
 			'browser compatibility',
@@ -355,7 +354,6 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'feature-specific-apis', title: 'Feature-specific requirements' },
 			{ id: 'optional-features', title: 'Features with fallbacks' },
 			{ id: 'build-targets', title: 'Choose a build target' },
-			{ id: 'testing', title: 'Test the browsers you ship' },
 		],
 	},
 	{

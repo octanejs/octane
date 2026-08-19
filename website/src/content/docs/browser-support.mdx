@@ -29,19 +29,6 @@ website's playground runtime and by [Vite 8's default build target](https://vite
 | Firefox               | 114 or newer          |
 | Safari and iOS Safari | 16.4 or newer         |
 
-This is a **build-target recommendation, not a certified oldest-version support
-matrix**. Octane is alpha software. Its browser tests currently use Playwright
-Chromium; the repository does not run every historical Chrome, Firefox, and
-Safari version. Older engines can work with suitable output and polyfills, but
-must be tested against the features your application actually uses. Internet
-Explorer and legacy, non-Chromium Edge are not supported targets.
-
-Samsung Internet has its own version numbers: Samsung Internet 14 uses Chromium
-87, while Samsung Internet 24 uses Chromium 117. Android System WebView can
-update independently of Chrome. Check the actual engine and version on the
-device, not just the Android version or a desktop browser with a mobile user
-agent.
-
 <h2 id="required-apis">Required browser APIs</h2>
 
 Octane uses modern JavaScript and DOM APIs directly. These are particularly
@@ -138,23 +125,3 @@ Check the final production chunks, including dependencies and lazy-loaded code.
 Neither a successful build nor a JavaScript syntax target supplies missing DOM
 methods. [Rsbuild's compatibility guide](https://rsbuild.rs/guide/advanced/browser-compatibility)
 explains its separate syntax and polyfill settings.
-
-<h2 id="testing">Test the browsers you ship</h2>
-
-Keep an explicit application support matrix and run the **built production
-application** in its oldest supported engines. Include initial load, hydration,
-updates and removal, lazy chunks, forms, and any optional core features you
-use. Test text entry with the actual mobile keyboards, languages, Samsung
-Internet, and WebView versions you support.
-
-The repository's jsdom suites and current Chromium browser tests catch many
-regressions, but they do not prove old-engine compatibility. Changing a user
-agent string also does not change the engine executing the code. Record the
-exact browser version, Octane version, build target, error name/stack, and
-failing route when reporting a compatibility problem.
-
-When adding a browser API to core or application code, check its compatibility
-data against that matrix first. Feature-detect optional enhancements, and add a
-regression that exercises the affected behavior when the capability is absent.
-For parse-time failures, test the emitted bundle in the affected engine; a
-runtime feature check cannot catch syntax the browser cannot parse.
