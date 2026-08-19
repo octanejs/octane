@@ -23,6 +23,7 @@ import { validateBatchManifest } from './state-lib.mjs';
 
 const ARCHIVE_MAX_BYTES = 192 * 1024 * 1024;
 const BLOB_MAX_BYTES = 16 * 1024 * 1024;
+const DIFF_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
 
 function usage() {
 	return `Usage: node scripts/react-port/materialize.mjs <command> [options]
@@ -162,9 +163,11 @@ async function fetchPristineFiles(lock, options) {
 	// size limits can defeat it, and every affected file falls back to the
 	// content-addressed blob endpoint, which cannot return the wrong bytes.
 	let extracted;
+	let archiveFallbackReason = null;
 	try {
 		extracted = await fetchArchiveFiles(lock, options);
-	} catch {
+	} catch (error) {
+		archiveFallbackReason = error instanceof Error ? error.message : String(error);
 		extracted = {
 			files: new Map(),
 			missing: lock.files.map((file) => file.path),
@@ -197,7 +200,7 @@ async function fetchPristineFiles(lock, options) {
 		}
 		extracted.files.set(relativePath, bytes);
 	}
-	return { files: extracted.files, blobFallbackCount: fallbackPaths.length };
+	return { files: extracted.files, blobFallbackCount: fallbackPaths.length, archiveFallbackReason };
 }
 
 function patchArtifactPaths(packageDirectory, targetPath) {
@@ -235,7 +238,7 @@ function regenerateAdaptedTree(lock, packageDirectory, pristineDirectory, execFi
 			let bytes = readFileSync(path.join(pristineDirectory, ...sourcePath.split('/')));
 			if (existsSync(patchPath)) {
 				const scratchPath = writeTreeFile(scratch, targetPath, bytes);
-				execFile('git', ['apply', '--whitespace=nowarn', patchPath], {
+				execFile('git', ['-c', 'core.autocrlf=false', 'apply', '--whitespace=nowarn', patchPath], {
 					cwd: scratch,
 					encoding: 'utf8',
 				});
@@ -346,7 +349,10 @@ async function commandRun(options) {
 			`${pristineDirectory} exists without a materialize state marker; remove or migrate it first`,
 		);
 	}
-	const { files, blobFallbackCount } = await fetchPristineFiles(lock, options);
+	const { files, blobFallbackCount, archiveFallbackReason } = await fetchPristineFiles(
+		lock,
+		options,
+	);
 	rmSync(pristineDirectory, { force: true, recursive: true });
 	for (const [relativePath, bytes] of files) {
 		writeTreeFile(pristineDirectory, relativePath, bytes);
@@ -375,6 +381,7 @@ async function commandRun(options) {
 		status: 'passed',
 		pristineFileCount: files.size,
 		blobFallbackCount,
+		...(archiveFallbackReason === null ? {} : { archiveFallbackReason }),
 		adaptedWritten: adapted.written.length,
 		adaptedSkipped: adapted.skipped,
 		lockFingerprint: lock.fingerprint,
@@ -396,7 +403,7 @@ function unifiedDiff(targetPath, pristineBytes, adaptedBytes, execFile) {
 			output = execFile(
 				'git',
 				['-c', 'core.autocrlf=false', 'diff', '--no-index', '--', leftPath, rightPath],
-				{ encoding: 'utf8' },
+				{ encoding: 'utf8', maxBuffer: DIFF_MAX_BUFFER_BYTES },
 			);
 		} catch (error) {
 			// git diff exits 1 when the files differ; that is the expected path.

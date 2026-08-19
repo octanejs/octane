@@ -268,6 +268,36 @@ describe('materialize CLI lifecycle', () => {
 		assert.match(failed.stderr, /Adapted file is missing for pinned upstream case/);
 	});
 
+	test('diff captures multi-megabyte adaptations and apply ignores host autocrlf', async () => {
+		const context = scenario();
+		await runCli(LOCK_ARGUMENTS(context));
+		await runCli(['run', '--package-dir', context.packageDirectory]);
+		const adaptedTest = path.join(context.packageDirectory, 'tests', 'upstream', 'index.test.js');
+		// Well past Node's 1MB execFileSync default so an unraised maxBuffer fails.
+		const bigAdaptation = `${readFileSync(adaptedTest, 'utf8')}${`// adapted line padding\n`.repeat(120_000)}`;
+		writeFileSync(adaptedTest, bigAdaptation);
+		const diffed = await runCli(['diff', '--package-dir', context.packageDirectory]);
+		assert.equal(diffed.exitCode, 0, diffed.stderr);
+
+		rmSync(path.join(context.packageDirectory, 'tests'), { recursive: true });
+		const environment = { ...process.env };
+		process.env.GIT_CONFIG_COUNT = '1';
+		process.env.GIT_CONFIG_KEY_0 = 'core.autocrlf';
+		process.env.GIT_CONFIG_VALUE_0 = 'true';
+		try {
+			const reran = await runCli(['run', '--package-dir', context.packageDirectory]);
+			assert.equal(reran.exitCode, 0, reran.stderr);
+			assert.equal(readFileSync(adaptedTest, 'utf8'), bigAdaptation);
+		} finally {
+			delete process.env.GIT_CONFIG_COUNT;
+			delete process.env.GIT_CONFIG_KEY_0;
+			delete process.env.GIT_CONFIG_VALUE_0;
+			for (const key of ['GIT_CONFIG_COUNT', 'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0']) {
+				if (environment[key] !== undefined) process.env[key] = environment[key];
+			}
+		}
+	});
+
 	test('lock refuses nodes without approved source-license evidence', async () => {
 		const context = scenario();
 		const manifestPath = path.join(context.workRoot, 'fixture-batch', 'manifest.json');

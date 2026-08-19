@@ -22,7 +22,11 @@ function tarHeader(name, size, typeflag) {
 
 export function buildTarGz(entries) {
 	const chunks = [];
-	for (const [name, content] of entries) {
+	for (const [name, content, typeflag] of entries) {
+		if (typeflag === '2') {
+			chunks.push(tarHeader(name, 0, '2'));
+			continue;
+		}
 		if (content === null) {
 			chunks.push(tarHeader(name, 0, '5'));
 			continue;

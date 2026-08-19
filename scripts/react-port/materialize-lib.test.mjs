@@ -150,6 +150,35 @@ describe('archive extraction', () => {
 		assert.equal(extracted.files.size, 1);
 	});
 
+	test('tolerates symlinks outside the pinned scope but rejects them inside it', () => {
+		const identity = fixtureIdentity({ repository: { subdirectory: 'packages/widget' } });
+		const lock = buildUpstreamLock({
+			identity,
+			license: { spdx: 'MIT', evidence: [], notices: [] },
+			treeEntries: fixtureTreeEntries(FIXTURE_SOURCES, 'packages/widget/'),
+			adaptedMappings: [],
+		});
+		const prefix = `mit-widget-${'a'.repeat(40)}/`;
+		const scopedEntries = [...FIXTURE_SOURCES.entries()].map(([relativePath, content]) => [
+			`${prefix}packages/widget/${relativePath}`,
+			content,
+		]);
+		const outside = extractPristineFromArchive(
+			lock,
+			buildTarGz([[`${prefix}docs/link-to-readme`, null, '2'], ...scopedEntries]),
+		);
+		assert.equal(outside.files.size, 3);
+		assert.deepEqual(outside.missing, []);
+		assert.throws(
+			() =>
+				extractPristineFromArchive(
+					lock,
+					buildTarGz([[`${prefix}packages/widget/link`, null, '2'], ...scopedEntries]),
+				),
+			/link/,
+		);
+	});
+
 	test('rejects archives without a single top-level directory', () => {
 		const lock = fixtureLock();
 		const archive = buildTarGz([

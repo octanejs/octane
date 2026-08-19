@@ -263,6 +263,11 @@ export function extractPristineFromArchive(lock, archiveBytes) {
 			const relativePath = relativize(entryPath);
 			return relativePath !== null && wanted.has(relativePath);
 		},
+		// The archive spans the whole repository; entries outside the pinned
+		// scope (including symlinks the hardened parser would reject) are never
+		// extracted, so they must not abort the scoped read. In-scope links
+		// still fail validation, matching the lock builder's symlink rejection.
+		skip: (entryPath) => relativize(entryPath) === null,
 		// The codeload archive spans the whole repository, not only the pinned
 		// subdirectory, so its entry limits are far above the lock's own caps.
 		limits: {

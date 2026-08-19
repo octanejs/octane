@@ -454,7 +454,10 @@ function readPaxSize(value, fallback) {
 	return size;
 }
 
-export function parseTarArchive(bytes, { select = () => false, limits = {} } = {}) {
+export function parseTarArchive(
+	bytes,
+	{ select = () => false, skip = () => false, limits = {} } = {},
+) {
 	if (!Buffer.isBuffer(bytes) && !(bytes instanceof Uint8Array)) {
 		throw new TypeError('Archive bytes must be a Buffer or Uint8Array');
 	}
@@ -517,6 +520,14 @@ export function parseTarArchive(bytes, { select = () => false, limits = {} } = {
 		const type =
 			typeFlag === '' || typeFlag === '0' ? 'file' : typeFlag === '5' ? 'directory' : 'link';
 		const entry = { path: entryPath, type, size };
+		// A caller-skipped entry is excluded before validation so a scoped read
+		// (for example one pinned subdirectory of a whole-repository archive) is
+		// not aborted by unsupported entry types it will never extract.
+		if (skip(entryPath, entry)) {
+			pendingPaxOverrides.clear();
+			offset = dataStart + Math.ceil(size / 512) * 512;
+			continue;
+		}
 		validateArchiveEntries([entry], limits);
 		entries.push(entry);
 		if (type === 'file' && select(entryPath, entry)) {
