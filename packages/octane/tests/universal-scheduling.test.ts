@@ -15,6 +15,7 @@ import {
 	universalTry,
 	universalValue,
 	use,
+	useCallback,
 	useContext,
 	useDeferredValue,
 	useEffect,
@@ -950,6 +951,36 @@ describe('universal transition scheduling', () => {
 		flushAll();
 		expect(values(container)).toEqual({ pending: false, content: 'third' });
 		expect(container.commits).toHaveLength(acceptedCommits);
+		root.unmount();
+	});
+
+	it('keeps callback values isolated from suspended drafts and compares their dependencies', () => {
+		const resource = deferred<string>();
+		const initialResource = fulfilled('initial');
+		const first = () => 'first';
+		const next = () => 'next';
+		const observed: Array<() => string> = [];
+		const Scene = defineUniversalComponent(
+			'object',
+			(props: { callback: () => string; dependency: number; resource: Promise<string> }) => {
+				const callback = useCallback(props.callback, [props.dependency], 'callback');
+				observed.push(callback);
+				return node('content', use(props.resource));
+			},
+		);
+		const { container, root } = objectRoot();
+
+		root.render(Scene, { callback: first, dependency: 0, resource: initialResource });
+		expect(observed.at(-1)).toBe(first);
+		root.render(Scene, { callback: next, dependency: 0, resource: initialResource });
+		expect(observed.at(-1)).toBe(first);
+		root.render(Scene, { callback: next, dependency: -0, resource: resource.promise });
+		expect(observed.at(-1)).toBe(next);
+		expect(values(container)).toEqual({ content: 'initial' });
+
+		root.render(Scene, { callback: next, dependency: 0, resource: initialResource });
+		expect(observed.at(-1)).toBe(first);
+		expect(values(container)).toEqual({ content: 'initial' });
 		root.unmount();
 	});
 

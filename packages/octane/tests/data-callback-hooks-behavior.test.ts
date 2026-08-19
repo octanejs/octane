@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { act, mount } from './_helpers';
 import { OffsetReader, OffsetReaderKeyed } from './_fixtures/data-callback-hooks.tsrx';
+import { loadCompiledFixtureSource } from './_server-fixture';
 
 // Dep-keying a callback changes when its identity moves, never what it computes.
 // These run in BOTH vitest projects, so the dev compile (which never keys) and
@@ -51,5 +52,57 @@ describe.each([
 		await act(() => store.set(30));
 		expect(r.find('#total').textContent).toBe('35');
 		r.unmount();
+	});
+});
+
+describe.each([false, true])('declared data callbacks (inline=%s)', (inlineHookMemo) => {
+	it('preserves a selection while its source and captured member stay equal', () => {
+		const { App } = loadCompiledFixtureSource(
+			`import { useMemo } from 'octane';
+			function useLocalSelector(source, selector) {
+				return useMemo(() => selector(source), [source, selector]);
+			}
+			export function App(props) @{
+				const selected = useLocalSelector(props.source, (s) => ({ total: s.base + props.offset }));
+				props.observe(selected);
+				<p>{String(selected.total)}</p>
+			}`,
+			{
+				id: 'declared-data-callback.tsrx',
+				mode: 'client',
+				compileOptions: {
+					hmr: false,
+					dev: false,
+					inlineHookMemo,
+					dataCallbackHooks: ['useLocalSelector'],
+				},
+			},
+		);
+		let selected!: { total: number };
+		const observe = (value: { total: number }) => {
+			selected = value;
+		};
+		const firstSource = { base: 10 };
+		const root = mount(App, { source: firstSource, offset: 1, tick: 0, observe });
+		const first = selected;
+		expect(root.html()).toBe('<p>11</p>');
+
+		root.update(App, { source: firstSource, offset: 1, tick: 1, observe });
+		expect(selected).toBe(first);
+		expect(root.html()).toBe('<p>11</p>');
+
+		const secondSource = { base: 20 };
+		root.update(App, { source: secondSource, offset: 1, tick: 1, observe });
+		const second = selected;
+		expect(second).not.toBe(first);
+		expect(root.html()).toBe('<p>21</p>');
+
+		root.update(App, { source: secondSource, offset: 5, tick: 1, observe });
+		const third = selected;
+		expect(third).not.toBe(second);
+		expect(root.html()).toBe('<p>25</p>');
+		root.update(App, { source: secondSource, offset: 5, tick: 2, observe });
+		expect(selected).toBe(third);
+		root.unmount();
 	});
 });

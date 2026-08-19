@@ -35,7 +35,7 @@ const sources = collectCompilerFiles().map((path) => ({
 }));
 
 describe('compiler AST emit architecture', () => {
-	it('keeps final JavaScript printing at the two owning emit boundaries', () => {
+	it('keeps final Program printing at the owning emit boundaries', () => {
 		const printSites: string[] = [];
 		for (const { code, path } of sources) {
 			for (const _match of code.matchAll(/\besrapPrint\s*\(/g)) {
@@ -44,9 +44,13 @@ describe('compiler AST emit architecture', () => {
 		}
 
 		// Volar delegates its one Program print to @tsrx/core's transform() with
-		// boundaryTokens enabled. The main compiler and client-only stub are the
-		// only compiler-owned Program printers.
-		expect(printSites.sort()).toEqual(['client-only-server.js', 'compile.js']);
+		// boundaryTokens enabled. Plain-hook memo lowering owns a TS-preserving
+		// whole-Program print; its surgical fallback never prints fragments.
+		expect(printSites.sort()).toEqual([
+			'client-only-server.js',
+			'compile.js',
+			'plain-hook-memo.js',
+		]);
 	});
 
 	it('only parses authored module inputs', () => {

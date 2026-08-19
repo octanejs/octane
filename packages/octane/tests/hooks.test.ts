@@ -12,6 +12,8 @@ import {
 	StableResultLookalikes,
 	CustomSelectorCallback,
 	CbTest,
+	ForwardedCallbackPair,
+	CallbackRenderPass,
 	RefTest,
 	EffectMount,
 	EffectDeps,
@@ -133,6 +135,78 @@ describe('useCallback', () => {
 		r.update(CbTest, { label: 'bye' });
 		expect(r.find('span').textContent).toBe('bye');
 		r.unmount();
+	});
+
+	it('preserves each custom-hook callback value without invoking it while comparing dependencies', () => {
+		const first = vi.fn(() => 'first');
+		const second = vi.fn(() => 'second');
+		const nextFirst = vi.fn(() => 'next-first');
+		const nextSecond = vi.fn(() => 'next-second');
+		const observed: Array<[() => string, () => string]> = [];
+		const observe = (left: () => string, right: () => string) => {
+			observed.push([left, right]);
+		};
+		const root = mount(ForwardedCallbackPair, {
+			first,
+			second,
+			dependencies: [NaN, 0],
+			observe,
+			label: 'initial',
+		});
+		expect(observed.at(-1)).toEqual([first, second]);
+		expect(first).not.toHaveBeenCalled();
+		expect(second).not.toHaveBeenCalled();
+
+		root.update(ForwardedCallbackPair, {
+			first: nextFirst,
+			second: nextSecond,
+			dependencies: [NaN, 0],
+			observe,
+			label: 'same',
+		});
+		expect(root.find('span').textContent).toBe('same');
+		expect(observed.at(-1)).toEqual([first, second]);
+		expect(nextFirst).not.toHaveBeenCalled();
+		expect(nextSecond).not.toHaveBeenCalled();
+
+		root.update(ForwardedCallbackPair, {
+			first: nextFirst,
+			second: nextSecond,
+			dependencies: [NaN, -0],
+			observe,
+			label: 'changed',
+		});
+		expect(observed.at(-1)).toEqual([nextFirst, nextSecond]);
+		expect(observed.at(-1)?.[0]()).toBe('next-first');
+		expect(observed.at(-1)?.[1]()).toBe('next-second');
+
+		root.update(ForwardedCallbackPair, {
+			first,
+			second,
+			dependencies: null,
+			observe,
+			label: 'always',
+		});
+		expect(observed.at(-1)).toEqual([first, second]);
+		root.update(ForwardedCallbackPair, {
+			first: nextFirst,
+			second: nextSecond,
+			dependencies: null,
+			observe,
+			label: 'always-again',
+		});
+		expect(observed.at(-1)).toEqual([nextFirst, nextSecond]);
+		root.unmount();
+	});
+
+	it('keeps a custom-hook callback across a render-phase state retry', () => {
+		const observed: Array<() => number> = [];
+		const root = mount(CallbackRenderPass, {
+			observe: (callback: () => number) => observed.push(callback),
+		});
+		expect(root.find('span').textContent).toBe('step=1 callback=0');
+		expect(observed.at(-1)).toBe(observed[0]);
+		root.unmount();
 	});
 });
 

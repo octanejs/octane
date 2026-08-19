@@ -1366,13 +1366,17 @@ function cloneDependency(node) {
 	return { ...node };
 }
 
-/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string }} options */
+/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, inferDependencies?: boolean }} options */
 function analyzeInternal(ast, options) {
 	const onlyImported = options.onlyImported === true;
 	const hookRuntimeModules = new Set(['octane', ...(options.hookRuntimeModules || [])]);
 	const analysis = buildScopes(ast, onlyImported, hookRuntimeModules);
-	markDependencyInvariantBindings(analysis);
 	const inferred = new Map();
+	// A hand-slotted module owns its authored dependency ABI. The production
+	// memo-only pass still needs lexical import provenance, but must not infer
+	// omitted lists or reject source the manual-slot path previously accepted.
+	if (options.inferDependencies === false) return { analysis, inferred };
+	markDependencyInvariantBindings(analysis);
 
 	for (const candidate of analysis.candidates) {
 		const rawCallback = candidate.call.arguments[candidate.config.callback];
@@ -1501,7 +1505,7 @@ function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps) {
  * keyed by the rebuilt calls. Dependency arrays are NOT inserted — that pass
  * edits source text from the inference results instead of reprinting the tree.
  */
-/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string }} [options] */
+/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, inferDependencies?: boolean }} [options] */
 export function annotateHookCalls(ast, options = {}) {
 	const { analysis, inferred } = analyzeInternal(ast, options);
 	return rebuildWithHookMetadata(ast, analysis, inferred, false);
