@@ -170,7 +170,9 @@ export function upstreamLockFingerprint(lock) {
 		schemaVersion: lock.schemaVersion,
 		identity: lock.identity,
 		license: lock.license,
-		scopes: lock.scopes ?? [],
+		// An empty optional field must not enter the fingerprint input: locks
+		// written before the field existed would otherwise stop validating.
+		...(lock.scopes?.length ? { scopes: lock.scopes } : {}),
 		adaptedMappings: lock.adaptedMappings ?? [],
 		adaptedRewrites: lock.adaptedRewrites ?? [],
 		files: lock.files,

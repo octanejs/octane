@@ -123,6 +123,24 @@ describe('lock construction and validation', () => {
 		);
 	});
 
+	test('locks written before optional fields existed keep validating', async () => {
+		const { fingerprint } = await import('./report-lib.mjs');
+		const lock = structuredClone(fixtureLock());
+		delete lock.scopes;
+		// A lock from before the scopes field stored a fingerprint over exactly
+		// this input shape; an empty or absent optional field must reproduce it.
+		const legacyFingerprint = fingerprint({
+			schemaVersion: lock.schemaVersion,
+			identity: lock.identity,
+			license: lock.license,
+			adaptedMappings: lock.adaptedMappings,
+			adaptedRewrites: lock.adaptedRewrites,
+			files: lock.files,
+		});
+		assert.equal(lock.fingerprint, legacyFingerprint);
+		assert.equal(validateUpstreamLock(lock).fingerprint, legacyFingerprint);
+	});
+
 	test('rejects a tampered fingerprint and adapted targets outside tests/upstream', () => {
 		const lock = fixtureLock();
 		const tampered = structuredClone(lock);
