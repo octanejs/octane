@@ -32,6 +32,10 @@ jobs:
         github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.event == 'push'
       )
+    # Keep this job on a GitHub-hosted runner: npm trusted publishing only
+    # accepts OIDC tokens whose `runner_environment` is `github-hosted`, so
+    # provenance (and therefore `changeset:publish`) fails on self-hosted
+    # runners such as Blacksmith.
     runs-on: ubuntu-latest
     permissions:
       actions: read

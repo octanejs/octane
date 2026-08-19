@@ -19,7 +19,7 @@ jobs:
     if: >-
       (github.event_name == 'issue_comment' && github.event.issue.pull_request) ||
       github.event_name == 'workflow_run'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       issues: read
       pull-requests: write
