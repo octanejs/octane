@@ -7,7 +7,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
-import { verifyTanstackStoreUpstream } from '../../packages/tanstack-store/scripts/verify-upstream.mjs';
+import { verifyMaterializedUpstreamEvidence } from './materialized-upstream-lib.mjs';
 
 const packageRoot = resolve(
 	dirname(fileURLToPath(import.meta.url)),
@@ -42,7 +42,7 @@ export function runPristineUpstreamSuite({
 	repoRoot = resolve(packageRoot, '../..'),
 	reportPath = join(tmpdir(), `octane-tanstack-store-pristine-${process.pid}.json`),
 } = {}) {
-	verifyTanstackStoreUpstream(packageRoot);
+	verifyMaterializedUpstreamEvidence(resolve(packageRoot, '../..'), 'packages/tanstack-store');
 	const runRoot = mkdtempSync(join(packageRoot, '.pristine-upstream-'));
 	try {
 		cpSync(join(upstreamRoot, 'src'), join(runRoot, 'src'), { recursive: true });
