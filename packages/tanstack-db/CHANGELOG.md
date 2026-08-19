@@ -1,5 +1,14 @@
 # @octanejs/tanstack-db
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [489a886]
+- Updated dependencies [922b2d4]
+- Updated dependencies [814a3c1]
+  - octane@0.1.41
+
 ## 0.0.3
 
 ### Patch Changes

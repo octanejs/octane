@@ -1,5 +1,15 @@
 # @octanejs/vaul
 
+## 0.0.7
+
+### Patch Changes
+
+- Updated dependencies [489a886]
+- Updated dependencies [922b2d4]
+- Updated dependencies [814a3c1]
+  - octane@0.1.41
+  - @octanejs/radix@0.1.40
+
 ## 0.0.6
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @octanejs/three
 
+## 0.1.34
+
+### Patch Changes
+
+- Updated dependencies [489a886]
+- Updated dependencies [922b2d4]
+- Updated dependencies [814a3c1]
+  - octane@0.1.41
+
 ## 0.1.33
 
 ### Patch Changes
