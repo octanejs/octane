@@ -165,7 +165,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			true,
 		);
 
-		expect(plan.requiredSkills).toContain('react-library-port');
+		expect(plan.requiredSkills).toContain('octane-react-library-port');
 		expect(plan.gates.parity.join('\n')).toContain('packages/<name>/UPSTREAM.md');
 		expect(plan.gates.parity.join('\n')).toContain('divergence');
 		expect(plan.gates.parity.join('\n')).toContain("pinned release's own suite");
@@ -175,7 +175,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			true,
 		);
 		expect(applicationPlan.gates.parity).toBeUndefined();
-		expect(applicationPlan.requiredSkills).not.toContain('react-library-port');
+		expect(applicationPlan.requiredSkills).not.toContain('octane-react-library-port');
 	});
 
 	it('blocks framework-core plans when maintainer tools are unavailable', () => {
@@ -283,6 +283,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			.map((entry) => entry.name)
 			.sort();
 
+		expect(REPO_SKILLS['react-library-port']).toBe('.rulesync/skills/react-library-port/SKILL.md');
 		expect(Object.keys(REPO_SKILLS).sort()).toEqual(onDisk);
 
 		for (const file of Object.values(REPO_SKILLS)) {

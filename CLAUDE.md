@@ -33,7 +33,9 @@ trigger first arises, even if it is a later step you chose:
 - `octane-core-extend`: before editing `packages/octane/src`.
 - `performance-audit`: a change that can move render, SSR, hydration, compiler
   output, or bundle cost.
-- `react-library-port`: a new or existing `@octanejs/*` binding.
+- `octane-react-library-port`: a new or existing `@octanejs/*` binding.
+- `react-library-port`: legacy compatibility trigger; immediately follow
+  `octane-react-library-port`.
 - `authoring-tsrx`: writing a new `.tsrx` file.
 - `triage`: the owning area is unclear.
 
@@ -136,7 +138,8 @@ scripts. Root config uses `silent: true`. While diagnosing, pass
 `--silent=false` for all console output or `--silent=passed-only` for failing
 tests. CLI options override the config.
 
-For binding parity test setup, follow `docs/react-parity-testing.md` and the `react-library-port` skill.
+For binding parity test setup, follow `docs/react-parity-testing.md` and the
+`octane-react-library-port` skill.
 
 Add a changeset for user-facing package changes; stay on the `patch` track while
 Octane is 0.x. Runtime, compiler, scheduler, reconciler, SSR/hydration, and build
