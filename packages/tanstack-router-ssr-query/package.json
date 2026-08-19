@@ -1,7 +1,7 @@
 {
   "name": "@octanejs/tanstack-router-ssr-query",
   "version": "0.0.30",
-  "description": "Octane port of @tanstack/react-router-ssr-query — TanStack Router ⇄ Query SSR integration.",
+  "description": "Octane port of @tanstack/react-router-ssr-query \u2014 TanStack Router \u21c4 Query SSR integration.",
   "type": "module",
   "main": "src/index.tsrx",
   "types": "src/index.tsrx.d.ts",
@@ -58,7 +58,8 @@
   "license": "MIT",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "author": {
     "name": "Dominic Gannaway",
