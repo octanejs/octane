@@ -98,7 +98,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "a433466f9292e203c7869298df0ef13260a8bc1edb07e7cf2bc92e0e559de268"
+          "sha256": "8b2667a6309a69c03506ddeb1b4594f49fc655a69e8dfda75fe7123314328322"
         }
       ]
     },
