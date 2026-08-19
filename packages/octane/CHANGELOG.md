@@ -1,5 +1,17 @@
 # octane
 
+## 0.1.41
+
+### Patch Changes
+
+- 489a886: Remove memo factory and dependency-array allocations from more production
+  client cache hits, including nested expressions, returned JSX, custom hooks,
+  plain TypeScript modules, and explicit hook slots. Preserve factory scope,
+  declaration timing, callback identity, and held-transition rollback/promotion,
+  and avoid the extra `useCallback` wrapper closure in every runtime.
+- 922b2d4: Avoid redundant external-store snapshot checks when an urgent DOM render is already queued. Keep universal-renderer subscriptions connected across snapshot and getter changes while preserving committed selectors, cleanup, and error handling. Avoid quadratic projection work for universal state-update queues that end in a replacement value.
+- 814a3c1: Recognize unshadowed String conversions as template text and add an opt-in Node-only TypeScript project adapter for string-child inference. Keep conversion calls intact, reject stale source facts, omit uncertain type proofs, and share the same text classification across client compilation, SSR, and hydration. Publish declarations for the compiler and adapter APIs.
+
 ## 0.1.40
 
 ### Patch Changes
