@@ -1,59 +1,134 @@
 # The inline hook-memo tier (de-callbacked useMemo/useCallback + parallel-use)
 
-Production client compiles lower the hook memo tier from runtime-callback form
-to inline caches, eliminating the per-render allocations the runtime form
-carries (the factory closure and the deps array, allocated on every render even
-when the dependency compare hits). Dev/HMR/profile compiles, server output, and
-universal-renderer units keep the runtime-callback form; the `octane-prod`
-vitest project is the coverage for the inline branch. `inlineHookMemo: false`
-is a diagnostic escape hatch (like `autoMemo: false`) for one-line bisection.
+Production client compiles lower eligible memo hooks from runtime-callback form
+to compiler-owned cache operations. A dependency hit evaluates neither the
+`useMemo` factory nor a dependency-array literal; `useCallback` creates its
+retained function only on a miss. This applies to `.tsrx`, returned JSX, and
+eligible plain `.ts`/`.js` hook modules. Dev/HMR/profile compiles, server output,
+and universal-renderer units keep their runtime hook form. `inlineHookMemo:
+false` is a diagnostic escape hatch (like `autoMemo: false`) for one-line
+bisection. The public hook API and explicit dependency semantics do not change.
 
 ## Tier A — authored and auto-generated useMemo/useCallback
 
-`const x = useMemo(fn, deps)` / `const x = useCallback(fn, deps)` declarations
-in proven render-scope bodies (the `localHookSlots` numeric-slot proof) become
-inline regions over a per-body flat cell array stored as a non-index property
+Memo calls in proven render-scope bodies (the `localHookSlots` numeric-slot
+proof) become inline regions over a per-body flat cell array stored as a non-index property
 on `__s.slots` (`_k$N` — same trick as autoMemo's `_m$N`; named properties
 leave the slots array's packed elements kind alone). Layout per site:
 `[initFlag, dep0..depK-1, value]`; the array is pre-sized and `.fill`ed so
-conditional sites can't punch elements-kind holes.
+conditional sites can't punch elements-kind holes. Expression bodies and
+single-return factories also lower in nested expressions, destructuring and
+multi-declarator initializers, short-circuit branches, and value returns.
 
 ```js
-let filtered;
-{
-  const __hkd0 = items, __hkd1 = q;
-  if (__hk[0] !== true || !Object.is(__hk[1], __hkd0) || !Object.is(__hk[2], __hkd1)) {
-    __hk[3] = items.filter((x) => x.includes(q));
-    __hk[1] = __hkd0; __hk[2] = __hkd1; __hk[0] = true;
-  }
-  filtered = __hk[3];
-}
+let d0, d1;
+const filtered =
+	((d0 = items),
+	(d1 = q),
+	cache[0] !== true || !memoEqual(cache[1], d0) || !memoEqual(cache[2], d1)
+		? publish2(
+				cache,
+				0,
+				items.filter((x) => x.includes(q)),
+				d0,
+				d1,
+			)
+		: cache[3]);
 ```
+
+The names above are illustrative. The compiler imports collision-free private
+helpers from `octane/internal/client`; `memoEqual` uses the runtime's `Object.is`
+intrinsic, so an authored binding named `Object` cannot change equality.
+Fixed-arity publishers for zero through four dependencies also avoid creating a
+rest array on an ordinary miss. Larger flat sites use the variadic cold path.
 
 Contract notes:
 
-- **Immediate publish, not autoMemo's transactional copy-on-write.** The
+- **Immediate publish, not autoMemo's render-end copy-on-write.** The
   runtime hooks map these regions replace publishes mid-render, and values must
   survive a later suspension in the same body — a user-authored
   `useMemo(() => fetch(id), [id])` keeps its promise identity across replay
-  attempts. Publish order preserves the throw contract: value first, dep cells
-  + init flag after, so a throwing factory leaves the previous entry fully
-  usable.
+  attempts. A throwing factory leaves the previous entry fully usable.
+- **Held transitions own both versions.** During an active transition attempt,
+  the miss-side publisher records the old and new complete site ranges in the
+  same two-way journal as ordinary hook-map memos. The held screen sees its old
+  promise/callback identities; promotion restores the attempted values; an
+  urgent supersession of the first hold does not adopt them. Ordinary hits allocate no history. Compiler-owned
+  lifetime-invariant callbacks use the same rule with a one-cell range.
 - **Object.is compares** — byte-for-byte React/`depsChanged` semantics (NaN,
   ±0) in both compile modes.
-- **useCallback allocates the closure only on a dependency miss** (and block
-  bodies inline through a result local + labeled break so early returns
-  survive).
+- **Safe block factories** inline through a separate result local and labeled
+  break. The original declaration and binding kind remain intact, including
+  its temporal dead zone. Anonymous function/class results and dependencies do
+  not acquire a generated temporary's inferred `.name`.
 - **Explicit `null` deps** = recompute every render → evaluated inline with no
   cache at all.
 - Numeric-slot authored memos are unaddressable by the parallel-use warm system
   (warm caches key by Symbols), so the inline regions' lack of
   recordRealWarmMemo/adoptWarmValue interaction is observably equivalent.
-- Kept on the runtime path: dev/HMR/profile, server, universal units,
-  custom-hook-context bodies, non-declaration positions, multi-declarator or
-  destructured declarations, non-literal-array deps, positional-deps factories,
-  async/generator factories, factories containing hook-shaped calls, and block
-  bodies with own-scope `var`/function declarations.
+- Explicit third slots never use a private per-site flat cache: two authored
+  calls may intentionally share that slot. They use the path-aware tier below.
+
+## Tier A2 — callable helpers, custom hooks, and explicit slots
+
+These sites must keep their ordinary `scope.hooks` entry because their effective
+identity includes the caller's `withSlot` path. After normal slot assignment,
+the compiler splits lookup from computation without allocating a wrapper:
+
+```js
+let dependency, slot, entry;
+return (
+	(dependency = value),
+	(slot = memoSlot(rawSlot, 'useMemo')),
+	(entry = memoTake1(slot, dependency)),
+	entry === null ? memoPublish(slot, value + 1, dependency) : entry.value
+);
+```
+
+`memoTake0…4` return an entry or `null`, not an arbitrary-value sentinel. Cached
+`undefined`, `null`, and even the parallel-use sentinel remain valid values.
+The raw slot resolves exactly once; warm adoption, warm-episode bookkeeping,
+immediate publication, and held-transition ownership match runtime `useMemo`.
+Dependency expressions run once, left to right, before the authored slot
+expression. Explicit `null` uses `memoPublishAlways`, preserving every-render
+recomputation and entry sharing.
+
+The shared AST-only lowering covers expression positions and direct
+declaration/return positions for multi-statement factories. Plain-module
+production transforms use one TypeScript-preserving Program print and return a
+real source map. Manually slotted modules get memo-only lowering: no new slots,
+inferred dependencies, or custom-hook wrappers. Modules with imported `use()`
+or unsupported specialization/printing shapes retain the existing surgical
+slotting path. `octane-no-slot` remains a hard opt-out.
+
+Both authored tiers require a known literal dependency array (no spreads or
+holes), or explicit `null`. `useMemo` requires a synchronous, zero-parameter
+arrow whose invocation scope can be removed. Ordinary functions retain their
+own `this`, `arguments`, `new.target`, and self-name scope. Positional factories,
+async/generator factories, hook-containing factories, direct eval, opaque
+directives, own-scope `var`/function declarations, and block factories that
+cannot be placed safely at a statement boundary keep the runtime path. The
+path-aware tier currently supports up to four dependencies; flat sites have no
+such arity limit. `useCallback` does not inline its returned function's body.
+Any direct eval in a module disables this optimization for that module, since
+even a sibling eval can observe a newly imported helper binding. Opaque
+execution-directive functions retain their whole nested subtree.
+
+The client, server, and universal runtime fallbacks also cache a callback value
+directly instead of allocating an extra `() => callback` wrapper. Server and
+universal compilers do not emit the new client-only cache ABI.
+
+### Existing continuing-transition limitation
+
+After promotion suspends on a later dependency, Octane's existing transition
+machinery keeps memo entries forward so the next promotion can reuse in-flight
+work. An urgent render after that second hold can therefore retain an
+empty-dependency callback first created by the attempted render. This behavior
+also occurs on the ordinary runtime-hook path; the inline tier preserves that
+behavior rather than introducing a different cache view. Fixing it requires
+selecting the committed memo view before the urgent render starts, not merely
+reversing entries when the hold is discarded. That scheduler change is separate
+from closure removal.
 
 ## Tier B — parallel-use creations (Symbol slots stay warm-visible)
 
@@ -65,9 +140,10 @@ take/publish ABI instead:
 ```js
 let __pu$0;
 {
-  const __hkd0 = a, __hkd1 = b;
-  __pu$0 = _$puTake2(_h$0, __hkd0, __hkd1);
-  if (__pu$0 === _$puMiss) __pu$0 = _$puPub(_h$0, make(__hkd0, __hkd1), __hkd0, __hkd1);
+	const __hkd0 = a,
+		__hkd1 = b;
+	__pu$0 = _$puTake2(_h$0, __hkd0, __hkd1);
+	if (__pu$0 === _$puMiss) __pu$0 = _$puPub(_h$0, make(__hkd0, __hkd1), __hkd0, __hkd1);
 }
 ```
 
@@ -123,7 +199,16 @@ universal pipeline keep current behavior.
   path — identical expectations is the semantic-equivalence proof). The chain
   tests fail without Pass A′ (duplicate fetch on replay, refetch on unrelated
   re-render, stale derived promise on input change).
-- `tests/inline-hook-memo-codegen.test.ts` — compile-mode/shape routing and
+- `tests/compiler/inline-hook-memo-codegen.test.ts` — compile-mode/shape routing and
   the no-dead-import property.
+- `tests/transitions.test.ts` — ordinary and invariant callback/promise identity
+  through suspend replay, held-screen rollback, promotion, later suspension,
+  and urgent supersession, including dependency arities zero through five.
+- Plain-module compiler/runtime tests cover manual slots, inferred deps,
+  namespace imports, source maps, declaration timing, and safety fallbacks.
+- [`benchmarks/hook-memo`](../benchmarks/hook-memo/README.md) — production A/B
+  semantic controls, post-tree-shaking function/array creation counters, and
+  code/bundle gzip ratio guards. Counters describe source-level creation
+  events, not exhaustive heap allocation or a measured latency improvement.
 - The `octane-prod` project re-runs the full hook/parallel-use/conformance
   suites against the inline branch.

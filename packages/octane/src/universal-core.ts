@@ -5608,7 +5608,12 @@ export function useEffect(
 	enqueueUniversalEffect('passive', create, deps, slot);
 }
 
-export function useMemo<T>(compute: () => T, deps?: readonly unknown[] | null, slot?: unknown): T {
+function memoHookValue<T>(
+	input: T | (() => T),
+	compute: boolean,
+	deps?: readonly unknown[] | null,
+	slot?: unknown,
+): T {
 	const owner = currentDraftOwner();
 	const resolved = resolveHookSlot(slot);
 	const previous = owner.hooks.get(resolved) as MemoHook<T> | undefined;
@@ -5628,11 +5633,17 @@ export function useMemo<T>(compute: () => T, deps?: readonly unknown[] | null, s
 	const warmed = takeUniversalWarmValue(owner.record.root, resolved, normalized);
 	const value =
 		warmed === NO_WARM_VALUE
-			? (compute as (...args: unknown[]) => T)(...(normalized ?? []))
+			? compute
+				? (input as (...args: unknown[]) => T)(...(normalized ?? []))
+				: (input as T)
 			: (warmed as T);
 	owner.hooks.set(resolved, { kind: 'memo', value, deps: normalized });
 	owner.clonedHooks.add(resolved);
 	return value;
+}
+
+export function useMemo<T>(compute: () => T, deps?: readonly unknown[] | null, slot?: unknown): T {
+	return memoHookValue<T>(compute, true, deps, slot);
 }
 
 export function useCallback<T extends (...args: any[]) => any>(
@@ -5640,7 +5651,7 @@ export function useCallback<T extends (...args: any[]) => any>(
 	deps?: readonly unknown[] | null,
 	slot?: unknown,
 ): T {
-	return useMemo(() => callback, deps, slot);
+	return memoHookValue<T>(callback, false, deps, slot);
 }
 
 export function useRef<T>(initial: T, slot?: unknown): { current: T } {

@@ -233,6 +233,7 @@ internally, get their own baseline and guard namespace.
 | `lynx-table-web` | lynx-table | none (headless Chromium) | Lynx-for-Web wall clock: the same table app for Octane and the vendored ReactLynx / Vue Lynx reference bundles under one byte-identical page driver; host-bound medians, no ratio guards |
 | `lynx-bundle-size` | lynx-bundle-size | none (builds) | semantic-checksummed production Rspeedy artifact bytes for background preview and dual-thread IFR modes; source/build evidence only |
 | `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
+| `hook-memo` | hook-memo | none (Node-only) | production hook-memo compiler on/off, clean semantic controls, deterministic function/array creation events, and compiled/bundled bytes |
 | `compiler-throughput` | compiler-throughput | none (Node-only) | six real production compiler pipelines, cold/warm/incremental transformations, 10/100/1,000 components, and heap diagnostics |
 | `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, and weather-app, normalized minify, raw/gzip/brotli |
 | `bundle-reachability` | bundle-size | none (builds and executes in jsdom) | isolated public feature imports, exact production-bundle behavior, forbidden-module reachability, and committed raw/gzip/brotli budgets |

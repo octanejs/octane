@@ -40,7 +40,8 @@
 // chunks dependencies-first, then installs a SINGLE import map — as a classic
 // (non-module) script it runs before any module load, which is baseline
 // import-map behavior in every supporting browser; no late-map mutation
-// anywhere — wiring bare `octane` / `octane/react` to those blobs and the
+// anywhere — wiring bare `octane`, its compiler-only client ABI, and
+// `octane/react` to those blobs and the
 // react family to esm.sh (react is only fetched if something imports it).
 // User modules keep those specifiers bare; sibling-file imports arrive as
 // `__pg_module:<name>__` tokens the bootstrap swaps for blob URLs.
@@ -66,7 +67,7 @@ export const PLAYGROUND_REACT_VERSION = '19.2.0';
 
 /** Shape of the runtime manifest built by the playgroundRuntime() vite plugin. */
 export interface RuntimeManifest {
-	entries: { octane: string; 'octane/react': string };
+	entries: { octane: string; 'octane/internal/client': string; 'octane/react': string };
 	order: string[];
 	files: Record<string, string>;
 }
@@ -142,6 +143,7 @@ window.addEventListener('message', async (event) => {
 			map.textContent = JSON.stringify({
 				imports: {
 					octane: blobs[entries['octane']],
+					'octane/internal/client': blobs[entries['octane/internal/client']],
 					'octane/react': blobs[entries['octane/react']],
 					react: esm('react@' + REACT_VERSION),
 					'react/jsx-runtime': esm('react@' + REACT_VERSION + '/jsx-runtime'),

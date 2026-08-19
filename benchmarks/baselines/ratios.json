@@ -2525,5 +2525,101 @@
     "reference": "solid",
     "maxRatio": 1.2,
     "note": "Protects the existing mount win: 32-leaf teardown + 1024-leaf mount measured 0.94x solid (1.70 vs 1.80) on 2026-08-09. Octane mounts faster than the fine-grained peers despite marker traffic; a breach means the compiled mount path grew per-node cost."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "eligible_hit_functions",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "All compiler-eligible dependency-hit scenarios must evaluate zero application or Octane-runtime function expressions. Counts are observed after production tree-shaking, not heap-allocation estimates."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "eligible_hit_application_array_literals",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "The eligible hit paths must not recreate authored dependency arrays or replacement application array literals. Per-case counters and clean semantic controls live in the result metadata."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "eligible_hit_arrays",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 1,
+    "note": "Bounds all observed application/runtime array literals, constructors, and rest arrays. The fixture-derived budget permits only the 352 existing custom-hook/JSX caller arrays across 32 renders of each eligible scenario."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "eligible_miss_functions",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 1,
+    "note": "Dependency misses may create the 448 semantically required fresh callbacks (14 callback results times 32 renders), but must not add memo-factory or runtime-wrapper closures."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "declaration_miss_arrays",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "Protects the established flat-cache declaration tier: one-dependency memo/callback misses must not create dependency or publisher rest arrays."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "identifier_deps_hit_runtime_functions",
+    "target": "runtime-form",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "An identifier dependency array deliberately keeps the runtime fallback. Its cache-hit path must not recreate an internal useCallback factory wrapper."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "identifier_deps_miss_runtime_functions",
+    "target": "runtime-form",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "The runtime fallback must not allocate an internal useCallback factory wrapper on dependency misses either."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "null_deps_hit_functions",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 1,
+    "note": "Explicit null runs every render: the fresh returned callback is required, while the useMemo factory closure is avoidable."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "null_deps_hit_arrays",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "Explicit-null inline memo/callback calls have no dependency array and must not introduce a replacement array."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "callback_name_mismatches",
+    "target": "inline",
+    "reference": "one-per-render",
+    "maxRatio": 0,
+    "note": "The clean optimized callbacks must preserve the observable function names of the runtime-form control, including anonymous explicit-null callbacks."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "code_gzip",
+    "target": "inline",
+    "reference": "runtime-form",
+    "maxRatio": 1.4,
+    "note": "Same-input production compiler output-size guard for the closure-removal fixture. Allows the inlined checks' intentional code-size tradeoff without hiding further growth in the full runtime bundle."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "bundle_gzip",
+    "target": "inline",
+    "reference": "runtime-form",
+    "maxRatio": 1.02,
+    "note": "Same-run clean tree-shaken application plus Octane runtime: closure-free lowering must stay within 2% gzip of the runtime-form control. No instrumentation contributes to these bytes."
   }
 ]

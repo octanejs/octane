@@ -30,7 +30,8 @@ describe('inline hook-memo tier — compile-mode and shape routing', () => {
 		// semantics (React parity for NaN/±0).
 		expect(code).not.toMatch(/useMemo\(/);
 		expect(code).not.toMatch(/useCallback\(/);
-		expect(code).toMatch(/Object\.is\(/);
+		expect(code).toMatch(/hookMemoEqual/);
+		expect(code).not.toMatch(/Object\.is\(/);
 	});
 
 	it('keeps the runtime path for shapes the inline tier declines', () => {
@@ -49,6 +50,127 @@ describe('inline hook-memo tier — compile-mode and shape routing', () => {
 		// Deps that aren't a literal array, and factories containing
 		// hook-shaped calls, stay on the runtime hook.
 		expect(code.match(/useMemo\(/g)?.length).toBe(2);
+	});
+
+	it('removes closures from expression, custom-hook return, and explicit-slot sites', () => {
+		const code = compile(
+			`
+				import { useMemo as memoValue, useCallback } from 'octane';
+				const SLOT = Symbol('authored');
+				function identity(value) { return value; }
+				function useReturned(value) { return memoValue(() => value + 1, [value]); }
+				function useBlock(value) {
+					return memoValue(() => { if (value < 0) return 0; const next = value + 1; return next; }, [value]);
+				}
+				export function App({ value }) @{
+					const [first] = memoValue(() => [value], [value]);
+					const callback = identity(useCallback(() => value, [value]));
+					const explicit = memoValue(() => value + 2, [value], SLOT);
+					const returned = useReturned(value);
+					const block = useBlock(value);
+					<p>{String(first + callback() + explicit + returned + block)}</p>
+				}
+			`,
+			'inline-memo-shapes.tsrx',
+			{ ...PROD, autoMemo: false },
+		).code;
+		expect(code).not.toMatch(/\b(?:memoValue|useCallback)\(/);
+		// Render-local sites avoid the hooks map; callable/custom-slot sites
+		// preserve their composable entry while removing the factory closure.
+		expect(code).toMatch(/hookMemoPublish1/);
+		expect(code).toMatch(/memoTake1/);
+		expect(code).toMatch(/memoSlot\(SLOT,/);
+	});
+
+	it('removes memo closures inside returned JSX without changing its callable ABI', () => {
+		const code = compile(
+			`/** @jsxImportSource octane */
+			import * as Octane from 'octane';
+			export function App({ value }) {
+				return <button onClick={Octane.useCallback(() => value, [value])}>
+					{Octane.useMemo(() => value + 1, [value])}
+				</button>;
+			}`,
+			'inline-memo-returned.tsx',
+			{ ...PROD, autoMemo: false },
+		).code;
+		expect(code).not.toMatch(/Octane\.use(?:Memo|Callback)\(/);
+		expect(code).toMatch(/export function App\(/);
+		expect(code).toMatch(/memoTake1/);
+	});
+
+	it('declines factory scopes and unsafe expression hoisting independently', () => {
+		for (const expression of [
+			`useMemo(function named() { return arguments[0]; }, [value])`,
+			`useMemo((dependency) => dependency, [value])`,
+			`useMemo(async () => value, [value])`,
+			`useMemo(() => { var local = value; return local; }, [value])`,
+			`useMemo(() => eval('value'), [value])`,
+			`String(useMemo(() => { const local = value; return local; }, [value]))`,
+		]) {
+			const code = compile(
+				`import { useMemo } from 'octane';
+				export function App({ value }) @{
+					const result = ${expression};
+					<p>{String(result)}</p>
+				}`,
+				'inline-memo-safety.tsrx',
+				{ ...PROD, autoMemo: false },
+			).code;
+			expect(code.match(/\buseMemo\(/g)?.length, expression).toBe(1);
+			expect(code, expression).not.toMatch(/\b(?:memoTake\d|hookMemoPublish\d?)\(/);
+		}
+	});
+
+	it('keeps opaque function subtrees opaque while lowering an ordinary sibling', () => {
+		const code = compile(
+			`import { useMemo } from 'octane';
+			function useOrdinary(value) { return useMemo(() => value, [value]); }
+			export function App({ value }) @{
+				'worklet';
+				function useInner(next) { return useMemo(() => next, [next]); }
+				const result = useMemo(() => value, [value]);
+				<><p>{String(result)}</p><span>tail</span></>
+			}`,
+			'inline-memo-opaque-owner.tsrx',
+			{ ...PROD, autoMemo: false },
+		).code;
+		expect(code.match(/\buseMemo\(/g)?.length).toBe(2);
+		expect(code).toMatch(/memoTake1/);
+	});
+
+	it('keeps the diagnostic off switch on the runtime path', () => {
+		const code = compile(
+			`import { useMemo } from 'octane';
+			function useValue(value) { return useMemo(() => value, [value]); }
+			export function App({ value }) @{
+				const result = useMemo(() => value + 1, [value]);
+				<p>{String(result + useValue(value))}</p>
+			}`,
+			'inline-memo-disabled.tsrx',
+			{ ...PROD, autoMemo: false, inlineHookMemo: false },
+		).code;
+		expect(code.match(/\buseMemo\(/g)?.length).toBe(2);
+		expect(code).not.toMatch(/octane\/internal\/client/);
+	});
+
+	it('does not lend render-local cache bindings to a later class initializer', () => {
+		const code = compile(
+			`import { useMemo } from 'octane';
+			export function App({ value, observe }) @{
+				class Later {
+					field = useMemo(() => value, [value]);
+					useValue(next) { return useMemo(() => next, [next]); }
+				}
+				observe(Later);
+				return null;
+			}`,
+			'inline-memo-class-scope.tsrx',
+			{ ...PROD, autoMemo: false },
+		).code;
+		expect(code.match(/\buseMemo\(/g)?.length).toBe(1);
+		expect(code).toMatch(/memoTake1/);
+		expect(code).not.toMatch(/hookMemoPublish\d?\(/);
 	});
 
 	it('keeps the runtime path in dev/HMR compiles', () => {

@@ -77,6 +77,21 @@ describe('@octanejs/mcp-server helpers', () => {
 			.map((line) => line.trim())
 			.filter((line) => line && line !== 'Available suites:');
 		expect(suites).toEqual(BENCHMARK_SUITES);
+
+		// The public MCP schema must accept every runner suite, not just keep
+		// an exported helper list in sync.
+		const server = createServer({ repoRoot });
+		const client = new Client({ name: 'octane-mcp-test', version: '1.0.0' });
+		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+		try {
+			await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+			const tools = await client.listTools();
+			const benchmark = tools.tools.find((tool) => tool.name === 'octane_benchmark');
+			expect(benchmark?.inputSchema.properties?.benchmark?.enum).toEqual(['all', ...suites]);
+		} finally {
+			await client.close();
+			await server.close();
+		}
 	});
 
 	it('classifies every maintained binding and recommends its test project', () => {

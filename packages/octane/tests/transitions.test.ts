@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { mount, act, createLog } from './_helpers';
 import { flushSync } from '../src/index.js';
 import {
@@ -27,6 +27,10 @@ import {
 	TransitionKeyedEmptyFill,
 	TransitionArrayModeExit,
 	TransitionOutsideBoundary,
+	TransitionAuthoredMemo,
+	TransitionAuthoredMemoStages,
+	TransitionInvariantMemo,
+	TransitionMemoArities,
 } from './_fixtures/transitions.tsrx';
 
 interface Deferred<T> {
@@ -42,6 +46,252 @@ function deferred<T>(): Deferred<T> {
 	});
 	return { promise, resolve, reject };
 }
+
+function fulfilledMemoValue(value: string): Promise<string> {
+	return {
+		status: 'fulfilled',
+		value,
+		then: (resolve: (value: string) => void) => void resolve(value),
+	} as unknown as Promise<string>;
+}
+
+interface MemoObservation {
+	step: number;
+	request: PromiseLike<string>;
+	callback: () => number;
+}
+
+function observeMemos() {
+	const entries: MemoObservation[] = [];
+	return {
+		entries,
+		observe(step: number, request: PromiseLike<string>, callback: () => number) {
+			entries.push({ step, request, callback });
+		},
+	};
+}
+
+describe('memoized values across suspended transitions', () => {
+	let activeMemoRoot: ReturnType<typeof mount> | null = null;
+	afterEach(async () => {
+		activeMemoRoot?.unmount();
+		activeMemoRoot = null;
+		await act(() => {});
+	});
+
+	it('reuses a request and callback created before an initial suspension', async () => {
+		const pending = deferred<string>();
+		const load = vi.fn(() => pending.promise);
+		const observations = observeMemos();
+		const root = mount(TransitionAuthoredMemo, { load, observe: observations.observe });
+		activeMemoRoot = root;
+		expect(root.find('#memo-fallback').textContent).toBe('loading');
+		const first = observations.entries[0];
+		expect(first.request).toBe(pending.promise);
+		expect(first.callback()).toBe(0);
+
+		await act(() => pending.resolve('zero'));
+		expect(root.find('#memo-value').textContent).toBe('zero');
+		expect(observations.entries.at(-1)?.request).toBe(first.request);
+		expect(observations.entries.at(-1)?.callback).toBe(first.callback);
+		expect(load.mock.calls).toEqual([[0]]);
+	});
+
+	it('keeps both committed and pending memo identities while a transition is held', async () => {
+		const pending = deferred<string>();
+		const initial = fulfilledMemoValue('zero');
+		const load = vi.fn((step: number) => (step === 0 ? initial : pending.promise));
+		const observations = observeMemos();
+		const root = mount(TransitionAuthoredMemo, { load, observe: observations.observe });
+		activeMemoRoot = root;
+		const first = observations.entries[0];
+
+		root.click('#memo-next');
+		const attempted = observations.entries.find((entry) => entry.step === 1)!;
+		expect(root.find('#memo-shell').textContent).toBe('shell-0:0');
+		expect(root.find('#memo-value').textContent).toBe('zero');
+		expect(root.findAll('#memo-fallback')).toHaveLength(0);
+		expect(observations.entries.at(-1)?.callback).toBe(first.callback);
+		expect(attempted.request).toBe(pending.promise);
+		expect(attempted.callback()).toBe(1);
+		expect(load.mock.calls).toEqual([[0], [1]]);
+
+		await act(() => pending.resolve('one'));
+		expect(root.find('#memo-shell').textContent).toBe('shell-1:0');
+		expect(root.find('#memo-value').textContent).toBe('one');
+		expect(observations.entries.at(-1)?.request).toBe(attempted.request);
+		expect(observations.entries.at(-1)?.callback).toBe(attempted.callback);
+		expect(load.mock.calls).toEqual([[0], [1]]);
+	});
+
+	it('does not restore an abandoned pending memo over an urgent update', async () => {
+		const pending = deferred<string>();
+		const initial = fulfilledMemoValue('zero');
+		const urgent = fulfilledMemoValue('two');
+		const load = vi.fn((step: number) =>
+			step === 0 ? initial : step === 1 ? pending.promise : urgent,
+		);
+		const observations = observeMemos();
+		const root = mount(TransitionAuthoredMemo, { load, observe: observations.observe });
+		activeMemoRoot = root;
+
+		root.click('#memo-next');
+		expect(root.find('#memo-value').textContent).toBe('zero');
+		root.click('#memo-urgent');
+		const committed = observations.entries.at(-1)!;
+		expect(committed.step).toBe(2);
+		expect(committed.callback()).toBe(2);
+		expect(root.find('#memo-shell').textContent).toBe('shell-2:0');
+		expect(root.find('#memo-value').textContent).toBe('two');
+
+		await act(() => pending.resolve('one'));
+		root.click('#memo-refresh');
+		expect(root.find('#memo-shell').textContent).toBe('shell-2:1');
+		expect(root.find('#memo-value').textContent).toBe('two');
+		expect(observations.entries.at(-1)?.request).toBe(committed.request);
+		expect(observations.entries.at(-1)?.callback).toBe(committed.callback);
+		expect(load.mock.calls).toEqual([[0], [1], [2]]);
+	});
+
+	it('retains already-started requests when promotion suspends on a later dependency', async () => {
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const initialFirst = fulfilledMemoValue('old-first');
+		const initialSecond = fulfilledMemoValue('old-second');
+		const load = vi.fn((step: number, stage: string) => {
+			if (step === 0) return stage === 'first' ? initialFirst : initialSecond;
+			return stage === 'first' ? first.promise : second.promise;
+		});
+		const root = mount(TransitionAuthoredMemoStages, { load });
+		activeMemoRoot = root;
+		expect(root.find('#memo-stages-value').textContent).toBe('old-first/old-second');
+
+		root.click('#memo-stages-next');
+		expect(root.find('#memo-stages-shell').textContent).toBe('shell-0');
+		expect(root.find('#memo-stages-value').textContent).toBe('old-first/old-second');
+		expect(load.mock.calls).toEqual([
+			[0, 'first'],
+			[0, 'second'],
+			[1, 'first'],
+		]);
+
+		await act(() => first.resolve('new-first'));
+		expect(root.find('#memo-stages-shell').textContent).toBe('shell-0');
+		expect(root.find('#memo-stages-value').textContent).toBe('old-first/old-second');
+		expect(load.mock.calls).toEqual([
+			[0, 'first'],
+			[0, 'second'],
+			[1, 'first'],
+			[1, 'second'],
+		]);
+
+		await act(() => second.resolve('new-second'));
+		expect(root.find('#memo-stages-shell').textContent).toBe('shell-1');
+		expect(root.find('#memo-stages-value').textContent).toBe('new-first/new-second');
+		expect(load.mock.calls).toEqual([
+			[0, 'first'],
+			[0, 'second'],
+			[1, 'first'],
+			[1, 'second'],
+		]);
+	});
+
+	it('promotes an invariant callback first reached by the suspended attempt', async () => {
+		const pending = deferred<string>();
+		const observed: Array<{ step: number; callback: () => void }> = [];
+		const root = mount(TransitionInvariantMemo, {
+			promise: pending.promise,
+			observe: (step: number, callback: () => void) => observed.push({ step, callback }),
+		});
+		activeMemoRoot = root;
+		root.click('#memo-invariant-next');
+		const attempted = observed[0].callback;
+		expect(root.find('#memo-invariant-shell').textContent).toBe('shell-0');
+		expect(root.find('#memo-invariant-value').textContent).toBe('zero');
+
+		await act(() => pending.resolve('one'));
+		expect(root.find('#memo-invariant-shell').textContent).toBe('shell-1');
+		expect(root.find('#memo-invariant-value').textContent).toBe('one:0');
+		expect(observed.at(-1)?.callback).toBe(attempted);
+		root.click('#memo-invariant-value');
+		expect(root.find('#memo-invariant-value').textContent).toBe('one:1');
+		expect(observed.at(-1)?.callback).toBe(attempted);
+	});
+
+	it('discards a newly reached invariant callback when an urgent render supersedes its hold', async () => {
+		const pending = deferred<string>();
+		const observed: Array<{ step: number; callback: () => void }> = [];
+		const root = mount(TransitionInvariantMemo, {
+			promise: pending.promise,
+			observe: (step: number, callback: () => void) => observed.push({ step, callback }),
+		});
+		activeMemoRoot = root;
+		root.click('#memo-invariant-next');
+		const attempted = observed[0].callback;
+		root.click('#memo-invariant-urgent');
+		const committed = observed.at(-1)!.callback;
+		expect(committed).not.toBe(attempted);
+		expect(root.find('#memo-invariant-shell').textContent).toBe('shell-2');
+		expect(root.find('#memo-invariant-value').textContent).toBe('urgent:0');
+
+		await act(() => pending.resolve('one'));
+		root.click('#memo-invariant-value');
+		expect(root.find('#memo-invariant-value').textContent).toBe('urgent:1');
+		expect(observed.at(-1)?.callback).toBe(committed);
+	});
+
+	for (const supersede of [false, true]) {
+		it(`preserves memo entries with zero through five dependencies across ${supersede ? 'urgent superseding' : 'promotion'}`, async () => {
+			const pending = deferred<string>();
+			const observed: Array<{
+				step: number;
+				values: Array<{ step: number }>;
+				late: { step: number } | null;
+			}> = [];
+			const root = mount(TransitionMemoArities, {
+				promise: pending.promise,
+				observe: (step: number, values: Array<{ step: number }>, late: { step: number } | null) =>
+					observed.push({ step, values, late }),
+			});
+			activeMemoRoot = root;
+			const initial = observed[0];
+			expect(initial.late).toBeNull();
+			root.click('#memo-arities-next');
+			const attempted = observed.find((entry) => entry.step === 1)!;
+			const held = observed.at(-1)!;
+			expect(root.find('#memo-arities-shell').textContent).toBe('shell-0');
+			expect(root.find('#memo-arities-value').textContent).toBe('zero:0,0,0,0,0,0');
+			for (let index = 0; index < initial.values.length; index++) {
+				expect(held.values[index]).toBe(initial.values[index]);
+				if (index === 0) expect(attempted.values[index]).toBe(initial.values[index]);
+				else expect(attempted.values[index]).not.toBe(initial.values[index]);
+			}
+			expect(held.late).toBeNull();
+			expect(attempted.late?.step).toBe(1);
+
+			if (supersede) root.click('#memo-arities-urgent');
+			await act(() => pending.resolve('one'));
+			const committed = observed.at(-1)!;
+			expect(root.find('#memo-arities-shell').textContent).toBe(supersede ? 'shell-2' : 'shell-1');
+			expect(root.find('#memo-arities-value').textContent).toBe(
+				supersede ? 'urgent:0,2,2,2,2,2' : 'one:0,1,1,1,1,1',
+			);
+			for (let index = 0; index < attempted.values.length; index++) {
+				if (supersede && index !== 0) {
+					expect(committed.values[index]).not.toBe(attempted.values[index]);
+				} else {
+					expect(committed.values[index]).toBe(attempted.values[index]);
+				}
+			}
+			if (supersede) {
+				expect(committed.late).not.toBe(attempted.late);
+				expect(committed.late?.step).toBe(2);
+			} else {
+				expect(committed.late).toBe(attempted.late);
+			}
+		});
+	}
+});
 
 describe('useTransition — basics', () => {
 	it('returns [isPending=false, start]; start runs fn and tags renders as transition', async () => {

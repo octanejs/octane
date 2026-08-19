@@ -49,6 +49,14 @@ import {
 	isInvariantLiteral,
 } from './hook-deps.js';
 import {
+	analyzeInlineMemoCall,
+	hasInlineMemoDirectEval,
+	hasInlineMemoOpaqueDirective,
+	isInlineMemoOwnerSafe,
+	lowerSlotMemoFunctions,
+	withoutInferredMemoName,
+} from './inline-hook-memo.js';
+import {
 	compileUniversal,
 	createLexicalAnalysis,
 	UNIVERSAL_COMPILER_RUNTIME_IMPORTS,
@@ -1003,13 +1011,25 @@ export function rtAlias(name) {
 // aliases imported from its renderer runtime. Ordinary DOM code keeps the
 // historical `_$name` aliases and merged `octane` import.
 function runtimeAliasForContext(ctx, name) {
-	return ctx._universalRuntimeUnit?.generatedRuntimeAliases?.[name] ?? rtAlias(name);
+	return (
+		ctx._universalRuntimeUnit?.generatedRuntimeAliases?.[name] ??
+		ctx.privateRuntimeAliases?.get(name) ??
+		rtAlias(name)
+	);
 }
 
 function requireRuntimeForContext(ctx, name) {
 	const alias = ctx._universalRuntimeUnit?.generatedRuntimeAliases?.[name];
 	if (alias !== undefined) return alias;
 	ctx.runtimeNeeded.add(name);
+	if (HOOK_MEMO_RUNTIME_HELPERS.has(name)) {
+		let local = ctx.privateRuntimeAliases?.get(name);
+		if (local === undefined) {
+			local = allocCompilerName(ctx, rtAlias(name));
+			(ctx.privateRuntimeAliases ??= new Map()).set(name, local);
+		}
+		return local;
+	}
 	return rtAlias(name);
 }
 
@@ -1053,14 +1073,37 @@ function importSpecifierPair(entry) {
 // Existing helpers remain on their historical public request so previously
 // compiled components and authored runtime imports retain their stable shape.
 // New compiler-only helpers use the private, renderer-specific ABI instead.
-const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set(['replaceRef', 'queueOwnRefDetach']);
+const HOOK_MEMO_RUNTIME_HELPERS = new Set([
+	'hookMemoCreate',
+	'hookMemoEqual',
+	'hookMemoPublish',
+	'hookMemoPublish0',
+	'hookMemoPublish1',
+	'hookMemoPublish2',
+	'hookMemoPublish3',
+	'hookMemoPublish4',
+	'hookMemoPublishInvariant',
+	'memoSlot',
+	'memoTake0',
+	'memoTake1',
+	'memoTake2',
+	'memoTake3',
+	'memoTake4',
+	'memoPublish',
+	'memoPublishAlways',
+]);
+const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
+	'replaceRef',
+	'queueOwnRefDetach',
+	...HOOK_MEMO_RUNTIME_HELPERS,
+]);
 const INTERNAL_SERVER_RUNTIME_HELPERS = new Set(['ssrSpreadContent']);
 
 function runtimeImportModuleFor(ctx, fallback, imported, local) {
 	for (const route of ctx.runtimeImportRoutes ?? []) {
 		if (route.locals?.has(local) || route.imported?.has(imported)) return route.module;
 	}
-	if (local === rtAlias(imported)) {
+	if (local === (ctx.privateRuntimeAliases?.get(imported) ?? rtAlias(imported))) {
 		if (fallback === 'octane' && INTERNAL_CLIENT_RUNTIME_HELPERS.has(imported)) {
 			return 'octane/internal/client';
 		}
@@ -1088,7 +1131,9 @@ function buildRuntimeImportNodes(ctx, moduleName, origin) {
 	const specifiers = new Set(ctx.userRuntimeNames);
 	for (const n of ctx.runtimeNeeded) {
 		const alias =
-			n === 'hookSlots' && ctx._hookSlotsHelperName ? ctx._hookSlotsHelperName : rtAlias(n);
+			n === 'hookSlots' && ctx._hookSlotsHelperName
+				? ctx._hookSlotsHelperName
+				: (ctx.privateRuntimeAliases?.get(n) ?? rtAlias(n));
 		specifiers.add(`${n} as ${alias}`);
 	}
 	const grouped = new Map();
@@ -6610,7 +6655,9 @@ function functionExpressionFromDeclaration(declaration, origin = declaration) {
 	expression.generator = !!declaration.generator;
 	if (declaration.returnType !== undefined) expression.returnType = declaration.returnType;
 	if (declaration.predicate !== undefined) expression.predicate = declaration.predicate;
-	return expression;
+	return declaration._octaneInlineMemoOpaqueOwner === true
+		? { ...expression, _octaneInlineMemoOpaqueOwner: true }
+		: expression;
 }
 
 // Split a multi-declarator statement only when it contains a component. Keeping
@@ -8132,9 +8179,16 @@ function compileInternal(
 	// Like `autoMemo: false`, `inlineHookMemo: false` is a diagnostic escape
 	// hatch only: it re-routes useMemo/useCallback and parallel-use creations
 	// back through the runtime-callback form so a miscompare can be bisected
-	// inline-cache-vs-elsewhere in one line.
+	// inline-cache-vs-elsewhere in one line. Direct eval can observe new
+	// module-level helper imports from a sibling function, so the whole module
+	// retains the runtime form in that rare case. Escaped identifiers also pass
+	// the cheap source gate before the exact AST check.
 	const inlineHookMemoEnabled =
-		options?.inlineHookMemo !== false && !hmrEnabled && !devEnabled && !profileEnabled;
+		options?.inlineHookMemo !== false &&
+		!hmrEnabled &&
+		!devEnabled &&
+		!profileEnabled &&
+		!((source.includes('eval') || source.includes('\\u')) && hasInlineMemoDirectEval(ast));
 	// Same production-only gate as the tiers above, and for the same reason: a
 	// lifted callback has left the component, which dev tooling, HMR boundaries,
 	// and profile attribution all reason about. Runs AFTER dependency inference
@@ -8200,10 +8254,12 @@ function compileInternal(
 		currentAutoCalculatedRenderableRefs: null, // proven non-escaping calculation holes, inherited by lexical child bodies
 		nextAutoMemoCacheId: 0, // unique non-index slots property per compiled render function
 		inlineHookMemo: inlineHookMemoEnabled, // de-callbacked useMemo/useCallback + pu creations
+		hasSlotMemoCandidates: false, // skip the final AST pass when no path-aware site survived
 		_puInlineLowering: false, // true only while a body pipeline ends in inlineHookMemoPass
 		currentHookMemoOffset: 0, // flat hook-memo cell offset for the body being emitted
 		currentHookMemoCacheProperty: null, // per-body `_k$N` slots property for the cell array
-		currentHookMemoNames: null, // lazily allocated { cache, result, label, temps[] } locals
+		currentHookMemoNames: null, // lazily allocated flat-cache and expression-temp locals
+		currentHookMemoOwnerSafe: false, // own scope permits compiler-introduced bindings
 		nextHookMemoCacheId: 0, // unique non-index slots property per compiled render function
 		currentInvariantLocals: null, // Set<string> of component-lifetime-stable local values
 		currentEventInvariantLocals: null, // Set<string> safe to retain in native event slots
@@ -9207,7 +9263,36 @@ function compileInternal(
 		vtHintNodes.push(inheritOriginLoc(b.stmt(b.call(rtAlias('__vtSeen'))), moduleOrigin));
 	}
 
-	// Built after HMR wiring so the import list includes `hmr`/`HMR` when needed.
+	// All remaining authored memo sites have now received their real hook slots.
+	// Lower callable helpers, returned-JSX functions, explicit-slot calls and
+	// statement-safe block factories against that path-aware entry. The marker
+	// is minted only by DOM-client hook slotting, so mixed renderer modules never
+	// accidentally import DOM memo helpers for a universal renderer's scope.
+	let moduleBody = [
+		...vtHintNodes,
+		...delegateNodes,
+		...styleNodes,
+		...templateNodes,
+		...helperNodes,
+		...bodyNodes,
+		...stampNodes,
+		...hmrNodes,
+		...profileNodes,
+	];
+	if (ctx.inlineHookMemo && ctx.hasSlotMemoCandidates) {
+		moduleBody = lowerSlotMemoFunctions(moduleBody, {
+			allocateName: (preferred) => allocCompilerName(ctx, preferred),
+			requireRuntime: (helper) => requireRuntimeForContext(ctx, helper),
+			canonicalHookName: (call) => call._octaneInlineMemoHook ?? null,
+		}).ast;
+		for (const helper of ['useMemo', 'useCallback']) {
+			if (!hasIdentifierReference(moduleBody, runtimeAliasForContext(ctx, helper))) {
+				ctx.runtimeNeeded.delete(helper);
+			}
+		}
+	}
+
+	// Built after every lowering and HMR wiring so all generated imports exist.
 	const runtimeImportNodes = buildRuntimeImportNodes(ctx, 'octane', moduleOrigin);
 	const profileRuntimeImportNodes = buildProfileRuntimeImportNodes(ctx, moduleOrigin);
 
@@ -9217,19 +9302,7 @@ function compileInternal(
 	const program = {
 		type: 'Program',
 		sourceType: 'module',
-		body: [
-			...runtimeImportNodes,
-			...profileRuntimeImportNodes,
-			...vtHintNodes,
-			...delegateNodes,
-			...styleNodes,
-			...templateNodes,
-			...helperNodes,
-			...bodyNodes,
-			...stampNodes,
-			...hmrNodes,
-			...profileNodes,
-		],
+		body: [...runtimeImportNodes, ...profileRuntimeImportNodes, ...moduleBody],
 		metadata: { path: [] },
 		start: ast.start,
 		end: ast.end,
@@ -13102,6 +13175,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	const prevHookMemoOffset = ctx.currentHookMemoOffset;
 	const prevHookMemoCacheProperty = ctx.currentHookMemoCacheProperty;
 	const prevHookMemoNames = ctx.currentHookMemoNames;
+	const prevHookMemoOwnerSafe = ctx.currentHookMemoOwnerSafe;
 	ctx.currentHookMemoOffset = 0;
 	ctx.currentHookMemoCacheProperty = `_k$${ctx.nextHookMemoCacheId++}`;
 	ctx.currentHookMemoNames = null;
@@ -13133,6 +13207,13 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			} else statements.push(child);
 		}
 	}
+	const hookMemoOpaqueOwner =
+		ctx.inlineHookMemo && hasInlineMemoOpaqueDirective({ body: b.block(statements) });
+	ctx.currentHookMemoOwnerSafe =
+		ctx.inlineHookMemo &&
+		options?.localHookSlots === true &&
+		!hookMemoOpaqueOwner &&
+		isInlineMemoOwnerSafe({ body: b.block([...statements, ...jsxNodes]) });
 
 	// Plan + emit JSX. Records any inline-sub-component code that needs to live
 	// INSIDE this function body (so for-of item bodies can capture parent state).
@@ -13260,7 +13341,8 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 
 	// De-callback the hook memo tier (production client compile). Authored and
 	// auto-generated useMemo/useCallback declarations become inline flat-cache
-	// regions (zero allocations on a dependency hit); Pass A parallel-use
+	// regions (zero allocations on a dependency hit); rewriteHookCalls handles
+	// the remaining safe expression positions with the same cache. Pass A parallel-use
 	// creations become closure-free puTake/puPub calls that keep their Symbol
 	// slot entries warm-visible in scope.hooks. Runs BEFORE rewriteHookCalls so
 	// consumed hook calls are never slotted (and add no runtime import); the
@@ -13270,7 +13352,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		workingStatements = inlineHookMemoPass(
 			workingStatements,
 			ctx,
-			options?.localHookSlots === true,
+			options?.localHookSlots === true && ctx.currentHookMemoOwnerSafe,
 		);
 	}
 	ctx._puInlineLowering = prevPuInlineLowering;
@@ -13429,11 +13511,10 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			),
 		);
 	}
-	// Hook-memo cell array (inline useMemo/useCallback regions). Unlike the
-	// autoMemo cache above this is NOT transactional: cells publish immediately
-	// so values — promise identity in particular — survive a mid-body suspension
-	// exactly like the runtime hooks map they replace. Pre-sized + filled so the
-	// array stays packed under conditional sites.
+	// Hook-memo cells publish immediately so promise identity survives ordinary
+	// suspension. Miss-side runtime publication also records the previous/next
+	// site during a held transition. Allocate through the runtime so authored
+	// bindings named Array or undefined cannot change the cache representation.
 	const hookMemoSize = ctx.currentHookMemoOffset;
 	if (hookMemoSize > 0) {
 		const hkName = hookMemoNames(ctx).cache;
@@ -13441,7 +13522,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			inheritOriginLoc(b.let(hkName, slotsMember(ctx.currentHookMemoCacheProperty)), node),
 			inheritOriginLoc(
 				b.if(
-					b.binary('===', b.id(hkName), b.id('undefined')),
+					b.binary('===', b.id(hkName), b.void0),
 					b.stmt(
 						b.assignment(
 							'=',
@@ -13449,14 +13530,23 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 							b.assignment(
 								'=',
 								b.id(hkName),
-								b.call(
-									b.member(b.new('Array', undefined, b.literal(hookMemoSize)), 'fill'),
-									b.id('undefined'),
-								),
+								b.call(requireRuntimeForContext(ctx, 'hookMemoCreate'), b.literal(hookMemoSize)),
 							),
 						),
 					),
 					null,
+				),
+				node,
+			),
+		);
+	}
+	const hookMemoExpressionTemps = ctx.currentHookMemoNames?.expressionTemps;
+	if (hookMemoExpressionTemps?.length > 0) {
+		bodyStatements.push(
+			inheritOriginLoc(
+				b.declaration(
+					'let',
+					hookMemoExpressionTemps.map((temp) => b.declarator(temp, null)),
 				),
 				node,
 			),
@@ -13578,11 +13668,19 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx.currentHookMemoOffset = prevHookMemoOffset;
 	ctx.currentHookMemoCacheProperty = prevHookMemoCacheProperty;
 	ctx.currentHookMemoNames = prevHookMemoNames;
+	ctx.currentHookMemoOwnerSafe = prevHookMemoOwnerSafe;
 	ctx.currentMapTemps = prevMapTemps;
 	// ONE FunctionDeclaration node — the caller prints it (once, with the full
 	// esrap map for top-level components) or embeds it in an enclosing body.
+	const emittedFunction = b.function_declaration(
+		b.id(name, node.id ?? node),
+		fnParams,
+		b.block(bodyStatements),
+	);
 	return inheritOriginLoc(
-		b.function_declaration(b.id(name, node.id ?? node), fnParams, b.block(bodyStatements)),
+		hookMemoOpaqueOwner
+			? { ...emittedFunction, _octaneInlineMemoOpaqueOwner: true }
+			: emittedFunction,
 		node.loc ? node : shellOrigin,
 	);
 }
@@ -15811,9 +15909,10 @@ function markStateGetterUsage(root, ctx) {
 
 // A compiled `@{}` render body always executes inside a runtime-owned Scope, so
 // its direct base-hook sites can use tiny module-local numbers. Do not extend
-// that proof through an arbitrary nested function: render props, callbacks and
-// helpers can execute in a caller's Scope, including alongside code from a
-// different module. Those sites retain globally unique, runtime-ranged Symbols.
+// that proof through an arbitrary nested function or class initializer: render
+// props, callbacks, helpers and later-created instances can execute in a caller's
+// Scope, including alongside code from a different module. Those sites retain
+// globally unique, runtime-ranged Symbols.
 function markHookSlotLocality(root, enabled) {
 	const marks = new WeakMap();
 	const walk = (node, functionDepth) => {
@@ -15829,7 +15928,9 @@ function markHookSlotLocality(root, enabled) {
 			functionDepth +
 			(node.type === 'FunctionDeclaration' ||
 			node.type === 'FunctionExpression' ||
-			node.type === 'ArrowFunctionExpression'
+			node.type === 'ArrowFunctionExpression' ||
+			node.type === 'ClassDeclaration' ||
+			node.type === 'ClassExpression'
 				? 1
 				: 0);
 		for (const key in node) {
@@ -15845,22 +15946,23 @@ function markHookSlotLocality(root, enabled) {
 // Inline hook-memo tier (production client compile — docs/decallback-memo.md)
 // ===========================================================================
 //
-// De-callbacks `const x = useMemo(fn, deps)` / `const x = useCallback(fn,
-// deps)` declarations in proven render-scope bodies: instead of allocating an
+// De-callbacks useMemo/useCallback in proven render-scope bodies: instead of allocating an
 // arrow + a deps array every render and paying a hooks-map lookup, each site
 // becomes an inline region over a per-body flat cell array stored as a
 // non-index property on `__s.slots` (`_k$N`, the same trick as autoMemo's
 // `_m$N` — named properties don't disturb the slots array's packed elements
 // kind). Layout per site: [initFlag, dep0..depK-1, value].
 //
-// Unlike the autoMemo region cache this one publishes IMMEDIATELY (no
-// copy-on-write, no commit swap): the runtime hooks map these regions replace
+// Unlike the autoMemo region cache this one publishes IMMEDIATELY: the runtime
+// hooks map these regions replace
 // also publishes mid-render, and values must survive a later suspension in the
 // same body — a user-authored `useMemo(() => fetch(id), [id])` must keep its
 // promise identity across replay attempts. Publish order preserves the
-// runtime's throw contract: the value cell is written first and the dep cells
-// + init flag only after, so a throwing compute leaves the previous entry
-// fully usable (old deps AND old value).
+// runtime's throw contract: a throwing compute leaves the previous entry fully
+// usable (old deps AND old value). Miss-side private publishers journal complete
+// old/new ranges only during an active held-transition attempt, sharing the
+// hook-map memo rollback/promotion machinery. Arity 0–4 publishers also avoid
+// introducing a rest-array allocation on ordinary misses.
 //
 // Dependency compares are Object.is — byte-for-byte React/`depsChanged`
 // semantics (NaN, ±0) in both compile modes.
@@ -15872,14 +15974,12 @@ function markHookSlotLocality(root, enabled) {
 // handled here — they must stay visible in scope.hooks for warm adoption and
 // get their own closure-free lowering.
 //
-// Kept on the runtime-callback path (correctness first): dev/HMR/profile
-// compiles, server mode, custom-hook-context bodies (no localHookSlots
-// proof), non-declaration positions, multi-declarator/destructured
-// declarations, deps that aren't a literal array (identifier/spread/elision),
-// omitted-deps calls inference declined, positional-deps factories
-// (params.length > 0), async/generator factories, factories containing
-// hook-shaped calls, and block bodies with own-scope `var`/function
-// declarations (their hoisting would leak into the component body).
+// Expression factories use sequence/conditional AST to preserve their exact
+// evaluation position. Multi-statement factories require a safe statement
+// boundary. Callable helpers and explicit slots instead use the shared
+// path-aware post-slot pass in inline-hook-memo.js. Both tiers keep unsafe
+// factory scopes and unknown dependency shapes on the runtime path; neither
+// changes dev/HMR/profile, server, or universal-renderer code generation.
 
 function hookMemoNames(ctx) {
 	let names = ctx.currentHookMemoNames;
@@ -15889,6 +15989,7 @@ function hookMemoNames(ctx) {
 			result: allocCompilerName(ctx, '__hkr'),
 			label: allocCompilerName(ctx, '__hkl'),
 			temps: [],
+			expressionTemps: [],
 		};
 	}
 	return names;
@@ -15902,82 +16003,13 @@ function hookMemoTemp(ctx, index) {
 	return names.temps[index];
 }
 
-// Hook-shaped call anywhere inside (including nested functions) — mirrors the
-// conservative gate of the parallel-use pipeline: a consumed factory must
-// never carry a call whose slot/occurrence bookkeeping belongs to the render
-// pass, and `use[A-Z]` names are reserved for hooks by convention.
-function containsHookShapedCall(root) {
-	let found = false;
-	walk(root);
-	return found;
-
-	function walk(n) {
-		if (found || n == null || typeof n !== 'object') return;
-		if (Array.isArray(n)) {
-			for (const child of n) walk(child);
-			return;
-		}
-		if (n.type === 'CallExpression') {
-			if (
-				typeof n._octaneImportedHook === 'string' ||
-				typeof n._octaneHookRuntimeImportedHook === 'string'
-			) {
-				found = true;
-				return;
-			}
-			const callee = unwrapTsExpr(n.callee);
-			if (
-				callee?.type === 'Identifier' &&
-				(callee.name === 'use' || /^use[A-Z]/.test(callee.name))
-			) {
-				found = true;
-				return;
-			}
-			if (
-				callee?.type === 'MemberExpression' &&
-				!callee.computed &&
-				callee.property?.type === 'Identifier' &&
-				(callee.property.name === 'use' || /^use[A-Z]/.test(callee.property.name))
-			) {
-				found = true;
-				return;
-			}
-		}
-		for (const key in n) {
-			if (key === 'loc' || key === 'start' || key === 'end' || key.startsWith('_octane')) continue;
-			walk(n[key]);
-		}
-	}
-}
-
-// Own-scope hazards for inlining a block body into the component function:
-// `var` hoists out of the inserted block and a FunctionDeclaration hoists
-// within it differently than within its original function scope.
-function blockBodyInlineSafe(body) {
-	let safe = true;
-	walk(body);
-	return safe;
-
-	function walk(n) {
-		if (!safe || n == null || typeof n !== 'object') return;
-		if (Array.isArray(n)) {
-			for (const child of n) walk(child);
-			return;
-		}
-		if (n.type === 'FunctionDeclaration') {
-			safe = false;
-			return;
-		}
-		if (FN_TYPES.has(n.type)) return;
-		if (n.type === 'VariableDeclaration' && n.kind === 'var') {
-			safe = false;
-			return;
-		}
-		for (const key in n) {
-			if (key === 'loc' || key === 'start' || key === 'end' || key.startsWith('_octane')) continue;
-			walk(n[key]);
-		}
-	}
+// Expression-position caches cannot introduce a block-local declaration. Each
+// site owns distinct function-local temps so a nested memo in a dependency
+// expression cannot overwrite its enclosing site's already-evaluated deps.
+function hookMemoExpressionTemp(ctx, preferred) {
+	const name = allocCompilerName(ctx, preferred);
+	hookMemoNames(ctx).expressionTemps.push(name);
+	return name;
 }
 
 // Rewrite the factory block body's OWN-scope `return` statements into
@@ -15993,7 +16025,7 @@ function replaceOwnReturns(node, names) {
 		if (FN_TYPES.has(n.type)) return n;
 		if (n.type === 'ReturnStatement') {
 			return b.block([
-				hkExprStmt(hkAssign(b.id(names.result), n.argument ?? b.id('undefined'))),
+				hkExprStmt(hkAssign(b.id(names.result), withoutInferredMemoName(n.argument ?? b.void0))),
 				{ type: 'BreakStatement', label: b.id(names.label) },
 			]);
 		}
@@ -16018,63 +16050,120 @@ function hkExprStmt(expression) {
 	return b.stmt(expression);
 }
 
-function hkObjectIs(left, right) {
-	return b.call(b.member(b.id('Object'), 'is'), left, right);
+function hkObjectIs(ctx, left, right) {
+	return b.call(requireRuntimeForContext(ctx, 'hookMemoEqual'), left, right);
 }
 
-// `const x = useMemo(fn, deps)` / `useCallback(fn, deps)` with trustworthy
-// hook provenance (same rules as rewriteHookCalls' isBuiltin) at declaration
-// statement position. Returns null for every shape the inline tier declines.
+function hookMemoPublishAlias(ctx, arity) {
+	return requireRuntimeForContext(ctx, arity <= 4 ? `hookMemoPublish${arity}` : 'hookMemoPublish');
+}
+
+// Only absent raw slots can use a private flat cache. An explicit third slot
+// may alias another call or compose with a custom-hook path, so it keeps the
+// path-aware runtime entry even when its closure can still be removed.
+function flatHookMemoOf(call) {
+	if (
+		call?._octaneHookRuntimeImportedHook !== undefined &&
+		call._octaneImportedHook === undefined
+	) {
+		return null;
+	}
+	const entry = analyzeInlineMemoCall(call, {
+		allowMissingSlot: true,
+		allowUnbound: true,
+		maxDeps: Infinity,
+	});
+	if (entry === null || entry.call.arguments.length !== 2) return null;
+	const callee = entry.call.callee;
+	return {
+		...entry,
+		immutableArrayFilter: callee._octaneImmutableArrayFilter ?? null,
+		generatedInvariant:
+			entry.name === 'useCallback' &&
+			callee._octaneGenerated === true &&
+			callee._octaneLifetimeInvariant === true,
+	};
+}
+
 function authoredHookMemoOf(stmt) {
 	if (stmt.type !== 'VariableDeclaration' || stmt.declarations?.length !== 1) return null;
 	const decl = stmt.declarations[0];
 	if (!decl || decl.id?.type !== 'Identifier' || !decl.init) return null;
-	const call = unwrapTsExpr(decl.init);
-	if (call?.type !== 'CallExpression' || call.optional) return null;
-	const callee = call.callee;
-	if (callee?.type !== 'Identifier') return null;
-	const imported = call._octaneImportedHook ?? call._octaneHookRuntimeImportedHook;
-	const name = imported ?? callee.name;
-	if (name !== 'useMemo' && name !== 'useCallback') return null;
-	if (
-		callee._octaneGenerated !== true &&
-		imported === undefined &&
-		call._octaneUnboundCallee !== true
-	) {
-		return null;
+	const entry = flatHookMemoOf(unwrapTsExpr(decl.init));
+	return entry === null ? null : { ...entry, decl };
+}
+
+function hookMemoMissTest(entry, ctx, base, depNames) {
+	const cell = (index) => b.member(b.id(hookMemoNames(ctx).cache), hkNumLit(index), true);
+	let miss = b.binary('!==', cell(base), b.literal(true, 'true'));
+	for (let i = 0; i < depNames.length; i++) {
+		miss = b.logical(
+			'||',
+			miss,
+			b.unary('!', hkObjectIs(ctx, cell(base + 1 + i), b.id(depNames[i]))),
+		);
 	}
-	if (call.arguments.length !== 2) return null;
-	if (call.arguments.some((a) => a.type === 'SpreadElement')) return null;
-	const fn = unwrapTsExpr(call.arguments[0]);
-	if (fn?.type !== 'ArrowFunctionExpression' && fn?.type !== 'FunctionExpression') return null;
-	const depsNode = unwrapTsExpr(call.arguments[1]);
-	let deps = null;
-	if (depsNode?.type === 'ArrayExpression') {
-		const elements = depsNode.elements || [];
-		for (const el of elements) {
-			if (el == null || el.type === 'SpreadElement') return null;
-		}
-		deps = elements;
-	} else if (!(depsNode?.type === 'Literal' && depsNode.value === null)) {
-		return null;
+	if (entry.immutableArrayFilter !== null) {
+		const { receiver, property } = entry.immutableArrayFilter;
+		miss = b.logical(
+			'||',
+			miss,
+			b.unary(
+				'!',
+				b.call(
+					requireRuntimeForContext(ctx, 'compilerCacheImmutableArrayFilter'),
+					b.id(receiver),
+					b.literal(property),
+				),
+			),
+		);
 	}
-	if (name === 'useMemo') {
-		if (fn.async || fn.generator || (fn.params?.length ?? 0) > 0) return null;
-		if (containsHookShapedCall(fn.body)) return null;
-		if (fn.body.type === 'BlockStatement' && !blockBodyInlineSafe(fn.body)) return null;
+	return miss;
+}
+
+// Sequence/conditional expressions keep the authored evaluation position,
+// short-circuiting and declaration TDZ. No IIFE, deps array, or memo factory is
+// evaluated on a hit. The retained useCallback function is created on a miss.
+function buildFlatHookMemoExpression(entry, ctx) {
+	if (entry.expression === null) return null;
+	if (entry.deps === null) return withoutInferredMemoName(entry.expression);
+	const names = hookMemoNames(ctx);
+	const base = ctx.currentHookMemoOffset;
+	const cell = (index) => b.member(b.id(names.cache), hkNumLit(index), true);
+	if (entry.generatedInvariant) {
+		ctx.currentHookMemoOffset = base + 1;
+		return b.logical(
+			'??',
+			cell(base),
+			b.call(
+				requireRuntimeForContext(ctx, 'hookMemoPublishInvariant'),
+				b.id(names.cache),
+				hkNumLit(base),
+				entry.expression,
+			),
+		);
 	}
-	return {
-		name,
-		decl,
-		kind: stmt.kind,
-		fn,
-		deps,
-		immutableArrayFilter: callee._octaneImmutableArrayFilter ?? null,
-		generatedInvariant:
-			name === 'useCallback' &&
-			callee._octaneGenerated === true &&
-			callee._octaneLifetimeInvariant === true,
-	};
+	ctx.currentHookMemoOffset = base + entry.deps.length + 2;
+	const sequence = [];
+	const depNames = entry.deps.map((dependency, index) => {
+		const name = hookMemoExpressionTemp(ctx, `__hkd${index}`);
+		sequence.push(hkAssign(b.id(name), withoutInferredMemoName(dependency)));
+		return name;
+	});
+	sequence.push(
+		b.conditional(
+			hookMemoMissTest(entry, ctx, base, depNames),
+			b.call(
+				hookMemoPublishAlias(ctx, entry.deps.length),
+				b.id(names.cache),
+				hkNumLit(base),
+				entry.expression,
+				...depNames.map((name) => b.id(name)),
+			),
+			cell(base + entry.deps.length + 1),
+		),
+	);
+	return sequence.length === 1 ? sequence[0] : b.sequence(sequence);
 }
 
 // Compute statements writing the site's result into `target` (an expression
@@ -16083,12 +16172,20 @@ function authoredHookMemoOf(stmt) {
 // useCallback caches the factory itself.
 function hookMemoComputeStatements(entry, ctx, target) {
 	const { name, fn } = entry;
-	if (name === 'useCallback') return [hkExprStmt(hkAssign(target, fn))];
-	if (fn.body.type !== 'BlockStatement') return [hkExprStmt(hkAssign(target, fn.body))];
+	if (name === 'useCallback') return [hkExprStmt(hkAssign(target, withoutInferredMemoName(fn)))];
+	if (fn.body.type !== 'BlockStatement')
+		return [hkExprStmt(hkAssign(target, withoutInferredMemoName(fn.body)))];
 	const names = hookMemoNames(ctx);
+	const rewritten = replaceOwnReturns(fn.body, names);
 	return [
 		b.let(names.result, null),
-		b.labeled(names.label, replaceOwnReturns(fn.body, names)),
+		b.labeled(names.label, {
+			...rewritten,
+			// A finally clause can cancel a return with break/continue. Only a
+			// return that actually exits this label may retain its assigned value;
+			// ordinary function fallthrough must still produce undefined.
+			body: [...rewritten.body, hkExprStmt(hkAssign(b.id(names.result), b.void0))],
+		}),
 		hkExprStmt(hkAssign(target, b.id(names.result))),
 	];
 }
@@ -16123,7 +16220,7 @@ function lowerPuMemoDecl(stmt, ctx) {
 		body.push(
 			b.declaration(
 				'const',
-				deps.map((dep, i) => b.declarator(temp(i), dep)),
+				deps.map((dep, i) => b.declarator(temp(i), withoutInferredMemoName(dep))),
 			),
 		);
 	}
@@ -16150,42 +16247,30 @@ function lowerPuMemoDecl(stmt, ctx) {
 function lowerAuthoredHookMemo(stmt, ctx) {
 	const entry = authoredHookMemoOf(stmt);
 	if (entry === null) return null;
-	const { name, decl, kind, fn, deps, generatedInvariant } = entry;
-	// Explicit `null` deps: recompute every render — no cache at all. A
-	// useCallback degenerates to the factory itself; a useMemo evaluates
-	// inline (via the shared block machinery when the body is a block).
+	const { decl, deps } = entry;
+	const declarationWith = (init) => ({
+		...stmt,
+		declarations: [{ ...decl, init }],
+	});
+	if (entry.expression !== null) {
+		return [declarationWith(buildFlatHookMemoExpression(entry, ctx))];
+	}
+	// Multi-statement useMemo factories need a statement region, but the
+	// authored declaration stays after it with its original binding kind.
+	// Explicit null deps recompute every render and need no cache.
 	if (deps === null) {
-		if (name === 'useCallback' || fn.body.type !== 'BlockStatement') {
-			const init = name === 'useCallback' ? fn : fn.body;
-			return [{ ...stmt, declarations: [{ ...decl, init }] }];
-		}
+		const result = b.id(allocCompilerName(ctx, '__hkv'));
 		return [
-			b.let(decl.id, null),
-			b.block([...hookMemoComputeStatements(entry, ctx, { ...decl.id })]),
+			b.let(result, null),
+			b.block(hookMemoComputeStatements(entry, ctx, result)),
+			declarationWith(result),
 		];
 	}
 	const names = hookMemoNames(ctx);
 	const base = ctx.currentHookMemoOffset;
-	if (generatedInvariant) {
-		// A compiler-owned callback whose captures are lifetime-invariant cannot
-		// miss after its first render. Its function value doubles as the init flag,
-		// and publishing it immediately preserves identity across suspension.
-		ctx.currentHookMemoOffset = base + 1;
-		const valueCell = () => b.member(b.id(names.cache), hkNumLit(base), true);
-		return [
-			{
-				...stmt,
-				declarations: [
-					{
-						...decl,
-						init: b.logical('??', valueCell(), b.assignment('=', valueCell(), fn)),
-					},
-				],
-			},
-		];
-	}
 	const k = deps.length;
 	ctx.currentHookMemoOffset = base + k + 2;
+	const result = b.id(allocCompilerName(ctx, '__hkv'));
 	const cellRef = (i) => b.member(b.id(names.cache), hkNumLit(i), true);
 	const valueCell = () => cellRef(base + 1 + k);
 	const body = [];
@@ -16193,41 +16278,36 @@ function lowerAuthoredHookMemo(stmt, ctx) {
 		body.push(
 			b.declaration(
 				'const',
-				deps.map((dep, i) => b.declarator(b.id(hookMemoTemp(ctx, i)), dep)),
-			),
-		);
-	}
-	let missTest = b.binary('!==', cellRef(base), b.literal(true, 'true'));
-	for (let i = 0; i < k; i++) {
-		missTest = b.logical(
-			'||',
-			missTest,
-			b.unary('!', hkObjectIs(cellRef(base + 1 + i), b.id(hookMemoTemp(ctx, i)))),
-		);
-	}
-	if (entry.immutableArrayFilter !== null) {
-		const { receiver, property } = entry.immutableArrayFilter;
-		missTest = b.logical(
-			'||',
-			missTest,
-			b.unary(
-				'!',
-				b.call(
-					requireRuntimeForContext(ctx, 'compilerCacheImmutableArrayFilter'),
-					b.id(receiver),
-					b.literal(property),
+				deps.map((dep, i) =>
+					b.declarator(b.id(hookMemoTemp(ctx, i)), withoutInferredMemoName(dep)),
 				),
 			),
 		);
 	}
-	const missBody = [...hookMemoComputeStatements(entry, ctx, valueCell())];
-	for (let i = 0; i < k; i++) {
-		missBody.push(hkExprStmt(hkAssign(cellRef(base + 1 + i), b.id(hookMemoTemp(ctx, i)))));
-	}
-	missBody.push(hkExprStmt(hkAssign(cellRef(base), b.literal(true, 'true'))));
+	const missTest = hookMemoMissTest(
+		entry,
+		ctx,
+		base,
+		deps.map((_, index) => hookMemoTemp(ctx, index)),
+	);
+	// Keep the authored binding in its TDZ while the factory runs. Publishing
+	// only after a successful compute also leaves the previous entry intact if
+	// the factory throws, and gives held transitions a complete old/new record.
+	const missBody = [
+		...hookMemoComputeStatements(entry, ctx, result),
+		hkExprStmt(
+			b.call(
+				hookMemoPublishAlias(ctx, deps.length),
+				b.id(names.cache),
+				hkNumLit(base),
+				result,
+				...deps.map((_, i) => b.id(hookMemoTemp(ctx, i))),
+			),
+		),
+	];
 	body.push(b.if(missTest, b.block(missBody), null));
-	body.push(hkExprStmt(hkAssign({ ...decl.id }, valueCell())));
-	return [b.let(decl.id, null), b.block(body)];
+	body.push(hkExprStmt(hkAssign(result, valueCell())));
+	return [b.let(result, null), b.block(body), declarationWith(result)];
 }
 
 // The statement walker: recurses into conditional blocks (conditional hooks
@@ -16293,6 +16373,52 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 	};
 	return mapAst(node, rewrite);
 
+	function canLowerClientMemo(call, name) {
+		return (
+			ctx.inlineHookMemo &&
+			ctx.mode !== 'server' &&
+			ctx._universalRuntimeUnit == null &&
+			call._octaneHookRuntimeImportedHook === undefined &&
+			(name === 'useMemo' || name === 'useCallback')
+		);
+	}
+
+	function slotMemoCandidate(call, name) {
+		if (call._octaneInlineMemoHook !== undefined) {
+			if (call._octaneInlineMemoHook !== null) ctx.hasSlotMemoCandidates = true;
+			return call._octaneInlineMemoHook;
+		}
+		if (localSlotMarks.get(call) === true && !ctx.currentHookMemoOwnerSafe) return null;
+		// Slotting a custom hook turns its call into withSlot(...). Preserve the
+		// safety proof from BEFORE that rewrite; otherwise a factory containing a
+		// hook could incorrectly appear hook-free in the final module pass.
+		if (analyzeInlineMemoCall(call, { allowMissingSlot: true, allowUnbound: true }) === null) {
+			return null;
+		}
+		ctx.hasSlotMemoCandidates = true;
+		return name;
+	}
+
+	function lowerLocalMemoExpression(call, name) {
+		if (
+			!canLowerClientMemo(call, name) ||
+			localSlotMarks.get(call) !== true ||
+			!ctx.currentHookMemoOwnerSafe ||
+			ctx.currentHookMemoCacheProperty === null
+		) {
+			return null;
+		}
+		const entry = flatHookMemoOf(call);
+		if (entry === null || entry.expression === null) return null;
+		// Recurse before replacing the outer call: mapAst intentionally does not
+		// descend into a replacement. Nested callback/helper scopes retain their
+		// Symbol slots, while deps in this render scope keep their own sites.
+		const args = call.arguments.map((argument) =>
+			rewriteHookCalls(argument, ctx, componentName, localRoot),
+		);
+		return buildFlatHookMemoExpression(flatHookMemoOf({ ...call, arguments: args }), ctx);
+	}
+
 	function rewriteHookCallNode(n) {
 		// First-class subtemplates have their own compileFunctionBody pass. Leave
 		// their contents untouched here so hook sites are slotted exactly once and
@@ -16344,11 +16470,18 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			const isCustom = !generated && !isBuiltin && /^use[A-Z]/.test(name) && name !== 'useContext';
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isCustom || isServerUse) {
+				if (isBuiltin) {
+					const inline = lowerLocalMemoExpression(n, name);
+					if (inline !== null) return inline;
+				}
 				// Keep a Symbol at custom-hook call boundaries: published bindings split
 				// that trailing value from optional user args and derive manual sub-slots
 				// from it. Proven render-scope base hooks can use the smaller numeric
 				// production ABI; arbitrary callable helpers cannot.
 				const hasSpread = n.arguments.some((arg) => arg.type === 'SpreadElement');
+				const memoRoute = isBuiltin && canLowerClientMemo(n, name);
+				const memoCandidate = memoRoute ? slotMemoCandidate(n, name) : null;
+				const explicitMemoSlot = memoRoute && n.arguments.length === 3 && !hasSpread;
 				const numericSlot =
 					!ctx.hmr &&
 					!ctx.profile &&
@@ -16372,7 +16505,12 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					ctx.userRuntimeNames.add(localName === name ? 'use' : `use as ${localName}`);
 				let symVar = null;
 				let slot;
-				if (numericSlot) {
+				if (explicitMemoSlot) {
+					// The authored third argument is already the raw memo slot. A
+					// fourth compiler slot is ignored by the runtime and would also
+					// hide this site from the path-aware closure-free lowering.
+					slot = null;
+				} else if (numericSlot) {
 					const id = ctx.nextHookSymId++;
 					slot = b.literal(id, String(id));
 				} else {
@@ -16398,7 +16536,10 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				// its own slot, e.g. `useStore(api, useShallow(sel))` or a hook in a deps
 				// array. (Allocating the outer slot first keeps its id stable; nested
 				// inner hooks just take the following ids.)
-				const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName, localRoot));
+				// Once a call is inside a callable/class scope, walking an argument
+				// separately must not re-promote its nested hooks to render-local.
+				const argsLocalRoot = localSlotMarks.get(n) === true;
+				const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName, argsLocalRoot));
 				// NB: base hooks are ALSO `use[A-Z]`, so the wrap is for custom hooks ONLY
 				// (`isCustom && !isBuiltin`) — base hooks keep the plain trailing-slot form.
 				if (isCustom && !isBuiltin) {
@@ -16411,7 +16552,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					const withSlotAlias = requireRuntimeForContext(ctx, 'withSlot');
 					return b.call(withSlotAlias, b.id(symVar), n.callee, ...args, b.id(symVar));
 				}
-				const hookArgs = appendHookSlotArgument(name, args, slot, numericSlot, n);
+				const hookArgs = explicitMemoSlot
+					? args
+					: appendHookSlotArgument(name, args, slot, numericSlot, n);
 				if (isServerUse && n._octaneHydrationSite !== undefined) {
 					hookArgs.push(
 						inheritOriginLoc(
@@ -16422,6 +16565,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				}
 				return {
 					...n,
+					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
 					callee:
 						getterHelper !== null
 							? b.id(runtimeAliasForContext(ctx, getterHelper))
@@ -16449,6 +16593,16 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			const isBuiltin = HOOK_NAMES.has(name);
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isServerUse) {
+				if (isBuiltin) {
+					const inline = lowerLocalMemoExpression(n, name);
+					if (inline !== null) return inline;
+				}
+				const memoRoute = isBuiltin && canLowerClientMemo(n, name);
+				const memoCandidate = memoRoute ? slotMemoCandidate(n, name) : null;
+				const explicitMemoSlot =
+					memoRoute &&
+					n.arguments.length === 3 &&
+					!n.arguments.some((argument) => argument.type === 'SpreadElement');
 				const annotatedOwner = ctx.profile ? ctx.profileOwnerMarks?.get(n) : null;
 				const profileOwner = annotatedOwner?.name || componentName;
 				const getterHelper = stateGetterMarks.get(n) ? STATE_GETTER_HELPERS[name] : null;
@@ -16459,7 +16613,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					localSlotMarks.get(n) === true &&
 					!n.arguments.some((arg) => arg.type === 'SpreadElement');
 				let slot;
-				if (numericSlot) {
+				if (explicitMemoSlot) {
+					slot = null;
+				} else if (numericSlot) {
 					const id = ctx.nextHookSymId++;
 					slot = b.literal(id, String(id));
 				} else {
@@ -16476,12 +16632,17 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 						true,
 					);
 				}
-				const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName, localRoot));
+				const args = n.arguments.map((a) =>
+					rewriteHookCalls(a, ctx, componentName, localSlotMarks.get(n) === true),
+				);
 				return {
 					...n,
+					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
 					callee:
 						getterHelper !== null ? b.id(runtimeAliasForContext(ctx, getterHelper)) : n.callee,
-					arguments: appendHookSlotArgument(name, args, slot, numericSlot, n),
+					arguments: explicitMemoSlot
+						? args
+						: appendHookSlotArgument(name, args, slot, numericSlot, n),
 				};
 			}
 		}
@@ -16518,8 +16679,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				true,
 			);
 			const withSlotAlias = requireRuntimeForContext(ctx, 'withSlot');
-			const object = rewriteHookCalls(n.callee.object, ctx, componentName, localRoot);
-			const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName, localRoot));
+			const argsLocalRoot = localSlotMarks.get(n) === true;
+			const object = rewriteHookCalls(n.callee.object, ctx, componentName, argsLocalRoot);
+			const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName, argsLocalRoot));
 			return b.call(
 				withSlotAlias,
 				b.id(symVar),
@@ -16536,6 +16698,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 // descriptor type identity). No component gate, no signature rewrite to (scope,props).
 function compileReturnJsxFunction(node, ctx, options) {
 	const name = node.id.name;
+	const hookMemoOpaqueOwner = ctx.inlineHookMemo && hasInlineMemoOpaqueDirective(node);
 	recordProfileComponent(ctx, node, name);
 	const scoping = applyCssScoping(node, ctx);
 	node = scoping.node;
@@ -16680,16 +16843,19 @@ function compileReturnJsxFunction(node, ctx, options) {
 	// helper fns (compInlinedSubs — filled by the statement mapping above) are
 	// function DECLARATION nodes embedded at the top of the body, matching the
 	// historical after-the-`{` splice.
+	const emittedFunction = b.function_declaration(
+		node.id,
+		node.params,
+		b.block([
+			...mapTemps.map((temp) => inheritOriginLoc(b.let(temp), node)),
+			...compInlinedSubs,
+			...newStatements,
+		]),
+	);
 	const fn = inheritOriginLoc(
-		b.function_declaration(
-			node.id,
-			node.params,
-			b.block([
-				...mapTemps.map((temp) => inheritOriginLoc(b.let(temp), node)),
-				...compInlinedSubs,
-				...newStatements,
-			]),
-		),
+		hookMemoOpaqueOwner
+			? { ...emittedFunction, _octaneInlineMemoOpaqueOwner: true }
+			: emittedFunction,
 		node,
 	);
 	// M2 AST emit: return the function declaration NODE plus any HMR-rebind /

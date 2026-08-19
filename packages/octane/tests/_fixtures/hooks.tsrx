@@ -108,6 +108,40 @@ export function CbTest(props) @{
 	<span>{props.label as string}</span>
 }
 
+function useForwardedCallback<T extends (...args: any[]) => any>(
+	callback: T,
+	dependencies: unknown[] | null,
+): T {
+	return useCallback(callback, dependencies);
+}
+
+export function ForwardedCallbackPair({
+	first,
+	second,
+	dependencies,
+	observe,
+	label,
+}: {
+	first: () => string;
+	second: () => string;
+	dependencies: unknown[] | null;
+	observe: (first: () => string, second: () => string) => void;
+	label: string;
+}) @{
+	const firstCallback = useForwardedCallback(first, dependencies);
+	const secondCallback = useForwardedCallback(second, dependencies);
+	observe(firstCallback, secondCallback);
+	<span>{label}</span>
+}
+
+export function CallbackRenderPass({ observe }: { observe: (callback: () => number) => void }) @{
+	const [step, setStep] = octaneUseState(0);
+	const callback = useForwardedCallback(() => step, []);
+	observe(callback);
+	if (step === 0) setStep(1);
+	<span>{'step=' + step + ' callback=' + callback()}</span>
+}
+
 // useRef — survives across renders, mutations don't trigger re-render.
 export function RefTest() @{
 	const ref = octaneUseRef(0);

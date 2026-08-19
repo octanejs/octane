@@ -11,7 +11,10 @@ import { compile } from 'octane/compiler';
 // stale closure rather than a loud error, which is why nothing is inferred here
 // and why the transform is inert until something opts in.
 
-const PROD = { hmr: false as const, dev: false };
+// Keep the inferred public hook call visible in this option/inference suite.
+// The runtime suite executes the declared form with inline lowering both on
+// and off; its cache identity and freshness must not depend on this artifact.
+const PROD = { hmr: false as const, dev: false, inlineHookMemo: false };
 const DECLARED = ['@octanejs/tanstack-store#useSelector'];
 
 const SOURCE = `

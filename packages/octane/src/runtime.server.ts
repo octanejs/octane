@@ -5197,9 +5197,9 @@ export const useLayoutEffect = useEffect;
 export const useInsertionEffect = useEffect;
 export function useImperativeHandle(): void {}
 
-export function useMemo<T>(compute: () => T, deps?: readonly unknown[] | null, slot?: symbol): T;
-export function useMemo<T>(
-	compute: () => T,
+function memoHookValue<T>(
+	input: T | (() => T),
+	compute: boolean,
 	depsOrSlot?: readonly unknown[] | null | ServerHookSlot,
 	maybeSlot?: ServerHookSlot,
 ): T {
@@ -5208,18 +5208,27 @@ export function useMemo<T>(
 		maybeSlot ?? (Array.isArray(depsOrSlot) || depsOrSlot === null ? undefined : depsOrSlot);
 	// `null` means recompute every pass. Omitted dependency arrays reach the
 	// runtime as compiler-inferred arrays, preserving Octane's documented API.
-	if (deps === null) return compute();
+	if (deps === null) return compute ? (input as () => T)() : (input as T);
 	const position = hookPosition(slot);
-	if (position === null) return compute();
+	if (position === null) return compute ? (input as () => T)() : (input as T);
 	let rec = position.list[position.index] as MemoHookRec | undefined;
 	if (rec === undefined) {
-		rec = { value: compute(), deps: deps.slice() };
+		rec = { value: compute ? (input as () => T)() : input, deps: deps.slice() };
 		position.list[position.index] = rec;
 	} else if (!serverDepsEqual(rec.deps, deps)) {
-		rec.value = compute();
+		rec.value = compute ? (input as () => T)() : input;
 		rec.deps = deps.slice();
 	}
 	return rec.value as T;
+}
+
+export function useMemo<T>(compute: () => T, deps?: readonly unknown[] | null, slot?: symbol): T;
+export function useMemo<T>(
+	compute: () => T,
+	depsOrSlot?: readonly unknown[] | null | ServerHookSlot,
+	maybeSlot?: ServerHookSlot,
+): T {
+	return memoHookValue<T>(compute, true, depsOrSlot, maybeSlot);
 }
 
 export function useCallback<F>(fn: F, deps?: readonly unknown[] | null, slot?: symbol): F;
@@ -5228,7 +5237,7 @@ export function useCallback<F>(
 	depsOrSlot?: readonly unknown[] | null | ServerHookSlot,
 	maybeSlot?: ServerHookSlot,
 ): F {
-	return (useMemo as any)(() => fn, depsOrSlot, maybeSlot) as F;
+	return memoHookValue<F>(fn, false, depsOrSlot, maybeSlot);
 }
 
 export function useRef<T = undefined>(): { current: T | undefined };
