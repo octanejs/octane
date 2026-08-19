@@ -128,6 +128,28 @@ describe('llms text', () => {
 		}
 	});
 
+	it('publishes core browser requirements in both agent summaries', () => {
+		const browserSupport = docBySlug('browser-support');
+		expect(browserSupport).toMatchObject({
+			title: 'Browser support',
+			source: 'website',
+			url: 'https://octanejs.dev/docs/browser-support',
+		});
+		expect(browserSupport!.sections).toContainEqual(
+			expect.objectContaining({ id: 'required-apis' }),
+		);
+		expect(browserSupport!.markdown).toContain('replaceChildren');
+
+		for (const text of [LLMS_TXT, LLMS_FULL_TXT]) {
+			const browserGuide = text.split('## Browser support\n')[1]?.split('\n## ')[0];
+			expect(browserGuide).toBeDefined();
+			for (const marker of ['/docs/browser-support', 'replaceChildren']) {
+				expect(browserGuide, marker).toContain(marker);
+			}
+		}
+		expect(LLMS_FULL_TXT).toContain(browserSupport!.markdown.trim());
+	});
+
 	it('documents behavior-only ownership in the summary and full website corpus', () => {
 		const ownershipGuide = LLMS_TXT.split(
 			'## Behavior-only roots and external ownership\n',
