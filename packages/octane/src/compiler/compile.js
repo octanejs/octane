@@ -13481,7 +13481,16 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			cssHash,
 		);
 	} else {
-		plan = planJsx(jsxNodes, ctx, name, inlinedSubs, parentNs, cssHash, mountCallbackSinks);
+		plan = planJsx(
+			jsxNodes,
+			ctx,
+			name,
+			inlinedSubs,
+			parentNs,
+			cssHash,
+			mountCallbackSinks,
+			options?.keyedSelection ?? null,
+		);
 	}
 	ctx.currentInvariantLocals = prevInvariantLocals;
 	ctx.currentEventInvariantLocals = prevEventInvariantLocals;
@@ -17422,6 +17431,11 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				const bodyHole = `h${holeProps.length}`;
 				holeProps.push(objectProp(bodyHole, b.id(rec.bodyHelper)));
 				rec.bodyHelper = `props.${bodyHole}`;
+				if (rec.selectionHelper != null) {
+					const selectionHole = `h${holeProps.length}`;
+					holeProps.push(objectProp(selectionHole, b.id(rec.selectionHelper)));
+					rec.selectionHelper = `props.${selectionHole}`;
+				}
 			}
 			if (mapCall) {
 				const methodHole = `h${holeProps.length}`;
@@ -20440,6 +20454,7 @@ function planJsx(
 	parentNs = 'html',
 	cssHash = null,
 	mountCallbackSinks = null,
+	keyedSelection = null,
 ) {
 	// DEV ONLY: per-element source-location map for THIS body (path-key → [line, col]),
 	// populated at the top of emitElementHtml and read in the binding mount loop to emit
@@ -20711,6 +20726,15 @@ function planJsx(
 				}
 				tplNs = resolved === null ? 'html' : resolved;
 				resolvedFrag = tplNs !== 'opaque';
+			}
+		}
+		// Binding planning precedes the final template namespace. An inherited
+		// opaque namespace can now use the same concrete namespace as clone(),
+		// including HTML's faster className property. Preserve explicit foreign
+		// content and leave genuinely opaque/mixed templates destination-aware.
+		if (tplNs !== 'opaque') {
+			for (const binding of elementBindings) {
+				if (binding.ns === 'opaque') binding.ns = tplNs;
 			}
 		}
 		const flag = nsFlag(tplNs);
@@ -21235,6 +21259,24 @@ function planJsx(
 		if (b.deferred) everyRenderLines.push(updateEmit);
 		else updateLines.push(updateEmit);
 	}
+	if (keyedSelection !== null && single && !noTemplate) {
+		// Reuse the ordinary root-class write and its exact bag fields. Updating
+		// only the DOM would leave the normal row diff's previous value stale.
+		const classes = elementBindings.filter(
+			(binding) => binding.kind === 'class' && binding.path.length === 0,
+		);
+		if (
+			classes.length === 1 &&
+			!classes[0].fresh &&
+			!classes[0].mountOnly &&
+			collectFreeIdentifiers(classes[0].expr, [
+				keyedSelection.itemName,
+				keyedSelection.selectedName,
+			]).size === 0
+		) {
+			keyedSelection.update = emitBindingUpdate(classes[0], bag);
+		}
+	}
 
 	// After (forBlock + ifBlock calls run on every render — they reconcile).
 	//
@@ -21343,6 +21385,7 @@ function planJsx(
 			rtAlias(forHelper),
 			fc.keyHelper,
 			fc.bodyHelper,
+			fc.selectionHelper,
 			fc.emptyHelper,
 		]);
 		registerClauseOrigin(ctx, fc.emptyKeyword, [fc.emptyHelper]);
@@ -21367,7 +21410,8 @@ function planJsx(
 			(fc.requiresScope ? 32 : 0) |
 			(fc.keyedSelectionIndex >= 0 ? fc.keyedSelectionIndex << 6 : 0);
 		// Arg layout: forBlock(__s, slot, host, items, keyFn, body, flags?, deps?,
-		// emptyBody?, anchor?, ownEnd?).
+		// emptyBody?, anchor?, ownEnd?, selectionBody?). The final argument is
+		// emitted only for a certified keyed-selection call.
 		// Optional args backfill positionally: `flags`/`deps` placeholders
 		// (`0`/`undefined`) when only `emptyHelper` (`null` when no `@empty`
 		// branch) or the anchor is present, and a `null` empty-body placeholder
@@ -21419,6 +21463,12 @@ function planJsx(
 		// list's trailing boundary. Let forBlock reuse it as its end marker instead
 		// of retaining it beside a newly-created `/for` comment.
 		if (fc.anchorVar) tailArgs.push(b.literal(true));
+		if (fc.selectionHelper != null) {
+			// tailArgs starts at argument 5; preserve the optional positions through
+			// ownEnd before supplying the selection updater as argument 12.
+			while (tailArgs.length < 7) tailArgs.push(undefinedNode());
+			tailArgs.push(helperRefNode(fc.selectionHelper));
+		}
 		if (isMappedList) {
 			const nativeName = allocCompilerName(ctx, '__mapNative');
 			if (fc.autoMemoDeps !== null) {
@@ -25000,6 +25050,7 @@ function hoistBodyHelper(
 	cssHash,
 	envNames,
 	idOrigin = null,
+	keyedSelection = null,
 ) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
 	const ownEnvNames = envNames === null ? null : helperCaptures(ctx, stmts, params);
@@ -25067,7 +25118,14 @@ function hoistBodyHelper(
 	);
 	let helperFn;
 	try {
-		helperFn = compileFunctionBody(fake, ctx, helperName, parentNs, cssHash);
+		helperFn = compileFunctionBody(
+			fake,
+			ctx,
+			helperName,
+			parentNs,
+			cssHash,
+			keyedSelection === null ? null : { keyedSelection },
+		);
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.currentInvariantLocals = prevInvariantLocals;
@@ -25076,6 +25134,35 @@ function hoistBodyHelper(
 	// Module-scope placement: the compiled helper joins the module AST as a
 	// hoisted statement node (M2 AST emit).
 	ctx.hoistedHelpers.push(helperFn);
+	if (keyedSelection?.update != null) {
+		const selectionName = allocCompilerName(ctx, `__select$${ctx.nextHelperId++}`);
+		const origin = keyedSelection.update;
+		const selectionBody = [
+			inheritOriginLoc(
+				b.const(
+					keyedSelection.selectedName,
+					b.member(b.id('__extra'), b.literal(keyedSelection.selectedIndex), true),
+				),
+				origin,
+			),
+			inheritOriginLoc(
+				b.const('_b', b.member(b.member(b.id('__s'), 'slots'), b.literal(0), true)),
+				origin,
+			),
+			keyedSelection.update,
+		];
+		ctx.hoistedHelpers.push(
+			inheritOriginLoc(
+				b.function_declaration(
+					b.id(selectionName, idOrigin ?? fakeOrigin ?? undefined),
+					[...params, b.id('__s'), b.id('__extra')],
+					b.block(selectionBody),
+				),
+				fakeOrigin,
+			),
+		);
+		keyedSelection.helper = selectionName;
+	}
 	return helperName;
 }
 
@@ -26518,18 +26605,6 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			node.emptyKeyword ?? null,
 		);
 	}
-	const itemHelperName = hoistBodyHelper(
-		ctx,
-		inlinedSubs,
-		'__item',
-		itemAllStmts,
-		itemParams,
-		parentNs,
-		cssHash,
-		envNames,
-		directiveKeywordOrigin(ctx, node),
-	);
-
 	// Single-root detection: when the body emits exactly one Element root and
 	// no other JSX siblings (no Fragment, no Component, no top-level if/for/try),
 	// the runtime can skip per-item Comment markers and use the row element
@@ -26601,6 +26676,31 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		!containsRenderCall(subStmts) &&
 		!containsAutoMemoUnsafeStructure(subStmts) &&
 		isHostMountSafeTree(subStmts[0]);
+	// Class-only updates need the stricter host-lifecycle proof as well as the
+	// existing equality proof. The item planner fills this compiler-owned result
+	// only when the root class survives as one ordinary cached binding.
+	const keyedSelection =
+		hostMountSafe && keyedSelectionIndex >= 0 && envNames !== null
+			? {
+					itemName,
+					selectedName: runtimeDepNames[keyedSelectionIndex],
+					selectedIndex: keyedSelectionIndex,
+					update: null,
+					helper: null,
+				}
+			: null;
+	const itemHelperName = hoistBodyHelper(
+		ctx,
+		inlinedSubs,
+		'__item',
+		itemAllStmts,
+		itemParams,
+		parentNs,
+		cssHash,
+		envNames,
+		directiveKeywordOrigin(ctx, node),
+		keyedSelection,
+	);
 
 	const mapCall = node.nativeArrayMap || null;
 	return {
@@ -26631,6 +26731,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		keyHelper,
 		inlineKey: inlineKey ? keyFn : null,
 		bodyHelper: itemHelperName,
+		selectionHelper: keyedSelection?.helper ?? null,
 		hasPerItemEventClosure,
 		pure,
 		singleRoot,

@@ -1040,24 +1040,27 @@ function stagedTransitionValue<T>(slot: TransitionActionSlot<T>): T {
 function stageTransitionValue<T>(
 	slot: TransitionActionSlot<T>,
 	block: Block,
-	operation: (value: T) => T,
+	operation: T | ((value: T) => T),
 	value: T,
 	forceRender = false,
 ): boolean {
 	const batch = transitionActionBatchForUpdate();
 	if (batch === null) return false;
+	// Replacement values need a replay closure only when an Action actually
+	// stages the update. Ordinary useState setters stay allocation-free here.
+	const replay = typeof operation === 'function' ? (operation as (value: T) => T) : () => operation;
 	const current = batch.updates.get(slot) as TransitionActionUpdate<T> | undefined;
 	if (current === undefined) {
 		batch.updates.set(slot, {
 			slot,
 			block,
-			operations: [operation],
+			operations: [replay],
 			baseValue: slot.value,
 			value,
 			forceRender,
 		});
 	} else {
-		current.operations.push(operation);
+		current.operations.push(replay);
 		current.value = value;
 		current.forceRender ||= forceRender;
 	}
@@ -3034,6 +3037,12 @@ interface FocusSelectionSnapshot {
 function activeElementForDocument(doc: Document): Element | null {
 	try {
 		let focused = doc.activeElement;
+		// Unfocused documents usually report body. It can itself host an open
+		// shadow tree, so only skip the descent when that tree has no focus.
+		if (focused === doc.body) {
+			focused = focused?.shadowRoot?.activeElement ?? null;
+			if (focused === null) return null;
+		}
 		while (focused !== null) {
 			if (focused.localName === 'iframe') {
 				let nested: Document | null;
@@ -5679,10 +5688,9 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 			value: initVal,
 			setter: (next) => {
 				const previous = stagedTransitionValue(s!);
-				const operation = typeof next === 'function' ? (next as (p: T) => T) : () => next;
-				const computed = operation(previous);
+				const computed = typeof next === 'function' ? (next as (p: T) => T)(previous) : next;
 				if (Object.is(computed, previous)) return;
-				if (stageTransitionValue(s!, block, operation, computed)) {
+				if (stageTransitionValue(s!, block, next, computed)) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						const update = s!.pendingActionBatch?.updates.get(s!) as
 							TransitionActionUpdate<T> | undefined;
@@ -25536,6 +25544,7 @@ export function keyedForBlock<T>(
 	emptyBody?: ComponentBody | null,
 	anchor?: Node | null,
 	ownEnd?: boolean,
+	selectionBody?: ComponentBody<T, any[]>,
 ): void {
 	const state = parentScope.slots[slotKey] as ForSlot | undefined;
 	if (TRANSITION_JOURNAL !== null) {
@@ -25552,7 +25561,15 @@ export function keyedForBlock<T>(
 		state !== undefined &&
 		activeHydration() === null &&
 		state.cachedDeps !== null &&
-		tryUpdateKeyedSelection(state, items, itemBody, state.cachedDeps, deps, flags >>> 6)
+		tryUpdateKeyedSelection(
+			state,
+			items,
+			itemBody,
+			state.cachedDeps,
+			deps,
+			flags >>> 6,
+			selectionBody,
+		)
 	) {
 		return;
 	}
@@ -25742,6 +25759,7 @@ export function fastKeyedForBlock<T>(
 	emptyBody?: ComponentBody | null,
 	anchor?: Node | null,
 	ownEnd?: boolean,
+	selectionBody?: ComponentBody<T, any[]>,
 ): void {
 	const state = parentScope.slots[slotKey] as ForSlot | undefined;
 	const parent = fastHostListParent(state, items, flags);
@@ -25758,6 +25776,7 @@ export function fastKeyedForBlock<T>(
 			emptyBody,
 			anchor,
 			ownEnd,
+			selectionBody,
 		);
 		return;
 	}
@@ -25883,6 +25902,7 @@ function tryUpdateKeyedSelection<T>(
 	previousDeps: any[],
 	deps: any[],
 	selectionIndex: number,
+	selectionBody: ComponentBody<T, any[]> | undefined,
 ): boolean {
 	if (
 		state.selectionItems !== items ||
@@ -25915,12 +25935,24 @@ function tryUpdateKeyedSelection<T>(
 	if (first !== undefined) {
 		first.body = itemBody as ComponentBody;
 		first.extra = deps;
-		(itemBody as any)(first.props, first, deps);
+		// A separately certified host row can update just its class binding. Raw
+		// object/function children register child slots, however, and must still
+		// reconcile on the ordinary body path even when their identity is stable.
+		// Primitive-only child holes retain no slots, so they pay no extra cache.
+		if (selectionBody !== undefined && first._slots === null) {
+			selectionBody(first.props, first, deps);
+		} else {
+			(itemBody as any)(first.props, first, deps);
+		}
 	}
 	if (second !== undefined) {
 		second.body = itemBody as ComponentBody;
 		second.extra = deps;
-		(itemBody as any)(second.props, second, deps);
+		if (selectionBody !== undefined && second._slots === null) {
+			selectionBody(second.props, second, deps);
+		} else {
+			(itemBody as any)(second.props, second, deps);
+		}
 	}
 	return true;
 }

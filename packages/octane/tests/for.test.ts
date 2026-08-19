@@ -16,6 +16,8 @@ import {
 	NestedConditionalTransition,
 	PlainCalleeList,
 	KeyedSelectionList,
+	KeyedSelectionControlledList,
+	KeyedSelectionRenderableList,
 	KeyedSelectionTransition,
 	KeyedSelectionUuidList,
 	MismatchedKeyedSelectionList,
@@ -488,6 +490,34 @@ describe('keyed list selection', () => {
 		r.unmount();
 	});
 
+	it('uses strict equality for NaN and signed-zero selection keys', () => {
+		const items = [
+			{ id: Number.NaN, label: 'not a number' },
+			{ id: -0, label: 'zero' },
+			{ id: 1, label: 'one' },
+		];
+		const r = mount(KeyedSelectionList, { items, selected: 1 });
+		const originalRows = r.findAll('li');
+
+		r.update(KeyedSelectionList, { items, selected: Number.NaN });
+		expect(r.findAll('li.selected')).toHaveLength(0);
+
+		r.update(KeyedSelectionList, { items, selected: -0 });
+		expect(r.findAll('li.selected')).toEqual([originalRows[1]]);
+		r.update(KeyedSelectionList, { items, selected: 0 });
+		expect(r.findAll('li.selected')).toEqual([originalRows[1]]);
+		r.update(KeyedSelectionList, { items, selected: 99 });
+		expect(r.findAll('li.selected')).toHaveLength(0);
+
+		const reordered = [items[2]!, items[0]!, items[1]!];
+		r.update(KeyedSelectionList, { items: reordered, selected: Number.NaN });
+		expect(r.findAll('li')).toEqual([originalRows[2], originalRows[0], originalRows[1]]);
+		expect(r.findAll('li.selected')).toHaveLength(0);
+		r.update(KeyedSelectionList, { items: reordered, selected: 0 });
+		expect(r.findAll('li.selected')).toEqual([originalRows[1]]);
+		r.unmount();
+	});
+
 	it('matches selection against the authored custom key property', () => {
 		const items = [
 			{ uuid: 'a-1', label: 'first' },
@@ -550,24 +580,83 @@ describe('keyed list selection', () => {
 		r.unmount();
 	});
 
-	it('preserves immutable keyed-row updates when the selection changes together', () => {
+	it('preserves immutable row updates when returning to an earlier selected key', () => {
 		const initialItems = makeRows();
 		const r = mount(KeyedSelectionList, { items: initialItems, selected: 1 });
 		const originalRows = r.findAll('li');
+
+		r.update(KeyedSelectionList, { items: initialItems, selected: 2 });
+		expect(r.findAll('li.selected')).toEqual([originalRows[1]]);
+
 		const updatedItems = [
 			initialItems[0]!,
 			{ ...initialItems[1]!, label: 'updated second' },
 			initialItems[2]!,
 		];
 
-		r.update(KeyedSelectionList, { items: updatedItems, selected: 2 });
+		r.update(KeyedSelectionList, { items: updatedItems, selected: 1 });
 		expect(labels(r)).toEqual(['first', 'updated second', 'third']);
-		expect(r.find('.selected').textContent).toBe('updated second');
+		expect(r.findAll('li.selected')).toEqual([originalRows[0]]);
 		expect(r.findAll('li')).toEqual(originalRows);
 
-		r.update(KeyedSelectionList, { items: updatedItems, selected: 3 });
-		expect(r.find('.selected').textContent).toBe('third');
+		r.update(KeyedSelectionList, { items: updatedItems, selected: 2 });
+		expect(r.find('.selected').textContent).toBe('updated second');
 		expect(labels(r)).toEqual(['first', 'updated second', 'third']);
+		r.unmount();
+	});
+
+	it('reasserts controlled values in rows whose selection changes', () => {
+		const items = makeRows();
+		const r = mount(KeyedSelectionControlledList, { items, selected: 1 });
+		const originalRows = r.findAll('li');
+		const controls = r.findAll('input') as HTMLInputElement[];
+		controls[0]!.focus();
+		controls[0]!.value = 'changed outside render';
+		controls[1]!.value = 'changed before selection';
+
+		r.update(KeyedSelectionControlledList, { items, selected: 2 });
+		expect(controls.map((control) => control.value)).toEqual(items.map((row) => row.label));
+		expect(r.findAll('li.selected')).toEqual([originalRows[1]]);
+		expect(r.findAll('li')).toEqual(originalRows);
+		expect(r.findAll('input')).toEqual(controls);
+		expect(document.activeElement).toBe(controls[0]);
+		r.unmount();
+	});
+
+	it('keeps stable render-function children live when their rows are selected', () => {
+		let first = 'first';
+		let second = 'second';
+		const items = [
+			{
+				id: 1,
+				content: () =>
+					createElement('span', { className: 'keyed-selection-readable-child' }, first),
+			},
+			{
+				id: 2,
+				content: () =>
+					createElement('span', { className: 'keyed-selection-readable-child' }, second),
+			},
+			{ id: 3, content: 'third' },
+		];
+		const r = mount(KeyedSelectionRenderableList, { items, selected: 1 });
+		const originalRows = r.findAll('li');
+		const originalChildren = r.findAll('.keyed-selection-readable-child');
+		expect(labels(r)).toEqual(['first', 'second', 'third']);
+
+		first = 'updated first';
+		second = 'updated second';
+		r.update(KeyedSelectionRenderableList, { items, selected: 2 });
+		expect(labels(r)).toEqual(['updated first', 'updated second', 'third']);
+		expect(r.findAll('li.selected')).toEqual([originalRows[1]]);
+		expect(r.findAll('li')).toEqual(originalRows);
+		expect(r.findAll('.keyed-selection-readable-child')).toEqual(originalChildren);
+
+		first = 'selected first again';
+		r.update(KeyedSelectionRenderableList, { items, selected: 1 });
+		expect(labels(r)).toEqual(['selected first again', 'updated second', 'third']);
+		expect(r.findAll('li.selected')).toEqual([originalRows[0]]);
+		expect(r.findAll('.keyed-selection-readable-child')).toEqual(originalChildren);
 		r.unmount();
 	});
 

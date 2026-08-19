@@ -1,4 +1,5 @@
 import { createElement, Suspense, use } from 'octane';
+import type { ClassValue } from 'octane/jsx-runtime';
 
 // Returns an SVG tree via createElement (VALUE position) so it renders through the
 // runtime de-opt reconciler — exercising SVG-namespace creation outside the compiled
@@ -82,6 +83,59 @@ function ReturnedAmbiguousAnchorRoot(props) {
 
 function ReturnedAmbiguousMathRowRoot(props) {
 	return <mrow id={props.id}>{props.label as string}</mrow>;
+}
+
+function ClassAnchorRoot(props: { id: string; value: ClassValue }) @{
+	<a id={props.id} class={props.value} />
+}
+
+function ClassHtmlFragment(props: { value: ClassValue }) @{
+	<>
+		<div id="class-html-fragment-first" class={props.value} />
+		<span id="class-html-fragment-second" className={props.value} />
+	</>
+}
+
+function ClassMixedFragment(props: { anchorId: string; groupId: string; value: ClassValue }) @{
+	<>
+		<a id={props.anchorId} class={props.value} />
+		<g id={props.groupId} className={props.value} />
+	</>
+}
+
+function ClassMathRoot(props: { value: ClassValue }) @{
+	<mrow id="class-math-fixed" className={props.value} />
+}
+
+export function TemplateClassNamespaces(props: { value: ClassValue }) @{
+	<section id="class-html-root" class={props.value}>
+		<a id="class-html-nested" className={props.value} />
+		<ClassHtmlFragment value={props.value} />
+		<TemplateHtmlDestination id="class-html-destination">
+			<ClassAnchorRoot id="class-html-ambiguous" value={props.value} />
+		</TemplateHtmlDestination>
+		<TemplateSvgDestination id="class-svg-destination">
+			<ClassAnchorRoot id="class-svg-ambiguous" value={props.value} />
+			<ClassMixedFragment
+				anchorId="class-svg-mixed-anchor"
+				groupId="class-svg-mixed-group"
+				value={props.value}
+			/>
+			<g id="class-svg-fixed" class={props.value} />
+			<foreignObject>
+				<span id="class-foreign-html" className={props.value} />
+			</foreignObject>
+		</TemplateSvgDestination>
+		<TemplateMathDestination id="class-math-destination">
+			<ClassAnchorRoot id="class-math-ambiguous" value={props.value} />
+			<ClassMathRoot value={props.value} />
+			<ClassMixedFragment
+				anchorId="class-math-mixed-anchor"
+				groupId="class-math-mixed-group"
+				value={props.value}
+			/>
+		</TemplateMathDestination>
+	</section>
 }
 
 // Template-form children cross an opaque component boundary before their

@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { mount, nextPaint } from './_helpers';
+import { act, mount, nextPaint } from './_helpers';
+import { flushSync, startTransition } from '../src/index.js';
 import {
 	LazyInit,
 	TwoStates,
+	StateValueProbe,
 	Tally,
 	MemoTest,
 	CustomMemoDeps,
@@ -41,6 +43,94 @@ describe('useState', () => {
 		expect(r.find('#a').textContent).toBe('2');
 		expect(r.find('#b').textContent).toBe('14');
 		r.unmount();
+	});
+
+	it('rebases functional Action updates while retaining later replacement values', async () => {
+		let setValue!: (next: number | ((previous: number) => number)) => void;
+		let getValue!: () => number;
+		let releaseFirst!: () => void;
+		let releaseFinal!: () => void;
+		const first = new Promise<void>((resolve) => (releaseFirst = resolve));
+		const final = new Promise<void>((resolve) => (releaseFinal = resolve));
+		const r = mount(StateValueProbe, {
+			initial: 1,
+			display: String,
+			expose: (set: typeof setValue, get: typeof getValue) => {
+				setValue = set;
+				getValue = get;
+			},
+		});
+		try {
+			flushSync(() =>
+				startTransition(async () => {
+					setValue((value) => value + 10);
+					await first;
+					setValue(40);
+					setValue((value) => value + 2);
+					await final;
+				}),
+			);
+			expect(r.find('span').textContent).toBe('1');
+			expect(getValue()).toBe(11);
+			flushSync(() => setValue(5));
+			expect(r.find('span').textContent).toBe('5');
+			expect(getValue()).toBe(15);
+
+			await act(() => releaseFirst());
+			expect(r.find('span').textContent).toBe('5');
+			expect(getValue()).toBe(42);
+			flushSync(() => setValue(9));
+			expect(r.find('span').textContent).toBe('9');
+			expect(getValue()).toBe(42);
+
+			await act(() => releaseFinal());
+			expect(r.find('span').textContent).toBe('42');
+			expect(getValue()).toBe(42);
+		} finally {
+			releaseFirst();
+			releaseFinal();
+			await act(() => {});
+			r.unmount();
+		}
+	});
+
+	it('retains function-valued state through urgent and staged replacements', async () => {
+		type Value = () => string;
+		let setValue!: (next: Value | ((previous: Value) => Value)) => void;
+		let getValue!: () => Value;
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		const initial = () => 'initial';
+		const staged = () => 'staged';
+		const urgent = () => 'urgent';
+		const r = mount(StateValueProbe, {
+			initial,
+			display: (value: Value) => value(),
+			expose: (set: typeof setValue, get: typeof getValue) => {
+				setValue = set;
+				getValue = get;
+			},
+		});
+		try {
+			flushSync(() =>
+				startTransition(async () => {
+					setValue(() => staged);
+					await gate;
+				}),
+			);
+			expect(r.find('span').textContent).toBe('initial');
+			expect(getValue()).toBe(staged);
+			flushSync(() => setValue(() => urgent));
+			expect(r.find('span').textContent).toBe('urgent');
+			expect(getValue()).toBe(staged);
+			await act(() => release());
+			expect(r.find('span').textContent).toBe('staged');
+			expect(getValue()).toBe(staged);
+		} finally {
+			release();
+			await act(() => {});
+			r.unmount();
+		}
 	});
 });
 
