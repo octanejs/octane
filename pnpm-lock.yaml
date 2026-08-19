@@ -1168,7 +1168,7 @@ importers:
         version: 0.3.120(prettier@3.9.6)
       '@tsrx/typescript-plugin':
         specifier: catalog:default
-        version: 0.3.120(@tsrx/react@0.2.58(react@19.2.8))(@tsrx/ripple@0.1.59)(@tsrx/solid@0.1.58(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.40(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
+        version: 0.3.120(@tsrx/react@0.2.58(react@19.2.8))(@tsrx/ripple@0.1.59)(@tsrx/solid@0.1.58(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.39(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -25289,8 +25289,8 @@ packages:
   ocache@0.1.5:
     resolution: {integrity: sha512-kNNnkkVQup/QDvmTz8Q84wc2ntiyoVHDxa6eHWKt5qdGAmFRBIxy83rxgCYEjW0x06UJ9E3P6VgM2yY4rOBH4w==}
 
-  octane@0.1.40:
-    resolution: {integrity: sha512-0RJUPbjQuM+s9kGVT8Q170KmR4D+5JUGtLi4juWB0r9+/SD+eaXb8b/ByIbZhE4SlkeBqA+zX9TidWk0hTd4xw==}
+  octane@0.1.39:
+    resolution: {integrity: sha512-QfN5/hSKyialjsGKqBMkhEFE/+Eve+CyNgXqBrMvt/g6hURaCJGhYK68J4ZQBBC8QdOkaj2NSS4awFnmo0YecQ==}
     engines: {node: '>=22.22.2'}
     peerDependencies:
       react: ^19.0.0
@@ -42103,7 +42103,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/typescript-plugin@0.3.120(@tsrx/react@0.2.58(react@19.2.8))(@tsrx/ripple@0.1.59)(@tsrx/solid@0.1.58(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.40(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
+  '@tsrx/typescript-plugin@0.3.120(@tsrx/react@0.2.58(react@19.2.8))(@tsrx/ripple@0.1.59)(@tsrx/solid@0.1.58(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.39(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.28
       '@volar/typescript': 2.4.28
@@ -42112,7 +42112,7 @@ snapshots:
       '@tsrx/react': 0.2.58(react@19.2.8)
       '@tsrx/ripple': 0.1.59
       '@tsrx/solid': 0.1.58(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15)
-      octane: 0.1.40(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      octane: 0.1.39(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
   '@tsrx/typescript-plugin@0.3.120(@tsrx/react@0.2.58(react@19.2.8))(@tsrx/ripple@0.1.59)(@tsrx/solid@0.1.58(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@packages+octane)(typescript@5.9.3)':
     dependencies:
@@ -52893,22 +52893,19 @@ snapshots:
     dependencies:
       ohash: 2.0.11
 
-  octane@0.1.40(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(svelte@5.56.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
+  octane@0.1.39(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       '@tsrx/core': 0.1.58(patch_hash=1ce4d5ad217fbae79df568fcb088bb50bef3478506b420b8084c4f1e8df6c5b2)
       '@types/react': 19.2.17
       devalue: 5.8.2
       es-module-lexer: 1.7.0
       esrap: 2.3.2
-      oxc-tsrx: 0.5.0(svelte@5.56.7)
     optionalDependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       vite: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
     transitivePeerDependencies:
       - '@typescript-eslint/types'
-      - svelte
-      - vite-plus
     optional: true
 
   ofetch@1.5.1:
