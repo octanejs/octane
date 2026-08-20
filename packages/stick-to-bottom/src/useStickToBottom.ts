@@ -5,7 +5,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'octane';
 
-type DependencyList = unknown[];
+type DependencyList = readonly unknown[];
 type RefCallback<T> = (instance: T | null) => void;
 type MutableRefObject<T> = { current: T };
 

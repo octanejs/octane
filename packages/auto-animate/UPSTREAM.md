@@ -7,7 +7,7 @@
 - tag commit: `b6a6feebf75c198dd85f280c549bc0303f9e7aa8`
 - advertised range: `0.10.x`
 - license: MIT
-- npm integrity: `sha512-KGomRttjUfORuPUjZGQw+6xfMrTM+sxnILv7JAd9AmabU9rg9i6gF/iC0Ih+QpKCubJpCA/1DX9UHKE8cX+A==`
+- npm integrity: `sha512-KGomRttjUfORuPUaR/ZGQw+6xfMrTM+sxnILv7JAd9AmabU9rg9i6gF/iC0Ih+QpKCubJpCA/1DX9UHKE8cX+A==`
 - npm shasum: `0eadd565f50e54e5dc6f29c41b32d32b53661eab`
 
 ## Source boundary
