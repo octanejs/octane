@@ -13,7 +13,9 @@ export function withoutLocation<T>(fn: () => T): T {
 }
 
 beforeEach(function resetHistory() {
-	history.replaceState(null, '', '/');
+	if (typeof history !== 'undefined') {
+		history.replaceState(null, '', '/');
+	}
 });
 
 afterEach(function cleanupDom() {
