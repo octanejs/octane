@@ -158,7 +158,7 @@ describe('useQuery', function () {
 
 	it('should update if a new query is received', async function () {
 		const { rerender } = renderHook(
-			function hook(props: { query: string; variables: { id?: number } }) {
+			function hook(props: { query: string; variables: Record<string, unknown> }) {
 				return useQuery({ query: props.query, variables: props.variables });
 			},
 			{ initialProps: { query: mockQuery, variables: mockVariables } },
@@ -173,7 +173,7 @@ describe('useQuery', function () {
       }
     `;
 
-		rerender({ query: newQuery, variables: {} as { id?: number } });
+		rerender({ query: newQuery, variables: {} });
 		expect(mockClient.executeQuery).toBeCalledTimes(2);
 		expect(mockClient.executeQuery).toHaveBeenNthCalledWith(
 			2,
