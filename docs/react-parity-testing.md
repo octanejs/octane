@@ -79,7 +79,8 @@ commit. Its adapted `tests/upstream/` suite is regenerated, never committed:
 `scripts/react-parity/check.mjs` runs `pnpm react-port:materialize run`
 (verify pristine, then rebuild adapted from the lock's mechanical rewrites
 plus the committed divergence patches) before any verifier, contract walk, or
-lane reads those paths. Regeneration fails closed if an adapted module
+lane reads those paths. Derived adapted copies are never tracked; only
+genuinely re-authored port-authored suites live in the repository. Regeneration fails closed if an adapted module
 still imports `react`, `react-dom`, or `@testing-library/react`, so a missed
 rewrite or a patch that reintroduces a React specifier is rejected inside this
 gate rather than surfacing at test time. The whole flow is offline. Manifest lanes for such a

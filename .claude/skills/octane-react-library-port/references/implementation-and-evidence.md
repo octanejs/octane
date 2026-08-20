@@ -128,6 +128,16 @@ declaration bundle, compiled dist output, or the tarball itself) lives under
 mixed into the lock-verified `upstream/` tree. The lock owns git bytes; the
 artifact directory owns registry bytes.
 
+A tracked suite under `tests/upstream/` is legitimate only for genuinely
+re-authored, port-authored evidence (a different harness, per-case citations,
+independently written scenarios). If the adapted files are derived copies of
+the pinned upstream tests — the same files with converted imports, renamed
+APIs, and scattered edits — they must be regenerated from the lock instead:
+mechanical conversions as `adaptedRewrites`, divergences as patches, tracked
+copies deleted. Patch hunks must be pure divergence in the pristine tree's own
+formatting: no reformatting, no wrapping changes, no `as any` shortcuts where
+Octane's native-event or ref-as-prop typing expresses the contract precisely.
+
 Keep the committed pristine tree genuinely pristine:
 
 - Never re-lock drifted bytes. If a vendored file differs from the pin (an
