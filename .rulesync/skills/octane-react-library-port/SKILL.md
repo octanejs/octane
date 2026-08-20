@@ -123,7 +123,10 @@ authority.
    verifies offline, regenerate the adapted suite with `materialize run`, and
    record every genuine divergence as a minimal committed patch with
    `materialize diff` (mechanical conversions belong in the lock's
-   `adaptedRewrites`, never in patches). Inventory and
+   `adaptedRewrites`, never in patches). Express pure-data provenance checks as
+   `audit/provenance.json` for the shared verifier and register pristine
+   runners with the shared `run-pristine.mjs` CLI (or `audit/pristine-suite.json`)
+   rather than writing per-package scripts. Inventory and
    crosswalk every upstream
    runtime/type case, register pristine/adapted lanes, and prove direct authored
    source, precise public declarations, and packed Node plus browser/no-Node type

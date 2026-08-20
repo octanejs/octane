@@ -117,6 +117,29 @@ For a new or upgraded port:
   reused from a framework-neutral core, intentional divergence, inapplicable,
   or an explicit gap with evidence.
 
+Evidence that comes from the npm registry rather than the git tree (a published
+declaration bundle, compiled dist output, or the tarball itself) lives under
+`packages/<binding>/upstream-artifact/`, prettier-ignored and outside published
+`files`, hash-pinned by the package's provenance config or verifier — never
+mixed into the lock-verified `upstream/` tree. The lock owns git bytes; the
+artifact directory owns registry bytes.
+
+Keep the committed pristine tree genuinely pristine:
+
+- Never re-lock drifted bytes. If a vendored file differs from the pin (an
+  appended newline, a rewritten header, an edited manifest), restore the true
+  bytes and move the adaptation somewhere honest: a lock `adaptedRewrite`, test
+  configuration, or a file the runner emits into its scratch tree.
+- Repo-authored helpers must not masquerade inside `upstream/`. A shim the
+  pristine lane needs (a `.js` re-export for a `.ts` authority, a fixture the
+  monorepo root provided) is emitted by the runner at run time or regenerated
+  from the lock, not committed among pinned files.
+- Pinned snapshots whose header a modern Jest rejects stay byte-exact in
+  `upstream/`; map the snapshot directory with `--adapted-map` plus an
+  `--adapted-rewrite` for the header, point Jest at the regenerated copies with
+  a `snapshotResolver`, and have the Jest config materialize them at load when
+  absent so a clean checkout works offline.
+
 Materialization does not move the license boundary. The lock and especially the
 patches are derived from upstream bytes, so they stay inside the approved-license
 gate: committing a patch is committing an adaptation. If immutable pin evidence
@@ -148,6 +171,38 @@ the parity manifest's ledger support files for the lock and patches.
 `scripts/react-parity/check.mjs` regenerates and verifies every package that
 commits an `audit/upstream.lock.json` before its verifiers and lanes run.
 
+## Prefer configuration over per-package scripts
+
+Reach for the shared, config-driven machinery before writing a package script;
+a new script is the escape hatch, not the default:
+
+- **Provenance checks that are pure data** — artifact hashes, required files,
+  license equalities/inclusions, package identity, export-condition mirroring,
+  unpublished-dir guards — go in `packages/<binding>/audit/provenance.json`,
+  executed by `node scripts/react-parity/verify-provenance.mjs` (schema in
+  `provenance-manifest-lib.mjs`). The lock check always runs first. Wire the
+  package's `upstream:verify`/`upstream:check` script to the shared CLI and
+  cite `audit/provenance.json` in the parity manifest.
+- **Pristine runners** register in `scripts/react-parity/run-pristine.mjs`
+  (package name → runtime module + label); package scripts call
+  `node ../../scripts/react-parity/run-pristine.mjs <package>`. Vitest-shaped
+  runners should themselves be config-driven via `audit/pristine-suite.json`
+  and the shared `pristine-suite-lib.mjs` engine; a hand-written runtime module
+  is for genuinely foreign harnesses (bun, JUnit, Playwright applications).
+- **Bespoke contracts stay scripts**: export crosswalks derived from a
+  TypeScript program, case-structure digests, title-replacement maps,
+  disposition inventories, and manifest generators encode judgment, not data.
+  Keep them per-package, but source their byte verification from the lock and
+  their pure-data checks from `provenance.json`.
+
+Any generator that rebuilds `audit/react-parity.json` or another committed
+inventory must emit the lock citation (and every other evidence row this model
+adds) itself, so a regeneration run reproduces the committed file byte-for-byte;
+hand-inserting a row a generator later drops is a review finding. After editing
+generated-or-hashed artifacts, always format first, then rehash, then re-verify
+stability — prettier restyling after hashing is the classic way to break a
+manifest.
+
 ## Package contract
 
 A completed publishable binding normally has:
@@ -163,9 +218,9 @@ A completed publishable binding normally has:
 - a committed byte-exact `upstream/` pristine tree pinned by
   `audit/upstream.lock.json` (offline-verified against upstream git blob shas),
   plus `audit/upstream-patches/` divergence patches and `.skip` rationales for
-  the adapted suite, with the regenerated `tests/upstream` tree git-ignored
-  (a legacy ledger-verified tree remains valid evidence until the binding
-  migrates);
+  the adapted suite, with the regenerated `tests/upstream` tree git-ignored;
+- registry-sourced evidence, when any, under `upstream-artifact/`, hash-pinned
+  by `audit/provenance.json` or the package's verifier;
 - `UPSTREAM.md` naming package, version/tag, immutable commit, source boundary,
   adapted/copied paths, excluded React shell, and behavioral oracle;
 - the binding's primary MIT `LICENSE`, plus a separately named, byte-exact root

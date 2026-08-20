@@ -81,7 +81,20 @@ commit. Its adapted `tests/upstream/` suite is regenerated, never committed:
 plus the committed divergence patches) before any verifier, contract walk, or
 lane reads those paths. The whole flow is offline. Manifest lanes for such a
 package cite only committed artifacts (the lock, patches, skip rationales,
-inventories, and wrapper tests), never regenerated files.
+inventories, and wrapper tests), never regenerated files. Registry-sourced
+evidence (published declarations, dist output, tarballs) lives under
+`upstream-artifact/`, outside the lock, hash-pinned per package.
+
+Per-package parity plumbing is configuration first, scripts second. Pure-data
+provenance checks live in `audit/provenance.json`, executed by the shared
+`scripts/react-parity/verify-provenance.mjs` (lock check first, then artifact
+hashes, required files, license equalities, package identity, export-condition
+mirroring). Pristine runners register in `scripts/react-parity/run-pristine.mjs`
+and, when Vitest-shaped, are themselves driven by `audit/pristine-suite.json`
+through `pristine-suite-lib.mjs`. Per-package scripts remain only for bespoke
+contracts — crosswalk derivation, case-structure digests, manifest generators —
+and any such generator must itself emit every evidence row the committed
+manifest carries, so regeneration reproduces it byte-for-byte.
 
 Differential tests must have their own project because their React-side fixture
 compilation and cache preparation do not belong to the full adapted suite:
