@@ -1,0 +1,11 @@
+{
+  "upstream": { "package": "react-oidc-context", "version": "3.3.1" },
+  "surface": "Complete against react-oidc-context 3.3.1: AuthContext, AuthProvider, AuthState/ErrorContext, reducer, useAuth, useAutoSignin, hasAuthParams, withAuth, withAuthenticationRequired. oidc-client-ts remains a peer; its source is not vendored.",
+  "divergences": [
+    "Octane has no class components, so withAuth/withAuthenticationRequired wrap function components via createElement rather than JSX class components.",
+    "Octane has no StrictMode double-invoke; AuthProvider still initializes once via didInitialize.",
+    "HOCs stay functions and render with createElement instead of JSX."
+  ],
+  "ssr": "AuthProvider constructs a settings-only UserManager stub when window is undefined and leaves navigator methods throwing until a custom UserManager is supplied or the client hydrates. Initial state is isLoading true / isAuthenticated false.",
+  "verified": "2026-08-20"
+}

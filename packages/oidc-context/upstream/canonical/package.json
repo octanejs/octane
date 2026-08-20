@@ -1,0 +1,85 @@
+{
+  "name": "react-oidc-context",
+  "version": "3.3.1",
+  "description": "OpenID Connect & OAuth2 authentication using react context api as state management",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/authts/react-oidc-context.git"
+  },
+  "homepage": "https://github.com/authts/react-oidc-context#readme",
+  "license": "MIT",
+  "main": "dist/umd/react-oidc-context.js",
+  "types": "dist/types/react-oidc-context.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/react-oidc-context.d.ts",
+      "import": "./dist/esm/react-oidc-context.js",
+      "require": "./dist/umd/react-oidc-context.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "authentication",
+    "context-api",
+    "oauth2",
+    "oidc",
+    "openid",
+    "OpenID Connect",
+    "react-component"
+  ],
+  "scripts": {
+    "build": "node scripts/build.js && npm run build-types",
+    "build-types": "tsc --emitDeclarationOnly && api-extractor run",
+    "clean": "git clean -fdX dist",
+    "prepack": "npm run build",
+    "test": "tsc -p test/tsconfig.json && jest",
+    "lint": "eslint --max-warnings=0 --cache .",
+    "prepare": "husky"
+  },
+  "peerDependencies": {
+    "oidc-client-ts": "^3.1.0",
+    "react": ">=16.14.0"
+  },
+  "devDependencies": {
+    "@eslint/compat": "^1.2.5",
+    "@eslint/eslintrc": "^3.2.0",
+    "@eslint/js": "^9.18.0",
+    "@microsoft/api-extractor": "^7.49.1",
+    "@stylistic/eslint-plugin": "^2.13.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@types/jest": "^30.0.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/react-test-renderer": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "esbuild": "^0.27.0",
+    "eslint": "^9.18.0",
+    "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-testing-library": "^7.1.1",
+    "globals": "^17.0.0",
+    "husky": "^9.1.7",
+    "jest": "^30.0.0",
+    "jest-environment-jsdom": "^30.0.0",
+    "jest-mock": "^30.0.0",
+    "lint-staged": "^16.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-test-renderer": "^18.3.1",
+    "ts-jest": "^29.4.0",
+    "tslib": "^2.8.1",
+    "typescript": "~5.8.2",
+    "yn": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": "eslint --cache --fix"
+  }
+}

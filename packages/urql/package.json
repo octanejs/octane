@@ -1,0 +1,59 @@
+{
+  "name": "@octanejs/urql",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "urql React bindings for Octane.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/urql"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsrx-tsc --noEmit"
+  },
+  "dependencies": {
+    "@urql/core": "6.0.3",
+    "wonka": "^6.3.2"
+  },
+  "peerDependencies": {
+    "graphql": "^16.0.0",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "graphql": "catalog:default",
+    "octane": "workspace:*",
+    "vitest": "catalog:default"
+  }
+}

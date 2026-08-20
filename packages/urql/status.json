@@ -1,0 +1,11 @@
+{
+  "upstream": { "package": "urql", "version": "5.0.3" },
+  "surface": "Complete against urql 5.0.3 React binding: re-exports @urql/core@6.0.3; ports Context/Provider/Consumer/useClient, useQuery/useMutation/useSubscription/useRequest, state/cache helpers, and Query/Mutation/Subscription render-prop components.",
+  "divergences": [
+    "Octane has no Context.Consumer on the context object; Consumer is a function component that reads with useContext and calls children(client).",
+    "Suspense still throws a Promise like upstream rather than wrapping it in Octane use(), so cache and replay timing stay aligned with the pinned React binding.",
+    "Render-prop components stay functions and return children(...) rather than JSX."
+  ],
+  "ssr": "No dedicated Octane SSR prepass. The Client/Provider pair is framework-neutral and usable on the server; upstream react-ssr-prepass coverage is out of scope.",
+  "verified": "2026-08-20"
+}

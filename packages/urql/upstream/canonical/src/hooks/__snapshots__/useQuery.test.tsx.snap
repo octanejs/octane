@@ -1,0 +1,13 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`on initial useEffect > initialises default state 1`] = `
+{
+  "data": undefined,
+  "error": undefined,
+  "extensions": undefined,
+  "fetching": true,
+  "hasNext": false,
+  "operation": undefined,
+  "stale": false,
+}
+`;
