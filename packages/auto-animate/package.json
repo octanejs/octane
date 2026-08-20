@@ -1,0 +1,51 @@
+{
+  "name": "@octanejs/auto-animate",
+  "version": "0.0.1",
+  "description": "Octane binding for @formkit/auto-animate 0.10.0: vanilla core reused, React useAutoAnimate ported.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/auto-animate"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react/index.tsrx",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --config vitest.config.js --project auto-animate",
+    "typecheck": "tsrx-tsc --noEmit"
+  },
+  "dependencies": {
+    "@formkit/auto-animate": "0.10.0"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "octane": "workspace:*",
+    "vitest": "catalog:default"
+  }
+}
