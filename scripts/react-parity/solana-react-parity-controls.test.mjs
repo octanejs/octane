@@ -26,50 +26,28 @@ function listedUpstreamArtifacts(kind) {
 }
 
 test('UPSTREAM.md dispositions cover every vendored runtime test file', () => {
-	const sums = read('packages/solana-react/upstream/SHA256SUMS')
-		.split('\n')
-		.map(function line(entry) {
-			return entry.trim().split(/\s+/).at(-1);
-		})
-		.filter(function keepTests(path) {
-			return path && /\/__tests__\//.test(path) && /-test\./.test(path);
-		})
-		.map(function toSrc(path) {
-			return path.replace(/^src\//, 'src/').replace(/^packages\/solana-react\/upstream\//, '');
-		});
-	// SHA256SUMS paths are relative to upstream/
-	const files = read('packages/solana-react/upstream/SHA256SUMS')
-		.split('\n')
-		.map(function line(entry) {
-			const parts = entry.trim().split(/\s+/);
-			return parts.length >= 2 ? parts[parts.length - 1] : '';
+	// Lock file paths are relative to upstream/
+	const files = JSON.parse(read('packages/solana-react/audit/upstream.lock.json'))
+		.files.map(function pathOf(entry) {
+			return entry.path;
 		})
 		.filter(function keepTests(path) {
 			return /__tests__\//.test(path) && /-test\./.test(path);
-		})
-		.map(function asSrc(path) {
-			return path.startsWith('src/') ? path : `src/${path.replace(/^.*?src\//, '')}`;
 		});
 	const unique = [...new Set(files)].sort();
 	const disposed = new Set(listedUpstreamArtifacts('runtime'));
 	for (const file of unique) {
 		assert.ok(disposed.has(file), `missing runtime disposition for ${file}`);
 	}
-	void sums;
 });
 
 test('UPSTREAM.md dispositions cover every vendored type-test file', () => {
-	const files = read('packages/solana-react/upstream/SHA256SUMS')
-		.split('\n')
-		.map(function line(entry) {
-			const parts = entry.trim().split(/\s+/);
-			return parts.length >= 2 ? parts[parts.length - 1] : '';
+	const files = JSON.parse(read('packages/solana-react/audit/upstream.lock.json'))
+		.files.map(function pathOf(entry) {
+			return entry.path;
 		})
 		.filter(function keepTypes(path) {
 			return /__typetests__\//.test(path) && /-typetest\.ts$/.test(path);
-		})
-		.map(function asSrc(path) {
-			return path.startsWith('src/') ? path : `src/${path.replace(/^.*?src\//, '')}`;
 		});
 	const unique = [...new Set(files)].sort();
 	const disposed = new Set(listedUpstreamArtifacts('types'));

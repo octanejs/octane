@@ -27,6 +27,7 @@
   "types": "src/index.ts",
   "files": [
     "src",
+    "LICENSE.upstream",
     "README.md",
     "status.json",
     "UPSTREAM.md"

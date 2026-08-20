@@ -14,8 +14,10 @@
 The npm package publishes `src/` and built `dist/`, but the repository at tag
 `v7.0.0` is the authoritative source for the full unit and type suites. The
 byte-exact `packages/react` directory from that commit is vendored under
-`upstream/` and locked file-by-file by `upstream/SHA256SUMS`. It is excluded
-from the published package by the explicit `files` allowlist.
+`upstream/` and verifies offline against the upstream git blob shas recorded in
+`audit/upstream.lock.json`; the pinned license is republished at the package
+root as `LICENSE.upstream`. The vendored tree is excluded from the published
+package by the explicit `files` allowlist.
 
 Framework-neutral Kit operations stay on `@solana/kit@7.0.0`. This package is
 the Octane reactive UI seam: client provider/store, Wallet Standard discovery,

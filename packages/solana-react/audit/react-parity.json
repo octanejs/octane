@@ -8,7 +8,7 @@
     "sourceRoot": "packages/react/src",
     "testRoot": "packages/react/src",
     "license": "MIT",
-    "integrity": "sha256:605e5fd0285c2c51586af11210f23fb1b47e10f8f5ac3c5736cfc32cf6fc3b5d",
+    "integrity": "sha256:f73adefa489c91d1f6ae7c61476a1ac15e26d5c58c48346b7c88dd100bc7729c",
     "verification": "verified"
   },
   "upstreamSuites": {
@@ -95,17 +95,17 @@
         {
           "path": "packages/solana-react/scripts/verify-upstream.mjs",
           "role": "support",
-          "sha256": "8642bcb9128d304812e8dd8dc718caa88eac2963a010fec7e5f6789c30b70cdc"
+          "sha256": "af83b5c56c90ea5f3d85d902098c2360c569ddc49020e166a87c3ba981d75980"
         },
         {
-          "path": "packages/solana-react/upstream/SHA256SUMS",
+          "path": "packages/solana-react/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "605e5fd0285c2c51586af11210f23fb1b47e10f8f5ac3c5736cfc32cf6fc3b5d"
+          "sha256": "63cc306d45c923df7d97e7e82f10bc94a417a9e17c0dd8221af165df178c7bef"
         },
         {
           "path": "scripts/react-parity/solana-react-parity-controls.test.mjs",
           "role": "support",
-          "sha256": "b55fceda99042763e9c4c9ef1546b53bc86dc3b2931958aa03a812713adb9c37"
+          "sha256": "fd55a2ff80c21dd71b8667fdb350add4b3ed50147b28c0539ac0ad949e747fad"
         }
       ]
     },
