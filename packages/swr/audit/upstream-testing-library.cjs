@@ -6,16 +6,19 @@ const testingLibraryRoot = dirname(
 	requireFromPackage.resolve('@testing-library/react/package.json'),
 );
 const testingLibrary = require(join(testingLibraryRoot, 'dist/index.js'));
-const { holdFirstTimeout } = require('./upstream-timer-gate.cjs');
+const { createSupersedingTimeoutGate, holdFirstTimeout } = require('./upstream-timer-gate.cjs');
 
 const REMOTE_MUTATION_RACE_TEST =
 	'useSWR - remote mutation should prevent race conditions with `useSWR`';
+const REMOTE_MUTATION_MULTIPLE_TEST =
+	'useSWR - remote mutation should prevent race condition if triggered multiple times';
 const LOCAL_MUTATION_VALIDATING_TEST =
 	'useSWR - local mutation should reset isValidating after mutate';
 const LOCAL_MUTATION_VALIDATING_TEXT = 'isValidating:true';
 
 let releaseInitialRequest = null;
 let releaseLocalMutationInitialRequest = null;
+let supersedingMutationTimers = null;
 
 function isRemoteMutationRaceTest() {
 	return expect.getState().currentTestName === REMOTE_MUTATION_RACE_TEST;
@@ -23,6 +26,10 @@ function isRemoteMutationRaceTest() {
 
 function isLocalMutationValidatingTest() {
 	return expect.getState().currentTestName === LOCAL_MUTATION_VALIDATING_TEST;
+}
+
+function isRemoteMutationMultipleTest() {
+	return expect.getState().currentTestName === REMOTE_MUTATION_MULTIPLE_TEST;
 }
 
 function render(element, options) {
@@ -53,12 +60,26 @@ function render(element, options) {
 		return held.result;
 	}
 
+	if (isRemoteMutationMultipleTest()) {
+		// The first two mutation requests use 10 ms timers separated by 5 ms
+		// waits. Keep each superseded completion pending until the next click has
+		// started its replacement; the third request retains its real timer.
+		supersedingMutationTimers = createSupersedingTimeoutGate(10, 2);
+	}
+
 	return testingLibrary.render(element, options);
 }
 
 const fireEvent = (...args) => testingLibrary.fireEvent(...args);
 Object.assign(fireEvent, testingLibrary.fireEvent, {
 	click(...args) {
+		if (isRemoteMutationMultipleTest()) {
+			if (supersedingMutationTimers === null) {
+				throw new Error('The repeated remote-mutation timer gate was not initialized');
+			}
+			return supersedingMutationTimers.run(() => testingLibrary.fireEvent.click(...args));
+		}
+
 		const result = testingLibrary.fireEvent.click(...args);
 		if (!isRemoteMutationRaceTest()) return result;
 		if (releaseInitialRequest === null) {
