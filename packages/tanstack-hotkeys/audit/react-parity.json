@@ -65,17 +65,17 @@
         {
           "path": "packages/tanstack-hotkeys/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "2f5291f93573b9866d30de1d6a09ace6c6a10a38c04db137283611584317f6ab"
+          "sha256": "26198c87b7ed76bff29ceff217ab66c8821f59ef2b490ad8c836eb1c9c1b5994"
         },
         {
           "path": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
           "role": "support",
-          "sha256": "ae1b744b96e0e1996d4acba2fb8a24ffa1147805e4aabb6b889f34de790a1b6c"
+          "sha256": "4e452b70de53303509752d35826d1268f8a9788284dd27ccd92dad30831a9399"
         },
         {
           "path": "packages/tanstack-hotkeys/tests/upstream-pristine.vitest.config.ts",
           "role": "support",
-          "sha256": "4ff7a9c63e85bd9abc53cb5ea8861b479b72ead23abac97dd1774ce4bad82d7f"
+          "sha256": "2ecd6b226dc2e5beb1c485afb1dff91cecb20224338786f46fcd5f31ae532e49"
         },
         {
           "path": "scripts/react-parity/tanstack-hotkeys-pristine-runtime.mjs",
@@ -83,14 +83,9 @@
           "sha256": "623a226552b2f19ffd20be00f5e53036fd71f52d8eaa95494b274188f0dcb421"
         },
         {
-          "path": "packages/tanstack-hotkeys/upstream/SHA256SUMS",
+          "path": "packages/tanstack-hotkeys/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "15d18ca1d85011855185b8f37d13958a01a4fe04e0cd586585554e5aa1741b7a"
-        },
-        {
-          "path": "packages/tanstack-hotkeys/scripts/check-upstream-ledger.mjs",
-          "role": "support",
-          "sha256": "55834dbdf5d55e9059c643074257b38ce48c453caf32bb1d54609ff7c8f606a8"
+          "sha256": "49a884c202febdaf1c53d97451dd33a11c6830a53325ee3dd6da2d4297d5aedb"
         }
       ]
     },
