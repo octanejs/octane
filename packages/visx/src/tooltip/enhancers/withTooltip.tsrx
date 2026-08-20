@@ -23,8 +23,8 @@ export default function withTooltip<BaseComponentProps = {}, TooltipData = {}>(
 	renderContainer: RenderTooltipContainer = function defaultRenderContainer(children, props) {
 		return <div {...props}>{children}</div>;
 	},
-) {
-	function WrappedComponent(props: BaseComponentProps) {
+): (props: BaseComponentProps) => OctaneNode {
+	function WrappedComponent(props: BaseComponentProps): OctaneNode {
 		const tooltipProps = useTooltip<TooltipData>();
 
 		return renderContainer(<BaseComponent {...tooltipProps} {...props} />, containerProps);

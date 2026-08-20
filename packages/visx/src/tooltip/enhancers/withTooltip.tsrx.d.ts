@@ -5,5 +5,5 @@ import type { UseTooltipParams } from '../hooks/useTooltip.tsrx';
 export type WithTooltipProvidedProps<TooltipData> = UseTooltipParams<TooltipData>;
 type WithTooltipContainerProps = Octane.HTMLAttributes<HTMLDivElement>;
 type RenderTooltipContainer = (children: ElementDescriptor, containerProps?: WithTooltipContainerProps) => ElementDescriptor | OctaneNode;
-export default function withTooltip<BaseComponentProps = {}, TooltipData = {}>(BaseComponent: ComponentBody<BaseComponentProps & WithTooltipProvidedProps<TooltipData>>, containerProps?: WithTooltipContainerProps, renderContainer?: RenderTooltipContainer): (props: BaseComponentProps) => unknown;
+export default function withTooltip<BaseComponentProps = {}, TooltipData = {}>(BaseComponent: ComponentBody<BaseComponentProps & WithTooltipProvidedProps<TooltipData>>, containerProps?: WithTooltipContainerProps, renderContainer?: RenderTooltipContainer): (props: BaseComponentProps) => OctaneNode;
 export {};
