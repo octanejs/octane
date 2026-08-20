@@ -22,7 +22,7 @@ describe('OverlayScrollbarsComponent', function componentSuite() {
 		it('correct root element with instance', function rootElement() {
 			const elementA = 'code';
 			const elementB = 'span';
-			const view = render(h(OverlayScrollbarsComponent, null));
+			const view = render(h(OverlayScrollbarsComponent, {}));
 			const container = view.container;
 
 			expect(container.firstElementChild).toBeTruthy();
@@ -48,13 +48,13 @@ describe('OverlayScrollbarsComponent', function componentSuite() {
 		});
 
 		it('data-overlayscrollbars-initialize', function initializeAttr() {
-			const { container } = render(h(OverlayScrollbarsComponent, null));
+			const { container } = render(h(OverlayScrollbarsComponent, {}));
 			expect(container.querySelector('[data-overlayscrollbars-initialize]')).toBeTruthy();
 		});
 
 		it('children', function children() {
 			const { container, getByText } = render(
-				h(OverlayScrollbarsComponent, null, 'hello ', h('span', null, 'react')),
+				h(OverlayScrollbarsComponent, {}, 'hello ', h('span', null, 'react')),
 			);
 			expect(getByText(/hello/).textContent).toMatch(/hello/);
 			expect(getByText(/react/).textContent).toMatch(/react/);

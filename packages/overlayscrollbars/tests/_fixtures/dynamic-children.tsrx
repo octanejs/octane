@@ -23,7 +23,7 @@ export function DynamicChildren() {
 	return <div>
 		<OverlayScrollbarsComponent>
 			@if (elements === 0) {
-				empty;
+				<span>empty</span>
 			}
 			@for (const i of items; key i) {
 				<span>{String(i)}</span>
