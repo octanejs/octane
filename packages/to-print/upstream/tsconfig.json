@@ -1,0 +1,43 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    // Project options
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "isolatedModules": true, // Required for Vite
+    "jsx": "react",
+    "lib": [
+      "ES2020",
+      "DOM"
+    ],
+    "module": "ESNext", // Required for Vite
+    "moduleResolution": "bundler",
+    "outDir": "dist",
+    "removeComments": true, // Strips all comments from TypeScript files when converting into JavaScript- you rarely read compiled code so this saves space
+    "target": "ES2020",
+    "skipLibCheck": true,
+
+    // Strict Checks
+    "allowUnreachableCode": false, // Pick up dead code paths
+    "alwaysStrict": true, // Ensures that your files are parsed in the ECMAScript strict mode, and emit “use strict” for each source file.
+    "noImplicitAny": true, // In some cases where no type annotations are present, TypeScript will fall back to a type of any for a variable when it cannot infer the type.
+    "strict": true,
+    "strictNullChecks": true, // When strictNullChecks is true, null and undefined have their own distinct types and you’ll get a type error if you try to use them where a concrete value is expected.
+  
+    // Linter Checks
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true, // Non-empty switch cases must break, return, or throw
+    "noImplicitReturns": true,
+    // "noUncheckedIndexedAccess": true, // Accessing index must always check for undefined
+    "noUnusedLocals": true, // Report errors on unused local variables.
+    "noUnusedParameters": true, // Report errors on unused parameters in functions
+  },
+  "exclude": [
+    "vite.config.dev.ts",
+    "vite.config.ts"
+  ],
+  "include": [
+    "./src",
+    "*.ts"
+  ]
+}
