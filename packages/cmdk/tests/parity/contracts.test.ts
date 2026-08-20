@@ -16,10 +16,14 @@ describe('@octanejs/cmdk parity audit contracts', () => {
 			verification: 'recorded-unverified',
 		});
 		expect(() =>
-			execFileSync(process.execPath, ['packages/cmdk/scripts/check-upstream-ledger.mjs'], {
-				cwd: root,
-				stdio: 'pipe',
-			}),
+			execFileSync(
+				process.execPath,
+				['scripts/react-port/materialize.mjs', 'run', '--check', '--package-dir', 'packages/cmdk'],
+				{
+					cwd: root,
+					stdio: 'pipe',
+				},
+			),
 		).not.toThrow();
 	});
 
