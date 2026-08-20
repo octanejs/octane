@@ -672,7 +672,7 @@ SSR / hydration: Editor and DiffEditor render a deterministic loading shell with
 
 Scope/evidence last checked: 2026-08-10.
 
-- Pinned to @monaco-editor/react 4.7.0 (upstream/COMMIT eb120e66), @monaco-editor/loader 1.7.0, monaco-editor 0.55.1 oracle, and React 19.2.7 for differential/typetest lanes.
+- Pinned to @monaco-editor/react 4.7.0 (audit/upstream.lock.json pin eb120e66), @monaco-editor/loader 1.7.0, monaco-editor 0.55.1 oracle, and React 19.2.7 for differential/typetest lanes.
 - Adapted upstream shell tests live in tests/upstream/*; harness negative-controls guard adapted inventory titles.
 - SSR (tests/ssr), hydration (tests/hydration), and Chromium browser harness (tests/browser) exercise framework and worker integration beyond upstream coverage.
 

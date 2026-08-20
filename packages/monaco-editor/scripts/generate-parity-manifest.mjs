@@ -504,7 +504,7 @@ const manifest = {
 				fileEntry('packages/monaco-editor/scripts/run-pristine-upstream.mjs', 'support'),
 				fileEntry('packages/monaco-editor/tests/upstream-pristine.vitest.config.ts', 'support'),
 				fileEntry('packages/monaco-editor/tests/_harness/pristine-setup.ts', 'support'),
-				fileEntry('packages/monaco-editor/upstream/COMMIT', 'support'),
+				fileEntry('packages/monaco-editor/audit/upstream.lock.json', 'support'),
 			],
 		},
 		{

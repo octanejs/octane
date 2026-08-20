@@ -8,7 +8,7 @@
     "sourceRoot": "src",
     "testRoot": "src",
     "license": "MIT",
-    "integrity": "sha256:9f083ce5c48af37cc904e49298a5d3338f5ff1f819b44b6cf04686f16f01363f",
+    "integrity": "sha256:46abb7e2335209e445163886b7cd9570d976a5873595e30961f0bee2d28f4974",
     "verification": "verified"
   },
   "upstreamSuites": {
@@ -93,9 +93,9 @@
           "sha256": "91a3c8962a0edcb956206a501d943fe99e1c78c6d4d8b5c9a948a3362c75978c"
         },
         {
-          "path": "packages/monaco-editor/upstream/COMMIT",
+          "path": "packages/monaco-editor/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "c2bc1ce614b25a5289bdc2a2224acd046c6a5680632389874a735b7af64779b7"
+          "sha256": "ce1a8517f4dcd0405ee365ef87691cdae162f9b5c33c39b816fbbbc02a685545"
         }
       ]
     },
