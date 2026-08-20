@@ -113,6 +113,42 @@ export function Page() @{
 	write(root, 'src/page.css', '.route { color: rebeccapurple; }\n');
 	write(
 		root,
+		'src/Layout.tsrx',
+		`import { Hydrate, type OctaneNode } from 'octane';
+import { interaction } from 'octane/hydration';
+import { LayoutDeferredHydrationProof } from './layout-deferred-hydration.tsrx';
+
+export default function Layout(props: { children: OctaneNode }) @{
+	<section class="layout">
+		<Hydrate when={interaction()}>
+			<LayoutDeferredHydrationProof />
+		</Hydrate>
+		{props.children}
+	</section>
+}
+`,
+	);
+	write(
+		root,
+		'src/layout-deferred-hydration.tsrx',
+		`import { useState } from 'octane';
+import './layout-deferred-hydration.css';
+
+export function LayoutDeferredHydrationProof() @{
+	const [clicks, setClicks] = useState(0);
+	<button class="rsbuild-layout-deferred-hydration-proof" onClick={() => setClicks((count) => count + 1)}>
+		{'rsbuild-layout-deferred-hydration-chunk-proof: ' + clicks}
+	</button>
+}
+`,
+	);
+	write(
+		root,
+		'src/layout-deferred-hydration.css',
+		'.rsbuild-layout-deferred-hydration-proof { color: teal; }\n',
+	);
+	write(
+		root,
 		'src/deferred-hydration.js',
 		`import './deferred-hydration.css';
 
@@ -154,7 +190,7 @@ export default defineConfig({
 	],
 	router: {
 		routes: [
-			new RenderRoute({ path: '/', entry: '/src/Page.tsrx' }),
+			new RenderRoute({ path: '/', entry: '/src/Page.tsrx', layout: '/src/Layout.tsrx' }),
 			new ServerRoute({
 				path: '/api/health',
 				handler: (context) => compose([])(context, () => Response.json({
@@ -579,6 +615,24 @@ document.querySelector('#root')!.textContent = typeof Counter;
 		expect(deferredJavaScript).toBeTruthy();
 		expect(assetMap['/src/Page.tsrx'].css).toContain(deferredCss);
 		expect(assetMap['/src/Page.tsrx'].js).not.toBe(deferredJavaScript);
+		const layoutDeferredCss = listFiles(clientRoot).find(
+			(file) =>
+				file.endsWith('.css') &&
+				readFileSync(join(clientRoot, file), 'utf8').includes(
+					'.rsbuild-layout-deferred-hydration-proof',
+				),
+		);
+		const layoutDeferredJavaScript = listFiles(clientRoot).find(
+			(file) =>
+				file.endsWith('.js') &&
+				readFileSync(join(clientRoot, file), 'utf8').includes(
+					'rsbuild-layout-deferred-hydration-chunk-proof',
+				),
+		);
+		expect(layoutDeferredCss).toBeTruthy();
+		expect(layoutDeferredJavaScript).toBeTruthy();
+		expect(assetMap['/src/Layout.tsrx'].css).toContain(layoutDeferredCss);
+		expect(assetMap['/src/Layout.tsrx'].js).not.toBe(layoutDeferredJavaScript);
 
 		const entry = pathToFileURL(join(serverRoot, 'entry.js'));
 		entry.searchParams.set('test', String(Date.now()));
@@ -592,9 +646,12 @@ document.querySelector('#root')!.textContent = typeof Counter;
 		expect(response.status).toBe(200);
 		expect(body).toContain('data-rsbuild-ssr="ready"');
 		expect(body).toContain('Rsbuild route');
+		expect(body).toContain('rsbuild-layout-deferred-hydration-chunk-proof: 0');
 		for (const cssFile of assetMap['/src/Page.tsrx'].css) expect(body).toContain(cssFile);
+		expect(body).toContain(`<link rel="stylesheet" href="/${layoutDeferredCss}">`);
 		expect(body).toContain(`<link rel="modulepreload" href="/${assetMap['/src/Page.tsrx'].js}">`);
 		expect(body).not.toContain(`<link rel="modulepreload" href="/${deferredJavaScript}">`);
+		expect(body).not.toContain(`<link rel="modulepreload" href="/${layoutDeferredJavaScript}">`);
 		expect(body).toContain('id="__octane_data"');
 		expect(body).not.toContain('<!--ssr-body-->');
 

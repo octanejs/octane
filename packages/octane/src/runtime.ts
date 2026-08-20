@@ -8219,6 +8219,15 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 			}
 		}
 		renderBlock(block);
+		// The internal try slot owns the complete adopted child range. A
+		// descriptor-only child need not clone a compiled root template, and a
+		// suspended resume can leave the cursor inside that range. Claim its
+		// remainder before cleanup so live server content is not swept as stale.
+		// An earlier template-owned claim remains authoritative.
+		const adoptedSlot = block.slots[0] as TrySlot | undefined;
+		if (adoptedSlot?.__kind === 'trySlotSlot') {
+			hydration.claimRootRemainder(adoptedSlot.end.nextSibling);
+		}
 		drainHydrationRenderPhaseUpdates(block);
 		// Suspended initial adoption intentionally leaves its real server arm and
 		// cursor untouched. Sweep only after that same arm eventually commits.

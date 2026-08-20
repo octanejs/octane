@@ -116,11 +116,12 @@ Available strategies:
 | `condition(booleanOrGetter)` | Hydrates once the condition is truthy. |
 | `never()` | Keeps initial server HTML permanently static. |
 
-`interaction()` listens for `pointerenter`, `focusin`, `pointerdown`, and
-`click` by default. Supported custom events are `auxclick`, `click`,
-`contextmenu`, `dblclick`, `focusin`, `keydown`, `keyup`, `mousedown`,
-`mouseenter`, `mouseover`, `mouseup`, `pointerdown`, `pointerenter`,
-`pointerover`, and `pointerup`.
+`interaction()` listens for `pointerenter`, `focusin`, `pointerdown`,
+`touchstart`, `touchend`, `beforeinput`, `input`, `compositionstart`,
+`compositionupdate`, `compositionend`, and `click` by default. Supported custom
+events also include `auxclick`, `contextmenu`, `dblclick`, `keydown`, `keyup`,
+`mousedown`, `mouseenter`, `mouseover`, `mouseup`, `pointerover`, and
+`pointerup`.
 
 #### Capture interactions before `hydrateRoot()`
 
@@ -178,10 +179,10 @@ Generated Hydrate chunks are not eagerly module-preloaded. Lazy-module discovery
 for independently suspended siblings never enters a dormant Hydrate boundary,
 so its child code remains deferred until activation or an explicit prefetch
 strategy. The Vite and Rsbuild app integrations still link CSS reachable from a
-route's deferred chunks, because that route's server HTML needs its styling
-before the child JavaScript loads. This eager CSS collection follows the route
-entry's asset graph; it does not turn deferred JavaScript into an eager
-dependency.
+route's deferred chunks, including its layout and configured root fallbacks,
+because that route's server HTML needs its styling before the child JavaScript
+loads. This eager CSS collection follows the composed route's asset graphs; it
+does not turn deferred JavaScript into an eager dependency.
 
 ### `prefetch`
 
@@ -379,8 +380,10 @@ static-HTML exception.
 Nested boundaries hydrate parent-first. Interaction intent can wake an
 unresolved ancestor chain, after which Octane replays a same-type event for the
 target boundary. A `never()` ancestor keeps every deferred descendant inert.
-Native event payload details such as pointer coordinates are not guaranteed to
-survive replay.
+Replay preserves supported platform event classes and their captured keyboard,
+pointer, mouse, touch, input, composition, and focus data where the browser can
+construct that event. A replayed event is still programmatic: it cannot restore
+the original event's trusted status or expired transient user activation.
 
 If activation races a pending renderer-owned streamed Suspense reveal, the
 boundary waits for that reveal or its client-render degradation before adopting
@@ -392,3 +395,7 @@ wrapper in layout and HTML nesting; direct placement inside SVG or MathML is
 unsupported because an HTML parser moves a `<div>` out of foreign content before
 hydration. The exact permanent-static form described above is wrapper-free and
 inherits its HTML, SVG, or MathML parser namespace.
+
+For the proposed next step—omitting an inert page shell while independently
+hydrating its live islands—see [Static shells and independently hydrated islands](./hydration-islands-plan.md).
+That design is not a shipped hydration mode.
