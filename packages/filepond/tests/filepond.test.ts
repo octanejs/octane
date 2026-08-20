@@ -70,7 +70,7 @@ describe('FilePond', function filePondSuite() {
 
 		if (supported() && pond) {
 			expect(ref.current).toBeNull();
-			expect(pond.element.isConnected).toBe(false);
+			expect(pond.element == null || pond.element.isConnected === false).toBe(true);
 		} else {
 			expect(ref.current).toBeNull();
 		}

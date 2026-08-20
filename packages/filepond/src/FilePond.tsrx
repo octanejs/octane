@@ -54,7 +54,10 @@ function copyPondMethods(handle: FilePondHandle, pond: Pond) {
 	for (let i = 0; i < keys.length; i++) {
 		const key = keys[i]!;
 		if (filteredMethods.indexOf(key) !== -1) continue;
-		(handle as Record<string, unknown>)[key] = (pond as Record<string, unknown>)[key];
+		(handle as unknown as Record<string, unknown>)[key] = (pond as unknown as Record<
+			string,
+			unknown
+		>)[key];
 	}
 }
 
@@ -93,7 +96,10 @@ export function FilePond(props: FilePondProps) @{
 			if (!pondRef.current) return;
 
 			const bin = document.createElement('div');
-			bin.append(pondRef.current.element);
+			const pondElement = pondRef.current.element;
+			if (pondElement) {
+				bin.append(pondElement);
+			}
 			pondRef.current.destroy();
 			pondRef.current = undefined;
 			handleRef.current.pond = null;
@@ -131,7 +137,6 @@ export function FilePond(props: FilePondProps) @{
 			multiple={props.allowMultiple}
 			required={props.required}
 			class={props.className ?? undefined}
-			capture={props.captureMethod ?? undefined}
 		/>
 	</div>
 }
