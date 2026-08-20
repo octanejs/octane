@@ -104,11 +104,17 @@ export function isRecognizableBsd3Text(content) {
 export function isRecognizableApache2Text(content) {
 	if (typeof content !== 'string') return false;
 	const text = normalizeLicenseText(content);
+	// The required phrases come from the license body (sections 1-9), so a
+	// terms-only copy without the appendix passes and a short "Licensed under
+	// the Apache License" notice header alone does not.
 	return [
 		'apache license',
 		'version 2.0',
-		'licensed under the apache license, version 2.0',
-		'unless required by applicable law or agreed to in writing, software distributed under the license is distributed on an "as is" basis',
+		'"license" shall mean the terms and conditions for use, reproduction, and distribution as defined by sections 1 through 9',
+		'grant of copyright license',
+		'grant of patent license',
+		'redistribution',
+		'unless required by applicable law or agreed to in writing',
 	].every((phrase) => text.includes(phrase));
 }
 

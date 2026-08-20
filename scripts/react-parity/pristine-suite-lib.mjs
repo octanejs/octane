@@ -22,7 +22,9 @@ export const PRISTINE_SUITE_CONFIG_RELATIVE_PATH = 'audit/pristine-suite.json';
 export function loadPristineSuiteConfig(repoRoot, packagePath) {
 	const configPath = path.resolve(repoRoot, packagePath, PRISTINE_SUITE_CONFIG_RELATIVE_PATH);
 	if (!existsSync(configPath)) {
-		throw new Error(`missing pristine suite config: ${packagePath}/${PRISTINE_SUITE_CONFIG_RELATIVE_PATH}`);
+		throw new Error(
+			`missing pristine suite config: ${packagePath}/${PRISTINE_SUITE_CONFIG_RELATIVE_PATH}`,
+		);
 	}
 	const config = JSON.parse(readFileSync(configPath, 'utf8'));
 	if (config.schemaVersion !== 1) {
@@ -36,7 +38,11 @@ export function loadPristineSuiteConfig(repoRoot, packagePath) {
 	if (!Array.isArray(config.copy) || config.copy.length === 0) {
 		throw new Error('pristine suite config must copy at least one pinned root');
 	}
-	for (const entry of [...config.copy, ...(config.overlay ? [config.overlay] : [])]) {
+	for (const entry of [
+		...config.copy,
+		...(config.overlay ? [config.overlay] : []),
+		...Object.keys(config.inlineFiles ?? {}),
+	]) {
 		if (typeof entry !== 'string' || !entry || entry.startsWith('/') || entry.includes('..')) {
 			throw new Error(`pristine suite config path is not package-relative: ${String(entry)}`);
 		}
@@ -65,7 +71,12 @@ export function pristineIdentitiesFromReport(report, { repoRoot, packagePath }) 
 export function runConfiguredPristineSuite(
 	repoRoot,
 	packagePath,
-	{ reportPath = path.join(tmpdir(), `octane-pristine-${path.basename(packagePath)}-${process.pid}.json`) } = {},
+	{
+		reportPath = path.join(
+			tmpdir(),
+			`octane-pristine-${path.basename(packagePath)}-${process.pid}.json`,
+		),
+	} = {},
 ) {
 	const config = loadPristineSuiteConfig(repoRoot, packagePath);
 	const packageRoot = path.resolve(repoRoot, packagePath);
@@ -86,10 +97,7 @@ export function runConfiguredPristineSuite(
 		for (const [relativePath, contents] of Object.entries(config.inlineFiles ?? {})) {
 			const target = path.join(runRoot, ...relativePath.split('/'));
 			mkdirSync(path.dirname(target), { recursive: true });
-			writeFileSync(
-				target,
-				typeof contents === 'string' ? contents : JSON.stringify(contents),
-			);
+			writeFileSync(target, typeof contents === 'string' ? contents : JSON.stringify(contents));
 		}
 		const result = spawnSync(
 			path.join(packageRoot, 'node_modules/.bin/vitest'),

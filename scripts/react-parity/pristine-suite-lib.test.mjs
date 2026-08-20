@@ -33,6 +33,8 @@ test('accepts a complete config and rejects missing or unsafe fields', () => {
 		{ ...valid, copy: [] },
 		{ ...valid, copy: ['../escape'] },
 		{ ...valid, overlay: '/absolute' },
+		{ ...valid, inlineFiles: { '../package.json': '{}' } },
+		{ ...valid, inlineFiles: { '/etc/passwd': 'x' } },
 	]) {
 		assert.throws(() => loadPristineSuiteConfig(fixtureRoot(broken), 'packages/example'));
 	}
@@ -50,20 +52,27 @@ test('maps scratch-root report paths onto the portable upstream prefix', () => {
 			},
 		],
 	};
-	assert.deepEqual(pristineIdentitiesFromReport(report, { repoRoot: '/repo', packagePath: 'packages/example' }), [
-		{
-			file: 'packages/example/upstream/tests/index.test.tsx',
-			fullName: 'renders',
-			status: 'passed',
-		},
-	]);
+	assert.deepEqual(
+		pristineIdentitiesFromReport(report, { repoRoot: '/repo', packagePath: 'packages/example' }),
+		[
+			{
+				file: 'packages/example/upstream/tests/index.test.tsx',
+				fullName: 'renders',
+				status: 'passed',
+			},
+		],
+	);
 });
 
 test('inventory ids are deterministic and duplicate identities stay distinct', () => {
 	const identities = [
 		{ file: 'packages/example/upstream/tests/a.test.ts', fullName: 'same title', status: 'passed' },
 		{ file: 'packages/example/upstream/tests/a.test.ts', fullName: 'same title', status: 'passed' },
-		{ file: 'packages/example/upstream/tests/a.test.ts', fullName: 'failed case', status: 'failed' },
+		{
+			file: 'packages/example/upstream/tests/a.test.ts',
+			fullName: 'failed case',
+			status: 'failed',
+		},
 	];
 	const inventory = inventoryFromIdentities(identities, {
 		project: 'example-pristine',
