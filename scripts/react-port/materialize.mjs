@@ -19,6 +19,7 @@ import {
 	verifyPristineTree,
 } from './materialize-lib.mjs';
 import {
+	classifyApprovedLicenseText,
 	evaluateApprovedLicense,
 	fetchBounded,
 	fetchJson,
@@ -67,6 +68,10 @@ Options:
                              target (lock; repeatable)
   --adapted-rewrite <f=r>    Mechanical source rewrite applied to every mapped
                              file before its patch (lock; repeatable, ordered)
+  --accept-license-file      Reviewed exception (lock with --pin): accept a
+                             recognizable approved license file when the
+                             pinned manifest declares no license at all; the
+                             lock records the file-only basis
   --check                    Verify without network or writes (run)
   -h, --help                 Show this help
 `;
@@ -79,6 +84,7 @@ function parseArguments(argumentsList) {
 		batch: null,
 		scopes: [],
 		check: false,
+		acceptLicenseFile: false,
 		commit: null,
 		manifestPath: null,
 		node: null,
@@ -167,6 +173,8 @@ function parseArguments(argumentsList) {
 				replace: value.slice(separator + 1),
 			});
 			index += 1;
+		} else if (argument === '--accept-license-file') {
+			options.acceptLicenseFile = true;
 		} else if (argument === '--check') {
 			options.check = true;
 		} else {
@@ -426,6 +434,18 @@ async function commandLockFromBatch(options) {
 const LICENSE_FILE_PATTERN = /^(?:licen[cs]e|copying)(?:\..*)?$/i;
 const NOTICE_FILE_PATTERN = /^notice(?:\..*)?$/i;
 
+// For a file-only license basis, every discovered license file must classify
+// to one approved identifier; that identifier then stands in for the missing
+// manifest declaration so the normal consistency checks still apply.
+function classifyLicenseFilesOnly(licenseFiles) {
+	const classifications = new Set(
+		licenseFiles.map((file) => classifyApprovedLicenseText(file.content)),
+	);
+	if (classifications.size !== 1) return undefined;
+	const [only] = classifications;
+	return only === 'unrecognized' ? undefined : only;
+}
+
 // Legacy migration mode: many published pins lack the registry gitHead that
 // preflight requires, but a vendored binding already carries a reviewed
 // UPSTREAM.md pin. The explicit pin is accepted only when the pinned commit's
@@ -499,8 +519,18 @@ async function commandLockFromPin(options) {
 		if (isNotice) noticeFiles.push(file);
 		else licenseFiles.push(file);
 	}
+	// --accept-license-file is a reviewed exception for pins whose manifest
+	// omits a license declaration entirely: the recognizable approved license
+	// file is then the evidence, and the lock records the file-only basis. It
+	// never overrides a contradicting declaration, and the default stays
+	// fail-closed on a silent manifest.
+	const manifestDeclaresLicense =
+		typeof manifest.license === 'string' && manifest.license.trim() !== '';
 	const verdict = evaluateApprovedLicense({
-		manifestLicense: manifest.license,
+		manifestLicense:
+			!manifestDeclaresLicense && options.acceptLicenseFile
+				? classifyLicenseFilesOnly(licenseFiles)
+				: manifest.license,
 		licenseFiles,
 		noticeFiles,
 	});
@@ -509,6 +539,8 @@ async function commandLockFromPin(options) {
 			`Pinned source license evidence is not approved: ${verdict.reasons.join('; ')}`,
 		);
 	}
+	const licenseDeclaration =
+		!manifestDeclaresLicense && options.acceptLicenseFile ? 'file-only' : 'manifest';
 	const lock = buildUpstreamLock({
 		identity: {
 			packageName,
@@ -519,6 +551,7 @@ async function commandLockFromPin(options) {
 		},
 		license: {
 			spdx: verdict.spdx,
+			declaration: licenseDeclaration,
 			evidence: verdict.evidence.map(({ path: filePath, sha256 }) => ({ path: filePath, sha256 })),
 			notices: verdict.notices.map(({ path: filePath, sha256 }) => ({ path: filePath, sha256 })),
 		},
