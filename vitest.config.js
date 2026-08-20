@@ -7641,12 +7641,15 @@ export default defineConfig({
 					name: 'oidc-context-ssr',
 					include: ['packages/oidc-context/tests/ssr.test.ts'],
 					environment: 'node',
-					setupFiles: ['packages/oidc-context/tests/_setup.ts'],
 					globals: false,
 				},
-				plugins: [octane()],
+				plugins: [octane({ ssr: true })],
 				resolve: {
 					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
 						{
 							find: /^@octanejs\/oidc-context$/,
 							replacement: resolve(import.meta.dirname, 'packages/oidc-context/src/index.ts'),

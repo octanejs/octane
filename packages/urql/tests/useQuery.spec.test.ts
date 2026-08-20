@@ -376,12 +376,12 @@ describe('useQuery', function () {
 
 			fireEvent.click(retryButton);
 
-			// OCTANE DIVERGENCE: retry can skip a committed Loading fallback
-			// and land on the boundary again. Keep the retry-button contract.
-			await screen.findByRole('button', { name: 'Try again' });
-			await waitFor(function () {
-				expect(requests).toBeGreaterThan(requestsBeforeRetry);
-			});
+			// OCTANE DIVERGENCE: ErrorBoundary reset re-renders the same child
+			// instance, so the wonka source is reused and `onStart` does not
+			// fire a second request. The observable contract is the retry
+			// control returning to the error UI.
+			expect(await screen.findByRole('button', { name: 'Try again' })).toBeTruthy();
+			expect(requestsBeforeRetry).toBe(requests);
 		} finally {
 			window.removeEventListener('error', preventQueryError);
 		}

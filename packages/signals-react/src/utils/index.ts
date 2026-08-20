@@ -22,8 +22,9 @@ function Item(props: { v: unknown; i?: Signal<number>; children: unknown }) {
 	return props.children as OctaneNode;
 }
 
-export function Show<T = boolean>(props: ShowProps<T>): OctaneNode {
-	useSignals();
+export function Show<T = boolean>(props: ShowProps<T>, ...rest: unknown[]): OctaneNode {
+	const [, slot] = splitSlot(rest);
+	useSignals(undefined, undefined, subSlot(slot, 'show-signals'));
 	const value = typeof props.when === 'function' ? props.when() : props.when.value;
 	if (!value) {
 		const fallback = props.fallback;
@@ -44,11 +45,16 @@ interface ForProps<T> {
 	children: (value: T, index: number) => OctaneNode;
 }
 
-export function For<T>(props: ForProps<T>): OctaneNode {
-	useSignals();
-	const cache = useMemo(function createCache() {
-		return new Map<T, { vnode: OctaneNode; i: Signal<number> }>();
-	}, []);
+export function For<T>(props: ForProps<T>, ...rest: unknown[]): OctaneNode {
+	const [, slot] = splitSlot(rest);
+	useSignals(undefined, undefined, subSlot(slot, 'for-signals'));
+	const cache = useMemo(
+		function createCache() {
+			return new Map<T, { vnode: OctaneNode; i: Signal<number> }>();
+		},
+		[],
+		subSlot(slot, 'for-cache'),
+	);
 	const list = (typeof props.each === 'function' ? props.each() : props.each) as
 		Signal<ReadonlyArray<T>> | ReadonlyArray<T>;
 	const listValue = list instanceof Signal ? list.value : list;
