@@ -5,7 +5,8 @@ class FakeIntersectionObserver {
 }
 
 const MyIntersectionObserver =
-	globalThis.IntersectionObserver || (FakeIntersectionObserver as typeof IntersectionObserver);
+	globalThis.IntersectionObserver ||
+	(FakeIntersectionObserver as unknown as typeof IntersectionObserver);
 
 class ElementObserver {
 	private observer: IntersectionObserver;
@@ -16,7 +17,7 @@ class ElementObserver {
 	}
 
 	public onObserved(entries: IntersectionObserverEntry[]) {
-		entries.forEach(function notify(entry) {
+		entries.forEach(function notify(this: ElementObserver, entry) {
 			const elementCallback = this.elementsMap.get(entry.target as Element);
 			if (elementCallback) {
 				elementCallback(entry);

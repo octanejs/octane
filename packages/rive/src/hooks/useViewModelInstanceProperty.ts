@@ -87,18 +87,19 @@ export function useViewModelInstanceProperty<P extends ViewModelInstanceValue, V
 
 			const prop = currentOptions.getProperty(currentInstance, currentPath);
 			if (prop) {
-				setProperty(prop);
-				setValue(currentOptions.getValue(prop));
+				const activeProp = prop;
+				setProperty(activeProp);
+				setValue(currentOptions.getValue(activeProp));
 
 				if (currentOptions.getExtendedData) {
-					setExtendedData(currentOptions.getExtendedData(prop));
+					setExtendedData(currentOptions.getExtendedData(activeProp));
 				}
 
 				function handleChange() {
-					setValue(currentOptions.getValue(prop));
+					setValue(currentOptions.getValue(activeProp));
 
 					if (currentOptions.getExtendedData) {
-						setExtendedData(currentOptions.getExtendedData(prop));
+						setExtendedData(currentOptions.getExtendedData(activeProp));
 					}
 
 					if (currentOptions.onPropertyEvent) {
