@@ -29,7 +29,8 @@
       "@octanejs/tanstack-router-ssr-query",
       "@octanejs/remix-router",
       "@octanejs/inertia",
-      "@octanejs/nuqs"
+      "@octanejs/nuqs",
+      "@octanejs/wouter"
     ]
   },
   {
@@ -69,7 +70,13 @@
       "@octanejs/usehooks-ts",
       "@octanejs/intersection-observer",
       "@octanejs/tanstack-hotkeys",
-      "@octanejs/tanstack-pacer"
+      "@octanejs/tanstack-pacer",
+      "@octanejs/stick-to-bottom",
+      "@octanejs/image-crop",
+      "@octanejs/content-loader",
+      "@octanejs/to-print",
+      "@octanejs/calendar",
+      "@octanejs/auto-animate"
     ]
   },
   {
@@ -88,7 +95,8 @@
       "@octanejs/monaco-editor",
       "@octanejs/syntax-highlighter",
       "@octanejs/mdx",
-      "@octanejs/i18next"
+      "@octanejs/i18next",
+      "@octanejs/html-react-parser"
     ]
   },
   {
