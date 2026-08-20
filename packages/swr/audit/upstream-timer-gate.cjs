@@ -43,4 +43,33 @@ function holdFirstTimeout(delay, run) {
 	};
 }
 
-module.exports = { holdFirstTimeout };
+function createSupersedingTimeoutGate(delay, heldRuns) {
+	if (!Number.isInteger(heldRuns) || heldRuns < 1) {
+		throw new Error('heldRuns must be a positive integer');
+	}
+
+	let runCount = 0;
+	let releasePrevious = null;
+
+	return {
+		run(callback) {
+			if (runCount < heldRuns) {
+				const held = holdFirstTimeout(delay, callback);
+				const release = releasePrevious;
+				releasePrevious = held.release;
+				runCount++;
+				release?.();
+				return held.result;
+			}
+
+			const result = callback();
+			const release = releasePrevious;
+			releasePrevious = null;
+			runCount++;
+			release?.();
+			return result;
+		},
+	};
+}
+
+module.exports = { createSupersedingTimeoutGate, holdFirstTimeout };

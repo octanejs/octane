@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest';
-import { useState } from 'octane';
+import { createRoot, useState } from 'octane';
 import { act, mount } from './_helpers';
 import type { OctaneDevtoolsHook } from '../src/devtools-hook';
 
@@ -50,4 +50,59 @@ describe('runtime devtools instrumentation (profile build)', () => {
 		off();
 		unmount();
 	});
+
+	it(
+		'notifies subscribers when an effect-free first render reaches its deferred commit',
+		async () => {
+			await Promise.resolve();
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			const root = createRoot(container);
+			let off = () => {};
+			try {
+				root.render(CounterApp);
+				const observedTrees: string[][] = [];
+				off = hook().subscribe(() => {
+					observedTrees.push(hook().getTree().map((entry) => entry.name));
+				});
+				expect(container.querySelector('span')?.textContent).toBe('0');
+				expect(observedTrees).toEqual([]);
+
+				await Promise.resolve();
+
+				expect(observedTrees.some((names) => names.includes('CounterApp'))).toBe(true);
+			} finally {
+				off();
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it(
+		'notifies subscribers when a synchronous click reaches its already-queued commit',
+		async () => {
+			const rendered = mount(<CounterApp />);
+			let off = () => {};
+			try {
+				await Promise.resolve();
+				const button = rendered.find('button') as HTMLButtonElement;
+				button.click();
+				expect(rendered.find('span').textContent).toBe('1');
+
+				const observedTrees: string[][] = [];
+				off = hook().subscribe(() => {
+					observedTrees.push(hook().getTree().map((entry) => entry.name));
+				});
+				expect(observedTrees).toEqual([]);
+				await Promise.resolve();
+
+				expect(observedTrees.some((names) => names.includes('CounterApp'))).toBe(true);
+				expect(rendered.find('span').textContent).toBe('1');
+			} finally {
+				off();
+				rendered.unmount();
+			}
+		},
+	);
 });

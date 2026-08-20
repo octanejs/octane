@@ -25,6 +25,12 @@ export function TwoStates() @{
 	</div>
 }
 
+export function StateValueProbe(props) @{
+	const [value, setValue, getValue] = octaneUseState(() => props.initial);
+	props.expose(setValue, getValue);
+	<span>{props.display(value) as string}</span>
+}
+
 // useReducer
 export function Tally() @{
 	const [n, dispatch] = useReducer((s, a) => s + a, 0);
