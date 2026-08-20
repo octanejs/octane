@@ -40,7 +40,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/i18next` | [`packages/i18next`](../packages/i18next) | framework binding | `0.1.36` | 3 |
 | `@octanejs/inertia` | [`packages/inertia`](../packages/inertia) | framework binding | `0.0.10` | 3 |
 | `@octanejs/ink` | [`packages/ink`](../packages/ink) | framework binding | `0.0.4` | 5 |
-| `@octanejs/input-otp` | [`packages/input-otp`](../packages/input-otp) | framework binding | `0.0.7` | 1 |
+| `@octanejs/input-otp` | [`packages/input-otp`](../packages/input-otp) | framework binding | `0.0.8` | 1 |
 | `@octanejs/intersection-observer` | [`packages/intersection-observer`](../packages/intersection-observer) | framework binding | `0.0.7` | 2 |
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.38` | 7 |
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.1.40` | 42 |

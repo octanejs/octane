@@ -17,6 +17,8 @@ it('should change the input value', async () => {
 
 it('should prevent typing greater than max length', async () => {
 	const input = page.getByRole('textbox');
-	await input.pressSequentially('1234567');
+	await input.pressSequentially('123456');
+	expect(await input.inputValue()).toBe('123456');
+	await input.pressSequentially('7');
 	expect(await input.inputValue()).toBe('123457');
 });

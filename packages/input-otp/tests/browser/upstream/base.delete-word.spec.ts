@@ -14,10 +14,13 @@ it('should backspace previous word (even if there is not a selected character)',
 it('should backspace selected char', async () => {
 	const input = page.getByRole('textbox');
 	await input.pressSequentially('123456');
-	await expectSelection(input, [5, 6]);
-	await input.press('ArrowLeft');
-	await expectSelection(input, [4, 5]);
-	await input.press('ArrowLeft');
+	expect(await input.inputValue()).toBe('123456');
+	await input.evaluate((element: HTMLInputElement) => {
+		element.setSelectionRange(3, 4);
+		document.dispatchEvent(new Event('selectionchange'));
+	});
+	await expect.poll(async () => input.getAttribute('data-input-otp-mss')).toBe('3');
+	await expect.poll(async () => input.getAttribute('data-input-otp-mse')).toBe('4');
 	await expectSelection(input, [3, 4]);
 	await input.press(`${modifier}+Backspace`);
 	expect(await input.inputValue()).toBe('12356');

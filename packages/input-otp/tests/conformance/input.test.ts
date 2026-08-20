@@ -28,8 +28,11 @@ describe('@octanejs/input-otp component state and projection', () => {
 		expect(input.autocomplete).toBe('one-time-code');
 		expect(input.inputMode).toBe('numeric');
 		expect(input.pattern).toBe('^\\d+$');
+		expect(input.spellcheck).toBe(false);
 		expect(input.getAttribute('aria-label')).toBe('Verification code');
 		expect(input.name).toBe('verification-code');
+		expect(app.find('[data-input-otp-container]').getAttribute('translate')).toBe('no');
+		expect(input.style.fontSize).toBe('var(--root-height, 16px)');
 		expect(app.find('[data-testid="context"]').getAttribute('data-slots')).toBe('1|2|_|_');
 		app.unmount();
 	});
@@ -148,6 +151,8 @@ describe('@octanejs/input-otp component state and projection', () => {
 		expect(input.required).toBe(true);
 		expect(input.tabIndex).toBe(3);
 		expect(input.autocomplete).toBe('off');
+		expect(input.spellcheck).toBe(true);
+		expect(document.getElementById('input-otp-style')?.getAttribute('nonce')).toBe('csp-style');
 
 		input.focus();
 		input.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));

@@ -26,6 +26,7 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
       pasteTransformer,
       containerClassName,
       noScriptCSSFallback = NOSCRIPT_CSS_FALLBACK,
+      nonce,
 
       render,
       children,
@@ -148,7 +149,7 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
           }
 
           if (start !== -1 && end !== -1 && start !== end) {
-            inputRef.current.setSelectionRange(start, end, direction)
+            input.setSelectionRange(start, end, direction)
           }
         }
 
@@ -173,6 +174,7 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
       if (!document.getElementById('input-otp-style')) {
         const styleEl = document.createElement('style')
         styleEl.id = 'input-otp-style'
+        if (nonce) styleEl.setAttribute('nonce', nonce)
         document.head.appendChild(styleEl)
 
         if (styleEl.sheet) {
@@ -213,8 +215,13 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
         }
       }
       updateRootHeight()
-      const resizeObserver = new ResizeObserver(updateRootHeight)
-      resizeObserver.observe(input)
+      // ResizeObserver is missing in older browsers (e.g. iOS Safari <13.4);
+      // without it the root height is still measured once on mount.
+      const resizeObserver =
+        typeof ResizeObserver === 'undefined'
+          ? null
+          : new ResizeObserver(updateRootHeight)
+      resizeObserver?.observe(input)
 
       return () => {
         document.removeEventListener(
@@ -222,8 +229,11 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
           onDocumentSelectionChange,
           { capture: true },
         )
-        resizeObserver.disconnect()
+        resizeObserver?.disconnect()
       }
+      // The style tag is created once per document, so only the first
+      // render's nonce can ever be used — a mount-only effect is intended.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     /** Mirrors for UI rendering purpose only */
@@ -238,7 +248,7 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
 
     /** Effects */
     React.useEffect(() => {
-      syncTimeouts(() => {
+      const timeouts = syncTimeouts(() => {
         // Forcefully remove :autofill state
         inputRef.current?.dispatchEvent(new Event('input'))
 
@@ -252,6 +262,9 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
           inputMetadataRef.current.prev = [s, e, dir]
         }
       })
+      return () => {
+        timeouts.forEach(timeout => clearTimeout(timeout))
+      }
     }, [value, isFocused])
 
     React.useEffect(() => {
@@ -311,14 +324,15 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
     const _pasteListener = React.useCallback(
       (e: React.ClipboardEvent<HTMLInputElement>) => {
         const input = inputRef.current
-        if (!pasteTransformer && (!initialLoadRef.current.isIOS || !e.clipboardData || !input)) {
+        if (
+          !pasteTransformer &&
+          (!initialLoadRef.current.isIOS || !e.clipboardData || !input)
+        ) {
           return
         }
-        
+
         const _content = e.clipboardData.getData('text/plain')
-        const content = pasteTransformer
-          ? pasteTransformer(_content)
-          : _content
+        const content = pasteTransformer ? pasteTransformer(_content) : _content
         e.preventDefault()
 
         const start = inputRef.current?.selectionStart
@@ -345,7 +359,7 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
         setMirrorSelectionStart(_start)
         setMirrorSelectionEnd(_end)
       },
-      [maxLength, onChange, regexp, value],
+      [maxLength, onChange, pasteTransformer, regexp, value],
     )
 
     /** Styles */
@@ -383,7 +397,7 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
         boxShadow: 'none',
         lineHeight: '1',
         letterSpacing: '-.5em',
-        fontSize: 'var(--root-height)',
+        fontSize: 'var(--root-height, 16px)',
         fontFamily: 'monospace',
         fontVariantNumeric: 'tabular-nums',
         // letterSpacing: '-1em',
@@ -422,6 +436,7 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
           maxLength={maxLength}
           value={value}
           ref={inputRef}
+          spellCheck={props.spellCheck ?? false}
           onPaste={e => {
             _pasteListener(e)
             props.onPaste?.(e)
@@ -454,6 +469,7 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
         maxLength,
         mirrorSelectionEnd,
         mirrorSelectionStart,
+        placeholder,
         props,
         regexp?.source,
         value,
@@ -472,7 +488,8 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
               (slotIdx >= mirrorSelectionStart && slotIdx < mirrorSelectionEnd))
 
           const char = value[slotIdx] !== undefined ? value[slotIdx] : null
-          const placeholderChar = value[0] !== undefined ? null : placeholder?.[slotIdx] ?? null
+          const placeholderChar =
+            value[0] !== undefined ? null : placeholder?.[slotIdx] ?? null
 
           return {
             char,
@@ -490,6 +507,7 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
       maxLength,
       mirrorSelectionEnd,
       mirrorSelectionStart,
+      placeholder,
       props.disabled,
       value,
     ])
@@ -516,6 +534,10 @@ export const OTPInput = React.forwardRef<HTMLInputElement, OTPInputProps>(
         <div
           ref={containerRef}
           data-input-otp-container
+          // Chrome's translation feature rewrites the slots' text nodes
+          // (wrapping them in <font>), which crashes React on the next
+          // update — and a one-time code is never meaningful to translate.
+          translate="no"
           style={rootStyle}
           className={containerClassName}
         >
@@ -541,7 +563,11 @@ function safeInsertRule(sheet: CSSStyleSheet, rule: string) {
   try {
     sheet.insertRule(rule)
   } catch {
-    console.error('input-otp could not insert CSS rule:', rule)
+    // Some environments reject individual selectors (e.g. `:autofill` in
+    // older WebViews). Losing one of these cosmetic rules never breaks the
+    // input, so it must not look like an application error — error-level
+    // logs end up in monitoring tools like Sentry.
+    console.warn('input-otp could not insert CSS rule:', rule)
   }
 }
 
