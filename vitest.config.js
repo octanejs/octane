@@ -6259,11 +6259,11 @@ export default defineConfig({
 				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'dropzone-pristine',
-					include: ['packages/dropzone/upstream/canonical/src/**/*.spec.{ts,tsx}'],
+					include: ['packages/dropzone/upstream/src/**/*.spec.{ts,tsx}'],
 					environment: 'jsdom',
 					globals: true,
 					clearMocks: true,
-					setupFiles: ['packages/dropzone/upstream/canonical/test-setup.js'],
+					setupFiles: ['packages/dropzone/upstream/test-setup.js'],
 					fileParallelism: false,
 				},
 			},

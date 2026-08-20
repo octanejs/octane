@@ -433,6 +433,37 @@ async function commandLockFromBatch(options) {
 
 const LICENSE_FILE_PATTERN = /^(?:licen[cs]e|copying)(?:\..*)?$/i;
 const NOTICE_FILE_PATTERN = /^notice(?:\..*)?$/i;
+const RELEASE_PLACEHOLDER_VERSIONS = new Set(['0.0.0-development', '0.0.0-semantic-release']);
+
+async function releaseTagMatchesCommit({ owner, repo, packageName, version }, options) {
+	const fetchOptions = {
+		fetchImpl: options.fetchImpl,
+		allowedHosts: new Set(['api.github.com']),
+		headers: githubHeaders(options),
+		requestTimeoutMs: options.requestTimeoutMs,
+	};
+	for (const tag of [`v${version}`, `${packageName}@${version}`]) {
+		let reference;
+		try {
+			reference = await fetchJson(
+				`https://api.github.com/repos/${owner}/${repo}/git/ref/tags/${encodeURIComponent(tag)}`,
+				fetchOptions,
+			);
+		} catch {
+			continue;
+		}
+		let sha = reference.object?.sha?.toLowerCase();
+		if (reference.object?.type === 'tag' && sha) {
+			const tagObject = await fetchJson(
+				`https://api.github.com/repos/${owner}/${repo}/git/tags/${sha}`,
+				fetchOptions,
+			);
+			sha = tagObject.object?.sha?.toLowerCase();
+		}
+		if (sha === options.commit) return true;
+	}
+	return false;
+}
 
 // For a file-only license basis, every discovered license file must classify
 // to one approved identifier; that identifier then stands in for the missing
@@ -486,7 +517,14 @@ async function commandLockFromPin(options) {
 			'utf8',
 		),
 	);
-	if (manifest.name !== packageName || manifest.version !== version) {
+	// Semantic-release repositories keep a placeholder version in git and stamp
+	// the real one at publish; for those, version correspondence is proven by
+	// the release tag resolving to the pinned commit instead.
+	const versionCorresponds =
+		manifest.version === version ||
+		(RELEASE_PLACEHOLDER_VERSIONS.has(manifest.version) &&
+			(await releaseTagMatchesCommit({ owner, repo, packageName, version }, options)));
+	if (manifest.name !== packageName || !versionCorresponds) {
 		throw new Error(
 			`Pinned commit manifest declares ${manifest.name}@${manifest.version}, not ${packageName}@${version}; the pin does not correspond to this commit`,
 		);
