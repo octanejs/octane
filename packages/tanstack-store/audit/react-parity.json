@@ -75,7 +75,7 @@
         {
           "path": "scripts/react-parity/tanstack-store-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "c2b1ed2ae82301a0c5d85586fde2e697e0bac537d4d2f7d506a8edebb1c4c81f"
+          "sha256": "f1297fd3044bbc24cf216691a0614b1d220ab93e5562dc66df67b21037f863e8"
         },
         {
           "path": "packages/tanstack-store/scripts/run-pristine-upstream.mjs",
@@ -91,6 +91,16 @@
           "path": "packages/tanstack-store/audit/upstream.lock.json",
           "role": "support",
           "sha256": "88cd0c83d3950851f39ab5d85eb9fd2f298dd298db0a7c5d0057aaea628bf0e7"
+        },
+        {
+          "path": "packages/tanstack-store/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "38f038c330c830da41aed92e1bddb43d3b48233eaa8d1a2868e38e61a2ff8665"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "5dbb930db1dc483b1a260405cb3d8efddca2462036f98b1f8e79bd1880434d23"
         }
       ]
     },
