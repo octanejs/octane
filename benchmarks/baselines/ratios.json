@@ -932,6 +932,102 @@
     "note": "Same-run Brotli server bytes retain the CSS proof saving without pinning compressor-specific absolute bytes."
   },
   {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "rspack-css-named-client-proven",
+    "reference": "rspack-css-named-client-control",
+    "maxRatio": 0.84,
+    "note": "Real Rspack/CssExtract named-export builds must retain the client CSS-folding benefit; source, emitted CSS, and SSR output are identical."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "rspack-css-named-client-proven",
+    "reference": "rspack-css-named-client-control",
+    "maxRatio": 0.88,
+    "note": "Same-run gzip guards actual Rspack graph-proof collection, not only the low-level compiler option."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "rspack-css-named-client-proven",
+    "reference": "rspack-css-named-client-control",
+    "maxRatio": 0.9,
+    "note": "The real named-export Rspack adapter must keep a material client Brotli saving with stylesheet ownership intact."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "rspack-css-named-server-proven",
+    "reference": "rspack-css-named-server-control",
+    "maxRatio": 0.88,
+    "note": "Named CSS-loader exports must reach production server template folding through the actual Rspack adapter."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "rspack-css-named-server-proven",
+    "reference": "rspack-css-named-server-control",
+    "maxRatio": 0.99,
+    "note": "Same-run compressed server bytes retain the measured Rspack named-export saving; full SSR and emitted CSS are checked separately."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "rspack-css-named-server-proven",
+    "reference": "rspack-css-named-server-control",
+    "maxRatio": 0.98,
+    "note": "The real Rspack server path must not silently stop folding proven named CSS exports."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "rspack-css-default-client-proven",
+    "reference": "rspack-css-default-client-control",
+    "maxRatio": 0.86,
+    "note": "Authenticated immutable default maps must retain a material client-code saving through the Rspack provider callback."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "rspack-css-default-client-proven",
+    "reference": "rspack-css-default-client-control",
+    "maxRatio": 0.88,
+    "note": "Same-source immutable-provider Rspack builds guard callback-based client folding with equal CSS and SSR semantics."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "rspack-css-default-client-proven",
+    "reference": "rspack-css-default-client-control",
+    "maxRatio": 0.9,
+    "note": "The authenticated-default Rspack client path must keep its compressed-code reduction."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "rspack-css-default-server-proven",
+    "reference": "rspack-css-default-server-control",
+    "maxRatio": 0.9,
+    "note": "The actual Rspack server adapter must consume immutable-default provider facts, with the same source and rendered HTML."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "rspack-css-default-server-proven",
+    "reference": "rspack-css-default-server-control",
+    "maxRatio": 0.96,
+    "note": "Same-run gzip guards the Rspack immutable-default server saving without pinning compressor-specific absolute bytes."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "rspack-css-default-server-proven",
+    "reference": "rspack-css-default-server-control",
+    "maxRatio": 0.96,
+    "note": "Same-run Brotli guards the authenticated-default server path; stylesheet bytes and full SSR checksums must match."
+  },
+  {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",

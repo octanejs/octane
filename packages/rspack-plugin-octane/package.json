@@ -53,6 +53,7 @@
   "devDependencies": {
     "@rspack/core": "catalog:default",
     "@types/node": "catalog:default",
+    "css-loader": "6.11.0",
     "octane": "workspace:*",
     "vitest": "catalog:default"
   }

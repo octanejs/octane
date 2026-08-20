@@ -8,6 +8,7 @@ import {
 	createClientReferenceManifest,
 	createOctaneCompiler,
 } from 'octane/compiler/bundler';
+import { installCssModuleConstants } from './css-module-constants.js';
 import {
 	getOctaneRspackBuildInfo,
 	inferRspackEnvironment,
@@ -344,12 +345,20 @@ export class OctaneRspackPlugin {
 		);
 		const environment = this.options.environment ?? inferRspackEnvironment(compiler.options.target);
 		const profile = environment === 'client' && this.options.profile === true;
-		const hmr =
-			environment === 'client' && hasHotModuleReplacement(compiler) && this.options.hmr !== false;
+		const hotModuleReplacement = hasHotModuleReplacement(compiler);
+		const hmr = environment === 'client' && hotModuleReplacement && this.options.hmr !== false;
 		const dev =
 			environment === 'client' &&
 			(this.options.dev ??
 				(compiler.options.mode === undefined || compiler.options.mode !== 'production'));
+		// Disabling Octane's own HMR wrapper does not make a hot CSS provider's
+		// exports immutable across replacement.
+		const cssModuleConstants =
+			this.options.cssModuleConstants !== undefined &&
+			this.options.cssModuleConstants !== false &&
+			compiler.options.mode === 'production' &&
+			!dev &&
+			!hotModuleReplacement;
 		assertProfilingDefineAvailable(compiler, profile);
 		saltPersistentCacheVersion(compiler, {
 			root,
@@ -367,8 +376,15 @@ export class OctaneRspackPlugin {
 			// transform results must not survive a requireDirective toggle.
 			requireDirective: this.options.requireDirective === true,
 			transpile: this.options.transpile !== false,
+			cssModuleConstants,
 		});
 		installProfilingDefine(compiler, profile);
+		if (cssModuleConstants) {
+			installCssModuleConstants(compiler, {
+				option: this.options.cssModuleConstants,
+				environment,
+			});
+		}
 		const neutralCompiler = createDiscoveryCompiler(this.options, root, profile);
 		const discoveryCompilers = [neutralCompiler];
 		for (const specialization of Object.values(this.options.layerSpecializations ?? {})) {

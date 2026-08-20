@@ -3,6 +3,12 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 import remapping from '@jridgewell/remapping';
 import { canonicalModuleId, cleanModuleId, createOctaneCompiler } from 'octane/compiler/bundler';
 import {
+	clearCssModuleBuildInfo,
+	CSS_MODULE_CONTEXT_KEY,
+	finishCssModuleConstants,
+	prepareCssModuleConstants,
+} from './css-module-data.js';
+import {
 	inferRspackEnvironment,
 	normalizeLoaderOptions,
 	selectLayerCompilerOptions,
@@ -85,6 +91,7 @@ async function resolveClientOnlyImports(context, compiler, source, id) {
 export default function octaneLoader(source, inputSourceMap) {
 	this.cacheable?.(true);
 	clearBuildInfo(this._module);
+	clearCssModuleBuildInfo(this._module);
 
 	try {
 		const options = normalizeLoaderOptions(this.getOptions?.() ?? {});
@@ -125,14 +132,24 @@ export default function octaneLoader(source, inputSourceMap) {
 			warn: (message) => this.emitWarning?.(new Error(message)),
 		});
 		const id = realModuleId(this.resource ?? this.resourcePath);
+		const authoredSource = String(source);
+		const cssModuleConstants =
+			this[CSS_MODULE_CONTEXT_KEY]?.enabled === true
+				? prepareCssModuleConstants(this, compiler, authoredSource, id, {
+						environment,
+						hmr,
+						dev,
+					})
+				: null;
 		const finish = (clientOnlyImports, callback) => {
 			try {
-				const result = compiler.transform(String(source), id, {
+				const result = compiler.transform(authoredSource, id, {
 					environment,
 					hmr,
 					dev,
 					profile,
 					...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
+					...cssModuleConstants?.transformOptions,
 				});
 
 				if (result === null) {
@@ -141,6 +158,7 @@ export default function octaneLoader(source, inputSourceMap) {
 				}
 
 				registerDependencies(this, result);
+				finishCssModuleConstants(this, cssModuleConstants, result);
 				if (result.kind === 'none') {
 					callback(null, source, this.sourceMap === false ? undefined : inputSourceMap);
 					return;
@@ -177,10 +195,10 @@ export default function octaneLoader(source, inputSourceMap) {
 			currentReference === null &&
 			typeof this.getResolve === 'function'
 		) {
-			const requests = compiler.findServerImportRequests(String(source), id);
+			const requests = compiler.findServerImportRequests(authoredSource, id);
 			if (requests.length > 0) {
 				const asyncCallback = this.async?.() ?? callback;
-				resolveClientOnlyImports(this, compiler, source, id).then(
+				resolveClientOnlyImports(this, compiler, authoredSource, id).then(
 					(imports) => finish(imports, asyncCallback),
 					(error) => asyncCallback(error instanceof Error ? error : new Error(String(error))),
 				);

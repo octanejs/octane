@@ -101,18 +101,36 @@ function recordValue(node, strings) {
  * A default map is deliberately data, not proof of immutability. A provider
  * must separately guarantee its lifetime and initialization before it can be
  * used. Calls, re-exports, getters, spreads, and mutable bindings never become
- * automatic facts.
+ * automatic facts by default. A host may additionally accept unwritten vars
+ * from an entirely pure final module, as emitted by CSS extraction loaders.
+ *
+ * @param {string} source
+ * @param {{ allowPureVar?: boolean }} [options]
  */
-export function readCssModuleExports(source) {
+export function readCssModuleExports(source, options) {
 	let ast;
 	try {
 		ast = parseModule(source, 'css-module.js');
 	} catch {
 		return null;
 	}
+	if (options?.allowPureVar === true) {
+		const exports = readCssModuleAst(ast, true);
+		// A var is not a constant merely because its initializer is a string.
+		// The complete module must exclude writes, calls, imports, and every
+		// other statement that could expose or change it. Fall back to the
+		// const-only reader so an impure module leaks no var-derived aliases or
+		// default-map values into an explicit provider's evidence either.
+		if (exports.pure) return exports;
+	}
+	return readCssModuleAst(ast, false);
+}
+
+function readCssModuleAst(ast, allowPureVar) {
 	const strings = new Map();
 	const frozenRecords = new Map();
 	const named = new Map();
+	const declarations = new Set();
 	let defaultRecord = null;
 	let pure = true;
 	let lexical = null;
@@ -148,12 +166,16 @@ export function readCssModuleExports(source) {
 	for (const statement of ast.body ?? []) {
 		const exported = statement.type === 'ExportNamedDeclaration';
 		const declaration = exported ? statement.declaration : statement;
-		if (declaration?.type === 'VariableDeclaration' && declaration.kind === 'const') {
+		if (
+			declaration?.type === 'VariableDeclaration' &&
+			(declaration.kind === 'const' || (allowPureVar && declaration.kind === 'var'))
+		) {
 			for (const item of declaration.declarations ?? []) {
-				if (item.id?.type !== 'Identifier') {
+				if (item.id?.type !== 'Identifier' || declarations.has(item.id.name)) {
 					pure = false;
 					continue;
 				}
+				declarations.add(item.id.name);
 				const value = stringValue(item.init, strings);
 				if (value !== undefined) {
 					strings.set(item.id.name, value);
@@ -211,11 +233,16 @@ function ownDataProperties(value, invalid, label) {
 }
 
 /** Validate an explicit host assertion against the exact module it describes. */
-export function validateCssModuleConstants(provided, exports, id) {
+export function validateCssModuleConstants(
+	provided,
+	exports,
+	id,
+	diagnosticOwner = 'octane/compiler/vite',
+) {
 	if (provided == null) return null;
 	const invalid = (reason) => {
 		throw new TypeError(
-			`octane/compiler/vite: invalid cssModuleConstants for ${JSON.stringify(id)}: ${reason}.`,
+			`${diagnosticOwner}: invalid cssModuleConstants for ${JSON.stringify(id)}: ${reason}.`,
 		);
 	};
 	const fields = ownDataProperties(provided, invalid, 'the provider result');

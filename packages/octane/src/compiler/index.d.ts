@@ -19,6 +19,17 @@ export interface CompileRendererBoundary {
 	server?: string;
 }
 
+/**
+ * An explicit provider guarantee, checked against the final module's literal
+ * exports. Each supplied value must already be initialized and remain the same
+ * string for every read. `default` requires own immutable data properties; an
+ * ordinary mutable CSS-module default object does not satisfy that contract.
+ */
+export interface OctaneCssModuleConstants {
+	named?: Readonly<Record<string, string>>;
+	default?: Readonly<Record<string, string>>;
+}
+
 export interface CompileOptions {
 	mode?: 'client' | 'server';
 	hmr?: boolean | 'vite' | 'webpack';

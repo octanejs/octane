@@ -1,4 +1,7 @@
 import type { Plugin } from 'vite';
+import type { OctaneCssModuleConstants } from './index.js';
+
+export type { OctaneCssModuleConstants } from './index.js';
 
 export interface OctaneRendererRuleOptions {
 	/** Glob or globs matched against canonical project-relative module IDs. */
@@ -64,17 +67,6 @@ export interface OctaneCssModuleConstantModule {
 	code: string;
 	meta: Readonly<Record<string, unknown>>;
 	environment: 'client' | 'server';
-}
-
-/**
- * An explicit provider guarantee, checked against the final module's literal
- * exports. Each supplied value must already be initialized and remain the same
- * string for every read. `default` requires own immutable data properties; an
- * ordinary mutable CSS-module default object does not satisfy that contract.
- */
-export interface OctaneCssModuleConstants {
-	named?: Readonly<Record<string, string>>;
-	default?: Readonly<Record<string, string>>;
 }
 
 export interface OctaneVitePluginOptions {
