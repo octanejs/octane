@@ -93,6 +93,11 @@
           "path": "packages/sonner/upstream/test/src/app/page.tsx",
           "role": "support",
           "sha256": "abbecf9ffbfe58d722bdd9cc9fe713114422975a0103fb00749afa531159bc4c"
+        },
+        {
+          "path": "packages/sonner/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "f02a2ec5602d6066324d36dc8fee4146cf80927579a4d040c8efb9f593653328"
         }
       ]
     },
