@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'octane';
 import type { I18n } from '@lingui/core';
-import { useLingui, type TransRenderProps } from '../src/index.ts';
+import { useLingui, type TransRenderProps } from '../../src/index.ts';
 
 export let staticRenderCount = 0;
 export let dynamicRenderCount = 0;

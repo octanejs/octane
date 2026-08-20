@@ -7665,7 +7665,7 @@ export default defineConfig({
 				test: {
 					name: 'urql',
 					include: ['packages/urql/tests/**/*.test.ts'],
-					environment: 'jsdom',
+					environment: 'happy-dom',
 					setupFiles: ['packages/urql/tests/_setup.ts'],
 					globals: false,
 				},

@@ -20,18 +20,16 @@ export function DynamicChildren() {
 		});
 	}
 
-	@{
-		<div>
-			<OverlayScrollbarsComponent>
-				@if (elements === 0) {
-					empty;
-				}
-				@for (const i of items; key i) {
-					<span>{String(i)}</span>
-				}
-			</OverlayScrollbarsComponent>
-			<button onClick={add}>add</button>
-			<button onClick={remove}>remove</button>
-		</div>
-	};
+	return <div>
+		<OverlayScrollbarsComponent>
+			@if (elements === 0) {
+				empty;
+			}
+			@for (const i of items; key i) {
+				<span>{String(i)}</span>
+			}
+		</OverlayScrollbarsComponent>
+		<button onClick={add}>add</button>
+		<button onClick={remove}>remove</button>
+	</div>;
 }

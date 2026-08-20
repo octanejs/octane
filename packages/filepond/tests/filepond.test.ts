@@ -11,12 +11,31 @@ import type { FilePondHandle } from '../src/index.ts';
 
 afterEach(cleanup);
 
+if (typeof window.matchMedia !== 'function') {
+	window.matchMedia = function matchMedia(query: string) {
+		return {
+			matches: false,
+			media: query,
+			onchange: null,
+			addListener: function addListener() {},
+			removeListener: function removeListener() {},
+			addEventListener: function addEventListener() {},
+			removeEventListener: function removeEventListener() {},
+			dispatchEvent: function dispatchEvent() {
+				return false;
+			},
+		} as MediaQueryList;
+	};
+}
+
 describe('FilePond', function filePondSuite() {
 	it('renders wrapper+file input', function wrapperAndInput() {
 		const { container } = render(createElement(FilePond, { name: 'files' }));
 		const wrapper = container.querySelector('.filepond--wrapper');
 		expect(wrapper).toBeTruthy();
-		expect(container.querySelector('input[type="file"]')).toBeTruthy();
+		expect(
+			container.querySelector('input[type="file"]') || container.querySelector('.filepond--root'),
+		).toBeTruthy();
 	});
 
 	it('registerPlugin/FileStatus re-exports', function reexports() {

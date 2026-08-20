@@ -9,6 +9,7 @@ export function ExternalSignalText(props: { count: Signal<number> }) {
 }
 
 export function UseSignalCounter() {
+	useSignals();
 	const count = useSignal(0);
 	function inc() {
 		count.value = count.value + 1;

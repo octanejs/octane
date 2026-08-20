@@ -1,6 +1,7 @@
 import {
 	computed,
-	effect,
+	Effect,
+	effect as coreEffect,
 	type EffectOptions,
 	type Model,
 	type ModelConstructor,
@@ -64,7 +65,7 @@ export interface EffectStore {
 let currentStore: EffectStore | undefined;
 
 function startComponentEffect(prevStore: EffectStore | undefined, nextStore: EffectStore) {
-	const endEffect = nextStore.effect._start();
+	const endEffect = startEffect(nextStore.effect);
 	currentStore = nextStore;
 	return finishComponentEffect.bind(nextStore, prevStore, endEffect);
 }
@@ -78,22 +79,85 @@ function finishComponentEffect(
 	currentStore = prevStore;
 }
 
+type RuntimeEffect = EffectInstance & {
+	_start?: () => () => void;
+	_callback?: () => void;
+	_dispose?: () => void;
+	S?: () => () => void;
+	c?: () => void;
+	d?: () => void;
+	dispose?: () => void;
+};
+
+function startEffect(instance: EffectInstance): () => void {
+	const runtime = instance as RuntimeEffect;
+	const start = typeof runtime._start === 'function' ? runtime._start : runtime.S;
+	if (typeof start !== 'function') {
+		throw new Error('@octanejs/signals-react: Effect._start is missing');
+	}
+	return start.call(instance);
+}
+
+function assignEffectCallback(instance: EffectInstance, notify: () => void) {
+	const runtime = instance as RuntimeEffect;
+	if (
+		typeof runtime._callback === 'function' ||
+		Object.prototype.hasOwnProperty.call(runtime, '_callback')
+	) {
+		runtime._callback = notify;
+	}
+	if (typeof runtime.c === 'function' || Object.prototype.hasOwnProperty.call(runtime, 'c')) {
+		runtime.c = notify;
+	}
+	if (runtime._callback !== notify && runtime.c !== notify) {
+		runtime._callback = notify;
+		runtime.c = notify;
+	}
+}
+
+function disposeEffect(instance: EffectInstance) {
+	const runtime = instance as RuntimeEffect;
+	if (typeof runtime.dispose === 'function') {
+		runtime.dispose();
+		return;
+	}
+	if (typeof runtime._dispose === 'function') {
+		runtime._dispose();
+		return;
+	}
+	if (typeof runtime.d === 'function') {
+		runtime.d();
+	}
+}
+
+function createEffectInstance(componentName?: string): EffectInstance {
+	const EffectCtor = Effect as unknown as {
+		new (fn: () => void, options?: { name?: string }): EffectInstance;
+	};
+	return new EffectCtor(function bindEffect() {}, { name: componentName || 'Component' });
+}
+
 function createEffectStore(_usage: EffectStoreUsage, componentName?: string): EffectStore {
-	let effectInstance!: EffectInstance;
+	let effectInstance: EffectInstance | undefined;
 	let endEffect: (() => void) | undefined;
 	let version = 0;
 	let onChangeNotifyReact: (() => void) | undefined;
-
-	const unsubscribe = effect(
+	// Published @preact/signals-core mangles Effect methods (`_start` → `S`,
+	// `_callback` → `c`). `effect(fn)` still invokes `fn` with `this` bound to
+	// the Effect instance, which is how the upstream React binding captures it.
+	const unsubscribe = coreEffect(
 		function bindEffect(this: EffectInstance) {
 			effectInstance = this;
 		},
 		{ name: componentName || 'Component' },
 	);
-	effectInstance._callback = function notify() {
+	if (effectInstance == null) {
+		effectInstance = createEffectInstance(componentName);
+	}
+	assignEffectCallback(effectInstance, function notify() {
 		version = (version + 1) | 0;
 		if (onChangeNotifyReact) onChangeNotifyReact();
-	};
+	});
 
 	return {
 		_usage,
@@ -292,7 +356,7 @@ export function useSignalEffect(
 
 	useEffect(
 		function subscribe() {
-			return effect(function run(this: EffectInstance) {
+			return coreEffect(function run() {
 				return callback.current();
 			}, options);
 		},

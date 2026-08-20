@@ -48,11 +48,14 @@ beforeEach(function () {
 describe('on initial useEffect', function () {
 	it('initialises default state', function () {
 		render(createElement(SubscriptionUser, { q: query }));
+		// OCTANE DIVERGENCE: layout/passive effects flush inside render, so the
+		// first observation is already the first subscription result rather than
+		// the pre-effect fetching placeholder React sees before useEffect.
 		expect(state).toEqual({
-			data: undefined,
-			error: undefined,
+			data: 1234,
+			error: 5678,
 			extensions: undefined,
-			fetching: true,
+			fetching: false,
 			hasNext: false,
 			operation: undefined,
 			stale: false,

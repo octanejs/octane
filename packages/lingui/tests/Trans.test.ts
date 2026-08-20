@@ -45,7 +45,7 @@ describe('Trans component', function transSuite() {
 		return renderWithI18n(node).container.textContent;
 	}
 	function html(node: OctaneNode) {
-		return renderWithI18n(node).container.innerHTML;
+		return renderWithI18n(node).container.innerHTML.replace(/<!--[\s\S]*?-->/g, '');
 	}
 
 	describe('should log console.error', function consoleErrorSuite() {
@@ -435,7 +435,7 @@ describe('Trans component', function transSuite() {
 					{ i18n, defaultComponent: DefaultComponentFC },
 					createElement(Trans, { id: 'Some text' }),
 				),
-			).container.innerHTML;
+			).container.innerHTML.replace(/<!--[\s\S]*?-->/g, '');
 			expect(span).toEqual('<div>Some text</div>');
 		});
 
@@ -449,7 +449,7 @@ describe('Trans component', function transSuite() {
 						{ i18n, defaultComponent: DefaultComponentFC },
 						createElement(Trans, { id: 'Some text', ...props }),
 					),
-				).container.innerHTML;
+				).container.innerHTML.replace(/<!--[\s\S]*?-->/g, '');
 				expect(translation).toEqual('Some text');
 			}
 		});

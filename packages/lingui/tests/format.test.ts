@@ -1,12 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render } from '@octanejs/testing-library';
-import { createElement, isValidElement, type OctaneNode } from 'octane';
+import { createElement, Fragment, isValidElement, type OctaneNode } from 'octane';
 import { formatElements } from '../src/format.ts';
 
 afterEach(cleanup);
 
+function toRenderable(elements: OctaneNode) {
+	if (typeof elements === 'string' || typeof elements === 'number') {
+		return createElement(Fragment, null, elements);
+	}
+	if (Array.isArray(elements)) {
+		return createElement(Fragment, null, elements);
+	}
+	return elements as Parameters<typeof render>[0];
+}
+
 function html(elements: OctaneNode) {
-	return render(elements as Parameters<typeof render>[0]).container.innerHTML;
+	return render(toRenderable(elements)).container.innerHTML.replace(/<!--[\s\S]*?-->/g, '');
 }
 
 function withMockConsole(

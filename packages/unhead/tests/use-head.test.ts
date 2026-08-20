@@ -34,14 +34,13 @@ describe('useHead hook', function useHeadHook() {
 	});
 
 	// Per packages/unhead/upstream/canonical/test/useHead.test.tsx:84
-	it('uses the head instance supplied through the universal value prop', function usesValueProp() {
+	it('uses the head instance supplied through the universal value prop', async function usesValueProp() {
 		const head = createHead();
 
 		render(createElement(UnheadProvider, { value: head }, createElement(TitleInput)));
 
-		return renderSSRHead(head).then(function assertTitle(rendered) {
-			expect(rendered.headTags).toContain('<title>Initial Title</title>');
-		});
+		const rendered = await renderSSRHead(head);
+		expect(rendered.headTags).toContain('<title>Initial Title</title>');
 	});
 
 	// Per packages/unhead/upstream/canonical/test/useHead.test.tsx:97

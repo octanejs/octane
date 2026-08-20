@@ -73,10 +73,15 @@ function createI18nStore(i18n: I18n, defaultComponent?: I18nDefaultComponent) {
 	}
 
 	function subscribe(onStoreChange: () => void) {
-		return i18n.on('change', function onI18nChange() {
+		const unsubscribe = i18n.on('change', function onI18nChange() {
 			updateContext();
 			onStoreChange();
 		});
+		if (latestLocale !== i18n.locale) {
+			updateContext();
+			onStoreChange();
+		}
+		return unsubscribe;
 	}
 
 	return {
