@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "dnd-kit bindings for the octane renderer — a full port of the modern @dnd-kit/react adapter over the framework-agnostic @dnd-kit/dom core.",
+  "description": "dnd-kit bindings for the octane renderer \u2014 a full port of the modern @dnd-kit/react adapter over the framework-agnostic @dnd-kit/dom core.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -31,7 +31,8 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts",
