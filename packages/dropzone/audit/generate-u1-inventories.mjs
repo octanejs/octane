@@ -17,7 +17,9 @@ const walk = (dir) =>
 const write = (path, value) =>
 	writeFileSync(resolve(root, path), `${JSON.stringify(value, null, 2)}\n`);
 
-const files = walk(resolve(root, 'upstream'))
+// The committed upstream/ git tree verifies against audit/upstream.lock.json;
+// these inventories pin only the unpacked npm artifact evidence.
+const files = walk(resolve(root, 'upstream-artifact'))
 	.map((path) => ({ path: relative(root, path), sha256: sha256(path) }))
 	.sort((a, b) => a.path.localeCompare(b.path));
 write('audit/upstream-files.json', {
