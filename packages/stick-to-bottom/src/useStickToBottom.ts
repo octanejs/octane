@@ -641,7 +641,7 @@ function useRefCallback<T extends (ref: HTMLElement | null) => any>(
 			result.current = ref;
 			return callback(ref);
 		},
-		deps,
+		deps as unknown[],
 		slot,
 	) as any as MutableRefObject<HTMLElement | null> & RefCallback<HTMLElement>;
 

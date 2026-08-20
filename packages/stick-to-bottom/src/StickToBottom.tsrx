@@ -41,8 +41,7 @@ export interface StickToBottomContext {
 const StickToBottomContext = createContext<StickToBottomContext | null>(null);
 
 type StickToBottomContextRef =
-	| { current: StickToBottomContext | null }
-	| ((value: StickToBottomContext | null) => void);
+	{ current: StickToBottomContext | null } | ((value: StickToBottomContext | null) => void);
 
 export interface StickToBottomProps extends Omit<DivProps, 'children'>, StickToBottomOptions {
 	contextRef?: StickToBottomContextRef;
