@@ -20662,8 +20662,8 @@ export function textSlot(
 
 // Slow path for the compiler's INLINE text-hole codegen. The compiled `.tsx`
 // `{expr}` value hole caches its text node on the binding bag and, on update,
-// does `setText(node, _v)` directly when `_v` is a primitive and a node already
-// exists — matching the `.tsrx` `{… as string}` text-binding hot path exactly.
+// calls `setText` directly when the value is a primitive and a node already
+// exists, normalizing `true` to empty to preserve renderable-child semantics.
 // It only calls here when that inline fast path doesn't apply: `_v` is an
 // object/function (component / element / array), or there's no cached node yet
 // (first render, hydration, or a prior non-text render). We hand off to the full
