@@ -75,12 +75,12 @@
         {
           "path": "scripts/react-parity/solana-react-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "fc4a0d4fd6b77e6d0e7357e9ba71da749919d40627752381342124d5c0bb1416"
+          "sha256": "cee3a199888a6953f162b9cc96e7dfa090c397ac7c3e0b69ebeaeaab49ecb8aa"
         },
         {
-          "path": "packages/solana-react/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "da9f50c5855b8c939c2b42f2269e7610a436bad21863bffcdae5f58599baccc7"
+          "sha256": "05b588ad14562a780437a1e023f6c24ceed437e61a5a77ba27197feb898823a0"
         },
         {
           "path": "packages/solana-react/tests/upstream-vitest.config.ts",
@@ -93,9 +93,9 @@
           "sha256": "ecd5d3d7ba54a6a82117ad21b4bb5394f5c77a07513171fa77b081663a1bcb43"
         },
         {
-          "path": "packages/solana-react/scripts/verify-upstream.mjs",
+          "path": "packages/solana-react/audit/provenance.json",
           "role": "support",
-          "sha256": "af83b5c56c90ea5f3d85d902098c2360c569ddc49020e166a87c3ba981d75980"
+          "sha256": "41580ce8d75a3df42d00505c95f685ce788951b67623557c8121ec3c63ab0996"
         },
         {
           "path": "packages/solana-react/audit/upstream.lock.json",

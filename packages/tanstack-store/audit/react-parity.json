@@ -78,9 +78,9 @@
           "sha256": "f1297fd3044bbc24cf216691a0614b1d220ab93e5562dc66df67b21037f863e8"
         },
         {
-          "path": "packages/tanstack-store/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "04da786339b230abe5c0511d8b658a7fcdb8fc85e80a27fb1d03bcca65bf52be"
+          "sha256": "05b588ad14562a780437a1e023f6c24ceed437e61a5a77ba27197feb898823a0"
         },
         {
           "path": "packages/tanstack-store/tests/upstream-vitest.config.ts",

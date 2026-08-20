@@ -33,7 +33,7 @@ pnpm --filter @octanejs/monaco-editor parity:generate
 | `audit/type-transformations.json` | Permitted type-lane transforms ledger |
 | `audit/test-classifications.json` | Disposition for every test and typetest file |
 
-Pristine runtime specs run against **React 19.2.7** via `tests/upstream-pristine.vitest.config.ts` and `scripts/run-pristine-upstream.mjs`.
+Pristine runtime specs run against **React 19.2.7** via `tests/upstream-pristine.vitest.config.ts` via the shared `scripts/react-parity/run-pristine.mjs` CLI.
 
 ## Immutable React oracle
 

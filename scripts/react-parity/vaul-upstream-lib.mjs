@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 
-import { verifyVaulUpstream as verifyPackageUpstream } from '../../packages/vaul/scripts/verify-upstream.mjs';
+import { verifyProvenanceManifest as verifyPackageUpstream } from './provenance-manifest-lib.mjs';
 
 /**
  * Repo-root entry point for react-parity:check.

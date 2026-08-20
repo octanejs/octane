@@ -83,9 +83,9 @@
           "sha256": "a36536560b0c819d6ef781737e330a64a3e2d7c502f9aa2ff835a63fb21e51a9"
         },
         {
-          "path": "packages/draggable/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "083fb2a55387ae9aae5b045632952c242d8ef2f4b9d5701d3c76f52a8d664808"
+          "sha256": "05b588ad14562a780437a1e023f6c24ceed437e61a5a77ba27197feb898823a0"
         },
         {
           "path": "packages/draggable/tests/upstream-vitest.config.ts",

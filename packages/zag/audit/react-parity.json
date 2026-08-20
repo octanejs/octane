@@ -88,9 +88,9 @@
           "sha256": "3fc205291d23f2d867643f55ee88a3c6856c18fc4c8232232e33b91435700794"
         },
         {
-          "path": "packages/zag/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "4e22fbbefcf556622558f582e01a0536272c748265eebe8a847c9902877797a1"
+          "sha256": "05b588ad14562a780437a1e023f6c24ceed437e61a5a77ba27197feb898823a0"
         },
         {
           "path": "packages/zag/tests/upstream-vitest.config.ts",
@@ -111,7 +111,7 @@
       "environment": "workspace-node",
       "project": "zag",
       "evidenceOrigin": "upstream-suite",
-      "notes": "One-for-one adapted @zag-js/react 1.42.0 machine and nested-states suite identities against @octanejs/zag. The inventory generator and react-parity:validate enforce the normalized pristine→adapted crosswalk; StrictMode identities stay pristine-only via audit/runtime-case-dispositions.json.",
+      "notes": "One-for-one adapted @zag-js/react 1.42.0 machine and nested-states suite identities against @octanejs/zag. The inventory generator and react-parity:validate enforce the normalized pristine\u2192adapted crosswalk; StrictMode identities stay pristine-only via audit/runtime-case-dispositions.json.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/zag/audit/adapted-runtime.json"
@@ -254,7 +254,7 @@
       "environment": "workspace-node",
       "project": "zag-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode→OctaneNode transformation.",
+      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode\u2192OctaneNode transformation.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",

@@ -78,9 +78,9 @@
           "sha256": "7857350920bd515db8cfe0b5cd2768550cc669baab123564ad02ca6dd4a13747"
         },
         {
-          "path": "packages/alien-signals/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "7443068c7d3a48b61e9a3abac15f00fb2d50280d2a959a15f7251d87e8f186fc"
+          "sha256": "05b588ad14562a780437a1e023f6c24ceed437e61a5a77ba27197feb898823a0"
         },
         {
           "path": "packages/alien-signals/audit/pristine-oracle-environment.json",
@@ -115,7 +115,7 @@
         {
           "path": "scripts/react-parity/alien-signals-runtime-inventory.mjs",
           "role": "support",
-          "sha256": "e913e3154ed1c8a062ea0026202324eef461f654deda23b4b76d56c413ec470a"
+          "sha256": "187e573ef7b8c1e19360c871a4d8fe03564248af5e0bf007616b4b9814c4730e"
         },
         {
           "path": "scripts/react-parity/alien-signals-runtime-lib.mjs",

@@ -80,12 +80,12 @@
         {
           "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "75cb27835a432945b7eaa5730b34dc55d18c7aa190373d80743d6e917356b493"
+          "sha256": "20701aea9b5e5f5249a2559f847aac79cb28f9e0bb5d24d3ef50b06101205a02"
         },
         {
-          "path": "packages/vaul/scripts/verify-upstream.mjs",
+          "path": "packages/vaul/audit/provenance.json",
           "role": "support",
-          "sha256": "6c0a2b14b449b666a129942024334f13e4bed389d53a7cfec585e439840a53ff"
+          "sha256": "5295e18d84cb0128e47ba66d105355bb98c4b3c653432c8054bc1a519affba72"
         },
         {
           "path": "packages/vaul/audit/upstream.lock.json",

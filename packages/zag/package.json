@@ -40,7 +40,7 @@
   },
   "scripts": {
     "test": "pnpm upstream:materialize && vitest run --root ../.. --project zag --project zag-differential --project zag-ssr --project zag-pristine",
-    "test:upstream": "node scripts/run-pristine-upstream.mjs",
+    "test:upstream": "node ../../scripts/react-parity/run-pristine.mjs zag",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
     "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
     "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."

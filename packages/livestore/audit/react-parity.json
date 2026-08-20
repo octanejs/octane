@@ -82,9 +82,9 @@
           "sha256": "f980e1c87addfe3cd2af4ebe960d9725fad42a458ffbe194165a727e36f4b7e4"
         },
         {
-          "path": "packages/livestore/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "279a959623caffce2f8be796233f9deed409912a7ba2cf9d12fad4350c0f516e"
+          "sha256": "05b588ad14562a780437a1e023f6c24ceed437e61a5a77ba27197feb898823a0"
         },
         {
           "path": "packages/livestore/tests/upstream-vitest.config.ts",
@@ -178,7 +178,7 @@
       "environment": "workspace-node",
       "project": "livestore-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode→OctaneNode transformation.",
+      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode\u2192OctaneNode transformation.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",

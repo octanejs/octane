@@ -78,9 +78,9 @@
           "sha256": "6920eb5a636adf0f40294e1939b06e8837c673021fc383dbdb7b3ea78f6a165a"
         },
         {
-          "path": "packages/monaco-editor/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "4d3fa183a5b3cf0d4735e9e9a706e68f1f7e4eeb7a8d2bd6db242c66167801dc"
+          "sha256": "05b588ad14562a780437a1e023f6c24ceed437e61a5a77ba27197feb898823a0"
         },
         {
           "path": "packages/monaco-editor/tests/upstream-pristine.vitest.config.ts",

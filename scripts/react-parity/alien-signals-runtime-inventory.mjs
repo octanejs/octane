@@ -166,7 +166,7 @@ const supportPaths = [
 	'scripts/react-parity/alien-signals-types-lib.mjs',
 	'scripts/react-parity/alien-signals-classifications-lib.mjs',
 	'scripts/react-parity/alien-signals-runtime-inventory.mjs',
-	'packages/alien-signals/scripts/run-pristine-upstream.mjs',
+	'scripts/react-parity/run-pristine.mjs',
 	'packages/alien-signals/audit/upstream.lock.json',
 	'packages/alien-signals/upstream/package.json',
 	'packages/alien-signals/upstream/tsconfig.json',
