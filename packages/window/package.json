@@ -31,9 +31,10 @@
   "types": "src/index.ts",
   "files": [
     "src",
+    "LICENSE.md",
+    "LICENSE.upstream",
     "README.md",
-    "UPSTREAM.md",
-    "LICENSE.md"
+    "UPSTREAM.md"
   ],
   "exports": {
     ".": "./src/index.ts"

@@ -15,15 +15,18 @@
 | Canonical tag archive SHA-256 | `d0b66c0138c6355051a75086ce0681aa5880249c0d14f1e9759185daee16e452` |
 | License | MIT, copyright Brian Vaughn |
 
-The byte-exact tagged `lib/` tree, published npm declaration bundle, repository
-package metadata, and license are vendored under `upstream/` for provenance and
-parity evidence. They are audit inputs only and must remain excluded from the
-published package.
+The byte-exact tagged tree (the `lib/` sources and tests, repository package
+metadata, Vitest setup, and license) is vendored under `upstream/` and verifies
+offline against the upstream git blob shas recorded in
+`audit/upstream.lock.json`. The published npm declaration bundle is vendored
+under `upstream-artifact/`, hash-pinned by `audit/upstream-contract.json`. The
+pinned license is republished at the package root as `LICENSE.upstream`. All of
+it is audit input only and must remain excluded from the published package.
 
-Run `pnpm --dir packages/window upstream:verify` to verify all 58 vendored
-artifacts, the exact file set, the published declaration bundle, the 14 upstream
-test artifacts and their 117 test registrations, package metadata, and the
-complete root export inventory.
+Run `pnpm --dir packages/window upstream:verify` to verify the lock-pinned tree
+and all 57 vendored artifacts, the exact file set, the published declaration
+bundle, the 14 upstream test artifacts and their 117 test registrations, package
+metadata, and the complete root export inventory.
 
 ## Public v2.3.0 surface
 
@@ -52,7 +55,7 @@ the generator. No vendored file is published.
 | --- | --- | --- |
 | `lib/components/**`, `lib/core/**`, `lib/hooks/**`, `lib/utils/**` production files | Source-correspondent port in `src/**`; React imports and renderer syntax are the only framework adaptations | `audit/adapted-transformations.json`, `tests/audit/adapted.test.mjs` |
 | `lib/**/*.test.{ts,tsx}` | Unchanged pristine execution and generated adapted execution | `audit/pristine-runtime.json`, `audit/adapted-runtime.json` |
-| `lib/utils/test/**`, `vitest.setup.js` | Unchanged pristine support; source-correspondent adapted support | `upstream/SHA256SUMS`, `tests/generate-adapted-tests.mjs` |
+| `lib/utils/test/**`, `vitest.setup.js` | Unchanged pristine support; source-correspondent adapted support | `audit/upstream.lock.json`, `tests/generate-adapted-tests.mjs` |
 | Published declaration bundle | Unchanged pristine oracle; identical shared assertion program targets Octane source | `audit/type-contract.json`, `typetests/**` |
 | Repository metadata and license | Vendored provenance only | `tests/audit/upstream.test.mjs` |
 

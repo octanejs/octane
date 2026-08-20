@@ -57,14 +57,14 @@
       },
       "files": [
         {
+          "path": "packages/window/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "5a89fd864f4a77c07c4b8d45b7983721f34edb103b8fc27d7aefa327061d112b"
+        },
+        {
           "path": "packages/window/audit/pristine-runtime.json",
           "role": "support",
           "sha256": "15608b899f5e84a14db173fa4aef4be85fc2efd6a2d5a1c61d77747cb2534afa"
-        },
-        {
-          "path": "packages/window/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "69d0a2e15466c0f44a6cd477835631f14f181eac149dbdbaa1ed0e01996c56ba"
         }
       ]
     },
