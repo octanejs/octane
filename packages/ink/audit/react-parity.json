@@ -8,7 +8,7 @@
     "sourceRoot": "src",
     "testRoot": "test",
     "license": "MIT",
-    "integrity": "sha256:593eaa38fabc7cba587566b524adfbe3c89c2901850c9524768258a2d76bda62",
+    "integrity": "sha256:845b3147ec071c67aa2ba8f42825414231ac950500181b005e1677016c51b39a",
     "verification": "recorded-unverified"
   },
   "upstreamSuites": {
@@ -53,6 +53,11 @@
       "evidenceOrigin": "repo-authored",
       "notes": "Runs identical terminal parser, keypress, ANSI sanitization, and width-measurement inputs through the Octane port and the vendored Ink 7.1.1 source.",
       "files": [
+        {
+          "path": "packages/ink/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "fc771e179260a26e7249cfc4cd79acc93c180f6f7100faa0b46dd877dd0f32d5"
+        },
         {
           "path": "packages/ink/tests/differential/core.test.ts",
           "role": "test",
