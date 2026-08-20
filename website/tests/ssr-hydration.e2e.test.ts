@@ -64,6 +64,7 @@ const ROUTES = [
 	'/docs/lynx',
 	'/docs/react-compat',
 	'/docs/profiling',
+	'/docs/browser-support',
 	'/docs/bindings',
 	'/errors',
 	'/errors/3?args%5B%5D=%22quoted%22',
@@ -875,7 +876,17 @@ describe('website dev-SSR → hydration (real browser)', { concurrent: false }, 
 					),
 				}));
 
-				await page.waitForTimeout(750);
+				// Capture the server node and geometry above, then wait for the client
+				// module graph and hydration commit before exercising delegated events.
+				await page.waitForLoadState('networkidle');
+				await page.waitForFunction(
+					() =>
+						new Promise<boolean>((resolve) =>
+							requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))),
+						),
+					null,
+					{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+				);
 
 				expect(await page.locator('.recharts-wrapper').count()).toBe(0);
 				expect(await page.locator('.bench-plot-shell').count()).toBe(0);

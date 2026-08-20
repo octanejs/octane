@@ -1,7 +1,8 @@
 // The sponsor acknowledgement closes the homepage without interrupting its
 // product narrative. The supplied lockup says what the relationship is, while
 // the copy gives it enough context to remain clear outside the image.
-import blacksmithBannerUrl from '../../../assets/blacksmith-ci.png';
+import blacksmithOnDarkUrl from '../../../assets/blacksmith-ci-on-dark.svg';
+import blacksmithOnLightUrl from '../../../assets/blacksmith-ci-on-light.svg';
 
 export function Sponsor() @{
 	<section class="sponsor" aria-labelledby="sponsor-heading">
@@ -25,9 +26,19 @@ export function Sponsor() @{
 				aria-label="Visit Blacksmith, Octane’s infrastructure sponsor"
 			>
 				<img
-					src={blacksmithBannerUrl}
-					width={736}
-					height={252}
+					class="sponsor-logo sponsor-logo-on-dark"
+					src={blacksmithOnDarkUrl}
+					width={440}
+					height={120}
+					loading="lazy"
+					decoding="async"
+					alt="CI powered by Blacksmith"
+				/>
+				<img
+					class="sponsor-logo sponsor-logo-on-light"
+					src={blacksmithOnLightUrl}
+					width={440}
+					height={120}
 					loading="lazy"
 					decoding="async"
 					alt="CI powered by Blacksmith"
@@ -45,7 +56,7 @@ export function Sponsor() @{
 				max-width: 64rem;
 				margin: 0 auto;
 				display: grid;
-				grid-template-columns: minmax(0, 1fr) minmax(22rem, 30rem);
+				grid-template-columns: minmax(0, 1fr) minmax(18rem, 20rem);
 				gap: 4rem;
 				align-items: center;
 			}
@@ -72,16 +83,13 @@ export function Sponsor() @{
 			}
 			.sponsor-lockup {
 				display: block;
-				border: 1px solid var(--border);
-				border-radius: 1rem;
-				overflow: hidden;
-				background: #0b1016;
-				transition:
-					border-color 0.15s ease,
-					transform 0.15s ease;
+				width: 100%;
+				max-width: 20rem;
+				justify-self: end;
+				background: transparent;
+				transition: transform 0.15s ease;
 			}
 			.sponsor-lockup:hover {
-				border-color: var(--border-strong);
 				transform: translateY(-2px);
 				text-decoration: none;
 			}
@@ -89,10 +97,19 @@ export function Sponsor() @{
 				outline: 2px solid var(--accent);
 				outline-offset: 3px;
 			}
-			.sponsor-lockup img {
+			.sponsor-logo {
 				display: block;
 				width: 100%;
 				height: auto;
+			}
+			.sponsor-logo-on-light {
+				display: none;
+			}
+			:global(:root[data-theme='light']) .sponsor-logo-on-dark {
+				display: none;
+			}
+			:global(:root[data-theme='light']) .sponsor-logo-on-light {
+				display: block;
 			}
 			@media (max-width: 800px) {
 				.sponsor-inner {
@@ -102,7 +119,7 @@ export function Sponsor() @{
 					margin: 0;
 				}
 				.sponsor-lockup {
-					max-width: 30rem;
+					justify-self: start;
 				}
 			}
 			@media (max-width: 560px) {

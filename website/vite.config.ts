@@ -1,12 +1,31 @@
 import { defineConfig, type Plugin } from 'vite';
-import { existsSync } from 'node:fs';
+import { cpSync, existsSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { octaneMdx } from '@octanejs/mdx/vite';
 import { threeRenderers } from '@octanejs/three/config';
 import { tanstackStart } from '@octanejs/tanstack-start/plugin/vite';
 import { nitro } from 'nitro/vite';
 import { websiteMdxOptions } from './mdx-options.ts';
 import { playgroundRuntime } from './playground-runtime.ts';
+
+// The upstream shadcn CLI fetches registry items directly from /r. Keep the
+// deployed tree derived from the package's checked generated output so website
+// builds cannot publish a second, independently drifting registry copy.
+function prepareShadcnRegistry(): void {
+	const sourceUrl = new URL('../packages/shadcn/registry/', import.meta.url);
+	const source = fileURLToPath(sourceUrl);
+	const destination = fileURLToPath(new URL('./public/r', import.meta.url));
+	if (!existsSync(new URL('registry.json', sourceUrl))) {
+		throw new Error(
+			'shadcn registry is missing; run `pnpm shadcn:registry` from the repository root',
+		);
+	}
+	rmSync(destination, { recursive: true, force: true });
+	cpSync(source, destination, { recursive: true });
+}
+
+prepareShadcnRegistry();
 
 // Does any pre-bundled dependency resolve to a checkout OUTSIDE node_modules —
 // a `link:` override in pnpm-workspace.yaml pointing at a sibling repo?
