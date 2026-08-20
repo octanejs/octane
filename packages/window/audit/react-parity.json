@@ -172,7 +172,7 @@
         {
           "path": "packages/window/audit/type-contract.json",
           "role": "support",
-          "sha256": "ab371968373a9c9b70d914e5b37c9a91ed8d9a5dc50ddfcd3bc0b695573cedbc"
+          "sha256": "6b341ca6520d7e4a2728689f2e5a9801d12b93f4a108468ee211f5d805890332"
         }
       ]
     },
@@ -250,7 +250,7 @@
         {
           "path": "packages/window/audit/type-contract.json",
           "role": "support",
-          "sha256": "ab371968373a9c9b70d914e5b37c9a91ed8d9a5dc50ddfcd3bc0b695573cedbc"
+          "sha256": "6b341ca6520d7e4a2728689f2e5a9801d12b93f4a108468ee211f5d805890332"
         }
       ]
     },

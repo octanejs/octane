@@ -148,7 +148,7 @@
         {
           "path": "packages/tanstack-hotkeys/typetests/pristine/tsconfig.json",
           "role": "support",
-          "sha256": "2908cf0ddfa89aaf55a111bd842c981054fc4d10e72c59fc958ae8dfb831cc41"
+          "sha256": "a73e5e1cd3f2d4a2ca0340e908f0361ef266dcc597c57e7e467e2860b28afde7"
         }
       ]
     },
