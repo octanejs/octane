@@ -33,7 +33,9 @@
   "files": [
     "src",
     "dist/cjs",
-    "README.md"
+    "LICENSE.upstream",
+    "README.md",
+    "UPSTREAM.md"
   ],
   "exports": {
     ".": {
