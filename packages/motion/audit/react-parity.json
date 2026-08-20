@@ -105,7 +105,7 @@
         {
           "path": "packages/motion/audit/pristine-wrapper-runtime.json",
           "role": "support",
-          "sha256": "663c52d1dd663a296a805ae075b6dcb42e75816d49c0a4ffcc34b3dfa5beee6e"
+          "sha256": "601d8ae74051c1ec5c8fc9a5da0be7d640b78b378a283e4bedde686e61f9bb3f"
         },
         {
           "path": "packages/motion/tests/_pristine-shims/src/index.ts",
@@ -160,7 +160,7 @@
         {
           "path": "packages/motion/tests/upstream-jest.matcher-compat.cjs",
           "role": "support",
-          "sha256": "16b5aabe7dba14b9c6e68cee934864fc08f30f26ecbc612d667b00660c05539a"
+          "sha256": "fe354ae690d63e17e5e344e63deb22ddaebbceaab5e68a14100f23e6ce3dc28d"
         }
       ]
     },

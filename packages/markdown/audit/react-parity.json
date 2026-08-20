@@ -11,10 +11,7 @@
     "integrity": "sha256:205f5c607c68e1e42b8d7a036326bdb3a105ae55e6469ecfcaf998004609d5f7",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "absent"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/markdown/src"],
@@ -102,7 +99,7 @@
         {
           "path": "packages/markdown/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "0e8d9501ea1675daa114f0b9f4de70361a2d76966dce71d32c487769d87f199d"
+          "sha256": "719fbd1eb82d967b7887bf64dade8b8fb4be17545c634dd79f831bfe57810b44"
         }
       ]
     },
@@ -132,12 +129,17 @@
         {
           "path": "scripts/react-parity/react-markdown-runtime-inventory.mjs",
           "role": "support",
-          "sha256": "0353ed591102a51e40365fe3cd86e334768f0e3cbcb1ea17c41a79bf22baf987"
+          "sha256": "d196049bbf63388fe5beff97847c0d36bbca677247e8089fc4ed4016d3bff78d"
         },
         {
           "path": "scripts/react-parity/react-markdown-crosswalk.mjs",
           "role": "support",
           "sha256": "e46c91d548e54b713de6d7664d314b7e6fba1d86fa1fd4b76e788997928e5705"
+        },
+        {
+          "path": "vitest.config.js",
+          "role": "support",
+          "sha256": "a2634afde96e7d9c152da4f15f31118ab5a50980546c01591d468447903852ee"
         }
       ]
     },

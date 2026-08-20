@@ -109,7 +109,7 @@
       "environment": "workspace-node",
       "project": "tanstack-router-ssr-query-pristine-types",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Invokes the vendored upstream tsconfig.build.json under typescript55–typescript60, matching upstream test:types accept/reject evidence (no dedicated expectType artifacts).",
+      "notes": "Invokes the vendored upstream tsconfig.build.json under typescript55\u2013typescript60, matching upstream test:types accept/reject evidence (no dedicated expectType artifacts).",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
@@ -174,7 +174,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json",
           "role": "support",
-          "sha256": "ef751750a07229bb6cceaebf8b2f1c40f3c1b56c97fe98891bee74adb7a66d14"
+          "sha256": "eba45ac24d71cfe94866c7f2e5c66986abcb49c7ae47362439439bbcf7539aca"
         }
       ]
     },

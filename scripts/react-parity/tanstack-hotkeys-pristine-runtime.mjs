@@ -55,7 +55,7 @@ export function inventoryFromIdentities(identities) {
 	return {
 		schemaVersion: 1,
 		project: 'tanstack-hotkeys-pristine',
-		roots: ['packages/tanstack-hotkeys/upstream/package/tests'],
+		roots: ['packages/tanstack-hotkeys/upstream/tests'],
 		files: [
 			...new Set(
 				tests.map(function fileOf(test) {
@@ -88,7 +88,7 @@ export function runPristineUpstreamSuite({
 			`--outputFile=${reportPath}`,
 		],
 		{
-			cwd: resolve(packageRoot, 'upstream/package'),
+			cwd: resolve(packageRoot, 'upstream'),
 			encoding: 'utf8',
 			env: {
 				...process.env,

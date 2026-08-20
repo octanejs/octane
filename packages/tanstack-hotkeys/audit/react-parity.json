@@ -80,7 +80,7 @@
         {
           "path": "scripts/react-parity/tanstack-hotkeys-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "623a226552b2f19ffd20be00f5e53036fd71f52d8eaa95494b274188f0dcb421"
+          "sha256": "6b7fb340c05c2123f936f48da0f305f49c312b30a9679f3f427d6160eb38ae93"
         },
         {
           "path": "packages/tanstack-hotkeys/audit/upstream.lock.json",

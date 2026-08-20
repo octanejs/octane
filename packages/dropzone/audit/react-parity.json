@@ -142,7 +142,7 @@
         {
           "path": "packages/dropzone/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "3c09bd1511cc47569e616f34a682340dc8e7bdeb0b14a2c564da4e47c288d5f6"
+          "sha256": "0bb35fa77e9583aa94ed2e5ce0acb6bada3d407eb95c1faf507f9c936c58bdaf"
         }
       ]
     },
@@ -179,7 +179,7 @@
         {
           "path": "packages/dropzone/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "3c09bd1511cc47569e616f34a682340dc8e7bdeb0b14a2c564da4e47c288d5f6"
+          "sha256": "0bb35fa77e9583aa94ed2e5ce0acb6bada3d407eb95c1faf507f9c936c58bdaf"
         }
       ]
     },

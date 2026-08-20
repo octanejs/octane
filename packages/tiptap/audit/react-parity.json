@@ -110,7 +110,7 @@
         {
           "path": "packages/tiptap/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "40f1a4efcbe013ed3fc0e3d461b6aa3290c651e3173885b191ef2e89a7287aad"
+          "sha256": "3158c4d9ede7756d6cef6989742c546353e526f46a79700dabf1ac162897c044"
         }
       ]
     },

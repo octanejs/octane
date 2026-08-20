@@ -159,12 +159,9 @@ describe('extractTestCases', () => {
 	});
 
 	test('covers the complete vendored markdown and Base UI registrar shapes', () => {
-		const markdownPath = new URL(
-			'../../packages/markdown/upstream/source/test.jsx',
-			import.meta.url,
-		);
+		const markdownPath = new URL('../../packages/markdown/upstream/test.jsx', import.meta.url);
 		const markdownCases = extractTestCases(readFileSync(markdownPath, 'utf8'), {
-			file: 'packages/markdown/upstream/source/test.jsx',
+			file: 'packages/markdown/upstream/test.jsx',
 		});
 		assert.equal(markdownCases.length, 91);
 

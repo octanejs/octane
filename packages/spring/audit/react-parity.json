@@ -65,7 +65,7 @@
         {
           "path": "packages/spring/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "fbdc1b30af577d4c3987e7181c419a2c90880ccdf0aa7f637ef1db12db3f14ec"
+          "sha256": "b429f77b7af9a54d2bfc4b8d05b36bd383478eb7e09c76b9e04049ec7a7cc2d4"
         },
         {
           "path": "packages/spring/tests/upstream-original.test.ts",

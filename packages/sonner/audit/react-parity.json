@@ -97,7 +97,7 @@
         {
           "path": "packages/sonner/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "f02a2ec5602d6066324d36dc8fee4146cf80927579a4d040c8efb9f593653328"
+          "sha256": "0d2d63f567c5ce9ae0c6cd023e3539e30820e4e805aa92f1c706f4a8f35aa665"
         }
       ]
     },

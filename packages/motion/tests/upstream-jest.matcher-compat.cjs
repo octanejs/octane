@@ -7,8 +7,7 @@ expect.extend({
 		const pass = received.mock ? received.mock.calls.length > 0 : false;
 		return {
 			pass,
-			message: () =>
-				`expected mock function ${pass ? 'not ' : ''}to have been called`,
+			message: () => `expected mock function ${pass ? 'not ' : ''}to have been called`,
 		};
 	},
 	toBeCalledTimes(received, times) {

@@ -90,7 +90,7 @@
         {
           "path": "packages/apollo-client/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "a893d6c8aa5e0a609627971affdaa88b8859ce35e1ea1eac58e6e0e61814d2c6"
+          "sha256": "738cc8626f56e2987d60dd4825e394f2a2697f9f0b3c3fb0498799de120f26c9"
         },
         {
           "path": "packages/apollo-client/LICENSE.upstream",
