@@ -222,7 +222,7 @@
         {
           "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm.test.tsx.patch",
           "role": "support",
-          "sha256": "7c8c7178efa68795e063dadc68420148f9568b757289c4145a82db9fe1057bd0"
+          "sha256": "2b3cfe6e4ef1fddd1eb3f5e6e57667e352adfed5cd283d764b3dc6f3e325a51c"
         },
         {
           "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/__snapshots__/watch.test.tsx.snap.patch",

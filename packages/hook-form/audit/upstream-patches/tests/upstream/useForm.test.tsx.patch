@@ -43,7 +43,20 @@ diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
        fireEvent.blur(input);
  
        expect(await screen.findByText('This is required.')).toBeVisible();
-@@ -1955,6 +1963,7 @@ describe('useForm', () => {
+@@ -1906,9 +1914,12 @@ describe('useForm', () => {
+     expect(getFieldState('lastName').isValidating).toBe(false);
+     expect(getFieldState('firstName').isValidating).toBe(false);
+     screen.getByText('stateValidation: false');
++    vi.useRealTimers();
+   });
+ 
+   it('should update isValidating without subscribing to validatingFields', async () => {
++    vi.useFakeTimers();
++
+     const App = () => {
+       const {
+         register,
+@@ -1955,6 +1966,7 @@ describe('useForm', () => {
      await waitFor(() => {
        expect(screen.queryByText('is validating')).not.toBeInTheDocument();
      });
@@ -51,7 +64,7 @@ diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
    });
  
    it('should correctly handle multiple async validation triggers', async () => {
-@@ -2033,6 +2042,7 @@ describe('useForm', () => {
+@@ -2033,6 +2045,7 @@ describe('useForm', () => {
  
      expect(formState.validatingFields).toStrictEqual({});
      expect(getFieldState('lastName').isValidating).toBe(false);
@@ -59,7 +72,7 @@ diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
    });
  
    it('should update isValidating to true when using with resolver', async () => {
-@@ -2107,6 +2117,7 @@ describe('useForm', () => {
+@@ -2107,6 +2120,7 @@ describe('useForm', () => {
      expect(formState.validatingFields).toStrictEqual({});
      expect(getFieldState('lastName').isValidating).toBe(false);
      expect(getFieldState('firstName').isValidating).toBe(false);
@@ -67,7 +80,7 @@ diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
    });
  
    it('should remove field from validatingFields on unregister', async () => {
-@@ -2150,6 +2161,7 @@ describe('useForm', () => {
+@@ -2150,6 +2164,7 @@ describe('useForm', () => {
        vi.runAllTimers();
      });
      expect(formState.validatingFields).toEqual({});
