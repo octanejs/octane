@@ -57,6 +57,23 @@ describe('built Start server', () => {
 		expect(fs.existsSync(path.join(staticRoot, 'playground-runtime.json'))).toBe(true);
 	});
 
+	it('serves the documented shadcn registry paths', async () => {
+		for (const registryPath of [
+			'/r/button.json',
+			'/r/styles/base-nova/button.json',
+			'/r/styles/radix-nova/button.json',
+			'/r/styles/aria-nova/button.json',
+		]) {
+			const { response, html } = await get(registryPath);
+			expect(response.status, registryPath).toBe(200);
+			expect(response.headers.get('content-type'), registryPath).toMatch(/^application\/json\b/);
+			expect(JSON.parse(html), registryPath).toMatchObject({
+				name: 'button',
+				type: 'registry:ui',
+			});
+		}
+	});
+
 	it('server-renders the home page with the hydration payload', async () => {
 		const { response, html } = await get('/');
 		expect(response.status).toBe(200);
