@@ -21646,6 +21646,11 @@ function planJsx(
 		// component calls; only the emitted runtime call differs.
 		if (cc.isChild) {
 			const V = () => b.id('_v');
+			// setText follows explicit text-binding coercion, which renders `true`.
+			// Renderable children suppress it. Normalize that one differing value
+			// while keeping the journaled text setter and its allocation-free path.
+			const childTextValue = () =>
+				b.conditional(b.binary('===', V(), b.literal(true)), b.literal(''), V());
 			// MARKERLESS only-child renderable: append a primitive as a single Text
 			// node (no `<!>`, no slot state), `setText` it inline on update — exactly
 			// like a `.tsrx` only-child text binding — and fall back to `childTextHole`
@@ -21695,7 +21700,7 @@ function planJsx(
 									b.unary('!', b.id('_o')),
 									b.binary('!==', V(), b.literal(null)),
 								]),
-								b.stmt(b.call('_$setText', b.id('_t'), V())),
+								b.stmt(b.call('_$setText', b.id('_t'), childTextValue())),
 								b.stmt(
 									b.assignment(
 										'=',
@@ -21811,13 +21816,15 @@ function planJsx(
 					org,
 					b.block([
 						b.const('_v', cc.valueExpr),
-						b.stmt(b.assignment('=', chp(), V())),
 						b.stmt(b.assignment('=', chv(), textHoleCall(V()))),
+						b.stmt(b.assignment('=', chp(), V())),
 					]),
 				);
 				continue;
 			}
 			ctx.runtimeNeeded.add('setText');
+			// Publish the raw value after the helper: setText must journal the old
+			// binding bag before a held transition can roll the DOM write back.
 			pushAfterStmt(
 				cc.id,
 				org,
@@ -21838,7 +21845,6 @@ function planJsx(
 					b.if(
 						b.logical('||', b.id('_o'), b.binary('!==', chp(), V())),
 						b.block([
-							b.stmt(b.assignment('=', chp(), V())),
 							b.const('_t', chv()),
 							b.if(
 								andChain([
@@ -21846,9 +21852,10 @@ function planJsx(
 									b.unary('!', b.id('_o')),
 									b.binary('!==', V(), b.literal(null)),
 								]),
-								b.stmt(b.call('_$setText', b.id('_t'), V())),
+								b.stmt(b.call('_$setText', b.id('_t'), childTextValue())),
 								b.stmt(b.assignment('=', chv(), textHoleCall(V()))),
 							),
+							b.stmt(b.assignment('=', chp(), V())),
 						]),
 						null,
 					),
