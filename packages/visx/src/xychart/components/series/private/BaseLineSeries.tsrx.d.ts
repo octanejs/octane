@@ -2,7 +2,8 @@
 import type { Octane } from 'octane/jsx-runtime';
 import type { LinePathProps } from '@octanejs/visx/shape';
 import type { AxisScale } from '@octanejs/visx/axis';
-import type { SeriesProps, SvgPathComponent } from '../../../types';
+import type { SeriesProps } from '../../../types';
+import type { SvgPathComponent } from '../../../types/svgPath';
 export type BaseLineSeriesProps<XScale extends AxisScale, YScale extends AxisScale, Datum extends object> = SeriesProps<XScale, YScale, Datum> & {
     /** Rendered component which is passed path props by BaseLineSeries after processing. */
     PathComponent?: SvgPathComponent;

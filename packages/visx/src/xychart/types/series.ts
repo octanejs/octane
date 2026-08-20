@@ -1,4 +1,3 @@
-import type { ComponentBody } from 'octane';
 import type { Octane } from 'octane/jsx-runtime';
 import type { AxisScale } from '@octanejs/visx/axis';
 import type { ScaleInput } from '@octanejs/visx/scale';
@@ -155,9 +154,6 @@ export type BarsProps<XScale extends AxisScale, YScale extends AxisScale> = {
 	Octane.SVGProps<SVGRectElement | SVGPathElement>,
 	'x' | 'y' | 'width' | 'height' | 'ref' | 'children'
 >;
-
-/** Host `path` or an Octane component that accepts path SVG props. */
-export type SvgPathComponent = 'path' | ComponentBody<Omit<Octane.SVGProps<SVGPathElement>, 'ref'>>;
 
 // BarStack transforms its child series Datum into CombinedData<XScale, YScale>
 export type BarStackDatum<XScale extends AxisScale, YScale extends AxisScale> = SeriesPoint<

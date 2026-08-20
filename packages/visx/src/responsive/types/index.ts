@@ -1,3 +1,5 @@
+export type ResizeObserver = globalThis.ResizeObserver;
+
 export type ResizeObserverPolyfill = {
 	new (callback: ResizeObserverCallback): ResizeObserver;
 };

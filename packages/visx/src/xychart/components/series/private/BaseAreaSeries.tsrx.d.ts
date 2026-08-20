@@ -2,7 +2,8 @@
 import type { Octane } from 'octane/jsx-runtime';
 import type { AxisScale } from '@octanejs/visx/axis';
 import type { AreaProps, LinePathProps } from '@octanejs/visx/shape';
-import type { SeriesProps, SvgPathComponent } from '../../../types';
+import type { SeriesProps } from '../../../types';
+import type { SvgPathComponent } from '../../../types/svgPath';
 export type BaseAreaSeriesProps<XScale extends AxisScale, YScale extends AxisScale, Datum extends object> = SeriesProps<XScale, YScale, Datum> & {
     /** Optional accessor to override the baseline value of Area shapes per datum (useful to generate band shapes) when chart is rendered horizontally (vertical line). Defaults to the scale zero value, not compatible with AreaStack. */
     x0Accessor?: SeriesProps<XScale, YScale, Datum>['xAccessor'];

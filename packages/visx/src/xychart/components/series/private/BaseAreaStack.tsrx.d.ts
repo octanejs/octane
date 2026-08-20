@@ -2,7 +2,8 @@
 import type { ElementDescriptor } from 'octane';
 import type { AxisScale } from '@octanejs/visx/axis';
 import type { StackPathConfig, AreaProps } from '@octanejs/visx/shape';
-import type { SeriesProps, SvgPathComponent } from '../../../types';
+import type { SeriesProps } from '../../../types';
+import type { SvgPathComponent } from '../../../types/svgPath';
 import type { BaseAreaSeriesProps } from './BaseAreaSeries.tsrx';
 type AreaStackChildProps<XScale extends AxisScale, YScale extends AxisScale, Datum extends object> = Omit<BaseAreaSeriesProps<XScale, YScale, Datum>, 'PathComponent' | 'curve'>;
 export type BaseAreaStackProps<XScale extends AxisScale, YScale extends AxisScale, Datum extends object> = {

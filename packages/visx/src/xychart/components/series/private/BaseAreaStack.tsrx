@@ -14,8 +14,8 @@ import type {
 	NearestDatumArgs,
 	NearestDatumReturnType,
 	SeriesProps,
-	SvgPathComponent,
 } from '../../../types';
+import type { SvgPathComponent } from '../../../types/svgPath';
 import DataContext from '../../../context/DataContext.tsrx';
 import type { BaseAreaSeriesProps } from './BaseAreaSeries.tsrx';
 import { BaseGlyphSeries } from './BaseGlyphSeries.tsrx';

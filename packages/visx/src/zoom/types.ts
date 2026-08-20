@@ -22,7 +22,7 @@ export type Translate = Pick<TransformMatrix, 'translateX' | 'translateY'>;
 
 export type Scale = Pick<TransformMatrix, 'scaleX' | 'scaleY'>;
 
-export type PinchDeltaState = {
+type PinchDeltaState = {
 	event: TouchEvent | PointerEvent | WheelEvent;
 	origin: [number, number];
 	offset: [number, number];
