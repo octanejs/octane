@@ -1,4 +1,3 @@
-import type React from 'react';
 import type { OctaneNode } from 'octane';
 import ChartTooltipContent from './ChartTooltipContent.tsrx';
 import FloatingTooltip from './FloatingTooltip.tsrx';
@@ -77,7 +76,9 @@ export default function ChartTooltip<Datum = unknown>({
 		offset={offset}
 		collisionPadding={collisionPadding}
 	>
-		{(state) => {
+		{function renderChartTooltip(
+			state: FloatingTooltipRootState<ChartTooltipItem<Datum>[]>,
+		) {
 			const content =
 				renderContent?.({ items, config, state }) ??
 					<ChartTooltipContent label={label} items={items} config={config} {...contentProps} />;

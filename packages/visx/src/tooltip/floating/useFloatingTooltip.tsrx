@@ -9,10 +9,15 @@ import {
 	useRole,
 } from '@octanejs/floating-ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'octane';
-import type React from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import { getTooltipAnchorReference } from './anchors';
 import { buildFloatingTooltipMiddleware } from './middleware';
-import type { OpenChangeReason, ReferenceElement, UseFloatingReturn } from './internalTypes';
+import type {
+	HTMLProps,
+	OpenChangeReason,
+	ReferenceElement,
+	UseFloatingReturn,
+} from './internalTypes';
 import type {
 	FloatingTooltipOpenChangeDetails,
 	TooltipAlign,
@@ -31,7 +36,7 @@ function getSideAndAlign(placement: string): { side: TooltipSide; align: Tooltip
 	};
 }
 
-function getFloatingPropsWithDefaultId<TProps extends React.HTMLProps<HTMLElement>>(
+function getFloatingPropsWithDefaultId<TProps extends HTMLProps<HTMLElement>>(
 	props: TProps | undefined,
 	id: string | undefined,
 ) {
@@ -263,7 +268,7 @@ export default function useFloatingTooltip<TData = unknown>(
 
 	const { align, side } = getSideAndAlign(floating.placement);
 	const getFloatingPropsWithId = useCallback(
-		<TProps extends React.HTMLProps<HTMLElement>>(props?: TProps) => getFloatingProps(
+		<TProps extends HTMLProps<HTMLElement>>(props?: TProps) => getFloatingProps(
 			getFloatingPropsWithDefaultId(props, id),
 		) as TProps,
 		[getFloatingProps, id],
@@ -290,10 +295,10 @@ export default function useFloatingTooltip<TData = unknown>(
 		update: floating.update,
 		openTooltip,
 		closeTooltip,
-		getReferenceProps: <TProps extends React.HTMLProps<Element>>(props?: TProps) =>
+		getReferenceProps: <TProps extends HTMLProps<Element>>(props?: TProps) =>
 			getReferenceProps(props) as TProps,
 		getFloatingProps: getFloatingPropsWithId,
-		getArrowProps: <TProps extends React.SVGProps<SVGSVGElement>>(props?: TProps) => {
+		getArrowProps: <TProps extends Octane.SVGProps<SVGSVGElement>>(props?: TProps) => {
 			const emptyProps = {};
 			return props ?? emptyProps as TProps;
 		},

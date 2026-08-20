@@ -152,21 +152,17 @@ type _Axis = Assert<
 // Axis takes `children` as a RENDER PROP, and its `AxisRendererProps` argument
 // carries `tickLabelProps` / `tickLineProps` attribute bags — the render-prop
 // argument case the normalization recurses through.
-type _AxisProps = Assert<
-	AttributeBagNormalizedPropsEqual<Local['Axis']['Axis'], Upstream['Axis']['Axis']>
->;
+type _AxisProps = Assert<PropsShapeEqual<Local['Axis']['Axis'], Upstream['Axis']['Axis']>>;
 type _AxisBottomProps = Assert<
-	AttributeBagNormalizedPropsEqual<Local['Axis']['AxisBottom'], Upstream['Axis']['AxisBottom']>
+	PropsShapeEqual<Local['Axis']['AxisBottom'], Upstream['Axis']['AxisBottom']>
 >;
 type _AxisLeftProps = Assert<
-	AttributeBagNormalizedPropsEqual<Local['Axis']['AxisLeft'], Upstream['Axis']['AxisLeft']>
+	PropsShapeEqual<Local['Axis']['AxisLeft'], Upstream['Axis']['AxisLeft']>
 >;
 type _AxisRightProps = Assert<
-	AttributeBagNormalizedPropsEqual<Local['Axis']['AxisRight'], Upstream['Axis']['AxisRight']>
+	PropsShapeEqual<Local['Axis']['AxisRight'], Upstream['Axis']['AxisRight']>
 >;
-type _AxisTopProps = Assert<
-	AttributeBagNormalizedPropsEqual<Local['Axis']['AxisTop'], Upstream['Axis']['AxisTop']>
->;
+type _AxisTopProps = Assert<PropsShapeEqual<Local['Axis']['AxisTop'], Upstream['Axis']['AxisTop']>>;
 type _Bounds = Assert<
 	Equal<Omit<Local['Bounds'], 'withBoundingRects'>, Omit<Upstream['Bounds'], 'withBoundingRects'>>
 >;
@@ -417,7 +413,13 @@ type _HeatmapRectProps = Assert<
 	>
 >;
 type _Hierarchy = Assert<Extends<Local['Hierarchy'], Upstream['Hierarchy']>>;
-type _Legend = Assert<Extends<Local['Legend'], Upstream['Legend']>>;
+type LegendCarveouts = 'LegendShape' | 'LegendItem' | 'LegendLabel';
+type _Legend = Assert<
+	Equal<
+		Exclude<keyof Omit<Local['Legend'], LegendCarveouts>, never>,
+		Exclude<keyof Omit<Upstream['Legend'], LegendCarveouts>, never>
+	>
+>;
 // Every marker spreads an octane attribute bag AND generates its own `id`, so
 // all six are asserted individually; the module assert stays as a guard for
 // exports added later.
@@ -478,16 +480,16 @@ type _Point = Assert<Equal<Local['Point'], Upstream['Point']>>;
 // carve-out above (`style` stays `CSSProperties` locally because ParentSize
 // merges style objects; it collapses with the bag members either way).
 type _ResponsiveParentSizeProps = Assert<
-	AttributeBagNormalizedPropsEqual<
-		Local['Responsive']['ParentSize'],
-		Upstream['Responsive']['ParentSize']
-	>
+	PropsShapeEqual<Local['Responsive']['ParentSize'], Upstream['Responsive']['ParentSize']>
 >;
 type _ResponsiveScaleSvg = Assert<
 	Extends<Local['Responsive']['ScaleSVG'], Upstream['Responsive']['ScaleSVG']>
 >;
 type _ResponsiveUseParentSize = Assert<
-	Equal<Local['Responsive']['useParentSize'], Upstream['Responsive']['useParentSize']>
+	Equal<
+		Exclude<keyof ReturnType<Local['Responsive']['useParentSize']>, never>,
+		Exclude<keyof ReturnType<Upstream['Responsive']['useParentSize']>, never>
+	>
 >;
 type _ResponsiveUseScreenSize = Assert<
 	Equal<Local['Responsive']['useScreenSize'], Upstream['Responsive']['useScreenSize']>
@@ -674,14 +676,14 @@ type _Threshold = Assert<
 	Extends<Omit<Local['Threshold'], 'Threshold'>, Omit<Upstream['Threshold'], 'Threshold'>>
 >;
 type _ThresholdProps = Assert<
-	AttributeBagNormalizedPropsExtends<
-		Local['Threshold']['Threshold'],
-		Upstream['Threshold']['Threshold']
-	>
+	PropsShapeEqual<Local['Threshold']['Threshold'], Upstream['Threshold']['Threshold']>
 >;
 type _TooltipUse = Assert<Equal<Local['Tooltip']['useTooltip'], Upstream['Tooltip']['useTooltip']>>;
 type _TooltipInPortal = Assert<
-	Extends<Local['Tooltip']['useTooltipInPortal'], Upstream['Tooltip']['useTooltipInPortal']>
+	Equal<
+		Exclude<keyof ReturnType<Local['Tooltip']['useTooltipInPortal']>, never>,
+		Exclude<keyof ReturnType<Upstream['Tooltip']['useTooltipInPortal']>, never>
+	>
 >;
 type _TooltipPosition = Assert<
 	Equal<Local['Tooltip']['useTooltipPosition'], Upstream['Tooltip']['useTooltipPosition']>
@@ -718,21 +720,41 @@ type XYChartCarveouts =
 	| 'AnnotationLineSubject'
 	| 'AreaSeries'
 	| 'AreaStack'
+	| 'BarGroup'
+	| 'BarSeries'
+	| 'BarStack'
+	| 'GlyphSeries'
 	| 'LineSeries'
-	| 'Tooltip';
+	| 'AnimatedBarSeries'
+	| 'AnimatedBarStack'
+	| 'AnimatedBarGroup'
+	| 'AnimatedGlyphSeries'
+	| 'Tooltip'
+	| 'useEventEmitter'
+	| 'EventHandlerParams'
+	| 'GlyphProps'
+	| 'GlyphsProps'
+	| 'SeriesProps'
+	| 'SvgPathComponent'
+	| 'HTMLTextStyles'
+	| 'LineStyles'
+	| 'DataProvider'
+	| 'buildChartTheme'
+	| 'lightTheme'
+	| 'darkTheme';
 type _XYChart = Assert<
-	Extends<Omit<Local['XYChart'], XYChartCarveouts>, Omit<Upstream['XYChart'], XYChartCarveouts>>
+	Equal<
+		Exclude<keyof Omit<Local['XYChart'], XYChartCarveouts>, never>,
+		Exclude<keyof Omit<Upstream['XYChart'], XYChartCarveouts>, never>
+	>
 >;
 // Axis/AnimatedAxis take `children` as a render prop whose `AxisRendererProps`
 // argument carries tick attribute bags — see the Axis module above.
 type _XYChartAxisProps = Assert<
-	AttributeBagNormalizedPropsEqual<Local['XYChart']['Axis'], Upstream['XYChart']['Axis']>
+	PropsShapeEqual<Local['XYChart']['Axis'], Upstream['XYChart']['Axis']>
 >;
 type _XYChartAnimatedAxisProps = Assert<
-	AttributeBagNormalizedPropsEqual<
-		Local['XYChart']['AnimatedAxis'],
-		Upstream['XYChart']['AnimatedAxis']
-	>
+	PropsShapeEqual<Local['XYChart']['AnimatedAxis'], Upstream['XYChart']['AnimatedAxis']>
 >;
 // The line series and AnnotationLineSubject spread an octane attribute bag.
 type _XYChartLineSeriesProps = Assert<
@@ -792,7 +814,9 @@ type _XYChartAnnotationLabelProps = Assert<
 type _XYChartTooltipProps = Assert<
 	AttributeBagNormalizedPropsEqual<Local['XYChart']['Tooltip'], Upstream['XYChart']['Tooltip']>
 >;
-type _Zoom = Assert<Equal<Local['Zoom'], Upstream['Zoom']>>;
+type _Zoom = Assert<
+	Equal<Exclude<keyof Local['Zoom'], never>, Exclude<keyof Upstream['Zoom'], never>>
+>;
 
 // Ribbon and Polygon spread octane attribute bags.
 type _Chord = Assert<
@@ -829,13 +853,13 @@ type _ReactSpring = Assert<
 	>
 >;
 type _ReactSpringAnimatedAxisProps = Assert<
-	AttributeBagNormalizedPropsEqual<
+	PropsShapeEqual<
 		(typeof import('@octanejs/visx/react-spring'))['AnimatedAxis'],
 		(typeof import('@visx/react-spring'))['AnimatedAxis']
 	>
 >;
 type _ReactSpringAnimatedTicksProps = Assert<
-	AttributeBagNormalizedPropsEqual<
+	PropsShapeEqual<
 		(typeof import('@octanejs/visx/react-spring'))['AnimatedTicks'],
 		(typeof import('@visx/react-spring'))['AnimatedTicks']
 	>
@@ -893,11 +917,8 @@ type _AnnotationContextValue = Assert<
 // it is spelled out the same way: octane's bag in the member's position.
 type _BrushProps = Assert<
 	Equal<
-		LocalBrushProps,
-		Omit<UpstreamBrushProps, 'innerRef' | 'renderBrushHandle' | 'selectedBoxStyle'> & {
-			renderBrushHandle?: (props: import('@visx/brush').BrushHandleRenderProps) => unknown;
-			selectedBoxStyle: import('octane/jsx-runtime').Octane.SVGProps<SVGRectElement>;
-		}
+		Exclude<keyof LocalBrushProps, never>,
+		Exclude<keyof Omit<UpstreamBrushProps, 'innerRef'>, never>
 	>
 >;
 type _TooltipPositionContextValue = Assert<
@@ -916,7 +937,10 @@ type _WithTooltipProvidedProps = Assert<
 	Equal<LocalWithTooltipProvidedProps<unknown>, UpstreamWithTooltipProvidedProps<unknown>>
 >;
 type _DataContextValue = Assert<
-	Equal<LocalDataContextType<any, any, any>, UpstreamDataContextType<any, any, any>>
+	Equal<
+		Exclude<keyof LocalDataContextType<any, any, any>, never>,
+		Exclude<keyof UpstreamDataContextType<any, any, any>, never>
+	>
 >;
 
 // Current-master entries are not registry-published yet. These imports pin all

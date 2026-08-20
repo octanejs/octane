@@ -1,6 +1,5 @@
 /* eslint jsx-a11y/mouse-events-have-key-events: 'off', @typescript-eslint/no-explicit-any: 'off' */
 import { useContext, useEffect } from 'octane';
-import type { PointerEvent } from 'react';
 import type { OctaneNode } from 'octane';
 import { ParentSize } from '@octanejs/visx/responsive';
 import type { ResizeObserverPolyfill } from '@octanejs/visx/responsive';

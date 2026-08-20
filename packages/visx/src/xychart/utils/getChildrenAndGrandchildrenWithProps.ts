@@ -1,9 +1,8 @@
-import type { ReactElement } from 'react';
-import type { OctaneNode } from 'octane';
+import type { ElementDescriptor, OctaneNode } from 'octane';
 import { Children } from 'octane';
 
 /** Returns whether the OctaneNode has props (and therefore is an `Element` versus primitive type) */
-function isChildWithProps<P extends object>(child: OctaneNode): child is ReactElement<P> {
+function isChildWithProps<P extends object>(child: OctaneNode): child is ElementDescriptor<P> {
 	return !!child && typeof child === 'object' && 'props' in child && child.props != null;
 }
 
@@ -13,7 +12,7 @@ function isChildWithProps<P extends object>(child: OctaneNode): child is ReactEl
  */
 export default function getChildrenAndGrandchildrenWithProps<P extends object>(
 	children: OctaneNode,
-): ReactElement<P>[] {
+): ElementDescriptor<P>[] {
 	return Children.toArray(children)
 		.flatMap((child) => {
 			if (isChildWithProps(child) && (child.props as any).children) {
@@ -21,5 +20,5 @@ export default function getChildrenAndGrandchildrenWithProps<P extends object>(
 			}
 			return child;
 		})
-		.filter((child) => isChildWithProps<P>(child)) as unknown as ReactElement<P>[];
+		.filter((child) => isChildWithProps<P>(child)) as unknown as ElementDescriptor<P>[];
 }
