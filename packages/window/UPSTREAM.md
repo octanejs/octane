@@ -46,16 +46,17 @@ the binding contract.
 The immutable boundary is every file under upstream `lib/`, plus `src/constants.ts`,
 `vitest.setup.js`, `package.json`, and the MIT license. Production modules are
 ported source-correspondently under `src/`; test modules are either executed
-byte-exact in the pristine lane or generated into `tests/upstream/` using the
-audited transformations in `audit/adapted-transformations.json`. Upstream test
-utilities remain byte-locked inputs and are mapped to the adapted utilities by
-the generator. No vendored file is published.
+byte-exact in the pristine lane or regenerated into `tests/upstream/`
+(gitignored) from the lock's mechanical `adaptedRewrites` plus the two
+committed divergence patches under `audit/upstream-patches/`, with the
+transformation classifications documented in
+`audit/adapted-transformations.json`. No vendored file is published.
 
 | Upstream module class | Octane disposition | Evidence |
 | --- | --- | --- |
 | `lib/components/**`, `lib/core/**`, `lib/hooks/**`, `lib/utils/**` production files | Source-correspondent port in `src/**`; React imports and renderer syntax are the only framework adaptations | `audit/adapted-transformations.json`, `tests/audit/adapted.test.mjs` |
 | `lib/**/*.test.{ts,tsx}` | Unchanged pristine execution and generated adapted execution | `audit/pristine-runtime.json`, `audit/adapted-runtime.json` |
-| `lib/utils/test/**`, `vitest.setup.js` | Unchanged pristine support; source-correspondent adapted support | `audit/upstream.lock.json`, `tests/generate-adapted-tests.mjs` |
+| `lib/utils/test/**`, `vitest.setup.js` | Unchanged pristine support; source-correspondent adapted support | `audit/upstream.lock.json` (adapted mapping and rewrites) |
 | Published declaration bundle | Unchanged pristine oracle; identical shared assertion program targets Octane source | `audit/type-contract.json`, `typetests/**` |
 | Repository metadata and license | Vendored provenance only | `tests/audit/upstream.test.mjs` |
 
@@ -82,26 +83,26 @@ the generator. No vendored file is published.
 
 ## Upstream test crosswalk
 
-Every row runs unchanged in `react-window-pristine` and as a generator-produced,
-audited adaptation in `react-window-adapted`; the inventories prove all 117
+Every row runs unchanged in `react-window-pristine` and as a lock-regenerated
+adaptation in `react-window-adapted`; the inventories prove all 117
 registered cases are unique and executed.
 
 | Upstream test file | Pristine disposition | Adapted disposition |
 | --- | --- | --- |
-| `components/grid/Grid.test.tsx` | byte-exact | generated framework adaptation |
-| `components/list/List.test.tsx` | byte-exact | generated framework adaptation |
-| `components/list/useDynamicRowHeight.test.ts` | byte-exact | generated framework adaptation |
-| `core/createCachedBounds.test.ts` | byte-exact | generated import adaptation |
-| `core/getEstimatedSize.test.ts` | byte-exact | generated import adaptation |
-| `core/getOffsetForIndex.test.ts` | byte-exact | generated import adaptation |
-| `core/getStartStopIndices.test.ts` | byte-exact | generated import adaptation |
-| `core/useCachedBounds.test.ts` | byte-exact | generated hook adaptation |
-| `core/useVirtualizer.test.ts` | byte-exact | generated hook adaptation |
-| `hooks/useMemoizedObject.test.ts` | byte-exact | generated hook adaptation |
-| `hooks/useResizeObserver.test.ts` | byte-exact | generated hook adaptation |
-| `hooks/useStableCallback.test.tsx` | byte-exact | generated hook adaptation |
-| `utils/parseNumericStyleValue.test.ts` | byte-exact | generated import adaptation |
-| `utils/shallowCompare.test.ts` | byte-exact | generated import adaptation |
+| `components/grid/Grid.test.tsx` | byte-exact | regenerated framework adaptation |
+| `components/list/List.test.tsx` | byte-exact | regenerated framework adaptation |
+| `components/list/useDynamicRowHeight.test.ts` | byte-exact | regenerated framework adaptation |
+| `core/createCachedBounds.test.ts` | byte-exact | regenerated import adaptation |
+| `core/getEstimatedSize.test.ts` | byte-exact | regenerated import adaptation |
+| `core/getOffsetForIndex.test.ts` | byte-exact | regenerated import adaptation |
+| `core/getStartStopIndices.test.ts` | byte-exact | regenerated import adaptation |
+| `core/useCachedBounds.test.ts` | byte-exact | regenerated hook adaptation |
+| `core/useVirtualizer.test.ts` | byte-exact | regenerated hook adaptation |
+| `hooks/useMemoizedObject.test.ts` | byte-exact | regenerated hook adaptation |
+| `hooks/useResizeObserver.test.ts` | byte-exact | regenerated hook adaptation |
+| `hooks/useStableCallback.test.tsx` | byte-exact | regenerated hook adaptation |
+| `utils/parseNumericStyleValue.test.ts` | byte-exact | regenerated import adaptation |
+| `utils/shallowCompare.test.ts` | byte-exact | regenerated import adaptation |
 
 ## Port-authored evidence crosswalk
 

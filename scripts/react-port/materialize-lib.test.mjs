@@ -188,6 +188,25 @@ describe('forbidden React specifiers', () => {
 });
 
 describe('adapted planning', () => {
+	test('a mapping include regex narrows the planned files', () => {
+		const lock = {
+			adaptedMappings: [
+				{ fromRoot: 'lib', toRoot: 'tests/upstream', include: '\\.test\\.[tj]sx?$' },
+			],
+			files: [
+				{ path: 'lib/Grid.tsx', gitBlob: 'a'.repeat(40) },
+				{ path: 'lib/Grid.test.tsx', gitBlob: 'b'.repeat(40) },
+				{ path: 'lib/core/get.test.ts', gitBlob: 'c'.repeat(40) },
+			],
+		};
+		assert.deepEqual(
+			planAdaptedFiles(lock)
+				.map((planned) => planned.targetPath)
+				.sort(),
+			['tests/upstream/Grid.test.tsx', 'tests/upstream/core/get.test.ts'],
+		);
+	});
+
 	test('maps pinned test files onto their tests/upstream targets', () => {
 		assert.deepEqual(planAdaptedFiles(fixtureLock()), [
 			{

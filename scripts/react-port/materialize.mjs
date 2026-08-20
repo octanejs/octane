@@ -65,8 +65,9 @@ Options:
   --work-root <dir>          Batch state root (default: .react-port-work)
   --scope <path>             Narrow the pin to this subtree-relative path
                              (lock; repeatable; default pins the whole subtree)
-  --adapted-map <from=to>    Map a pinned source root onto a tests/upstream
-                             target (lock; repeatable)
+  --adapted-map <from=to[:re]>  Map a pinned source root onto a tests/upstream
+                             target, optionally narrowed to files matching the
+                             include regex (lock; repeatable)
   --adapted-rewrite <f=r>    Mechanical source rewrite applied to every mapped
                              file before its patch (lock; repeatable, ordered)
   --accept-license-file      Reviewed exception (lock with --pin): accept a
@@ -157,11 +158,16 @@ function parseArguments(argumentsList) {
 		} else if (argument === '--adapted-map') {
 			const separator = value?.indexOf('=') ?? -1;
 			if (separator <= 0 || separator === value.length - 1) {
-				throw new Error('--adapted-map requires <pinned-root>=<tests/upstream-target>');
+				throw new Error(
+					'--adapted-map requires <pinned-root>=<tests/upstream-target>[:include-regex]',
+				);
 			}
+			const target = value.slice(separator + 1);
+			const includeSeparator = target.indexOf(':');
 			options.adaptedMappings.push({
 				fromRoot: value.slice(0, separator),
-				toRoot: value.slice(separator + 1),
+				toRoot: includeSeparator === -1 ? target : target.slice(0, includeSeparator),
+				...(includeSeparator === -1 ? {} : { include: target.slice(includeSeparator + 1) }),
 			});
 			index += 1;
 		} else if (argument === '--adapted-rewrite') {

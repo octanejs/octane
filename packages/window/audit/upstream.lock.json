@@ -23,8 +23,139 @@
     "notices": []
   },
   "scopes": ["LICENSE.md", "lib", "package.json", "src/constants.ts", "vitest.setup.js"],
-  "adaptedMappings": [],
-  "adaptedRewrites": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "lib",
+      "toRoot": "tests/upstream",
+      "include": "\\.test\\.[tj]sx?$"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "import { render, screen } from \"@testing-library/react\";",
+      "replace": "/** @jsxImportSource octane */\nimport { render, screen } from \"@testing-library/react\";"
+    },
+    {
+      "find": "import { act, render, screen } from \"@testing-library/react\";",
+      "replace": "/** @jsxImportSource octane */\nimport { act, render, screen } from \"@testing-library/react\";"
+    },
+    {
+      "find": "import { fireEvent, render, renderHook, screen } from \"@testing-library/react\";",
+      "replace": "/** @jsxImportSource octane */\nimport { fireEvent, render, renderHook, screen } from \"@testing-library/react\";"
+    },
+    {
+      "find": "import { act, createRef, useEffect, useLayoutEffect, useRef } from \"react\";",
+      "replace": "import { createRef } from \"../../../create-ref\";\nimport { act, useEffect, useLayoutEffect, useRef } from \"octane\";"
+    },
+    {
+      "find": "import { createRef, useEffect, useLayoutEffect, useRef } from \"react\";",
+      "replace": "import { createRef } from \"../../../create-ref\";\nimport { useEffect, useLayoutEffect, useRef } from \"octane\";"
+    },
+    {
+      "find": "\"@testing-library/react\"",
+      "replace": "\"@octanejs/testing-library\""
+    },
+    {
+      "find": "import type { CellComponentProps, GridImperativeAPI } from \"./types\";",
+      "replace": "import type { CellComponentProps, GridImperativeAPI } from \"../../../../src/components/grid/types\";"
+    },
+    {
+      "find": "import { type ListImperativeAPI, type RowComponentProps } from \"./types\";",
+      "replace": "import { type ListImperativeAPI, type RowComponentProps } from \"../../../../src/components/list/types\";"
+    },
+    {
+      "find": "\"../../../src/constants\"",
+      "replace": "\"../../../../src/constants\""
+    },
+    {
+      "find": "\"../../src/constants\"",
+      "replace": "\"../../../src/constants\""
+    },
+    {
+      "find": "\"../../utils/assert\"",
+      "replace": "\"../../../../src/utils/assert\""
+    },
+    {
+      "find": "\"../../utils/test/mockResizeObserver\"",
+      "replace": "\"../../../utils/mockResizeObserver\""
+    },
+    {
+      "find": "\"../utils/test/mockResizeObserver\"",
+      "replace": "\"../../utils/mockResizeObserver\""
+    },
+    {
+      "find": "\"../types\"",
+      "replace": "\"../../../src/types\""
+    },
+    {
+      "find": "\"../utils/getScrollbarSize\"",
+      "replace": "\"../../../src/utils/getScrollbarSize\""
+    },
+    {
+      "find": "\"./createCachedBounds\"",
+      "replace": "\"../../../src/core/createCachedBounds\""
+    },
+    {
+      "find": "\"./getEstimatedSize\"",
+      "replace": "\"../../../src/core/getEstimatedSize\""
+    },
+    {
+      "find": "\"./getOffsetForIndex\"",
+      "replace": "\"../../../src/core/getOffsetForIndex\""
+    },
+    {
+      "find": "\"./getStartStopIndices\"",
+      "replace": "\"../../../src/core/getStartStopIndices\""
+    },
+    {
+      "find": "\"./useCachedBounds\"",
+      "replace": "\"../../../src/core/useCachedBounds\""
+    },
+    {
+      "find": "\"./useVirtualizer\"",
+      "replace": "\"../../../src/core/useVirtualizer\""
+    },
+    {
+      "find": "\"./useMemoizedObject\"",
+      "replace": "\"../../../src/hooks/useMemoizedObject\""
+    },
+    {
+      "find": "\"./useResizeObserver\"",
+      "replace": "\"../../../src/hooks/useResizeObserver\""
+    },
+    {
+      "find": "\"./useStableCallback\"",
+      "replace": "\"../../../src/hooks/useStableCallback\""
+    },
+    {
+      "find": "\"./parseNumericStyleValue\"",
+      "replace": "\"../../../src/utils/parseNumericStyleValue\""
+    },
+    {
+      "find": "\"./shallowCompare\"",
+      "replace": "\"../../../src/utils/shallowCompare\""
+    },
+    {
+      "find": "\"./Grid\"",
+      "replace": "\"../../../../src/components/grid/Grid\""
+    },
+    {
+      "find": "\"./useGridCallbackRef\"",
+      "replace": "\"../../../../src/components/grid/useGridCallbackRef\""
+    },
+    {
+      "find": "\"./List\"",
+      "replace": "\"../../../../src/components/list/List\""
+    },
+    {
+      "find": "\"./useDynamicRowHeight\"",
+      "replace": "\"../../../../src/components/list/useDynamicRowHeight\""
+    },
+    {
+      "find": "\"./useListCallbackRef\"",
+      "replace": "\"../../../../src/components/list/useListCallbackRef\""
+    }
+  ],
   "files": [
     {
       "path": "lib/components/grid/Grid.test.tsx",
@@ -312,5 +443,5 @@
       "size": 594
     }
   ],
-  "fingerprint": "d61ed836330ef6203474ed5ef035266951312cabc4fd439ce7dc316d6fec908d"
+  "fingerprint": "be6cf4ca0e496fe6158421b3063d46bd7f34e638d67d1e347f47f034050e61d6"
 }

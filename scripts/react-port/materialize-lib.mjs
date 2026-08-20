@@ -88,6 +88,18 @@ function validateAdaptedMappings(adaptedMappings) {
 			throw new Error(`Adapted mapping toRoot is duplicated: ${mapping.toRoot}`);
 		}
 		targetRoots.add(mapping.toRoot);
+		if (mapping.include !== undefined) {
+			if (typeof mapping.include !== 'string' || mapping.include.length === 0) {
+				throw new Error('Adapted mapping include must be a nonempty regular-expression string');
+			}
+			try {
+				new RegExp(mapping.include);
+			} catch {
+				throw new Error(
+					`Adapted mapping include is not a valid regular expression: ${mapping.include}`,
+				);
+			}
+		}
 	}
 }
 
@@ -207,6 +219,11 @@ export function buildUpstreamLock({
 }) {
 	validateIdentity(identity);
 	if (!Array.isArray(treeEntries)) throw new Error('Upstream tree entries are required');
+	const canonicalMappings = adaptedMappings.map((mapping) => ({
+		fromRoot: mapping.fromRoot,
+		toRoot: mapping.toRoot,
+		...(mapping.include !== undefined ? { include: mapping.include } : {}),
+	}));
 	const subdirectory = identity.repository.subdirectory ?? null;
 	const scopePrefix = subdirectory ? `${subdirectory}/` : '';
 	// Scopes narrow the pin to a reviewed subset of the subtree (for example the
@@ -246,7 +263,7 @@ export function buildUpstreamLock({
 		},
 		license,
 		scopes: [...scopes].sort(),
-		adaptedMappings,
+		adaptedMappings: canonicalMappings,
 		adaptedRewrites,
 		files,
 	};
@@ -259,9 +276,14 @@ export function planAdaptedFiles(lock) {
 	const targets = new Set();
 	for (const mapping of lock.adaptedMappings ?? []) {
 		const fromPrefix = `${mapping.fromRoot}/`;
+		// An optional include regex narrows the mapping to matching files (for
+		// example test files interleaved with source in the pinned tree).
+		const include = mapping.include === undefined ? null : new RegExp(mapping.include);
 		for (const file of lock.files) {
 			if (!file.path.startsWith(fromPrefix)) continue;
-			const targetPath = `${mapping.toRoot}/${file.path.slice(fromPrefix.length)}`;
+			const relativePath = file.path.slice(fromPrefix.length);
+			if (include !== null && !include.test(relativePath)) continue;
+			const targetPath = `${mapping.toRoot}/${relativePath}`;
 			if (targets.has(targetPath)) {
 				throw new Error(`Adapted mappings produce a duplicated target: ${targetPath}`);
 			}
