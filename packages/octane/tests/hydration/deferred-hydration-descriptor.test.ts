@@ -208,6 +208,48 @@ describe('deferred hydration of descriptor components', () => {
 			expect(onRecoverableError).toHaveBeenCalledOnce();
 		});
 
+		for (const suspended of [false, true]) {
+			it(`${ownership}: cleans up the current server-range tail on ${suspended ? 'resumed' : 'immediate'} adoption`, async () => {
+				const pending = deferred<void>();
+				const when = load();
+				const onInput = vi.fn();
+				const onHydrated = vi.fn();
+				const onRecoverableError = vi.fn();
+				const onUncaughtError = vi.fn();
+				renderServer(ownership, { when });
+				const input = container.querySelector('#descriptor-editor') as HTMLInputElement;
+				input.value = 'Draft before activation';
+				const wrapper = input.parentElement!;
+				const stale = document.createElement('p');
+				stale.textContent = 'Added before activation completed';
+				// Another DOM integration can insert content at the boundary's tail
+				// while Octane has left its server HTML visible but inactive.
+				if (!suspended) wrapper.insertBefore(stale, wrapper.lastChild);
+				hydrate(
+					ownership,
+					{ when, pending: suspended ? pending.promise : undefined, onInput, onHydrated },
+					{ onRecoverableError, onUncaughtError },
+				);
+				await Client.act(() => {});
+				if (suspended) {
+					wrapper.insertBefore(stale, wrapper.lastChild);
+					expect(stale.isConnected).toBe(true);
+					expect(onHydrated).not.toHaveBeenCalled();
+					await Client.act(() => pending.resolve());
+				}
+
+				expect(container.querySelector('#descriptor-editor')).toBe(input);
+				expect(input.value).toBe('Draft before activation');
+				expect(stale.isConnected).toBe(false);
+				expect(onRecoverableError).toHaveBeenCalledOnce();
+				expect(onUncaughtError).not.toHaveBeenCalled();
+				expect(onHydrated).toHaveBeenCalledOnce();
+				input.value = 'Live draft after cleanup';
+				await Client.act(() => input.dispatchEvent(new Event('input', { bubbles: true })));
+				expect(onInput).toHaveBeenCalledExactlyOnceWith('Live draft after cleanup');
+			});
+		}
+
 		it(`${ownership}: does not revive an unmounted pending activation`, async () => {
 			const pending = deferred<void>();
 			const when = load();

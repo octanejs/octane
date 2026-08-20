@@ -209,6 +209,31 @@ The immutable shell remains server-owned. A future live-context bridge or SPA
 promotion mechanism needs its own design and tests; it is not implied by this
 entry mode.
 
+## Deferred Hydrate recovery follow-up
+
+Completed descriptor adoption and divergent fragment recovery are separate
+contracts. Runtime-only, compiler-shaped probes against the existing runtime
+show that a mismatched multi-root fragment inside Hydrate can report a
+recoverable mismatch, remove its own insertion anchor, and then throw
+`NotFoundError` while rebuilding. Both immediate and suspended cases reproduce
+on the pre-change base. This is an existing limitation, not fixed by deferring
+the descriptor cleanup claim; native compiler coverage is still required.
+
+A recovery design must validate and replace only a proven owner range. Use the
+actual current scope's insertion owner, including adopted lite-scope ranges,
+and retain the live end anchor and unaffected siblings. A fresh fragment may
+contain component, conditional, list, or Suspense holes: those children must
+client-build without adopting a following owner's server range. Suppressing DOM
+adoption must not leave the recovered subtree's serialized `use()` values for a
+later sibling to consume. Replaying setup or restarting the whole island is not
+a safe shortcut around seed, ID, ref, effect, and browser-state ownership.
+
+Before shipping this recovery, add public compiler regressions in development
+and production for immediate and suspended mismatches, nested and lite owners,
+mixed directive holes, later sibling identity/events, cancellation, repeated
+suspension, and seeds before and after the replaced range. The independent-island
+protocol must not assume this stronger recovery contract already exists.
+
 ## Vite, Rspack, and app integration
 
 Keep proof rules, reference IDs, manifest validation/versioning, and diagnostics

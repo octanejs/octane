@@ -3,5 +3,6 @@
 ---
 
 Preserve server-rendered descriptor components when a suspended Hydrate boundary
-resumes. Avoid false hydration mismatch reports while continuing to remove
-genuinely unmatched server content.
+resumes. Claim fallback cleanup ranges only after adoption completes, avoiding
+false hydration mismatch reports while preserving template-owned checks and
+removing genuinely unmatched content added during suspension.
