@@ -65,6 +65,11 @@ export default defineConfig({
 				entry: ['Page', '/src/Page.tsrx'],
 				layout: '/src/Layout.tsrx',
 			}),
+			new RenderRoute({
+				path: '/layout-assets',
+				entry: ['Page', '/src/Page.tsrx'],
+				layout: '/src/LayoutAssets.tsrx',
+			}),
 		],
 	},
 });
