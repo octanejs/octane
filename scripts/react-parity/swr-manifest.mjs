@@ -93,7 +93,7 @@ const manifest = {
 			project: 'swr-pristine',
 			evidenceOrigin: 'upstream-suite',
 			notes:
-				'Runs the byte-exact SWR 2.4.2 Jest suite. A testing-library harness holds initial request completion in two mutation race cases until the competing mutation starts or the shared in-flight state is observed, preserving the upstream assertions without wall-clock ordering.',
+				'Runs the byte-exact SWR 2.4.2 Jest suite. A testing-library harness holds superseded or initial request completion in three mutation race cases until the competing mutation starts or the shared in-flight state is observed, preserving the upstream assertions without wall-clock ordering.',
 			execution: {
 				kind: 'jest-full',
 				config: 'packages/swr/audit/jest-pristine.config.mjs',

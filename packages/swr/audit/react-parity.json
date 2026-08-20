@@ -51,7 +51,7 @@
       "environment": "workspace-node",
       "project": "swr-pristine",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs the byte-exact SWR 2.4.2 Jest suite. A testing-library harness holds initial request completion in two mutation race cases until the competing mutation starts or the shared in-flight state is observed, preserving the upstream assertions without wall-clock ordering.",
+      "notes": "Runs the byte-exact SWR 2.4.2 Jest suite. A testing-library harness holds superseded or initial request completion in three mutation race cases until the competing mutation starts or the shared in-flight state is observed, preserving the upstream assertions without wall-clock ordering.",
       "execution": {
         "kind": "jest-full",
         "config": "packages/swr/audit/jest-pristine.config.mjs",
@@ -72,12 +72,12 @@
         {
           "path": "packages/swr/audit/upstream-testing-library.cjs",
           "role": "support",
-          "sha256": "374d3a59054ffd0e8ccf3b235086ca2bf73a3587e00b8f89d86de5c384fd80da"
+          "sha256": "96a2ae60edb9b397036c6cc5a983e85602a1438d19aa795abf3c3cc405fb8d9a"
         },
         {
           "path": "packages/swr/audit/upstream-timer-gate.cjs",
           "role": "support",
-          "sha256": "0c87828c172fe2a2ef69993f7242ec2383146f24a27df95c39b68d30bb113db4"
+          "sha256": "1c94d08482c159da3010c4315c40eb0c0d8edfa9d8267e1810e2e8c738fcd4ac"
         },
         {
           "path": "packages/swr/upstream/SHA256SUMS",
@@ -97,7 +97,7 @@
         {
           "path": "scripts/react-parity/swr-upstream-timer-gate.test.mjs",
           "role": "support",
-          "sha256": "ca6abd0cd93fcb95c050db71e0152214451710352191d65d974e8052ccc3f916"
+          "sha256": "aba0f36716203cc96f7b6568e7199c7cf8694f5e6cf45b070d2ccaf18891cb8d"
         }
       ]
     },
