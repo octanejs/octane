@@ -2,7 +2,7 @@ const path = require('node:path');
 const { createRequire } = require('node:module');
 
 const packageRequire = createRequire(path.resolve(__dirname, '../package.json'));
-const upstreamRoot = path.resolve(__dirname, '../upstream/tag');
+const upstreamRoot = path.resolve(__dirname, '../upstream');
 
 function resolveFromPackage(specifier) {
 	return packageRequire.resolve(specifier);
@@ -23,6 +23,9 @@ module.exports = {
 		escapeString: true,
 		printBasicPrototype: true,
 	},
+	// The pinned snapshots keep their byte-exact legacy header in upstream/;
+	// Jest reads the lock-regenerated, header-corrected copies instead.
+	snapshotResolver: path.resolve(__dirname, 'upstream-jest.snapshot-resolver.cjs'),
 	moduleNameMapper: {
 		'^react$': resolveFromPackage('react-18'),
 		'^react/jsx-runtime$': resolveFromPackage('react-18/jsx-runtime'),

@@ -34,22 +34,22 @@
     {
       "path": "packages/popper/tests/upstream/Manager.test.tsx",
       "disposition": "adapted-upstream-suite",
-      "oracle": "Adapted cases from packages/popper/upstream/tag/src/Manager.test.js."
+      "oracle": "Adapted cases from packages/popper/upstream/src/Manager.test.js."
     },
     {
       "path": "packages/popper/tests/upstream/Popper.test.tsx",
       "disposition": "adapted-upstream-suite",
-      "oracle": "Adapted cases from packages/popper/upstream/tag/src/Popper.test.js."
+      "oracle": "Adapted cases from packages/popper/upstream/src/Popper.test.js."
     },
     {
       "path": "packages/popper/tests/upstream/Reference.test.tsx",
       "disposition": "adapted-upstream-suite",
-      "oracle": "Adapted cases from packages/popper/upstream/tag/src/Reference.test.js with the direct setter-context provider fixture."
+      "oracle": "Adapted cases from packages/popper/upstream/src/Reference.test.js with the direct setter-context provider fixture."
     },
     {
       "path": "packages/popper/tests/upstream/usePopper.test.tsx",
       "disposition": "adapted-upstream-suite",
-      "oracle": "Adapted cases from packages/popper/upstream/tag/src/usePopper.test.js."
+      "oracle": "Adapted cases from packages/popper/upstream/src/usePopper.test.js."
     },
     {
       "path": "packages/popper/typetests/main-test.tsx",
