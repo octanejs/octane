@@ -23,8 +23,38 @@
     "notices": []
   },
   "scopes": [],
-  "adaptedMappings": [],
-  "adaptedRewrites": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "tests",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "'../src/useHotkeyRegistrations'",
+      "replace": "'@octanejs/tanstack-hotkeys'"
+    },
+    {
+      "find": "'../src/useHotkeySequences'",
+      "replace": "'@octanejs/tanstack-hotkeys'"
+    },
+    {
+      "find": "'../src/useHotkeys'",
+      "replace": "'@octanejs/tanstack-hotkeys'"
+    },
+    {
+      "find": "'../src/useHotkey'",
+      "replace": "'@octanejs/tanstack-hotkeys'"
+    },
+    {
+      "find": "'@testing-library/react'",
+      "replace": "'@octanejs/testing-library'"
+    },
+    {
+      "find": "from 'react'",
+      "replace": "from 'octane'"
+    }
+  ],
   "files": [
     {
       "path": "CHANGELOG.md",
@@ -152,5 +182,5 @@
       "size": 381
     }
   ],
-  "fingerprint": "042df7ae3f19c89f3bd6d6277e75bdf6ca6a598fed452d8cc26fe4c22e8e2390"
+  "fingerprint": "c91e5faeea614466294bdc007241445cab756a0e76cfc3006cae3db8a7b05bc7"
 }

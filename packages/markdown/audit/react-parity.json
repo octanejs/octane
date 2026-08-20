@@ -11,7 +11,10 @@
     "integrity": "sha256:205f5c607c68e1e42b8d7a036326bdb3a105ae55e6469ecfcaf998004609d5f7",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/markdown/src"],
@@ -139,7 +142,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "a2634afde96e7d9c152da4f15f31118ab5a50980546c01591d468447903852ee"
+          "sha256": "2bfa7942e0cddf2a565c6cb0242a388131f91c9d233cfe8a1f61027130000cbe"
         }
       ]
     },

@@ -1199,11 +1199,17 @@ export default defineConfig({
 			{
 				testExecution: {
 					group: 'react-parity',
-					include: ['packages/tanstack-hotkeys/tests/upstream/**/*.test.ts'],
+					include: [
+						'packages/tanstack-hotkeys/tests/upstream/**/*.test.ts',
+						'packages/tanstack-hotkeys/tests/upstream/**/*.test.tsx',
+					],
 				},
 				test: {
 					name: 'tanstack-hotkeys',
-					include: ['packages/tanstack-hotkeys/tests/**/*.test.ts'],
+					include: [
+						'packages/tanstack-hotkeys/tests/**/*.test.ts',
+						'packages/tanstack-hotkeys/tests/upstream/**/*.test.tsx',
+					],
 					exclude: [
 						'packages/tanstack-hotkeys/tests/upstream-original.test.ts',
 						'packages/tanstack-hotkeys/tests/differential/**/*.test.ts',

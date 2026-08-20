@@ -23,7 +23,7 @@
     },
     "tests": {
       "roots": ["packages/tanstack-hotkeys/tests/upstream"],
-      "include": ["\\.test\\.ts$"],
+      "include": ["\\.test\\.tsx?$"],
       "exclude": []
     }
   },
@@ -85,7 +85,7 @@
         {
           "path": "packages/tanstack-hotkeys/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "49a884c202febdaf1c53d97451dd33a11c6830a53325ee3dd6da2d4297d5aedb"
+          "sha256": "bb2184f9cc8fb38772139bd7a38132e3a4307813a34f0b31c292224d582fc4c9"
         }
       ]
     },
@@ -105,7 +105,7 @@
         {
           "path": "packages/tanstack-hotkeys/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "e5869993d034496b7d33adb23653b74bbf7a7ba89d53a1ae8d250813da00552d"
+          "sha256": "2c80e1f3139aa516c720fe43d190c3502a2e894f6a83911d684d56294f176fe4"
         },
         {
           "path": "packages/tanstack-hotkeys/tests/_setup.ts",
@@ -115,7 +115,7 @@
         {
           "path": "packages/tanstack-hotkeys/audit/upstream-crosswalk.json",
           "role": "support",
-          "sha256": "03bf000c8edc41d144d37b989da6e0c982f72a465d19f2d5ecc763333ebd33ea"
+          "sha256": "952ef00237f313591f0ee503cbf2f81bf5b048d95006d55cf7b23f238c09adfe"
         }
       ]
     },
