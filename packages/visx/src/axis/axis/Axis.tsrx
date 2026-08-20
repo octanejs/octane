@@ -1,4 +1,5 @@
 import cx from 'classnames';
+import { createElement } from 'octane';
 import { Group } from '@octanejs/visx/group';
 import type { SharedAxisProps, AxisScale, AxisRendererProps } from '../types';
 import AxisRenderer from './AxisRenderer.tsrx';
@@ -7,7 +8,7 @@ import Orientation from '../constants/orientation';
 import useAxis from '../react/useAxis.tsrx';
 
 function renderAxis<Scale extends AxisScale>(axis: AxisRendererProps<Scale>) {
-	return <AxisRenderer {...axis} />;
+	return createElement(AxisRenderer, axis as Parameters<typeof AxisRenderer>[0]);
 }
 
 export type AxisProps<Scale extends AxisScale> = SharedAxisProps<Scale> & {
