@@ -14,9 +14,15 @@
 | Type oracle | `@types/react@19.2.17` / `@types/react-dom@19.2.3` |
 | License | MIT, retained byte-exact under both evidence boundaries |
 
-`upstream/npm/package/` is the unpacked registry artifact. `upstream/source/`
-contains the canonical runtime source, test suite, JSX loader, TypeScript
-configuration, package metadata, and license from the pinned commit. The npm
+`upstream-artifact/package/` is the unpacked registry artifact, hash-pinned by
+the provenance verifier. `upstream/` contains the canonical runtime source,
+test suite, JSX loader, TypeScript configuration, package metadata, and
+license from the pinned commit, pinned by `audit/upstream.lock.json`: each
+committed file verifies offline against its upstream git blob sha
+(`pnpm react-port:materialize run --check --package-dir packages/markdown`),
+and the verifier's negative controls exercise that layer. The upstream MIT
+license is retained byte-exact as `LICENSE.upstream`, hash-matched to the
+lock. The npm
 artifact does not publish `test.jsx` or `script/load-jsx.js`, so the canonical
 repository supplies that test boundary. The runtime source and license present
 in both artifacts are byte-identical.
