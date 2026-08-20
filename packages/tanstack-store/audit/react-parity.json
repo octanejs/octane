@@ -100,7 +100,7 @@
         {
           "path": "scripts/react-parity/pristine-suite-lib.mjs",
           "role": "support",
-          "sha256": "5dbb930db1dc483b1a260405cb3d8efddca2462036f98b1f8e79bd1880434d23"
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
         }
       ]
     },

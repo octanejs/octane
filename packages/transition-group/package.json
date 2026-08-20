@@ -28,7 +28,8 @@
     "LICENSE",
     "README.md",
     "UPSTREAM.md",
-    "status.json"
+    "status.json",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts",
@@ -43,7 +44,7 @@
     "test": "pnpm upstream:check && pnpm upstream:verify && pnpm test:upstream && vitest run --root ../.. --project transition-group --project transition-group-ssr",
     "parity:inventory": "node ../../scripts/react-parity/react-transition-group-runtime-inventory.mjs",
     "test:upstream": "jest --config tests/upstream-jest.config.cjs --rootDir upstream --runInBand --no-watchman",
-    "upstream:check": "node audit/check-upstream.mjs",
+    "upstream:check": "node ../../scripts/react-port/materialize.mjs run --check --package-dir .",
     "upstream:verify": "node ../../scripts/react-parity/react-transition-group-upstream.mjs",
     "parity:pristine-inventory": "node ../../scripts/react-parity/react-transition-group-pristine-runtime.mjs --write",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
