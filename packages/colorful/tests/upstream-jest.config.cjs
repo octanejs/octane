@@ -1,6 +1,6 @@
 const path = require('node:path');
 
-const tagRoot = path.resolve(__dirname, '../upstream/tag');
+const tagRoot = path.resolve(__dirname, '../upstream');
 
 module.exports = {
 	rootDir: tagRoot,
@@ -24,4 +24,7 @@ module.exports = {
 	},
 	setupFiles: [path.resolve(__dirname, 'upstream-jest.setup.cjs')],
 	setupFilesAfterEnv: [path.resolve(__dirname, 'upstream-jest.snapshot.cjs')],
+	// The pinned snapshot keeps its byte-exact legacy header in upstream/;
+	// Jest reads the lock-regenerated, header-corrected copy instead.
+	snapshotResolver: path.resolve(__dirname, 'upstream-jest.snapshot-resolver.cjs'),
 };

@@ -12,9 +12,16 @@
 - React oracle: `react@19.2.7` / `react-dom@19.2.7` with `@types/react@19.2.17` / `@types/react-dom@19.2.3` via the dedicated `react-colorful-react-oracle` pnpm catalog (exact pins; not `catalog:default`)
 - Pristine upstream `check-types` types: `@types/react@17.0.83` / `@types/react-dom@17.0.26` via npm aliases (`@types/react-colorful-pristine`, `@types/react-dom-colorful-pristine`)
 
-The byte-preserved tag sources and tests live under `upstream/tag`; the
-published declaration and package authorities live under `upstream/npm`.
-Neither directory is included in the published package.
+The byte-exact tag sources and tests live under `upstream/` and verify offline
+against the upstream git blob shas recorded in `audit/upstream.lock.json`; the
+published declaration and package authorities live under `upstream-artifact/`,
+hash-pinned by `audit/upstream-inventory.json`. The pinned license is
+republished at the package root as `LICENSE.upstream`. Jest 30 rejects the
+pinned snapshot's legacy `goo.gl` header, so the lock's adapted rewrite
+regenerates a header-corrected copy under `tests/upstream/tag/` (gitignored)
+that the pristine Jest lane reads through
+`tests/upstream-jest.snapshot-resolver.cjs`; the snapshot body is unchanged.
+Neither vendored directory is included in the published package.
 
 Framework-neutral color utilities are source-correspondent. React components,
 hooks, JSX, synthetic event wrappers, and DOM prop types are adapted to Octane

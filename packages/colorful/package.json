@@ -24,9 +24,10 @@
   "types": "./src/index.ts",
   "files": [
     "src",
+    "LICENSE",
+    "LICENSE.upstream",
     "README.md",
-    "UPSTREAM.md",
-    "LICENSE"
+    "UPSTREAM.md"
   ],
   "exports": {
     ".": "./src/index.ts"
@@ -36,7 +37,7 @@
     "upstream:verify": "node audit/upstream-inventory.mjs",
     "test:type-parity": "node ../../scripts/react-parity/react-colorful-types.mjs",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsc --noEmit -p typetests/tsconfig.pristine.json && tsc --noEmit -p audit/type-probes/tsconfig.pristine.json",
-    "test:pristine": "node ../../scripts/react-parity/jest-full-runner.mjs --config packages/colorful/tests/upstream-jest.config.cjs --root packages/colorful/upstream/tag"
+    "test:pristine": "node ../../scripts/react-parity/jest-full-runner.mjs --config packages/colorful/tests/upstream-jest.config.cjs --root packages/colorful/upstream"
   },
   "peerDependencies": {
     "octane": "workspace:*"
