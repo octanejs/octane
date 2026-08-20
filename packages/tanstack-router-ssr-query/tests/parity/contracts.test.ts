@@ -65,7 +65,8 @@ describe('@octanejs/tanstack-router-ssr-query parity audit contracts', () => {
 		});
 		expect(crosswalk.typeSuite).toMatchObject({
 			disposition: 'present',
-			pristineProject: 'packages/tanstack-router-ssr-query/upstream/tsconfig.build.json',
+			pristineProject:
+				'packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json',
 			adaptedCompiler: 'tsrx-tsc',
 		});
 		expect(crosswalk.typeSuite.pristineCompilers).toEqual([
@@ -89,7 +90,7 @@ describe('@octanejs/tanstack-router-ssr-query parity audit contracts', () => {
 		});
 		expect(pristine?.execution?.compilerBins).toHaveLength(6);
 		expect(pristine?.execution?.project).toBe(
-			'packages/tanstack-router-ssr-query/upstream/tsconfig.build.json',
+			'packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json',
 		);
 		expect(
 			manifest.lanes.some(function hasPristine(lane) {

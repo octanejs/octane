@@ -35,7 +35,14 @@ if (JSON.stringify(bindingConditions) !== JSON.stringify(upstreamConditions)) {
 		`package export condition mismatch\nexpected: ${upstreamConditions.join(', ')}\nactual: ${bindingConditions.join(', ')}`,
 	);
 }
-for (const unpublished of ['audit', 'scripts', 'tests', 'typetests', 'upstream']) {
+for (const unpublished of [
+	'audit',
+	'scripts',
+	'tests',
+	'typetests',
+	'upstream',
+	'upstream-artifact',
+]) {
 	if (bindingPkg.files.includes(unpublished))
 		throw new Error(`${unpublished}/ must remain unpublished evidence`);
 }

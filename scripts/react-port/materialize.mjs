@@ -476,17 +476,22 @@ async function commandLockFromPin(options) {
 	}
 	const licenseFiles = [];
 	const noticeFiles = [];
+	// License evidence is gathered from the repository root, the pin subtree
+	// root, and the directory of the identity-proving member manifest, so a
+	// member-scoped license or notice cannot hide behind a root-level one.
+	const manifestDirectory = path.posix.dirname(manifestPath);
+	const licenseDirectories = new Set(['.', subdirectory ?? '.', manifestDirectory]);
 	for (const entry of treeEntries) {
 		if (entry.type !== 'blob' || entry.mode === '120000') continue;
 		const directory = path.posix.dirname(entry.path);
-		if (directory !== '.' && directory !== (subdirectory ?? '.')) continue;
+		if (!licenseDirectories.has(directory)) continue;
 		const basename = path.posix.basename(entry.path);
 		const isLicense = LICENSE_FILE_PATTERN.test(basename);
 		const isNotice = NOTICE_FILE_PATTERN.test(basename);
 		if (!isLicense && !isNotice) continue;
 		const file = {
 			path: entry.path,
-			scope: directory === (subdirectory ?? '.') ? 'package' : 'root',
+			scope: directory === '.' ? 'root' : 'package',
 			content: (await fetchGitBlob(owner, repo, entry.sha, entry.size ?? 0, options)).toString(
 				'utf8',
 			),

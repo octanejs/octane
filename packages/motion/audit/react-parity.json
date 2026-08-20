@@ -51,12 +51,10 @@
       "environment": "workspace-node",
       "project": "motion-pristine",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs the curated Motion 12.42.2 useMotionValue Jest cases byte-exact against motion/react in native Jest (jest-full), with pin artifacts under packages/motion/upstream/.",
+      "notes": "Wrapper lane: the Vitest project runs tests/upstream-original.test.ts, which verifies the lock-pinned upstream bytes offline, assembles a scratch Jest root from those bytes plus tests/_pristine-shims/, runs the curated Motion 12.42.2 useMotionValue Jest cases byte-exact against motion/react, and checks every passed identity against audit/pristine-runtime.json.",
       "execution": {
-        "kind": "jest-full",
-        "config": "packages/motion/tests/upstream-jest.config.cjs",
-        "root": "packages/motion/upstream",
-        "inventory": "packages/motion/audit/pristine-runtime.json"
+        "kind": "vitest-full",
+        "inventory": "packages/motion/audit/pristine-wrapper-runtime.json"
       },
       "files": [
         {
@@ -70,14 +68,9 @@
           "sha256": "21f1b2549f11af48d24274bb0b9365e8186c583b8425e6ff6babd5e55ca36790"
         },
         {
-          "path": "scripts/react-parity/jest-full-runner.mjs",
-          "role": "support",
-          "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
-        },
-        {
           "path": "packages/motion/tests/upstream-jest.config.cjs",
           "role": "support",
-          "sha256": "7284a19f8c8310628796865c53bc3bffea16e87bfb575fc2eff6a9a7cbde5fdb"
+          "sha256": "e583822e5dee233c9ae4d033dc4b49dd3611438987a8bddcbec470d5dc0d9bf7"
         },
         {
           "path": "packages/motion/LICENSE.upstream",
@@ -108,6 +101,21 @@
           "path": "packages/motion/audit/upstream.lock.json",
           "role": "support",
           "sha256": "da1d742cc27f22b753e2c73843f9ef987ebbe5de7f8227e8f6238f8ed19432d1"
+        },
+        {
+          "path": "packages/motion/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "663c52d1dd663a296a805ae075b6dcb42e75816d49c0a4ffcc34b3dfa5beee6e"
+        },
+        {
+          "path": "packages/motion/tests/_pristine-shims/src/index.ts",
+          "role": "support",
+          "sha256": "c9ae8822093071d28a30005cee492bd31ae1289fddd4fd3391e6447598b86317"
+        },
+        {
+          "path": "packages/motion/tests/_pristine-shims/src/value/use-motion-value.ts",
+          "role": "support",
+          "sha256": "27f28f89c2ca45219ba111bf2f5859ad361ce36fb0e28b000c108f1aae2671e3"
         }
       ]
     },

@@ -230,6 +230,40 @@ describe('archive extraction', () => {
 		);
 	});
 
+	test('a scoped pin ignores out-of-scope files and symlinks in the archive', () => {
+		const lock = buildUpstreamLock({
+			identity: fixtureIdentity(),
+			license: { spdx: 'MIT', evidence: [], notices: [] },
+			treeEntries: fixtureTreeEntries(),
+			scopes: ['tests'],
+			adaptedMappings: [],
+		});
+		assert.deepEqual(
+			lock.files.map((file) => file.path),
+			['tests/index.test.js'],
+		);
+		const prefix = `mit-widget-${'a'.repeat(40)}/`;
+		const extracted = extractPristineFromArchive(
+			lock,
+			buildTarGz([
+				[`${prefix}docs/link`, null, '2'],
+				[`${prefix}src/index.js`, FIXTURE_SOURCES.get('src/index.js')],
+				[`${prefix}tests/index.test.js`, FIXTURE_SOURCES.get('tests/index.test.js')],
+			]),
+		);
+		assert.equal(extracted.files.size, 1);
+		assert.deepEqual(extracted.missing, []);
+		assert.deepEqual(extracted.unexpected, []);
+		const withInScopeExtra = extractPristineFromArchive(
+			lock,
+			buildTarGz([
+				[`${prefix}tests/index.test.js`, FIXTURE_SOURCES.get('tests/index.test.js')],
+				[`${prefix}tests/extra.test.js`, 'extra\n'],
+			]),
+		);
+		assert.deepEqual(withInScopeExtra.unexpected, ['tests/extra.test.js']);
+	});
+
 	test('rejects archives without a single top-level directory', () => {
 		const lock = fixtureLock();
 		const archive = buildTarGz([

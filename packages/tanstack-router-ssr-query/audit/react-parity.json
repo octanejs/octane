@@ -83,7 +83,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/audit/upstream-crosswalk.json",
           "role": "support",
-          "sha256": "3304fb05c56efdaa0390e88d52116a82363ce3d48f96535513f65f89067526ff"
+          "sha256": "02e7674c3252b1f91179a053688e2562667ebcf7ebce2c930bfc7cf281cbb95a"
         },
         {
           "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
@@ -121,7 +121,7 @@
           "packages/tanstack-router-ssr-query/node_modules/typescript59/lib/tsc.js",
           "packages/tanstack-router-ssr-query/node_modules/typescript60/lib/tsc.js"
         ],
-        "project": "packages/tanstack-router-ssr-query/upstream/tsconfig.build.json"
+        "project": "packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json"
       },
       "files": [
         {
@@ -162,16 +162,6 @@
           ]
         },
         {
-          "path": "packages/tanstack-router-ssr-query/upstream/tsconfig.build.json",
-          "role": "support",
-          "sha256": "a7b24536d0421b619917e5b92add24c561237b185e2592ba4b2d4d649b67d5e1"
-        },
-        {
-          "path": "packages/tanstack-router-ssr-query/upstream/tsconfig.json",
-          "role": "support",
-          "sha256": "303acc36428c434a274bde0b6258eba3413dac9147bf647672d7289c4884bdb9"
-        },
-        {
           "path": "packages/tanstack-router-ssr-query/tsconfig.json",
           "role": "support",
           "sha256": "54593830c286058e815a124ba3d0b2fe0c598879531786e055d7ddb54ac25aed"
@@ -180,6 +170,11 @@
           "path": "packages/tanstack-router-ssr-query/tsconfig.octane.json",
           "role": "support",
           "sha256": "0397e587688e9b4131084ce70c06d0ae6268682fb3cf674c331fcb81a358ce36"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "ef751750a07229bb6cceaebf8b2f1c40f3c1b56c97fe98891bee74adb7a66d14"
         }
       ]
     },

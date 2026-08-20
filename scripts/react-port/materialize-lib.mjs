@@ -296,6 +296,10 @@ export function extractPristineFromArchive(lock, archiveBytes) {
 		maxOutputLength: MAX_LOCK_TOTAL_BYTES + 64 * 1024 * 1024,
 	});
 	const subdirectory = lock.identity.repository.subdirectory;
+	const scopes = lock.scopes ?? [];
+	const inScope = (relativePath) =>
+		scopes.length === 0 ||
+		scopes.some((scope) => relativePath === scope || relativePath.startsWith(`${scope}/`));
 	const wanted = new Map(lock.files.map((file) => [file.path, file]));
 	const prefixes = new Set();
 	const relativize = (entryPath) => {
@@ -315,10 +319,14 @@ export function extractPristineFromArchive(lock, archiveBytes) {
 			return relativePath !== null && wanted.has(relativePath);
 		},
 		// The archive spans the whole repository; entries outside the pinned
-		// scope (including symlinks the hardened parser would reject) are never
-		// extracted, so they must not abort the scoped read. In-scope links
-		// still fail validation, matching the lock builder's symlink rejection.
-		skip: (entryPath) => relativize(entryPath) === null,
+		// subtree or the lock's scopes (including symlinks the hardened parser
+		// would reject) are never extracted, so they must not abort or pollute
+		// the scoped read. In-scope links still fail validation, matching the
+		// lock builder's symlink rejection.
+		skip: (entryPath) => {
+			const relativePath = relativize(entryPath);
+			return relativePath === null || !inScope(relativePath);
+		},
 		// The codeload archive spans the whole repository, not only the pinned
 		// subdirectory, so its entry limits are far above the lock's own caps.
 		limits: {
