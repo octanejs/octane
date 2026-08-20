@@ -16,7 +16,9 @@ function toRenderable(elements: OctaneNode) {
 }
 
 function html(elements: OctaneNode) {
-	return render(toRenderable(elements)).container.innerHTML.replace(/<!--[\s\S]*?-->/g, '');
+	return render(
+		toRenderable(elements) as unknown as Parameters<typeof render>[0],
+	).container.innerHTML.replace(/<!--[\s\S]*?-->/g, '');
 }
 
 function withMockConsole(

@@ -71,7 +71,7 @@ describe('Trans component', function transSuite() {
 							render: renderProp,
 							component,
 							id: 'Some text',
-						} as TransRenderCallbackOrComponent & { id: string }),
+						} as unknown as TransRenderCallbackOrComponent & { id: string }),
 					),
 				);
 
