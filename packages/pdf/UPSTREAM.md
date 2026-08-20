@@ -19,10 +19,18 @@
 These versions are the exact `catalog:react-pdf-react-oracle` pins in `pnpm-workspace.yaml`.
 
 The pinned tag source, all 13 source test authorities, package metadata,
-README, TypeScript programs, and license are vendored under `upstream/tag`.
-The complete published npm artifact is vendored under `upstream/npm`.
-Monorepo-root test fixtures (`test-utils.ts`, `__mocks__/`) are vendored under
-`upstream/support` and linked into the package root for relative imports.
+README, TypeScript programs, and license are vendored under
+`upstream/packages/react-pdf`, and the monorepo-root test fixtures
+(`test-utils.ts`, `__mocks__/`) at the `upstream/` root, mirroring the pinned
+repository layout; every file verifies offline against the upstream git blob
+shas recorded in `audit/upstream.lock.json`, and the fixtures are symlinked into
+the package root for relative imports. The published npm artifact source is
+vendored under `upstream-artifact/`. The pinned license is republished at the
+package root as `LICENSE.upstream`. The upstream specs import `__mocks__/*.js`
+and `test-utils.js` specifiers that upstream's Vite maps onto the TypeScript
+authorities; the pristine runner emits those thin re-export shims into its
+scratch tree instead of vendoring repo-authored files inside the pristine
+boundary.
 
 `audit/upstream-inventory.json` records SHA-256 hashes for both authorities.
 `audit/case-map.json` accounts for every upstream runtime identity with either a
