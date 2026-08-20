@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config';
 
 const upstreamRoot = process.env.REACT_DRAGGABLE_PRISTINE_ROOT
 	? resolve(process.env.REACT_DRAGGABLE_PRISTINE_ROOT)
-	: resolve(import.meta.dirname, '../upstream/tag');
+	: resolve(import.meta.dirname, '../upstream');
 
 export default defineConfig({
 	plugins: [react()],

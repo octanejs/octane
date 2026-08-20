@@ -1,1242 +1,1242 @@
 {
   "schemaVersion": 1,
   "project": "draggable-pristine",
-  "roots": ["packages/draggable/upstream/tag/test"],
+  "roots": ["packages/draggable/upstream/test"],
   "files": [
-    "packages/draggable/upstream/tag/test/Draggable.test.jsx",
-    "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
-    "packages/draggable/upstream/tag/test/typeCompat.test.ts",
-    "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
-    "packages/draggable/upstream/tag/test/utils/domFns.test.js",
-    "packages/draggable/upstream/tag/test/utils/getPrefix.extra.test.js",
-    "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
-    "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
-    "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
-    "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
-    "packages/draggable/upstream/tag/test/utils/shims.test.js"
+    "packages/draggable/upstream/test/Draggable.test.jsx",
+    "packages/draggable/upstream/test/DraggableCore.test.jsx",
+    "packages/draggable/upstream/test/typeCompat.test.ts",
+    "packages/draggable/upstream/test/utils/domFns.extra.test.js",
+    "packages/draggable/upstream/test/utils/domFns.test.js",
+    "packages/draggable/upstream/test/utils/getPrefix.extra.test.js",
+    "packages/draggable/upstream/test/utils/getPrefix.test.js",
+    "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
+    "packages/draggable/upstream/test/utils/positionFns.test.js",
+    "packages/draggable/upstream/test/utils/shims.extra.test.js",
+    "packages/draggable/upstream/test/utils/shims.test.js"
   ],
   "tests": [
     {
       "id": "pristine:2d2c50ca36b0a33b",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable SVG support should detect SVG elements",
       "status": "passed"
     },
     {
       "id": "pristine:0567e2ebacbb2e27",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable SVG support should not set isElementSVG for non-SVG elements",
       "status": "passed"
     },
     {
       "id": "pristine:5624dde22097cfea",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable SVG support should set initial transform attribute for SVG",
       "status": "passed"
     },
     {
       "id": "pristine:04f70320ffc69e7e",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable axis constraint should not move when axis=\"none\"",
       "status": "passed"
     },
     {
       "id": "pristine:d2c13ae87c22d7e9",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable callbacks should call onStart when drag starts",
       "status": "passed"
     },
     {
       "id": "pristine:dde75defa8f3f43f",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable callbacks should cancel drag when onStart returns false",
       "status": "passed"
     },
     {
       "id": "pristine:f1851203b003fa42",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable controlled component should respect position prop changes",
       "status": "passed"
     },
     {
       "id": "pristine:1c3be460540299a6",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable controlled component should revert to controlled position after drag",
       "status": "passed"
     },
     {
       "id": "pristine:16933db6d57b60a9",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable default props should have sensible defaults",
       "status": "passed"
     },
     {
       "id": "pristine:00f8a16010e41cdf",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable disabled prop should not drag when disabled",
       "status": "passed"
     },
     {
       "id": "pristine:112ceb1ec676e91b",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable dragging classes should add dragged class after drag",
       "status": "passed"
     },
     {
       "id": "pristine:0fdf81fd0d1d8107",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable dragging classes should add dragging class during drag",
       "status": "passed"
     },
     {
       "id": "pristine:a661dc7ef98f4fef",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable dragging classes should use custom class names",
       "status": "passed"
     },
     {
       "id": "pristine:578e89d2f929d25f",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable position should respect defaultPosition",
       "status": "passed"
     },
     {
       "id": "pristine:83cb66350ad9ed56",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable position should respect positionOffset with numbers",
       "status": "passed"
     },
     {
       "id": "pristine:3eecd2105025a9e8",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable position should respect positionOffset with percentages",
       "status": "passed"
     },
     {
       "id": "pristine:da9be3b834f7848b",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable position should use controlled position",
       "status": "passed"
     },
     {
       "id": "pristine:aae7a35f65be1437",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable rendering should apply transform style",
       "status": "passed"
     },
     {
       "id": "pristine:d22c4e1e4a689bec",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable rendering should preserve child className",
       "status": "passed"
     },
     {
       "id": "pristine:e007b37d2720c500",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable rendering should preserve child styles",
       "status": "passed"
     },
     {
       "id": "pristine:5005b3864d667d6d",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable rendering should render with default class",
       "status": "passed"
     },
     {
       "id": "pristine:320ce776c966ce24",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable rendering should use custom defaultClassName",
       "status": "passed"
     },
     {
       "id": "pristine:f4f4e84d957554cb",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable validation should still render when className is set on Draggable",
       "status": "passed"
     },
     {
       "id": "pristine:54a46ad74511d696",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable validation should still render when style is set on Draggable",
       "status": "passed"
     },
     {
       "id": "pristine:1da28ead424ce043",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable validation should still render when transform is set on Draggable",
       "status": "passed"
     },
     {
       "id": "pristine:3fb2e60152c5383a",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable validation should throw when multiple children provided",
       "status": "passed"
     },
     {
       "id": "pristine:643b635f8ef58f77",
-      "file": "packages/draggable/upstream/tag/test/Draggable.test.jsx",
+      "file": "packages/draggable/upstream/test/Draggable.test.jsx",
       "fullName": "Draggable validation should throw when no children provided",
       "status": "passed"
     },
     {
       "id": "pristine:98f50c8a3a7469d9",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore allowAnyClick prop should only respond to left click by default",
       "status": "passed"
     },
     {
       "id": "pristine:6758d408a2b43302",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore allowAnyClick prop should respond to any click when allowAnyClick is true",
       "status": "passed"
     },
     {
       "id": "pristine:546bd0c377214a08",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore cancel prop should not drag from cancel elements",
       "status": "passed"
     },
     {
       "id": "pristine:bc8593a4f728a17e",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore cancellation should cancel drag when onStart returns false",
       "status": "passed"
     },
     {
       "id": "pristine:60165ee30cd704e7",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore cancellation should stop drag when onDrag returns false",
       "status": "passed"
     },
     {
       "id": "pristine:c320135b81b38f4a",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore disabled state should not start dragging when disabled",
       "status": "passed"
     },
     {
       "id": "pristine:30760650b31792c8",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore enableUserSelectHack prop should add transparent selection class by default",
       "status": "passed"
     },
     {
       "id": "pristine:724cb1993145d677",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore enableUserSelectHack prop should not add class when enableUserSelectHack is false",
       "status": "passed"
     },
     {
       "id": "pristine:272f6abf3007a2f7",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore enableUserSelectHack prop should not add user-select class when onStart returns false",
       "status": "passed"
     },
     {
       "id": "pristine:e72c49266624a0ef",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore error handling should throw error when no children provided",
       "status": "passed"
     },
     {
       "id": "pristine:3bf522b5e26f7ab9",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore grid prop should not call onDrag if movement is less than grid",
       "status": "passed"
     },
     {
       "id": "pristine:6876ab8f0a2ad361",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore grid prop should snap movement to grid",
       "status": "passed"
     },
     {
       "id": "pristine:f622e99969a8910a",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore handle prop should only drag from handle",
       "status": "passed"
     },
     {
       "id": "pristine:baf4001c4aa34f4f",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore handle prop should work with nested elements in handle",
       "status": "passed"
     },
     {
       "id": "pristine:f4a63866db3f5baa",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore mouse events should call onDrag during mouse move",
       "status": "passed"
     },
     {
       "id": "pristine:825b61050ea46efa",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore mouse events should call onStart when mouse down",
       "status": "passed"
     },
     {
       "id": "pristine:5968cc83aabdd305",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore mouse events should call onStop when mouse up",
       "status": "passed"
     },
     {
       "id": "pristine:d5ae5f68c0756170",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore mouse events should provide correct data in callbacks",
       "status": "passed"
     },
     {
       "id": "pristine:49f8952a2835d0aa",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore nodeRef prop should use nodeRef instead of findDOMNode",
       "status": "passed"
     },
     {
       "id": "pristine:af7001b7eae4d8ae",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore nodeRef prop should work with forwardRef components",
       "status": "passed"
     },
     {
       "id": "pristine:50be85fc39cef47f",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore nonce prop applies the nonce to the injected style element on drag start",
       "status": "passed"
     },
     {
       "id": "pristine:b6140ea7c982755b",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore onMouseDown prop should call onMouseDown callback",
       "status": "passed"
     },
     {
       "id": "pristine:347f91d948d86fb6",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore onMouseDown prop should call onMouseDown even when disabled",
       "status": "passed"
     },
     {
       "id": "pristine:ca577715460756cf",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore rendering should accept a single child only",
       "status": "passed"
     },
     {
       "id": "pristine:25d0be99487663c7",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore rendering should render its child",
       "status": "passed"
     },
     {
       "id": "pristine:e13f963055704f6f",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore scale prop should adjust position based on scale",
       "status": "passed"
     },
     {
       "id": "pristine:3fa15a2aa5136454",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore scale prop should work with scale < 1",
       "status": "passed"
     },
     {
       "id": "pristine:545f633e93ea42e6",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore touch events should call preventDefault on touchstart by default",
       "status": "passed"
     },
     {
       "id": "pristine:6a6fbd4dd56aded2",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore touch events should handle touch start",
       "status": "passed"
     },
     {
       "id": "pristine:73d0eb47cc638f9e",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore touch events should not call preventDefault when allowMobileScroll is true",
       "status": "passed"
     },
     {
       "id": "pristine:6858c3ea8c039149",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore touch events with handle should call preventDefault on touchstart when using handle",
       "status": "passed"
     },
     {
       "id": "pristine:5870c0f7cc710bca",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore touch events with handle should not call preventDefault on touchstart for cancel elements",
       "status": "passed"
     },
     {
       "id": "pristine:f8f12c4f1c2a8b11",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore unmount safety should not continue drag if onStart returns false",
       "status": "passed"
     },
     {
       "id": "pristine:bb320f85f361e2cd",
-      "file": "packages/draggable/upstream/tag/test/DraggableCore.test.jsx",
+      "file": "packages/draggable/upstream/test/DraggableCore.test.jsx",
       "fullName": "DraggableCore unmount safety should track mounted state correctly",
       "status": "passed"
     },
     {
       "id": "pristine:38b22a1b10054465",
-      "file": "packages/draggable/upstream/tag/test/typeCompat.test.ts",
+      "file": "packages/draggable/upstream/test/typeCompat.test.ts",
       "fullName": "public type-surface compatibility public surface is API-compatible with the old hand-written surface",
       "status": "passed"
     },
     {
       "id": "pristine:4ad22bb1d6eb8177",
-      "file": "packages/draggable/upstream/tag/test/typeCompat.test.ts",
+      "file": "packages/draggable/upstream/test/typeCompat.test.ts",
       "fullName": "public type-surface compatibility the existing typings/test.tsx still compiles unchanged against the public surface",
       "status": "passed"
     },
     {
       "id": "pristine:b905f674a8534ceb",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addClassName / removeClassName classList-absent fallback adds via string concatenation when classList is unavailable",
       "status": "passed"
     },
     {
       "id": "pristine:08c323619e2fef83",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addClassName / removeClassName classList-absent fallback removes via regex when classList is unavailable",
       "status": "passed"
     },
     {
       "id": "pristine:7e1f2c6e14689a46",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addEvent / removeEvent fallback branches falls back to on<event> assignment when neither API exists",
       "status": "passed"
     },
     {
       "id": "pristine:fdeccc4a8bc9e0d6",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addEvent / removeEvent fallback branches uses attachEvent/detachEvent when present",
       "status": "passed"
     },
     {
       "id": "pristine:69dc97e9a3f3ea03",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addUserSelectStyles / scheduleRemoveUserSelectStyles applies an explicit nonce to the injected style element",
       "status": "passed"
     },
     {
       "id": "pristine:c11204f808452783",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addUserSelectStyles / scheduleRemoveUserSelectStyles does not clear a focused-input Caret selection",
       "status": "passed"
     },
     {
       "id": "pristine:f562fe9d7e5d20f2",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addUserSelectStyles / scheduleRemoveUserSelectStyles does not inject a second style element on repeated calls",
       "status": "passed"
     },
     {
       "id": "pristine:4b3ed9fb2141670d",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addUserSelectStyles / scheduleRemoveUserSelectStyles does not retroactively set a nonce on an already-injected element",
       "status": "passed"
     },
     {
       "id": "pristine:ddc1e7687fd399b9",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addUserSelectStyles / scheduleRemoveUserSelectStyles does not set a nonce attribute when none is provided",
       "status": "passed"
     },
     {
       "id": "pristine:69dcb2a91c7f323c",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addUserSelectStyles / scheduleRemoveUserSelectStyles falls back to __webpack_nonce__ when no explicit nonce is passed",
       "status": "passed"
     },
     {
       "id": "pristine:7f8c82bec81da4fb",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addUserSelectStyles / scheduleRemoveUserSelectStyles injects a style element and tags the body once",
       "status": "passed"
     },
     {
       "id": "pristine:d3a3fd3ffa04b445",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addUserSelectStyles / scheduleRemoveUserSelectStyles is a no-op when doc is null/undefined",
       "status": "passed"
     },
     {
       "id": "pristine:2bf3a48d0d26d271",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addUserSelectStyles / scheduleRemoveUserSelectStyles is a no-op when scheduling removal with a null doc",
       "status": "passed"
     },
     {
       "id": "pristine:e2157ef706ac5277",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addUserSelectStyles / scheduleRemoveUserSelectStyles prefers an explicit nonce over __webpack_nonce__",
       "status": "passed"
     },
     {
       "id": "pristine:a63092ab5f6b4188",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage addUserSelectStyles / scheduleRemoveUserSelectStyles removes the body class via requestAnimationFrame",
       "status": "passed"
     },
     {
       "id": "pristine:ecca7f070334fbac",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage createCSSTransform keys the transform under the browser-prefixed transform property",
       "status": "passed"
     },
     {
       "id": "pristine:864b473c28307cd4",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage createCSSTransform prepends a positionOffset",
       "status": "passed"
     },
     {
       "id": "pristine:209fd43a84a9b830",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage createCSSTransform supports string (percentage) positionOffsets",
       "status": "passed"
     },
     {
       "id": "pristine:905d3adc985907f7",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage createSVGTransform prepends a unit-less positionOffset",
       "status": "passed"
     },
     {
       "id": "pristine:cb53fd639949d99e",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage createSVGTransform produces a unit-less translate string",
       "status": "passed"
     },
     {
       "id": "pristine:c809b4544f0361ba",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage getTouch falls back to changedTouches",
       "status": "passed"
     },
     {
       "id": "pristine:f0e04a7714186fe7",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage getTouch finds the touch in targetTouches by identifier",
       "status": "passed"
     },
     {
       "id": "pristine:60c53ede1e30b27a",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage getTouch returns undefined when no touch matches",
       "status": "passed"
     },
     {
       "id": "pristine:274036efe917732c",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage getTouchIdentifier falls back to changedTouches when targetTouches is empty",
       "status": "passed"
     },
     {
       "id": "pristine:eea541c184a69801",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage getTouchIdentifier reads the first targetTouches identifier",
       "status": "passed"
     },
     {
       "id": "pristine:17b09248ec4442e1",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage getTouchIdentifier returns undefined when there are no touches",
       "status": "passed"
     },
     {
       "id": "pristine:52c033cbdeddc6a9",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage matchesSelector bail-out branch returns false for a node without any matches() implementation",
       "status": "passed"
     },
     {
       "id": "pristine:709186f587899122",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage offsetXYFromParent divides by scale",
       "status": "passed"
     },
     {
       "id": "pristine:a3924a1997060056",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage offsetXYFromParent subtracts the parent rect and adds scroll for non-body parents",
       "status": "passed"
     },
     {
       "id": "pristine:e0299bda8030e54e",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.extra.test.js",
       "fullName": "domFns - additional coverage offsetXYFromParent treats the body offsetParent as origin {0,0}",
       "status": "passed"
     },
     {
       "id": "pristine:62c210b641983acc",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities addClassName / removeClassName should add class names",
       "status": "passed"
     },
     {
       "id": "pristine:df46bdc79235bb87",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities addClassName / removeClassName should handle removing non-existent classes",
       "status": "passed"
     },
     {
       "id": "pristine:a2ff53331ab3a3bd",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities addClassName / removeClassName should not duplicate class names",
       "status": "passed"
     },
     {
       "id": "pristine:6247011cee4af2d4",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities addClassName / removeClassName should remove class names",
       "status": "passed"
     },
     {
       "id": "pristine:80a3efb0d906c229",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities addEvent / removeEvent should add and remove event listeners",
       "status": "passed"
     },
     {
       "id": "pristine:56dcc3eee91f1fa7",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities addEvent / removeEvent should handle null elements gracefully",
       "status": "passed"
     },
     {
       "id": "pristine:477f892386dbb0c2",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities getTranslation should create translate string with px suffix",
       "status": "passed"
     },
     {
       "id": "pristine:5110ffd7d3142f76",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities getTranslation should create translate string without suffix (for SVG)",
       "status": "passed"
     },
     {
       "id": "pristine:6be9fe190fcbc05c",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities getTranslation should handle percentage offsets",
       "status": "passed"
     },
     {
       "id": "pristine:62c5bae43a8959ff",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities getTranslation should include position offset when provided",
       "status": "passed"
     },
     {
       "id": "pristine:c5810232b02d7861",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities innerHeight / innerWidth should calculate inner dimensions excluding padding",
       "status": "passed"
     },
     {
       "id": "pristine:8d6d51a58796c415",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities matchesSelector should match id selectors",
       "status": "passed"
     },
     {
       "id": "pristine:b328841327ff7f98",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities matchesSelector should match simple class selectors",
       "status": "passed"
     },
     {
       "id": "pristine:5f6c1d30d19684f2",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities matchesSelector should match tag selectors",
       "status": "passed"
     },
     {
       "id": "pristine:05350bc2718c7a07",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities matchesSelectorAndParentsTo should match element itself",
       "status": "passed"
     },
     {
       "id": "pristine:72a26f596cc970af",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities matchesSelectorAndParentsTo should match parent elements",
       "status": "passed"
     },
     {
       "id": "pristine:35ca46350affb366",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities matchesSelectorAndParentsTo should return false when no match",
       "status": "passed"
     },
     {
       "id": "pristine:67169408a552bf77",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities matchesSelectorAndParentsTo should stop at baseNode",
       "status": "passed"
     },
     {
       "id": "pristine:59bbad2899bdad39",
-      "file": "packages/draggable/upstream/tag/test/utils/domFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/domFns.test.js",
       "fullName": "domFns utilities outerHeight / outerWidth should calculate outer dimensions including borders",
       "status": "passed"
     },
     {
       "id": "pristine:a6aa5dc9751d16d0",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.extra.test.js",
       "fullName": "getPrefix - additional edge cases browserPrefixToKey edge cases emits a leading hyphen literally (no preceding char to capitalize)",
       "status": "passed"
     },
     {
       "id": "pristine:2af10048f7761cad",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.extra.test.js",
       "fullName": "getPrefix - additional edge cases browserPrefixToKey edge cases handles a single-character property",
       "status": "passed"
     },
     {
       "id": "pristine:63f7bd8423cf1c0e",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.extra.test.js",
       "fullName": "getPrefix - additional edge cases browserPrefixToKey edge cases handles trailing hyphen gracefully",
       "status": "passed"
     },
     {
       "id": "pristine:1b93608caee85819",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.extra.test.js",
       "fullName": "getPrefix - additional edge cases browserPrefixToStyle edge cases lowercases multi-letter prefixes",
       "status": "passed"
     },
     {
       "id": "pristine:e6f040e6c7731b23",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.extra.test.js",
       "fullName": "getPrefix - additional edge cases browserPrefixToStyle edge cases returns the prop untouched for an empty prefix",
       "status": "passed"
     },
     {
       "id": "pristine:9b93564572e67aeb",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.extra.test.js",
       "fullName": "getPrefix - additional edge cases getPrefix - ms / O prefixes and partial chains detects prefixes for a kebab-cased property",
       "status": "passed"
     },
     {
       "id": "pristine:67190da4a78bbf98",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.extra.test.js",
       "fullName": "getPrefix - additional edge cases getPrefix - ms / O prefixes and partial chains detects the O prefix",
       "status": "passed"
     },
     {
       "id": "pristine:963ad16378c71172",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.extra.test.js",
       "fullName": "getPrefix - additional edge cases getPrefix - ms / O prefixes and partial chains detects the ms prefix",
       "status": "passed"
     },
     {
       "id": "pristine:c676cbedba445d75",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.extra.test.js",
       "fullName": "getPrefix - additional edge cases getPrefix - ms / O prefixes and partial chains returns empty string when document is missing entirely",
       "status": "passed"
     },
     {
       "id": "pristine:a31862fb1d72fb00",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.extra.test.js",
       "fullName": "getPrefix - additional edge cases getPrefix - ms / O prefixes and partial chains returns empty string when documentElement itself is missing",
       "status": "passed"
     },
     {
       "id": "pristine:7dd6ea290b49508a",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities browserPrefixToKey should handle kebab-case properties",
       "status": "passed"
     },
     {
       "id": "pristine:02f848a5d8a3fc7e",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities browserPrefixToKey should handle multi-hyphen properties",
       "status": "passed"
     },
     {
       "id": "pristine:2e4d4aa78f199a41",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities browserPrefixToKey should prefix and capitalize for Moz",
       "status": "passed"
     },
     {
       "id": "pristine:220e26538bb59b80",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities browserPrefixToKey should prefix and capitalize for Webkit",
       "status": "passed"
     },
     {
       "id": "pristine:0374eb0340e85f43",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities browserPrefixToKey should return prop unchanged when no prefix",
       "status": "passed"
     },
     {
       "id": "pristine:3dafa6f064249e07",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities browserPrefixToStyle should add CSS prefix for Moz",
       "status": "passed"
     },
     {
       "id": "pristine:002e83386020b1a4",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities browserPrefixToStyle should add CSS prefix for Webkit",
       "status": "passed"
     },
     {
       "id": "pristine:232c0d9a844780df",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities browserPrefixToStyle should add CSS prefix for ms",
       "status": "passed"
     },
     {
       "id": "pristine:41e56601eb07c1d4",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities browserPrefixToStyle should return prop unchanged when no prefix",
       "status": "passed"
     },
     {
       "id": "pristine:c76ee43c0595635c",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities getPrefix should return Moz prefix when MozTransform exists",
       "status": "passed"
     },
     {
       "id": "pristine:d3e76ada2184493e",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities getPrefix should return Webkit prefix when WebkitTransform exists",
       "status": "passed"
     },
     {
       "id": "pristine:6d86253f3f0afa9f",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities getPrefix should return empty string when documentElement.style is unavailable",
       "status": "passed"
     },
     {
       "id": "pristine:62e5643b5a3bdae9",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities getPrefix should return empty string when no prefix matches",
       "status": "passed"
     },
     {
       "id": "pristine:2939f0f9392a45d2",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities getPrefix should return empty string when prop exists unprefixed",
       "status": "passed"
     },
     {
       "id": "pristine:47a089bc721b828f",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities getPrefix should return empty string when window is undefined",
       "status": "passed"
     },
     {
       "id": "pristine:6942edda25f94486",
-      "file": "packages/draggable/upstream/tag/test/utils/getPrefix.test.js",
+      "file": "packages/draggable/upstream/test/utils/getPrefix.test.js",
       "fullName": "getPrefix utilities getPrefix should use transform as default prop",
       "status": "passed"
     },
     {
       "id": "pristine:8cd4e00cc6101420",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getBoundPosition clamps to object bounds (left/top lower limits)",
       "status": "passed"
     },
     {
       "id": "pristine:3f62f72501c9baf1",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getBoundPosition clamps to object bounds (right/bottom upper limits)",
       "status": "passed"
     },
     {
       "id": "pristine:655d6a151dc0a01a",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getBoundPosition does not mutate the original bounds object (clone)",
       "status": "passed"
     },
     {
       "id": "pristine:3679b77b0e672896",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getBoundPosition ignores limits that are not numbers (partial bounds object)",
       "status": "passed"
     },
     {
       "id": "pristine:bbba4374eeead3f2",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getBoundPosition short-circuits and returns x/y unchanged when bounds is falsy",
       "status": "passed"
     },
     {
       "id": "pristine:d056c0f17a782d11",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getBoundPosition string selector bounds resolves bounds via a CSS selector against the root node",
       "status": "passed"
     },
     {
       "id": "pristine:93bd731297cf37e5",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getBoundPosition string selector bounds resolves bounds=\"parent\" against the parent node",
       "status": "passed"
     },
     {
       "id": "pristine:c8d20324e8b1cd1d",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getBoundPosition string selector bounds throws a descriptive error when the selector matches nothing",
       "status": "passed"
     },
     {
       "id": "pristine:0277a76ede18a663",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getBoundPosition throws when the node has been unmounted",
       "status": "passed"
     },
     {
       "id": "pristine:4d0cf5e862ba014f",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getControlPosition applies scale to the returned coordinates",
       "status": "passed"
     },
     {
       "id": "pristine:c5b868c68bbdcd43",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getControlPosition honors a user-provided offsetParent and its scroll/rect",
       "status": "passed"
     },
     {
       "id": "pristine:27e034da3f864181",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getControlPosition reads the matching touch when a touchIdentifier is provided",
       "status": "passed"
     },
     {
       "id": "pristine:5a700fecc048b3f3",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getControlPosition returns mouse coords mapped through the document body offsetParent",
       "status": "passed"
     },
     {
       "id": "pristine:fdfb6a414126b301",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.bounds.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.bounds.test.js",
       "fullName": "positionFns getControlPosition returns null when a touchIdentifier is given but the touch is absent",
       "status": "passed"
     },
     {
       "id": "pristine:54da61c8fd0bffa5",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities canDragX should return false for axis \"none\"",
       "status": "passed"
     },
     {
       "id": "pristine:f67fc2ca2e2e832a",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities canDragX should return false for axis \"y\"",
       "status": "passed"
     },
     {
       "id": "pristine:0bb7022624bb48ff",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities canDragX should return true for axis \"both\"",
       "status": "passed"
     },
     {
       "id": "pristine:87951675b4081d37",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities canDragX should return true for axis \"x\"",
       "status": "passed"
     },
     {
       "id": "pristine:a347eb7d2668e45e",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities canDragY should return false for axis \"none\"",
       "status": "passed"
     },
     {
       "id": "pristine:b837d6073139d54a",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities canDragY should return false for axis \"x\"",
       "status": "passed"
     },
     {
       "id": "pristine:57d047f22e53e5cd",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities canDragY should return true for axis \"both\"",
       "status": "passed"
     },
     {
       "id": "pristine:07b0256393b2907a",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities canDragY should return true for axis \"y\"",
       "status": "passed"
     },
     {
       "id": "pristine:62f51b364249aae8",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities createCoreData should calculate deltas when lastX/lastY are set",
       "status": "passed"
     },
     {
       "id": "pristine:aeeb5afa785526d7",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities createCoreData should create initial data when lastX/lastY are NaN",
       "status": "passed"
     },
     {
       "id": "pristine:736dd1c769a1e721",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities createCoreData should throw when node is unmounted",
       "status": "passed"
     },
     {
       "id": "pristine:274c3f3390959662",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities createDraggableData should apply scale to delta values",
       "status": "passed"
     },
     {
       "id": "pristine:cd6f6feb3af00f7a",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities createDraggableData should create data with scale of 1",
       "status": "passed"
     },
     {
       "id": "pristine:e87fe96cf699b4b3",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities snapToGrid should handle different x and y grid values",
       "status": "passed"
     },
     {
       "id": "pristine:380c9ab459be4df0",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities snapToGrid should handle negative values",
       "status": "passed"
     },
     {
       "id": "pristine:0767b62d827e892d",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities snapToGrid should handle zero values",
       "status": "passed"
     },
     {
       "id": "pristine:d1d5d330668309ba",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities snapToGrid should round at midpoint (standard Math.round behavior)",
       "status": "passed"
     },
     {
       "id": "pristine:471d86619b8ccc7d",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities snapToGrid should snap exactly at grid boundaries",
       "status": "passed"
     },
     {
       "id": "pristine:8ee616240f0c5d3c",
-      "file": "packages/draggable/upstream/tag/test/utils/positionFns.test.js",
+      "file": "packages/draggable/upstream/test/utils/positionFns.test.js",
       "fullName": "positionFns utilities snapToGrid should snap to grid values",
       "status": "passed"
     },
     {
       "id": "pristine:d7a1d501e561b3eb",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases dontSetMe flags truthy non-string prop values",
       "status": "passed"
     },
     {
       "id": "pristine:421827cbede45aae",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases dontSetMe returns undefined for an absent prop",
       "status": "passed"
     },
     {
       "id": "pristine:af1dca56d5ce1b71",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases dontSetMe returns undefined for falsy NaN values",
       "status": "passed"
     },
     {
       "id": "pristine:6acba033a64ea777",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases findInArray does not return falsy elements even if the callback is truthy at that index",
       "status": "passed"
     },
     {
       "id": "pristine:e9dba531061c025d",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases findInArray returns the first match when multiple satisfy the callback",
       "status": "passed"
     },
     {
       "id": "pristine:ed10c0d621aeffbb",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases findInArray returns undefined for an empty array",
       "status": "passed"
     },
     {
       "id": "pristine:f0482d17159f4efe",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases findInArray works over array-like (TouchList-style) objects with a length",
       "status": "passed"
     },
     {
       "id": "pristine:da52e7421d975f47",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases int parses leading sign and ignores trailing units",
       "status": "passed"
     },
     {
       "id": "pristine:af7b39e293aad2ab",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases int returns NaN for an empty string",
       "status": "passed"
     },
     {
       "id": "pristine:f8fa2be286721107",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases int returns NaN for non-numeric strings",
       "status": "passed"
     },
     {
       "id": "pristine:74a7bf46300894f8",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases isFunction recognizes class constructors as functions",
       "status": "passed"
     },
     {
       "id": "pristine:7bace59463ee1682",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases isFunction recognizes generator functions as functions",
       "status": "passed"
     },
     {
       "id": "pristine:f03bf701a2e86c50",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases isFunction returns false for boolean values",
       "status": "passed"
     },
     {
       "id": "pristine:e76f0f58e734cb84",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases isNum returns false for arrays",
       "status": "passed"
     },
     {
       "id": "pristine:2149ac8cd8ce37df",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases isNum returns false for boxed Number objects",
       "status": "passed"
     },
     {
       "id": "pristine:194ecb122777bf16",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.extra.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.extra.test.js",
       "fullName": "shims - additional edge cases isNum treats -Infinity as a number",
       "status": "passed"
     },
     {
       "id": "pristine:f3850f5ebce0c023",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities dontSetMe should return error when prop is set",
       "status": "passed"
     },
     {
       "id": "pristine:c7f7f162d2521323",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities dontSetMe should return undefined for falsy values",
       "status": "passed"
     },
     {
       "id": "pristine:e0517afd4948d974",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities dontSetMe should return undefined when prop is not set",
       "status": "passed"
     },
     {
       "id": "pristine:3428c565f98ee4af",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities findInArray should find first element matching callback",
       "status": "passed"
     },
     {
       "id": "pristine:6da8db7782096af0",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities findInArray should pass index and array to callback",
       "status": "passed"
     },
     {
       "id": "pristine:81d090b8d09263cc",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities findInArray should return undefined if no match found",
       "status": "passed"
     },
     {
       "id": "pristine:9f0f8be501cc2a51",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities findInArray should work with objects",
       "status": "passed"
     },
     {
       "id": "pristine:ac80ae922daf3465",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities int should handle decimal strings by truncating",
       "status": "passed"
     },
     {
       "id": "pristine:9a7c33dbfbf15c56",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities int should parse integer strings",
       "status": "passed"
     },
     {
       "id": "pristine:950f6862f90df3dc",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities int should parse pixel values",
       "status": "passed"
     },
     {
       "id": "pristine:7ec0f47c80e1b0f5",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities isFunction should return false for non-functions",
       "status": "passed"
     },
     {
       "id": "pristine:2ac2b9a040d50a56",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities isFunction should return true for arrow functions",
       "status": "passed"
     },
     {
       "id": "pristine:bc482c26a5ea9c95",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities isFunction should return true for async functions",
       "status": "passed"
     },
     {
       "id": "pristine:587c6e2c902546b6",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities isFunction should return true for regular functions",
       "status": "passed"
     },
     {
       "id": "pristine:a65548e1c3e0edd1",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities isNum should return false for NaN",
       "status": "passed"
     },
     {
       "id": "pristine:6bcbeed2504c572c",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities isNum should return false for non-numbers",
       "status": "passed"
     },
     {
       "id": "pristine:88e809f67f48e30f",
-      "file": "packages/draggable/upstream/tag/test/utils/shims.test.js",
+      "file": "packages/draggable/upstream/test/utils/shims.test.js",
       "fullName": "shims utilities isNum should return true for valid numbers",
       "status": "passed"
     }
