@@ -186,6 +186,11 @@
           "sha256": "fdc175ffe1f69cd2d3afe99e707c8dc5535b022eb09f6887d11260261c0895fd"
         },
         {
+          "path": "packages/drei/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "8203c1a57fa9485acba692c6f1f633910c063d003c9aa3f2a2bbf0a9936efccd"
+        },
+        {
           "path": "packages/drei/scripts/check-react-parity.mjs",
           "role": "support",
           "sha256": "3e16a425d352e48bc311262bfd5aa5d9e13a25b599ff2e6133c1b26ff90cda24"
