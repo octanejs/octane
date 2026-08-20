@@ -22,6 +22,7 @@ import { gzipSync, constants as zc } from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { measureCssModules } from './css-modules.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '../..');
@@ -217,6 +218,11 @@ try {
 	textTypeProject.dispose();
 }
 
+// Paired sentinels keep new optimization claims out of the fixed corpus. The
+// CSS control and candidate use identical source/provider bytes and verify both
+// the emitted stylesheet and public SSR output before reporting their sizes.
+const cssModules = await measureCssModules();
+
 const payload = {
 	suite: 'codegen-size',
 	iterations: 1,
@@ -232,6 +238,7 @@ const payload = {
 		{ name: 'text-types-syntax', ops: textTypes.syntax },
 		{ name: 'text-types-explicit', ops: textTypes.explicit, meta: textTypes.meta },
 		{ name: 'text-types-inferred', ops: textTypes.inferred, meta: textTypes.meta },
+		...cssModules.targets,
 	],
 };
 
@@ -246,6 +253,13 @@ console.log(
 console.log(
 	`TypeScript text sentinel  inferred ${textTypes.inferred.raw.median}/${textTypes.inferred.minified.median}/${textTypes.inferred.gzip.median}  explicit ${textTypes.explicit.raw.median}/${textTypes.explicit.minified.median}/${textTypes.explicit.gzip.median}  syntax ${textTypes.syntax.raw.median}/${textTypes.syntax.minified.median}/${textTypes.syntax.gzip.median}`,
 );
+for (const mode of ['client', 'server']) {
+	const control = cssModules.summary.modes[`${mode}-control`];
+	const proven = cssModules.summary.modes[`${mode}-proven`];
+	console.log(
+		`CSS-module ${mode} sentinel  min ${control.minified} -> ${proven.minified}  gz ${control.gzip} -> ${proven.gzip}  br ${control.brotli} -> ${proven.brotli}`,
+	);
+}
 
 if (process.env.BENCH_JSON) {
 	fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');

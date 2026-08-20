@@ -26,6 +26,11 @@ import {
 	findDescriptorChildrenImports,
 	findVoidComponentImports,
 } from './bundler.js';
+import {
+	isPlainCssModuleId,
+	readCssModuleExports,
+	validateCssModuleConstants,
+} from './css-module-imports.js';
 
 export { discoverOctaneSourceDependencies };
 
@@ -66,6 +71,130 @@ function voidImportKey(request, imported) {
 
 function compiledCodeFingerprint(code) {
 	return nodeCrypto.createHash('sha256').update(code).digest('base64url');
+}
+
+function createCssModuleProofState() {
+	return { modules: new Map(), inFlight: new Set(), consumed: new Map() };
+}
+
+async function loadCssModuleProof(context, id, environment, provider, state) {
+	// A virtual CSS provider may itself pass through Octane and import its
+	// caller. Never await the same proof promise through that in-flight graph.
+	// A concurrent first importer can conservatively miss this optimization;
+	// completed module proofs remain reusable for the rest of the build.
+	if (state.inFlight.has(id)) return null;
+	let proof = state.modules.get(id);
+	if (proof === undefined) {
+		state.inFlight.add(id);
+		proof = (async () => {
+			let loaded;
+			try {
+				// Only the module itself is needed. Walking its imports here would
+				// make a CSS provider's virtual graph capable of deadlocking an
+				// importer that is still in its pre-transform hook.
+				loaded = await context.load({ id, resolveDependencies: false });
+			} catch {
+				return null;
+			}
+			const moduleInfo = context.getModuleInfo(id) ?? loaded;
+			if (moduleInfo?.id !== id || typeof moduleInfo.code !== 'string') return null;
+			const code = moduleInfo.code;
+			const exports = readCssModuleExports(code);
+			const supplied =
+				provider === undefined
+					? null
+					: validateCssModuleConstants(
+							provider(Object.freeze({ id, code, meta: moduleInfo.meta ?? {}, environment })),
+							exports,
+							id,
+						);
+			// Vite's normal CSS-module output has immutable named const strings,
+			// but its default object is mutable. Only the explicit host contract
+			// can make a default-map member a constant.
+			const named = isPlainCssModuleId(id) && exports?.pure ? new Map(exports.named) : new Map();
+			for (const [name, value] of supplied?.named ?? []) named.set(name, value);
+			const defaultMap = supplied?.default ?? new Map();
+			if (named.size === 0 && defaultMap.size === 0) return null;
+			return { id, fingerprint: compiledCodeFingerprint(code), named, default: defaultMap };
+		})().finally(() => state.inFlight.delete(id));
+		state.modules.set(id, proof);
+	}
+	return proof;
+}
+
+async function loadCssModuleImports(context, requests, importer, environment, provider, state) {
+	if (
+		requests.length === 0 ||
+		typeof context.resolve !== 'function' ||
+		typeof context.load !== 'function' ||
+		typeof context.getModuleInfo !== 'function'
+	) {
+		return null;
+	}
+	const imports = new Map();
+	const resolvedImports = await Promise.all(
+		requests.map(async (request) => {
+			let resolved;
+			try {
+				resolved = await context.resolve(request, importer, { skipSelf: true });
+			} catch {
+				return;
+			}
+			if (
+				resolved == null ||
+				resolved.external ||
+				typeof resolved.id !== 'string' ||
+				cleanModuleId(resolved.id) === cleanModuleId(importer)
+			) {
+				return;
+			}
+			const proof = await loadCssModuleProof(context, resolved.id, environment, provider, state);
+			return proof === null ? undefined : [request, proof];
+		}),
+	);
+	for (const entry of resolvedImports) {
+		if (entry !== undefined) imports.set(entry[0], entry[1]);
+	}
+	if (imports.size === 0) return null;
+	return {
+		requests: [...imports.keys()],
+		resolve(request, imported, property) {
+			const proof = imports.get(request);
+			if (proof === undefined) return undefined;
+			if (property === null) return proof.named.get(imported);
+			if (imported === '*') return proof.named.get(property);
+			if (imported === 'default') return proof.default.get(property);
+			return undefined;
+		},
+		consume(requests) {
+			for (const request of requests ?? []) {
+				const proof = imports.get(request);
+				if (proof === undefined || state.consumed.has(proof.id)) continue;
+				const moduleInfo = context.getModuleInfo(proof.id);
+				if (
+					moduleInfo == null ||
+					typeof moduleInfo.code !== 'string' ||
+					compiledCodeFingerprint(moduleInfo.code) !== proof.fingerprint
+				) {
+					throw new Error(`CSS-module constant proof changed for ${JSON.stringify(proof.id)}.`);
+				}
+				state.consumed.set(proof.id, proof.fingerprint);
+			}
+		},
+	};
+}
+
+function verifyCssModuleProofs(context, state) {
+	for (const [id, fingerprint] of state.consumed) {
+		const moduleInfo = context.getModuleInfo?.(id);
+		if (
+			moduleInfo == null ||
+			typeof moduleInfo.code !== 'string' ||
+			compiledCodeFingerprint(moduleInfo.code) !== fingerprint
+		) {
+			throw new Error(`CSS-module constant proof changed for ${JSON.stringify(id)}.`);
+		}
+	}
 }
 
 async function loadImportMetadata(
@@ -406,6 +535,14 @@ export function octane(options = {}) {
 	if (options.strong !== undefined && typeof options.strong !== 'boolean') {
 		throw new TypeError('octane/compiler/vite: `strong` must be a boolean when provided.');
 	}
+	if (
+		options.cssModuleConstants !== undefined &&
+		typeof options.cssModuleConstants !== 'function'
+	) {
+		throw new TypeError(
+			'octane/compiler/vite: `cssModuleConstants` must be a function when provided.',
+		);
+	}
 	if (options.parallelUse !== undefined) {
 		// Removed 2026-07-16: the parallel-use() pipeline is unconditional compiled
 		// semantics (docs/suspense-parallel-use-plan.md). Warn instead of throwing
@@ -416,6 +553,7 @@ export function octane(options = {}) {
 	}
 	let hmrEnabled = options.hmr;
 	let specializeProductionRoots = false;
+	let specializeCssModuleConstants = false;
 	let emitClientReferenceManifest = options.ssr !== true;
 	// Profiling is intentionally independent of serve/HMR. `ssr: true` is the
 	// adapter's explicit server-only override, where client profiling must stay off.
@@ -449,6 +587,19 @@ export function octane(options = {}) {
 	const descriptorSourceCache = new Map();
 	const descriptorExportCache = new Map();
 	const descriptorGraphCache = new Map();
+	// Vite can share a plugin instance between client and server environments.
+	// CSS naming/virtual providers can differ between them, so never key a proof
+	// merely by its path or share a previous build's final-module snapshot.
+	const cssModuleProofStates = new Map();
+	const cssModuleProofState = (context, environment) => {
+		const key = context.environment ?? environment;
+		let state = cssModuleProofStates.get(key);
+		if (state === undefined) {
+			state = createCssModuleProofState();
+			cssModuleProofStates.set(key, state);
+		}
+		return state;
+	};
 	// Rollup's one-shot build graph can safely load an unresolved virtual module
 	// to collect its transform metadata. Vite's dev plugin container cannot: a
 	// transform awaiting `this.load()` for a virtual dependency can wait on the
@@ -472,6 +623,7 @@ export function octane(options = {}) {
 		descriptorSourceCache.clear();
 		descriptorExportCache.clear();
 		descriptorGraphCache.clear();
+		cssModuleProofStates.clear();
 		projectRoot = nodePath.resolve(root);
 		compiler = createOctaneCompiler({
 			root: projectRoot,
@@ -545,6 +697,23 @@ export function octane(options = {}) {
 			// reruns when only an imported module's output contract changes. Keep the
 			// proof to one-shot production builds where the graph is compiled together.
 			specializeProductionRoots = config.command === 'build' && config.build?.watch == null;
+			specializeCssModuleConstants = specializeProductionRoots && !hmrEnabled;
+		},
+		buildStart() {
+			if (this.environment === undefined) cssModuleProofStates.clear();
+			else cssModuleProofStates.delete(this.environment);
+		},
+		buildEnd(error) {
+			const keys = this.environment === undefined ? ['client', 'server'] : [this.environment];
+			for (const key of keys) {
+				const state = cssModuleProofStates.get(key);
+				if (state === undefined) continue;
+				try {
+					if (!error) verifyCssModuleProofs(this, state);
+				} finally {
+					cssModuleProofStates.delete(key);
+				}
+			}
 		},
 		watchChange(id) {
 			compiler.invalidate(id);
@@ -553,6 +722,7 @@ export function octane(options = {}) {
 			descriptorSourceCache.clear();
 			descriptorExportCache.clear();
 			descriptorGraphCache.clear();
+			cssModuleProofStates.clear();
 		},
 		generateBundle(_outputOptions, bundle) {
 			if (!emitClientReferenceManifest) return;
@@ -576,12 +746,30 @@ export function octane(options = {}) {
 				forceSsr !== undefined
 					? forceSsr
 					: transformOptions?.ssr === true || this.environment?.config?.consumer === 'server';
-			const transformWithProof = (proven, descriptorProven = new Set(), clientOnlyImports = []) => {
+			const environment = server ? 'server' : 'client';
+			const cssRequests = specializeCssModuleConstants
+				? compiler.findCssModuleImportRequests(code, id, environment)
+				: [];
+			const loadCssImports = () =>
+				loadCssModuleImports(
+					this,
+					cssRequests,
+					id,
+					environment,
+					options.cssModuleConstants,
+					cssModuleProofState(this, environment),
+				);
+			const transformWithProof = (
+				proven,
+				descriptorProven = new Set(),
+				clientOnlyImports = [],
+				cssImports = null,
+			) => {
 				const propagatedExports = [...descriptorProven]
 					.filter((key) => key.startsWith('export\0'))
 					.map((key) => key.slice('export\0'.length));
 				const result = compiler.transform(code, id, {
-					environment: server ? 'server' : 'client',
+					environment,
 					hmr: !server && hmrEnabled ? 'vite' : false,
 					// DEV server transforms also carry SSR-only diagnostics. HMR itself
 					// remains client-only; an explicit `hmr: false` keeps both transforms
@@ -603,6 +791,15 @@ export function octane(options = {}) {
 									descriptorProven.has(voidImportKey(request, imported)),
 							}
 						: {}),
+					...(cssImports === null
+						? null
+						: {
+								resolveCssModuleConstant: cssImports.resolve,
+								// A real class read must survive in each independently retained
+								// template. A global side-effect override would make styles from
+								// an unused exported component newly eager.
+								preserveCssModuleReferences: cssImports.requests,
+							}),
 				});
 				if (result === null) {
 					if (propagatedExports.length === 0) return null;
@@ -616,6 +813,7 @@ export function octane(options = {}) {
 						},
 					};
 				}
+				cssImports?.consume(result.cssModuleConstantImports);
 				for (const dependency of result.dependencies) this.addWatchFile?.(dependency);
 				const meta = {};
 				if (result.clientReference !== undefined) {
@@ -660,8 +858,9 @@ export function octane(options = {}) {
 						descriptorGraphCache,
 						allowDescriptorGraphLoad,
 					),
-				]).then(([imports, descriptorProven]) =>
-					transformWithProof(null, descriptorProven, imports),
+					loadCssImports(),
+				]).then(([imports, descriptorProven, cssImports]) =>
+					transformWithProof(null, descriptorProven, imports, cssImports),
 				);
 			}
 
@@ -672,7 +871,7 @@ export function octane(options = {}) {
 			const descriptorImports = findDescriptorChildrenImports(code, id).filter(
 				(candidate) => candidate.local !== undefined || !nodeFs.existsSync(cleanModuleId(id)),
 			);
-			if (voidImports.length === 0 && descriptorImports.length === 0) {
+			if (voidImports.length === 0 && descriptorImports.length === 0 && cssRequests.length === 0) {
 				return transformWithProof(null);
 			}
 			return Promise.all([
@@ -686,7 +885,10 @@ export function octane(options = {}) {
 					descriptorGraphCache,
 					allowDescriptorGraphLoad,
 				),
-			]).then(([proven, descriptorProven]) => transformWithProof(proven, descriptorProven));
+				loadCssImports(),
+			]).then(([proven, descriptorProven, cssImports]) =>
+				transformWithProof(proven, descriptorProven, [], cssImports),
+			);
 		},
 	};
 }

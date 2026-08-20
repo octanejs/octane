@@ -207,6 +207,44 @@ describe('octane() plugin factory', () => {
 		}
 	});
 
+	it('forwards immutable CSS-provider facts to the bundled compiler', async () => {
+		const cssId = '/repo/src/panel.module.css';
+		const cssCode = 'export default Object.freeze({root:"_panel_root",label:"_panel_label"});';
+		const cssModule = { id: cssId, code: cssCode, meta: {}, moduleSideEffects: false };
+		const provider = vi.fn(() => ({
+			default: { root: '_panel_root', label: '_panel_label' },
+		}));
+		const [compiler] = octane({ hmr: false, cssModuleConstants: provider });
+		await (compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
+		(compiler.configResolved as (config: unknown) => void)({
+			root: '/repo',
+			command: 'build',
+			build: {},
+			define: {},
+		});
+		const source =
+			'import styles from "./panel.module.css"; ' +
+			'export function Panel() @{ <section class={styles.root}><span class={styles.label}>Ready</span></section> }';
+		const output = await (compiler.transform as any).call(
+			{
+				resolve: async (request: string) =>
+					request === './panel.module.css' ? { id: cssId } : null,
+				load: async () => cssModule,
+				getModuleInfo: (id: string) => (id === cssId ? cssModule : null),
+			},
+			source,
+			'/repo/src/Panel.tsrx',
+		);
+		expect(provider).toHaveBeenCalledWith({
+			id: cssId,
+			code: cssCode,
+			meta: {},
+			environment: 'client',
+		});
+		expect(output.code).toContain('_panel_label');
+		expect(cssModule.moduleSideEffects).toBe(false);
+	});
+
 	it.each([true, false])('forwards strong=%s to the bundled compiler', async (strong) => {
 		const [compiler] = octane({ hmr: false, strong });
 		await (compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
