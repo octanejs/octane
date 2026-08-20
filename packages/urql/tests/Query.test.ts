@@ -4,7 +4,7 @@ import { createElement, type OctaneNode } from 'octane';
 import { render } from '@octanejs/testing-library';
 import { map, interval, pipe } from 'wonka';
 
-import { Query } from '../src/components/Query';
+import { Query, type QueryState } from '../src/components/Query';
 import { mockClient } from './_client-mock';
 
 vi.mock('../src/context', function () {
@@ -43,7 +43,7 @@ describe('Query', function () {
 			return createElement(Query, {
 				query,
 				variables,
-				children: function children(arg: { data: unknown; fetching: boolean; error: unknown }) {
+				children: function children(arg: QueryState) {
 					props = { data: arg.data, fetching: arg.fetching, error: arg.error };
 					return createElement(Test);
 				},

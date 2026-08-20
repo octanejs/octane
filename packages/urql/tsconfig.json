@@ -11,7 +11,8 @@
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "verbatimModuleSyntax": true,
-    "strict": true
+    "strict": true,
+    "skipLibCheck": true
   },
   "include": ["./src/", "./tests/types/"],
   "exclude": ["node_modules", "dist", "tests"]

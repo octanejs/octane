@@ -45,7 +45,7 @@ export function computeNextState<T extends Stateish>(prevState: T, result: Parti
 	return isShallowDifferent(prevState, newState) ? newState : prevState;
 }
 
-export function hasDepsChanged<T extends { length: number }>(a: T, b: T) {
+export function hasDepsChanged(a: readonly unknown[], b: readonly unknown[]) {
 	for (let i = 0, l = b.length; i < l; i++) if (a[i] !== b[i]) return true;
 	return false;
 }

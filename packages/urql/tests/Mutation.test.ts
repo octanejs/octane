@@ -4,7 +4,7 @@ import { createElement, type OctaneNode } from 'octane';
 import { act, render } from '@octanejs/testing-library';
 import { delay, fromValue, pipe } from 'wonka';
 
-import { Mutation } from '../src/components/Mutation';
+import { Mutation, type MutationState } from '../src/components/Mutation';
 import { mockClient } from './_client-mock';
 
 vi.mock('../src/context', function () {
@@ -36,12 +36,7 @@ describe('Mutation', function () {
 		function App(): OctaneNode {
 			return createElement(Mutation, {
 				query,
-				children: function children(arg: {
-					data: unknown;
-					fetching: boolean;
-					error: unknown;
-					executeMutation: (vars?: unknown) => void;
-				}) {
+				children: function children(arg: MutationState) {
 					execute = arg.executeMutation;
 					props = { data: arg.data, fetching: arg.fetching, error: arg.error };
 					return createElement(Test);

@@ -173,7 +173,7 @@ describe('useQuery', function () {
       }
     `;
 
-		rerender({ query: newQuery, variables: {} });
+		rerender({ query: newQuery, variables: {} as { id?: number } });
 		expect(mockClient.executeQuery).toBeCalledTimes(2);
 		expect(mockClient.executeQuery).toHaveBeenNthCalledWith(
 			2,
@@ -354,15 +354,13 @@ describe('useQuery', function () {
 
 		try {
 			render(
-				createElement(
-					ErrorBoundary,
-					{ fallback },
-					createElement(
-						Suspense,
-						{ fallback: createElement('p', null, 'Loading') },
-						createElement(QueryUser),
-					),
-				),
+				createElement(ErrorBoundary, {
+					fallback,
+					children: createElement(Suspense, {
+						fallback: createElement('p', null, 'Loading'),
+						children: createElement(QueryUser),
+					}),
+				}),
 			);
 
 			// OCTANE DIVERGENCE: a delayed query error can hit the boundary
