@@ -34,7 +34,8 @@
     "src",
     "README.md",
     "UPSTREAM.md",
-    "LICENSE"
+    "LICENSE",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/mod.ts",
@@ -44,7 +45,7 @@
     "test": "vitest run --config vitest.config.ts && vitest run --config vitest.ssr.config.ts",
     "test:upstream": "node scripts/run-pristine-upstream.mjs",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
-    "upstream:verify": "node scripts/verify-upstream.mjs"
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "dependencies": {
     "@livestore/common": "catalog:default",

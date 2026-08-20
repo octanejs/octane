@@ -29,4 +29,3 @@ Object.keys(dom.window).forEach((property) => {
     }
   }
 })
-
