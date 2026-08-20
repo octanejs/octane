@@ -20,10 +20,9 @@ import {
 } from 'octane';
 import { splitSlot, subSlot } from '../internal';
 
-const Empty = [] as const;
+const Empty: unknown[] = [];
 
-const symDispose: unique symbol = ((Symbol as { dispose?: symbol }).dispose ||
-	Symbol.for('Symbol.dispose')) as unique symbol;
+const symDispose = (Symbol as { dispose?: symbol }).dispose || Symbol.for('Symbol.dispose');
 
 interface EffectInstance {
 	_sources: object | undefined;
@@ -299,7 +298,11 @@ export function _useSignalsImplementation(
 	return store;
 }
 
-export function useSignals(usage?: EffectStoreUsage, componentName?: string): EffectStore;
+export function useSignals(
+	usage?: EffectStoreUsage,
+	componentName?: string,
+	slot?: symbol,
+): EffectStore;
 export function useSignals(
 	...rest: [usage?: EffectStoreUsage, componentName?: string, slot?: symbol]
 ): EffectStore {
@@ -309,7 +312,7 @@ export function useSignals(
 	return _useSignalsImplementation(usage, componentName, slot);
 }
 
-export function useSignal<T>(value: T, options?: SignalOptions<T>): Signal<T>;
+export function useSignal<T>(value: T, options?: SignalOptions<T>, slot?: symbol): Signal<T>;
 export function useSignal<T = undefined>(): Signal<T | undefined>;
 export function useSignal<T>(...rest: [value?: T, options?: SignalOptions<T>, slot?: symbol]) {
 	const [user, slot] = splitSlot(rest);

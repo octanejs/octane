@@ -5,26 +5,23 @@ import { useSignals } from '../../src/runtime/index.ts';
 import { For, Show, useLiveSignal, useSignalRef } from '../../src/utils/index.ts';
 
 function Paragraph(props: { children?: unknown }) {
-	return createElement('p', null, props.children);
+	return createElement('p', {}, props.children);
 }
 
 export function ShowToggle(props: { toggle: Signal<boolean> }) {
-	return createElement(
-		Show,
-		{
-			when: props.toggle,
-			fallback: createElement(Paragraph, null, 'Hiding'),
-		},
-		createElement(Paragraph, null, 'Showing'),
-	);
+	return createElement(Show, {
+		when: props.toggle,
+		fallback: createElement(Paragraph, {}, 'Hiding'),
+		children: createElement(Paragraph, {}, 'Showing'),
+	});
 }
 
 export function ForList(props: { items: Signal<string[]> }) {
 	return createElement(For, {
 		each: props.items,
-		fallback: createElement(Paragraph, null, 'empty'),
-		children: function renderItem(value: string) {
-			return createElement('li', null, value);
+		fallback: createElement(Paragraph, {}, 'empty'),
+		children: function renderItem(value: unknown) {
+			return createElement('li', {}, String(value));
 		},
 	});
 }
