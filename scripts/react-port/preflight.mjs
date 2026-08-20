@@ -18,7 +18,8 @@ function usage() {
 	return `Usage: node scripts/react-port/preflight.mjs [options] <package-or-url> [...]
 
 Resolve one or more public npm/GitHub inputs, verify immutable provenance, and
-enforce Octane's approved MIT-or-Unlicense policy before binding writes.
+enforce Octane's approved-license policy (MIT, Unlicense, BSD-3-Clause,
+Apache-2.0) before binding writes.
 
 Options:
   --prerequisite <input>     Add a discovered prerequisite without marking it requested

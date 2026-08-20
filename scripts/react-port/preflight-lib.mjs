@@ -49,7 +49,12 @@ const TEST_CONFIG_PATTERN =
 const MAX_UPSTREAM_TEST_FILES = 500;
 const MAX_UPSTREAM_TEST_BYTES = 16 * 1024 * 1024;
 
-export const APPROVED_LICENSE_IDENTIFIERS = Object.freeze(['MIT', 'Unlicense']);
+export const APPROVED_LICENSE_IDENTIFIERS = Object.freeze([
+	'MIT',
+	'Unlicense',
+	'BSD-3-Clause',
+	'Apache-2.0',
+]);
 
 export { fingerprint, parseInput, sanitizeForReport, stableStringify };
 
@@ -85,9 +90,33 @@ export function isRecognizableUnlicenseText(content) {
 	].every((phrase) => text.includes(phrase));
 }
 
+export function isRecognizableBsd3Text(content) {
+	if (typeof content !== 'string') return false;
+	const text = normalizeLicenseText(content);
+	return [
+		'redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met',
+		'redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer',
+		'neither the name of',
+		'this software is provided by the copyright holders and contributors "as is"',
+	].every((phrase) => text.includes(phrase));
+}
+
+export function isRecognizableApache2Text(content) {
+	if (typeof content !== 'string') return false;
+	const text = normalizeLicenseText(content);
+	return [
+		'apache license',
+		'version 2.0',
+		'licensed under the apache license, version 2.0',
+		'unless required by applicable law or agreed to in writing, software distributed under the license is distributed on an "as is" basis',
+	].every((phrase) => text.includes(phrase));
+}
+
 export function classifyApprovedLicenseText(content) {
 	if (isRecognizableMitText(content)) return 'MIT';
 	if (isRecognizableUnlicenseText(content)) return 'Unlicense';
+	if (isRecognizableBsd3Text(content)) return 'BSD-3-Clause';
+	if (isRecognizableApache2Text(content)) return 'Apache-2.0';
 	return 'unrecognized';
 }
 
@@ -178,9 +207,15 @@ export function evaluateApprovedLicense({ manifestLicense, licenseFiles = [], no
 		evidence,
 		notices,
 		obligations: [
-			approvedSpdx === 'MIT'
-				? 'Retain the upstream copyright and permission notice in all copies or substantial portions of the software.'
-				: 'Retain the upstream Unlicense text with copied or adapted source to preserve provenance and its warranty disclaimer.',
+			{
+				MIT: 'Retain the upstream copyright and permission notice in all copies or substantial portions of the software.',
+				Unlicense:
+					'Retain the upstream Unlicense text with copied or adapted source to preserve provenance and its warranty disclaimer.',
+				'BSD-3-Clause':
+					'Retain the upstream copyright notice, the BSD-3-Clause conditions list, and its disclaimer with copied or adapted source; do not use upstream names to endorse the binding.',
+				'Apache-2.0':
+					'Retain the upstream Apache-2.0 license text with copied or adapted source and preserve every upstream NOTICE file.',
+			}[approvedSpdx],
 			...(notices.length > 0
 				? ['Retain every applicable upstream NOTICE file and attribution in the completed binding.']
 				: []),
@@ -298,7 +333,7 @@ export function assessResolvedEvidence({ input, registry, source }) {
 		repair:
 			blockers.length === 0
 				? null
-				: 'Resolve every identity conflict and supply matching MIT or Unlicense evidence without overriding the policy gate.',
+				: 'Resolve every identity conflict and supply matching approved-license evidence (MIT, Unlicense, BSD-3-Clause, or Apache-2.0) without overriding the policy gate.',
 		evidenceFingerprint: fingerprint(fingerprintInput),
 	});
 }
