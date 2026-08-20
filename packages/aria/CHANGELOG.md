@@ -1,5 +1,16 @@
 # @octanejs/aria
 
+## 0.0.36
+
+### Patch Changes
+
+- Updated dependencies [1581e1b]
+- Updated dependencies [afa3722]
+- Updated dependencies [231e248]
+- Updated dependencies [2f9b301]
+- Updated dependencies [939c64d]
+  - octane@0.1.42
+
 ## 0.0.35
 
 ### Patch Changes
