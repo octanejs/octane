@@ -8223,6 +8223,15 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		// Suspended initial adoption intentionally leaves its real server arm and
 		// cursor untouched. Sweep only after that same arm eventually commits.
 		if (state.hydrated) {
+			// A descriptor-only child need not clone a compiled root template, and a
+			// resumed cursor can still be inside the internal try slot's owned range.
+			// Wait until adoption completes before claiming that range's remainder:
+			// a later template clone must get the first claim, and DOM added while
+			// suspended must not be skipped by an earlier fallback snapshot.
+			const adoptedSlot = block.slots[0] as TrySlot | undefined;
+			if (adoptedSlot?.__kind === 'trySlotSlot') {
+				hydration.claimRootRemainder(adoptedSlot.end.nextSibling);
+			}
 			hydration.flushClassWrites();
 			hydration.flushTextWarnings();
 			hydration.finishRoot();
