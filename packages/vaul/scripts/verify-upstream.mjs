@@ -1,7 +1,9 @@
-import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -17,41 +19,23 @@ function toPortable(path) {
 }
 
 /**
- * Verifies every vendored Vaul upstream byte against upstream/SHA256SUMS
- * and confirms the required Playwright test-boundary artifacts are present.
+ * Verifies every vendored Vaul upstream byte against the upstream git blob
+ * shas in audit/upstream.lock.json and confirms the required Playwright
+ * test-boundary artifacts are present.
  */
 export function verifyVaulUpstream(root = packageRoot) {
 	const upstream = join(root, 'upstream');
-	const sums = join(upstream, 'SHA256SUMS');
-	const expected = new Map(
-		readFileSync(sums, 'utf8')
-			.trim()
-			.split('\n')
-			.map(function parseLine(line) {
-				const [hash, path] = line.split(/\s{2}/u);
-				return [path, hash];
-			}),
+	execFileSync(
+		process.execPath,
+		[join(repoRoot, 'scripts/react-port/materialize.mjs'), 'run', '--check', '--package-dir', root],
+		{ cwd: repoRoot, stdio: 'pipe' },
 	);
 
 	const actualFiles = walk(upstream)
 		.map(function toRelative(path) {
 			return toPortable(relative(upstream, path));
 		})
-		.filter(function keepSource(path) {
-			return path !== 'SHA256SUMS';
-		})
 		.sort();
-	const expectedFiles = [...expected.keys()].sort();
-
-	if (JSON.stringify(actualFiles) !== JSON.stringify(expectedFiles)) {
-		throw new Error('Vendored Vaul file inventory differs from upstream/SHA256SUMS');
-	}
-
-	for (const path of actualFiles) {
-		const bytes = readFileSync(join(upstream, path));
-		const hash = createHash('sha256').update(bytes).digest('hex');
-		if (hash !== expected.get(path)) throw new Error(`Vendored byte drift: ${path}`);
-	}
 
 	for (const required of [
 		'playwright.config.ts',
@@ -71,10 +55,7 @@ export function verifyVaulUpstream(root = packageRoot) {
 		throw new Error('Vaul license evidence does not contain the pinned MIT notice');
 	}
 
-	return {
-		files: actualFiles.length,
-		integrity: `sha256:${createHash('sha256').update(readFileSync(sums)).digest('hex')}`,
-	};
+	return { files: actualFiles.length };
 }
 
 const isMain =
