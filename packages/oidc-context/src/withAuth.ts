@@ -11,7 +11,7 @@ import { splitSlot, subSlot } from './internal';
 export function withAuth<P>(
 	Component: ComponentBody<P & { auth: AuthContextProps }>,
 ): ComponentBody<Omit<P, keyof AuthContextProps>> {
-	const displayName = `withAuth(${Component.displayName || Component.name})`;
+	const displayName = `withAuth(${Component.name || 'Component'})`;
 	function WithAuth(props: Omit<P, keyof AuthContextProps>, ...rest: unknown[]): OctaneNode {
 		const [, slot] = splitSlot(rest);
 		const auth = useAuth(subSlot(slot, 'auth'));

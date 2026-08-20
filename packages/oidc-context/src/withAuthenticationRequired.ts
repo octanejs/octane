@@ -43,7 +43,7 @@ export function withAuthenticationRequired<P extends object>(
 	const OnRedirecting = options.OnRedirecting ?? defaultOnRedirecting;
 	const onBeforeSignin = options.onBeforeSignin;
 	const signinRedirectArgs = options.signinRedirectArgs;
-	const displayName = `withAuthenticationRequired(${Component.displayName || Component.name})`;
+	const displayName = `withAuthenticationRequired(${Component.name || 'Component'})`;
 	function WithAuthenticationRequired(props: P, ...rest: unknown[]): OctaneNode {
 		const [, slot] = splitSlot(rest);
 		const auth = useAuth(subSlot(slot, 'auth'));

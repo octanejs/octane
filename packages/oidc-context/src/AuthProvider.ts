@@ -11,7 +11,7 @@ import {
 	type OctaneNode,
 } from 'octane';
 
-import { AuthContext } from './AuthContext';
+import { AuthContext, type AuthContextProps } from './AuthContext';
 import { type ErrorContext, initialAuthState } from './AuthState';
 import { splitSlot, subSlot } from './internal';
 import { reducer } from './reducer';
@@ -321,5 +321,5 @@ export function AuthProvider(props: AuthProviderProps, ...rest: unknown[]): Octa
 		subSlot(slot, 'value'),
 	);
 
-	return createElement(AuthContext.Provider, { value: contextValue }, children);
+	return createElement(AuthContext.Provider, { value: contextValue as AuthContextProps }, children);
 }
