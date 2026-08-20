@@ -1,6 +1,6 @@
 // Per packages/oidc-context/upstream/canonical/test/AuthProvider.test.tsx
 import { act, renderHook, waitFor } from '@octanejs/testing-library';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UserManager, type User } from 'oidc-client-ts';
 import { useAuth } from '../src/useAuth';
 import { createWrapper } from './helpers';
@@ -17,11 +17,18 @@ const settingsStub = {
 const user = { id_token: '__test_user__' } as User;
 
 describe('AuthProvider', function () {
+	beforeEach(function () {
+		vi.clearAllMocks();
+	});
+
 	it('should signinRedirect when asked', async function () {
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function useAuthHook() {
-			return useAuth();
-		}, { wrapper });
+		const { result } = renderHook(
+			function useAuthHook() {
+				return useAuth();
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current.user).toBeUndefined();
@@ -37,11 +44,7 @@ describe('AuthProvider', function () {
 
 	it('should handle signinCallback success and call onSigninCallback', async function () {
 		const onSigninCallback = vi.fn();
-		window.history.pushState(
-			{},
-			document.title,
-			'/?code=__test_code__&state=__test_state__',
-		);
+		window.history.pushState({}, document.title, '/?code=__test_code__&state=__test_state__');
 		expect(window.location.href).toBe(
 			'https://www.example.com/?code=__test_code__&state=__test_state__',
 		);
@@ -49,9 +52,12 @@ describe('AuthProvider', function () {
 		const wrapper = createWrapper({ ...settingsStub, onSigninCallback });
 
 		act(function () {
-			renderHook(function useAuthHook() {
-				return useAuth();
-			}, { wrapper });
+			renderHook(
+				function useAuthHook() {
+					return useAuth();
+				},
+				{ wrapper },
+			);
 		});
 
 		await waitFor(function () {
@@ -63,11 +69,7 @@ describe('AuthProvider', function () {
 	it('should run onSigninCallback only once in StrictMode', async function () {
 		// OCTANE DIVERGENCE: Octane has no StrictMode double-invoke; didInitialize still runs once.
 		const onSigninCallback = vi.fn();
-		window.history.pushState(
-			{},
-			document.title,
-			'/?code=__test_code__&state=__test_state__',
-		);
+		window.history.pushState({}, document.title, '/?code=__test_code__&state=__test_state__');
 		expect(window.location.href).toBe(
 			'https://www.example.com/?code=__test_code__&state=__test_state__',
 		);
@@ -75,9 +77,12 @@ describe('AuthProvider', function () {
 		const wrapper = createWrapper({ ...settingsStub, onSigninCallback });
 
 		act(function () {
-			renderHook(function useAuthHook() {
-				return useAuth();
-			}, { wrapper });
+			renderHook(
+				function useAuthHook() {
+					return useAuth();
+				},
+				{ wrapper },
+			);
 		});
 
 		await waitFor(function () {
@@ -88,11 +93,7 @@ describe('AuthProvider', function () {
 
 	it('should handle signinCallback errors and call onSigninCallback', async function () {
 		const onSigninCallback = vi.fn();
-		window.history.pushState(
-			{},
-			document.title,
-			'/?error=__test_error__&state=__test_state__',
-		);
+		window.history.pushState({}, document.title, '/?error=__test_error__&state=__test_state__');
 		expect(window.location.href).toBe(
 			'https://www.example.com/?error=__test_error__&state=__test_state__',
 		);
@@ -100,9 +101,12 @@ describe('AuthProvider', function () {
 		const wrapper = createWrapper({ ...settingsStub, onSigninCallback });
 
 		act(function () {
-			renderHook(function useAuthHook() {
-				return useAuth();
-			}, { wrapper });
+			renderHook(
+				function useAuthHook() {
+					return useAuth();
+				},
+				{ wrapper },
+			);
 		});
 
 		await waitFor(function () {
@@ -126,9 +130,12 @@ describe('AuthProvider', function () {
 		});
 
 		act(function () {
-			renderHook(function useAuthHook() {
-				return useAuth();
-			}, { wrapper });
+			renderHook(
+				function useAuthHook() {
+					return useAuth();
+				},
+				{ wrapper },
+			);
 		});
 
 		await waitFor(function () {
@@ -155,9 +162,12 @@ describe('AuthProvider', function () {
 		});
 
 		const result = await act(async function () {
-			const rendered = renderHook(function useAuthHook() {
-				return useAuth();
-			}, { wrapper });
+			const rendered = renderHook(
+				function useAuthHook() {
+					return useAuth();
+				},
+				{ wrapper },
+			);
 			return rendered.result;
 		});
 
@@ -181,9 +191,12 @@ describe('AuthProvider', function () {
 
 	it('should signinResourceOwnerCredentials when asked', async function () {
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function useAuthHook() {
-			return useAuth();
-		}, { wrapper });
+		const { result } = renderHook(
+			function useAuthHook() {
+				return useAuth();
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current.user).toBeUndefined();
@@ -204,9 +217,12 @@ describe('AuthProvider', function () {
 	it('should handle removeUser and call onRemoveUser', async function () {
 		const onRemoveUser = vi.fn();
 		const wrapper = createWrapper({ ...settingsStub, onRemoveUser });
-		const { result } = renderHook(function useAuthHook() {
-			return useAuth();
-		}, { wrapper });
+		const { result } = renderHook(
+			function useAuthHook() {
+				return useAuth();
+			},
+			{ wrapper },
+		);
 
 		await act(function () {
 			return result.current.removeUser();
@@ -220,9 +236,12 @@ describe('AuthProvider', function () {
 
 	it('should handle signoutSilent', async function () {
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function useAuthHook() {
-			return useAuth();
-		}, { wrapper });
+		const { result } = renderHook(
+			function useAuthHook() {
+				return useAuth();
+			},
+			{ wrapper },
+		);
 
 		await act(function () {
 			return result.current.signoutSilent();
@@ -232,16 +251,21 @@ describe('AuthProvider', function () {
 	});
 
 	it('should get the user', async function () {
-		const mockGetUser = vi.mocked(UserManager.prototype.getUser).mockImplementation(function resolveUser() {
-			return new Promise(function (resolve) {
-				resolve(user);
+		const mockGetUser = vi
+			.mocked(UserManager.prototype.getUser)
+			.mockImplementation(function resolveUser() {
+				return new Promise(function (resolve) {
+					resolve(user);
+				});
 			});
-		});
 
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function useAuthHook() {
-			return useAuth();
-		}, { wrapper });
+		const { result } = renderHook(
+			function useAuthHook() {
+				return useAuth();
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(UserManager.prototype.getUser).toHaveBeenCalled();
@@ -263,9 +287,12 @@ describe('AuthProvider', function () {
 		});
 
 		const result = await act(async function () {
-			const rendered = renderHook(function useAuthHook() {
-				return useAuth();
-			}, { wrapper });
+			const rendered = renderHook(
+				function useAuthHook() {
+					return useAuth();
+				},
+				{ wrapper },
+			);
 			return rendered.result;
 		});
 
@@ -295,9 +322,12 @@ describe('AuthProvider', function () {
 		});
 
 		const result = await act(async function () {
-			const rendered = renderHook(function useAuthHook() {
-				return useAuth();
-			}, { wrapper });
+			const rendered = renderHook(
+				function useAuthHook() {
+					return useAuth();
+				},
+				{ wrapper },
+			);
 			return rendered.result;
 		});
 
@@ -344,9 +374,12 @@ describe('AuthProvider', function () {
 
 	it('should set isLoading to false after initializing', async function () {
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function useAuthHook() {
-			return useAuth();
-		}, { wrapper });
+		const { result } = renderHook(
+			function useAuthHook() {
+				return useAuth();
+			},
+			{ wrapper },
+		);
 		expect(result.current.isLoading).toBe(true);
 
 		await waitFor(function () {
@@ -362,9 +395,12 @@ describe('AuthProvider', function () {
 			}),
 		);
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function useAuthHook() {
-			return useAuth();
-		}, { wrapper });
+		const { result } = renderHook(
+			function useAuthHook() {
+				return useAuth();
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current.isLoading).toBe(false);
@@ -399,9 +435,12 @@ describe('AuthProvider', function () {
 		const wrapper = createWrapper({ ...settingsStub });
 
 		const result = await act(async function () {
-			const rendered = renderHook(function useAuthHook() {
-				return useAuth();
-			}, { wrapper });
+			const rendered = renderHook(
+				function useAuthHook() {
+					return useAuth();
+				},
+				{ wrapper },
+			);
 			return rendered.result;
 		});
 
@@ -433,9 +472,12 @@ describe('AuthProvider', function () {
 	it('should not update context value after rerender without state changes', async function () {
 		const wrapper = createWrapper({ ...settingsStub });
 		const { result, rerender } = await act(async function () {
-			return renderHook(function useAuthHook() {
-				return useAuth();
-			}, { wrapper });
+			return renderHook(
+				function useAuthHook() {
+					return useAuth();
+				},
+				{ wrapper },
+			);
 		});
 		const memoized = result.current;
 

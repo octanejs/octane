@@ -1,6 +1,6 @@
 // Per packages/oidc-context/upstream/canonical/test/useAutoSignin.test.tsx
 import { renderHook, waitFor } from '@octanejs/testing-library';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UserManager } from 'oidc-client-ts';
 import { useAutoSignin } from '../src/useAutoSignin';
 import type { AuthProviderProps } from '../src';
@@ -17,11 +17,18 @@ const settingsStub: AuthProviderProps = {
 };
 
 describe('useAutoSignin', function () {
+	beforeEach(function () {
+		vi.clearAllMocks();
+	});
+
 	it('should auto sign in using default signinRedirect', async function () {
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function hook() {
-			return useAutoSignin();
-		}, { wrapper });
+		const { result } = renderHook(
+			function hook() {
+				return useAutoSignin();
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current).toBeDefined();
@@ -33,9 +40,12 @@ describe('useAutoSignin', function () {
 
 	it('should auto sign in using provided method signinRedirect', async function () {
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function hook() {
-			return useAutoSignin({ signinMethod: 'signinRedirect' });
-		}, { wrapper });
+		const { result } = renderHook(
+			function hook() {
+				return useAutoSignin({ signinMethod: 'signinRedirect' });
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current).toBeDefined();
@@ -47,9 +57,12 @@ describe('useAutoSignin', function () {
 
 	it('should auto sign in using provided method signinPopup', async function () {
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function hook() {
-			return useAutoSignin({ signinMethod: 'signinPopup' });
-		}, { wrapper });
+		const { result } = renderHook(
+			function hook() {
+				return useAutoSignin({ signinMethod: 'signinPopup' });
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current).toBeDefined();
@@ -61,9 +74,12 @@ describe('useAutoSignin', function () {
 
 	it('should auto sign and not call signinRedirect if other method provided', async function () {
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function hook() {
-			return useAutoSignin({ signinMethod: 'signinPopup' });
-		}, { wrapper });
+		const { result } = renderHook(
+			function hook() {
+				return useAutoSignin({ signinMethod: 'signinPopup' });
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current).toBeDefined();
@@ -79,12 +95,15 @@ describe('useAutoSignin', function () {
 			redirect_uri: 'custom_redirect',
 			state: 'custom_state',
 		};
-		const { result } = renderHook(function hook() {
-			return useAutoSignin({
-				signinMethod: 'signinRedirect',
-				signinArgs: redirectArgs,
-			});
-		}, { wrapper });
+		const { result } = renderHook(
+			function hook() {
+				return useAutoSignin({
+					signinMethod: 'signinRedirect',
+					signinArgs: redirectArgs,
+				});
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current).toBeDefined();
@@ -103,12 +122,15 @@ describe('useAutoSignin', function () {
 			},
 			extraQueryParams: { foo: 'bar' },
 		};
-		const { result } = renderHook(function hook() {
-			return useAutoSignin({
-				signinMethod: 'signinPopup',
-				signinArgs: popupArgs,
-			});
-		}, { wrapper });
+		const { result } = renderHook(
+			function hook() {
+				return useAutoSignin({
+					signinMethod: 'signinPopup',
+					signinArgs: popupArgs,
+				});
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current).toBeDefined();
@@ -123,11 +145,14 @@ describe('useAutoSignin', function () {
 			redirect_uri: 'default_method_redirect',
 			extraQueryParams: { foo: 'bar' },
 		};
-		const { result } = renderHook(function hook() {
-			return useAutoSignin({
-				signinArgs: redirectArgs,
-			});
-		}, { wrapper });
+		const { result } = renderHook(
+			function hook() {
+				return useAutoSignin({
+					signinArgs: redirectArgs,
+				});
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current).toBeDefined();
@@ -138,11 +163,14 @@ describe('useAutoSignin', function () {
 
 	it('should call signinRedirect without signinArgs when no signinArgs provided', async function () {
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function hook() {
-			return useAutoSignin({
-				signinMethod: 'signinRedirect',
-			});
-		}, { wrapper });
+		const { result } = renderHook(
+			function hook() {
+				return useAutoSignin({
+					signinMethod: 'signinRedirect',
+				});
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current).toBeDefined();
@@ -153,11 +181,14 @@ describe('useAutoSignin', function () {
 
 	it('should call signinPopup without signinArgs when no signinArgs provided', async function () {
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function hook() {
-			return useAutoSignin({
-				signinMethod: 'signinPopup',
-			});
-		}, { wrapper });
+		const { result } = renderHook(
+			function hook() {
+				return useAutoSignin({
+					signinMethod: 'signinPopup',
+				});
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current).toBeDefined();

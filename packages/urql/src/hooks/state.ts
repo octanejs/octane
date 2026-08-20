@@ -10,10 +10,7 @@ export const initialState = {
 	operation: undefined,
 };
 
-function areOperationsEqual(
-	a: { key: number } | undefined,
-	b: { key: number } | undefined,
-) {
+function areOperationsEqual(a: { key: number } | undefined, b: { key: number } | undefined) {
 	return a === b || !!(a && b && a.key === b.key);
 }
 

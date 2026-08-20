@@ -101,9 +101,7 @@ export function useQuery<Data = any, Variables extends AnyVariables = AnyVariabl
 					currentSource,
 					takeWhile(function keepTaking() {
 						return (
-							(currentSuspense && !resolve) ||
-							!result ||
-							('hasNext' in result && result.hasNext)
+							(currentSuspense && !resolve) || !result || ('hasNext' in result && result.hasNext)
 						);
 					}),
 					subscribe(function onResult(_result) {

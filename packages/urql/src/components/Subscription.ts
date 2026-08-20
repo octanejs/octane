@@ -19,8 +19,10 @@ export type SubscriptionProps<
 	children(arg: SubscriptionState<Result, Variables>): OctaneNode;
 };
 
-export interface SubscriptionState<Data = any, Variables extends AnyVariables = AnyVariables>
-	extends UseSubscriptionState<Data, Variables> {
+export interface SubscriptionState<
+	Data = any,
+	Variables extends AnyVariables = AnyVariables,
+> extends UseSubscriptionState<Data, Variables> {
 	executeSubscription: UseSubscriptionExecute;
 }
 

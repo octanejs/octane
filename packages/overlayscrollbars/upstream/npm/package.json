@@ -1,0 +1,50 @@
+{
+  "name": "overlayscrollbars-react",
+  "version": "0.5.6",
+  "description": "OverlayScrollbars for React.",
+  "author": "Rene Haas | KingSora",
+  "license": "MIT",
+  "homepage": "https://kingsora.github.io/OverlayScrollbars",
+  "bugs": "https://github.com/KingSora/OverlayScrollbars/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KingSora/OverlayScrollbars.git",
+    "directory": "packages/overlayscrollbars-react"
+  },
+  "keywords": [
+    "overlayscrollbars",
+    "react",
+    "component",
+    "hook",
+    "hooks",
+    "styleable",
+    "custom",
+    "scrollbar",
+    "scrollbars",
+    "scroll"
+  ],
+  "main": "overlayscrollbars-react.cjs.js",
+  "module": "overlayscrollbars-react.esm.js",
+  "types": "types/overlayscrollbars-react.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./types/overlayscrollbars-react.d.mts",
+        "default": "./overlayscrollbars-react.mjs"
+      },
+      "require": {
+        "types": "./types/overlayscrollbars-react.d.cts",
+        "default": "./overlayscrollbars-react.cjs"
+      },
+      "default": {
+        "types": "./types/overlayscrollbars-react.d.ts",
+        "default": "./overlayscrollbars-react.cjs.js"
+      }
+    }
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "overlayscrollbars": "^2.0.0"
+  },
+  "sideEffects": false
+}

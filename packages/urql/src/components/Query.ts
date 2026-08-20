@@ -12,8 +12,10 @@ export type QueryProps<Data = any, Variables extends AnyVariables = AnyVariables
 	children(arg: QueryState<Data, Variables>): OctaneNode;
 };
 
-export interface QueryState<Data = any, Variables extends AnyVariables = AnyVariables>
-	extends UseQueryState<Data, Variables> {
+export interface QueryState<
+	Data = any,
+	Variables extends AnyVariables = AnyVariables,
+> extends UseQueryState<Data, Variables> {
 	executeQuery: UseQueryExecute;
 }
 

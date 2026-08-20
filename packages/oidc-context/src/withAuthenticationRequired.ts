@@ -50,12 +50,7 @@ export function withAuthenticationRequired<P extends object>(
 
 		useEffect(
 			function redirectAnonymous() {
-				if (
-					hasAuthParams() ||
-					auth.isLoading ||
-					auth.activeNavigator ||
-					auth.isAuthenticated
-				) {
+				if (hasAuthParams() || auth.isLoading || auth.activeNavigator || auth.isAuthenticated) {
 					return;
 				}
 				void (async function signin() {

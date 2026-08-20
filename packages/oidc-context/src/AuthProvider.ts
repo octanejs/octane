@@ -15,7 +15,13 @@ import { AuthContext } from './AuthContext';
 import { type ErrorContext, initialAuthState } from './AuthState';
 import { splitSlot, subSlot } from './internal';
 import { reducer } from './reducer';
-import { hasAuthParams, normalizeError, renewSilentError, signinError, signoutError } from './utils';
+import {
+	hasAuthParams,
+	normalizeError,
+	renewSilentError,
+	signinError,
+	signoutError,
+} from './utils';
 
 /**
  * @public
@@ -132,9 +138,7 @@ function bindNavigatorMethod(userManager: UserManager, key: NavigatorKey, dispat
 	if (!method) {
 		return unsupportedEnvironment(key);
 	}
-	return async function navigator(
-		args: ProcessResourceOwnerPasswordCredentialsArgs & never[],
-	) {
+	return async function navigator(args: ProcessResourceOwnerPasswordCredentialsArgs & never[]) {
 		dispatch({
 			type: 'NAVIGATOR_INIT',
 			method: key,
@@ -180,14 +184,17 @@ export function AuthProvider(props: AuthProviderProps, ...rest: unknown[]): Octa
 	delete (userManagerSettings as AuthProviderBaseProps).onRemoveUser;
 	delete (userManagerSettings as AuthProviderUserManagerProps).userManager;
 
-	const [userManager] = useState(function createManager() {
-		return (
-			userManagerProp ??
-			(UserManagerImpl
-				? new UserManagerImpl(userManagerSettings as UserManagerSettings)
-				: ({ settings: userManagerSettings } as UserManager))
-		);
-	}, subSlot(slot, 'manager'));
+	const [userManager] = useState(
+		function createManager() {
+			return (
+				userManagerProp ??
+				(UserManagerImpl
+					? new UserManagerImpl(userManagerSettings as UserManagerSettings)
+					: ({ settings: userManagerSettings } as UserManager))
+			);
+		},
+		subSlot(slot, 'manager'),
+	);
 
 	const [state, dispatch] = useReducer(reducer, initialAuthState, subSlot(slot, 'state'));
 	const userManagerContext = useMemo(

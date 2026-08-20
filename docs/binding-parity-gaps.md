@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**0 active pin(s) across 82 binding package(s).**
+**0 active pin(s) across 90 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -31,6 +31,7 @@ surface and evidence.
 | `@octanejs/dropzone` | 0 |
 | `@octanejs/electron` | 0 |
 | `@octanejs/embla-carousel` | 0 |
+| `@octanejs/filepond` | 0 |
 | `@octanejs/floating-ui` | 0 |
 | `@octanejs/gsap` | 0 |
 | `@octanejs/hook-form` | 0 |
@@ -41,6 +42,7 @@ surface and evidence.
 | `@octanejs/intersection-observer` | 0 |
 | `@octanejs/jotai` | 0 |
 | `@octanejs/lexical` | 0 |
+| `@octanejs/lingui` | 0 |
 | `@octanejs/livestore` | 0 |
 | `@octanejs/lucide` | 0 |
 | `@octanejs/mantine-hooks` | 0 |
@@ -50,6 +52,8 @@ surface and evidence.
 | `@octanejs/monaco-editor` | 0 |
 | `@octanejs/motion` | 0 |
 | `@octanejs/nuqs` | 0 |
+| `@octanejs/oidc-context` | 0 |
+| `@octanejs/overlayscrollbars` | 0 |
 | `@octanejs/pdf` | 0 |
 | `@octanejs/phosphor-icons` | 0 |
 | `@octanejs/popper` | 0 |
@@ -61,8 +65,10 @@ surface and evidence.
 | `@octanejs/redux` | 0 |
 | `@octanejs/redux-toolkit` | 0 |
 | `@octanejs/remix-router` | 0 |
+| `@octanejs/rive` | 0 |
 | `@octanejs/rxjs` | 0 |
 | `@octanejs/shadcn` | 0 |
+| `@octanejs/signals-react` | 0 |
 | `@octanejs/solana-react` | 0 |
 | `@octanejs/sonner` | 0 |
 | `@octanejs/spring` | 0 |
@@ -89,6 +95,8 @@ surface and evidence.
 | `@octanejs/three` | 0 |
 | `@octanejs/tiptap` | 0 |
 | `@octanejs/transition-group` | 0 |
+| `@octanejs/unhead` | 0 |
+| `@octanejs/urql` | 0 |
 | `@octanejs/usehooks-ts` | 0 |
 | `@octanejs/valtio` | 0 |
 | `@octanejs/vaul` | 0 |

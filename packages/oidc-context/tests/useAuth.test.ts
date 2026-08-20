@@ -17,9 +17,12 @@ const settingsStub = {
 describe('useAuth', function () {
 	it('should provide the auth context', async function () {
 		const wrapper = createWrapper({ ...settingsStub });
-		const { result } = renderHook(function useAuthHook() {
-			return useAuth();
-		}, { wrapper });
+		const { result } = renderHook(
+			function useAuthHook() {
+				return useAuth();
+			},
+			{ wrapper },
+		);
 
 		await waitFor(function () {
 			expect(result.current).toBeDefined();

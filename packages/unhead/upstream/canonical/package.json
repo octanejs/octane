@@ -1,0 +1,146 @@
+{
+  "name": "@unhead/react",
+  "type": "module",
+  "version": "3.3.2",
+  "description": "Full-stack <head> manager built for React.",
+  "author": "Harlan Wilton <harlan@harlanzw.com>",
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/harlan-zw",
+  "homepage": "https://unhead.unjs.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unjs/unhead.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/unjs/unhead/issues"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.mjs"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.mjs"
+    },
+    "./stream/server": {
+      "types": "./dist/stream/server.d.ts",
+      "default": "./dist/stream/server.mjs"
+    },
+    "./stream/client": {
+      "types": "./dist/stream/client.d.ts",
+      "default": "./dist/stream/client.mjs"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "default": "./dist/utils.mjs"
+    },
+    "./plugins": {
+      "types": "./dist/plugins.d.ts",
+      "default": "./dist/plugins.mjs"
+    },
+    "./bundler": {
+      "types": "./dist/bundler.d.ts",
+      "default": "./dist/bundler.mjs"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.mjs"
+    },
+    "./stream/vite": {
+      "types": "./dist/stream/vite.d.ts",
+      "default": "./dist/stream/vite.mjs"
+    },
+    "./helmet": {
+      "types": "./dist/helmet.d.ts",
+      "default": "./dist/helmet.mjs"
+    }
+  },
+  "main": "dist/index.mjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "server": [
+        "dist/server"
+      ],
+      "client": [
+        "dist/client"
+      ],
+      "stream/server": [
+        "dist/stream/server"
+      ],
+      "stream/client": [
+        "dist/stream/client"
+      ],
+      "plugins": [
+        "dist/plugins"
+      ],
+      "utils": [
+        "dist/utils"
+      ],
+      "bundler": [
+        "dist/bundler"
+      ],
+      "vite": [
+        "dist/vite"
+      ],
+      "stream/vite": [
+        "dist/stream/vite"
+      ],
+      "helmet": [
+        "dist/helmet"
+      ]
+    }
+  },
+  "files": [
+    "*.d.ts",
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "stub": "unbuild --stub",
+    "export:sizes": "npx export-size . -r",
+    "test:attw": "attw --pack",
+    "prepack": "pnpm run build"
+  },
+  "peerDependencies": {
+    "react": ">=19.2.4",
+    "vite": ">=6.4.2",
+    "webpack": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    },
+    "webpack": {
+      "optional": true
+    }
+  },
+  "build": {
+    "external": [
+      "react"
+    ]
+  },
+  "dependencies": {
+    "@unhead/bundler": "workspace:*",
+    "magic-string": "catalog:",
+    "oxc-walker": "catalog:",
+    "unhead": "workspace:*",
+    "unplugin": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/react": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "vite": "catalog:"
+  }
+}

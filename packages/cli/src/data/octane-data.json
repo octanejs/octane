@@ -248,6 +248,24 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/filepond",
+      "version": "0.0.1",
+      "category": "Forms and content",
+      "upstream": {
+        "package": "react-filepond",
+        "version": "7.1.3",
+        "source": "https://github.com/pqina/react-filepond/tree/dfa6a7b4fc5dad12b08ca2732d7e0d78b5a74a95",
+        "license": "MIT"
+      },
+      "surface": "react-filepond 7.1.3 FilePond wrapper over filepond@4.32.12, plus registerPlugin and FileStatus re-exports. Imperative pond APIs are exposed on a ref handle { pond } rather than a class instance.",
+      "divergences": [
+        "FilePond is a function component; there is no class instance.",
+        "Imperative pond methods are on the ref handle { pond } (and copied onto that handle), not on a class component instance."
+      ],
+      "ssr": "The wrapper and file input render on the server. create() runs in useLayoutEffect on the client when filepond.supported() is true, and destroy() runs on unmount.",
+      "verified": "2026-08-20"
+    },
+    {
       "name": "@octanejs/floating-ui",
       "version": "0.1.40",
       "category": "UI and interaction",
@@ -389,6 +407,28 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/lingui",
+      "version": "0.0.1",
+      "category": "Forms and content",
+      "upstream": {
+        "package": "@lingui/react",
+        "version": "6.6.0",
+        "source": "https://github.com/lingui/js-lingui/tree/665a19815378dedd89346bb7707bdb0e28df79e7",
+        "license": "MIT"
+      },
+      "surface": "Client runtime surface at @lingui/react 6.6.0: I18nProvider, useLingui, LinguiContext, Trans, and TransNoContext over @lingui/core@6.6.0. ./macro, ./server setI18n/getI18n, and react-server TransRsc are explicit gaps.",
+      "divergences": [
+        "Public node and component types use OctaneNode and do not import React.",
+        "Locale subscription uses octane useSyncExternalStore rather than use-sync-external-store.",
+        "Trans component class components are not supported; pass a function component.",
+        "./macro and @lingui/babel-plugin-lingui-macro are compile-time and are not ported.",
+        "./server setI18n/getI18n depends on React.cache / RSC and is not ported.",
+        "react-server index-rsc / TransRsc is not ported."
+      ],
+      "ssr": "I18nProvider reads the i18n snapshot through useSyncExternalStore (client and server snapshot are the same). Render is null until i18n.activate has set a locale. RSC setI18n/getI18n is an explicit gap.",
+      "verified": "2026-08-20"
+    },
+    {
       "name": "@octanejs/livestore",
       "version": "0.0.11",
       "category": "AI, data, and routing",
@@ -517,6 +557,34 @@
       ],
       "ssr": "The react-free server entry has a dedicated Node lane for parsing and serialising search params. Client hydration remains outside the supported evidence claim.",
       "verified": "2026-08-02"
+    },
+    {
+      "name": "@octanejs/oidc-context",
+      "version": "0.0.1",
+      "category": "AI, data, and routing",
+      "upstream": { "package": "react-oidc-context", "version": "3.3.1" },
+      "surface": "Complete against react-oidc-context 3.3.1: AuthContext, AuthProvider, AuthState/ErrorContext, reducer, useAuth, useAutoSignin, hasAuthParams, withAuth, withAuthenticationRequired. oidc-client-ts remains a peer; its source is not vendored.",
+      "divergences": [
+        "Octane has no class components, so withAuth/withAuthenticationRequired wrap function components via createElement rather than JSX class components.",
+        "Octane has no StrictMode double-invoke; AuthProvider still initializes once via didInitialize.",
+        "HOCs stay functions and render with createElement instead of JSX."
+      ],
+      "ssr": "AuthProvider constructs a settings-only UserManager stub when window is undefined and leaves navigator methods throwing until a custom UserManager is supplied or the client hydrates. Initial state is isLoading true / isAuthenticated false.",
+      "verified": "2026-08-20"
+    },
+    {
+      "name": "@octanejs/overlayscrollbars",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": { "package": "overlayscrollbars-react", "version": "0.5.6" },
+      "surface": "Complete against overlayscrollbars-react 0.5.6: OverlayScrollbarsComponent and useOverlayScrollbars over the overlayscrollbars ^2 peer. Body-host document takeover tests are an explicit gap.",
+      "divergences": [
+        "Octane has no forwardRef; OverlayScrollbarsComponent takes ref as a prop and exposes { osInstance, getElement } through useImperativeHandle.",
+        "The root element prop is a string host tag rendered with createElement, not a generic React ElementType.",
+        "Public children types use OctaneNode and do not import React."
+      ],
+      "ssr": "useOverlayScrollbars defers initialization with no-op idle/rAF helpers when window is undefined. OverlayScrollbarsComponent still renders the host tag and contents wrapper; the overlayscrollbars instance is created in an effect on the client.",
+      "verified": "2026-08-20"
     },
     {
       "name": "@octanejs/pdf",
@@ -673,6 +741,28 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/rive",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "@rive-app/react-canvas",
+        "version": "4.32.0",
+        "source": "https://github.com/rive-app/rive-react/tree/af85cadd907fd93c950acc5a2338d275f80dfe2d",
+        "tagCommit": "af85cadd907fd93c950acc5a2338d275f80dfe2d",
+        "integrity": "sha512-3r+9xZmdPZTLGNhHq3QuFKVtkPCRnpx6icSqIRUnpGDOmA1U3eADb2crSuwh9voXtHJ0ddexagF+zYmSIC+1ug==",
+        "shasum": "59198561130aceac35bf0f754fc0884ce989fc5b",
+        "license": "MIT"
+      },
+      "surface": "Official @rive-app/react-canvas 4.32.0 hook and Rive canvas-wrapper surface over the unchanged @rive-app/canvas@2.40.0 runtime, with Octane createElement host output and manual hook-slot forwarding.",
+      "divergences": [
+        "JSX in useRive / Rive is rewritten with Octane createElement. There is no forwardRef.",
+        "Hooks are authored in plain .ts and forward compiler-injected trailing slots through splitSlot / subSlot.",
+        "jsdom cannot run Rive WASM; committed tests are contract-level (export surface, pre-load useRive, canvas wrapper, null state-machine input) rather than a full runtime load."
+      ],
+      "ssr": "Initial hook state is null / idle. Effects construct Rive only after a canvas is attached on the client.",
+      "verified": "2026-08-20"
+    },
+    {
       "name": "@octanejs/rxjs",
       "version": "0.1.20",
       "category": "Shared state",
@@ -714,6 +804,21 @@
       ],
       "ssr": "Tier 1 is fully server-rendered and tested (17 families through renderToString with no browser globals, including Slot-composed hosts), with hydration adoption pinned for representative shapes (plain host, Button-asChild anchor, nested Table) — zero mismatch, preserved node identity. Tier 2's portal-free components (Checkbox, RadioGroup, Switch, Slider, Tabs, Toggle, ToggleGroup, Accordion, Collapsible, AspectRatio, Progress) are server-rendered and tested. Field is SSR-safe (no portals/browser globals); Sidebar server-renders its static desktop branch (useIsMobile is false on the server; the mobile Sheet branch and tooltip portals are client-only). Portal-backed overlays/menus/Select are excluded until the radix binding supports overlay SSR; ScrollArea awaits verification of its viewport style injection on the server.",
       "verified": "2026-08-02"
+    },
+    {
+      "name": "@octanejs/signals-react",
+      "version": "0.0.1",
+      "category": "Shared state",
+      "upstream": { "package": "@preact/signals-react", "version": "3.12.0" },
+      "surface": "Client runtime surface at @preact/signals-react 3.12.0: core re-exports, useSignal/useComputed/useSignalEffect/useModel, ./runtime useSignals, and ./utils Show/For/useLiveSignal/useSignalRef over @preact/signals-core@1.14.4. wrapJsx, Signal-as-ReactElement, and the Babel react-transform plugin are explicit gaps.",
+      "divergences": [
+        "wrapJsx is a no-op because Octane has no jsx-runtime to monkeypatch.",
+        "Signal.prototype is not given React $$typeof / type / props; read .value instead of rendering a Signal as a child.",
+        "Babel @preact/signals-react-transform auto-tracking is not ported; call useSignals() in components that read signals during render.",
+        "Public utils children types use OctaneNode and do not import React."
+      ],
+      "ssr": "useSignals installs an empty effect store when window is undefined so server render does not subscribe. useSignal/useComputed/useModel still allocate. Client hydration starts tracking in useSyncExternalStore + layout cleanup.",
+      "verified": "2026-08-20"
     },
     {
       "name": "@octanejs/solana-react",
@@ -1096,6 +1201,39 @@
       ],
       "ssr": "Transition state and wrapper markup render on the server; DOM class mutation begins only after client mount and requires nodeRef.",
       "verified": "2026-08-09"
+    },
+    {
+      "name": "@octanejs/unhead",
+      "version": "0.0.1",
+      "category": "Styling, tests, and devtools",
+      "upstream": {
+        "package": "@unhead/react",
+        "version": "3.3.2",
+        "source": "https://github.com/unjs/unhead/tree/ea4d6e207cbe50694e8ee53df08b1440a3a27c8c/packages/react",
+        "license": "MIT"
+      },
+      "surface": "Runtime @unhead/react hooks, Head, Helmet, and client/server UnheadProvider over the unchanged unhead@3.3.2 core. ./utils is a verbatim unhead/utils re-export.",
+      "divergences": [
+        "Head and Helmet cannot inspect TSRX block children; consumers pass children={createElement(...)} or an array of createElement host tags.",
+        "./bundler, ./vite, ./stream/vite, and ./plugins are compiler/bundler plugins and are not ported.",
+        "./stream/server and ./stream/client wrap React streaming (renderToPipeableStream) and are not ported."
+      ],
+      "ssr": "Supported. Server UnheadProvider takes a required value. Client entries are created in useEffect and disposed on unmount; SSR still pushes during render when head.ssr is set.",
+      "verified": "2026-08-20"
+    },
+    {
+      "name": "@octanejs/urql",
+      "version": "0.0.1",
+      "category": "AI, data, and routing",
+      "upstream": { "package": "urql", "version": "5.0.3" },
+      "surface": "Complete against urql 5.0.3 React binding: re-exports @urql/core@6.0.3; ports Context/Provider/Consumer/useClient, useQuery/useMutation/useSubscription/useRequest, state/cache helpers, and Query/Mutation/Subscription render-prop components.",
+      "divergences": [
+        "Octane has no Context.Consumer on the context object; Consumer is a function component that reads with useContext and calls children(client).",
+        "Suspense still throws a Promise like upstream rather than wrapping it in Octane use(), so cache and replay timing stay aligned with the pinned React binding.",
+        "Render-prop components stay functions and return children(...) rather than JSX."
+      ],
+      "ssr": "No dedicated Octane SSR prepass. The Client/Provider pair is framework-neutral and usable on the server; upstream react-ssr-prepass coverage is out of scope.",
+      "verified": "2026-08-20"
     },
     {
       "name": "@octanejs/usehooks-ts",

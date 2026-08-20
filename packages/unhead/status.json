@@ -1,0 +1,20 @@
+{
+  "upstream": {
+    "package": "@unhead/react",
+    "version": "3.3.2",
+    "source": "https://github.com/unjs/unhead/tree/ea4d6e207cbe50694e8ee53df08b1440a3a27c8c/packages/react",
+    "license": "MIT"
+  },
+  "surface": "Runtime @unhead/react hooks, Head, Helmet, and client/server UnheadProvider over the unchanged unhead@3.3.2 core. ./utils is a verbatim unhead/utils re-export.",
+  "divergences": [
+    "Head and Helmet cannot inspect TSRX block children; consumers pass children={createElement(...)} or an array of createElement host tags.",
+    "./bundler, ./vite, ./stream/vite, and ./plugins are compiler/bundler plugins and are not ported.",
+    "./stream/server and ./stream/client wrap React streaming (renderToPipeableStream) and are not ported."
+  ],
+  "ssr": "Supported. Server UnheadProvider takes a required value. Client entries are created in useEffect and disposed on unmount; SSR still pushes during render when head.ssr is set.",
+  "verified": "2026-08-20",
+  "notes": [
+    "Pinned to @unhead/react@3.3.2 / unhead@3.3.2.",
+    "Verified with UnheadProvider + useHead title updates, Head createElement children, useSeoMeta, and unmount dispose."
+  ]
+}

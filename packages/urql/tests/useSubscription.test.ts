@@ -28,7 +28,10 @@ function SubscriptionUser(props: {
 	context?: Partial<OperationContext>;
 	pause?: boolean;
 }): OctaneNode {
-	const pair = useSubscription({ query: props.q, context: props.context, pause: props.pause }, props.handler);
+	const pair = useSubscription(
+		{ query: props.q, context: props.context, pause: props.pause },
+		props.handler,
+	);
 	state = pair[0];
 	execute = pair[1];
 	return createElement('p', null, state.data);

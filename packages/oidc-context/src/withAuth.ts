@@ -12,10 +12,7 @@ export function withAuth<P>(
 	Component: ComponentBody<P & { auth: AuthContextProps }>,
 ): ComponentBody<Omit<P, keyof AuthContextProps>> {
 	const displayName = `withAuth(${Component.displayName || Component.name})`;
-	function WithAuth(
-		props: Omit<P, keyof AuthContextProps>,
-		...rest: unknown[]
-	): OctaneNode {
+	function WithAuth(props: Omit<P, keyof AuthContextProps>, ...rest: unknown[]): OctaneNode {
 		const [, slot] = splitSlot(rest);
 		const auth = useAuth(subSlot(slot, 'auth'));
 		return createElement(Component, { ...(props as P), auth });

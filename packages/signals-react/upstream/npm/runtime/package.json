@@ -1,0 +1,30 @@
+{
+  "name": "@preact/signals-react-runtime",
+  "description": "Sub package for @preact/signals-react that contains the pure runtime functions",
+  "private": true,
+  "amdName": "reactSignalsRuntime",
+  "main": "dist/runtime.js",
+  "module": "dist/runtime.module.js",
+  "unpkg": "dist/runtime.min.js",
+  "types": "dist/index.d.ts",
+  "source": "src/index.ts",
+  "mangle": "../../../mangle.json",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "browser": "./dist/runtime.module.js",
+      "import": "./dist/runtime.mjs",
+      "require": "./dist/runtime.js"
+    }
+  },
+  "dependencies": {
+    "@preact/signals-core": "workspace:^1.14.4",
+    "use-sync-external-store": "^1.2.0"
+  },
+  "devDependencies": {
+    "@preact/signals-react": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^16.14.0 || 17.x || 18.x"
+  }
+}

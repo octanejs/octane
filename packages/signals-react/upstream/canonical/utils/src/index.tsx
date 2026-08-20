@@ -1,0 +1,127 @@
+import { ReadonlySignal, Signal, signal } from "@preact/signals-core";
+import { useSignal } from "@preact/signals-react";
+import { useSignals } from "@preact/signals-react/runtime";
+import {
+	Fragment,
+	createElement,
+	useMemo,
+	ReactNode,
+	useLayoutEffect,
+	useEffect,
+} from "react";
+
+interface ShowProps<T = boolean> {
+	when: Signal<T> | ReadonlySignal<T> | (() => T);
+	fallback?: ReactNode | (() => ReactNode);
+	children: ReactNode | ((value: NonNullable<T>) => ReactNode);
+}
+
+const Item = (props: any) => {
+	useSignals();
+	return typeof props.children === "function"
+		? props.children(props.v, props.i ? props.i.value : undefined)
+		: props.children;
+};
+
+Item.displayName = "Item";
+
+export function Show<T = boolean>(props: ShowProps<T>): JSX.Element | null {
+	useSignals();
+	const value =
+		typeof props.when === "function" ? props.when() : props.when.value;
+	if (!value) {
+		const fallback = props.fallback;
+		return (
+			typeof fallback === "function" ? fallback() : fallback
+		) as JSX.Element | null;
+	}
+	return <Item v={value} children={props.children} />;
+}
+
+Show.displayName = "Show";
+
+type ForEach<T> =
+	| ReadonlyArray<T>
+	| Signal<ReadonlyArray<T>>
+	| ReadonlySignal<ReadonlyArray<T>>;
+
+interface ForProps<T> {
+	each: ForEach<T> | (() => ForEach<T>);
+	fallback?: ReactNode | (() => ReactNode);
+	getKey?: (item: T, index: number) => string | number;
+	children: (value: T, index: number) => ReactNode;
+}
+
+export function For<T>(props: ForProps<T>): JSX.Element | null {
+	useSignals();
+	const cache = useMemo(() => new Map(), []);
+	const list = (typeof props.each === "function" ? props.each() : props.each) as
+		| Signal<ReadonlyArray<T>>
+		| ReadonlyArray<T>;
+
+	const listValue = list instanceof Signal ? list.value : list;
+
+	if (!listValue.length) {
+		const fallback = props.fallback;
+		return (
+			typeof fallback === "function" ? fallback() : fallback
+		) as JSX.Element | null;
+	}
+
+	const removed = new Set(cache.keys());
+
+	const items = listValue.map((value, index) => {
+		removed.delete(value);
+		let entry = cache.get(value);
+		if (!entry) {
+			const i = signal(index);
+			const key = props.getKey ? props.getKey(value, index) : index;
+			const vnode = (
+				<Item v={value} key={key} i={i} children={props.children} />
+			);
+			entry = { vnode, i };
+			cache.set(value, entry);
+		} else if (entry.i.peek() !== index) {
+			// Index changed (e.g. an earlier item was removed/reordered). Push the
+			// new index through the per-item signal so the cached vnode is reused
+			// and the child re-renders reactively instead of being recreated.
+			entry.i.value = index;
+		}
+		return entry.vnode;
+	});
+
+	removed.forEach(value => {
+		cache.delete(value);
+	});
+
+	return createElement(Fragment, { children: items });
+}
+
+For.displayName = "For";
+
+const useIsomorphicLayoutEffect =
+	typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+export function useLiveSignal<T>(value: T): Signal<T> {
+	const s = useSignal(value);
+	useIsomorphicLayoutEffect(() => {
+		if (s.peek() !== value) s.value = value;
+	}, [value]);
+	return s;
+}
+
+export function useSignalRef<T>(value: T) {
+	const ref = useSignal(value) as Signal<T> & { current: T };
+	if (!("current" in ref))
+		Object.defineProperty(ref, "current", refSignalProto);
+	return ref;
+}
+const refSignalProto = {
+	configurable: true,
+	get(this: Signal) {
+		return this.value;
+	},
+	set(this: Signal, v: any) {
+		this.value = v;
+	},
+};

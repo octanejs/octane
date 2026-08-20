@@ -1,0 +1,78 @@
+{
+  "name": "rive-react",
+  "version": "4.32.0",
+  "description": "React wrapper around the rive-js library",
+  "main": "dist/index.js",
+  "typings": "dist/types/index.d.ts",
+  "files": [
+    "dist/**"
+  ],
+  "scripts": {
+    "test": "jest",
+    "build": "bunchee src/index.ts -m --no-sourcemap",
+    "dev": "watch 'npm run build' src",
+    "lint": "eslint -c .eslintrc.js 'src/**/*{.ts,.tsx}'",
+    "format": "prettier --write src",
+    "types:check": "tsc --noEmit",
+    "release": "release-it",
+    "release:patch": "npm run release -- --ci",
+    "release:minor": "npm run release -- minor --ci",
+    "release:major": "npm run release -- major --ci",
+    "setup-builds": "./scripts/build.sh",
+    "setup-packages": "./scripts/setup_all_packages.sh",
+    "bump-versions": "./scripts/bump_all_versions.sh $npm_package_version",
+    "publish:all": "./scripts/publish_all.sh --access public",
+    "storybook": "yarn --cwd examples storybook"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rive-app/rive-react.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rive-app/rive-react/issues"
+  },
+  "homepage": "https://github.com/rive-app/rive-react#readme",
+  "dependencies": {
+    "@rive-app/canvas": "2.40.0",
+    "@rive-app/canvas-lite": "2.40.0",
+    "@rive-app/webgl2": "2.40.0"
+  },
+  "peerDependencies": {
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.18.0",
+    "@testing-library/jest-dom": "^5.13.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/jest": "^27.0.3",
+    "@types/node": "^18.17.0",
+    "@types/offscreencanvas": "^2019.6.4",
+    "@types/react": "^18.0.0",
+    "@types/testing-library__jest-dom": "^5.9.5",
+    "@typescript-eslint/eslint-plugin": "^5.7.0",
+    "@typescript-eslint/parser": "^5.7.0",
+    "auto-changelog": "^2.3.0",
+    "babel-loader": "^8.2.5",
+    "bunchee": "^2.0.0",
+    "eslint": "^7.28.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-config-standard": "^16.0.3",
+    "eslint-plugin-import": "^2.23.4",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^3.4.0",
+    "eslint-plugin-promise": "^5.1.0",
+    "eslint-plugin-react": "^7.27.1",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-storybook": "^0.5.12",
+    "jest": "^27.0.4",
+    "prettier": "^2.3.1",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "release-it": "^14.10.0",
+    "ts-jest": "^27.1.1",
+    "typescript": "^4.5.4",
+    "watch": "^1.0.2"
+  }
+}

@@ -76,11 +76,7 @@ export function useSubscription<
 
 	let currentResult = state[1];
 	if (source !== state[0] && hasDepsChanged(state[2], deps)) {
-		setState([
-			source,
-			(currentResult = computeNextState(state[1], { fetching: !!source })),
-			deps,
-		]);
+		setState([source, (currentResult = computeNextState(state[1], { fetching: !!source })), deps]);
 	}
 
 	useEffect(
@@ -89,11 +85,7 @@ export function useSubscription<
 				deferDispatch(setState, function reduce(prev) {
 					const nextResult = computeNextState(prev[1], result);
 					if (prev[1] === nextResult) return prev;
-					if (
-						handlerRef.current &&
-						nextResult.data != null &&
-						prev[1].data !== nextResult.data
-					) {
+					if (handlerRef.current && nextResult.data != null && prev[1].data !== nextResult.data) {
 						nextResult.data = handlerRef.current(prev[1].data, nextResult.data) as any;
 					}
 

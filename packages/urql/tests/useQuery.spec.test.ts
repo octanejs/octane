@@ -357,7 +357,11 @@ describe('useQuery', function () {
 				createElement(
 					ErrorBoundary,
 					{ fallback },
-					createElement(Suspense, { fallback: createElement('p', null, 'Loading') }, createElement(QueryUser)),
+					createElement(
+						Suspense,
+						{ fallback: createElement('p', null, 'Loading') },
+						createElement(QueryUser),
+					),
 				),
 			);
 

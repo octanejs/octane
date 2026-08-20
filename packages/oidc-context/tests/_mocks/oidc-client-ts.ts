@@ -6,10 +6,7 @@ type MockManager = {
 	settings: unknown;
 };
 
-const MockUserManager = vi.fn(function MockUserManager(
-	this: MockManager,
-	args: unknown,
-) {
+const MockUserManager = vi.fn(function MockUserManager(this: MockManager, args: unknown) {
 	this.events = {
 		load: vi.fn(),
 		unload: vi.fn(),

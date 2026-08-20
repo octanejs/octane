@@ -1,0 +1,23 @@
+{
+  "upstream": {
+    "package": "@lingui/react",
+    "version": "6.6.0",
+    "source": "https://github.com/lingui/js-lingui/tree/665a19815378dedd89346bb7707bdb0e28df79e7",
+    "license": "MIT"
+  },
+  "surface": "Client runtime surface at @lingui/react 6.6.0: I18nProvider, useLingui, LinguiContext, Trans, and TransNoContext over @lingui/core@6.6.0. ./macro, ./server setI18n/getI18n, and react-server TransRsc are explicit gaps.",
+  "inventory": {
+    "supported": ["I18nProvider", "useLingui", "LinguiContext", "Trans", "TransNoContext"],
+    "subpaths": []
+  },
+  "divergences": [
+    "Public node and component types use OctaneNode and do not import React.",
+    "Locale subscription uses octane useSyncExternalStore rather than use-sync-external-store.",
+    "Trans component class components are not supported; pass a function component.",
+    "./macro and @lingui/babel-plugin-lingui-macro are compile-time and are not ported.",
+    "./server setI18n/getI18n depends on React.cache / RSC and is not ported.",
+    "react-server index-rsc / TransRsc is not ported."
+  ],
+  "ssr": "I18nProvider reads the i18n snapshot through useSyncExternalStore (client and server snapshot are the same). Render is null until i18n.activate has set a locale. RSC setI18n/getI18n is an explicit gap.",
+  "verified": "2026-08-20"
+}

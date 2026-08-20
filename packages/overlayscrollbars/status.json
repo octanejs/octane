@@ -1,0 +1,11 @@
+{
+  "upstream": { "package": "overlayscrollbars-react", "version": "0.5.6" },
+  "surface": "Complete against overlayscrollbars-react 0.5.6: OverlayScrollbarsComponent and useOverlayScrollbars over the overlayscrollbars ^2 peer. Body-host document takeover tests are an explicit gap.",
+  "divergences": [
+    "Octane has no forwardRef; OverlayScrollbarsComponent takes ref as a prop and exposes { osInstance, getElement } through useImperativeHandle.",
+    "The root element prop is a string host tag rendered with createElement, not a generic React ElementType.",
+    "Public children types use OctaneNode and do not import React."
+  ],
+  "ssr": "useOverlayScrollbars defers initialization with no-op idle/rAF helpers when window is undefined. OverlayScrollbarsComponent still renders the host tag and contents wrapper; the overlayscrollbars instance is created in an effect on the client.",
+  "verified": "2026-08-20"
+}

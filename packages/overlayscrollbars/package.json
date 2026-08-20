@@ -1,0 +1,55 @@
+{
+  "name": "@octanejs/overlayscrollbars",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "overlayscrollbars-react bindings for Octane, ported from overlayscrollbars-react 0.5.6.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/overlayscrollbars"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --config vitest.config.js --project overlayscrollbars",
+    "typecheck": "tsrx-tsc --noEmit"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*",
+    "overlayscrollbars": "^2.0.0"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "octane": "workspace:*",
+    "overlayscrollbars": "2.16.0",
+    "vitest": "catalog:default"
+  }
+}

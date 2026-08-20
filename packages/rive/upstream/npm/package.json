@@ -1,0 +1,26 @@
+{
+  "name": "@rive-app/react-canvas",
+  "version": "4.32.0",
+  "description": "React wrapper around the @rive-app/canvas library",
+  "main": "dist/index.js",
+  "typings": "dist/types/index.d.ts",
+  "files": [
+    "dist/**"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rive-app/rive-react.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rive-app/rive-react/issues"
+  },
+  "homepage": "https://github.com/rive-app/rive-react#readme",
+  "dependencies": {
+    "@rive-app/canvas": "2.40.0"
+  },
+  "peerDependencies": {
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0"
+  }
+}

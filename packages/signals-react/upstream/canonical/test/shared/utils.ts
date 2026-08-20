@@ -1,0 +1,117 @@
+import React from "react";
+import { vi, expect, type MockInstance } from "vitest";
+import { act as realAct } from "react-dom/test-utils";
+
+export interface Root {
+	render(element: JSX.Element | null): void;
+	unmount(): void;
+}
+
+export const isProd = process.env.NODE_ENV === "production";
+export const isReact16 = React.version.startsWith("16.");
+
+export { createRoot } from "./create-root";
+
+// When testing using react's production build, we can't use act (React
+// explicitly throws an error in this situation). So instead we'll fake act by
+// waiting for a requestAnimationFrame and then 10ms for React's concurrent
+// rerendering and any effects to flush. We'll make a best effort to throw a
+// helpful error in afterEach if we detect that act() was called but not
+// awaited.
+const afterFrame = (ms: number) =>
+	new Promise(r => requestAnimationFrame(() => setTimeout(r, ms)));
+
+let acting = 0;
+async function prodActShim(cb: () => void | Promise<void>): Promise<void> {
+	acting++;
+	try {
+		await cb();
+		await afterFrame(10);
+	} finally {
+		acting--;
+	}
+}
+
+export function checkHangingAct() {
+	if (acting > 0) {
+		throw new Error(
+			`It appears act() was called but not awaited. This could happen if a test threw an Error or if a test forgot to await a call to act. Make sure to await act() calls in tests.`
+		);
+	}
+}
+
+function realActShim(cb: any) {
+	const ret = realAct(cb);
+	if (String(ret.then).includes("it is not a Promise.")) {
+		return {
+			then(r: any) {
+				r();
+			},
+		};
+	}
+	return ret;
+}
+
+export const act =
+	process.env.NODE_ENV === "production"
+		? (prodActShim as typeof realAct)
+		: (realActShim as typeof realAct);
+
+/**
+ * `console.log` supports formatting strings with `%s` for string substitutions.
+ * This function accepts a string and additional arguments of values and returns
+ * a string with the values substituted in.
+ */
+export function consoleFormat(str: string, ...values: unknown[]): string {
+	let idx = 0;
+	return str.replace(/%s/g, () => String(values[idx++]));
+}
+
+declare global {
+	let errorSpy: MockInstance<typeof console.error> | undefined;
+}
+
+// Only one spy can be active on an object at a time and since all tests share
+// the same console object we need to make sure we're only spying on it once.
+// We'll use this method to share the spy across all tests.
+export function getConsoleErrorSpy(): MockInstance<typeof console.error> {
+	if (typeof errorSpy === "undefined") {
+		(globalThis as any).errorSpy = vi.spyOn(console, "error");
+	}
+
+	return errorSpy!;
+}
+
+const messagesToIgnore = [
+	// Ignore errors for timeouts of tests that often happen while debugging
+	/async tests and hooks,/,
+	// Ignore React 16 warnings about awaiting `act` calls (warning removed in React 18)
+	/Do not await the result of calling act/,
+	// Ignore how chai or mocha uses `console.error` to print out errors
+	/AssertionError/,
+];
+
+if (isReact16) {
+	// Ignore React 16 warning about useLayoutEffect on the server. The useSyncExternalStore
+	// shim uses useLayoutEffect and we don't care about this warning.
+	messagesToIgnore.push(/useLayoutEffect does nothing on the server/);
+}
+
+export function checkConsoleErrorLogs(): void {
+	const errorSpy = getConsoleErrorSpy();
+	if (errorSpy.mock.calls.length > 0) {
+		let message: string;
+		if (errorSpy.mock.calls[0][0].toString().includes("%s")) {
+			const firstArg = errorSpy.mock.calls[0][0];
+			message = consoleFormat(firstArg, ...errorSpy.mock.calls[0].slice(1));
+		} else {
+			message = errorSpy.mock.calls[0].join(" ");
+		}
+
+		if (messagesToIgnore.every(re => re.test(message) === false)) {
+			expect.fail(
+				`Console.error was unexpectedly called with this message: \n${message}`
+			);
+		}
+	}
+}

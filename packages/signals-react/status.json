@@ -1,0 +1,12 @@
+{
+  "upstream": { "package": "@preact/signals-react", "version": "3.12.0" },
+  "surface": "Client runtime surface at @preact/signals-react 3.12.0: core re-exports, useSignal/useComputed/useSignalEffect/useModel, ./runtime useSignals, and ./utils Show/For/useLiveSignal/useSignalRef over @preact/signals-core@1.14.4. wrapJsx, Signal-as-ReactElement, and the Babel react-transform plugin are explicit gaps.",
+  "divergences": [
+    "wrapJsx is a no-op because Octane has no jsx-runtime to monkeypatch.",
+    "Signal.prototype is not given React $$typeof / type / props; read .value instead of rendering a Signal as a child.",
+    "Babel @preact/signals-react-transform auto-tracking is not ported; call useSignals() in components that read signals during render.",
+    "Public utils children types use OctaneNode and do not import React."
+  ],
+  "ssr": "useSignals installs an empty effect store when window is undefined so server render does not subscribe. useSignal/useComputed/useModel still allocate. Client hydration starts tracking in useSyncExternalStore + layout cleanup.",
+  "verified": "2026-08-20"
+}

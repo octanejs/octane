@@ -7497,6 +7497,219 @@ export default defineConfig({
 					hookTimeout: 60_000,
 				},
 			},
+			{
+				test: {
+					name: 'lingui',
+					include: ['packages/lingui/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/lingui$/,
+							replacement: resolve(import.meta.dirname, 'packages/lingui/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'filepond',
+					include: ['packages/filepond/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/filepond$/,
+							replacement: resolve(import.meta.dirname, 'packages/filepond/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'rive',
+					include: ['packages/rive/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/rive$/,
+							replacement: resolve(import.meta.dirname, 'packages/rive/src/index.ts'),
+						},
+						{
+							find: /^@rive-app\/canvas$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/rive/tests/_stubs/rive-app-canvas.ts',
+							),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'unhead',
+					include: ['packages/unhead/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/unhead$/,
+							replacement: resolve(import.meta.dirname, 'packages/unhead/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/unhead\/client$/,
+							replacement: resolve(import.meta.dirname, 'packages/unhead/src/client.ts'),
+						},
+						{
+							find: /^@octanejs\/unhead\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/unhead/src/server.ts'),
+						},
+						{
+							find: /^@octanejs\/unhead\/helmet$/,
+							replacement: resolve(import.meta.dirname, 'packages/unhead/src/helmet.ts'),
+						},
+						{
+							find: /^@octanejs\/unhead\/utils$/,
+							replacement: resolve(import.meta.dirname, 'packages/unhead/src/utils.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'overlayscrollbars',
+					include: ['packages/overlayscrollbars/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/overlayscrollbars$/,
+							replacement: resolve(import.meta.dirname, 'packages/overlayscrollbars/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'oidc-context',
+					include: ['packages/oidc-context/tests/**/*.test.ts'],
+					exclude: [...configDefaults.exclude, 'packages/oidc-context/tests/ssr.test.ts'],
+					environment: 'happy-dom',
+					environmentOptions: {
+						happyDOM: {
+							url: 'https://www.example.com/',
+						},
+					},
+					setupFiles: ['packages/oidc-context/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/oidc-context$/,
+							replacement: resolve(import.meta.dirname, 'packages/oidc-context/src/index.ts'),
+						},
+						{
+							find: /^oidc-client-ts$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/oidc-context/tests/_mocks/oidc-client-ts.ts',
+							),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'oidc-context-ssr',
+					include: ['packages/oidc-context/tests/ssr.test.ts'],
+					environment: 'node',
+					setupFiles: ['packages/oidc-context/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/oidc-context$/,
+							replacement: resolve(import.meta.dirname, 'packages/oidc-context/src/index.ts'),
+						},
+						{
+							find: /^oidc-client-ts$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/oidc-context/tests/_mocks/oidc-client-ts.ts',
+							),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'urql',
+					include: ['packages/urql/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					setupFiles: ['packages/urql/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/urql$/,
+							replacement: resolve(import.meta.dirname, 'packages/urql/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'signals-react',
+					include: ['packages/signals-react/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/signals-react$/,
+							replacement: resolve(import.meta.dirname, 'packages/signals-react/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/signals-react\/runtime$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/signals-react/src/runtime/index.ts',
+							),
+						},
+						{
+							find: /^@octanejs\/signals-react\/utils$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/signals-react/src/utils/index.ts',
+							),
+						},
+					],
+				},
+			},
 			...['pristine', 'adapted'].map((lane) => ({
 				testExecution: { group: 'react-parity' },
 				test: {

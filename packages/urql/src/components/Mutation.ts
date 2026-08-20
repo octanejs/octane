@@ -10,8 +10,10 @@ export interface MutationProps<Data = any, Variables extends AnyVariables = AnyV
 	children(arg: MutationState<Data, Variables>): OctaneNode;
 }
 
-export interface MutationState<Data = any, Variables extends AnyVariables = AnyVariables>
-	extends UseMutationState<Data, Variables> {
+export interface MutationState<
+	Data = any,
+	Variables extends AnyVariables = AnyVariables,
+> extends UseMutationState<Data, Variables> {
 	executeMutation: UseMutationExecute<Data, Variables>;
 }
 

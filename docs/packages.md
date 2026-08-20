@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**96 publishable package(s), including 82 framework binding(s) and 3 framework integration(s).**
+**104 publishable package(s), including 90 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -34,6 +34,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/dropzone` | [`packages/dropzone`](../packages/dropzone) | framework binding | `0.0.7` | 2 |
 | `@octanejs/electron` | [`packages/electron`](../packages/electron) | framework binding | `0.0.19` | 6 |
 | `@octanejs/embla-carousel` | [`packages/embla-carousel`](../packages/embla-carousel) | framework binding | `0.0.7` | 2 |
+| `@octanejs/filepond` | [`packages/filepond`](../packages/filepond) | framework binding | `0.0.1` | 2 |
 | `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.40` | 1 |
 | `@octanejs/gsap` | [`packages/gsap`](../packages/gsap) | framework binding | `0.0.10` | 1 |
 | `@octanejs/hook-form` | [`packages/hook-form`](../packages/hook-form) | framework binding | `0.1.38` | 1 |
@@ -44,6 +45,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/intersection-observer` | [`packages/intersection-observer`](../packages/intersection-observer) | framework binding | `0.0.7` | 2 |
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.38` | 7 |
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.1.40` | 42 |
+| `@octanejs/lingui` | [`packages/lingui`](../packages/lingui) | framework binding | `0.0.1` | 2 |
 | `@octanejs/livestore` | [`packages/livestore`](../packages/livestore) | framework binding | `0.0.11` | 2 |
 | `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.36` | 4 |
 | `@octanejs/mantine-hooks` | [`packages/mantine-hooks`](../packages/mantine-hooks) | framework binding | `0.1.22` | 1 |
@@ -54,6 +56,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/monaco-editor` | [`packages/monaco-editor`](../packages/monaco-editor) | framework binding | `0.0.9` | 1 |
 | `@octanejs/motion` | [`packages/motion`](../packages/motion) | framework binding | `0.1.40` | 2 |
 | `@octanejs/nuqs` | [`packages/nuqs`](../packages/nuqs) | framework binding | `0.1.30` | 7 |
+| `@octanejs/oidc-context` | [`packages/oidc-context`](../packages/oidc-context) | framework binding | `0.0.1` | 1 |
+| `@octanejs/overlayscrollbars` | [`packages/overlayscrollbars`](../packages/overlayscrollbars) | framework binding | `0.0.1` | 1 |
 | `@octanejs/pdf` | [`packages/pdf`](../packages/pdf) | framework binding | `0.0.7` | 3 |
 | `@octanejs/phosphor-icons` | [`packages/phosphor-icons`](../packages/phosphor-icons) | framework binding | `0.0.21` | 2 |
 | `@octanejs/popper` | [`packages/popper`](../packages/popper) | framework binding | `0.0.7` | 2 |
@@ -65,11 +69,13 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/redux` | [`packages/redux`](../packages/redux) | framework binding | `0.1.38` | 1 |
 | `@octanejs/redux-toolkit` | [`packages/redux-toolkit`](../packages/redux-toolkit) | framework binding | `0.1.36` | 4 |
 | `@octanejs/remix-router` | [`packages/remix-router`](../packages/remix-router) | framework binding | `0.1.37` | 2 |
+| `@octanejs/rive` | [`packages/rive`](../packages/rive) | framework binding | `0.0.1` | 1 |
 | `@octanejs/rsbuild-plugin` | [`packages/rsbuild-plugin-octane`](../packages/rsbuild-plugin-octane) | metaframework | `0.1.36` | 3 |
 | `@octanejs/rspack-plugin` | [`packages/rspack-plugin-octane`](../packages/rspack-plugin-octane) | compiler integration | `0.1.36` | 2 |
 | `@octanejs/rxjs` | [`packages/rxjs`](../packages/rxjs) | framework binding | `0.1.20` | 2 |
 | `@octanejs/seo` | [`packages/seo`](../packages/seo) | document metadata | `0.0.26` | 1 |
 | `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.26` | 121 |
+| `@octanejs/signals-react` | [`packages/signals-react`](../packages/signals-react) | framework binding | `0.0.1` | 3 |
 | `@octanejs/solana-react` | [`packages/solana-react`](../packages/solana-react) | framework binding | `0.0.10` | 2 |
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.36` | 2 |
 | `@octanejs/spring` | [`packages/spring`](../packages/spring) | framework binding | `0.0.7` | 2 |
@@ -97,6 +103,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/three` | [`packages/three`](../packages/three) | framework binding | `0.1.34` | 7 |
 | `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.35` | 2 |
 | `@octanejs/transition-group` | [`packages/transition-group`](../packages/transition-group) | framework binding | `0.0.7` | 7 |
+| `@octanejs/unhead` | [`packages/unhead`](../packages/unhead) | framework binding | `0.0.1` | 5 |
+| `@octanejs/urql` | [`packages/urql`](../packages/urql) | framework binding | `0.0.1` | 1 |
 | `@octanejs/usehooks-ts` | [`packages/usehooks-ts`](../packages/usehooks-ts) | framework binding | `0.0.22` | 1 |
 | `@octanejs/valtio` | [`packages/valtio`](../packages/valtio) | framework binding | `0.1.24` | 5 |
 | `@octanejs/vaul` | [`packages/vaul`](../packages/vaul) | framework binding | `0.0.7` | 3 |

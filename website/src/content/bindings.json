@@ -4,6 +4,7 @@
     "description": "Small stores, atoms, observable state, Redux, RTK Query, and TanStack Store.",
     "packages": [
       "@octanejs/alien-signals",
+      "@octanejs/signals-react",
       "@octanejs/zustand",
       "@octanejs/valtio",
       "@octanejs/jotai",
@@ -20,6 +21,8 @@
     "packages": [
       "@octanejs/tanstack-ai",
       "@octanejs/apollo-client",
+      "@octanejs/urql",
+      "@octanejs/oidc-context",
       "@octanejs/livestore",
       "@octanejs/dexie",
       "@octanejs/swr",
@@ -67,6 +70,8 @@
       "@octanejs/lucide",
       "@octanejs/phosphor-icons",
       "@octanejs/usehooks-ts",
+      "@octanejs/rive",
+      "@octanejs/overlayscrollbars",
       "@octanejs/intersection-observer",
       "@octanejs/tanstack-hotkeys",
       "@octanejs/tanstack-pacer"
@@ -79,6 +84,7 @@
       "@octanejs/hook-form",
       "@octanejs/input-otp",
       "@octanejs/dropzone",
+      "@octanejs/filepond",
       "@octanejs/tanstack-form",
       "@octanejs/lexical",
       "@octanejs/tiptap",
@@ -88,7 +94,8 @@
       "@octanejs/monaco-editor",
       "@octanejs/syntax-highlighter",
       "@octanejs/mdx",
-      "@octanejs/i18next"
+      "@octanejs/i18next",
+      "@octanejs/lingui"
     ]
   },
   {
@@ -126,7 +133,8 @@
       "@octanejs/styled-components",
       "@octanejs/testing-library",
       "@octanejs/tanstack-devtools",
-      "@octanejs/devtools"
+      "@octanejs/devtools",
+      "@octanejs/unhead"
     ]
   }
 ]

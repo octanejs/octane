@@ -27,9 +27,7 @@ export interface UseAutoSigninOptions {
  *
  * @returns The current status of the authentication process.
  */
-export function useAutoSignin(options?: {
-	signinArgs?: SigninRedirectArgs;
-}): UseAutoSignInReturn;
+export function useAutoSignin(options?: { signinArgs?: SigninRedirectArgs }): UseAutoSignInReturn;
 
 /**
  * @public
@@ -71,7 +69,9 @@ export function useAutoSignin(options: {
 	signinArgs?: SigninPopupArgs;
 }): UseAutoSignInReturn;
 
-export function useAutoSignin(...rest: [options?: UseAutoSigninOptions, slot?: symbol]): UseAutoSignInReturn {
+export function useAutoSignin(
+	...rest: [options?: UseAutoSigninOptions, slot?: symbol]
+): UseAutoSignInReturn {
 	const [user, slot] = splitSlot(rest);
 	const options = (user[0] as UseAutoSigninOptions | undefined) ?? {};
 	const signinMethod = options.signinMethod ?? 'signinRedirect';

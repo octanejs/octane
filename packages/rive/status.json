@@ -1,0 +1,51 @@
+{
+  "upstream": {
+    "package": "@rive-app/react-canvas",
+    "version": "4.32.0",
+    "source": "https://github.com/rive-app/rive-react/tree/af85cadd907fd93c950acc5a2338d275f80dfe2d",
+    "tagCommit": "af85cadd907fd93c950acc5a2338d275f80dfe2d",
+    "integrity": "sha512-3r+9xZmdPZTLGNhHq3QuFKVtkPCRnpx6icSqIRUnpGDOmA1U3eADb2crSuwh9voXtHJ0ddexagF+zYmSIC+1ug==",
+    "shasum": "59198561130aceac35bf0f754fc0884ce989fc5b",
+    "license": "MIT"
+  },
+  "peer": {
+    "package": "@rive-app/canvas",
+    "version": "2.40.0",
+    "license": "MIT"
+  },
+  "surface": "Official @rive-app/react-canvas 4.32.0 hook and Rive canvas-wrapper surface over the unchanged @rive-app/canvas@2.40.0 runtime, with Octane createElement host output and manual hook-slot forwarding.",
+  "divergences": [
+    "JSX in useRive / Rive is rewritten with Octane createElement. There is no forwardRef.",
+    "Hooks are authored in plain .ts and forward compiler-injected trailing slots through splitSlot / subSlot.",
+    "jsdom cannot run Rive WASM; committed tests are contract-level (export surface, pre-load useRive, canvas wrapper, null state-machine input) rather than a full runtime load."
+  ],
+  "ssr": "Initial hook state is null / idle. Effects construct Rive only after a canvas is attached on the client.",
+  "verified": "2026-08-20",
+  "supportedExports": [
+    "default",
+    "useRive",
+    "useStateMachineInput",
+    "useResizeCanvas",
+    "useRiveFile",
+    "useViewModel",
+    "useViewModelInstance",
+    "useGlobalViewModelInstance",
+    "useViewModelInstanceNumber",
+    "useViewModelInstanceString",
+    "useViewModelInstanceBoolean",
+    "useViewModelInstanceColor",
+    "useViewModelInstanceEnum",
+    "useViewModelInstanceTrigger",
+    "useViewModelInstanceImage",
+    "useViewModelInstanceFont",
+    "useViewModelInstanceList",
+    "useViewModelInstanceArtboard",
+    "RiveProps",
+    "RiveState",
+    "UseRiveParameters",
+    "UseRiveFileParameters",
+    "UseRiveOptions",
+    "export * from @rive-app/canvas"
+  ],
+  "unsupported": ["@rive-app/react-webgl", "@rive-app/react-webgl2"]
+}
