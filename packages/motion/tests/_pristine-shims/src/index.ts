@@ -3,8 +3,12 @@ export {
 	AnimatePresence,
 	MotionConfig,
 	MotionConfigContext,
+	animate,
+	cancelFrame,
+	frame,
 	isMotionComponent,
 	motion,
 	unwrapMotionComponent,
 	useMotionValue,
+	useMotionValueEvent,
 } from 'motion/react';

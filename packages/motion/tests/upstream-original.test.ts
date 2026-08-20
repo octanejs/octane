@@ -82,10 +82,12 @@ it('runs the curated Motion useMotionValue Jest suite unchanged', function () {
 	}
 	const output = `${result.stdout}\n${result.stderr}`;
 	expect(result.status, output).toBe(0);
-	expect(output).toMatch(/Tests:\s+5 passed, 5 total/);
 	const expected = JSON.parse(
 		readFileSync(resolve(repoRoot, 'packages/motion/audit/pristine-runtime.json'), 'utf8'),
 	).tests;
+	expect(output).toMatch(
+		new RegExp(`Tests:\\s+${expected.length} passed, ${expected.length} total`),
+	);
 	const reportJson = JSON.parse(readFileSync(report, 'utf8'));
 	const executed = reportJson.testResults
 		.flatMap(function mapSuite(suite: {

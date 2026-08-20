@@ -40,7 +40,7 @@ The binding reuses Motion's framework-neutral animation engine and ports a bound
 
 Upstream ships an extensive Jest client suite plus Cypress and embedded type tests under `packages/framer-motion`. The npm tarball does not include those tests; they are taken from the git pin.
 
-This package records `upstreamSuites.runtime/types` as **present** (the pin contains those suites) and provenance as **recorded-unverified** until every pin artifact receives an adapted or supported-exclusion disposition. The current curated subset still runs:
+This package records `upstreamSuites.runtime/types` as **present** (the pin contains those suites) and provenance as **recorded-unverified** until every pin artifact receives an adapted or supported-exclusion disposition. The pristine oracle now runs the complete pinned `src/value/__tests__` suite — 82 cases across 9 files (motion-value, unwrap-value, use-follow-value, use-motion-template, use-motion-value, use-scroll, use-spring, use-transform, use-velocity) — byte-exact against `motion/react@12.42.2`, with per-hook runner shims in `tests/_pristine-shims/` and a Jest-30 alias-matcher compat setup. Adapted coverage: `use-motion-value` has a one-for-one adapted counterpart; the remaining eight files are executed pristine-only and are open adaptation work tracked here (useMotionTemplate, useVelocity, and useFollowValue are additionally unported exports). The curated evidence set also runs:
 
 - pristine: byte-exact `useMotionValue` Jest cases from the pin, executed with native Jest (`jest-full`) against `motion/react@12.42.2`
 - adapted: one-for-one Octane ports of those cases

@@ -8,12 +8,16 @@ module.exports = {
 	modulePaths: [
 		join(__dirname, '..', 'node_modules'),
 		join(__dirname, '..', '..', '..', 'node_modules'),
+		// pnpm's hidden hoist store holds transitive dependencies (motion-utils,
+		// expect) that neither package tree exposes directly.
+		join(__dirname, '..', '..', '..', 'node_modules', '.pnpm', 'node_modules'),
 	],
+	setupFilesAfterEnv: [join(__dirname, 'upstream-jest.matcher-compat.cjs')],
 	clearMocks: true,
 	resetMocks: true,
 	restoreMocks: true,
 	roots: ['<rootDir>/src'],
-	testMatch: ['**/value/__tests__/use-motion-value.test.tsx'],
+	testMatch: ['**/value/__tests__/*.test.ts', '**/value/__tests__/*.test.tsx'],
 	transform: {
 		'^.+\\.tsx?$': [
 			// Resolved absolutely: the pristine wrapper runs this config against a
