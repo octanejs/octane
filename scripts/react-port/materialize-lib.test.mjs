@@ -12,6 +12,7 @@ import {
 import {
 	MATERIALIZE_STATE_FILE,
 	assertSafeLockPath,
+	findForbiddenReactSpecifiers,
 	buildUpstreamLock,
 	extractPristineFromArchive,
 	gitBlobSha1,
@@ -149,6 +150,39 @@ describe('lock construction and validation', () => {
 		assert.throws(
 			() => fixtureLock({ adaptedMappings: [{ fromRoot: 'tests', toRoot: 'src' }] }),
 			/toRoot must be tests\/upstream/,
+		);
+	});
+});
+
+describe('forbidden React specifiers', () => {
+	test('flags every React import form in module code', () => {
+		const source = [
+			"import { useState } from 'react';",
+			'import "react-dom/client";',
+			"const rtl = require('@testing-library/react');",
+			"const lazy = await import('react/jsx-runtime');",
+		].join('\n');
+		assert.deepEqual(findForbiddenReactSpecifiers('tests/upstream/x.test.tsx', source), [
+			'@testing-library/react',
+			'react',
+			'react-dom/client',
+			'react/jsx-runtime',
+		]);
+	});
+
+	test('ignores non-React specifiers that merely start with react', () => {
+		const source = [
+			"import { HexColorPicker } from 'react-colorful';",
+			"import octane from 'octane';",
+			"import { render } from '@octanejs/testing-library';",
+		].join('\n');
+		assert.deepEqual(findForbiddenReactSpecifiers('tests/upstream/x.test.ts', source), []);
+	});
+
+	test('ignores non-module targets such as snapshots', () => {
+		assert.deepEqual(
+			findForbiddenReactSpecifiers('tests/upstream/tag/snapshots/x.test.js.snap', "from 'react'"),
+			[],
 		);
 	});
 });

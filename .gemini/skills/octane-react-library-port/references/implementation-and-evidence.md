@@ -86,7 +86,11 @@ For a new or upgraded port:
   against the lock, then rebuilds the `tests/upstream` targets by copying each
   mapped pristine file, applying the lock's mechanical rewrites, and applying
   its committed divergence patch from `audit/upstream-patches/`. `run --check`
-  verifies without writing. Add a package `.gitignore` with `/tests/upstream/`;
+  verifies without writing. Materialization also fails closed if any
+  regenerated adapted module still imports `react`, `react-dom`, or
+  `@testing-library/react` — the rewrites remove those specifiers, and a patch
+  cannot reintroduce one — so the adapted suite provably executes against
+  Octane. Add a package `.gitignore` with `/tests/upstream/`;
   the regenerated adapted suite is never committed.
 
 - author the adaptation by editing the regenerated `tests/upstream` files, then

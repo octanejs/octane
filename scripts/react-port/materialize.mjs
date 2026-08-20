@@ -11,6 +11,7 @@ import {
 	UPSTREAM_LOCK_RELATIVE_PATH,
 	UPSTREAM_PATCHES_RELATIVE_PATH,
 	applyAdaptedRewrites,
+	findForbiddenReactSpecifiers,
 	buildUpstreamLock,
 	extractPristineFromArchive,
 	gitBlobSha1,
@@ -320,6 +321,14 @@ function regenerateAdaptedTree(lock, packageDirectory, pristineDirectory, execFi
 					encoding: 'utf8',
 				});
 				bytes = readFileSync(scratchPath);
+			}
+			if (!bytes.includes(0)) {
+				const forbidden = findForbiddenReactSpecifiers(targetPath, bytes.toString('utf8'));
+				if (forbidden.length > 0) {
+					throw new Error(
+						`Adapted file ${targetPath} still imports React (${forbidden.join(', ')}); the adapted suite must execute against Octane — remove the specifier via an adaptedRewrite or fix the patch`,
+					);
+				}
 			}
 			writeTreeFile(packageDirectory, targetPath, bytes);
 			written.push(targetPath);

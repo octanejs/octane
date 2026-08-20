@@ -118,6 +118,24 @@ export function applyAdaptedRewrites(text, adaptedRewrites = []) {
 	return rewritten;
 }
 
+const ADAPTED_MODULE_FILE_PATTERN = /\.(?:[cm]?js|jsx|tsx?|tsrx)$/;
+const REACT_SPECIFIER_PATTERN = /^(?:react|react-dom)(?:\/|$)|^@testing-library\/react(?:\/|$)/;
+const MODULE_SPECIFIER_PATTERN =
+	/(?:\bfrom\s*|\brequire\s*\(\s*|\bimport\s*\(\s*|\bimport\s+)(['"])([^'"\n]+)\1/g;
+
+// The adapted suite must execute against Octane, never React. Rewrites remove
+// React specifiers mechanically, but a committed patch could reintroduce one;
+// this scan makes that fail at materialization, inside the same gate that
+// verifies the lock, instead of surfacing (or not) at test time.
+export function findForbiddenReactSpecifiers(targetPath, text) {
+	if (!ADAPTED_MODULE_FILE_PATTERN.test(targetPath)) return [];
+	const found = new Set();
+	for (const match of text.matchAll(MODULE_SPECIFIER_PATTERN)) {
+		if (REACT_SPECIFIER_PATTERN.test(match[2])) found.add(match[2]);
+	}
+	return [...found].sort();
+}
+
 export function validateUpstreamLock(lock) {
 	if (!lock || typeof lock !== 'object') throw new Error('Upstream lock must be an object');
 	if (lock.schemaVersion !== UPSTREAM_LOCK_SCHEMA_VERSION) {

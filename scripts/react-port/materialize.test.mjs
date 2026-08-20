@@ -260,6 +260,25 @@ describe('materialize CLI lifecycle', () => {
 		assert.doesNotMatch(patch, /^[+-].*node:test\/reporters/m);
 	});
 
+	test('a patch that reintroduces a React import fails materialization', async () => {
+		const context = scenario();
+		await runCli(LOCK_ARGUMENTS(context));
+		await runCli(['run', '--package-dir', context.packageDirectory]);
+		const adaptedTest = path.join(context.packageDirectory, 'tests', 'upstream', 'index.test.js');
+		writeFileSync(
+			adaptedTest,
+			`import { useState } from 'react';\n${readFileSync(adaptedTest, 'utf8')}`,
+		);
+		const diffed = await runCli(['diff', '--package-dir', context.packageDirectory]);
+		assert.equal(diffed.exitCode, 0, diffed.stderr);
+
+		rmSync(path.join(context.packageDirectory, 'tests'), { recursive: true });
+		const reran = await runCli(['run', '--package-dir', context.packageDirectory]);
+		assert.notEqual(reran.exitCode, 0);
+		assert.match(reran.stderr, /still imports React \(react\)/);
+		assert.match(reran.stderr, /must execute against Octane/);
+	});
+
 	test('archive drift falls back to content-addressed blobs and forged blobs fail', async () => {
 		const context = scenario();
 		await runCli(LOCK_ARGUMENTS(context));
