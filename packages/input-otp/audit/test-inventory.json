@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "root": "upstream/source/apps/test/src/tests",
+  "root": "upstream/apps/test/src/tests",
   "artifactCount": 8,
   "caseCount": 15,
   "requiredPortAuthoredClassifications": [

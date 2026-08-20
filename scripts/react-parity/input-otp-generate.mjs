@@ -47,14 +47,14 @@ const lanes = [
 const upstreamFiles = ['packages/input-otp/tests/pristine/upstream.browser.test.ts'];
 const pristineLedgerPath = 'packages/input-otp/audit/pristine-adaptation-ledger.json';
 const pinnedUpstreamFiles = [
-	'packages/input-otp/upstream/source/apps/test/src/tests/base.delete-word.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/base.props.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/base.render.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/base.selections.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/base.slot.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/base.typing.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/with-autofocus.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/with-on-complete.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/base.delete-word.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/base.props.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/base.render.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/base.selections.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/base.slot.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/base.typing.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/with-autofocus.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/with-on-complete.spec.ts',
 ];
 
 function sha(contents) {
