@@ -2,7 +2,7 @@ import { createElement, type OctaneNode } from 'octane';
 import type { Unhead } from 'unhead/types';
 import { UnheadProvider } from '@octanejs/unhead/client';
 
-export function withHead(head: Unhead, child: OctaneNode): OctaneNode {
+export function withHead(head: Unhead, child: OctaneNode) {
 	return createElement(UnheadProvider, { head, children: child });
 }
 

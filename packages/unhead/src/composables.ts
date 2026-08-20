@@ -21,7 +21,7 @@ import { splitSlot, subSlot } from './internal';
 
 interface ScriptCallbackRecord {
 	active: boolean;
-	handler: (...args: unknown[]) => unknown;
+	handler: (...args: any[]) => any;
 	key: 'loaded' | 'error';
 	registered: boolean;
 	renderScoped: boolean;
@@ -29,7 +29,7 @@ interface ScriptCallbackRecord {
 	script: UseScriptReturn<any>;
 }
 
-export function useUnhead(): Unhead;
+export function useUnhead(slot?: symbol): Unhead;
 export function useUnhead(...rest: [slot?: symbol]): Unhead {
 	splitSlot(rest);
 	const instance = useContext(UnheadContext);
@@ -42,7 +42,7 @@ export function useUnhead(...rest: [slot?: symbol]): Unhead {
 function withSideEffects<T extends ActiveHeadEntry<any>>(
 	input: unknown,
 	options: HeadEntryOptions & { head?: Unhead },
-	fn: (head: Unhead, input: unknown, options: HeadEntryOptions) => T,
+	fn: (head: Unhead, input: any, options: HeadEntryOptions) => T,
 	slot: symbol | undefined,
 ): T {
 	const head = options.head || useUnhead(subSlot(slot, 'unhead'));
@@ -216,7 +216,7 @@ export function useScript<T extends Record<symbol | string, any> = Record<symbol
 		subSlot(slot, 'trigger'),
 	);
 
-	function registerCb(key: 'loaded' | 'error', cb: (...args: unknown[]) => unknown) {
+	function registerCb(key: 'loaded' | 'error', cb: (...args: any[]) => any) {
 		const renderScoped = !(isMounted.current && committedRenderId.current === currentRenderId);
 		const record: ScriptCallbackRecord = {
 			active: true,
