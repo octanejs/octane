@@ -173,7 +173,7 @@ describe('useQuery', function () {
       }
     `;
 
-		rerender({ query: newQuery, variables: {} });
+		rerender({ query: newQuery, variables: {} } as never);
 		expect(mockClient.executeQuery).toBeCalledTimes(2);
 		expect(mockClient.executeQuery).toHaveBeenNthCalledWith(
 			2,
