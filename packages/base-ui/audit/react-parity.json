@@ -140,6 +140,11 @@
       },
       "files": [
         {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "82937a5512e6a5520261f1604eb30f8830a0385fb65a021e28157b16dd4d758f"
+        },
+        {
           "path": "packages/base-ui/audit/adapted-runtime.json",
           "role": "support",
           "sha256": "44f227cee8df2ed4d681caa04ea92c86c0346cb789f326296ee820bea8908027"
