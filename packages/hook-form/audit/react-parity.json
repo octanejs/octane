@@ -80,9 +80,9 @@
           "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
         },
         {
-          "path": "packages/hook-form/upstream/SHA256SUMS",
+          "path": "packages/hook-form/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "1f82b4850b552aa0e1ab542eae604dbbcd4eaf5a5adcb03fff8282ebbd556d36"
+          "sha256": "27cb80c845616fad95fbb53571a1732fe389523d454cd411a6cd20206c24f21a"
         },
         {
           "path": "packages/hook-form/audit/upstream-adapted.SHA256SUMS",
@@ -102,7 +102,7 @@
         {
           "path": "scripts/react-parity/hook-form-upstream-lib.mjs",
           "role": "support",
-          "sha256": "739855b1c3bc514cb2e485adc15c5111b2616a41e5ce3f25f517be9c74c1a200"
+          "sha256": "b3a56820c30e88108b672c66ed3fbbb0cbcf68b2194accf80fba55a5db60a297"
         }
       ]
     },
@@ -260,8 +260,8 @@
           "cases": [
             {
               "id": "differential:register",
-              "testName": "register: typing → per-keystroke validation → submit → reset renders byte-identical",
-              "fullName": "differential: @octanejs/hook-form vs real react-hook-form register: typing → per-keystroke validation → submit → reset renders byte-identical"
+              "testName": "register: typing \u2192 per-keystroke validation \u2192 submit \u2192 reset renders byte-identical",
+              "fullName": "differential: @octanejs/hook-form vs real react-hook-form register: typing \u2192 per-keystroke validation \u2192 submit \u2192 reset renders byte-identical"
             },
             {
               "id": "differential:controller",

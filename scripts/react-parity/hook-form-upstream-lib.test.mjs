@@ -6,7 +6,6 @@ import test from 'node:test';
 
 import {
 	renderHookFormAdaptedInventory,
-	renderHookFormUpstreamInventory,
 	verifyHookFormUpstream,
 } from './hook-form-upstream-lib.mjs';
 
@@ -20,10 +19,6 @@ async function fixture() {
 	await writeFile(join(portedTests, 'example.test.ts'), "it('same behavior', () => {});\n");
 	await writeFile(join(upstreamTests, 'example.test.ts.snap'), 'snapshot\n');
 	await writeFile(join(portedTests, 'example.test.ts.snap'), 'snapshot\n');
-	await writeFile(
-		join(root, 'packages/hook-form/upstream/SHA256SUMS'),
-		renderHookFormUpstreamInventory(root),
-	);
 	await mkdir(join(root, 'packages/hook-form/audit'), { recursive: true });
 	await writeFile(
 		join(root, 'packages/hook-form/audit/upstream-adapted.SHA256SUMS'),
@@ -34,29 +29,34 @@ async function fixture() {
 
 test('accepts an intact byte-locked one-for-one adapted suite', async () => {
 	const { root } = await fixture();
-	assert.deepEqual(verifyHookFormUpstream(root), {
+	assert.deepEqual(verifyHookFormUpstream(root, { lock: false }), {
 		artifacts: 2,
 		portedCases: 1,
 		upstreamCases: 1,
 	});
 });
 
-test('rejects vendored byte drift', async () => {
+test('rejects vendored byte drift through the lock layer', async () => {
+	// A fixture root has no audit/upstream.lock.json, so the lock spawn itself
+	// must fail closed rather than silently passing.
 	const { root, upstreamTests } = await fixture();
 	await writeFile(join(upstreamTests, 'example.test.ts'), "it('changed', () => {});\n");
-	assert.throws(() => verifyHookFormUpstream(root), /upstream inventory drifted/);
+	assert.throws(() => verifyHookFormUpstream(root), /drifted from audit\/upstream\.lock\.json/);
 });
 
 test('rejects a missing adapted artifact', async () => {
 	const { portedTests, root } = await fixture();
 	await unlink(join(portedTests, 'example.test.ts.snap'));
-	assert.throws(() => verifyHookFormUpstream(root), /account for every upstream test artifact/);
+	assert.throws(
+		() => verifyHookFormUpstream(root, { lock: false }),
+		/account for every upstream test artifact/,
+	);
 });
 
 test('rejects an unrecorded adapted title change', async () => {
 	const { portedTests, root } = await fixture();
 	await writeFile(join(portedTests, 'example.test.ts'), "it('different behavior', () => {});\n");
-	assert.throws(() => verifyHookFormUpstream(root), /test registrations drifted/);
+	assert.throws(() => verifyHookFormUpstream(root, { lock: false }), /test registrations drifted/);
 });
 
 test('rejects duplicating one port-only case while dropping another', async () => {
@@ -76,21 +76,17 @@ test('rejects duplicating one port-only case while dropping another', async () =
 		`it('same dirty behavior', () => {});\nit('${firstExtra}', () => {});\nit('${secondExtra}', () => {});\n`,
 	);
 	await writeFile(
-		join(root, 'packages/hook-form/upstream/SHA256SUMS'),
-		renderHookFormUpstreamInventory(root),
-	);
-	await writeFile(
 		join(root, 'packages/hook-form/audit/upstream-adapted.SHA256SUMS'),
 		renderHookFormAdaptedInventory(root),
 	);
 
-	assert.doesNotThrow(() => verifyHookFormUpstream(root));
+	assert.doesNotThrow(() => verifyHookFormUpstream(root, { lock: false }));
 	await writeFile(
 		portedFile,
 		`it('same dirty behavior', () => {});\nit('${firstExtra}', () => {});\nit('${firstExtra}', () => {});\n`,
 	);
 	assert.throws(
-		() => verifyHookFormUpstream(root),
+		() => verifyHookFormUpstream(root, { lock: false }),
 		/expected every recorded Octane regression case to execute once/,
 	);
 });
@@ -113,7 +109,7 @@ test('rejects disabled, focused, or expected-failing adapted tests', async () =>
 			`${registration}('same behavior', () => {});\n`,
 		);
 		assert.throws(
-			() => verifyHookFormUpstream(root),
+			() => verifyHookFormUpstream(root, { lock: false }),
 			/focused, failing, skip, or todo markers/,
 			registration,
 		);
@@ -126,5 +122,8 @@ test('rejects adapted assertion or callback drift even when the title is unchang
 		join(portedTests, 'example.test.ts'),
 		"it('same behavior', () => {}); // drift\n",
 	);
-	assert.throws(() => verifyHookFormUpstream(root), /adapted test inventory drifted/);
+	assert.throws(
+		() => verifyHookFormUpstream(root, { lock: false }),
+		/adapted test inventory drifted/,
+	);
 });

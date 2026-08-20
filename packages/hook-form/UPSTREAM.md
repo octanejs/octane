@@ -16,7 +16,9 @@ The npm artifact publishes compiled `dist/` output and declarations only. The
 byte-exact source, original tests, snapshots, Jest configuration, package
 metadata, and license therefore come from the canonical repository at the tag
 commit above. They live under `upstream/`, are excluded from the published
-package, and are locked file-by-file by `upstream/SHA256SUMS`.
+package, and verify offline against the upstream git blob shas recorded in
+`audit/upstream.lock.json`. The pinned license is republished at the package
+root as `LICENSE.upstream`.
 
 Run `pnpm --dir packages/hook-form upstream:verify` to check the vendored bytes
 and the one-for-one adapted-suite inventory. Run
