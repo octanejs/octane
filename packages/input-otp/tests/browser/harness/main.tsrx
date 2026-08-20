@@ -82,8 +82,8 @@ function NoPasswordManagerPush(_props: {}) @{
 }
 
 function PwmSpace(_props: {}) @{
-	<div>
-		<div data-testid="roomy">
+	<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 40 }}>
+		<div data-testid="roomy" style={{ width: 'fit-content' }}>
 			<OTPInput maxLength={6}>
 				<Slots />
 			</OTPInput>

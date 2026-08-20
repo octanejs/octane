@@ -410,6 +410,10 @@ let ownedInputStyle: HTMLStyleElement | null = null;
 let inputStyleUsers = 0;
 
 function acquireInputStyles(nonce?: string): () => void {
+	if (ownedInputStyle && !ownedInputStyle.isConnected) {
+		ownedInputStyle = null;
+		inputStyleUsers = 0;
+	}
 	const existing = document.getElementById('input-otp-style');
 	if (existing && existing !== ownedInputStyle) return () => {};
 	inputStyleUsers++;

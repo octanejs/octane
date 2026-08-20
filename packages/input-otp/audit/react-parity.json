@@ -50,7 +50,7 @@
       "environment": "workspace-node",
       "project": "input-otp-pristine-browser",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Adapted execution of all 15 pinned upstream React identities in real Chromium; complete pinned-source hashes, rewritten-source hash, and allowed transforms are recorded in the crosswalk.",
+      "notes": "Adapted execution of all 19 pinned upstream React identities in real Chromium; complete pinned-source hashes, rewritten-source hash, and allowed transforms are recorded in the crosswalk.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/input-otp/audit/pristine-runtime-browser.json"
@@ -64,17 +64,17 @@
         {
           "path": "packages/input-otp/audit/pristine-runtime-crosswalk.json",
           "role": "support",
-          "sha256": "4ec3bc16ca28a59cb07851dd204439afbff0800a8e5a683d9d8a41f5edcbae74"
+          "sha256": "1d88930fa68ebfb79189ae4b26bbcb3a56eabe7efe21af3fd2fc7417df9a4813"
         },
         {
           "path": "packages/input-otp/audit/pristine-adaptation-ledger.json",
           "role": "support",
-          "sha256": "d3fd0a17675eda85769ec0533da9379774694a0e37a625325c3839574d2d36f3"
+          "sha256": "7bf59feb3860ef6a035a98e238eb287a09c47551c0d3efa409557642440e22fc"
         },
         {
           "path": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
           "role": "support",
-          "sha256": "b99018c80d008d4d11c776ee0b96accfadf06825f9a80119fed879a546709056"
+          "sha256": "f9257765451998e0b6103c0b014f39680dce85ec9637411126ba3bf17a671f3a"
         },
         {
           "path": "packages/input-otp/upstream/source/apps/playground/src/tests/base.delete-word.spec.ts",

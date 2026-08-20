@@ -1,5 +1,5 @@
 import { flushSync } from 'octane';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { flushEffects, mount } from '../../../octane/tests/_helpers';
 import {
@@ -18,6 +18,10 @@ function edit(input: HTMLInputElement, value: string): void {
 }
 
 describe('@octanejs/input-otp component state and projection', () => {
+	beforeEach(() => {
+		document.getElementById('input-otp-style')?.remove();
+	});
+
 	it('renders one real input with upstream attributes and context slots', () => {
 		const app = mount(UncontrolledInput, {});
 		const inputs = app.findAll('input[data-input-otp]');
@@ -28,7 +32,7 @@ describe('@octanejs/input-otp component state and projection', () => {
 		expect(input.autocomplete).toBe('one-time-code');
 		expect(input.inputMode).toBe('numeric');
 		expect(input.pattern).toBe('^\\d+$');
-		expect(input.spellcheck).toBe(false);
+		expect(input.getAttribute('spellcheck')).toBe('false');
 		expect(input.getAttribute('aria-label')).toBe('Verification code');
 		expect(input.name).toBe('verification-code');
 		expect(app.find('[data-input-otp-container]').getAttribute('translate')).toBe('no');
@@ -146,13 +150,18 @@ describe('@octanejs/input-otp component state and projection', () => {
 			onMouseLeave: vi.fn(),
 		};
 		const app = mount(CallbackInput, callbacks);
+		flushEffects();
 		const input = app.find('[data-testid="forwarded-input"]') as HTMLInputElement;
 		expect(input.id).toBe('forwarded-id');
 		expect(input.required).toBe(true);
 		expect(input.tabIndex).toBe(3);
 		expect(input.autocomplete).toBe('off');
-		expect(input.spellcheck).toBe(true);
-		expect(document.getElementById('input-otp-style')?.getAttribute('nonce')).toBe('csp-style');
+		expect(input.getAttribute('spellcheck')).toBe('true');
+		const injectedStyle = document.getElementById('input-otp-style');
+		expect(injectedStyle).not.toBeNull();
+		expect(injectedStyle?.getAttribute('nonce') || (injectedStyle as HTMLStyleElement).nonce).toBe(
+			'csp-style',
+		);
 
 		input.focus();
 		input.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));

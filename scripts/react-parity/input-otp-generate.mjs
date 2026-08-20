@@ -289,7 +289,7 @@ const manifest = {
 			project: 'input-otp-pristine-browser',
 			evidenceOrigin: 'upstream-suite',
 			notes:
-				'Adapted execution of all 15 pinned upstream React identities in real Chromium; complete pinned-source hashes, rewritten-source hash, and allowed transforms are recorded in the crosswalk.',
+				'Adapted execution of all 19 pinned upstream React identities in real Chromium; complete pinned-source hashes, rewritten-source hash, and allowed transforms are recorded in the crosswalk.',
 			execution: { kind: 'vitest-full', inventory: pristinePath },
 			files: [
 				await support(pristinePath),

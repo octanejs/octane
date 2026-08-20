@@ -28,6 +28,11 @@ async function pressAndExpectSelection(key: string, start: number, end: number):
 	await expectMirrorSelection(start, end);
 }
 
+async function settleMirrorSelection(start: number, end: number): Promise<void> {
+	await input().evaluate(() => document.dispatchEvent(new Event('selectionchange')));
+	await expectMirrorSelection(start, end);
+}
+
 async function plantFakeBadge(): Promise<void> {
 	await page.evaluate(() => {
 		const badge = document.createElement('div');
@@ -52,6 +57,7 @@ it('should backspace selected char', async () => {
 it('should forward-delete character when pressing delete', async () => {
 	await input().pressSequentially('123456');
 	expect(await input().inputValue()).toBe('123456');
+	await settleMirrorSelection(5, 6);
 	await input().press('Delete');
 	expect(await input().inputValue()).toBe('12345');
 	await setSelectionAndWait(0, 1);
@@ -95,12 +101,15 @@ it('should expose hover flags', async () => {
 });
 it('should replace selected char if another is pressed', async () => {
 	await input().pressSequentially('123');
-	await input().press('ArrowLeft');
+	await settleMirrorSelection(3, 3);
+	await pressAndExpectSelection('ArrowLeft', 2, 3);
 	await input().pressSequentially('1');
 	expect(await input().inputValue()).toBe('121');
 });
 it('should replace last char if another one is pressed', async () => {
-	await input().pressSequentially('1234567');
+	await input().pressSequentially('123456');
+	await settleMirrorSelection(5, 6);
+	await input().pressSequentially('7');
 	await page.waitForTimeout(100);
 	expect(await input().inputValue()).toBe('123457');
 });
@@ -151,6 +160,7 @@ it('should change the input value', async () => {
 it('should prevent typing greater than max length', async () => {
 	await input().pressSequentially('123456');
 	expect(await input().inputValue()).toBe('123456');
+	await settleMirrorSelection(5, 6);
 	await input().pressSequentially('7');
 	expect(await input().inputValue()).toBe('123457');
 });

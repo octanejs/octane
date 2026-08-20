@@ -29,7 +29,9 @@ it('should replace selected char if another is pressed', async () => {
 
 it('should replace last char if another one is pressed', async () => {
 	const input = page.getByRole('textbox');
-	await input.pressSequentially('1234567');
+	await input.pressSequentially('123456');
+	await expectSelection(input, [5, 6]);
+	await input.pressSequentially('7');
 	expect(await input.inputValue()).toBe('123457');
 });
 

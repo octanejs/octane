@@ -41,7 +41,7 @@
   ],
   "rewrittenExecution": {
     "path": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-    "sha256": "b99018c80d008d4d11c776ee0b96accfadf06825f9a80119fed879a546709056"
+    "sha256": "f9257765451998e0b6103c0b014f39680dce85ec9637411126ba3bf17a671f3a"
   },
   "identityCrosswalk": [
     {
@@ -242,6 +242,6 @@
   ],
   "adaptationLedger": {
     "path": "packages/input-otp/audit/pristine-adaptation-ledger.json",
-    "sha256": "d3fd0a17675eda85769ec0533da9379774694a0e37a625325c3839574d2d36f3"
+    "sha256": "7bf59feb3860ef6a035a98e238eb287a09c47551c0d3efa409557642440e22fc"
   }
 }

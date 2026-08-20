@@ -74,8 +74,8 @@ function Complete() {
 }
 function PwmSpace() {
 	return (
-		<div>
-			<div data-testid="roomy">
+		<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 40 }}>
+			<div data-testid="roomy" style={{ width: 'fit-content' }}>
 				<OTPInput maxLength={6} render={(state) => <Slots {...state} />} />
 			</div>
 			<div data-testid="tight" style={{ width: 'fit-content', overflowX: 'auto', padding: 8 }}>
