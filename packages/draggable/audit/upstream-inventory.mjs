@@ -598,6 +598,13 @@ export async function validate(root = packageRoot) {
 		license === upstreamLicense && license.includes('MIT License'),
 		'MIT license is missing or changed',
 	);
+	// LICENSE.upstream ships in the published files, so a drifted copy must
+	// fail verification, not just the in-tree upstream/LICENSE.
+	const republishedLicense = await readFile(join(root, 'LICENSE.upstream'), 'utf8');
+	assert(
+		republishedLicense === upstreamLicense,
+		'published LICENSE.upstream does not match the pinned upstream license',
+	);
 	return actual;
 }
 

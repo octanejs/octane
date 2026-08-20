@@ -90,7 +90,7 @@
         {
           "path": "packages/draggable/tests/upstream-vitest.config.ts",
           "role": "support",
-          "sha256": "d24105f3bef6f0686a1e566789d229f33df5f30e0790fc3c8ad50416918d09a5"
+          "sha256": "b71c5ffa912e13c8a8e3a0e29f139a557fdedf32c80f3dc657157cd5243c2058"
         }
       ]
     },

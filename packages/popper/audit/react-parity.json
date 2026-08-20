@@ -76,7 +76,7 @@
         {
           "path": "packages/popper/tests/upstream-jest.config.cjs",
           "role": "support",
-          "sha256": "d81e73bc29dc2e3b11a2c2ac79ae446cfe2513bb42fea6f6495bcd8ecd0596f8"
+          "sha256": "7e40dabd375a3ca8329d536fd3eecf21e38e31070738a817d6d592f20b072526"
         },
         {
           "path": "packages/popper/tests/upstream-jest.setup.cjs",

@@ -4,6 +4,26 @@ const { createRequire } = require('node:module');
 const packageRequire = createRequire(path.resolve(__dirname, '../package.json'));
 const upstreamRoot = path.resolve(__dirname, '../upstream');
 
+// The snapshot resolver reads lock-regenerated copies under tests/upstream/tag/
+// (gitignored). Materialize them here when absent so a clean checkout or a
+// standalone lane run works offline; staleness is enforced by the parity
+// verifiers.
+const { execFileSync } = require('node:child_process');
+const { existsSync } = require('node:fs');
+const regeneratedSnapshots = path.resolve(__dirname, 'upstream/tag/snapshots');
+if (!existsSync(regeneratedSnapshots)) {
+	execFileSync(
+		process.execPath,
+		[
+			path.resolve(__dirname, '../../../scripts/react-port/materialize.mjs'),
+			'run',
+			'--package-dir',
+			path.resolve(__dirname, '..'),
+		],
+		{ stdio: 'pipe' },
+	);
+}
+
 function resolveFromPackage(specifier) {
 	return packageRequire.resolve(specifier);
 }

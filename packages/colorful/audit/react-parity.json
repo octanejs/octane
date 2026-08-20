@@ -71,7 +71,7 @@
         {
           "path": "packages/colorful/tests/upstream-jest.config.cjs",
           "role": "support",
-          "sha256": "f133912c75aa28f8e0789d0607b880fbf6b935ff2474421d0a850be876614c91"
+          "sha256": "35b0bddbf02e4805458567b7dea273479740f4bbcde5c7c4888666ac8588657a"
         },
         {
           "path": "packages/colorful/tests/upstream-jest.setup.cjs",
