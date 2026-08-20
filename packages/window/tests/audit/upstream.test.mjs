@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -16,21 +15,9 @@ function fixture() {
 	return directory;
 }
 
-function rewriteChecksum(root, relativePath) {
-	const sumsPath = join(root, 'upstream/SHA256SUMS');
-	const hash = createHash('sha256')
-		.update(readFileSync(join(root, 'upstream', relativePath)))
-		.digest('hex');
-	const lines = readFileSync(sumsPath, 'utf8').split('\n');
-	const index = lines.findIndex((line) => line.endsWith(`  ${relativePath}`));
-	assert.notEqual(index, -1);
-	lines[index] = `${hash}  ${relativePath}`;
-	writeFileSync(sumsPath, lines.join('\n'));
-}
-
 test('accepts the pristine pinned tree', () => {
 	assert.deepEqual(verifyUpstream(packageRoot), {
-		files: 58,
+		files: 57,
 		testFiles: 14,
 		testCases: 117,
 		runtimeExports: 8,
@@ -43,7 +30,7 @@ test('rejects byte drift', () => {
 	try {
 		const path = join(root, 'upstream/lib/types.ts');
 		writeFileSync(path, `${readFileSync(path, 'utf8')}\n`);
-		assert.throws(() => verifyUpstream(root), /lib\/types\.ts checksum differs/);
+		assert.throws(() => verifyUpstream(root), /lock verification failed/);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -53,17 +40,16 @@ test('rejects missing vendored evidence', () => {
 	const root = fixture();
 	try {
 		rmSync(join(root, 'upstream/lib/core/getEstimatedSize.test.ts'));
-		assert.throws(() => verifyUpstream(root), /vendored file inventories differ/);
+		assert.throws(() => verifyUpstream(root), /lock verification failed/);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
 
-test('rejects renamed test identities even if the changed byte is re-locked', () => {
+test('rejects renamed test identities independently of the lock layer', () => {
 	const root = fixture();
 	try {
-		const relativePath = 'lib/core/getEstimatedSize.test.ts';
-		const path = join(root, 'upstream', relativePath);
+		const path = join(root, 'upstream/lib/core/getEstimatedSize.test.ts');
 		writeFileSync(
 			path,
 			readFileSync(path, 'utf8').replace(
@@ -71,21 +57,18 @@ test('rejects renamed test identities even if the changed byte is re-locked', ()
 				'silently renamed case',
 			),
 		);
-		rewriteChecksum(root, relativePath);
-		assert.throws(() => verifyUpstream(root), /test inventory checksum differs/);
+		assert.throws(() => verifyUpstream(root, { lock: false }), /test inventory checksum differs/);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
 
-test('rejects public export drift even if the changed byte is re-locked', () => {
+test('rejects public export drift independently of the lock layer', () => {
 	const root = fixture();
 	try {
-		const relativePath = 'lib/index.ts';
-		const path = join(root, 'upstream', relativePath);
+		const path = join(root, 'upstream/lib/index.ts');
 		writeFileSync(path, readFileSync(path, 'utf8').replace('Grid', 'GridRenamed'));
-		rewriteChecksum(root, relativePath);
-		assert.throws(() => verifyUpstream(root), /runtime exports differ/);
+		assert.throws(() => verifyUpstream(root, { lock: false }), /runtime exports differ/);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

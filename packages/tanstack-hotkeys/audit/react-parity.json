@@ -23,7 +23,7 @@
     },
     "tests": {
       "roots": ["packages/tanstack-hotkeys/tests/upstream"],
-      "include": ["\\.test\\.ts$"],
+      "include": ["\\.test\\.tsx?$"],
       "exclude": []
     }
   },
@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -65,32 +65,27 @@
         {
           "path": "packages/tanstack-hotkeys/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "2f5291f93573b9866d30de1d6a09ace6c6a10a38c04db137283611584317f6ab"
+          "sha256": "26198c87b7ed76bff29ceff217ab66c8821f59ef2b490ad8c836eb1c9c1b5994"
         },
         {
           "path": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
           "role": "support",
-          "sha256": "ae1b744b96e0e1996d4acba2fb8a24ffa1147805e4aabb6b889f34de790a1b6c"
+          "sha256": "4e452b70de53303509752d35826d1268f8a9788284dd27ccd92dad30831a9399"
         },
         {
           "path": "packages/tanstack-hotkeys/tests/upstream-pristine.vitest.config.ts",
           "role": "support",
-          "sha256": "4ff7a9c63e85bd9abc53cb5ea8861b479b72ead23abac97dd1774ce4bad82d7f"
+          "sha256": "2ecd6b226dc2e5beb1c485afb1dff91cecb20224338786f46fcd5f31ae532e49"
         },
         {
           "path": "scripts/react-parity/tanstack-hotkeys-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "623a226552b2f19ffd20be00f5e53036fd71f52d8eaa95494b274188f0dcb421"
+          "sha256": "6b7fb340c05c2123f936f48da0f305f49c312b30a9679f3f427d6160eb38ae93"
         },
         {
-          "path": "packages/tanstack-hotkeys/upstream/SHA256SUMS",
+          "path": "packages/tanstack-hotkeys/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "15d18ca1d85011855185b8f37d13958a01a4fe04e0cd586585554e5aa1741b7a"
-        },
-        {
-          "path": "packages/tanstack-hotkeys/scripts/check-upstream-ledger.mjs",
-          "role": "support",
-          "sha256": "55834dbdf5d55e9059c643074257b38ce48c453caf32bb1d54609ff7c8f606a8"
+          "sha256": "bb2184f9cc8fb38772139bd7a38132e3a4307813a34f0b31c292224d582fc4c9"
         }
       ]
     },
@@ -110,7 +105,7 @@
         {
           "path": "packages/tanstack-hotkeys/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "e5869993d034496b7d33adb23653b74bbf7a7ba89d53a1ae8d250813da00552d"
+          "sha256": "2c80e1f3139aa516c720fe43d190c3502a2e894f6a83911d684d56294f176fe4"
         },
         {
           "path": "packages/tanstack-hotkeys/tests/_setup.ts",
@@ -120,7 +115,7 @@
         {
           "path": "packages/tanstack-hotkeys/audit/upstream-crosswalk.json",
           "role": "support",
-          "sha256": "03bf000c8edc41d144d37b989da6e0c982f72a465d19f2d5ecc763333ebd33ea"
+          "sha256": "952ef00237f313591f0ee503cbf2f81bf5b048d95006d55cf7b23f238c09adfe"
         }
       ]
     },
@@ -153,7 +148,7 @@
         {
           "path": "packages/tanstack-hotkeys/typetests/pristine/tsconfig.json",
           "role": "support",
-          "sha256": "2908cf0ddfa89aaf55a111bd842c981054fc4d10e72c59fc958ae8dfb831cc41"
+          "sha256": "a73e5e1cd3f2d4a2ca0340e908f0361ef266dcc597c57e7e467e2860b28afde7"
         }
       ]
     },

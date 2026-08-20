@@ -8,7 +8,7 @@
     "sourceRoot": "src",
     "testRoot": "test",
     "license": "MIT",
-    "integrity": "sha256:593eaa38fabc7cba587566b524adfbe3c89c2901850c9524768258a2d76bda62",
+    "integrity": "sha256:845b3147ec071c67aa2ba8f42825414231ac950500181b005e1677016c51b39a",
     "verification": "recorded-unverified"
   },
   "upstreamSuites": {
@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -53,6 +53,11 @@
       "evidenceOrigin": "repo-authored",
       "notes": "Runs identical terminal parser, keypress, ANSI sanitization, and width-measurement inputs through the Octane port and the vendored Ink 7.1.1 source.",
       "files": [
+        {
+          "path": "packages/ink/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "fc771e179260a26e7249cfc4cd79acc93c180f6f7100faa0b46dd877dd0f32d5"
+        },
         {
           "path": "packages/ink/tests/differential/core.test.ts",
           "role": "test",
@@ -68,7 +73,7 @@
         {
           "path": "vitest.config.js",
           "role": "support",
-          "sha256": "6dd6514dcff62a822d783600fe1611f01d031a3ee63881004991efab202850ed"
+          "sha256": "09df6d0a9ca9cfb83bbaaae4fd13cc8479e92501ad0860e1b5e85537329e70b3"
         }
       ]
     }

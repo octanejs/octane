@@ -7,7 +7,7 @@
     "sourceRoot": "src",
     "testRoot": "test",
     "license": "MIT",
-    "integrity": "sha256:a95445810caa946472b2693d52b59281e2e6350f45a06067d7c42b277b257813",
+    "integrity": "sha256:d062e21bae0c864c3559707c0451edabc0aac32a22eda239064a3faa7c9f1b21",
     "verification": "recorded-unverified"
   },
   "upstreamSuites": {
@@ -43,7 +43,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -80,17 +80,17 @@
         {
           "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "75cb27835a432945b7eaa5730b34dc55d18c7aa190373d80743d6e917356b493"
+          "sha256": "20701aea9b5e5f5249a2559f847aac79cb28f9e0bb5d24d3ef50b06101205a02"
         },
         {
-          "path": "packages/vaul/scripts/verify-upstream.mjs",
+          "path": "packages/vaul/audit/provenance.json",
           "role": "support",
-          "sha256": "498bb78691d55687bb6afb6d79b2a5ce6cf376aa9b6689c2daa71aab2ec116fe"
+          "sha256": "5295e18d84cb0128e47ba66d105355bb98c4b3c653432c8054bc1a519affba72"
         },
         {
-          "path": "packages/vaul/upstream/SHA256SUMS",
+          "path": "packages/vaul/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "a95445810caa946472b2693d52b59281e2e6350f45a06067d7c42b277b257813"
+          "sha256": "7aacac5e86c6971f51420a1e93d6fa3ff13c9b5232a13cc5475571d89fc88003"
         }
       ]
     },
@@ -204,9 +204,9 @@
           "sha256": "af996cc31b548bbf85b090e3a52015c91b98f0170bd0d10faee78daa4841e84f"
         },
         {
-          "path": "packages/vaul/upstream/SHA256SUMS",
+          "path": "packages/vaul/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "a95445810caa946472b2693d52b59281e2e6350f45a06067d7c42b277b257813"
+          "sha256": "7aacac5e86c6971f51420a1e93d6fa3ff13c9b5232a13cc5475571d89fc88003"
         }
       ]
     },

@@ -7,7 +7,11 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
-import { verifyZagUpstream } from '../../packages/zag/scripts/verify-upstream.mjs';
+import {
+	UPSTREAM_LOCK_RELATIVE_PATH,
+	validateUpstreamLock,
+	verifyPristineTree,
+} from '../react-port/materialize-lib.mjs';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../packages/zag');
 const upstreamRoot = join(packageRoot, 'upstream');
@@ -39,7 +43,18 @@ export function runPristineUpstreamSuite({
 	repoRoot = resolve(packageRoot, '../..'),
 	reportPath = join(tmpdir(), `octane-zag-pristine-${process.pid}.json`),
 } = {}) {
-	verifyZagUpstream(packageRoot);
+	// The pristine tree regenerates from audit/upstream.lock.json
+	// (react-port:materialize run); refuse to run against a missing or drifted
+	// tree so the lane can only ever execute the pinned bytes.
+	const lock = validateUpstreamLock(
+		JSON.parse(readFileSync(join(packageRoot, UPSTREAM_LOCK_RELATIVE_PATH), 'utf8')),
+	);
+	const drift = verifyPristineTree(lock, upstreamRoot);
+	if (drift.missing.length > 0 || drift.mismatched.length > 0 || drift.unexpected.length > 0) {
+		throw new Error(
+			`packages/zag/upstream does not match audit/upstream.lock.json (missing: ${drift.missing.join(', ') || 'none'}; mismatched: ${drift.mismatched.join(', ') || 'none'}; unexpected: ${drift.unexpected.join(', ') || 'none'}). Run: pnpm react-port:materialize run --package-dir packages/zag`,
+		);
+	}
 	const runRoot = mkdtempSync(join(packageRoot, '.pristine-upstream-'));
 	try {
 		cpSync(join(upstreamRoot, 'src'), join(runRoot, 'src'), { recursive: true });

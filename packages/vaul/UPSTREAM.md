@@ -7,8 +7,10 @@ This binding targets `vaul@1.1.2` from
 The exact React source, complete Playwright test boundary (Next demo app, specs,
 Playwright config, workspace metadata), package metadata, README, stylesheet, and
 MIT license used for the port are retained under `upstream/`, vendored from the
-tagged git repository. Byte inventory is locked by `upstream/SHA256SUMS`. The npm
-tarball SHA-256 is `d062e21bae0c864c3559707c0451edabc0aac32a22eda239064a3faa7c9f1b21`
+tagged git repository. Every file verifies offline against the upstream git blob
+shas recorded in `audit/upstream.lock.json`, and the pinned license is
+republished at the package root as `LICENSE.upstream`. The npm tarball SHA-256 is
+`d062e21bae0c864c3559707c0451edabc0aac32a22eda239064a3faa7c9f1b21`
 (published package surface only). Run `pnpm --dir packages/vaul upstream:check` to
 verify the vendored evidence.
 

@@ -345,4 +345,3 @@ const waitForStoreReady = async (result: { current: Store<any> }): Promise<void>
     expect(result.current[StoreInternalsSymbol].clientSession).toBeDefined()
   })
 }
-

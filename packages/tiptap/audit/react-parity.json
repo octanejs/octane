@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -63,29 +63,19 @@
           "sha256": "94603d4fc4bb1764842eef97a48b1023c70eb29ffde69db0466eda8d8db6dfed"
         },
         {
-          "path": "packages/tiptap/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "20cd60a54d60da3e0768e825bc98c5d1798e697384459fd9ee424f1194694663"
-        },
-        {
-          "path": "packages/tiptap/scripts/verify-upstream.mjs",
-          "role": "support",
-          "sha256": "b683ee6f75cfe7b15f13c2dfcde34de01a20eeb2f8d886277d810f74420ee6b8"
-        },
-        {
           "path": "packages/tiptap/tests/_harness/verify-upstream.ts",
           "role": "support",
-          "sha256": "640b2a24d7ec40b4f72a82ed720c2fb76ad54c65cd0bb232c20f97ab21d98337"
+          "sha256": "26f7c9b1f7971b0bb951d9d3685d3b2876caebb0d127d8c7a1192814c2149ecf"
         },
         {
-          "path": "packages/tiptap/upstream/LICENSE.md",
+          "path": "packages/tiptap/LICENSE.upstream",
           "role": "support",
           "sha256": "c96e5ecb55ac593157ad1d21d1f44a611187f494a0f04c235a1ae692c88d6ba9"
         },
         {
           "path": "packages/tiptap/upstream/package.json",
           "role": "support",
-          "sha256": "2aed9edf82538a76d8696aa248397b160302793bd5081b235359335a688ccf95"
+          "sha256": "c5b357187d92f5235a01c1a42ba85cb47b667458a936315b5d6e3eb4d3979a1f"
         },
         {
           "path": "packages/tiptap/upstream/src/EditorContent.spec.ts",
@@ -116,6 +106,11 @@
           "path": "packages/tiptap/tests/upstream/assertions.md",
           "role": "support",
           "sha256": "1bd1acf855ab715331a68eccb0acf9b9da6d6983bacead35ccaad72753acc5e3"
+        },
+        {
+          "path": "packages/tiptap/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "3158c4d9ede7756d6cef6989742c546353e526f46a79700dabf1ac162897c044"
         }
       ]
     },

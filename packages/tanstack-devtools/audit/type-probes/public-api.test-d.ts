@@ -3,7 +3,7 @@ import {
 	TanStackDevtools,
 	type TanStackDevtoolsReactInit,
 	type TanStackDevtoolsReactPlugin,
-} from '../../upstream/package/src/index';
+} from '../../upstream/src/index';
 
 declare function expectType<T>(value: T): void;
 

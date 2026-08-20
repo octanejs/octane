@@ -89,16 +89,20 @@ function testEvidence(source) {
 }
 
 export async function buildInventory(root = packageRoot) {
+	// The pristine upstream/ tree verifies offline against audit/upstream.lock.json
+	// (upstream git blob shas); this inventory hash-pins the npm artifact evidence.
 	const upstreamRoot = join(root, 'upstream');
-	const artifactPaths = await filesUnder(upstreamRoot);
+	const artifactRoot = join(root, 'upstream-artifact');
+	const artifactPaths = await filesUnder(artifactRoot);
 	const artifacts = await Promise.all(
 		artifactPaths.map(async (path) => {
-			const bytes = await readFile(join(upstreamRoot, path));
+			const bytes = await readFile(join(artifactRoot, path));
 			return { path, bytes: bytes.length, sha256: sha256(bytes) };
 		}),
 	);
+	const upstreamPaths = await filesUnder(upstreamRoot);
 	const cases = [];
-	for (const file of artifactPaths.filter((path) => /tag\/src\/.*\.test\.js$/.test(path))) {
+	for (const file of upstreamPaths.filter((path) => /^src\/.*\.test\.js$/.test(path))) {
 		const source = await readFile(join(upstreamRoot, file), 'utf8');
 		for (const entry of staticCases(source)) {
 			cases.push({
@@ -110,7 +114,8 @@ export async function buildInventory(root = packageRoot) {
 			});
 		}
 	}
-	for (const file of ['tag/typings/tests/main-test.tsx', 'tag/typings/tests/svg-test.tsx']) {
+	for (const file of ['typings/tests/main-test.tsx', 'typings/tests/svg-test.tsx']) {
+		await access(join(upstreamRoot, file));
 		cases.push({ id: `${file}::type program`, file, line: 1, name: 'type program', kind: 'types' });
 	}
 	const caseMap = JSON.parse(await readFile(join(root, 'audit/case-map.json'), 'utf8'));
@@ -224,9 +229,22 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 		await writeFile(inventoryPath, `${JSON.stringify(inventory, null, 2)}\n`);
 		console.log(`wrote ${relative(packageRoot, inventoryPath)}`);
 	} else {
+		// The committed pristine tree verifies against the lock's git blob shas.
+		const { execFileSync } = await import('node:child_process');
+		execFileSync(
+			process.execPath,
+			[
+				join(packageRoot, '../../scripts/react-port/materialize.mjs'),
+				'run',
+				'--check',
+				'--package-dir',
+				packageRoot,
+			],
+			{ cwd: join(packageRoot, '../..'), stdio: 'pipe' },
+		);
 		await validate();
 		console.log(
-			`verified ${inventory.artifacts.length} artifacts and ${inventory.upstreamCases.length} upstream cases`,
+			`verified the lock-pinned upstream tree, ${inventory.artifacts.length} npm artifacts, and ${inventory.upstreamCases.length} upstream cases`,
 		);
 	}
 }

@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "TanStack Hotkeys bindings for Octane — reuses the framework-agnostic @tanstack/hotkeys core with an Octane hook adapter.",
+  "description": "TanStack Hotkeys bindings for Octane \u2014 reuses the framework-agnostic @tanstack/hotkeys core with an Octane hook adapter.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -24,7 +24,8 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts"

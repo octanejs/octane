@@ -16,5 +16,5 @@
       "react-dom": ["../node_modules/@types/react-dom-colorful-pristine/index.d.ts"]
     }
   },
-  "include": ["../upstream/tag/src/**/*"]
+  "include": ["../upstream/src/**/*"]
 }

@@ -9,8 +9,5 @@
     "typeRoots": ["../node_modules/@types"],
     "types": ["react"]
   },
-  "files": [
-    "../upstream/tag/typings/tests/main-test.tsx",
-    "../upstream/tag/typings/tests/svg-test.tsx"
-  ]
+  "files": ["../upstream/typings/tests/main-test.tsx", "../upstream/typings/tests/svg-test.tsx"]
 }

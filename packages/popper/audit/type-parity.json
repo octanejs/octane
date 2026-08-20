@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "upstreamRoot": "packages/popper/upstream/tag/typings/tests",
+  "upstreamRoot": "packages/popper/upstream/typings/tests",
   "adaptedRoot": "packages/popper/typetests",
   "inventories": {
     "upstream": "packages/popper/audit/upstream-types.json",

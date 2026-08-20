@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as octane from '../../src/utils/index';
-import * as react from '../../upstream/canonical/src/utils/index';
+import * as react from '../../upstream/src/utils/index';
 
 function observe<T>(fn: () => T) {
 	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});

@@ -189,7 +189,7 @@ flowchart TB
 
 ### Implementation Constraints
 
-- Read `AGENTS.md`, `.agents/skills/react-library-port/SKILL.md`, `.agents/memories/testing.md`, and `.agents/memories/tsrx-authoring.md` before implementation.
+- Read `AGENTS.md`, `.agents/skills/octane-react-library-port/SKILL.md`, `.agents/memories/testing.md`, and `.agents/memories/tsrx-authoring.md` before implementation.
 - Components authored in `.tsrx` require corresponding public declaration coverage; never add a published ambient `declare module '*.tsrx'`.
 - Tests assert observable contracts rather than React internals, Fiber timing, synthetic events, or private Inertia implementation fields.
 - Genuine Octane runtime/compiler defects get regression coverage and root-cause fixes in the owning package; do not hide them in the binding.
@@ -225,7 +225,7 @@ flowchart TB
 
 ### Sources and Research
 
-- `AGENTS.md` and `.agents/skills/react-library-port/SKILL.md` — repository binding-port contract.
+- `AGENTS.md` and `.agents/skills/octane-react-library-port/SKILL.md` — repository binding-port contract.
 - `docs/react-library-compat-plan.md` — core-reuse, differential-test, and divergence methodology.
 - `packages/apollo-client` and `docs/apollo-client-port-plan.md` — full adapter surface, SSR, public type, and packed-consumer precedent.
 - `packages/tanstack-router` and `docs/tanstack-parity-audit.md` — router, link, layouts, SSR, and native-event precedent.

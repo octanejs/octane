@@ -68,4 +68,3 @@ export const useStoreRegistry = (override?: StoreRegistry) => {
 
   return storeRegistry
 }
-

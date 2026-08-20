@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/useForm/trigger.test.tsx b/tests/upstream/useForm/trigger.test.tsx
+--- a/tests/upstream/useForm/trigger.test.tsx
++++ b/tests/upstream/useForm/trigger.test.tsx
+@@ -458,7 +458,7 @@ describe('trigger', () => {
+           <FormProvider {...methods}>
+             <form>
+               <input
+-                onChange={(e) =>
++                onInput={(e) =>
+                   methods.setValue('test', e.target.value, {
+                     shouldValidate: true,
+                   })
+@@ -466,7 +466,7 @@ describe('trigger', () => {
+               />
+               <InputA />
+               <input
+-                onChange={(e) =>
++                onInput={(e) =>
+                   methods.setValue('test1', e.target.value, {
+                     shouldValidate: true,
+                   })

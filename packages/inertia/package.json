@@ -14,7 +14,7 @@
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "Inertia.js bindings for the octane renderer — reuses @inertiajs/core and ports the React adapter onto octane.",
+  "description": "Inertia.js bindings for the octane renderer \u2014 reuses @inertiajs/core and ports the React adapter onto octane.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -32,7 +32,8 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts",

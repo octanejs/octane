@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -80,7 +80,7 @@
         {
           "path": "scripts/react-parity/zag-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "9fcb626a447149790233037c99d54cb9a79d4894af6c22f82d29f85fd7fd24ae"
+          "sha256": "ec982085164b59c832c40b92466c13cfbe73b96817b94eaed9ce37659afda637"
         },
         {
           "path": "scripts/react-parity/zag-runtime-crosswalk.mjs",
@@ -88,9 +88,9 @@
           "sha256": "3fc205291d23f2d867643f55ee88a3c6856c18fc4c8232232e33b91435700794"
         },
         {
-          "path": "packages/zag/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "4e22fbbefcf556622558f582e01a0536272c748265eebe8a847c9902877797a1"
+          "sha256": "05b588ad14562a780437a1e023f6c24ceed437e61a5a77ba27197feb898823a0"
         },
         {
           "path": "packages/zag/tests/upstream-vitest.config.ts",
@@ -98,14 +98,9 @@
           "sha256": "15d603d0095c5e417ee548c517cbe012a5a5c942536b3ee006abdb3d7ee0d4dc"
         },
         {
-          "path": "packages/zag/scripts/verify-upstream.mjs",
+          "path": "packages/zag/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "15845612c0d55117aaf84da53413dceb46d28a8ff71fca1e28dbce6e908b3b06"
-        },
-        {
-          "path": "packages/zag/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "037f857d00462559b9790acc2214c818678eb9d61970d6c394dc26dcfcd1516d"
+          "sha256": "8241115c7b6af6d0a701e643aa08ddb31fdb114deca390ad27441fcb79482431"
         }
       ]
     },
@@ -116,7 +111,7 @@
       "environment": "workspace-node",
       "project": "zag",
       "evidenceOrigin": "upstream-suite",
-      "notes": "One-for-one adapted @zag-js/react 1.42.0 machine and nested-states suite identities against @octanejs/zag. The inventory generator and react-parity:validate enforce the normalized pristine→adapted crosswalk; StrictMode identities stay pristine-only via audit/runtime-case-dispositions.json.",
+      "notes": "One-for-one adapted @zag-js/react 1.42.0 machine and nested-states suite identities against @octanejs/zag. The inventory generator and react-parity:validate enforce the normalized pristine\u2192adapted crosswalk; StrictMode identities stay pristine-only via audit/runtime-case-dispositions.json.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/zag/audit/adapted-runtime.json"
@@ -146,6 +141,16 @@
           "path": "packages/zag/audit/test-classifications.json",
           "role": "support",
           "sha256": "8097add882252cae7fff541f68cf49c1ad7917b4c9f3d022534aec8eb4563855"
+        },
+        {
+          "path": "packages/zag/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "8241115c7b6af6d0a701e643aa08ddb31fdb114deca390ad27441fcb79482431"
+        },
+        {
+          "path": "packages/zag/audit/upstream-patches/tests/upstream/strict-mode.test.tsx.skip",
+          "role": "support",
+          "sha256": "761cabdd92c889edd2a4375a37377a1876b846f2ab475cabe607ecb9ae1cc52b"
         }
       ]
     },
@@ -249,7 +254,7 @@
       "environment": "workspace-node",
       "project": "zag-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode→OctaneNode transformation.",
+      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode\u2192OctaneNode transformation.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",

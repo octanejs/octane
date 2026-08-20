@@ -1,0 +1,3506 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-syntax-highlighter",
+    "version": "16.1.1",
+    "repository": {
+      "owner": "react-syntax-highlighter",
+      "repo": "react-syntax-highlighter",
+      "subdirectory": null
+    },
+    "commit": "ecac533ba1fce8cf4f98a79c5c913f1a7ffab34c",
+    "integrity": "sha512-PjVawBGy80C6YbC5DDZJeUjBmC7skaoEUdvfFQediQHgCL7aKyVHe57SaJGfQsloGDac+gCpTfRdtxzWWKmCXA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "a74e9029bdf2e92141bc711a6b17fa77b90c10eeec51193c83279cc69848f5bf"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["LICENSE", "__tests__", "babel.config.js", "package.json", "src"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "__tests__/__snapshots__/code-style-passed-to-line-numbers.js.snap",
+      "gitBlob": "38525e2071aae5bfe6ced6f46699abdbd7a69a15",
+      "size": 5206
+    },
+    {
+      "path": "__tests__/__snapshots__/custom-code.js.snap",
+      "gitBlob": "65a5de86b9b6b72cd4060cdcb6a821d9266f9c1f",
+      "size": 7404
+    },
+    {
+      "path": "__tests__/__snapshots__/custom-pre.js.snap",
+      "gitBlob": "1ec346a13220a47f3cdd483bbba8998aec620e16",
+      "size": 7394
+    },
+    {
+      "path": "__tests__/__snapshots__/light-async.js.snap",
+      "gitBlob": "cf244bf583f2a24b7342f99575d9c816620f7d77",
+      "size": 25764
+    },
+    {
+      "path": "__tests__/__snapshots__/line-numbers.js.snap",
+      "gitBlob": "ada0da29d30c76979ad17ca874742efad9522b2b",
+      "size": 56960
+    },
+    {
+      "path": "__tests__/__snapshots__/multiline-comments.js.snap",
+      "gitBlob": "39c3d98f4b47513f2b7d2c9d7804e5d066b8e8fa",
+      "size": 2522
+    },
+    {
+      "path": "__tests__/__snapshots__/no-inline.js.snap",
+      "gitBlob": "57a11cebbd0e698e62c58c25cf4b8d28e06a5d54",
+      "size": 3953
+    },
+    {
+      "path": "__tests__/__snapshots__/no-language.js.snap",
+      "gitBlob": "23729beeae5a8bf1fdeca41620c16095144a3bf0",
+      "size": 3694
+    },
+    {
+      "path": "__tests__/__snapshots__/prism-async-light.js.snap",
+      "gitBlob": "e17c05d58deb2f62cf37c2e7be2f386f9963db90",
+      "size": 5882
+    },
+    {
+      "path": "__tests__/__snapshots__/prism-async.js.snap",
+      "gitBlob": "bce2637f06839ebdce3d368c5ee283ccfe9c08d5",
+      "size": 29037
+    },
+    {
+      "path": "__tests__/__snapshots__/prism-light.js.snap",
+      "gitBlob": "e39d4fdb65eee39edd7087a9acdef17734621543",
+      "size": 19642
+    },
+    {
+      "path": "__tests__/__snapshots__/refractor.js.snap",
+      "gitBlob": "f1eb01c8fd5cfdbf02e9325b82fc264e08d931ea",
+      "size": 12855
+    },
+    {
+      "path": "__tests__/__snapshots__/render-plain-string.js.snap",
+      "gitBlob": "1098ac9c090e3464c824e630b551104fd34d2574",
+      "size": 431
+    },
+    {
+      "path": "__tests__/__snapshots__/render.js.snap",
+      "gitBlob": "6a0f650ce796e4f1a40efa6ee2efe88cfda3bbd8",
+      "size": 5469
+    },
+    {
+      "path": "__tests__/__snapshots__/text-language.js.snap",
+      "gitBlob": "6476f149f4c12212a78a83105800c68eaa840169",
+      "size": 810
+    },
+    {
+      "path": "__tests__/__snapshots__/unknown-language.js.snap",
+      "gitBlob": "060b40cccd708db654d9d93f81320a3e0a59fb4b",
+      "size": 3783
+    },
+    {
+      "path": "__tests__/__snapshots__/vue-language.js.snap",
+      "gitBlob": "401e4a6c71e71e93952d2b2865e4c8d81ad28b24",
+      "size": 4726
+    },
+    {
+      "path": "__tests__/__snapshots__/wrap-lines.js.snap",
+      "gitBlob": "4ec96a118d1bfc408296b7d28c1409877cdb7702",
+      "size": 34496
+    },
+    {
+      "path": "__tests__/async-syntax-highlighter.js",
+      "gitBlob": "46873fd615628f5e10f9553b1ed268f36035ab89",
+      "size": 4811
+    },
+    {
+      "path": "__tests__/code-style-passed-to-line-numbers.js",
+      "gitBlob": "ebc357ec0b510e83dfcbb49c8d1d2c6f4ba908d0",
+      "size": 771
+    },
+    {
+      "path": "__tests__/custom-code.js",
+      "gitBlob": "61612c1b76f668c2a1802ff070c074432d5a3c8b",
+      "size": 949
+    },
+    {
+      "path": "__tests__/custom-pre.js",
+      "gitBlob": "0f1252153ffa7604c598df0aa5b6a3b85de587f0",
+      "size": 931
+    },
+    {
+      "path": "__tests__/light-async.js",
+      "gitBlob": "534aab479262789cf32fa7584a738c60041598be",
+      "size": 5426
+    },
+    {
+      "path": "__tests__/line-numbers.js",
+      "gitBlob": "46cb1355a8a336f72d4f69de7123a9b974504d10",
+      "size": 2635
+    },
+    {
+      "path": "__tests__/multiline-comments.js",
+      "gitBlob": "9da053b14359a26755c868cd90f3a6e586de2a69",
+      "size": 452
+    },
+    {
+      "path": "__tests__/no-inline.js",
+      "gitBlob": "5327922d4ff479adabbf97d75ab9ab3bf444c4d8",
+      "size": 697
+    },
+    {
+      "path": "__tests__/no-language.js",
+      "gitBlob": "44ff55df52f0847d5d2d242db65bd5abcdb17daa",
+      "size": 574
+    },
+    {
+      "path": "__tests__/prism-async-light.js",
+      "gitBlob": "7f9a58948629693dcfdb7dd1913f77440c8aaffb",
+      "size": 2455
+    },
+    {
+      "path": "__tests__/prism-async.js",
+      "gitBlob": "6cbcb86eef4305b18a854d3e6cc9ff5633db8f75",
+      "size": 2415
+    },
+    {
+      "path": "__tests__/prism-light.js",
+      "gitBlob": "4b8ee9db11e3edb6c9437ea66d3d3b3e66d57d81",
+      "size": 1295
+    },
+    {
+      "path": "__tests__/refractor.js",
+      "gitBlob": "aad0304f9378e265fa59f726d60466ed9dd8fae3",
+      "size": 640
+    },
+    {
+      "path": "__tests__/render-plain-string.js",
+      "gitBlob": "743d51d9667e67ee5fc834bcb7a49d9716b38d07",
+      "size": 604
+    },
+    {
+      "path": "__tests__/render.js",
+      "gitBlob": "b5977f94ee72171fa47b1e2734c3df07aa430672",
+      "size": 596
+    },
+    {
+      "path": "__tests__/text-language.js",
+      "gitBlob": "d9e63d56e3e815989a6a509dd40bf549d07dc260",
+      "size": 627
+    },
+    {
+      "path": "__tests__/unknown-language.js",
+      "gitBlob": "f6b2d84a00c51160e05f85818802d8b0fe8a9b40",
+      "size": 649
+    },
+    {
+      "path": "__tests__/vue-language.js",
+      "gitBlob": "97f6410f3e5ca493cd8d396eed1d3c0829542fc5",
+      "size": 446
+    },
+    {
+      "path": "__tests__/wrap-lines.js",
+      "gitBlob": "f0911bc21c0efcbcd1816321206c2621bef845a6",
+      "size": 3221
+    },
+    {
+      "path": "babel.config.js",
+      "gitBlob": "0580764b6720fe248cc51effdb2f4c2b4da53841",
+      "size": 837
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "c90c5fd71d8c9339e0cc19f7a24e760ad480eebf",
+      "size": 1071
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "3bf5847319e3910e13bd2d7a04be976fbb87f5c8",
+      "size": 4537
+    },
+    {
+      "path": "src/async-languages/create-language-async-loader.js",
+      "gitBlob": "362c475fc3b995f92bb6bd6371696ce81717455d",
+      "size": 169
+    },
+    {
+      "path": "src/async-languages/hljs.js",
+      "gitBlob": "d9cbc0b84c8637e42e49381bd98942b58878abd8",
+      "size": 33513
+    },
+    {
+      "path": "src/async-languages/prism.js",
+      "gitBlob": "aa07c74144df5918948bf3a06b1b7684f467e61b",
+      "size": 47250
+    },
+    {
+      "path": "src/async-syntax-highlighter.js",
+      "gitBlob": "b630c062fd43fe24518457ce191d335af46feea3",
+      "size": 3988
+    },
+    {
+      "path": "src/checkForListedLanguage.js",
+      "gitBlob": "ea50f4fd8cf7c8761e7bf9413636ccbf45043a06",
+      "size": 135
+    },
+    {
+      "path": "src/create-element.js",
+      "gitBlob": "168bbeaa789f6836d70db3c674947714f482b570",
+      "size": 6435
+    },
+    {
+      "path": "src/default-highlight.js",
+      "gitBlob": "350351d410ef486910478d1d9cec57a5c0acb8c9",
+      "size": 335
+    },
+    {
+      "path": "src/highlight.js",
+      "gitBlob": "5c666efd8748cdcddf2a5658ff49844e1431167d",
+      "size": 11794
+    },
+    {
+      "path": "src/index.js",
+      "gitBlob": "cca5ea32e1e18e5251f33c35f043a1f4afef0b80",
+      "size": 430
+    },
+    {
+      "path": "src/languages/hljs/1c.js",
+      "gitBlob": "afc104b115056dca087332bea2772b58f029a3b8",
+      "size": 71
+    },
+    {
+      "path": "src/languages/hljs/abnf.js",
+      "gitBlob": "c327f23b471d65e6d1fcbda454b3ae603062a9f5",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/accesslog.js",
+      "gitBlob": "c9e0d4fc2df2b6d7adf75cdf6b34cef36d837085",
+      "size": 88
+    },
+    {
+      "path": "src/languages/hljs/actionscript.js",
+      "gitBlob": "5e1432b1c2c3fb70a1bab23d5cc2df80e318be3c",
+      "size": 97
+    },
+    {
+      "path": "src/languages/hljs/ada.js",
+      "gitBlob": "b4e25a4d4e6cd3eb41220c3b664b6b0461c61315",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/angelscript.js",
+      "gitBlob": "c8f1b564d9c1f1c5101c5ac34df0f0e7dc767ebd",
+      "size": 94
+    },
+    {
+      "path": "src/languages/hljs/apache.js",
+      "gitBlob": "df523a6e0ae86483cf948980ba068f0f196e71cb",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/applescript.js",
+      "gitBlob": "55dfb463a3e6d4c72b0a9531a8888bd24b5e437e",
+      "size": 94
+    },
+    {
+      "path": "src/languages/hljs/arcade.js",
+      "gitBlob": "00d0c75b802b6eef5e5c746f215f3de40b8db15e",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/arduino.js",
+      "gitBlob": "bad75f4e9a1975e2630ea6769d6e1f5e972dcc61",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/armasm.js",
+      "gitBlob": "279a98d2b370fead8afee3419f64a904b80da1c6",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/asciidoc.js",
+      "gitBlob": "46a70208da3081bdebea26879460f40711eae5b6",
+      "size": 85
+    },
+    {
+      "path": "src/languages/hljs/aspectj.js",
+      "gitBlob": "d2071c47708ce18677f59af4513967186e5cf6f8",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/autohotkey.js",
+      "gitBlob": "c2c747a88c21412c61f8393ab125c8cbf2ca7c49",
+      "size": 91
+    },
+    {
+      "path": "src/languages/hljs/autoit.js",
+      "gitBlob": "522292ab6b95cbc0a89513566908dba08384091c",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/avrasm.js",
+      "gitBlob": "bc477cb07bb3011e157357ec6cf70c09a4501a96",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/awk.js",
+      "gitBlob": "db7f5519b75550adddae0cced5028db836566bb8",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/axapta.js",
+      "gitBlob": "9086e5ce42c99e78b6a855cf475c703150cc06be",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/bash.js",
+      "gitBlob": "42bdd3fe6d9b65cb9b81b1ae491fb78857ca9102",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/basic.js",
+      "gitBlob": "1b7d27200bfb9d2c64d51f0568e0f7fb8652b3c3",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/bnf.js",
+      "gitBlob": "c4dee3495f6e21cd3657539eccb1f652e5975cb0",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/brainfuck.js",
+      "gitBlob": "ee711981c90ee08421c4fa2579f46dd76f813d1a",
+      "size": 88
+    },
+    {
+      "path": "src/languages/hljs/c-like.js",
+      "gitBlob": "056b6e286d70fe111c86f50f780de1b9238c9dd9",
+      "size": 77
+    },
+    {
+      "path": "src/languages/hljs/c.js",
+      "gitBlob": "e5acdfec06045038cd487de64711feb12d11da5f",
+      "size": 64
+    },
+    {
+      "path": "src/languages/hljs/cal.js",
+      "gitBlob": "a72b26710cd444c0062387880a7253d2561ed91f",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/capnproto.js",
+      "gitBlob": "933ebea0ec23eeb0a8691b4dbcdb3632096fc050",
+      "size": 88
+    },
+    {
+      "path": "src/languages/hljs/ceylon.js",
+      "gitBlob": "daf6b2e3f3a7407e17876ea2fc76ab53a9f0adca",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/clean.js",
+      "gitBlob": "791186c59477ea581cb2a127c801d125f1d1ce7b",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/clojure-repl.js",
+      "gitBlob": "689e3c1eecb6c30be18faeabf5679abd6e624a3c",
+      "size": 95
+    },
+    {
+      "path": "src/languages/hljs/clojure.js",
+      "gitBlob": "49495d417a0987f331092187d827d49b1260014b",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/cmake.js",
+      "gitBlob": "1ba54969d2464875830c645fa89ce4c64a1049df",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/coffeescript.js",
+      "gitBlob": "62984bfd9ddbbbecb55a40d30efd8de7c5f712e0",
+      "size": 97
+    },
+    {
+      "path": "src/languages/hljs/coq.js",
+      "gitBlob": "ed16ca103deead48096d50b2b888e895f56786ca",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/cos.js",
+      "gitBlob": "4592bd95e46e41a644662db935fd52eb0de1d557",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/cpp.js",
+      "gitBlob": "5b02a922df5d8766b2de91528e287f2b585c10a5",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/crmsh.js",
+      "gitBlob": "f11bef56ce8dc248f67f51a97ac63fbc351e851c",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/crystal.js",
+      "gitBlob": "722e8a760fe868122ce231d3d141e04c9e8a9405",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/csharp.js",
+      "gitBlob": "af33d0f83d996674fdcd05ae86b15f0e3df9706a",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/csp.js",
+      "gitBlob": "3485dba68cffb488ec1c9ba0be01578f53eb9722",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/css.js",
+      "gitBlob": "04b47da07d2da9eb257279c180d5f1a8d5d4265d",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/d.js",
+      "gitBlob": "8b613b27914dcb20858c2f8bdab79470c0e632d4",
+      "size": 64
+    },
+    {
+      "path": "src/languages/hljs/dart.js",
+      "gitBlob": "82a7690f48b266b62574f5ec053801893b65eb65",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/delphi.js",
+      "gitBlob": "b09599666321fecc1549429b0159a3af86286915",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/diff.js",
+      "gitBlob": "1d29446e79a06ae554c10add6dffdcdb346e79a2",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/django.js",
+      "gitBlob": "10be37da2b57e4861f663fe64e610de831692caa",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/dns.js",
+      "gitBlob": "4d6889077c98a46c9520aa0fca84e1026d1b20ba",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/dockerfile.js",
+      "gitBlob": "fddd4c1a8fc5d8967815916b9dfc55c7e3e3b03d",
+      "size": 91
+    },
+    {
+      "path": "src/languages/hljs/dos.js",
+      "gitBlob": "c2214aca064a26f89964db795b8e5bb8c12f4b60",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/dsconfig.js",
+      "gitBlob": "7c57b60f5bf0518188014719618425df3ade25de",
+      "size": 85
+    },
+    {
+      "path": "src/languages/hljs/dts.js",
+      "gitBlob": "b9541929979000eb594e0f6d1792cc26c870b2c2",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/dust.js",
+      "gitBlob": "a33b1c4a1e96d9c1a1492d1b4cb7b8a9856eccf5",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/ebnf.js",
+      "gitBlob": "1ac6d776b12bab7c6635cf198da4dfecb50ce714",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/elixir.js",
+      "gitBlob": "bf10dc7f51b6b8c1aec1fb2efdbfdb7544ffcd5c",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/elm.js",
+      "gitBlob": "83a2824a70b80d1b7705c420a1ce152f3433d6b4",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/erb.js",
+      "gitBlob": "6bcd7ffcdede65341fe46be58ebfcd9ceb8a9f3f",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/erlang-repl.js",
+      "gitBlob": "601afb7d9a298d6a1a3242b6c8b127076e45cd8e",
+      "size": 92
+    },
+    {
+      "path": "src/languages/hljs/erlang.js",
+      "gitBlob": "4d18b79f9c6ffdc9c8c84dc4bab1b730677c1fb9",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/excel.js",
+      "gitBlob": "b429bf3d77572f49e139db4bdf97bc80add39df7",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/fix.js",
+      "gitBlob": "0bf94b95b5f3769e999d711b42cc6a3ca5be2e41",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/flix.js",
+      "gitBlob": "3a9334f66c277cd7d4f1fd04305fa38d323ee80e",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/fortran.js",
+      "gitBlob": "05c73c72c52145e11e4b383da803d1b37db3c456",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/fsharp.js",
+      "gitBlob": "b459d6a0c0f570c8e1b4b67b04a10c20b6872a3a",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/gams.js",
+      "gitBlob": "1f3515198eb4d8e0c1870117fce9aa7ec406335a",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/gauss.js",
+      "gitBlob": "ae7470136f0b75e8a4299f7d917c8789f50274de",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/gcode.js",
+      "gitBlob": "af6a399be0e08f0c6d4c85639bf5de6efbcd6a1d",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/gherkin.js",
+      "gitBlob": "e7852f671bfb5ee2f5c64fa09fbc62b25064e58c",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/glsl.js",
+      "gitBlob": "77fdeef165f5f843c4314742a486c12494b0b082",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/gml.js",
+      "gitBlob": "dbc4684551a5af07989c3dc5ddead8feee7a0a9d",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/go.js",
+      "gitBlob": "be524660a5a7e5942fd904bc9d8a9bbf59c69d18",
+      "size": 67
+    },
+    {
+      "path": "src/languages/hljs/golo.js",
+      "gitBlob": "c92bae3895bc6b8b37be88e20e84cd7cd94f85f1",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/gradle.js",
+      "gitBlob": "a372516b95143233774d88aad28ac9536ff47777",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/groovy.js",
+      "gitBlob": "af82c37253657bf14843733ad872dd18e540fb3d",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/haml.js",
+      "gitBlob": "bc9edaa870702923e616ab2351a3aaf16ded8eab",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/handlebars.js",
+      "gitBlob": "bdef360d6de2de10c7fcab739241d54785283cf4",
+      "size": 91
+    },
+    {
+      "path": "src/languages/hljs/haskell.js",
+      "gitBlob": "9075907ac585bdfce1d3003af2b209467fcc5fea",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/haxe.js",
+      "gitBlob": "0b6a5745ee1d788887244965fe785df9a767562e",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/hsp.js",
+      "gitBlob": "843e2aff630d5926e86ddd48003349a1842bbfc1",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/htmlbars.js",
+      "gitBlob": "68860fba35632ff56e7b607f6b0cefcf1a5e4566",
+      "size": 85
+    },
+    {
+      "path": "src/languages/hljs/http.js",
+      "gitBlob": "b8ea0f9e15327e9c702698d03265ab4713ee81a1",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/hy.js",
+      "gitBlob": "f71a3fd7442081773f65d53f35b95fb892b9fb32",
+      "size": 67
+    },
+    {
+      "path": "src/languages/hljs/index.js",
+      "gitBlob": "1bb9960d74f15b77e9655b6f316cfeefeb00eb3f",
+      "size": 8694
+    },
+    {
+      "path": "src/languages/hljs/inform7.js",
+      "gitBlob": "d5529ff97cd1ad48d5f313d52962cd768dc264af",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/ini.js",
+      "gitBlob": "d95dfe6a1a05b39b512829a3c7033c4b7dc18def",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/irpf90.js",
+      "gitBlob": "bde4f0cd682a0111caa7b23ffb506a5d476d548c",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/isbl.js",
+      "gitBlob": "2533436b653a30df645db53e7f8d6e6ad25f2ae0",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/java.js",
+      "gitBlob": "ef29d24b5f8ddb0bd82cf846e1656d2ca11b71ab",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/javascript.js",
+      "gitBlob": "97854271736c9e00dabdbc6cfe1f41fa254dd0a5",
+      "size": 91
+    },
+    {
+      "path": "src/languages/hljs/jboss-cli.js",
+      "gitBlob": "e97b376472e646ae878e556de042c53a6a20e079",
+      "size": 86
+    },
+    {
+      "path": "src/languages/hljs/json.js",
+      "gitBlob": "f420167f0668dbfaf8f6cadb78611ddb68b89b0d",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/julia-repl.js",
+      "gitBlob": "ad8a7fbf2869b02fd9ce8ced694ae1f02da9aa81",
+      "size": 89
+    },
+    {
+      "path": "src/languages/hljs/julia.js",
+      "gitBlob": "96d9063052c714d1738c7601dd30c41bbefbcb1b",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/kotlin.js",
+      "gitBlob": "4cc2ff3a4a882f6edbcb3b6b4dc2ca8d6d1f98c0",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/lasso.js",
+      "gitBlob": "0f15258074bc7b8266b3968e3f69e894985d87c5",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/latex.js",
+      "gitBlob": "01553113b9539b468bf297e578b629709015c526",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/ldif.js",
+      "gitBlob": "23b9ed8c5081d867a40a02fedcd72ee12d1b2665",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/leaf.js",
+      "gitBlob": "83eb857998814f69d9afc426422033808fe37751",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/less.js",
+      "gitBlob": "ccbbee4882eb0abea17df7809f41dd0d85fddd66",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/lisp.js",
+      "gitBlob": "a18fd511d9c7cf463601782217e61bfc21e96149",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/livecodeserver.js",
+      "gitBlob": "8a99680cc8e5c3287cd9cd0a74ab919063aec28a",
+      "size": 103
+    },
+    {
+      "path": "src/languages/hljs/livescript.js",
+      "gitBlob": "5ade1604d4f52fca2cc7cab06f04eb015060a78e",
+      "size": 91
+    },
+    {
+      "path": "src/languages/hljs/llvm.js",
+      "gitBlob": "2efe5f3e5fffe8fb245460ee5d6742fb9d401e69",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/lsl.js",
+      "gitBlob": "0ed7001ed92f934d9bc234241c6a66574f0754f6",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/lua.js",
+      "gitBlob": "649df52c0e8049c5c2ddedfdd07ad7aeed7f10bb",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/makefile.js",
+      "gitBlob": "250c4e5d34465be3c20c7d4686071fa8320c4ced",
+      "size": 85
+    },
+    {
+      "path": "src/languages/hljs/markdown.js",
+      "gitBlob": "5ceede593af86397c7bcbf3357a4776cd988b924",
+      "size": 85
+    },
+    {
+      "path": "src/languages/hljs/mathematica.js",
+      "gitBlob": "d3dc677b524f9dbd11eecfe870919af85dcda369",
+      "size": 94
+    },
+    {
+      "path": "src/languages/hljs/matlab.js",
+      "gitBlob": "ad138ec61f6403ca463ddc40003611762394e707",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/maxima.js",
+      "gitBlob": "8e86dde66237ff0f2937e4b8a5455e688650cc91",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/mel.js",
+      "gitBlob": "def8ddbcbd3e1d80f2b78c49ee6edbaca25a11ad",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/mercury.js",
+      "gitBlob": "c68abe469364635c09adde72b5777757634e59d1",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/mipsasm.js",
+      "gitBlob": "93d97dc2f5205a42106530c39ffebb8d12e9b0e9",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/mizar.js",
+      "gitBlob": "8a9540a89f6a078f7f3b0e65d0a12c68327b9396",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/mojolicious.js",
+      "gitBlob": "3921f980f95e92e6987b08eb4b294b584b0f81bd",
+      "size": 94
+    },
+    {
+      "path": "src/languages/hljs/monkey.js",
+      "gitBlob": "96d49b5d6fa5c09f3a8c1808bbbb4b6d72e47208",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/moonscript.js",
+      "gitBlob": "c4b0ac172a029389732ab84441a8845f3bcf4c39",
+      "size": 91
+    },
+    {
+      "path": "src/languages/hljs/n1ql.js",
+      "gitBlob": "091c6ced23ec78a610f1260756ba4d04007a2f92",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/nginx.js",
+      "gitBlob": "23e33030cb3a3f2122f6511c00b16b048de67994",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/nim.js",
+      "gitBlob": "a56c7ae058fd669c576910d89a2416080ee48a30",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/nix.js",
+      "gitBlob": "7271c2c369ff0ffde43e84829d351978643ffacf",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/node-repl.js",
+      "gitBlob": "b008934614ee1b79c20a3f5ed3f4615e8bf8641d",
+      "size": 86
+    },
+    {
+      "path": "src/languages/hljs/nsis.js",
+      "gitBlob": "a61a37578e6540147fb5f526977ff22572ec302a",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/objectivec.js",
+      "gitBlob": "0bba6f34237b019ed937e32b4038f24f6b761313",
+      "size": 91
+    },
+    {
+      "path": "src/languages/hljs/ocaml.js",
+      "gitBlob": "38fcd1bc6964598e6e072d551aa3a8c4f41f8fe1",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/openscad.js",
+      "gitBlob": "2aadb2ca2ae56aff5be85b33a395b60e1f451219",
+      "size": 85
+    },
+    {
+      "path": "src/languages/hljs/oxygene.js",
+      "gitBlob": "017e974fc258f1ff0bcb4ecd86d7b2abc9637479",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/parser3.js",
+      "gitBlob": "f276a5c8650837cfaf0ae0f47e299a1ae153e1c5",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/perl.js",
+      "gitBlob": "3a080ff74b0cbdf2feeded43bf72ec5b0c8d53d4",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/pf.js",
+      "gitBlob": "a8e4a221c1276c18bb0ba3e60501f498cdecfbc4",
+      "size": 67
+    },
+    {
+      "path": "src/languages/hljs/pgsql.js",
+      "gitBlob": "038e9fe83da7452b843d842ac92318ee0ecfd6fd",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/php-template.js",
+      "gitBlob": "7cf32f0ab55bed09cdf4ffd945bc6d49e09cde6a",
+      "size": 95
+    },
+    {
+      "path": "src/languages/hljs/php.js",
+      "gitBlob": "7130735a845797c8052723b1b1a4bf53bc1e2dc2",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/plaintext.js",
+      "gitBlob": "9103c5efe6b9956d5dfab8b6ea634c22c8984381",
+      "size": 88
+    },
+    {
+      "path": "src/languages/hljs/pony.js",
+      "gitBlob": "506ae0229dc51a06e3f818fe416f80f9832c49e4",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/powershell.js",
+      "gitBlob": "30f150c52f97905876abbb8fae9d2ed1012d0d17",
+      "size": 91
+    },
+    {
+      "path": "src/languages/hljs/processing.js",
+      "gitBlob": "00f809dca80b80bb4d66fc7af0ceaddeb7b784f1",
+      "size": 91
+    },
+    {
+      "path": "src/languages/hljs/profile.js",
+      "gitBlob": "96a200d10cdabfab7eee7871444ba37ab8be916e",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/prolog.js",
+      "gitBlob": "dd98c531d488523d2413818cc16f8076c46abeb4",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/properties.js",
+      "gitBlob": "01775fcf50a9465ee1fd4b9777e58dc070323963",
+      "size": 91
+    },
+    {
+      "path": "src/languages/hljs/protobuf.js",
+      "gitBlob": "4d14731fa286aea6ab54cc2a1bafb52338d1313e",
+      "size": 85
+    },
+    {
+      "path": "src/languages/hljs/puppet.js",
+      "gitBlob": "5a7ec869f4f348eb77d69d4ff432d31de0b6d346",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/purebasic.js",
+      "gitBlob": "472c93b9f7022fef479c882739a819e8b9ea5295",
+      "size": 88
+    },
+    {
+      "path": "src/languages/hljs/python-repl.js",
+      "gitBlob": "96ae3833bc45861749be32345ec8779f1f5c1e59",
+      "size": 92
+    },
+    {
+      "path": "src/languages/hljs/python.js",
+      "gitBlob": "42b4ad1421726f9608140960f77cb68372fb2e5a",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/q.js",
+      "gitBlob": "eaf4242c75d5ec284651ee69bb7b6eb77673ffbf",
+      "size": 64
+    },
+    {
+      "path": "src/languages/hljs/qml.js",
+      "gitBlob": "600a661dd9b2e25a5e774f7f024935b5f630677b",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/r.js",
+      "gitBlob": "fe468a4006df7fba6b3c382c4f250b062a7fd2a3",
+      "size": 64
+    },
+    {
+      "path": "src/languages/hljs/reasonml.js",
+      "gitBlob": "a7b8ac11a1f3888a82f44a93370336773d4efbe5",
+      "size": 85
+    },
+    {
+      "path": "src/languages/hljs/rib.js",
+      "gitBlob": "c85dfc4f73368f532e129756c67f61f1fd8c057d",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/roboconf.js",
+      "gitBlob": "18d47b141f74d9b21230b34c49f89e93a245191e",
+      "size": 85
+    },
+    {
+      "path": "src/languages/hljs/routeros.js",
+      "gitBlob": "91019a9d76cbe62eace38b9a553368b9b3ae07a8",
+      "size": 85
+    },
+    {
+      "path": "src/languages/hljs/rsl.js",
+      "gitBlob": "56fc06edf6f3be0dfb978ec3c880f95a56118033",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/ruby.js",
+      "gitBlob": "e84d46c1c06573259eb103c357b51ecaf3b6c02a",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/ruleslanguage.js",
+      "gitBlob": "2de36f3b20b5faeb88d1fd2fa0d3e516a071fdea",
+      "size": 100
+    },
+    {
+      "path": "src/languages/hljs/rust.js",
+      "gitBlob": "98a31dfff0cc75fd5fc9e889124b2e341f5849a9",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/sas.js",
+      "gitBlob": "289a2a332748d644099a64bad117fa39de5326c5",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/scala.js",
+      "gitBlob": "a0527f65160a39ac1e460179e24b55fde470403c",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/scheme.js",
+      "gitBlob": "0775d553968e577e8f21153829f4238712677272",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/scilab.js",
+      "gitBlob": "c973df2a081a794fe42cd8a06507aefac4d088a3",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/scss.js",
+      "gitBlob": "21087e63284d69dea85144266fc51c2365f97db8",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/shell.js",
+      "gitBlob": "790c39e535631a5bd45a0d53e0b68ce4d098240b",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/smali.js",
+      "gitBlob": "a9655a0588b61f55fd8d0c5617510d9449d255a5",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/smalltalk.js",
+      "gitBlob": "a162fc84ba2fc94bb6c14279e6ba9d0b42c5188b",
+      "size": 88
+    },
+    {
+      "path": "src/languages/hljs/sml.js",
+      "gitBlob": "11ab93b4b377a659509853bf585845bfaa4f3a55",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/sqf.js",
+      "gitBlob": "aee5d9729a9873c9b201a73fa538865fbb6d4c32",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/sql_more.js",
+      "gitBlob": "d8030fa6eb45eac989e27d78f54b4b1bffe64bf4",
+      "size": 83
+    },
+    {
+      "path": "src/languages/hljs/sql.js",
+      "gitBlob": "16c6f5bc1f52c211c4215a1ae32a806c48461518",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/stan.js",
+      "gitBlob": "7d5e07c46c41595f78b3b01751d2b9e3c9baecbb",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/stata.js",
+      "gitBlob": "b2a7ac1178ef224d950e161b3f55eae4de0a1e25",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/step21.js",
+      "gitBlob": "0723e13fbd9ce46d77814ba34930e404aa53136e",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/stylus.js",
+      "gitBlob": "8fc15d70fc53f4bdc21eda0e881b8891159ad3a7",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/subunit.js",
+      "gitBlob": "a68a1788bfb679e3f780539066aa81311499a6a1",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/supported-languages.js",
+      "gitBlob": "2a2ef507f2e2be80844a94f0a969e7b6dd4e29d5",
+      "size": 2357
+    },
+    {
+      "path": "src/languages/hljs/swift.js",
+      "gitBlob": "121fa46640e8418cc97d4b93ba2b6e6db6d47d07",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/taggerscript.js",
+      "gitBlob": "8cc2e166a2858bee10068a0fa0118803e5898c07",
+      "size": 97
+    },
+    {
+      "path": "src/languages/hljs/tap.js",
+      "gitBlob": "3d061bc03912ac5bbfec437e6b017c66409a7bb4",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/tcl.js",
+      "gitBlob": "da752e6dfca971c205fa58c5dfde07a19dd8e262",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/thrift.js",
+      "gitBlob": "0554f944f0d7e2bfe1af9146eee8cf2f50e5f024",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/tp.js",
+      "gitBlob": "e25a6a73f78f25b50e9b62ad8972475fa170e1bc",
+      "size": 67
+    },
+    {
+      "path": "src/languages/hljs/twig.js",
+      "gitBlob": "3f71505ad9e43d40b7b5dffbbbe1853bc4ace6f9",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/typescript.js",
+      "gitBlob": "1c681c5d9f67eb62e6bde0b945c811b9a0b78703",
+      "size": 91
+    },
+    {
+      "path": "src/languages/hljs/vala.js",
+      "gitBlob": "ec5a6d1399ec91164a8581907aa8fae0af2d6532",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/vbnet.js",
+      "gitBlob": "7181d4cae1bd1997512eaad8d31a935452b3dace",
+      "size": 76
+    },
+    {
+      "path": "src/languages/hljs/vbscript-html.js",
+      "gitBlob": "7482c77e33d132ee075b80a9859581581c9db7be",
+      "size": 98
+    },
+    {
+      "path": "src/languages/hljs/vbscript.js",
+      "gitBlob": "53ad46604b8b30a7bae80576e744606e6d0ff265",
+      "size": 85
+    },
+    {
+      "path": "src/languages/hljs/verilog.js",
+      "gitBlob": "f3a487935b5039dfb29d91b14c3c1abd0945bec7",
+      "size": 82
+    },
+    {
+      "path": "src/languages/hljs/vhdl.js",
+      "gitBlob": "bf7dbe39d4c9f6dd92a66446632655db0982460c",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/vim.js",
+      "gitBlob": "00322cca544d0d65f22112090d3cd5937dad6e55",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/vue.js",
+      "gitBlob": "31e42141cb9ff67e5a461c59ed7f5993d865bdf8",
+      "size": 139
+    },
+    {
+      "path": "src/languages/hljs/x86asm.js",
+      "gitBlob": "9c0885cf17e7a6317fa16b80642a4394956c5655",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/xl.js",
+      "gitBlob": "0e181f8013d9fbe90e8dc04826b0912f8c82798f",
+      "size": 67
+    },
+    {
+      "path": "src/languages/hljs/xml.js",
+      "gitBlob": "25c0a74e5481028ab9d7642979ab41f7377e284c",
+      "size": 70
+    },
+    {
+      "path": "src/languages/hljs/xquery.js",
+      "gitBlob": "7e72117a5655e6206de6fa50e883dfbba6af8ce5",
+      "size": 79
+    },
+    {
+      "path": "src/languages/hljs/yaml.js",
+      "gitBlob": "d3ed71c66158742e7cfcbcdb6a2d5000c278a9e4",
+      "size": 73
+    },
+    {
+      "path": "src/languages/hljs/zephir.js",
+      "gitBlob": "d678880b76f371124481cb61a27b878c1d417577",
+      "size": 79
+    },
+    {
+      "path": "src/languages/prism/abap.js",
+      "gitBlob": "dcf2ff733ea4dfc19fcffb30c50af79fa5246408",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/abnf.js",
+      "gitBlob": "b4352761e20e002ea24edf282d5312ab80b1bfd3",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/actionscript.js",
+      "gitBlob": "30ccb125a7ce2339457b4edbec3bd0c3dbf2c3bf",
+      "size": 80
+    },
+    {
+      "path": "src/languages/prism/ada.js",
+      "gitBlob": "6faf5722527da39602296a329b62aa85a05e7445",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/agda.js",
+      "gitBlob": "64d2e53306be85d39109f9c8f723f10d8308bc39",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/al.js",
+      "gitBlob": "06ada87fc681782a0a8aa89a6d045155e13be0ab",
+      "size": 50
+    },
+    {
+      "path": "src/languages/prism/antlr4.js",
+      "gitBlob": "360bb7067677b0ce14c7e1e98f07e5588c33ff38",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/apacheconf.js",
+      "gitBlob": "c523d96eb2b73c8ebd99aff92c48ce142ed4eca1",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/apex.js",
+      "gitBlob": "f23c8e0a448ec47b1c12ca91f063f6a7fcab4cb5",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/apl.js",
+      "gitBlob": "b3a0f833bbafef28429e6643248019776b3f2277",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/applescript.js",
+      "gitBlob": "cb86c076839abe7a25bd0922d5288a0e8dfd69db",
+      "size": 77
+    },
+    {
+      "path": "src/languages/prism/aql.js",
+      "gitBlob": "300e2e6045388dc929310c5c37a01281719a717c",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/arduino.js",
+      "gitBlob": "73a57a3e784d4f906034f0de0e3e9205bf0b695c",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/arff.js",
+      "gitBlob": "038853ec0a8df038ad1d8fa170e772d9055c6a1b",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/armasm.js",
+      "gitBlob": "c907ea17de690474dff9beb0c8406fd6842b2acc",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/arturo.js",
+      "gitBlob": "ff9490b38b5a96cf99eacfc5f0a7e136a92f91a7",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/asciidoc.js",
+      "gitBlob": "bccf57c48fc209eb7f63099adf4ed3b8d14f4e88",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/asm6502.js",
+      "gitBlob": "69ff82fd6b6b7b5d53ad80e67e514a76d41c19e1",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/asmatmel.js",
+      "gitBlob": "e66e69fe8df91221b8d42af843d368923439aaec",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/aspnet.js",
+      "gitBlob": "d7c83e4831b027d7bde21a513ab7a09f6cf2ad06",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/autohotkey.js",
+      "gitBlob": "3e7a9362e1ccf86a7776d7dc7ad8ff746e1feee9",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/autoit.js",
+      "gitBlob": "55459e2e372f3f0a858261d6da95dc1006ab5f29",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/avisynth.js",
+      "gitBlob": "d8af4e2e5fc07f3b2de746a1ca5dc5f9df09308b",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/avro-idl.js",
+      "gitBlob": "e66d3ae4fd5de4160ff65e97ed5195ca8844b533",
+      "size": 66
+    },
+    {
+      "path": "src/languages/prism/awk.js",
+      "gitBlob": "6ff772ec11432592c7153db44580e2c528b2d750",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/bash.js",
+      "gitBlob": "70db8585a0cce8d9fef7008308e8c1905a852c8f",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/basic.js",
+      "gitBlob": "4e64c506d5168ca315d8c46127e22e207dae1ac0",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/batch.js",
+      "gitBlob": "240b0675017e71fb3dd40bd2fd49b987694b6b29",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/bbcode.js",
+      "gitBlob": "a56e54240014460e4f9e8586b1284668d7385ead",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/bbj.js",
+      "gitBlob": "df4d2017d10810294da93cc11266eb1892770b75",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/bicep.js",
+      "gitBlob": "d91554e84b83ad5d109d09e925dbb0ecc01a75e6",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/birb.js",
+      "gitBlob": "ea791adc1d3281130785f8ef5b86eaa04a7a6a9a",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/bison.js",
+      "gitBlob": "73a6f40d58d5ebf0b68e87355fd5ff39c08cde0c",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/bnf.js",
+      "gitBlob": "82b1dd3418d38c79c6a994d1cc8d4a4331952af1",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/bqn.js",
+      "gitBlob": "2ed1a3da81cec30407a740ae4fa75e9dac4b82a9",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/brainfuck.js",
+      "gitBlob": "2fc95b4d7d54a3b1aa5f6b6f0f065b859cb32b2d",
+      "size": 71
+    },
+    {
+      "path": "src/languages/prism/brightscript.js",
+      "gitBlob": "9e3ffb33be24e09ed2c1bcbd162088d23048b339",
+      "size": 80
+    },
+    {
+      "path": "src/languages/prism/bro.js",
+      "gitBlob": "4bbbaa0ef01d99e9b62f72cf1d97d334165f35c3",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/bsl.js",
+      "gitBlob": "07115224e7471b5ecd051f405bf05511224fd7e7",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/c.js",
+      "gitBlob": "f65520d14fc4a7451d36768f0e6c9712f85ec38c",
+      "size": 47
+    },
+    {
+      "path": "src/languages/prism/cfscript.js",
+      "gitBlob": "666a10883871fa1bb06a7759d2af74cf93bd95bb",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/chaiscript.js",
+      "gitBlob": "874c0d0d6031794fb9fe64ea0ac40f4a24053026",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/cil.js",
+      "gitBlob": "00bcebc2b8515f01fb28381c20d790c5e32b228f",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/cilkc.js",
+      "gitBlob": "fe5851aa7cf9d502b14fb6959acbe1ce2f130c32",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/cilkcpp.js",
+      "gitBlob": "c2fac4545ee9f65fcbd492235cac359da7a3fff3",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/clike.js",
+      "gitBlob": "29adf03bb7fdfb362a12a815c269d2e936101d03",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/clojure.js",
+      "gitBlob": "4f2bdcde68cbcdae2505a0d1ec885c810709b6da",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/cmake.js",
+      "gitBlob": "38c09b965d2dd236104763ab16875c257453844c",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/cobol.js",
+      "gitBlob": "919eca7400ca3de4ad49aefc31da62c2207e13e1",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/coffeescript.js",
+      "gitBlob": "5580295cd707e178273428e474db46b26016a66a",
+      "size": 80
+    },
+    {
+      "path": "src/languages/prism/concurnas.js",
+      "gitBlob": "ccb538a55ca4ffc1317ef59c3760392401888b3a",
+      "size": 71
+    },
+    {
+      "path": "src/languages/prism/cooklang.js",
+      "gitBlob": "0684861de2108b7f7f86cc9189c5d986e7dd364e",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/coq.js",
+      "gitBlob": "e80c533e4d743ebdd0aedd5b6d468184baa2f4e8",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/core.js",
+      "gitBlob": "6864f8e5bef59fa438299c7ac15b9dabc746c5dd",
+      "size": 66
+    },
+    {
+      "path": "src/languages/prism/cpp.js",
+      "gitBlob": "0a7149fbbb2526aef2a9fb48a0b8ec484deab47f",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/crystal.js",
+      "gitBlob": "85b9150244af29e40696d3e35178f0f22421013d",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/csharp.js",
+      "gitBlob": "686750f01d820e25c6540f83ccc60183193d6fdb",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/cshtml.js",
+      "gitBlob": "70af786ea3c631e739d16cae2b55ae678fa94d94",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/csp.js",
+      "gitBlob": "168f97ebbb7281c5f3fecfd1e18050c9ebc0b56e",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/css-extras.js",
+      "gitBlob": "261342491a0627d6a794cb677d5577d0369d503d",
+      "size": 72
+    },
+    {
+      "path": "src/languages/prism/css.js",
+      "gitBlob": "d803145350a04305854e8cb1c80862b6bafc9dc9",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/csv.js",
+      "gitBlob": "d8423cb7090df23a25fcb1c1e2d5fe361ccbd68d",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/cue.js",
+      "gitBlob": "ad537d7ff96093474cef8e3971f00e8762232795",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/cypher.js",
+      "gitBlob": "371afa6f8728e68ced704c69d0c68fa2acef26bf",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/d.js",
+      "gitBlob": "b474bcc34056aa190d59a4ec340208fa225cf4fc",
+      "size": 47
+    },
+    {
+      "path": "src/languages/prism/dart.js",
+      "gitBlob": "c590fa5c2f5b4864b168f8933289d4dd50c288c0",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/dataweave.js",
+      "gitBlob": "b248863643fc5665adbd0b273a127c637039d3bc",
+      "size": 71
+    },
+    {
+      "path": "src/languages/prism/dax.js",
+      "gitBlob": "e75019be83b6786ab1d30ed13a45d13d9d0e077d",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/dhall.js",
+      "gitBlob": "1d9549e2d0c6749821867158b77aa10640424976",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/diff.js",
+      "gitBlob": "57e66f15300c3d40956d84ae88752a12ba9eaf6c",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/django.js",
+      "gitBlob": "b98fd9488317c8f19e362e8023db5e7737b502c1",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/dns-zone-file.js",
+      "gitBlob": "463886f8dd890daeb466c3b067288e9b15ca8af0",
+      "size": 79
+    },
+    {
+      "path": "src/languages/prism/docker.js",
+      "gitBlob": "930ec334bfd720d6a1b3d813f9c9a73bd9bf5fbc",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/dot.js",
+      "gitBlob": "608d7169f532dd0705b9ad6c279d870a333d0cff",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/ebnf.js",
+      "gitBlob": "544ff4ebe1d72d38c03d51ec5077afec1082457e",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/editorconfig.js",
+      "gitBlob": "2d766cc3b992e49bb7e8fb56c87ac20fca30c777",
+      "size": 80
+    },
+    {
+      "path": "src/languages/prism/eiffel.js",
+      "gitBlob": "35d844638ce7385b3b4184dc1d2c7c9efd904c7f",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/ejs.js",
+      "gitBlob": "8b9298e4bb895b2c723d1de0574a30e93ee49b23",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/elixir.js",
+      "gitBlob": "8df34a493e52aabbe63b11af36f591aa125b9689",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/elm.js",
+      "gitBlob": "e19ab8814a01ea3a9528f8f26504850024327d0d",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/erb.js",
+      "gitBlob": "9c4b7c0bc986f3ac1d0ce42e53ab053fbeb4524e",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/erlang.js",
+      "gitBlob": "97f1f8593e314ed6171b648da32d8e7c66ab6fc8",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/etlua.js",
+      "gitBlob": "c11f147fc2d057581c0eeccab195cc43980e009f",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/excel-formula.js",
+      "gitBlob": "f0985ceb663a7b52aed1f2fe2566adf3711fc549",
+      "size": 81
+    },
+    {
+      "path": "src/languages/prism/factor.js",
+      "gitBlob": "7a62aa41b8467071b5523c71b73f998f3f0c8fef",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/false.js",
+      "gitBlob": "8c4445ba21df1d1150b1ae5193a76c14726affa0",
+      "size": 67
+    },
+    {
+      "path": "src/languages/prism/firestore-security-rules.js",
+      "gitBlob": "f67959932c1a9eed337384dc7a316d5f423e0bcb",
+      "size": 112
+    },
+    {
+      "path": "src/languages/prism/flow.js",
+      "gitBlob": "4bd8055faf662a4cc219546d9c7ebd7a3d19a330",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/fortran.js",
+      "gitBlob": "8a614e0a0596e79ea5d6144e32fb6120603b32a7",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/fsharp.js",
+      "gitBlob": "d9fc9802ba27c6177ba0ec0383d18b715a15ad4d",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/ftl.js",
+      "gitBlob": "3b3811e20cbc4d121fedb21e1317d651605fe6f0",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/gap.js",
+      "gitBlob": "e73c74bb3387e613acef2d754af87c49aad02c06",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/gcode.js",
+      "gitBlob": "3a140d327409c8079ca2cd6df14d8c8579f52dd5",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/gdscript.js",
+      "gitBlob": "727d982c986b0063421cd9d998840d75ec7fe5d2",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/gedcom.js",
+      "gitBlob": "b2680fd823d8f2414a5dd9eabc69a7140ff3640a",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/gettext.js",
+      "gitBlob": "55e1ec722a215790e040f532b127455b697e634b",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/gherkin.js",
+      "gitBlob": "b3eb768a7ac0cae42148dc715b73d7bc64f039ac",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/git.js",
+      "gitBlob": "d8418fd85449ce0748af6d070e09a0a2f3a82c71",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/glsl.js",
+      "gitBlob": "13875e9a7b91b4badb19fef7cffc8dda8e2d74bc",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/gml.js",
+      "gitBlob": "81206c0f0a27d521ac35fdc96733e62b41f22ee6",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/gn.js",
+      "gitBlob": "8ff07bd8ea9f8671a393928a135550cae1c60200",
+      "size": 50
+    },
+    {
+      "path": "src/languages/prism/go-module.js",
+      "gitBlob": "6421e3c5a8b01d60f74fa60fafdc194afceae1ed",
+      "size": 69
+    },
+    {
+      "path": "src/languages/prism/go.js",
+      "gitBlob": "96077a63638b487946bd1f0a517467a69f7d9733",
+      "size": 50
+    },
+    {
+      "path": "src/languages/prism/gradle.js",
+      "gitBlob": "14d8009271012c53c01d88be5caa563723ab8b82",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/graphql.js",
+      "gitBlob": "3209c7fcb68a18a25203ccba2d4b78c1e96b7d7f",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/groovy.js",
+      "gitBlob": "c6a00af082d6b266c4bd9c1111b62e7afe11ba88",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/haml.js",
+      "gitBlob": "ac6ac4658e96dc7cd3a1c52b628369f665dd2420",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/handlebars.js",
+      "gitBlob": "718ae7185bd92159dae6afbeda678c682af3068c",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/haskell.js",
+      "gitBlob": "895f389a27751ff4aa3bd38b88c6e10eaa446ed0",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/haxe.js",
+      "gitBlob": "cde203ecc92e059d6f7b4d6f060f9a63fb87977b",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/hcl.js",
+      "gitBlob": "b0aa5730cd47a101b0ff44d1d2e6d307099ab888",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/hlsl.js",
+      "gitBlob": "1fb0b01b115c90271f12066fbb84075cc45ab336",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/hoon.js",
+      "gitBlob": "edbeebc58b6c850597b80e970c30f6efa03ec130",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/hpkp.js",
+      "gitBlob": "8a7b2a5be36d057bcb14cb9189c4865ea89a5fe3",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/hsts.js",
+      "gitBlob": "83e24690f9988c30cb9ee287e169843d74ca7d0b",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/http.js",
+      "gitBlob": "5341cf0f90f9f6377162cc6d399ef8830a3e2094",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/ichigojam.js",
+      "gitBlob": "87c8ee94e0ee6e7277f04aa5fe0a518416471fd6",
+      "size": 71
+    },
+    {
+      "path": "src/languages/prism/icon.js",
+      "gitBlob": "c24506aea604bc7a05b84310168a8e0d617a7477",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/icu-message-format.js",
+      "gitBlob": "5ee381cb75f24ddef60583448904f2572a39e406",
+      "size": 94
+    },
+    {
+      "path": "src/languages/prism/idris.js",
+      "gitBlob": "8c46664ea249d6b390c966fde542096ef311956a",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/iecst.js",
+      "gitBlob": "84ea65773b43ddf6fd4f6bd132ec5e61c48d70c0",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/ignore.js",
+      "gitBlob": "f1fa2346671a33c4be914cf2f23f2eb220bd3ed4",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/index.js",
+      "gitBlob": "abe0dee6d5694e3ee231634c974f01ff054ad18e",
+      "size": 13642
+    },
+    {
+      "path": "src/languages/prism/inform7.js",
+      "gitBlob": "226248342c5249e16eb0708ecde1b910d2ae3d9d",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/ini.js",
+      "gitBlob": "2095f3363ebfb1e8f0b6e796e00b74d0486d70fb",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/io.js",
+      "gitBlob": "64567864b829b1071c749e574c67647827f6717a",
+      "size": 50
+    },
+    {
+      "path": "src/languages/prism/j.js",
+      "gitBlob": "cd4306ec7c44782826956cd413f8bcd15c0a3c81",
+      "size": 47
+    },
+    {
+      "path": "src/languages/prism/java.js",
+      "gitBlob": "1fb56bca1e36f1b3b9a52aad2ccc58a8caa89620",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/javadoc.js",
+      "gitBlob": "a412a966084fbea7fccdac38f4ba0abe905c3094",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/javadoclike.js",
+      "gitBlob": "460b3605bbbf5e1bd87ec4c0824efe68fe2a0c9e",
+      "size": 77
+    },
+    {
+      "path": "src/languages/prism/javascript.js",
+      "gitBlob": "9630b4f5b8115f573cfd183fa91ceed288d48e55",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/javastacktrace.js",
+      "gitBlob": "a71b808c557c40e81fe556010420282769a029c2",
+      "size": 86
+    },
+    {
+      "path": "src/languages/prism/jexl.js",
+      "gitBlob": "7bb3f88fcecc265ac4d4488e697a85a9a8642864",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/jolie.js",
+      "gitBlob": "ac54d16c45efe80528bdf8aa343f8341828dee36",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/jq.js",
+      "gitBlob": "d6aeacb0820aa11590e344ac51ad0313b7cc6af7",
+      "size": 50
+    },
+    {
+      "path": "src/languages/prism/js-extras.js",
+      "gitBlob": "6e504440fd40666cb5b99c5718578b66284d27d3",
+      "size": 69
+    },
+    {
+      "path": "src/languages/prism/js-templates.js",
+      "gitBlob": "4152cd759b055183bfd001b7fbe9d4fb6110c78f",
+      "size": 78
+    },
+    {
+      "path": "src/languages/prism/jsdoc.js",
+      "gitBlob": "7ccd877146a128ed1df83b4cda70051c59226405",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/json.js",
+      "gitBlob": "5027d5bd0e683b0a6eb753b1f89e7ae6e8c02cac",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/json5.js",
+      "gitBlob": "120ec6669fba245435c87345d1a3bcb3319ad76b",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/jsonp.js",
+      "gitBlob": "df6abdcc41b0e68caa118b5f046b0c515f0dc892",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/jsstacktrace.js",
+      "gitBlob": "ac7df78b8bd475969ebc15c22904adeb896b1f3b",
+      "size": 80
+    },
+    {
+      "path": "src/languages/prism/jsx.js",
+      "gitBlob": "7fc2e22b3ac7d594a0f582eb0646de0024e20b37",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/julia.js",
+      "gitBlob": "0b19ffd9f31cb183add07cea24e4131667aa483d",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/keepalived.js",
+      "gitBlob": "78fbfe973f54575ed37d1b374408a87c1f50a617",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/keyman.js",
+      "gitBlob": "2c062c275b308d01103aa40d8dcbb50309afb40b",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/kotlin.js",
+      "gitBlob": "9a9fadf2dca4a5f4f4b3f3caa69e0f9a39f3ca63",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/kumir.js",
+      "gitBlob": "df12670ea1af627a9d1de95a78068133a1c496e6",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/kusto.js",
+      "gitBlob": "715b3683c552ade5da4e4bd2008b4983734ed9a2",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/latex.js",
+      "gitBlob": "2dfcd8d243150e8caec39117cd7046d5dd733daf",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/latte.js",
+      "gitBlob": "7e2cfb1df926e38aa93b3cb635499014f68d80b1",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/less.js",
+      "gitBlob": "619a5c5b7845c34207f1a479b68c521bc249aba7",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/lilypond.js",
+      "gitBlob": "ab0da3fe9769b97f43dadf5f51532dc7689f5358",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/linker-script.js",
+      "gitBlob": "ee3acae9c39f2396c3e4fc48051ee806bc4189ea",
+      "size": 81
+    },
+    {
+      "path": "src/languages/prism/liquid.js",
+      "gitBlob": "89978f6bf84f2581664db114d2fbd70244a96636",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/lisp.js",
+      "gitBlob": "8d7502aa5dcbb84a4a5a74790e29d4211793ea55",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/livescript.js",
+      "gitBlob": "e30848ed6ae6207cb2dd1ba5101bdc54409c2283",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/llvm.js",
+      "gitBlob": "bc470be9c59d6e1ff83fee68c4fef4159eb1460f",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/log.js",
+      "gitBlob": "3bfeeadeb02433025d61d93aa55b74da3c0498af",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/lolcode.js",
+      "gitBlob": "0faa78894e1b7519607ef4074611ebb4e36eb453",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/lua.js",
+      "gitBlob": "856859ceb5cd96bcf87a2c673461fa7c30f59325",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/magma.js",
+      "gitBlob": "926e82f09b5c854557c7600471885f6540890e28",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/makefile.js",
+      "gitBlob": "546bde20748ef35e9e1786a92d44308783bad7f1",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/markdown.js",
+      "gitBlob": "affddfc3f4897e8825c42e8191854f15742592d9",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/markup-templating.js",
+      "gitBlob": "9fa79e81b3387ce3de0bc071180d521db76bf83b",
+      "size": 93
+    },
+    {
+      "path": "src/languages/prism/markup.js",
+      "gitBlob": "ea91298319db45091c448eee91317a0738e5b2b8",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/mata.js",
+      "gitBlob": "da451310872b85c92f2d0bf321b57ff1fca7964d",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/matlab.js",
+      "gitBlob": "1edccca723e39acdfc1daca0dfef9ccfb484f8be",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/maxscript.js",
+      "gitBlob": "29229ce1c0108f6c5d40d6df099ba338858ac133",
+      "size": 71
+    },
+    {
+      "path": "src/languages/prism/mel.js",
+      "gitBlob": "e212bfae923ba841a315c7fc7f44055d9b3285a9",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/mermaid.js",
+      "gitBlob": "5f3ec2f8ce859ae523ac5483d4d2137986386b4f",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/metafont.js",
+      "gitBlob": "58e3bd5000766979f0d5f6f23a7b51dd0848dfa6",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/mizar.js",
+      "gitBlob": "42bdd439b7dfc0b264e41bbf84055ab994db7b04",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/mongodb.js",
+      "gitBlob": "40aad7d318bbae17a1f604dc97dc93a877b1bad2",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/monkey.js",
+      "gitBlob": "125129bd91cc13444bf7022e48393eb59f76010d",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/moonscript.js",
+      "gitBlob": "b3758527e5ba9800a3b66c80a88adbde7dfd39c4",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/n1ql.js",
+      "gitBlob": "cb0cfd468f184c048b27d42ce2aebe7d4988b336",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/n4js.js",
+      "gitBlob": "a03f1ebbdedd571296f37921719932062823ff63",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/nand2tetris-hdl.js",
+      "gitBlob": "a971b76c55c5a59d19379cf0576ff4ea80c78b47",
+      "size": 87
+    },
+    {
+      "path": "src/languages/prism/naniscript.js",
+      "gitBlob": "af1240a73815e49ba2e7e0507515167425dd8128",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/nasm.js",
+      "gitBlob": "707d8a68ca4fa37a2d91b1a4459b41d8b4e1b675",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/neon.js",
+      "gitBlob": "b3177a8c3e10e2d31f45f5576b5e813919a03e74",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/nevod.js",
+      "gitBlob": "94ee53d30c92aaf9c4d02a564c6250e29fed16b5",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/nginx.js",
+      "gitBlob": "64fe87b3e021a48bd6810cc492614ac464ada22a",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/nim.js",
+      "gitBlob": "dfd9cd470652d7ea4aeb2bd951a930669af2421a",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/nix.js",
+      "gitBlob": "1d4db02f5b11dd139fcc1d82351dfd4f08ea07e7",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/nsis.js",
+      "gitBlob": "ccdb1dc81d6a3c4970ad0e871e071df0cbbc90bc",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/objectivec.js",
+      "gitBlob": "426b09549512636a6aaf8b85400ea3ed47729a45",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/ocaml.js",
+      "gitBlob": "6e5df387b3d8efb0e4e92022d560098818214e10",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/odin.js",
+      "gitBlob": "a0baa12ecf00d086f4b0a134ac432cb33a76f0f1",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/opencl.js",
+      "gitBlob": "4a57bb4e40b10be5f5b3709df91f3961c8d5336e",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/openqasm.js",
+      "gitBlob": "f9e3da0ed04f60b1a775c4137575a5ba7fb97481",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/oz.js",
+      "gitBlob": "d5897d56c2dcd42eeb6afb922ac64c939619d88f",
+      "size": 50
+    },
+    {
+      "path": "src/languages/prism/parigp.js",
+      "gitBlob": "932813f514a058518433126e31e0b95e72501385",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/parser.js",
+      "gitBlob": "f784ffb3d2e6ef0eb77f424e2e271fe9af593e3d",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/pascal.js",
+      "gitBlob": "f7570d55c4040441a18501ee51995bb8ad62b2e8",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/pascaligo.js",
+      "gitBlob": "71e83f5a17d95443c7a995ef983f1782fde4fe9d",
+      "size": 71
+    },
+    {
+      "path": "src/languages/prism/pcaxis.js",
+      "gitBlob": "686b098bdff3c3c55cfe2f348755f09714e5cc28",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/peoplecode.js",
+      "gitBlob": "b5c06f5eece38940f99a1353ab18cc3084bcd249",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/perl.js",
+      "gitBlob": "c9a397393245e5bb8a1a9e2b45b9d421eb1415ec",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/php-extras.js",
+      "gitBlob": "f541d12d0af228add2826ae1b7fed8b3dc0b42a9",
+      "size": 72
+    },
+    {
+      "path": "src/languages/prism/php.js",
+      "gitBlob": "323bc2dd8753a4d4b8b6085c543251802fd62a79",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/phpdoc.js",
+      "gitBlob": "481fa26085680d6422edf8035951359758301435",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/plant-uml.js",
+      "gitBlob": "bbe7b94730bb1116207aba9b7dbdabbb57dbf108",
+      "size": 69
+    },
+    {
+      "path": "src/languages/prism/plsql.js",
+      "gitBlob": "647111637b6e7916764fd1f67672b054457ae000",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/powerquery.js",
+      "gitBlob": "321a65bfece4c92bf07fe6760e6032383810a26e",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/powershell.js",
+      "gitBlob": "91576c4a860fd33113313da7451c4fc713f9487a",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/processing.js",
+      "gitBlob": "bbb5867b54f39716f7c6b6ffa6042e99ac48eae0",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/prolog.js",
+      "gitBlob": "9157b13ee496e047e343c1987425b2b282e0c416",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/promql.js",
+      "gitBlob": "395d7438b119f63100196865a1b76e2c66038787",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/properties.js",
+      "gitBlob": "f12acfafdbc802fb21b15c04881369b9af6f5ec7",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/protobuf.js",
+      "gitBlob": "a3a951be6e88251dc6322a6dbdcf682702a7785a",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/psl.js",
+      "gitBlob": "87a26eff3f6a79e424682c38148133e9f21cab5c",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/pug.js",
+      "gitBlob": "a863f2a65dcc8033f3142dc702c91d9a82d22c9a",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/puppet.js",
+      "gitBlob": "a92a5bd44c7de5e7ea477e2d857fa8336363c933",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/pure.js",
+      "gitBlob": "deb5c0ccbad06cdf9d0ee60e6caab2988933396c",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/purebasic.js",
+      "gitBlob": "82053e938ffd8aa8535650e73ad4ce0a28c4ea88",
+      "size": 71
+    },
+    {
+      "path": "src/languages/prism/purescript.js",
+      "gitBlob": "eb5541d8619518e108258d674e02a1523a6022a7",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/python.js",
+      "gitBlob": "d6cf288317a1fc3f8c9fd054052a0da96272452a",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/q.js",
+      "gitBlob": "78e73580efb6de3eabdf1bd7660f81e8d914b869",
+      "size": 47
+    },
+    {
+      "path": "src/languages/prism/qml.js",
+      "gitBlob": "4e0e4a6952a34e7de261e10f25150971b97fe9e0",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/qore.js",
+      "gitBlob": "dcf53e5376eb8faacffcbf925fe4c59edba82239",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/qsharp.js",
+      "gitBlob": "d38d76ee6adf19e7fcda48d5e93b37da0fe0d9ce",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/r.js",
+      "gitBlob": "54368d081b93802ff7e46878adcbd79f3098e568",
+      "size": 47
+    },
+    {
+      "path": "src/languages/prism/racket.js",
+      "gitBlob": "086edabb34bd7569a226f3d2623d3341104d60db",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/reason.js",
+      "gitBlob": "26b7fdb5fe9106e77710843f1ca8f6a51fdc5809",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/regex.js",
+      "gitBlob": "d20d864ac73dc6b6f5019cd638619dfbc47c6fbb",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/rego.js",
+      "gitBlob": "07c9c28efd96dcfa4d0d967006496bd6301b63b9",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/renpy.js",
+      "gitBlob": "cfded48eab35b13d06cc2598f9b9c5a5ba41a62f",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/rescript.js",
+      "gitBlob": "f98442e997af8c18c88a66aab99972d9694daeae",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/rest.js",
+      "gitBlob": "50f54e7f560be54fad98beadff18ba684e0bb05e",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/rip.js",
+      "gitBlob": "f7f2d40db2f6557b05c24e8af6d3fe71af061da9",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/roboconf.js",
+      "gitBlob": "fa425776fbb3a45d6f00541108e892e4c8a27eff",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/robotframework.js",
+      "gitBlob": "895e11b6b0a69beb5e6b6f3e4da5315254af6b6d",
+      "size": 86
+    },
+    {
+      "path": "src/languages/prism/ruby.js",
+      "gitBlob": "17ab17cd7e2a11c34a5b4adf20ec2aea9fa44b29",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/rust.js",
+      "gitBlob": "1c3de6c3b02f7dbaa3aff44f08d2bf6f45123d89",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/sas.js",
+      "gitBlob": "21324516c3d37bcb3a9531c3eb34329db0080940",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/sass.js",
+      "gitBlob": "15f3723746cc4921f2cef8d20c719fc3b88e609d",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/scala.js",
+      "gitBlob": "0934713208ced898cabdddcab3d5cf0f86d2093f",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/scheme.js",
+      "gitBlob": "38a1ddf579ae07a862e1d4090276977a4daddb06",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/scss.js",
+      "gitBlob": "dbc019f6e1f065399ca93f1480dbf85429da207b",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/shell-session.js",
+      "gitBlob": "31a54033efd44b35b0ea1de15a079d46e0fc4efc",
+      "size": 81
+    },
+    {
+      "path": "src/languages/prism/smali.js",
+      "gitBlob": "027b655ab71ba4022290befa29fdf5275ad3b225",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/smalltalk.js",
+      "gitBlob": "2dfe2afdde2b4daa2d4671548adfa24ae853b85f",
+      "size": 71
+    },
+    {
+      "path": "src/languages/prism/smarty.js",
+      "gitBlob": "6adbef4930804c4ee8dd764fcc21a73f68ea5037",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/sml.js",
+      "gitBlob": "b342d16934fe39b7b3ea08341c0039d5049198b9",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/solidity.js",
+      "gitBlob": "0197519e230904b865f148927dacaf1061865b4e",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/solution-file.js",
+      "gitBlob": "d4b2cd6465b38b7f72ce8dc31b98565341411e64",
+      "size": 81
+    },
+    {
+      "path": "src/languages/prism/soy.js",
+      "gitBlob": "a8b6e5c8c294adea474b9cd2c16f1ae28aa87a66",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/sparql.js",
+      "gitBlob": "82ed448da0ff5449b717a432e50d2d5c2de7d098",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/splunk-spl.js",
+      "gitBlob": "e240644b7556a04f3b4b19636bf0385db3670acf",
+      "size": 72
+    },
+    {
+      "path": "src/languages/prism/sqf.js",
+      "gitBlob": "765638c48f222cf6e54ee0f229e0b1d5f89b8db5",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/sql.js",
+      "gitBlob": "3453878492b7b19a42ab39a163a239d5c7e2d41d",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/squirrel.js",
+      "gitBlob": "9e409ee5b1c61c0ebbbb11b88ac9f1011a3ce03a",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/stan.js",
+      "gitBlob": "e94e08f3e0988a334e4a1951768d75a7ce56f32a",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/stata.js",
+      "gitBlob": "d3af2f8e1e5fce61395e5651bcb24aeabae0dbb1",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/stylus.js",
+      "gitBlob": "2eb9621a4ea9d4cdfc940cf1d4ae04a8700f1a47",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/supercollider.js",
+      "gitBlob": "0fd2f19fcee08a028ee4b432da3e4fa4f4102f80",
+      "size": 83
+    },
+    {
+      "path": "src/languages/prism/supported-languages.js",
+      "gitBlob": "dea5a5b1391002c138f4a0c8e9ba4edf1f319b58",
+      "size": 3673
+    },
+    {
+      "path": "src/languages/prism/swift.js",
+      "gitBlob": "2d9c352f9a9fa80ef0c6c6aaf616f82b6c0367a1",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/systemd.js",
+      "gitBlob": "102f7ab2a9cdecacdac4c89363cbd3ecff446963",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/t4-cs.js",
+      "gitBlob": "89a11c3239d3a47edb9a81b25660b57ee30c16c6",
+      "size": 57
+    },
+    {
+      "path": "src/languages/prism/t4-templating.js",
+      "gitBlob": "3d17e0525176afb8474a2a9c39aa56f8ab4eaecb",
+      "size": 81
+    },
+    {
+      "path": "src/languages/prism/t4-vb.js",
+      "gitBlob": "adadfd3c335fb56362d9fd7e6f91be67d6c75d0b",
+      "size": 57
+    },
+    {
+      "path": "src/languages/prism/tap.js",
+      "gitBlob": "e7e79da15ccedf72717b06812d7dc0248f6f899d",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/tcl.js",
+      "gitBlob": "0790b5c87ac427fedc077546436e5271be40b4aa",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/textile.js",
+      "gitBlob": "a754bbaf796db4665b344a77296c890136ea5134",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/toml.js",
+      "gitBlob": "2a25ee6fbda9cdcc1cf6ad8f6e5f023255e767bd",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/tremor.js",
+      "gitBlob": "482d18b2e5bc6cea7d6f958977646c48abb0b759",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/tsx.js",
+      "gitBlob": "5f3dfe6b19241c09b242c8fa2216921c2d9eb475",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/tt2.js",
+      "gitBlob": "bd6a8b63215579ec86a34415024ac515af6f55ec",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/turtle.js",
+      "gitBlob": "ca7217d938c92f50c7bdc889b18409b7771076e5",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/twig.js",
+      "gitBlob": "fb02ee09fa76cdc2229271cb52f2ba6f5d90ed59",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/typescript.js",
+      "gitBlob": "2819ab480bec3ed314421c612b9ead58e426395d",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/typoscript.js",
+      "gitBlob": "b482af0d950c346d2788051445065ad0db8d7335",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/unrealscript.js",
+      "gitBlob": "addd378266a9b9f1903c82be16f28932179d78af",
+      "size": 80
+    },
+    {
+      "path": "src/languages/prism/uorazor.js",
+      "gitBlob": "00980ec5b95b56b8b6f7b6941f0278ea5a6fc11e",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/uri.js",
+      "gitBlob": "b5b1546ebfe0c66c7d218b661643d41e8709a438",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/v.js",
+      "gitBlob": "c82102e8b3d3f299b788a7955a8d42443b26ce2e",
+      "size": 47
+    },
+    {
+      "path": "src/languages/prism/vala.js",
+      "gitBlob": "60a4f8850989304e727499fe10a6e98f7ff170cb",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/vbnet.js",
+      "gitBlob": "b5c40bf8aa52dafdee0104cfb47f6183f7218dbf",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/velocity.js",
+      "gitBlob": "d4b6683dd6518e0a928a11e241f65fd976a80c79",
+      "size": 68
+    },
+    {
+      "path": "src/languages/prism/verilog.js",
+      "gitBlob": "d324f5823bf12c79638b01b6f4bb42f6e2aae9e4",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/vhdl.js",
+      "gitBlob": "10db3ff95580d6abd7968961cd789be9622a4604",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/vim.js",
+      "gitBlob": "6a26fc419ffdd5121a3dbdc07b2adfd122044f56",
+      "size": 53
+    },
+    {
+      "path": "src/languages/prism/visual-basic.js",
+      "gitBlob": "77004ded52f90a1635f0ea3f239dfc8de6ab533c",
+      "size": 78
+    },
+    {
+      "path": "src/languages/prism/warpscript.js",
+      "gitBlob": "cf47b4b3b3bd97a28ed1dd67fee6cd62bcf31bea",
+      "size": 74
+    },
+    {
+      "path": "src/languages/prism/wasm.js",
+      "gitBlob": "b552d1db88ff2732dc63266f391bd39b9cd9afb5",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/web-idl.js",
+      "gitBlob": "8ead05d007a9e7dc78f32df37935a96144ba4cbb",
+      "size": 63
+    },
+    {
+      "path": "src/languages/prism/wgsl.js",
+      "gitBlob": "c88fd955a4f0c51ed8cff443d5f14300a460d085",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/wiki.js",
+      "gitBlob": "c8f19212b7662783da918eb2330bf9c659254202",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/wolfram.js",
+      "gitBlob": "7e3eca987cf3d68b06f570ee14f775e60cf68010",
+      "size": 65
+    },
+    {
+      "path": "src/languages/prism/wren.js",
+      "gitBlob": "6885bf32c199db1b2a1144f8036df438bce6ea9a",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/xeora.js",
+      "gitBlob": "8944abe1a68ede1bf8138d5145d6d7a371b7dc03",
+      "size": 59
+    },
+    {
+      "path": "src/languages/prism/xml-doc.js",
+      "gitBlob": "01da1d1aff1037c159b9b6e3c1d3d21f367c2f15",
+      "size": 63
+    },
+    {
+      "path": "src/languages/prism/xojo.js",
+      "gitBlob": "a4f5f5671958cb37d264592c05c5d1f6f4384a22",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/xquery.js",
+      "gitBlob": "7f53b486fca0e401a7c343e572b25f19bf93bf5e",
+      "size": 62
+    },
+    {
+      "path": "src/languages/prism/yaml.js",
+      "gitBlob": "26debb332886661050a11626f0f6482fbfb11af8",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/yang.js",
+      "gitBlob": "236c226422816b026a0c64d71a69c51fc4cc15f1",
+      "size": 56
+    },
+    {
+      "path": "src/languages/prism/zig.js",
+      "gitBlob": "f0c870333ee65fd3ef47dd0f0e13c5cc845a5dd2",
+      "size": 53
+    },
+    {
+      "path": "src/light-async.js",
+      "gitBlob": "1a92ae1d2949586593f87326b7f6f0f9d5d50694",
+      "size": 797
+    },
+    {
+      "path": "src/light.js",
+      "gitBlob": "2f37f796d54e53cc2116d07348cefc6eaf59c20a",
+      "size": 230
+    },
+    {
+      "path": "src/prism-async-light.js",
+      "gitBlob": "5f666d14bbcd0278a2df7c85c26ce890fa42a22f",
+      "size": 582
+    },
+    {
+      "path": "src/prism-async.js",
+      "gitBlob": "87996673fa700359378a9223a790075870e6a436",
+      "size": 474
+    },
+    {
+      "path": "src/prism-light.js",
+      "gitBlob": "54a7005a33b48e5fb4d9229cf0eedcd046c3c3d8",
+      "size": 333
+    },
+    {
+      "path": "src/prism.js",
+      "gitBlob": "6d78b672d22b4613a2a99d550bd9baeedb755b93",
+      "size": 340
+    },
+    {
+      "path": "src/styles/hljs/a11y-dark.js",
+      "gitBlob": "561e7451a074dc334bcbcde8c1e1d2dfcbb369f2",
+      "size": 1823
+    },
+    {
+      "path": "src/styles/hljs/a11y-light.js",
+      "gitBlob": "7632582a908d146d173b141e3ca669bb26985893",
+      "size": 1823
+    },
+    {
+      "path": "src/styles/hljs/agate.js",
+      "gitBlob": "ec3ed728dc9598c19cf0c480edc1095bb5712363",
+      "size": 1892
+    },
+    {
+      "path": "src/styles/hljs/an-old-hope.js",
+      "gitBlob": "45f58cd07498d76f442acde6dc5437c465e83d14",
+      "size": 1823
+    },
+    {
+      "path": "src/styles/hljs/androidstudio.js",
+      "gitBlob": "fbe56d85bebc7612ba8c55a0f1a213807431a458",
+      "size": 1543
+    },
+    {
+      "path": "src/styles/hljs/arduino-light.js",
+      "gitBlob": "8586f1bb575f58a4fa4be772f2130acc96589559",
+      "size": 2195
+    },
+    {
+      "path": "src/styles/hljs/arta.js",
+      "gitBlob": "65e823d2d46c0c381d2908648caabba303d003c7",
+      "size": 1897
+    },
+    {
+      "path": "src/styles/hljs/ascetic.js",
+      "gitBlob": "3462e8ee64a96838d0be0ac6804289166a849f04",
+      "size": 1250
+    },
+    {
+      "path": "src/styles/hljs/atelier-cave-dark.js",
+      "gitBlob": "0e8c2c81bfdbb71c225f6a3fa0b37d65eec4acb1",
+      "size": 2019
+    },
+    {
+      "path": "src/styles/hljs/atelier-cave-light.js",
+      "gitBlob": "1d9b3c7de4ff7585dae741eb583224143cc28bfa",
+      "size": 2019
+    },
+    {
+      "path": "src/styles/hljs/atelier-dune-dark.js",
+      "gitBlob": "74c79fac7277370de8eec776e46db858bdc931a8",
+      "size": 1709
+    },
+    {
+      "path": "src/styles/hljs/atelier-dune-light.js",
+      "gitBlob": "86e379b5e9400351a35928df8ae0affa1aa4347a",
+      "size": 1709
+    },
+    {
+      "path": "src/styles/hljs/atelier-estuary-dark.js",
+      "gitBlob": "565397383dc11d0c768cfbfd1abfc4c2ee87d664",
+      "size": 2019
+    },
+    {
+      "path": "src/styles/hljs/atelier-estuary-light.js",
+      "gitBlob": "5373e610b17932126542939fcdc49847a188968b",
+      "size": 2019
+    },
+    {
+      "path": "src/styles/hljs/atelier-forest-dark.js",
+      "gitBlob": "137289c70757aa96eb86c0f1765b50ef25eb7e27",
+      "size": 1709
+    },
+    {
+      "path": "src/styles/hljs/atelier-forest-light.js",
+      "gitBlob": "a30d46223b81e279bf0e1999d70fba93c672b719",
+      "size": 1709
+    },
+    {
+      "path": "src/styles/hljs/atelier-heath-dark.js",
+      "gitBlob": "8297839cbfe218a69a23333e6b1e539cf0a002dd",
+      "size": 1709
+    },
+    {
+      "path": "src/styles/hljs/atelier-heath-light.js",
+      "gitBlob": "728da2f0a954e3e13b127917947c427266fe4052",
+      "size": 1709
+    },
+    {
+      "path": "src/styles/hljs/atelier-lakeside-dark.js",
+      "gitBlob": "161581147dafb27d5727f04ba45627c74fcde7d9",
+      "size": 1709
+    },
+    {
+      "path": "src/styles/hljs/atelier-lakeside-light.js",
+      "gitBlob": "acf392246e01f51108601193e73f7b1d68b19009",
+      "size": 1709
+    },
+    {
+      "path": "src/styles/hljs/atelier-plateau-dark.js",
+      "gitBlob": "d5cfa042d33c49241cdb52bed36d4ddb4978b0cb",
+      "size": 2019
+    },
+    {
+      "path": "src/styles/hljs/atelier-plateau-light.js",
+      "gitBlob": "4f2680f51f1cc81b055b8b463ab17e361e3b70d4",
+      "size": 2019
+    },
+    {
+      "path": "src/styles/hljs/atelier-savanna-dark.js",
+      "gitBlob": "cfba6a2f03b8ef09618ba1d7cdd7c686fb803933",
+      "size": 2019
+    },
+    {
+      "path": "src/styles/hljs/atelier-savanna-light.js",
+      "gitBlob": "220204115092f883773f0de56bf1c52e55816860",
+      "size": 2019
+    },
+    {
+      "path": "src/styles/hljs/atelier-seaside-dark.js",
+      "gitBlob": "4b8e0103da0ab9cc695dcd1debd36ada862e3f53",
+      "size": 1709
+    },
+    {
+      "path": "src/styles/hljs/atelier-seaside-light.js",
+      "gitBlob": "d8bf1479631b7214291fe6433e27ecb1a69adc56",
+      "size": 1709
+    },
+    {
+      "path": "src/styles/hljs/atelier-sulphurpool-dark.js",
+      "gitBlob": "2750f045ace3560990b81273432d8b2d66606716",
+      "size": 1709
+    },
+    {
+      "path": "src/styles/hljs/atelier-sulphurpool-light.js",
+      "gitBlob": "9c4e7200e8ff4467181fa910905ddbdb60c0c623",
+      "size": 1709
+    },
+    {
+      "path": "src/styles/hljs/atom-one-dark-reasonable.js",
+      "gitBlob": "cb8e67ecd7dbad61943e2973f1a798ca8ec8fcfc",
+      "size": 2843
+    },
+    {
+      "path": "src/styles/hljs/atom-one-dark.js",
+      "gitBlob": "9bbe72d3c4c3012eb2354459671c8b809ae704ff",
+      "size": 2226
+    },
+    {
+      "path": "src/styles/hljs/atom-one-light.js",
+      "gitBlob": "24a2c06705729359b574e3a99f4e11c8bbdfe877",
+      "size": 2226
+    },
+    {
+      "path": "src/styles/hljs/brown-paper.js",
+      "gitBlob": "755aeb1e41a20c81fa9700d01133d1a5114052e9",
+      "size": 1829
+    },
+    {
+      "path": "src/styles/hljs/codepen-embed.js",
+      "gitBlob": "7e67241e8636c78fd0737147789d5290b1040619",
+      "size": 1811
+    },
+    {
+      "path": "src/styles/hljs/color-brewer.js",
+      "gitBlob": "4ea5f165e5b911c6f279d8a812a3cb5e929d9a43",
+      "size": 1860
+    },
+    {
+      "path": "src/styles/hljs/darcula.js",
+      "gitBlob": "ce8d8a6c477d3308eb6352a2e92c8940fa5c35d6",
+      "size": 2037
+    },
+    {
+      "path": "src/styles/hljs/dark.js",
+      "gitBlob": "26b6edfdf50d09fb1d94963f1940598905deeb79",
+      "size": 1737
+    },
+    {
+      "path": "src/styles/hljs/darkula.js",
+      "gitBlob": "56004c9f9e0627ae25f38e9fbe5848d8078663e3",
+      "size": 17
+    },
+    {
+      "path": "src/styles/hljs/default-style.js",
+      "gitBlob": "80080eceb42eccb341aef564fbcb98ec9544c718",
+      "size": 2191
+    },
+    {
+      "path": "src/styles/hljs/docco.js",
+      "gitBlob": "955a00c5e055edd47e050d9e73b692c01924f422",
+      "size": 2136
+    },
+    {
+      "path": "src/styles/hljs/dracula.js",
+      "gitBlob": "f4f5b9cf7489fba084525c4f8cd607ea880ab519",
+      "size": 1818
+    },
+    {
+      "path": "src/styles/hljs/far.js",
+      "gitBlob": "e0336575e18a77dca16248480508133d651dda90",
+      "size": 1927
+    },
+    {
+      "path": "src/styles/hljs/foundation.js",
+      "gitBlob": "a22ff8a6b30c88b0310f8192d1f3c5aebaaed36a",
+      "size": 1866
+    },
+    {
+      "path": "src/styles/hljs/github-gist.js",
+      "gitBlob": "1bc19724bc738ea1c5ea894081418ba0f0425eaa",
+      "size": 1854
+    },
+    {
+      "path": "src/styles/hljs/github.js",
+      "gitBlob": "cca8897c126b946f261af5546cd6c643c2e50110",
+      "size": 2335
+    },
+    {
+      "path": "src/styles/hljs/gml.js",
+      "gitBlob": "a175229683a753f52ef24152d801a1882aa0d8ce",
+      "size": 2152
+    },
+    {
+      "path": "src/styles/hljs/googlecode.js",
+      "gitBlob": "90b0ea15a4bd00b66e7c34607d86730d0c540449",
+      "size": 2118
+    },
+    {
+      "path": "src/styles/hljs/gradient-dark.js",
+      "gitBlob": "da9125f014cf59f0f737b763364d0e692b69a638",
+      "size": 2640
+    },
+    {
+      "path": "src/styles/hljs/gradient-light.js",
+      "gitBlob": "6a6797026cd3dbc1a5019dd9620a8f48fa53b654",
+      "size": 2670
+    },
+    {
+      "path": "src/styles/hljs/grayscale.js",
+      "gitBlob": "45ee007d1414ef34034b0f797aae76e7dd7cda35",
+      "size": 3833
+    },
+    {
+      "path": "src/styles/hljs/gruvbox-dark.js",
+      "gitBlob": "8c3faad513a03916d468f297e205e795f8a0fb17",
+      "size": 2790
+    },
+    {
+      "path": "src/styles/hljs/gruvbox-light.js",
+      "gitBlob": "d14c7a806111b543fad32b3fbdf849436a4fb445",
+      "size": 2790
+    },
+    {
+      "path": "src/styles/hljs/hopscotch.js",
+      "gitBlob": "ed0118f9912b611e219a3ae4f11d31c325287dfc",
+      "size": 1946
+    },
+    {
+      "path": "src/styles/hljs/hybrid.js",
+      "gitBlob": "33a3f233378fa4891f4db236a1921f26c86c0ef6",
+      "size": 2460
+    },
+    {
+      "path": "src/styles/hljs/idea.js",
+      "gitBlob": "a6959f210521d6439941ff2065f042540a5fb991",
+      "size": 2534
+    },
+    {
+      "path": "src/styles/hljs/index.js",
+      "gitBlob": "61eb7a20b3ebe5315763af0f712410edf593c86b",
+      "size": 5584
+    },
+    {
+      "path": "src/styles/hljs/ir-black.js",
+      "gitBlob": "d94b9625cc6f643114cf1542a1ca75d03a8e9c5c",
+      "size": 1819
+    },
+    {
+      "path": "src/styles/hljs/isbl-editor-dark.js",
+      "gitBlob": "2ff7b2b13bf436cf4248335b480262eed8d482da",
+      "size": 2581
+    },
+    {
+      "path": "src/styles/hljs/isbl-editor-light.js",
+      "gitBlob": "27e221c6bc252d34936f6a76fa65426a0fd88531",
+      "size": 2575
+    },
+    {
+      "path": "src/styles/hljs/kimbie.dark.js",
+      "gitBlob": "1b4a945ba328b93151c383742adaa199f3036aac",
+      "size": 1880
+    },
+    {
+      "path": "src/styles/hljs/kimbie.light.js",
+      "gitBlob": "f0adf69b1a8e108220fa3de5b5779042973942cf",
+      "size": 1880
+    },
+    {
+      "path": "src/styles/hljs/lightfair.js",
+      "gitBlob": "82da229c22e45566560ba1b14d55d37be261b529",
+      "size": 2268
+    },
+    {
+      "path": "src/styles/hljs/lioshi.js",
+      "gitBlob": "7029133962be9f4aa8ad32e17e9b66672524b837",
+      "size": 1947
+    },
+    {
+      "path": "src/styles/hljs/magula.js",
+      "gitBlob": "d56546754a281db0d135cc76bee02b0a1e34f7a7",
+      "size": 1920
+    },
+    {
+      "path": "src/styles/hljs/mono-blue.js",
+      "gitBlob": "e1094980423c246d17c4f2467e25ace704dc2509",
+      "size": 1857
+    },
+    {
+      "path": "src/styles/hljs/monokai-sublime.js",
+      "gitBlob": "71f58f8fab4e1ffef328d14286a5be5bdf064bdf",
+      "size": 2231
+    },
+    {
+      "path": "src/styles/hljs/monokai.js",
+      "gitBlob": "251aa6e315e5b7d0cb9b11ada0ea3b36b7573582",
+      "size": 2239
+    },
+    {
+      "path": "src/styles/hljs/night-owl.js",
+      "gitBlob": "b89461954bbe54c49af5fe34a5a6e45293fe117b",
+      "size": 2883
+    },
+    {
+      "path": "src/styles/hljs/nnfx-dark.js",
+      "gitBlob": "5958a5e9fe643eb2cbec9483cd89f1caf9652741",
+      "size": 2247
+    },
+    {
+      "path": "src/styles/hljs/nnfx.js",
+      "gitBlob": "a401650444308bfad65c4794ef8e24cd94d41e8e",
+      "size": 2247
+    },
+    {
+      "path": "src/styles/hljs/nord.js",
+      "gitBlob": "ec04e7ca7092c8489e69dc849b81ea1d7376f398",
+      "size": 4804
+    },
+    {
+      "path": "src/styles/hljs/obsidian.js",
+      "gitBlob": "cb4517c8c33cd2a52eb85e78a83b827974d12152",
+      "size": 2297
+    },
+    {
+      "path": "src/styles/hljs/ocean.js",
+      "gitBlob": "fedad6035e452d1f9295d713314e5c01a3aa38d1",
+      "size": 1823
+    },
+    {
+      "path": "src/styles/hljs/paraiso-dark.js",
+      "gitBlob": "fa0a9c561f4f8633f394572a2acb26def7c2967f",
+      "size": 1823
+    },
+    {
+      "path": "src/styles/hljs/paraiso-light.js",
+      "gitBlob": "be725a5c3c6119840f40f1837cbc0ce084bdcbb0",
+      "size": 1823
+    },
+    {
+      "path": "src/styles/hljs/pojoaque.js",
+      "gitBlob": "f8661747890a825bcdf959a07be3ce94d7a80a66",
+      "size": 2048
+    },
+    {
+      "path": "src/styles/hljs/purebasic.js",
+      "gitBlob": "5b448d3117b46b59ef34c520f8b0006e317c3d3e",
+      "size": 2345
+    },
+    {
+      "path": "src/styles/hljs/qtcreator_dark.js",
+      "gitBlob": "e4805fd01dd918a8a85a9b306bafc76ed12ebe84",
+      "size": 2315
+    },
+    {
+      "path": "src/styles/hljs/qtcreator_light.js",
+      "gitBlob": "52c1b1e00e536d7846b7230f6460b538a3abee9c",
+      "size": 2315
+    },
+    {
+      "path": "src/styles/hljs/railscasts.js",
+      "gitBlob": "e1fd45960c6caa0bb619cb66e5c35a780ed79fc4",
+      "size": 2168
+    },
+    {
+      "path": "src/styles/hljs/rainbow.js",
+      "gitBlob": "e3b095fd3da9009101e5b0680c76a8be13bfbe08",
+      "size": 2129
+    },
+    {
+      "path": "src/styles/hljs/routeros.js",
+      "gitBlob": "59e726bbc85f1beb685928a6b94c2a8124b71a16",
+      "size": 2307
+    },
+    {
+      "path": "src/styles/hljs/school-book.js",
+      "gitBlob": "d1f3a4f7223c6306122b67aa73691ce1aa86ff9e",
+      "size": 2083
+    },
+    {
+      "path": "src/styles/hljs/shades-of-purple.js",
+      "gitBlob": "3faeee6a3e63299f1891f81ca8d392d6640f4266",
+      "size": 2048
+    },
+    {
+      "path": "src/styles/hljs/solarized-dark.js",
+      "gitBlob": "ae0704181b1b0501a967845a70ae838d11e85b43",
+      "size": 2208
+    },
+    {
+      "path": "src/styles/hljs/solarized-light.js",
+      "gitBlob": "6a8843b7f5a60256802697cf2f7be4a28036a66e",
+      "size": 2208
+    },
+    {
+      "path": "src/styles/hljs/srcery.js",
+      "gitBlob": "3ab3e60f5646a416ea9777f512a2e7d329bb34a5",
+      "size": 2091
+    },
+    {
+      "path": "src/styles/hljs/stackoverflow-dark.js",
+      "gitBlob": "9e79d95ace1fee2d76c7883b9fbbbd0145cb2fd7",
+      "size": 2125
+    },
+    {
+      "path": "src/styles/hljs/stackoverflow-light.js",
+      "gitBlob": "2517a131fa9a759d4ba402b1557087bb5ef0ac4e",
+      "size": 2124
+    },
+    {
+      "path": "src/styles/hljs/sunburst.js",
+      "gitBlob": "ba672a95dbcc80fd111d668b5d6b678667932dbf",
+      "size": 2106
+    },
+    {
+      "path": "src/styles/hljs/tomorrow-night-blue.js",
+      "gitBlob": "d1722ad404c28bedb0f7d1c4c01c7ad975f7870d",
+      "size": 1821
+    },
+    {
+      "path": "src/styles/hljs/tomorrow-night-bright.js",
+      "gitBlob": "9b1af85fcce5555dfe5b3394ab0b4833deb90de9",
+      "size": 1821
+    },
+    {
+      "path": "src/styles/hljs/tomorrow-night-eighties.js",
+      "gitBlob": "c1d56b14ff190a5e25109cff91d66914abdfce57",
+      "size": 1823
+    },
+    {
+      "path": "src/styles/hljs/tomorrow-night.js",
+      "gitBlob": "1e0b04df44e6603dadbd3416bb306c81d0267bdc",
+      "size": 1823
+    },
+    {
+      "path": "src/styles/hljs/tomorrow.js",
+      "gitBlob": "033b74db389a58b1873b1196bda9de93c6ec7914",
+      "size": 1821
+    },
+    {
+      "path": "src/styles/hljs/vs.js",
+      "gitBlob": "2771adec15d228069b64d39f5f5db2baf45e1f4f",
+      "size": 1747
+    },
+    {
+      "path": "src/styles/hljs/vs2015.js",
+      "gitBlob": "7d9794e42153d3fd9b9adbf000cfd40616279cb3",
+      "size": 2695
+    },
+    {
+      "path": "src/styles/hljs/xcode.js",
+      "gitBlob": "e03fd7012b9b520e9e9cbc966ccfb55101d56fec",
+      "size": 2330
+    },
+    {
+      "path": "src/styles/hljs/xt256.js",
+      "gitBlob": "53549ee69df8176a6011847f3ee691dc142654ae",
+      "size": 2005
+    },
+    {
+      "path": "src/styles/hljs/zenburn.js",
+      "gitBlob": "32fedec1b946386accd02685997f0204219d1070",
+      "size": 1828
+    },
+    {
+      "path": "src/styles/prism/a11y-dark.js",
+      "gitBlob": "d39f89f6f8e5e6569c02336de04573325ea7159c",
+      "size": 3152
+    },
+    {
+      "path": "src/styles/prism/a11y-one-light.js",
+      "gitBlob": "48e6f85c202fb30ab85df975eb9f7442f0e49009",
+      "size": 13980
+    },
+    {
+      "path": "src/styles/prism/atom-dark.js",
+      "gitBlob": "f2adccc3bcae6a2e384a8c0c8b7543bfe9d5f191",
+      "size": 3341
+    },
+    {
+      "path": "src/styles/prism/base16-ateliersulphurpool.light.js",
+      "gitBlob": "ce940d9e56ef6d068113b9f83b83761d8c14bb9d",
+      "size": 5068
+    },
+    {
+      "path": "src/styles/prism/cb.js",
+      "gitBlob": "185ec2ad8a06c96cf1d98c0149f3016d4b191621",
+      "size": 3807
+    },
+    {
+      "path": "src/styles/prism/coldark-cold.js",
+      "gitBlob": "be6bc5b66b643c8af9bf3c2cf2857145bddd727a",
+      "size": 10123
+    },
+    {
+      "path": "src/styles/prism/coldark-dark.js",
+      "gitBlob": "f34ed64bc3ed25c72b07335101ab9aae89ac83fd",
+      "size": 10117
+    },
+    {
+      "path": "src/styles/prism/coy-without-shadows.js",
+      "gitBlob": "b0d7232b49b564662696670c8219ca0a075f75e6",
+      "size": 4376
+    },
+    {
+      "path": "src/styles/prism/coy.js",
+      "gitBlob": "99a4af462980fe90d45f50bdd20fe0a4203c16ae",
+      "size": 6447
+    },
+    {
+      "path": "src/styles/prism/darcula.js",
+      "gitBlob": "58189fea761c1aae576eb61ae599464cc97c6e72",
+      "size": 4825
+    },
+    {
+      "path": "src/styles/prism/dark.js",
+      "gitBlob": "ebb1c8edb777ade828d40e3ea8bb859013b9d480",
+      "size": 3767
+    },
+    {
+      "path": "src/styles/prism/dracula.js",
+      "gitBlob": "7f81734b9326d0de2aa4e08f7b76cef8ac68f2f7",
+      "size": 3354
+    },
+    {
+      "path": "src/styles/prism/duotone-dark.js",
+      "gitBlob": "fd08f0179c1b4eca44a753719ab6547725731b64",
+      "size": 5483
+    },
+    {
+      "path": "src/styles/prism/duotone-earth.js",
+      "gitBlob": "6cd9e022c40598eb79308cd848f8c9a76592478a",
+      "size": 5483
+    },
+    {
+      "path": "src/styles/prism/duotone-forest.js",
+      "gitBlob": "86db82a81ba3a867e78e541d69ebad9fe54dd103",
+      "size": 5483
+    },
+    {
+      "path": "src/styles/prism/duotone-light.js",
+      "gitBlob": "9448276e2530c30ebd351b86527fb44898ec2004",
+      "size": 5477
+    },
+    {
+      "path": "src/styles/prism/duotone-sea.js",
+      "gitBlob": "4eb3cb47e503edd116a36abaaf1c082ce22d1843",
+      "size": 5483
+    },
+    {
+      "path": "src/styles/prism/duotone-space.js",
+      "gitBlob": "2d571776962d96c4aee0e9ab393b2fcac98654de",
+      "size": 5483
+    },
+    {
+      "path": "src/styles/prism/funky.js",
+      "gitBlob": "f35931961f9c6862f93bfda12ee5bd9672a51932",
+      "size": 4151
+    },
+    {
+      "path": "src/styles/prism/ghcolors.js",
+      "gitBlob": "ae01a05244e3a74615edc5685571d6d3a18ec1bd",
+      "size": 4197
+    },
+    {
+      "path": "src/styles/prism/gruvbox-dark.js",
+      "gitBlob": "a269d7c52daf7c9a4cfd44120a3709e81f3cdc9f",
+      "size": 4000
+    },
+    {
+      "path": "src/styles/prism/gruvbox-light.js",
+      "gitBlob": "c622cba9150dc7c66789c81cc131ed9f57988533",
+      "size": 4000
+    },
+    {
+      "path": "src/styles/prism/holi-theme.js",
+      "gitBlob": "3990fa5d9c2909d4d86cfc1b91450ca95f5962d0",
+      "size": 4655
+    },
+    {
+      "path": "src/styles/prism/hopscotch.js",
+      "gitBlob": "1ba6b5c981f3e6552a3927ba10c5d49eab49cebf",
+      "size": 3331
+    },
+    {
+      "path": "src/styles/prism/index.js",
+      "gitBlob": "43b681bdcc89775fb921aef11d6f3ec5231cae5f",
+      "size": 2372
+    },
+    {
+      "path": "src/styles/prism/lucario.js",
+      "gitBlob": "0081318b7cc215e39072836e0b816d6882dab09c",
+      "size": 3354
+    },
+    {
+      "path": "src/styles/prism/material-dark.js",
+      "gitBlob": "76f82d0d64b0f803e33c3fac0f458d0467ebb468",
+      "size": 4268
+    },
+    {
+      "path": "src/styles/prism/material-light.js",
+      "gitBlob": "7f00fba0cc4227e8562b25f3a6cef95b290efd7a",
+      "size": 4498
+    },
+    {
+      "path": "src/styles/prism/material-oceanic.js",
+      "gitBlob": "eda5c13a7e5c22637f5c80d321490bdc128a4491",
+      "size": 4354
+    },
+    {
+      "path": "src/styles/prism/night-owl.js",
+      "gitBlob": "88f8ff5fe223a47294c0c9dad92fab2cfdf282ed",
+      "size": 4926
+    },
+    {
+      "path": "src/styles/prism/nord.js",
+      "gitBlob": "b64b128a8a8dfd4be91733ca5ee7f9ff93fd3ec9",
+      "size": 3284
+    },
+    {
+      "path": "src/styles/prism/okaidia.js",
+      "gitBlob": "488c9e91d939e32f826c3f5d16437b8287691edf",
+      "size": 3407
+    },
+    {
+      "path": "src/styles/prism/one-dark.js",
+      "gitBlob": "fa7c839ee2e145bb6ca838739df3afa6846afb97",
+      "size": 16655
+    },
+    {
+      "path": "src/styles/prism/one-light.js",
+      "gitBlob": "edff1813d40ef906f07393e7cd8d3bb5a9d85591",
+      "size": 16155
+    },
+    {
+      "path": "src/styles/prism/pojoaque.js",
+      "gitBlob": "09dd83b1d46a02a366307e46b2567acf7aa7b67e",
+      "size": 6727
+    },
+    {
+      "path": "src/styles/prism/prism.js",
+      "gitBlob": "d3c551f892985db7fdd6ed5ef1b479cde44bcca2",
+      "size": 4475
+    },
+    {
+      "path": "src/styles/prism/shades-of-purple.js",
+      "gitBlob": "e12b8d6937cbce2331d6b38b9e6abe78bd31ef6a",
+      "size": 5771
+    },
+    {
+      "path": "src/styles/prism/solarized-dark-atom.js",
+      "gitBlob": "25c24734114e2672a7d1b7ef7bb9b5d2224a9349",
+      "size": 3341
+    },
+    {
+      "path": "src/styles/prism/solarizedlight.js",
+      "gitBlob": "9989576699aef3d4b29dd5f0f6114987957991f9",
+      "size": 3809
+    },
+    {
+      "path": "src/styles/prism/synthwave84.js",
+      "gitBlob": "7508d6eb20dd8034c7008f6ffa29883caaf68009",
+      "size": 4943
+    },
+    {
+      "path": "src/styles/prism/tomorrow.js",
+      "gitBlob": "7b767514f74ea852b296229b926e9fd90c0c8bcc",
+      "size": 3230
+    },
+    {
+      "path": "src/styles/prism/twilight.js",
+      "gitBlob": "97729408ca97dcf7a685217cec68bfd16e5b1b6f",
+      "size": 5769
+    },
+    {
+      "path": "src/styles/prism/vs-dark.js",
+      "gitBlob": "e6794b71549451869121425c1a8774757096f805",
+      "size": 3403
+    },
+    {
+      "path": "src/styles/prism/vs.js",
+      "gitBlob": "ded4bf1516b051f68c5c2f460f33c3ea099bc00a",
+      "size": 4973
+    },
+    {
+      "path": "src/styles/prism/vsc-dark-plus.js",
+      "gitBlob": "57180e34180b06e713988adb8075ec94e8ab0545",
+      "size": 6483
+    },
+    {
+      "path": "src/styles/prism/xonokai.js",
+      "gitBlob": "448f752bb373cb716897a0de1f084e348d5a9355",
+      "size": 4342
+    },
+    {
+      "path": "src/styles/prism/z-touch.js",
+      "gitBlob": "10e01245654bf9782bf8dd7427360144165ba765",
+      "size": 4919
+    }
+  ],
+  "fingerprint": "24c678cf623d08e50dc304edce74a83828936cf5674b92ff1d9991217b0d5beb"
+}

@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "TanStack Store bindings for Octane — reuses the framework-agnostic @tanstack/store core with an Octane hook adapter.",
+  "description": "TanStack Store bindings for Octane \u2014 reuses the framework-agnostic @tanstack/store core with an Octane hook adapter.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -31,16 +31,17 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
     "test": "vitest run",
-    "test:upstream": "node scripts/run-pristine-upstream.mjs",
+    "test:upstream": "node ../../scripts/react-parity/run-pristine.mjs tanstack-store",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
-    "upstream:verify": "node scripts/verify-upstream.mjs"
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "dependencies": {
     "@tanstack/store": "0.11.0"

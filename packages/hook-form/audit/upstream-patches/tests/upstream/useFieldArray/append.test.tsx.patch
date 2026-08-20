@@ -1,0 +1,24 @@
+diff --git a/tests/upstream/useFieldArray/append.test.tsx b/tests/upstream/useFieldArray/append.test.tsx
+--- a/tests/upstream/useFieldArray/append.test.tsx
++++ b/tests/upstream/useFieldArray/append.test.tsx
+@@ -16,7 +16,10 @@ import { useForm } from '../../../src/useForm';
+ 
+ let i = 0;
+ 
+-vi.mock('../../../src/logic/generateId', () => () => String(i++));
++// octane: vitest module mock — path resolved from tests/upstream/useFieldArray/, factory returns { default }
++vi.mock('../../../src/logic/generateId', () => ({
++  default: () => String(i++),
++}));
+ 
+ describe('append', () => {
+   beforeEach(() => {
+@@ -521,7 +524,7 @@ describe('append', () => {
+     });
+ 
+     it('should not invoke resolver per register during append; only array-scoped + final isValid', async () => {
+-      const resolver = jest
++      const resolver = vi
+         .fn()
+         .mockImplementation((values) => ({ values, errors: {} }));
+ 

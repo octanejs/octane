@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -57,6 +57,11 @@
       },
       "files": [
         {
+          "path": "packages/pdf/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "59ea21a946bdba029c2fc5ec0bd955a1118e50860e51b2b277d0c14e8b6cfb6f"
+        },
+        {
           "path": "packages/pdf/audit/pristine-wrapper-runtime.json",
           "role": "support",
           "sha256": "cb9278da6bb87b3ca75a9cadb77706ce7b04773d9384f0601dad5cd33e343da2"
@@ -64,7 +69,7 @@
         {
           "path": "packages/pdf/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "5f7cc0a4c2b022bb20b66b0b1db0f74dc25617c5865d7eff0e164546e19a85b3"
+          "sha256": "85498da1f944248c5d77c19d78fe4c010e9bdae6c2b4a6a570ed88fb423f9c89"
         },
         {
           "path": "packages/pdf/tests/upstream-original.test.ts",
@@ -74,15 +79,15 @@
         {
           "path": "scripts/react-parity/pdf-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "6a874a62d093d6618b84a74d050ce59317fa8de9097538b4e6009f9f812f9390"
+          "sha256": "12f8c7fde3da0a9a2680934bf8cf193e07327d1880e24e3eb57b750f45874c11"
         },
         {
           "path": "packages/pdf/tests/upstream-vitest.config.ts",
           "role": "support",
-          "sha256": "d155a5536d000a8cfc0ef0ff3ffb8500df5a72b7d5adf498688ace5c6e42d081"
+          "sha256": "7b46872bd60a1ab824323d53c5d1001bc8d35afe88f3edaa3a943ef6408354d2"
         },
         {
-          "path": "packages/pdf/upstream/support/test-utils.ts",
+          "path": "packages/pdf/upstream/test-utils.ts",
           "role": "support",
           "sha256": "5067a04350acefaa99f177c4dd8d22ec8bbee274003f49986f8cfad521959c4d"
         }

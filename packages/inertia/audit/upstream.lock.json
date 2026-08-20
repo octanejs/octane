@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@inertiajs/react",
+    "version": "3.6.1",
+    "repository": {
+      "owner": "inertiajs",
+      "repo": "inertia",
+      "subdirectory": "packages/react"
+    },
+    "commit": "68b13b662d7a6ecdd504026ee18733192b0c7d73",
+    "integrity": "sha512-z5TJIj80TmLqhJE6FD6RwfmbcYPFuMT63orrXayLW084yYAKLye4i9aeeCt6+mDxC1hMMP16Uf68ePiLtl0saA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "17e3b9936480e5244d88a27da590e87282379e37b8c9e1599f4fe98360a252c2"
+      },
+      {
+        "path": "packages/react/LICENSE",
+        "sha256": "17e3b9936480e5244d88a27da590e87282379e37b8c9e1599f4fe98360a252c2"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["package.json", "src"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "package.json",
+      "gitBlob": "f4774a7b67c32588545775280a5a09bc8c1ae318",
+      "size": 1934
+    },
+    {
+      "path": "src/App.ts",
+      "gitBlob": "aa27cfed7bd2f3dec51662e42e9557f7e6101a87",
+      "size": 7533
+    },
+    {
+      "path": "src/createInertiaApp.ts",
+      "gitBlob": "8341f1ebf4605c83ff0a1f90c1b8061ffc6453c3",
+      "size": 6793
+    },
+    {
+      "path": "src/Deferred.ts",
+      "gitBlob": "796b8f161a668d7ece5d05e3310042808932f903",
+      "size": 2535
+    },
+    {
+      "path": "src/env.d.ts",
+      "gitBlob": "94ebf6c7294db117efb6b9f93fbebc89962354ad",
+      "size": 109
+    },
+    {
+      "path": "src/Form.ts",
+      "gitBlob": "e1e6987002e2861e969bd889bac3f63f945bbb76",
+      "size": 9663
+    },
+    {
+      "path": "src/Head.ts",
+      "gitBlob": "3d8208d5481626d31c27801444ee566e22f4149f",
+      "size": 3021
+    },
+    {
+      "path": "src/HeadContext.ts",
+      "gitBlob": "3e7f645804242829440ae275488ac08326f69757",
+      "size": 220
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "c4c8deed0ce9e1a6018befb6a612655ad483b193",
+      "size": 1249
+    },
+    {
+      "path": "src/InfiniteScroll.ts",
+      "gitBlob": "0aad78ad7d84db09f14b4854eb43098ce98be2d9",
+      "size": 11298
+    },
+    {
+      "path": "src/layoutProps.ts",
+      "gitBlob": "f056b1404f55128095b75780b776e6ec6c25f910",
+      "size": 799
+    },
+    {
+      "path": "src/Link.ts",
+      "gitBlob": "7b8db3d997f2195afe7f87662625c97dc0196364",
+      "size": 7777
+    },
+    {
+      "path": "src/PageContext.ts",
+      "gitBlob": "c12e8b8d876b647ecf1bd4f83ced42bd8334e97a",
+      "size": 206
+    },
+    {
+      "path": "src/react.ts",
+      "gitBlob": "f7ca3074d42b17546b65a4b25c5877ea039110a9",
+      "size": 450
+    },
+    {
+      "path": "src/server.ts",
+      "gitBlob": "a3168b6e22beea9f0057ff92b579c15780a6117f",
+      "size": 60
+    },
+    {
+      "path": "src/types.ts",
+      "gitBlob": "ca7aa160f1cac6945458b409e06bfa8fd5f34e9e",
+      "size": 651
+    },
+    {
+      "path": "src/useForm.ts",
+      "gitBlob": "f94f2dbff3fde453091c288af40132f6492df4f7",
+      "size": 9974
+    },
+    {
+      "path": "src/useFormState.ts",
+      "gitBlob": "1ee9ce840e9c5ff7817ae6ad847b76d80ac9a462",
+      "size": 16015
+    },
+    {
+      "path": "src/useHttp.ts",
+      "gitBlob": "15a13e90660703b0efcaffba05206056d9e8cfe4",
+      "size": 13641
+    },
+    {
+      "path": "src/usePage.ts",
+      "gitBlob": "947f6557099f673d83149c068c7a41b9768c2269",
+      "size": 430
+    },
+    {
+      "path": "src/usePoll.ts",
+      "gitBlob": "6161406a79f81cda447616f455ab89c1c036c010",
+      "size": 856
+    },
+    {
+      "path": "src/usePrefetch.ts",
+      "gitBlob": "832e02cbbb7fa506f624091c3f3d11f5303b8f6e",
+      "size": 1433
+    },
+    {
+      "path": "src/useRemember.ts",
+      "gitBlob": "529bfc02a0c06176a8f0607d5b53d625ad4a7ee8",
+      "size": 859
+    },
+    {
+      "path": "src/WhenVisible.ts",
+      "gitBlob": "b0af9fe32172ab789f7550442a70c7b7b61439d8",
+      "size": 3523
+    }
+  ],
+  "fingerprint": "f3f5968a7123a0516880519a0c6e69bfa58825634795cdf88a42b7f781cc781c"
+}

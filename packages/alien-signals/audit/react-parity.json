@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -75,27 +75,22 @@
         {
           "path": "scripts/react-parity/alien-signals-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "7a3ce432c7ece6ecf28f47180e9b89d344e1436277e73caf42d9f366b60e7e1e"
+          "sha256": "7857350920bd515db8cfe0b5cd2768550cc669baab123564ad02ca6dd4a13747"
         },
         {
-          "path": "packages/alien-signals/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "7443068c7d3a48b61e9a3abac15f00fb2d50280d2a959a15f7251d87e8f186fc"
-        },
-        {
-          "path": "packages/alien-signals/scripts/verify-upstream.mjs",
-          "role": "support",
-          "sha256": "7fc3f29a1c652092891ea1c95ceb1da434108c2a9eef62dd82306a4cae221546"
-        },
-        {
-          "path": "packages/alien-signals/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "7f67ce32b4d7d512d6afe8a3b91bde057d93b2a74d32ab9a4da97920cd7ef426"
+          "sha256": "05b588ad14562a780437a1e023f6c24ceed437e61a5a77ba27197feb898823a0"
         },
         {
           "path": "packages/alien-signals/audit/pristine-oracle-environment.json",
           "role": "support",
           "sha256": "66a9082b9644aa8db0f7257d4c082880b5be7d6f901bdc79cccfc6ce25a4d1b3"
+        },
+        {
+          "path": "packages/alien-signals/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "b2ee1d80678b8bf972ceb7e560567b884821694146a54e9b6bff79f1937154d8"
         }
       ]
     },
@@ -120,7 +115,7 @@
         {
           "path": "scripts/react-parity/alien-signals-runtime-inventory.mjs",
           "role": "support",
-          "sha256": "8de5b2020afb4b7ce14e373643a1047912e220c0cd8ec93fe1356621fff8d4ee"
+          "sha256": "187e573ef7b8c1e19360c871a4d8fe03564248af5e0bf007616b4b9814c4730e"
         },
         {
           "path": "scripts/react-parity/alien-signals-runtime-lib.mjs",

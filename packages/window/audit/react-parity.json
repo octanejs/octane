@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -57,14 +57,14 @@
       },
       "files": [
         {
+          "path": "packages/window/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "11299186085276a238d8b07764e49e02135d3eb8e50b7949bdf255867585e658"
+        },
+        {
           "path": "packages/window/audit/pristine-runtime.json",
           "role": "support",
           "sha256": "15608b899f5e84a14db173fa4aef4be85fc2efd6a2d5a1c61d77747cb2534afa"
-        },
-        {
-          "path": "packages/window/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "69d0a2e15466c0f44a6cd477835631f14f181eac149dbdbaa1ed0e01996c56ba"
         }
       ]
     },
@@ -92,9 +92,19 @@
           "sha256": "20018a26697f78395f3289e371b8606f4a64604cd77ec7c02908cc05fe143508"
         },
         {
-          "path": "packages/window/tests/generate-adapted-tests.mjs",
+          "path": "packages/window/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "584515f956967578e1f4414bbf1b5d1b510f65316919d6ce5470aa79e9c22747"
+          "sha256": "11299186085276a238d8b07764e49e02135d3eb8e50b7949bdf255867585e658"
+        },
+        {
+          "path": "packages/window/audit/upstream-patches/tests/upstream/components/grid/Grid.test.tsx.patch",
+          "role": "support",
+          "sha256": "7ec6687fbed3028f76b963e4e0f4e313981d9d20170400c343618ae7e66c6e86"
+        },
+        {
+          "path": "packages/window/audit/upstream-patches/tests/upstream/components/list/List.test.tsx.patch",
+          "role": "support",
+          "sha256": "e3e8de3fa1c1ebd8d1d7a78980a1b192599d2df4830d4fe1719facf3383c353e"
         }
       ]
     },
@@ -172,7 +182,7 @@
         {
           "path": "packages/window/audit/type-contract.json",
           "role": "support",
-          "sha256": "ab371968373a9c9b70d914e5b37c9a91ed8d9a5dc50ddfcd3bc0b695573cedbc"
+          "sha256": "6b341ca6520d7e4a2728689f2e5a9801d12b93f4a108468ee211f5d805890332"
         }
       ]
     },
@@ -250,7 +260,7 @@
         {
           "path": "packages/window/audit/type-contract.json",
           "role": "support",
-          "sha256": "ab371968373a9c9b70d914e5b37c9a91ed8d9a5dc50ddfcd3bc0b695573cedbc"
+          "sha256": "6b341ca6520d7e4a2728689f2e5a9801d12b93f4a108468ee211f5d805890332"
         }
       ]
     },

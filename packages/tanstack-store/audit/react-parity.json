@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -75,12 +75,12 @@
         {
           "path": "scripts/react-parity/tanstack-store-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "9e5abbff95b4d78953b1d5b270c51c222013184ecf956d725b0b47c7a7c533c5"
+          "sha256": "f1297fd3044bbc24cf216691a0614b1d220ab93e5562dc66df67b21037f863e8"
         },
         {
-          "path": "packages/tanstack-store/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "04da786339b230abe5c0511d8b658a7fcdb8fc85e80a27fb1d03bcca65bf52be"
+          "sha256": "05b588ad14562a780437a1e023f6c24ceed437e61a5a77ba27197feb898823a0"
         },
         {
           "path": "packages/tanstack-store/tests/upstream-vitest.config.ts",
@@ -88,14 +88,19 @@
           "sha256": "682394291a575181d26118f9037f589cd19311025f5bd6895cbf7027cfa92e91"
         },
         {
-          "path": "packages/tanstack-store/scripts/verify-upstream.mjs",
+          "path": "packages/tanstack-store/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "082590c6edb1bf9bd11c20ed5659763853fe83a511e584d7f3cb123dd03b330c"
+          "sha256": "13977af0bf9b35af41b6e5f145270963349e7c38890790fc1673000e2598fee9"
         },
         {
-          "path": "packages/tanstack-store/upstream/SHA256SUMS",
+          "path": "packages/tanstack-store/audit/pristine-suite.json",
           "role": "support",
-          "sha256": "edaa458866b5a172ae1dcdca7aa36a0378efd4ddf3dfb6904e6923727857ee95"
+          "sha256": "c8a360c5f09256529cec50d5af7f768584014675c405c322cc463589c18c79e4"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
         }
       ]
     },
@@ -138,14 +143,14 @@
           "sha256": "631944237a0593316c06b531b9b1874e190360fb14074da6acc715713ed332b9"
         },
         {
-          "path": "packages/tanstack-store/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "edaa458866b5a172ae1dcdca7aa36a0378efd4ddf3dfb6904e6923727857ee95"
-        },
-        {
           "path": "packages/tanstack-store/audit/test-classifications.json",
           "role": "support",
           "sha256": "32610b5626bababc6cecca42901cfb01166b9f5c8a2f2116bdfeb7562fde5bc6"
+        },
+        {
+          "path": "packages/tanstack-store/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "13977af0bf9b35af41b6e5f145270963349e7c38890790fc1673000e2598fee9"
         }
       ]
     },
@@ -191,9 +196,9 @@
           "sha256": "db885a95b7220f9db79b0edd5d49e767c6e19fae0f685553c42021fdfa61e0bf"
         },
         {
-          "path": "packages/tanstack-store/upstream/SHA256SUMS",
+          "path": "packages/tanstack-store/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "edaa458866b5a172ae1dcdca7aa36a0378efd4ddf3dfb6904e6923727857ee95"
+          "sha256": "13977af0bf9b35af41b6e5f145270963349e7c38890790fc1673000e2598fee9"
         }
       ]
     },

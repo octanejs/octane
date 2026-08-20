@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -51,51 +51,34 @@
       "environment": "workspace-node",
       "project": "motion-pristine",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs the curated Motion 12.42.2 useMotionValue Jest cases byte-exact against motion/react in native Jest (jest-full), with pin artifacts under packages/motion/upstream/.",
+      "notes": "Wrapper lane: the Vitest project runs tests/upstream-original.test.ts, which verifies the lock-pinned upstream bytes offline, assembles a scratch Jest root from those bytes plus tests/_pristine-shims/, and runs all 82 pinned framer-motion@12.42.2 value-suite cases (9 files) byte-exact against motion/react, checking every passed identity against audit/pristine-runtime.json. The matcher-compat setup restores the alias matchers Jest 30 removed.",
       "execution": {
-        "kind": "jest-full",
-        "config": "packages/motion/tests/upstream-jest.config.cjs",
-        "root": "packages/motion/upstream",
-        "inventory": "packages/motion/audit/pristine-runtime.json"
+        "kind": "vitest-full",
+        "inventory": "packages/motion/audit/pristine-wrapper-runtime.json"
       },
       "files": [
         {
           "path": "packages/motion/tests/upstream-original.test.ts",
           "role": "support",
-          "sha256": "062ac469737dd974b4a65e678c0e946df475e56df333a438c9c7a7fd2c312eea"
+          "sha256": "37e20e52820a0ed74cbae826eb6dd352a9e2f66440e9032a1a9b495176b8290b"
         },
         {
           "path": "packages/motion/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "21f1b2549f11af48d24274bb0b9365e8186c583b8425e6ff6babd5e55ca36790"
-        },
-        {
-          "path": "scripts/react-parity/jest-full-runner.mjs",
-          "role": "support",
-          "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
-        },
-        {
-          "path": "packages/motion/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "82bea0b9b535d78ebf27976bdc826480f6481c7bfea6e0abdb0c3f0bbf756afc"
+          "sha256": "2d328f170129d9abf0ac742539b39b820cc80f8e4d41e0a84fe6493755fcc0b4"
         },
         {
           "path": "packages/motion/tests/upstream-jest.config.cjs",
           "role": "support",
-          "sha256": "7284a19f8c8310628796865c53bc3bffea16e87bfb575fc2eff6a9a7cbde5fdb"
+          "sha256": "3f03e349a91b65a88bcf5f94d73d113a18e9084763752246c10fb9ef31a39edd"
         },
         {
-          "path": "packages/motion/scripts/verify-upstream.mjs",
-          "role": "support",
-          "sha256": "56311d68b15292ebdcb4fc46dc1296cb63b29eec06097af980a09d4961326bb9"
-        },
-        {
-          "path": "packages/motion/upstream/LICENSE.md",
+          "path": "packages/motion/LICENSE.upstream",
           "role": "support",
           "sha256": "5ff46083b88563822b0560dd6221ab89d2f74bc97a52d4c97a75020fd62c6f32"
         },
         {
-          "path": "packages/motion/upstream/package.json",
+          "path": "packages/motion/tests/_pristine-shims/package.json",
           "role": "support",
           "sha256": "b89dbd2ecda49863338123e0232ff32c0390918ca7f86943c7b327c4f099abef"
         },
@@ -110,14 +93,74 @@
           "sha256": "b3a4efce5810f0f4a83d9cdb5581b66de0746819d3d618ccb8e10070ae01a9dd"
         },
         {
-          "path": "packages/motion/upstream/src/jest.setup.upstream.tsx",
-          "role": "support",
-          "sha256": "b3a4efce5810f0f4a83d9cdb5581b66de0746819d3d618ccb8e10070ae01a9dd"
-        },
-        {
           "path": "packages/motion/upstream/src/gestures/__tests__/utils.ts",
           "role": "support",
           "sha256": "ee0d589731d082978838a05748c9a9166711932241c6ed0df9419555e2f3e5e6"
+        },
+        {
+          "path": "packages/motion/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "e9c2c122fae8a55e7d79f63e427477edd336bf285a0f16eb18ba2ea65827b9c3"
+        },
+        {
+          "path": "packages/motion/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "601d8ae74051c1ec5c8fc9a5da0be7d640b78b378a283e4bedde686e61f9bb3f"
+        },
+        {
+          "path": "packages/motion/tests/_pristine-shims/src/index.ts",
+          "role": "support",
+          "sha256": "f841b01b3ef664c3a9d109afcfeaf777ebb648cbd0c742c337ea4b63dc07bb0e"
+        },
+        {
+          "path": "packages/motion/tests/_pristine-shims/src/value/use-motion-value.ts",
+          "role": "support",
+          "sha256": "27f28f89c2ca45219ba111bf2f5859ad361ce36fb0e28b000c108f1aae2671e3"
+        },
+        {
+          "path": "packages/motion/tests/_pristine-shims/src/animation/animate.ts",
+          "role": "support",
+          "sha256": "9bf5f2624a5929182d95390f3f5c995f6a2a4e5a9a8a55a8e1fa4e4bba34a803"
+        },
+        {
+          "path": "packages/motion/tests/_pristine-shims/src/utils/use-motion-value-event.ts",
+          "role": "support",
+          "sha256": "29f99457e6180af7a876749d853905ab026f711b8c7c50600a8ae5697797c756"
+        },
+        {
+          "path": "packages/motion/tests/_pristine-shims/src/value/use-follow-value.ts",
+          "role": "support",
+          "sha256": "4d030a65199045f58967e402b494e5e7bb0455ee843107c5254e5aa1e3b4527e"
+        },
+        {
+          "path": "packages/motion/tests/_pristine-shims/src/value/use-motion-template.ts",
+          "role": "support",
+          "sha256": "1ed65bf25a642c61b4a153ad0ff23b41583a0f0551df8e315b3ab94eecf76629"
+        },
+        {
+          "path": "packages/motion/tests/_pristine-shims/src/value/use-scroll.ts",
+          "role": "support",
+          "sha256": "ab891f15a61a5adc4c4fb12bcbf9d35389b9151beecfeddf2297cccb5a5a2ad8"
+        },
+        {
+          "path": "packages/motion/tests/_pristine-shims/src/value/use-spring.ts",
+          "role": "support",
+          "sha256": "1f96c845bca7185f7b283157030ba092a54fafc577033e78d04e1dac57a9a79d"
+        },
+        {
+          "path": "packages/motion/tests/_pristine-shims/src/value/use-transform.ts",
+          "role": "support",
+          "sha256": "ba32df9c97b6cf68d42edaa957b6d9faea7514a470724e97e1df45862cc546f1"
+        },
+        {
+          "path": "packages/motion/tests/_pristine-shims/src/value/use-velocity.ts",
+          "role": "support",
+          "sha256": "28860a2f26c59b710dcb45d32f7d87c5d0331a82cb8b8c3dc9de7a1bdccfd0ba"
+        },
+        {
+          "path": "packages/motion/tests/upstream-jest.matcher-compat.cjs",
+          "role": "support",
+          "sha256": "fe354ae690d63e17e5e344e63deb22ddaebbceaab5e68a14100f23e6ce3dc28d"
         }
       ]
     },

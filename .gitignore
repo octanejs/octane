@@ -78,6 +78,8 @@ packages/tanstack-store/.upstream-vitest-cache/
 # Pristine vitest cache for tanstack-hotkeys upstream suite
 packages/tanstack-hotkeys/.vite-pristine/
 
+# Resumable React-library port evidence and one-writer batch state.
+.react-port-work/
 packages/spring/.pristine-vite-cache/
 # Published declaration trees vendored for binding pristine type probes.
 # Root `dist` would otherwise ignore packages/*/upstream/dist/.

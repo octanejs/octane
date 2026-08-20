@@ -1,0 +1,300 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-colorful",
+    "version": "5.8.0",
+    "repository": {
+      "owner": "omgovich",
+      "repo": "react-colorful",
+      "subdirectory": null
+    },
+    "commit": "d914e7647c40a8bbdb286985176e769d76061732",
+    "integrity": "sha512-Wy9OzPfjSN9bF12OB8N7UQvlsZ0I+7wHxpN+bV5BjNQGxOj6IiwkRjevJK9yOBjJWGQvAaf1OXtn8rUeEatAng=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "c779efe5dfb04b7b7cac35c4898725e4d22e98b86bc81c9556311d067bf97af5"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "ACKNOWLEDGMENTS",
+    "LICENSE",
+    "README.md",
+    "package.json",
+    "src",
+    "tests",
+    "tsconfig.build.json",
+    "tsconfig.json"
+  ],
+  "adaptedMappings": [
+    {
+      "fromRoot": "tests/__snapshots__",
+      "toRoot": "tests/upstream/tag/snapshots"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "https://goo.gl/fbAQLP",
+      "replace": "https://jestjs.io/docs/snapshot-testing"
+    }
+  ],
+  "files": [
+    {
+      "path": "ACKNOWLEDGMENTS",
+      "gitBlob": "235b4c312beaa52a6645693b547592a928976814",
+      "size": 404
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "2f0672801902f9413a6580f024342a4472a1d32f",
+      "size": 1093
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "30de70f7592a6ef2bd4da0a8ff19575f8a658697",
+      "size": 5738
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "b36278638e5dbaba177528f96becb7930efe3527",
+      "size": 18475
+    },
+    {
+      "path": "src/components/common/Alpha.tsx",
+      "gitBlob": "314b327275c978d558f3c864500b6aad47263973",
+      "size": 1908
+    },
+    {
+      "path": "src/components/common/AlphaColorPicker.tsx",
+      "gitBlob": "72088757fec7d68a7e7716c54d21376497832fc1",
+      "size": 1393
+    },
+    {
+      "path": "src/components/common/ColorInput.tsx",
+      "gitBlob": "74d33881bab5689c7be8087d934e4d4218571edb",
+      "size": 2071
+    },
+    {
+      "path": "src/components/common/ColorPicker.tsx",
+      "gitBlob": "161f6205c77e003280d052061434ad2b11b9c4f7",
+      "size": 1278
+    },
+    {
+      "path": "src/components/common/Hue.tsx",
+      "gitBlob": "b5fa5b428e4edd3002efd948eb11965617537dc9",
+      "size": 1427
+    },
+    {
+      "path": "src/components/common/Interactive.tsx",
+      "gitBlob": "977477dee584f4a54b6d8819e44f10874a2c92f9",
+      "size": 6277
+    },
+    {
+      "path": "src/components/common/Pointer.tsx",
+      "gitBlob": "55f677f50a8280623b9cb1addbf43c2e3323682f",
+      "size": 599
+    },
+    {
+      "path": "src/components/common/Saturation.tsx",
+      "gitBlob": "862999e5e0945c39c29e8f55b3eb68f2397ab4b9",
+      "size": 1592
+    },
+    {
+      "path": "src/components/HexAlphaColorPicker.tsx",
+      "gitBlob": "654c1f30809cbfcdb5908b8a5c74667673a94c35",
+      "size": 552
+    },
+    {
+      "path": "src/components/HexColorInput.tsx",
+      "gitBlob": "1144b0a9898e6d597a19d5a392875b43ff559e2e",
+      "size": 1113
+    },
+    {
+      "path": "src/components/HexColorPicker.tsx",
+      "gitBlob": "003eaf0868a9c72c2df6d3e9cf58c436e06d2917",
+      "size": 567
+    },
+    {
+      "path": "src/components/HslaColorPicker.tsx",
+      "gitBlob": "f52c626a32498685292c4d8600e9f0f54dc4fd06",
+      "size": 607
+    },
+    {
+      "path": "src/components/HslaStringColorPicker.tsx",
+      "gitBlob": "7e494a855afeb07ab0347936af0dcaf17ee83a64",
+      "size": 612
+    },
+    {
+      "path": "src/components/HslColorPicker.tsx",
+      "gitBlob": "25163702adce4ffaffbd5eb792f732401fd4f81c",
+      "size": 656
+    },
+    {
+      "path": "src/components/HslStringColorPicker.tsx",
+      "gitBlob": "fbc92bae62233d942ff027b1699583d778f0d18f",
+      "size": 588
+    },
+    {
+      "path": "src/components/HsvaColorPicker.tsx",
+      "gitBlob": "60b4d05c7265a545c63407778311f494fb75e6d2",
+      "size": 597
+    },
+    {
+      "path": "src/components/HsvaStringColorPicker.tsx",
+      "gitBlob": "1b341604787629d71d6040900df0e4401f6d8d1d",
+      "size": 612
+    },
+    {
+      "path": "src/components/HsvColorPicker.tsx",
+      "gitBlob": "afb6d2d76897efb9f7f13eae7b20bdc650c798b3",
+      "size": 594
+    },
+    {
+      "path": "src/components/HsvStringColorPicker.tsx",
+      "gitBlob": "6606f1f90800ff109caee7409b6ee01ce7f80257",
+      "size": 588
+    },
+    {
+      "path": "src/components/RgbaColorPicker.tsx",
+      "gitBlob": "2501e66a17dc381943f08f0bbe2ea8c74758b458",
+      "size": 607
+    },
+    {
+      "path": "src/components/RgbaStringColorPicker.tsx",
+      "gitBlob": "a0b23ab0fa97cce54e4c3e837a482413bd85b052",
+      "size": 610
+    },
+    {
+      "path": "src/components/RgbColorPicker.tsx",
+      "gitBlob": "5e310ea5d798f7ea5fccb1f77fad782888699460",
+      "size": 656
+    },
+    {
+      "path": "src/components/RgbStringColorPicker.tsx",
+      "gitBlob": "112a76b7f9f7ffbc24dbf00b8dca5ea5027e097a",
+      "size": 586
+    },
+    {
+      "path": "src/css/styles.css",
+      "gitBlob": "b0190dbb44633b3051da0ce1bb4193ebf5770196",
+      "size": 2532
+    },
+    {
+      "path": "src/css/styles.css.d.ts",
+      "gitBlob": "cff8ab624fab002c3b4907fabe699c246f936683",
+      "size": 59
+    },
+    {
+      "path": "src/hooks/useColorManipulation.ts",
+      "gitBlob": "8935f0400f07fb7421e408fd82efcb4735b8eef7",
+      "size": 2481
+    },
+    {
+      "path": "src/hooks/useEventCallback.ts",
+      "gitBlob": "8c2d9685f444349452bfbf615fdb88e58c755552",
+      "size": 388
+    },
+    {
+      "path": "src/hooks/useIsomorphicLayoutEffect.ts",
+      "gitBlob": "9ab897f63e355990ee4f6f53389eb16e59fd7bb6",
+      "size": 348
+    },
+    {
+      "path": "src/hooks/useStyleSheet.ts",
+      "gitBlob": "77a6f2add452cc7298ee72d9b75f26171d02a841",
+      "size": 2157
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "6e11cf9032c003c9863c24727dfa611c022123d5",
+      "size": 1240
+    },
+    {
+      "path": "src/types.ts",
+      "gitBlob": "ecb811c55ea73b33fe4be93924014f7ffedbd221",
+      "size": 1312
+    },
+    {
+      "path": "src/utils/clamp.ts",
+      "gitBlob": "74e52fd0e861fbf04b1f8b198d4f0c6e186e6e6a",
+      "size": 298
+    },
+    {
+      "path": "src/utils/compare.ts",
+      "gitBlob": "43f00b31fad123614c6531531613f6d4e9b12db6",
+      "size": 1376
+    },
+    {
+      "path": "src/utils/convert.ts",
+      "gitBlob": "2d35b38e096338488f2a26a6bb0d241bae72c8eb",
+      "size": 5907
+    },
+    {
+      "path": "src/utils/format.ts",
+      "gitBlob": "2295207d45ec1076e685c444052013aa8c5b41e7",
+      "size": 94
+    },
+    {
+      "path": "src/utils/nonce.ts",
+      "gitBlob": "6dcb4c7fe16ae8d2dd6bfa5d05983d9eb237af4a",
+      "size": 752
+    },
+    {
+      "path": "src/utils/round.ts",
+      "gitBlob": "7e8ac0d435d217ae958ee996be8f16e0bcedceec",
+      "size": 138
+    },
+    {
+      "path": "src/utils/validate.ts",
+      "gitBlob": "4d2f84667af3e3a22e434814d8ae020e076e4e8d",
+      "size": 395
+    },
+    {
+      "path": "tests/__mocks__/styles.css.mock.ts",
+      "gitBlob": "fb566d0767043a86707e2baaa0ab71a78eb182b4",
+      "size": 36
+    },
+    {
+      "path": "tests/__snapshots__/components.test.js.snap",
+      "gitBlob": "4c8488351279d7380c768b024abb5e348665bd39",
+      "size": 5629
+    },
+    {
+      "path": "tests/components.test.js",
+      "gitBlob": "b1a04f088f3b43cf2adca366b29f3f61ca006d2b",
+      "size": 20456
+    },
+    {
+      "path": "tests/csp.test.js",
+      "gitBlob": "e6f43fb8af0ae8a760ad9a9dbf6d4aa7bb10e54b",
+      "size": 577
+    },
+    {
+      "path": "tests/shadowDom.test.js",
+      "gitBlob": "1b193b0f63a42f220a96ab0b7f444eee16db1c07",
+      "size": 754
+    },
+    {
+      "path": "tests/utils.test.js",
+      "gitBlob": "1243e66bbb977074e33b788bf6ac951f86c5b0c7",
+      "size": 10097
+    },
+    {
+      "path": "tsconfig.build.json",
+      "gitBlob": "398b6a50b3e952331c4e45378571b4296c0247d6",
+      "size": 64
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "5ca81b6f82dd3ad122f7c80778fe8c3c8cd7bf80",
+      "size": 308
+    }
+  ],
+  "fingerprint": "e7902e41159e9d904a2579d9cc4608565652670a3cbc963aff042f2a19e6b331"
+}

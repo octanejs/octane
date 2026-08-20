@@ -1,0 +1,286 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@vis.gl/react-mapbox",
+    "version": "8.1.2",
+    "repository": {
+      "owner": "visgl",
+      "repo": "react-map-gl",
+      "subdirectory": "modules/react-mapbox"
+    },
+    "commit": "b1e46fcfb9d5de9bb179ca54e7d27617caa28c65",
+    "integrity": "sha512-g/TbFYympMg+TMS+ctASbcgIxEJRnYL7+VyCo2rI6dpG7dUP4wNOOAUxO8og6OH6QwavaQVYSHcY4mfQL7Ixbw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "c80c7101e5039d2f5359729c5fa6b4d58c6904bf7ba75bd6cafd0078438d6634"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["package.json", "src", "test"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "package.json",
+      "gitBlob": "62ef937f0231aa85d29ff87b0beb576ba34b9da6",
+      "size": 867
+    },
+    {
+      "path": "src/components/attribution-control.ts",
+      "gitBlob": "69145704df48d9b80711087966d96b8e1c1e393a",
+      "size": 856
+    },
+    {
+      "path": "src/components/fullscreen-control.ts",
+      "gitBlob": "cf4d300b29e5e252f9d346dcde0f3402aa23a39f",
+      "size": 1151
+    },
+    {
+      "path": "src/components/geolocate-control.ts",
+      "gitBlob": "60e0510d95cec7c2adedf20b821b772ff2d83ce0",
+      "size": 2953
+    },
+    {
+      "path": "src/components/layer.ts",
+      "gitBlob": "439be9c8da0858ffe4fa02c8852ea1083910eeb2",
+      "size": 3846
+    },
+    {
+      "path": "src/components/map.tsx",
+      "gitBlob": "fbd52b3993143d139a30f4f22bd5c2821fe04e0a",
+      "size": 3594
+    },
+    {
+      "path": "src/components/marker.ts",
+      "gitBlob": "c1fbec740fca08c52f64f24c45ffff2cf1738320",
+      "size": 4024
+    },
+    {
+      "path": "src/components/navigation-control.ts",
+      "gitBlob": "5014e908326351eb1e1241d5f6752c801008e9e4",
+      "size": 848
+    },
+    {
+      "path": "src/components/popup.ts",
+      "gitBlob": "6225c52acd9f2fcea34d4b61ddc7fef479f5893d",
+      "size": 3178
+    },
+    {
+      "path": "src/components/scale-control.ts",
+      "gitBlob": "db6066b9d4d0b91092d48e0b7131edb32f663ca2",
+      "size": 1274
+    },
+    {
+      "path": "src/components/source.ts",
+      "gitBlob": "3139d61a71db84447d295502a758816eebdd122a",
+      "size": 4085
+    },
+    {
+      "path": "src/components/use-control.ts",
+      "gitBlob": "aa06fff4b2919d5288d9197915d03495c4824560",
+      "size": 1816
+    },
+    {
+      "path": "src/components/use-map.tsx",
+      "gitBlob": "65353feffdf5820b7d6924ae81334b354975b0de",
+      "size": 1776
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "e25d01827c681c138617dd805b94d9a9d92b4384",
+      "size": 1505
+    },
+    {
+      "path": "src/mapbox/create-ref.ts",
+      "gitBlob": "217a45b2e94fa6352a4379617666c4f24c2f122e",
+      "size": 2874
+    },
+    {
+      "path": "src/mapbox/mapbox.ts",
+      "gitBlob": "bb40fd7c3635e169a1d1a68494c0fe9f7563f261",
+      "size": 21492
+    },
+    {
+      "path": "src/mapbox/proxy-transform.ts",
+      "gitBlob": "7dd94ed11b3b2ac8283c0c939c680ba0318431f2",
+      "size": 5513
+    },
+    {
+      "path": "src/types/common.ts",
+      "gitBlob": "3dea80df130ec64ee937c650e8ad8a6ed117133d",
+      "size": 870
+    },
+    {
+      "path": "src/types/events.ts",
+      "gitBlob": "a608a20769efbcad74f3e433d770923403cb9a49",
+      "size": 3437
+    },
+    {
+      "path": "src/types/internal.ts",
+      "gitBlob": "04f2253b73f11e9465c09814af23c5cf180cdd4b",
+      "size": 506
+    },
+    {
+      "path": "src/types/lib.ts",
+      "gitBlob": "aee3e346e5226495ca33e51788b3a8cc0c2c3917",
+      "size": 1748
+    },
+    {
+      "path": "src/types/style-spec.ts",
+      "gitBlob": "1d1f66936947f6e86b4c0ff82bf2947a71c1295f",
+      "size": 1127
+    },
+    {
+      "path": "src/utils/apply-react-style.ts",
+      "gitBlob": "2ff1b9b64be9254fdbe250ec6abd22266ce58c24",
+      "size": 673
+    },
+    {
+      "path": "src/utils/assert.ts",
+      "gitBlob": "5aabbd6ad26b73e194f6b06068eb29c573204927",
+      "size": 122
+    },
+    {
+      "path": "src/utils/compare-class-names.ts",
+      "gitBlob": "420345b9c92aad75b4bac8a8988a0d445b9c9abe",
+      "size": 755
+    },
+    {
+      "path": "src/utils/deep-equal.ts",
+      "gitBlob": "879d98e8c9c2e1a342261ffba271d8393e352934",
+      "size": 1423
+    },
+    {
+      "path": "src/utils/set-globals.ts",
+      "gitBlob": "0f6d049234c967d9e9aa876e064e1fcd7989c8d7",
+      "size": 1913
+    },
+    {
+      "path": "src/utils/style-utils.ts",
+      "gitBlob": "179c1a74918b447b23ec43c11f52181b26e4d10f",
+      "size": 1788
+    },
+    {
+      "path": "src/utils/transform.ts",
+      "gitBlob": "778224474d4645a24d8f5ba96374f7be8dd6ef84",
+      "size": 3304
+    },
+    {
+      "path": "src/utils/use-isomorphic-layout-effect.ts",
+      "gitBlob": "9c1e39c42d2e03364ef58f4587cdf2cd122b721f",
+      "size": 356
+    },
+    {
+      "path": "test/components/controls.spec.jsx",
+      "gitBlob": "ec8ab22bdb592b29e01f38c0acf446e5d80de4d4",
+      "size": 2069
+    },
+    {
+      "path": "test/components/index.js",
+      "gitBlob": "958e49fe889878c90c5a1ecfeb0bd636f7e23b7b",
+      "size": 166
+    },
+    {
+      "path": "test/components/layer.spec.jsx",
+      "gitBlob": "d6c2ccd2e8daa628fc966ec5dc2e9f8dd74c78c9",
+      "size": 2230
+    },
+    {
+      "path": "test/components/map.spec.jsx",
+      "gitBlob": "827d491b2736c6c69bba4158fa27be9c2fe82f93",
+      "size": 6481
+    },
+    {
+      "path": "test/components/marker.spec.jsx",
+      "gitBlob": "69bfe50689c5f1231846ae74b88db647dd9051a6",
+      "size": 3194
+    },
+    {
+      "path": "test/components/popup.spec.jsx",
+      "gitBlob": "f1850cfb91a57eeba63f683edc831bbd8583fe60",
+      "size": 2389
+    },
+    {
+      "path": "test/components/source.spec.jsx",
+      "gitBlob": "80296d50f3de214b46494dada15f67a99e28a97c",
+      "size": 1900
+    },
+    {
+      "path": "test/components/use-map.spec.jsx",
+      "gitBlob": "e109d92bbc5057076a74f00416ec86aba5abb80a",
+      "size": 1376
+    },
+    {
+      "path": "test/utils/apply-react-style.spec.js",
+      "gitBlob": "d246dcb7190ac7ed5c34aa3184a495c68e3ee528",
+      "size": 858
+    },
+    {
+      "path": "test/utils/compare-class-names.spec.js",
+      "gitBlob": "af7c8d50e145e828284c270f33df4d4d3a3e1be2",
+      "size": 1221
+    },
+    {
+      "path": "test/utils/deep-equal.spec.js",
+      "gitBlob": "729266b4ce8947f495c67f72099d3fe27a8b3002",
+      "size": 1755
+    },
+    {
+      "path": "test/utils/index.js",
+      "gitBlob": "d455dddc7a13a38cda3ade2a36ab7403e4c052b3",
+      "size": 156
+    },
+    {
+      "path": "test/utils/mapbox-gl-mock/edge_insets.js",
+      "gitBlob": "fb8381ec614bc6afd4cf8521accebf8ab4fa4271",
+      "size": 1852
+    },
+    {
+      "path": "test/utils/mapbox-gl-mock/lng_lat_bounds.js",
+      "gitBlob": "a99b8ff3b001d01987af58601df1c1d59d8e7a8a",
+      "size": 3094
+    },
+    {
+      "path": "test/utils/mapbox-gl-mock/lng_lat.js",
+      "gitBlob": "7c37b2e6a56ac28710aa8324393660d965fc47c7",
+      "size": 2266
+    },
+    {
+      "path": "test/utils/mapbox-gl-mock/transform.js",
+      "gitBlob": "2de043b865628275a66fdc95da1d60364ccef5c5",
+      "size": 2066
+    },
+    {
+      "path": "test/utils/mapbox-gl-mock/util.js",
+      "gitBlob": "54ac8e65a7f8f3faa0d5af8ec00d7717536bb19f",
+      "size": 522
+    },
+    {
+      "path": "test/utils/style-utils.spec.js",
+      "gitBlob": "f8c875dbd5fc680233a7fe46df5536e80d16c082",
+      "size": 4442
+    },
+    {
+      "path": "test/utils/test-utils.jsx",
+      "gitBlob": "18f14a5878c79ed5ba70bf741dbb22f9f6afddb0",
+      "size": 406
+    },
+    {
+      "path": "test/utils/token.js",
+      "gitBlob": "d9cf5adb7f8afcd8d610a896d297865074d95b1c",
+      "size": 68
+    },
+    {
+      "path": "test/utils/transform.spec.js",
+      "gitBlob": "142072d520063a9946e65b9b625d2038c49b75d2",
+      "size": 3210
+    }
+  ],
+  "fingerprint": "82be99e70abc677a9320d54c6825721059277103a7ea780a644f0d3bb23b63b0"
+}

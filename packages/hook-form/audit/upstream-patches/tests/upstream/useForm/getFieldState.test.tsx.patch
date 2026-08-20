@@ -1,0 +1,25 @@
+diff --git a/tests/upstream/useForm/getFieldState.test.tsx b/tests/upstream/useForm/getFieldState.test.tsx
+--- a/tests/upstream/useForm/getFieldState.test.tsx
++++ b/tests/upstream/useForm/getFieldState.test.tsx
+@@ -27,8 +27,8 @@ const NestedInput = ({ control }: { control: Control<FormValues> }) => {
+     <fieldset>
+       <input
+         value={field.value.first}
+-        onChange={(e) => {
+-          field.onChange({
++        onInput={(e) => {
++          field.onInput({
+             ...field.value,
+             first: e.target.value,
+           });
+@@ -37,8 +37,8 @@ const NestedInput = ({ control }: { control: Control<FormValues> }) => {
+       />
+       <input
+         value={field.value.last}
+-        onChange={(e) => {
+-          field.onChange({
++        onInput={(e) => {
++          field.onInput({
+             ...field.value,
+             last: e.target.value,
+           });

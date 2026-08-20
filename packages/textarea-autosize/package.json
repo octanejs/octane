@@ -22,7 +22,8 @@
     "src",
     "README.md",
     "UPSTREAM.md",
-    "LICENSE"
+    "LICENSE",
+    "LICENSE.upstream"
   ],
   "sideEffects": false,
   "exports": {
@@ -103,7 +104,7 @@
     "test:browser": "vitest run --root ../.. --project textarea-autosize-browser",
     "test:pristine": "CI=true jest --config jest.pristine.config.cjs --runInBand",
     "test:types": "tsc -p audit/type-probes/tsconfig.pristine.json --noEmit && tsrx-tsc -p typetests/tsconfig.json --noEmit",
-    "verify:upstream": "node scripts/verify-upstream.mjs"
+    "verify:upstream": "node ../../scripts/react-parity/verify-provenance.mjs"
   },
   "peerDependencies": {
     "octane": "workspace:*"

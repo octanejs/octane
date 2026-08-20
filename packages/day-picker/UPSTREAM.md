@@ -6,7 +6,7 @@
 - License: MIT
 - Upstream package root: `packages/react-day-picker`
 
-The exact upstream package source, tests, styles, package metadata, and license are retained under `upstream/`. `audit/SHA256SUMS` and `audit/check-upstream.mjs` make additions, removals, and byte changes detectable.
+The exact upstream package source, tests, styles, package metadata, and license are retained under `upstream/`. Every file verifies offline against the upstream git blob shas recorded in `audit/upstream.lock.json` (run `pnpm --dir packages/day-picker upstream:check`), and the pinned license is republished at the package root as `LICENSE.upstream`.
 
 The Octane implementation preserves the root, locale, stylesheet, and package metadata entry points. React-specific hooks and JSX components are adapted to Octane; framework-neutral date calculations and formatters retain their upstream behavior.
 

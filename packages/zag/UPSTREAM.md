@@ -11,13 +11,21 @@
 | React oracle | `19.2.7` with `@types/react@19.2.7` and `@types/react-dom@19.2.3` (`catalog:zag-react-oracle`) |
 | Testing Library oracle | `@testing-library/react@16.3.2` (`catalog:zag-react-oracle`; satisfies upstream `^16.3.2`) |
 | jsdom oracle | `29.0.1` (`catalog:zag-react-oracle`; satisfies upstream `^29.0.1`) |
-| Vendored tree integrity | `sha256:037f857d00462559b9790acc2214c818678eb9d61970d6c394dc26dcfcd1516d` (`packages/zag/upstream/SHA256SUMS`) |
-| License | MIT, © Chakra UI |
+| Pinned tree integrity | `audit/upstream.lock.json` (fingerprint `3883ca3c33ce1b95fcb8b5d8969c267081eabc0ff6a295d8415d4f2184974114`; per-file git blob shas) |
+| License | MIT, © Chakra UI (`LICENSE.upstream`, hash-matched to the lock) |
 
 Repository: `https://github.com/chakra-ui/zag.git`. The npm artifact publishes
 compiled `dist/` output. The framework adapter source and its Vitest suite at
-this pin live under `packages/frameworks/react` in the canonical repository and
-are vendored byte-exact at `packages/zag/upstream/` (MIT). Framework-agnostic
+this pin live under `packages/frameworks/react` in the canonical repository.
+They are committed byte-exact under `packages/zag/upstream/` and pinned by
+`audit/upstream.lock.json`, which records each file's git blob sha — its
+content address in the upstream repository — so the committed copy verifies
+offline against the pinned commit (`pnpm react-port:materialize run --check`).
+The adapted suite regenerates into `tests/upstream/` (git-ignored) from the
+pristine bytes plus the lock's mechanical `adaptedRewrites`; every mapped file
+currently needs no divergence patch, and the pinned StrictMode suite is
+dispositioned out via its committed `.skip` rationale in
+`audit/upstream-patches/`. Framework-agnostic
 `@zag-js/core`, `@zag-js/store`, `@zag-js/types`, and `@zag-js/utils` at the same
 version are reused unchanged and are not reimplemented here.
 

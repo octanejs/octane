@@ -753,4 +753,3 @@ exports[`useClientDocument > should update the data based on component key 2`] =
   ],
 }
 `;
-

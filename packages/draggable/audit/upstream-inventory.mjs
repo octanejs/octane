@@ -78,11 +78,22 @@ function adaptedBrowserId(entry) {
 }
 
 async function buildInventory(root = packageRoot) {
+	// The tag tree lives at upstream/ (lock-verified against upstream git blob
+	// shas) and the unpacked npm artifact at upstream-artifact/; the inventory
+	// keeps the historical tag/ and npm/ identity prefixes.
 	const upstreamRoot = join(root, 'upstream');
-	const artifactFiles = await filesUnder(upstreamRoot);
+	const artifactRoot = join(root, 'upstream-artifact');
+	const artifactAbsolute = (path) =>
+		path.startsWith('npm/')
+			? join(artifactRoot, path.slice('npm/'.length))
+			: join(upstreamRoot, path.slice('tag/'.length));
+	const artifactFiles = [
+		...(await filesUnder(upstreamRoot)).map((path) => `tag/${path}`),
+		...(await filesUnder(artifactRoot)).map((path) => `npm/${path}`),
+	].sort();
 	const artifacts = [];
 	for (const path of artifactFiles) {
-		const bytes = await readFile(join(upstreamRoot, path));
+		const bytes = await readFile(artifactAbsolute(path));
 		artifacts.push({ path, bytes: bytes.length, sha256: sha256(bytes) });
 	}
 
@@ -94,19 +105,19 @@ async function buildInventory(root = packageRoot) {
 	);
 	const unitCases = [];
 	for (const path of unitFiles) {
-		const source = await readFile(join(upstreamRoot, path), 'utf8');
+		const source = await readFile(artifactAbsolute(path), 'utf8');
 		for (const { line, name } of staticCalls(source, ['it', 'test']))
 			unitCases.push({ id: `${path}:${line}::${name}`, file: path, line, name });
 	}
 	const browserPath = 'tag/test/browser/browser.test.js';
-	const browserSource = await readFile(join(upstreamRoot, browserPath), 'utf8');
+	const browserSource = await readFile(artifactAbsolute(browserPath), 'utf8');
 	const browserCases = staticCalls(browserSource, ['it', 'test']).map(({ line, name }) => ({
 		id: `${browserPath}:${line}::${name}`,
 		file: browserPath,
 		line,
 		name,
 	}));
-	const typeSource = await readFile(join(upstreamRoot, 'tag/test/typeCompat/fixture.tsx'), 'utf8');
+	const typeSource = await readFile(artifactAbsolute('tag/test/typeCompat/fixture.tsx'), 'utf8');
 
 	const markerPaths = [
 		'tests/runtime/draggable.test.ts',
@@ -141,7 +152,14 @@ async function buildInventory(root = packageRoot) {
 	}
 	const browserCasePath = 'tests/browser/parity.browser.test.ts';
 	const browserCaseSource = await readFile(join(root, browserCasePath), 'utf8');
-	const browserAdapted = staticCalls(browserCaseSource, ['adaptedCase']);
+	// The browser lane registers plain `it` cases under @parity-case
+	// adapted-browser markers rather than adaptedCase calls.
+	const browserAdapted = [
+		...browserCaseSource.matchAll(/@parity-case\s+adapted-browser:([^\n]+?)\s*$/gm),
+	].map((match) => ({
+		line: browserCaseSource.slice(0, match.index).split(/\r?\n/).length,
+		name: match[1],
+	}));
 	sameIdentities(browserAdapted, browserCases, 'adapted browser case', (value) =>
 		value.file ? adaptedBrowserIdentity(value) : value.name,
 	);
@@ -536,7 +554,9 @@ export async function validate(root = packageRoot) {
 		'every upstream disposition must cite executable or source evidence',
 	);
 	const availableEvidence = new Set(
-		(await filesUnder(root)).filter((path) => !path.startsWith('upstream/')),
+		(await filesUnder(root)).filter(
+			(path) => !path.startsWith('upstream/') && !path.startsWith('upstream-artifact/'),
+		),
 	);
 	const adaptedCaseIds = new Set(expected.inventories.adaptedCases.map((value) => value.id));
 	for (const value of allDispositions) {
@@ -567,14 +587,23 @@ export async function validate(root = packageRoot) {
 
 	sameIdentities(Object.keys(manifest.exports), ['.', './package.json'], 'package subpath');
 	assert(
-		!manifest.files.some((path) => /^(?:upstream|audit|tests\/audit)(?:\/|$)/.test(path)),
+		!manifest.files.some((path) =>
+			/^(?:upstream|upstream-artifact|audit|tests\/audit)(?:\/|$)/.test(path),
+		),
 		'audit evidence must not be published',
 	);
 	const license = await readFile(join(root, 'LICENSE'), 'utf8');
-	const upstreamLicense = await readFile(join(root, 'upstream/tag/LICENSE'), 'utf8');
+	const upstreamLicense = await readFile(join(root, 'upstream/LICENSE'), 'utf8');
 	assert(
 		license === upstreamLicense && license.includes('MIT License'),
 		'MIT license is missing or changed',
+	);
+	// LICENSE.upstream ships in the published files, so a drifted copy must
+	// fail verification, not just the in-tree upstream/LICENSE.
+	const republishedLicense = await readFile(join(root, 'LICENSE.upstream'), 'utf8');
+	assert(
+		republishedLicense === upstreamLicense,
+		'published LICENSE.upstream does not match the pinned upstream license',
 	);
 	return actual;
 }
@@ -590,9 +619,23 @@ if (process.argv[1] && basename(process.argv[1]) === basename(fileURLToPath(impo
 		);
 		console.log('wrote react-draggable upstream inventory');
 	} else {
+		// The committed upstream/ tree also verifies against the lock's
+		// upstream git blob shas.
+		const { execFileSync } = await import('node:child_process');
+		execFileSync(
+			process.execPath,
+			[
+				join(packageRoot, '../../scripts/react-port/materialize.mjs'),
+				'run',
+				'--check',
+				'--package-dir',
+				root,
+			],
+			{ cwd: join(packageRoot, '../..'), stdio: 'pipe' },
+		);
 		const result = await validate(root);
 		console.log(
-			`verified ${result.artifacts.length} artifacts, ${result.inventories.unitCases.length} unit/type cases, ${result.inventories.browserCases.length} browser cases, and ${result.inventories.typeAssertions.length} type assertions`,
+			`verified the lock-pinned upstream tree, ${result.artifacts.length} artifacts, ${result.inventories.unitCases.length} unit/type cases, ${result.inventories.browserCases.length} browser cases, and ${result.inventories.typeAssertions.length} type assertions`,
 		);
 	}
 }

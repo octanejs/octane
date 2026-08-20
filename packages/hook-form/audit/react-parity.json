@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -80,14 +80,9 @@
           "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
         },
         {
-          "path": "packages/hook-form/upstream/SHA256SUMS",
+          "path": "packages/hook-form/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "1f82b4850b552aa0e1ab542eae604dbbcd4eaf5a5adcb03fff8282ebbd556d36"
-        },
-        {
-          "path": "packages/hook-form/audit/upstream-adapted.SHA256SUMS",
-          "role": "support",
-          "sha256": "be8367f849b429ad37918bf7de1077a8ffba4594b76fff1068d025b2f3b3d3b7"
+          "sha256": "0a38278f20907ef9c7e314d0b289cc7c24aef15e82c4714e827ab67d3510e028"
         },
         {
           "path": "packages/hook-form/tests/upstream-jest.config.cjs",
@@ -102,7 +97,227 @@
         {
           "path": "scripts/react-parity/hook-form-upstream-lib.mjs",
           "role": "support",
-          "sha256": "739855b1c3bc514cb2e485adc15c5111b2616a41e5ce3f25f517be9c74c1a200"
+          "sha256": "037d1cd3bfe6e91a1ed479c977e525a484d308d68109181705b71e658fd9a77d"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/__snapshots__/useFieldArray.test.tsx.snap.patch",
+          "role": "support",
+          "sha256": "d440f8d678c3c9927a7edd97e1797234e6d73a2bb591908ac5e6e59ae2bab396"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/__snapshots__/useWatch.test.tsx.snap.patch",
+          "role": "support",
+          "sha256": "bb5bccb82192612fac07bc30f03d6095616dc6db0b3694d0fbace3714fca1cae"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/controller.server.test.tsx.patch",
+          "role": "support",
+          "sha256": "84d7511aafe615de1c7c2be69e5823c193761f5416ec0f70a1851afeb1b1aadc"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/controller.test.tsx.patch",
+          "role": "support",
+          "sha256": "8fbca8c831184650f6dcde26bc5d5eae0cd3e5c604256877f5323590f2795d9f"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/form.test.tsx.patch",
+          "role": "support",
+          "sha256": "05d2764b4fafdfd50d201f3a6998857dc7114a5f0586ecbecbc1669d48c645ef"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/formStateSubscribe.server.test.tsx.patch",
+          "role": "support",
+          "sha256": "99033b76a2767e18501286a9afd7937dfd4dbb690d8a6b87112277f1862d7339"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/formStateSubscribe.test.tsx.patch",
+          "role": "support",
+          "sha256": "bde573156cbb1023fdb82f73c8d0f20ad4e1cb20fa332f97b3ef42641b2cc223"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/logic/createFormControl.test.ts.patch",
+          "role": "support",
+          "sha256": "3561dbcb1b46d40cae3e120f76a6ae9361e7a6c084e250370bd84979eddefe4b"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/logic/getDirtyFields.test.ts.patch",
+          "role": "support",
+          "sha256": "4728f1381a2a4301116d007870b5dfca55d55988251f4ff179df99d1f78dfacb"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/logic/unsetEmptyArray.test.ts.patch",
+          "role": "support",
+          "sha256": "eecb65e1635d38676f602ff9fe6ea5c4dc28213875492abd99b370e75b4f0411"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/logic/validateField.test.tsx.patch",
+          "role": "support",
+          "sha256": "ef150d282329dec027e23f18409b9f892323e5f7c62adbf897e6ae53cbeb0860"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/type.test.tsx.patch",
+          "role": "support",
+          "sha256": "56da7ecea48b03fc987c1a44fd79feef6885b07373d5c3e19c9e8134429ebcdd"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useController.test.tsx.patch",
+          "role": "support",
+          "sha256": "42056e1a44f689a3034d86c6f768982827c8bb2391eeb9602016e2fa697f179e"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFieldArray.test.tsx.patch",
+          "role": "support",
+          "sha256": "aab7ae1b5ffdf48c6646189e27bd0ceaf0974dd39e101d616187d0833d56e9a6"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFieldArray/append.test.tsx.patch",
+          "role": "support",
+          "sha256": "80954d5b4cff1e99ba0657de4d1885639ff0c342a7364beb44a7af1b8a4e8051"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFieldArray/dirtyFields.test.tsx.patch",
+          "role": "support",
+          "sha256": "4e6f691c089ef408c35a6a8dba85d64dbeb6073cb29e5087d2eec95cd9746502"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFieldArray/insert.test.tsx.patch",
+          "role": "support",
+          "sha256": "69dac0307aa9c2f165e1448b8227e4736a77fdcf1a505ddb2d1a6b0071999c6d"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFieldArray/move.test.tsx.patch",
+          "role": "support",
+          "sha256": "0064de124be6d1e13928c66b1e0444fca9d162ab240c0475796468d1058f081e"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFieldArray/prepend.test.tsx.patch",
+          "role": "support",
+          "sha256": "7877c7db14a9058ee95697087d0099408b18662ec1e2fd5538fab609adb00779"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFieldArray/remove.test.tsx.patch",
+          "role": "support",
+          "sha256": "25fd2266eeb155093f598b3a3647b4d3781903cd5dc47a2b6b404864af72c3a4"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFieldArray/replace.test.tsx.patch",
+          "role": "support",
+          "sha256": "e025ebb54d9478acc3ecbd18e4c4fcfdec29b28e5cfbbb293993f99d477746a6"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFieldArray/swap.test.tsx.patch",
+          "role": "support",
+          "sha256": "fc251f243a663a686ed4e8e601f78d10910d3878b24dfcb0b8d77a962e5d4d1a"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFieldArray/update.test.tsx.patch",
+          "role": "support",
+          "sha256": "48f8feb1dd5a8ab75f80ca5d89ddc99f1872d0657c08bca05988ac7fcea955f8"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm.server.test.tsx.patch",
+          "role": "support",
+          "sha256": "c12274899c6056ad59dacdb344a9ca956f9d17e89278b03a286cfce12a673f3f"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm.test.tsx.patch",
+          "role": "support",
+          "sha256": "2b3cfe6e4ef1fddd1eb3f5e6e57667e352adfed5cd283d764b3dc6f3e325a51c"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/__snapshots__/watch.test.tsx.snap.patch",
+          "role": "support",
+          "sha256": "bf10116e7dcfdf1d7106b1a7ba3aa12d829ae1eb19f73840bb1e899757868f2a"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/formState.test.tsx.patch",
+          "role": "support",
+          "sha256": "9fe07e01a5d455e1594e59ef177a512349d88c2f2001c1048c2800010bd618bb"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/getFieldState.test.tsx.patch",
+          "role": "support",
+          "sha256": "8e61558ec13f99e9052e24d5278f6ce42284c9157037021d71e1b990c3b8681f"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/handleSubmit.test.tsx.patch",
+          "role": "support",
+          "sha256": "a0d8f3ffba0269f7740a995cffc22b9f2b81fbe8135f933d237502f17b6de6eb"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/register.test.tsx.patch",
+          "role": "support",
+          "sha256": "390f7b3e7a52452d586b89ae8a3687fc271a33e4285506de7c2a17a4c1a7a0e4"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/reset.test.tsx.patch",
+          "role": "support",
+          "sha256": "d9433791367f3755f3e921ff25b46a721670ef366877afae17ae80663f06dd72"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/resolver.test.tsx.patch",
+          "role": "support",
+          "sha256": "7078117f3e41d82e91ca41c5e0b2392a2f98820596cdfff21a20baeec574d9d8"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/setValue.test.tsx.patch",
+          "role": "support",
+          "sha256": "e83a5377bbd1165d53b9fde2ba3b12b16fbfb58c0fd390ab956c47fa65f7091d"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/trigger.test.tsx.patch",
+          "role": "support",
+          "sha256": "c9de1aacf502210d0a4cf73b7d6c5c2f46c62d9d19d49b0668645512bf40e7d4"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/useFormWithNullValues.test.tsx.patch",
+          "role": "support",
+          "sha256": "5e3374cc29901216ee20c6b774f9cac00c4cb23c6e728e21c5116abbc02a5476"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useForm/watch.test.tsx.patch",
+          "role": "support",
+          "sha256": "5265e4f12e10c53e853e2cd75ec4f85f1249072548af049d9143addc4e4ccab7"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFormContext.server.test.tsx.patch",
+          "role": "support",
+          "sha256": "f9c36ab4869278c7cd9a897ac40de8688c56e7a4397d380c3421d9eabb6f12a3"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFormContext.test.tsx.patch",
+          "role": "support",
+          "sha256": "56574c375d44a23cedf82a07d4f278e319bc66496e5dd0455e2d4dfe192a9aa8"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useFormState.test.tsx.patch",
+          "role": "support",
+          "sha256": "cd3ccc1908c382e4d71e3f773376d472b95321fce944d9984acbda3225edb3f5"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/useWatch.test.tsx.patch",
+          "role": "support",
+          "sha256": "367f1eb1add9bdaa423d5c7a021d17bc63914b0c025dd5abfdec30595050cfb4"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/utils/__snapshots__/flatten.test.ts.snap.patch",
+          "role": "support",
+          "sha256": "521c365f382c827739a81f86a7b5eb53d53fa35549cd562a821f1bb0e2b8ba65"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/utils/live.test.ts.patch",
+          "role": "support",
+          "sha256": "1b3069d32c9fc347ae582b53e49dbecff38437a8ff14e766f803867fc534fef8"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/watch.server.test.tsx.patch",
+          "role": "support",
+          "sha256": "b31919e07ff3764cabe757570ec198dcd881134a32f39bd50d695521d0b9fa2c"
+        },
+        {
+          "path": "packages/hook-form/audit/upstream-patches/tests/upstream/watch.test.tsx.patch",
+          "role": "support",
+          "sha256": "098eb9b4910ed634bb39995d75e8f361f0046ace3e67b23dc8d740d8e819c196"
         }
       ]
     },
@@ -208,7 +423,7 @@
         {
           "path": "packages/hook-form/tests/upstream/useController.test.tsx",
           "role": "test",
-          "sha256": "bdcd1b2ff94d9b1b81f847b300c64de2e39af5978748751563755129f193c5f7",
+          "sha256": "0e74a03767b0fba9ab27deb8f70890482de41fbef7b1eabf8bfc7232c3d24543",
           "cases": [
             {
               "id": "adapted:controller-on-input",
@@ -260,8 +475,8 @@
           "cases": [
             {
               "id": "differential:register",
-              "testName": "register: typing → per-keystroke validation → submit → reset renders byte-identical",
-              "fullName": "differential: @octanejs/hook-form vs real react-hook-form register: typing → per-keystroke validation → submit → reset renders byte-identical"
+              "testName": "register: typing \u2192 per-keystroke validation \u2192 submit \u2192 reset renders byte-identical",
+              "fullName": "differential: @octanejs/hook-form vs real react-hook-form register: typing \u2192 per-keystroke validation \u2192 submit \u2192 reset renders byte-identical"
             },
             {
               "id": "differential:controller",

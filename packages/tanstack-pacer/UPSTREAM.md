@@ -16,8 +16,10 @@
 
 ## Source, exports, and suites
 
-The byte-exact tagged adapter directory and root license are vendored under `upstream/`.
-`SHA256SUMS` authenticates all 52 files, including 43 source files. The tagged package contains no
+The byte-exact tagged adapter directory is vendored under `upstream/`; all 51 files verify
+offline against the upstream git blob shas recorded in `audit/upstream.lock.json`, and the
+pinned root license is republished at the package root as `LICENSE.upstream`, hash-matched
+to the lock's license evidence. The tagged package contains no
 runtime test, fixture, or snapshot artifacts. Upstream's `test:types` script compiles package source
 with `tsc` and has no dedicated type-assertion files, so suite presence is `insufficient` while
 compile lanes still run.

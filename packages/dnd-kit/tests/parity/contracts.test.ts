@@ -17,10 +17,20 @@ describe('@octanejs/dnd-kit parity audit contracts', () => {
 			verification: 'recorded-unverified',
 		});
 		expect(() =>
-			execFileSync(process.execPath, ['packages/dnd-kit/scripts/check-upstream-ledger.mjs'], {
-				cwd: root,
-				stdio: 'pipe',
-			}),
+			execFileSync(
+				process.execPath,
+				[
+					'scripts/react-port/materialize.mjs',
+					'run',
+					'--check',
+					'--package-dir',
+					'packages/dnd-kit',
+				],
+				{
+					cwd: root,
+					stdio: 'pipe',
+				},
+			),
 		).not.toThrow();
 	});
 

@@ -72,6 +72,34 @@ environments, transforms, or preparation, such as pristine Jest evidence,
 adapted DOM tests, differential tests, and server-mode compilation. Mark each
 fully group-owned project with the same `testExecution.group`.
 
+A package that commits `audit/upstream.lock.json` commits its pinned pristine
+`upstream/` tree byte-exact; the lock records each file's upstream git blob
+sha, so the committed copy verifies offline against the pinned upstream
+commit. Its adapted `tests/upstream/` suite is regenerated, never committed:
+`scripts/react-parity/check.mjs` runs `pnpm react-port:materialize run`
+(verify pristine, then rebuild adapted from the lock's mechanical rewrites
+plus the committed divergence patches) before any verifier, contract walk, or
+lane reads those paths. Derived adapted copies are never tracked; only
+genuinely re-authored port-authored suites live in the repository. Regeneration fails closed if an adapted module
+still imports `react`, `react-dom`, or `@testing-library/react`, so a missed
+rewrite or a patch that reintroduces a React specifier is rejected inside this
+gate rather than surfacing at test time. The whole flow is offline. Manifest lanes for such a
+package cite only committed artifacts (the lock, patches, skip rationales,
+inventories, and wrapper tests), never regenerated files. Registry-sourced
+evidence (published declarations, dist output, tarballs) lives under
+`upstream-artifact/`, outside the lock, hash-pinned per package.
+
+Per-package parity plumbing is configuration first, scripts second. Pure-data
+provenance checks live in `audit/provenance.json`, executed by the shared
+`scripts/react-parity/verify-provenance.mjs` (lock check first, then artifact
+hashes, required files, license equalities, package identity, export-condition
+mirroring). Pristine runners register in `scripts/react-parity/run-pristine.mjs`
+and, when Vitest-shaped, are themselves driven by `audit/pristine-suite.json`
+through `pristine-suite-lib.mjs`. Per-package scripts remain only for bespoke
+contracts — crosswalk derivation, case-structure digests, manifest generators —
+and any such generator must itself emit every evidence row the committed
+manifest carries, so regeneration reproduces it byte-for-byte.
+
 Differential tests must have their own project because their React-side fixture
 compilation and cache preparation do not belong to the full adapted suite:
 

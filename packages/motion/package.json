@@ -14,7 +14,7 @@
       ]
     }
   },
-  "description": "Framer Motion bindings for the octane renderer — reuses motion-dom's animation engine, swaps the React components for octane host components.",
+  "description": "Framer Motion bindings for the octane renderer \u2014 reuses motion-dom's animation engine, swaps the React components for octane host components.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -32,7 +32,8 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts",
@@ -41,8 +42,8 @@
   "scripts": {
     "test": "vitest run --root ../.. --project motion",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test:upstream": "jest --config tests/upstream-jest.config.cjs --rootDir upstream --runInBand --no-watchman",
-    "upstream:verify": "node ./scripts/verify-upstream.mjs"
+    "test:upstream": "vitest run --root ../.. --project motion-pristine",
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "dependencies": {
     "motion": "catalog:default",

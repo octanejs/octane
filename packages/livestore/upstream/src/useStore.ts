@@ -127,4 +127,3 @@ export const withReactApi = <TSchema extends LiveStoreSchema, TContext = {}>(
 
   return store as Store<TSchema, TContext> & ReactApi
 }
-

@@ -18,14 +18,15 @@ function read(relativePath) {
 }
 
 test('verifyTanstackStoreUpstreamEvidence rejects vendored byte drift', () => {
-	const path = join(REPO, 'packages/tanstack-store/upstream/SHA256SUMS');
+	// The lock pins each committed upstream file's upstream git blob sha; a
+	// working-tree byte flip must fail the offline verification layer.
+	const path = join(REPO, UPSTREAM_TEST);
 	const original = readFileSync(path, 'utf8');
-	const corrupted = `${original.replace(/^([0-9a-f]{64})/m, '0'.repeat(64))}`;
 	try {
-		writeFileSync(path, corrupted);
+		writeFileSync(path, `${original}\n// drift`);
 		assert.throws(function verifyCorrupted() {
 			verifyTanstackStoreUpstreamEvidence(REPO);
-		}, /Vendored byte drift|file inventory differs/);
+		}, /drifted from the lock/);
 	} finally {
 		writeFileSync(path, original);
 	}

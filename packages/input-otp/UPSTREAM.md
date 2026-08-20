@@ -13,11 +13,14 @@
 | npm tarball SHA-256 | `372ada860a04000a06a9bd10732e0ea79a2587c473e6a738930728529de51c77` |
 | License | MIT, copyright Guilherme Rodz |
 
-`upstream/source/` contains the byte-exact package source, the complete upstream
+`upstream/` contains the byte-exact package source, the complete upstream
 Playwright application and suite, and the canonical MIT license from the pinned
-commit. `upstream/npm/` contains the complete unpacked npm publication artifact.
-Both evidence boundaries are locked file-by-file by `upstream/SHA256SUMS` and
-must remain excluded from the published package files.
+commit; every file verifies offline against the upstream git blob shas recorded
+in `audit/upstream.lock.json`. `upstream-artifact/` contains the vendored npm
+publication evidence (manifest, README, and the published `.d.mts` declaration),
+hash-pinned by `audit/verify-provenance.mjs`. The pinned license is republished
+at the package root as `LICENSE.upstream`. Both evidence trees must remain
+excluded from the published package files.
 
 Run `node packages/input-otp/audit/verify-provenance.mjs --negative-controls`
 from the repository root to reject modified, missing, or extra vendored files;
@@ -29,8 +32,8 @@ evidence classification set.
 
 The published package exposes exactly five runtime exports: `OTPInput`,
 `OTPInputContext`, `REGEXP_ONLY_DIGITS`, `REGEXP_ONLY_CHARS`, and
-`REGEXP_ONLY_DIGITS_AND_CHARS`. The canonical source barrel and both published
-declaration formats are checked against `audit/public-api.json`.
+`REGEXP_ONLY_DIGITS_AND_CHARS`. The canonical source barrel and the published
+`.d.mts` declaration are checked against `audit/public-api.json`.
 
 ## Public type crosswalk
 

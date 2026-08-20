@@ -47,14 +47,14 @@ const lanes = [
 const upstreamFiles = ['packages/input-otp/tests/pristine/upstream.browser.test.ts'];
 const pristineLedgerPath = 'packages/input-otp/audit/pristine-adaptation-ledger.json';
 const pinnedUpstreamFiles = [
-	'packages/input-otp/upstream/source/apps/test/src/tests/base.delete-word.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/base.props.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/base.render.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/base.selections.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/base.slot.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/base.typing.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/with-autofocus.spec.ts',
-	'packages/input-otp/upstream/source/apps/test/src/tests/with-on-complete.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/base.delete-word.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/base.props.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/base.render.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/base.selections.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/base.slot.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/base.typing.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/with-autofocus.spec.ts',
+	'packages/input-otp/upstream/apps/test/src/tests/with-on-complete.spec.ts',
 ];
 
 function sha(contents) {
@@ -290,6 +290,8 @@ const manifest = {
 				'Adapted execution of all 15 pinned upstream React identities in real Chromium; complete pinned-source hashes, rewritten-source hash, and allowed transforms are recorded in the crosswalk.',
 			execution: { kind: 'vitest-full', inventory: pristinePath },
 			files: [
+				// The lane's pinned-tree evidence: the lock's upstream git blob shas.
+				await support('packages/input-otp/audit/upstream.lock.json'),
 				await support(pristinePath),
 				await support(pristineCrosswalkPath),
 				await support(pristineLedgerPath),

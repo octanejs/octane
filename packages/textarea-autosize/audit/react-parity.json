@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -145,7 +145,7 @@
         {
           "path": "packages/textarea-autosize/audit/pristine-types.json",
           "role": "test",
-          "sha256": "16d2e2feed56a6bd3f1898d49009ef840b808d7f68074735f1dee4365cc02035",
+          "sha256": "ea5d9f148694a51c0fdd1df195a87826774cf4a397a4bc0a91fa85728526ceaf",
           "cases": [
             {
               "id": "types:pristine",
@@ -157,12 +157,12 @@
         {
           "path": "packages/textarea-autosize/audit/type-probes/public-api.test-d.ts",
           "role": "support",
-          "sha256": "1a6b40998b27dabb1a024807ffc5fb5bc3e6a44f01714f0e850fba9fa8ee89b0"
+          "sha256": "2e8ac193ef2af85f13f35a3d4436b331a12cb257d31e0a9b2a71644f08d4020c"
         },
         {
           "path": "packages/textarea-autosize/audit/type-probes/tsconfig.pristine.json",
           "role": "support",
-          "sha256": "76f149cbf7daefaca713dfe7307b6d3174823267b38cf0b9fd0fda0cb31eeee5"
+          "sha256": "2b1b669a0599fe297a2ab4023751115827be104e278d4c7a05152cef97fe300b"
         },
         {
           "path": "packages/textarea-autosize/audit/type-parity.json",

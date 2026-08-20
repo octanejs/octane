@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -54,19 +54,24 @@
       "execution": {
         "kind": "jest-full",
         "config": "packages/colorful/tests/upstream-jest.config.cjs",
-        "root": "packages/colorful/upstream/tag",
+        "root": "packages/colorful/upstream",
         "inventory": "packages/colorful/audit/pristine-runtime.json"
       },
       "files": [
         {
+          "path": "packages/colorful/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "50135f844ec8ab667a9fb4b4d6269e35179ea1462259f7a48fe1e9ec5eb04ff0"
+        },
+        {
           "path": "packages/colorful/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "86a3323c4f503c2f0afafb35e766427b8cd54204570052af93f90df4c2d8d5d4"
+          "sha256": "aab633febcfb42893147db4597e34b0dfe68cf840ef5c819c899dbdb14d25bbc"
         },
         {
           "path": "packages/colorful/tests/upstream-jest.config.cjs",
           "role": "support",
-          "sha256": "196bc7f577e50cdbf954dd1a904a74b4abec69426e1b4f1d980d0e6105f9bf4d"
+          "sha256": "35b0bddbf02e4805458567b7dea273479740f4bbcde5c7c4888666ac8588657a"
         },
         {
           "path": "packages/colorful/tests/upstream-jest.setup.cjs",
@@ -82,6 +87,11 @@
           "path": "scripts/react-parity/jest-full-runner.mjs",
           "role": "support",
           "sha256": "814293ec04c0617093e241064e19f38e18e040cc02d0fb9108dabc87df2b8d5d"
+        },
+        {
+          "path": "packages/colorful/tests/upstream-jest.snapshot-resolver.cjs",
+          "role": "support",
+          "sha256": "d8f77b0e74bbaac16663dca75717ab8c1650705b0d8e8f9db5077ade1572a91e"
         }
       ]
     },
@@ -149,7 +159,7 @@
         {
           "path": "packages/colorful/typetests/tsconfig.pristine.json",
           "role": "test",
-          "sha256": "17e1136b24f9fae724061f469cdd061aa27ef1fdeb7f8ac4c4bb19fa6387b0d5",
+          "sha256": "653f7997733bad3012399cdf4e3b9b196d765263fd26c65ea177687cc01f1648",
           "cases": [
             {
               "id": "types:react-colorful-pristine",
@@ -171,7 +181,7 @@
         {
           "path": "packages/colorful/audit/type-parity.json",
           "role": "support",
-          "sha256": "8624a8e0b49ffdbfebfdb296667a9852d931f1a5b2312d66bf3665e3b4e4a5f9"
+          "sha256": "07d7a0af2c1cb1f4686adaa01bd5f55ca9dc517cb5c0ef02119d066d190225d9"
         },
         {
           "path": "scripts/react-parity/react-colorful-types-lib.mjs",
@@ -224,7 +234,7 @@
         {
           "path": "packages/colorful/audit/type-parity.json",
           "role": "support",
-          "sha256": "8624a8e0b49ffdbfebfdb296667a9852d931f1a5b2312d66bf3665e3b4e4a5f9"
+          "sha256": "07d7a0af2c1cb1f4686adaa01bd5f55ca9dc517cb5c0ef02119d066d190225d9"
         },
         {
           "path": "scripts/react-parity/react-colorful-types-lib.mjs",
@@ -249,7 +259,7 @@
         {
           "path": "packages/colorful/audit/upstream-inventory.mjs",
           "role": "support",
-          "sha256": "332f353914070962d8a785dde6d59185489af788e6c634e7d60703d65a9c988b"
+          "sha256": "54f4fe1d9bc27f05a52efb69655f37b086d2c282e41197f475a9a583e92bb54c"
         },
         {
           "path": "scripts/react-parity/react-colorful-upstream-lib.mjs",
@@ -302,7 +312,7 @@
         {
           "path": "packages/colorful/audit/type-parity.json",
           "role": "support",
-          "sha256": "8624a8e0b49ffdbfebfdb296667a9852d931f1a5b2312d66bf3665e3b4e4a5f9"
+          "sha256": "07d7a0af2c1cb1f4686adaa01bd5f55ca9dc517cb5c0ef02119d066d190225d9"
         },
         {
           "path": "packages/colorful/audit/pristine-types.json",
@@ -377,7 +387,7 @@
         {
           "path": "packages/colorful/audit/upstream-inventory.mjs",
           "role": "support",
-          "sha256": "332f353914070962d8a785dde6d59185489af788e6c634e7d60703d65a9c988b"
+          "sha256": "54f4fe1d9bc27f05a52efb69655f37b086d2c282e41197f475a9a583e92bb54c"
         }
       ]
     }

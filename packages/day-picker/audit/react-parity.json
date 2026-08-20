@@ -7,7 +7,7 @@
     "sourceRoot": "src",
     "testRoot": "src",
     "license": "MIT",
-    "integrity": "sha256:bfb5146c055aa4b017bde0ff5e76d9a90e5496b6d03c4df7659d98eb14c450af",
+    "integrity": "sha256:7774da7f1d03c4e0b5d15e698fb62a12789d0a65bee58ba53a23ac154ca4dde0",
     "verification": "recorded-unverified"
   },
   "upstreamSuites": {
@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -67,9 +67,9 @@
           "sha256": "12201e8c5b64aaf3d08ee5bf99a0cf71fd703d0d98a498aa957f4870eae27272"
         },
         {
-          "path": "packages/day-picker/audit/upstream-integrity.json",
+          "path": "packages/day-picker/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "89f6591d65ac0c3d42838b2c8c4e531eab7faa005e3978188eac99d9a3f6b263"
+          "sha256": "7774da7f1d03c4e0b5d15e698fb62a12789d0a65bee58ba53a23ac154ca4dde0"
         }
       ]
     }

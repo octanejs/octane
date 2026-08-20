@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -54,14 +54,19 @@
       "execution": {
         "kind": "jest-full",
         "config": "packages/popper/tests/upstream-jest.config.cjs",
-        "root": "packages/popper/upstream/tag",
+        "root": "packages/popper/upstream",
         "inventory": "packages/popper/audit/pristine-runtime.json"
       },
       "files": [
         {
+          "path": "packages/popper/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "910c3b071360dd1163b3953e80ecbc6db8d77aeb47e438b4e2b1c07359b39fdb"
+        },
+        {
           "path": "packages/popper/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "1f58840a667cd039b375edb626fae3ef3bfcaca84de3c002c7fb61da8d30a478"
+          "sha256": "15b4e9e61451e2960ec6aa89f4970af72571016f3f5200eb14d6dbb0f96f13ac"
         },
         {
           "path": "scripts/react-parity/jest-full-runner.mjs",
@@ -71,12 +76,17 @@
         {
           "path": "packages/popper/tests/upstream-jest.config.cjs",
           "role": "support",
-          "sha256": "53fb512e6821d7c8c2d77242dc5fb86b5e17fb8455e9d8646c8e9930d7421155"
+          "sha256": "7e40dabd375a3ca8329d536fd3eecf21e38e31070738a817d6d592f20b072526"
         },
         {
           "path": "packages/popper/tests/upstream-jest.setup.cjs",
           "role": "support",
-          "sha256": "bbfe7c0d222dd12306db3b69b0da9c8e2d618d48bfc27e1b81602a8fa249f602"
+          "sha256": "5f92cba97a5edda3bbfbab482ecc028be51b078b39e3d1f129fe04cc751e371d"
+        },
+        {
+          "path": "packages/popper/tests/upstream-jest.snapshot-resolver.cjs",
+          "role": "support",
+          "sha256": "680f8f71515a6f2ce37fdee5934c48d22787322a9e3e54df1d887c5dd3d7a994"
         }
       ]
     },
@@ -101,7 +111,7 @@
         {
           "path": "packages/popper/audit/test-classifications.json",
           "role": "support",
-          "sha256": "171232e1613ba9b251c08147f68667ebc44efca6cb01eae05b50b0cee5073db7"
+          "sha256": "eafbada82f064a6df4aed1e8d33429aaae4cb0010dc18c5ae008ee0b38fae821"
         },
         {
           "path": "scripts/react-parity/popper-classifications-lib.mjs",
@@ -133,7 +143,7 @@
         {
           "path": "packages/popper/audit/test-classifications.json",
           "role": "support",
-          "sha256": "171232e1613ba9b251c08147f68667ebc44efca6cb01eae05b50b0cee5073db7"
+          "sha256": "eafbada82f064a6df4aed1e8d33429aaae4cb0010dc18c5ae008ee0b38fae821"
         }
       ]
     },
@@ -152,7 +162,7 @@
       },
       "files": [
         {
-          "path": "packages/popper/upstream/tag/typings/tests/main-test.tsx",
+          "path": "packages/popper/upstream/typings/tests/main-test.tsx",
           "role": "test",
           "sha256": "01a7c18182a94ababe7be342aa4f48dde561d48679e82847186860b1a51ac684",
           "cases": [
@@ -164,7 +174,7 @@
           ]
         },
         {
-          "path": "packages/popper/upstream/tag/typings/tests/svg-test.tsx",
+          "path": "packages/popper/upstream/typings/tests/svg-test.tsx",
           "role": "test",
           "sha256": "0e84b6ac8cd2372d87288d4cebd5fee6c466077e63b6a095e8cad03a3fd0d68e",
           "cases": [
@@ -178,12 +188,12 @@
         {
           "path": "packages/popper/typetests/tsconfig.pristine.json",
           "role": "support",
-          "sha256": "11f66d3ee6cd77bd17b1f2ec9bb6299d97b9f8e79c9ebe118bb1994e3d73bc21"
+          "sha256": "bfede4cbc4543f14c8ac47045d2e4ec9c74a3c5298ff00f957c3e00e30f5ec6c"
         },
         {
           "path": "packages/popper/audit/type-parity.json",
           "role": "support",
-          "sha256": "4742d3b70db5bb1d52552bf9a99a5757fb4495f84e7938c36ac427abe35b53dc"
+          "sha256": "a8c9e3a3e1e9ac25c496a88cc5aa3dd8b4e110da480c87000a28a93f299eac4e"
         },
         {
           "path": "packages/popper/audit/upstream-types.json",
@@ -238,7 +248,7 @@
         {
           "path": "packages/popper/audit/type-parity.json",
           "role": "support",
-          "sha256": "4742d3b70db5bb1d52552bf9a99a5757fb4495f84e7938c36ac427abe35b53dc"
+          "sha256": "a8c9e3a3e1e9ac25c496a88cc5aa3dd8b4e110da480c87000a28a93f299eac4e"
         },
         {
           "path": "packages/popper/audit/upstream-types.json",
@@ -258,7 +268,7 @@
         {
           "path": "packages/popper/typetests/assertions.md",
           "role": "support",
-          "sha256": "9540abd1870c44e368a20a7074aacf169d84c2f61212c764a31cea116ad4dc35"
+          "sha256": "ee2f98b2be8ce032c3128a4e2cafa8488bf0c8fb898e1e84683f85c2fbb76b3c"
         },
         {
           "path": "scripts/react-parity/popper-types-lib.mjs",

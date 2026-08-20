@@ -11,9 +11,9 @@
     "skipLibCheck": true,
     "baseUrl": "..",
     "paths": {
-      "react-draggable": ["upstream/npm/build/cjs/cjs.d.ts"]
+      "react-draggable": ["upstream-artifact/build/cjs/cjs.d.ts"]
     }
   },
-  "include": ["../upstream/tag/typings/test.tsx", "../upstream/tag/test/typeCompat/fixture.tsx"],
+  "include": ["../upstream/typings/test.tsx", "../upstream/test/typeCompat/fixture.tsx"],
   "exclude": []
 }

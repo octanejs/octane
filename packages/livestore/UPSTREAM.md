@@ -14,8 +14,12 @@
 The npm package publishes `src/` and built `dist/`, but its repository contains
 the authoritative React source, tests, snapshots, configuration, package
 metadata, and license. The byte-exact `packages/@livestore/react` directory from
-the canonical tag commit is vendored under `upstream/` and locked file-by-file
-by `upstream/SHA256SUMS`. It is excluded from the published package by the
+the canonical tag commit is vendored under `upstream/` and pinned by
+`audit/upstream.lock.json`: each committed file verifies offline against its
+upstream git blob sha (`pnpm react-port:materialize run --check --package-dir
+packages/livestore`). The upstream Apache-2.0 license is retained byte-exact
+as `LICENSE.upstream` beside the binding's own MIT `LICENSE`. The tree is
+excluded from the published package by the
 explicit `files` allowlist.
 
 The port reuses LiveStore's released framework-neutral packages unchanged. Only

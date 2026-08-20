@@ -31,15 +31,16 @@
   "types": "src/index.ts",
   "files": [
     "src",
+    "LICENSE.md",
+    "LICENSE.upstream",
     "README.md",
-    "UPSTREAM.md",
-    "LICENSE.md"
+    "UPSTREAM.md"
   ],
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
-    "adapted:generate": "node tests/generate-adapted-tests.mjs",
+    "adapted:generate": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
     "test": "pnpm upstream:verify && pnpm test:audit && node ../../scripts/react-parity/harness.mjs run-required --manifest packages/window/audit/react-parity.json",
     "upstream:verify": "node tests/audit/verify-upstream.mjs",
     "test:audit": "node --test tests/audit/*.test.mjs",

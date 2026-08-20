@@ -19,4 +19,3 @@ export default tsconfigJson({
   exclude: [...packageTsconfigExclude],
   references: [refs.common, refs.adapterWeb, refs.frameworkToolkit, refs.livestore, refs.utils, refs.utilsDev],
 })
-

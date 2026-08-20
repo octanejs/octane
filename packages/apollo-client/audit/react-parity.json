@@ -8,7 +8,7 @@
     "sourceRoot": "src/react and src/testing/react",
     "testRoot": "src/react/**/__tests__ and src/testing/react/__tests__",
     "license": "MIT",
-    "integrity": "sha256:042025ab55bc5221b761cadd9d264c9d519390bffa6cd3f4f5b451a43b0a6649",
+    "integrity": "sha256:d2f17af8384c1f572cb3133153fe292546f4bb2768afcf30cc02091990ee057f",
     "verification": "recorded-unverified"
   },
   "upstreamSuites": {
@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -88,12 +88,12 @@
           "sha256": "b68f4c69e528c4659a7111b07d1ee021116fa27e0a37a5a7164dcbd4f958e327"
         },
         {
-          "path": "packages/apollo-client/upstream/SHA256SUMS",
+          "path": "packages/apollo-client/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "042025ab55bc5221b761cadd9d264c9d519390bffa6cd3f4f5b451a43b0a6649"
+          "sha256": "738cc8626f56e2987d60dd4825e394f2a2697f9f0b3c3fb0498799de120f26c9"
         },
         {
-          "path": "packages/apollo-client/upstream/LICENSE",
+          "path": "packages/apollo-client/LICENSE.upstream",
           "role": "support",
           "sha256": "6d4568f2adac9fd90e85a2802a1e8ae25f707af9243cd5a8843402399b92b3c4"
         },

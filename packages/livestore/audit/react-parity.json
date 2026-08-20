@@ -44,7 +44,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -79,12 +79,12 @@
         {
           "path": "scripts/react-parity/livestore-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "1da63bc79c0c7d910a027d6b57668ac25fb074e2be03a8788d68b1febe7c1075"
+          "sha256": "f980e1c87addfe3cd2af4ebe960d9725fad42a458ffbe194165a727e36f4b7e4"
         },
         {
-          "path": "packages/livestore/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "279a959623caffce2f8be796233f9deed409912a7ba2cf9d12fad4350c0f516e"
+          "sha256": "05b588ad14562a780437a1e023f6c24ceed437e61a5a77ba27197feb898823a0"
         },
         {
           "path": "packages/livestore/tests/upstream-vitest.config.ts",
@@ -92,14 +92,14 @@
           "sha256": "c88ddacc2bb8fe4c5c7876f3dce6bcac89b25661348e6e91ed74d671448a4a3f"
         },
         {
-          "path": "packages/livestore/scripts/verify-upstream.mjs",
+          "path": "packages/livestore/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "db37d79eef48654e6cc0b35f748beed7869638c4e740893efe2cf27033b9124b"
+          "sha256": "df20a51ead99beab13111318fa8b8e3f9814ddf4b9ec1964c81914c30cf63262"
         },
         {
-          "path": "packages/livestore/upstream/SHA256SUMS",
+          "path": "packages/livestore/audit/pristine-suite.json",
           "role": "support",
-          "sha256": "d018c617a63e616aeba211b73ca6b4c126795ebc4f5d873f2296765b60b5e44f"
+          "sha256": "5620bcba48fa67dc97f20bdc56e45902187c1c34b270ba9e26de22d8b73e5cd0"
         }
       ]
     },
@@ -178,7 +178,7 @@
       "environment": "workspace-node",
       "project": "livestore-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode→OctaneNode transformation.",
+      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode\u2192OctaneNode transformation.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",

@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -91,24 +91,19 @@
           "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
-          "path": "packages/dnd-kit/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "cea0d1ab363c6fd22ec54aa731e1b7845c6ce093d9119aecfb4281e49511b30e"
-        },
-        {
           "path": "packages/dnd-kit/audit/test-classifications.json",
           "role": "support",
           "sha256": "011bbc6121612fb797e166a4fc8d3f01999ccfb29c1e39b6f52459ec6d82431a"
         },
         {
-          "path": "packages/dnd-kit/scripts/check-upstream-ledger.mjs",
-          "role": "support",
-          "sha256": "d60b3af0adbf5484dc068cd49ce65b31131ad7a0c53de25b5e2a37568cba549b"
-        },
-        {
           "path": "scripts/react-parity/dnd-kit-controls.test.mjs",
           "role": "support",
           "sha256": "b336789448ebc47d2c2d5b8fcd643b1f0104b8c083b1e9ee1bab3068819b80ac"
+        },
+        {
+          "path": "packages/dnd-kit/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "ea9f6defc5d432488525eb7a003c04218c63c236147a03809711d58e289b8923"
         }
       ]
     }

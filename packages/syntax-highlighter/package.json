@@ -28,6 +28,7 @@
   "files": [
     "src",
     "LICENSE",
+    "LICENSE.upstream",
     "README.md",
     "UPSTREAM.md"
   ],

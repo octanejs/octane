@@ -45,14 +45,7 @@ export function runPristineUpstreamSuite({
 	verifyReactSpringVendoredBytes(repoRoot);
 	const runRoot = mkdtempSync(join(packageRoot, '.pristine-upstream-'));
 	try {
-		for (const entry of [
-			'packages',
-			'targets',
-			'vitest.config.ts',
-			'LICENSE',
-			'SHA256SUMS',
-			'package.json',
-		]) {
+		for (const entry of ['packages', 'targets', 'vitest.config.ts', 'LICENSE', 'package.json']) {
 			const source = join(upstreamRoot, entry);
 			if (!existsSync(source)) continue;
 			cpSync(source, join(runRoot, entry), { recursive: true });

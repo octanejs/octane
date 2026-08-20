@@ -18,7 +18,7 @@
     "verification": "recorded-unverified"
   },
   "notes": [
-    "Adapter source is vendored byte-exact under `upstream/react-db/src` (with `upstream/SHA256SUMS`, `.prettierignore`d, excluded from published `files`) so an upstream bump is a reviewable diff. See `UPSTREAM.md` for the pin, export crosswalk, and upstream-suite disposition.",
+    "Adapter source is vendored byte-exact under `upstream/react-db/src`, pinned by `audit/upstream.lock.json` (each file verifies offline against its upstream git blob sha; `.prettierignore`d, excluded from published `files`) so an upstream bump is a reviewable diff. See `UPSTREAM.md` for the pin, export crosswalk, and upstream-suite disposition.",
     "Bounded evidence: the shared `@tanstack/db` live-query conformance suite runs against the Octane adapter driver with zero known gaps and zero universal expected-fails (after the 0.7.0 order-only-move fix, db #1669), plus local coverage for suspense (incl. an async fallback), coordinated infinite-query windows, effect hooks, paced mutations, and eager onStoreChange; type tests cover the `useLiveQuery` overload families.",
     "Open toward full `verified`: no executable React-differential lane and no one-for-one adaptation of the upstream `@tanstack/react-db` runtime/type suites (which the npm artifact does not ship) yet; consistent with the recorded-unverified posture of the other bindings.",
     "The `@tanstack/db` expression evaluator and comparison utilities are vendored under `tests/db-fixtures/db-internal/` (pinned to 0.7.0, logic unchanged from 0.6.17) so the infinite-query tests can interpret the where/cursor IR db generates internally; these are test-only and not shipped."

@@ -105,7 +105,7 @@ const manifest = {
 				file('packages/swr/audit/jest-pristine.config.mjs'),
 				file('packages/swr/audit/upstream-testing-library.cjs'),
 				file('packages/swr/audit/upstream-timer-gate.cjs'),
-				file('packages/swr/upstream/SHA256SUMS'),
+				file('packages/swr/audit/upstream.lock.json'),
 				file('scripts/react-parity/jest-full-runner.mjs'),
 				file('scripts/react-parity/swr-runtime-inventory.mjs'),
 				file('scripts/react-parity/swr-upstream-timer-gate.test.mjs'),

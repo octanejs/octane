@@ -1,6 +1,6 @@
 {
   "source": {
-    "upstream": "upstream/canonical/src/utils/index.ts",
+    "upstream": "upstream/src/utils/index.ts",
     "upstreamSha256": "100fc1599de1ca93cf2ea9b1eb1c850cd410f0ef1313fef8ad7b6ff340ff4b98",
     "adapted": "src/utils/index.ts",
     "adaptedSha256": "9a36a6a7bc6ff651e5b1a4a1e52be8cc9e98668abc23cb52392609fd1c900600",
@@ -10,7 +10,7 @@
     ]
   },
   "runtime": {
-    "upstream": "upstream/canonical/src/utils/index.spec.ts",
+    "upstream": "upstream/src/utils/index.spec.ts",
     "adapted": "tests/adapted/utils/index.spec.ts",
     "adaptedSha256": "c0074e0079a0416d4c653e1222c2b197c08a0ece125baa77dc7bdddad5eabecd",
     "expectedCases": 70,
@@ -22,7 +22,7 @@
   },
   "differential": {
     "file": "tests/differential/utils.test.ts",
-    "sha256": "e20fb393cc1d402d200a79563e3af44954737ad5f64ca5b5a28b5e91a01ec875",
+    "sha256": "f30e51860d71a3422e9ff44585f4cfea348f132c0a5b8039b99616404f3acc3f",
     "cases": 3
   },
   "types": [

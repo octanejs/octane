@@ -21,6 +21,7 @@
     "README.md",
     "UPSTREAM.md",
     "LICENSE",
+    "LICENSE.upstream",
     "status.json"
   ],
   "scripts": {

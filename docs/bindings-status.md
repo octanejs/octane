@@ -672,7 +672,7 @@ SSR / hydration: Editor and DiffEditor render a deterministic loading shell with
 
 Scope/evidence last checked: 2026-08-10.
 
-- Pinned to @monaco-editor/react 4.7.0 (upstream/COMMIT eb120e66), @monaco-editor/loader 1.7.0, monaco-editor 0.55.1 oracle, and React 19.2.7 for differential/typetest lanes.
+- Pinned to @monaco-editor/react 4.7.0 (audit/upstream.lock.json pin eb120e66), @monaco-editor/loader 1.7.0, monaco-editor 0.55.1 oracle, and React 19.2.7 for differential/typetest lanes.
 - Adapted upstream shell tests live in tests/upstream/*; harness negative-controls guard adapted inventory titles.
 - SSR (tests/ssr), hydration (tests/hydration), and Chromium browser harness (tests/browser) exercise framework and worker integration beyond upstream coverage.
 
@@ -1165,7 +1165,7 @@ SSR / hydration: Not yet exercised: no server-render tests are included for the 
 
 Scope/evidence last checked: 2026-08-13.
 
-- Adapter source is vendored byte-exact under `upstream/react-db/src` (with `upstream/SHA256SUMS`, `.prettierignore`d, excluded from published `files`) so an upstream bump is a reviewable diff. See `UPSTREAM.md` for the pin, export crosswalk, and upstream-suite disposition.
+- Adapter source is vendored byte-exact under `upstream/react-db/src`, pinned by `audit/upstream.lock.json` (each file verifies offline against its upstream git blob sha; `.prettierignore`d, excluded from published `files`) so an upstream bump is a reviewable diff. See `UPSTREAM.md` for the pin, export crosswalk, and upstream-suite disposition.
 - Bounded evidence: the shared `@tanstack/db` live-query conformance suite runs against the Octane adapter driver with zero known gaps and zero universal expected-fails (after the 0.7.0 order-only-move fix, db #1669), plus local coverage for suspense (incl. an async fallback), coordinated infinite-query windows, effect hooks, paced mutations, and eager onStoreChange; type tests cover the `useLiveQuery` overload families.
 - Open toward full `verified`: no executable React-differential lane and no one-for-one adaptation of the upstream `@tanstack/react-db` runtime/type suites (which the npm artifact does not ship) yet; consistent with the recorded-unverified posture of the other bindings.
 - The `@tanstack/db` expression evaluator and comparison utilities are vendored under `tests/db-fixtures/db-internal/` (pinned to 0.7.0, logic unchanged from 0.6.17) so the infinite-query tests can interpret the where/cursor IR db generates internally; these are test-only and not shipped.

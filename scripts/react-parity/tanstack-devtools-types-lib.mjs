@@ -109,8 +109,8 @@ function assertionGroups(source, fileName) {
 
 function normalizeSpecifier(specifier) {
 	if (
-		specifier === '../../upstream/package/src/index' ||
-		specifier === '../../upstream/package/src/index.ts' ||
+		specifier === '../../upstream/src/index' ||
+		specifier === '../../upstream/src/index.ts' ||
 		specifier === '../src/index' ||
 		specifier === '../src/index.ts' ||
 		specifier === '@octanejs/tanstack-devtools' ||

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "root": "packages/popper/upstream/tag",
+  "root": "packages/popper/upstream",
   "snapshots": 4,
   "tests": [
     {

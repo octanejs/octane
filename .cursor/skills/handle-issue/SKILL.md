@@ -43,7 +43,7 @@ Use this to inspect an issue, triage it, propose a solution, and optionally impl
 
 6. **Optional implementation**
    - Follow `bug-hunter.md` for bugs.
-   - Follow `react-library-port.md` for binding/compat issues.
+   - Follow `octane-react-library-port` for binding/compat issues.
    - Follow `octane-core-extend.md` for runtime/compiler extensions.
 
 7. **Issue response template**

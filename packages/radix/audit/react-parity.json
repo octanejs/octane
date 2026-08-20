@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -70,8 +70,8 @@
             },
             {
               "id": "differential:radix-collapsible",
-              "testName": "Collapsible: closed → open → closed, byte-identical",
-              "fullName": "differential: @octanejs/radix vs real Radix on React Collapsible: closed → open → closed, byte-identical"
+              "testName": "Collapsible: closed \u2192 open \u2192 closed, byte-identical",
+              "fullName": "differential: @octanejs/radix vs real Radix on React Collapsible: closed \u2192 open \u2192 closed, byte-identical"
             },
             {
               "id": "differential:radix-accordion-single",
@@ -156,9 +156,9 @@
           "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
-          "path": "packages/radix/upstream/SHA256SUMS",
+          "path": "packages/radix/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "c49ef85ab70fa8b48cc79056e5581fa8d5f5c84533c8d492e6e24176cc7ad75c"
+          "sha256": "a2551122ea6e37f3a2d7d3e31ed5ad1d3fc263c57f0aa91c80f1eb7460940819"
         },
         {
           "path": "packages/radix/audit/test-classifications.json",
@@ -168,7 +168,7 @@
         {
           "path": "packages/radix/scripts/check-upstream-ledger.mjs",
           "role": "support",
-          "sha256": "fd69d907aa63cf1a35aad2c8a51d17155fee2fce61cc21832cc53eb649704c67"
+          "sha256": "26ae5ee4c015965fec8961d738680bc4a56d1b9f4094d107e32720aef400651b"
         },
         {
           "path": "scripts/react-parity/radix-controls.test.mjs",
@@ -178,7 +178,7 @@
         {
           "path": "packages/radix/audit/export-crosswalk.json",
           "role": "support",
-          "sha256": "97763764b16bfe05ee9ea3558a8a2278aed8f2ad262c6938f093fe21fd2cbe57"
+          "sha256": "5115fa8235e1a41a7cdcd30e6a756971770fc1b5ee2d1e208e40d9374fde0030"
         }
       ]
     },

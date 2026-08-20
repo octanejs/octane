@@ -221,4 +221,3 @@ describe.each([{ strictMode: true }, { strictMode: false }])('useRcResource (str
     expect(cleanupSpy).toHaveBeenCalledTimes(1)
   })
 })
-

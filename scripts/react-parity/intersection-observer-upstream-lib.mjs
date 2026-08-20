@@ -1,5 +1,4 @@
-import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 
 import { extractTestCases } from './inventory-lib.mjs';
@@ -7,9 +6,6 @@ import { extractTestCases } from './inventory-lib.mjs';
 const PACKAGE = 'packages/intersection-observer';
 const UPSTREAM_TEST_ROOT = `${PACKAGE}/upstream/src/__tests__`;
 const PORTED_TEST_ROOT = `${PACKAGE}/tests/upstream`;
-const FIXTURES_ROOT = `${PACKAGE}/tests/_fixtures`;
-const UPSTREAM_INVENTORY_PATH = `${PACKAGE}/upstream/SHA256SUMS`;
-const PORTED_INVENTORY_PATH = `${PACKAGE}/audit/upstream-adapted.SHA256SUMS`;
 const PRISTINE_RUNTIME = `${PACKAGE}/audit/pristine-runtime.json`;
 const ADAPTED_RUNTIME = `${PACKAGE}/audit/adapted-runtime.json`;
 const PRISTINE_BROWSER = `${PACKAGE}/audit/pristine-browser-runtime.json`;
@@ -17,7 +13,6 @@ const ADAPTED_BROWSER = `${PACKAGE}/audit/adapted-browser-runtime.json`;
 
 const TITLE_REPLACEMENTS = new Map();
 const PORT_ONLY_CASES = new Map();
-const PORT_ONLY_ARTIFACTS = new Set(['_setup.ts']);
 
 function filesBelow(root) {
 	return readdirSync(root, { recursive: true, withFileTypes: true })
@@ -44,33 +39,6 @@ function testFiles(root) {
 	return testArtifacts(root).filter(function keepTests(file) {
 		return file.endsWith('.test.ts') || file.endsWith('.test.tsx');
 	});
-}
-
-export function renderIntersectionObserverUpstreamInventory(repoRoot) {
-	const upstreamRoot = resolve(repoRoot, `${PACKAGE}/upstream`);
-	return `${filesBelow(upstreamRoot)
-		.filter(function keepSource(file) {
-			return portableRelative(upstreamRoot, file) !== 'SHA256SUMS';
-		})
-		.map(function digestLine(file) {
-			const digest = createHash('sha256').update(readFileSync(file)).digest('hex');
-			return `${digest}  ${portableRelative(upstreamRoot, file)}`;
-		})
-		.join('\n')}\n`;
-}
-
-export function renderIntersectionObserverAdaptedInventory(repoRoot) {
-	const roots = [resolve(repoRoot, PORTED_TEST_ROOT), resolve(repoRoot, FIXTURES_ROOT)];
-	const packageRoot = resolve(repoRoot, PACKAGE);
-	const lines = [];
-	for (const root of roots) {
-		if (!existsSync(root)) continue;
-		for (const file of filesBelow(root)) {
-			const digest = createHash('sha256').update(readFileSync(file)).digest('hex');
-			lines.push(`${digest}  ${portableRelative(packageRoot, file)}`);
-		}
-	}
-	return `${lines.sort().join('\n')}\n`;
 }
 
 function fullNames(inventoryPath, repoRoot) {
@@ -103,30 +71,19 @@ export function verifyIntersectionObserverRuntimeCrosswalk(repoRoot) {
 	};
 }
 
+// Byte integrity for the pinned upstream tree and the regenerated adapted
+// suite is owned by audit/upstream.lock.json plus react-port:materialize
+// (which check.mjs runs before this verifier). This verifier owns the
+// semantic layer: artifact and registration crosswalks over those trees.
 export function verifyIntersectionObserverUpstream(repoRoot) {
-	const expectedInventory = readFileSync(resolve(repoRoot, UPSTREAM_INVENTORY_PATH), 'utf8');
-	const actualInventory = renderIntersectionObserverUpstreamInventory(repoRoot);
-	if (actualInventory !== expectedInventory) {
-		throw new Error(
-			'react-intersection-observer upstream inventory drifted; re-vendor the pinned tag',
-		);
-	}
-
 	const upstreamRoot = resolve(repoRoot, UPSTREAM_TEST_ROOT);
 	const portedRoot = resolve(repoRoot, PORTED_TEST_ROOT);
 	const upstreamArtifacts = testArtifacts(upstreamRoot);
-	const portedArtifacts = testArtifacts(portedRoot).filter(function dropPortOnly(file) {
-		return !PORT_ONLY_ARTIFACTS.has(file);
-	});
+	const portedArtifacts = testArtifacts(portedRoot);
 	if (JSON.stringify(upstreamArtifacts) !== JSON.stringify(portedArtifacts)) {
 		throw new Error(
 			'react-intersection-observer adapted suite must account for every upstream test artifact',
 		);
-	}
-	for (const artifact of PORT_ONLY_ARTIFACTS) {
-		if (!existsSync(resolve(portedRoot, artifact))) {
-			throw new Error(`${artifact}: expected Octane adapted support file is missing`);
-		}
 	}
 
 	let upstreamCases = 0;
@@ -171,14 +128,6 @@ export function verifyIntersectionObserverUpstream(repoRoot) {
 		}
 		upstreamCases += upstream.length;
 		portedCases += ported.length;
-	}
-
-	const expectedPortedInventory = readFileSync(resolve(repoRoot, PORTED_INVENTORY_PATH), 'utf8');
-	const actualPortedInventory = renderIntersectionObserverAdaptedInventory(repoRoot);
-	if (actualPortedInventory !== expectedPortedInventory) {
-		throw new Error(
-			'react-intersection-observer adapted test inventory drifted; review and record the change',
-		);
 	}
 
 	const crosswalk = verifyIntersectionObserverRuntimeCrosswalk(repoRoot);

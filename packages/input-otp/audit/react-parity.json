@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -57,6 +57,11 @@
       },
       "files": [
         {
+          "path": "packages/input-otp/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "e7804dcc52aac9a7b99d9d70799656b563ee055e42f6dda58159906d5c8b52cc"
+        },
+        {
           "path": "packages/input-otp/audit/pristine-runtime-browser.json",
           "role": "support",
           "sha256": "39dc394785d83f1d7c4beefb59448736c89b7f0d8b7d43a629e310efa7e3298a"
@@ -64,7 +69,7 @@
         {
           "path": "packages/input-otp/audit/pristine-runtime-crosswalk.json",
           "role": "support",
-          "sha256": "fb53116c8795691c2d40d6c8bc76463e121b3047ad5f671767891fb7ef824953"
+          "sha256": "4a847ab4dadc62d722bf159897fe679bc42d9359d91a43e7675689654ca9811f"
         },
         {
           "path": "packages/input-otp/audit/pristine-adaptation-ledger.json",
@@ -77,42 +82,42 @@
           "sha256": "e8fb243db21bddaaef76e670561f1d92f0db514ed49af8ba48fe2fd9876ce345"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/test/src/tests/base.delete-word.spec.ts",
+          "path": "packages/input-otp/upstream/apps/test/src/tests/base.delete-word.spec.ts",
           "role": "support",
           "sha256": "311a845d1566d6c4b978ced1881da6d3df297d7ebecf3474423e7ffe7cd365ba"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/test/src/tests/base.props.spec.ts",
+          "path": "packages/input-otp/upstream/apps/test/src/tests/base.props.spec.ts",
           "role": "support",
           "sha256": "9a6ed238323b02cb34efef3224982597ac5130d5ec117903d32de955feebc666"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/test/src/tests/base.render.spec.ts",
+          "path": "packages/input-otp/upstream/apps/test/src/tests/base.render.spec.ts",
           "role": "support",
           "sha256": "b7924a0b71da35dbd0ca95bc6882a5980c082878c92b050bcdd9b85b7d868c99"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/test/src/tests/base.selections.spec.ts",
+          "path": "packages/input-otp/upstream/apps/test/src/tests/base.selections.spec.ts",
           "role": "support",
           "sha256": "648aef080f80ecdf7f3d618d40f1301aa18c738e4923bc6e2c335583e0de08cd"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/test/src/tests/base.slot.spec.ts",
+          "path": "packages/input-otp/upstream/apps/test/src/tests/base.slot.spec.ts",
           "role": "support",
           "sha256": "370090e7e678b2099aa4f00126d98b3d0ff479a7fc336d3b25c31b19845e68ec"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/test/src/tests/base.typing.spec.ts",
+          "path": "packages/input-otp/upstream/apps/test/src/tests/base.typing.spec.ts",
           "role": "support",
           "sha256": "4440f5cfbc0284de6815a08f02167d1d7fb83b97fc978fd47033b964a290ec5b"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/test/src/tests/with-autofocus.spec.ts",
+          "path": "packages/input-otp/upstream/apps/test/src/tests/with-autofocus.spec.ts",
           "role": "support",
           "sha256": "df34526e673189c1561d61d82089736344bb670f528ab649193f60954570c939"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/test/src/tests/with-on-complete.spec.ts",
+          "path": "packages/input-otp/upstream/apps/test/src/tests/with-on-complete.spec.ts",
           "role": "support",
           "sha256": "3b380592c0f0374ff423b9d346377e9e1cd285455c6f1985b03af68778233452"
         }
@@ -215,7 +220,7 @@
         {
           "path": "packages/input-otp/audit/type-probes/pristine.ts",
           "role": "test",
-          "sha256": "ded69286fbcf4d0e9bea9c1ad47499a26ae5ffb1605cd0d735ee4119eb1f5873",
+          "sha256": "4f8961cf10dd1ca233b94c3be6d73240084765a888943d64a3b3f4b01f9d5984",
           "cases": [
             {
               "id": "types:input-otp-pristine",

@@ -1,7 +1,7 @@
 const { createRequire } = require('node:module');
 const path = require('node:path');
 
-require('../upstream/tag/jest.setup.js');
+require('../upstream/jest.setup.js');
 
 const packageRequire = createRequire(path.resolve(__dirname, '../package.json'));
 const prettyFormat = packageRequire('pretty-format');

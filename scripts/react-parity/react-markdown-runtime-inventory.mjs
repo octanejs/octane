@@ -22,8 +22,8 @@ const lanes = [
 	{
 		project: 'node:test',
 		destination: 'packages/markdown/audit/pristine-runtime.json',
-		root: 'packages/markdown/upstream/source',
-		file: 'packages/markdown/upstream/source/test.jsx',
+		root: 'packages/markdown/upstream',
+		file: 'packages/markdown/upstream/test.jsx',
 		inventory: 'packages/markdown/audit/test-inventory.json',
 	},
 	{

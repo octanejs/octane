@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -81,14 +81,9 @@
           "sha256": "728a276a725b9c4e16dc715d2d1b488c4a325849e8ba4d70b84987d4e5de6ca2"
         },
         {
-          "path": "packages/tanstack-router-ssr-query/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "f4d0fa0b4c6db73fe47fdbd2013b0579844d83bcad44fd12ba8196fa46fbffd2"
-        },
-        {
           "path": "packages/tanstack-router-ssr-query/audit/upstream-crosswalk.json",
           "role": "support",
-          "sha256": "ed1ef2d23b27d2c2162ad7562cb37f8b2692c81b6888417722b4a53846556873"
+          "sha256": "02e7674c3252b1f91179a053688e2562667ebcf7ebce2c930bfc7cf281cbb95a"
         },
         {
           "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
@@ -96,14 +91,14 @@
           "sha256": "de7506c4ba1972116103810b8ca6ce6de17a3cf6483423a4d430fb7d37b3549f"
         },
         {
-          "path": "packages/tanstack-router-ssr-query/scripts/check-upstream-ledger.mjs",
-          "role": "support",
-          "sha256": "19b84780ef935e3972a52a973601d36d7e290a22d7f9e163d73d3a4180bea217"
-        },
-        {
           "path": "scripts/react-parity/tanstack-router-ssr-query-controls.test.mjs",
           "role": "support",
           "sha256": "1ecafe43b22388449651495a179491c9fd7361babfef803f78dbe93bce2ba07c"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "8b2667a6309a69c03506ddeb1b4594f49fc655a69e8dfda75fe7123314328322"
         }
       ]
     },
@@ -114,7 +109,7 @@
       "environment": "workspace-node",
       "project": "tanstack-router-ssr-query-pristine-types",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Invokes the vendored upstream tsconfig.build.json under typescript55–typescript60, matching upstream test:types accept/reject evidence (no dedicated expectType artifacts).",
+      "notes": "Invokes the vendored upstream tsconfig.build.json under typescript55\u2013typescript60, matching upstream test:types accept/reject evidence (no dedicated expectType artifacts).",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
@@ -126,11 +121,11 @@
           "packages/tanstack-router-ssr-query/node_modules/typescript59/lib/tsc.js",
           "packages/tanstack-router-ssr-query/node_modules/typescript60/lib/tsc.js"
         ],
-        "project": "packages/tanstack-router-ssr-query/upstream/package/tsconfig.build.json"
+        "project": "packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json"
       },
       "files": [
         {
-          "path": "packages/tanstack-router-ssr-query/upstream/package/src/index.tsx",
+          "path": "packages/tanstack-router-ssr-query/upstream/src/index.tsx",
           "role": "test",
           "sha256": "5cc143a009df65f9dcc1820a61ab0cb64519b33abf32dc3f71c513496fbc4a5a",
           "cases": [
@@ -167,16 +162,6 @@
           ]
         },
         {
-          "path": "packages/tanstack-router-ssr-query/upstream/package/tsconfig.build.json",
-          "role": "support",
-          "sha256": "a7b24536d0421b619917e5b92add24c561237b185e2592ba4b2d4d649b67d5e1"
-        },
-        {
-          "path": "packages/tanstack-router-ssr-query/upstream/package/tsconfig.json",
-          "role": "support",
-          "sha256": "303acc36428c434a274bde0b6258eba3413dac9147bf647672d7289c4884bdb9"
-        },
-        {
           "path": "packages/tanstack-router-ssr-query/tsconfig.json",
           "role": "support",
           "sha256": "54593830c286058e815a124ba3d0b2fe0c598879531786e055d7ddb54ac25aed"
@@ -185,6 +170,11 @@
           "path": "packages/tanstack-router-ssr-query/tsconfig.octane.json",
           "role": "support",
           "sha256": "0397e587688e9b4131084ce70c06d0ae6268682fb3cf674c331fcb81a358ce36"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "eba45ac24d71cfe94866c7f2e5c66986abcb49c7ae47362439439bbcf7539aca"
         }
       ]
     },

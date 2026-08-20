@@ -18,7 +18,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
-import { verifyVaulUpstream } from '../../packages/vaul/scripts/verify-upstream.mjs';
+import { verifyProvenanceManifest } from './provenance-manifest-lib.mjs';
 
 const repoRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const runnerPath = fileURLToPath(import.meta.url);
@@ -492,7 +492,7 @@ export async function main(args = process.argv.slice(2)) {
 	const reportPath = join(workRoot, 'playwright-report.json');
 	try {
 		if (config.mode === 'vaul-next') {
-			verifyVaulUpstream(join(repoRoot, 'packages/vaul'));
+			verifyProvenanceManifest(join(repoRoot, 'packages/vaul'));
 			copyDirectoryContents(suiteRoot, workRoot);
 		} else {
 			mkdirSync(join(workRoot, 'src'), { recursive: true });

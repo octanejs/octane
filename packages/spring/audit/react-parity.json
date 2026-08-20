@@ -8,7 +8,7 @@
     "sourceRoot": "packages/core/src",
     "testRoot": "packages/core/src",
     "license": "MIT",
-    "integrity": "sha256:10e6fb1c530efe9409d9f3184488bc7d57bcbae3c92ee97553859e4cd0eda993",
+    "integrity": "sha256:ee2f4d21417c3b3bf80edb7ac3fece4d6d28cf9927176cae0ab61c01e79d57a7",
     "verification": "verified"
   },
   "upstreamSuites": {
@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -65,7 +65,7 @@
         {
           "path": "packages/spring/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "4a8102fbd2977b6919fad5e2f8733f09c235cec8544f60f7298df129ff174ee6"
+          "sha256": "b429f77b7af9a54d2bfc4b8d05b36bd383478eb7e09c76b9e04049ec7a7cc2d4"
         },
         {
           "path": "packages/spring/tests/upstream-original.test.ts",
@@ -75,7 +75,7 @@
         {
           "path": "scripts/react-parity/react-spring-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "7ea2302caed866516e5e30a6f0804ff34b792ad202071d396d673c20bb994f1d"
+          "sha256": "79d76079a06699345c7f02de22aceb1b4f46b349afeae132970a67b638dad11c"
         },
         {
           "path": "packages/spring/tests/upstream-vitest.config.ts",
@@ -83,9 +83,9 @@
           "sha256": "fb5755ac97ed5842f8393b95df61ff6d8e9bee84bdcaf66bd9c771332445ef80"
         },
         {
-          "path": "packages/spring/upstream/SHA256SUMS",
+          "path": "packages/spring/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "10e6fb1c530efe9409d9f3184488bc7d57bcbae3c92ee97553859e4cd0eda993"
+          "sha256": "ee2f4d21417c3b3bf80edb7ac3fece4d6d28cf9927176cae0ab61c01e79d57a7"
         }
       ]
     },

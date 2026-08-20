@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@tiptap/react",
+    "version": "3.28.0",
+    "repository": {
+      "owner": "ueberdosis",
+      "repo": "tiptap",
+      "subdirectory": "packages/react"
+    },
+    "commit": "c5f4b576eb2d521364bba524616e0702027987d3",
+    "integrity": "sha512-BxzSAqaDEldQ97K/v6+GizU1/Dxx9VWkRh7PLQql6bXlAMiz6T1G3dGt25vvv1hQ1FoMt5ExWY5NkrPmR8G8ew=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "c96e5ecb55ac593157ad1d21d1f44a611187f494a0f04c235a1ae692c88d6ba9"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["package.json", "src"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "package.json",
+      "gitBlob": "ab83cdfcb5488b6cfb0e310780bff2d9fe8e635e",
+      "size": 1960
+    },
+    {
+      "path": "src/Context.tsx",
+      "gitBlob": "e0d24e6429f07c6ca98e6eb4b993e90035b9eafa",
+      "size": 1597
+    },
+    {
+      "path": "src/Editor.ts",
+      "gitBlob": "cd45f785ef448c9aea6f629d32e38adf71747ce7",
+      "size": 561
+    },
+    {
+      "path": "src/EditorContent.spec.ts",
+      "gitBlob": "fcc5a9e31c4161c1f4e3928436458f5ba0bccf46",
+      "size": 1200
+    },
+    {
+      "path": "src/EditorContent.tsx",
+      "gitBlob": "8ee8383030b14d7e4d1f980b50ff7a360d436f87",
+      "size": 5514
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "359cb90e6eec7ba22dec28f11abd1de8350b6dc5",
+      "size": 462
+    },
+    {
+      "path": "src/menus/BubbleMenu.spec.ts",
+      "gitBlob": "719a9ddc97fcc547cf5347a764d237f293fdcde9",
+      "size": 6076
+    },
+    {
+      "path": "src/menus/BubbleMenu.tsx",
+      "gitBlob": "4b61930be7dc4898948f1713bd466f49f36c4293",
+      "size": 4755
+    },
+    {
+      "path": "src/menus/FloatingMenu.spec.ts",
+      "gitBlob": "5580d1cb4c0d12046c4b1eb15cd0c927deee71a8",
+      "size": 5734
+    },
+    {
+      "path": "src/menus/FloatingMenu.tsx",
+      "gitBlob": "1b208e6b1fc07653a3a0d120380e868438df654a",
+      "size": 4849
+    },
+    {
+      "path": "src/menus/getAutoPluginKey.ts",
+      "gitBlob": "96601d493cf0f154c7b90eb41ca7216cb7fc73b9",
+      "size": 196
+    },
+    {
+      "path": "src/menus/index.ts",
+      "gitBlob": "557625b86b88c04b15f1401ecb78e59218ed348d",
+      "size": 80
+    },
+    {
+      "path": "src/menus/useMenuElementProps.ts",
+      "gitBlob": "e8464444f8cf699701b10977dc12a07573f970a4",
+      "size": 9353
+    },
+    {
+      "path": "src/NodeViewContent.tsx",
+      "gitBlob": "1d369927cfc7f8b0988eb2272ff666848b3783fe",
+      "size": 743
+    },
+    {
+      "path": "src/NodeViewWrapper.tsx",
+      "gitBlob": "c22c5eb1c6e4a175932e68639d9d7d430e7acfdc",
+      "size": 577
+    },
+    {
+      "path": "src/ReactMarkViewRenderer.tsx",
+      "gitBlob": "041af6a85cbb72f537d689b48523f686663bf1d4",
+      "size": 3327
+    },
+    {
+      "path": "src/ReactNodeViewRenderer.tsx",
+      "gitBlob": "462a4b23c95ecb771840480426443e9ab5dd46fc",
+      "size": 14482
+    },
+    {
+      "path": "src/ReactRenderer.tsx",
+      "gitBlob": "d5edbbe5554c7e38ad2fc33336b1daa827f03f6c",
+      "size": 7545
+    },
+    {
+      "path": "src/Tiptap.tsx",
+      "gitBlob": "cbe91fe9ed9b6a493b41f47697435d3b160df32a",
+      "size": 6807
+    },
+    {
+      "path": "src/types.ts",
+      "gitBlob": "b0f0dadbef388fefd7b39b0d1b0d11399eff5daf",
+      "size": 210
+    },
+    {
+      "path": "src/use-client.spec.ts",
+      "gitBlob": "e72a0bb3e154a610823be7d93de97813e3622946",
+      "size": 888
+    },
+    {
+      "path": "src/useEditor.ts",
+      "gitBlob": "2a13a54cf13ef81472f61b2762d4c5452ed60fe4",
+      "size": 12369
+    },
+    {
+      "path": "src/useEditorState.ts",
+      "gitBlob": "dc46475a689d959bcf2467761fe840d6f53bdedf",
+      "size": 5665
+    },
+    {
+      "path": "src/useReactNodeView.ts",
+      "gitBlob": "e9b7e464b34fd826d85dd0e3837019914db668ad",
+      "size": 994
+    }
+  ],
+  "fingerprint": "602d9eb164af5242fc1b39ef2f608e274877574b8b2cc8a16db2462a07945c6b"
+}

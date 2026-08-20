@@ -1,0 +1,286 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@tanstack/react-pacer",
+    "version": "0.22.1",
+    "repository": {
+      "owner": "TanStack",
+      "repo": "pacer",
+      "subdirectory": "packages/react-pacer"
+    },
+    "commit": "a894009100aeb373965d4121eb92a1af634af012",
+    "integrity": "sha512-CenQqK0GluSPIrnsG1yuD7w5uMSQ/4lI9AcGEFxBrRd66r260boWcYRIsS5+eHtXb238FoZYhKmJPGlhRzmHRw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "9fe9970f409e5b1d2067c0107ac0201761d5fddc53e9b20b66619fb0d2b4122f"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "8d05be0224809d142a3c74d27fd6c88707733ebb",
+      "size": 14737
+    },
+    {
+      "path": "eslint.config.js",
+      "gitBlob": "ec5db3c6ca1de79115ecb2233e284203b9a4a03e",
+      "size": 841
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "6a2df9e4c88c53487451e0aa1cae8bb01cbc42a1",
+      "size": 3431
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "f8717eefe28c37ba1ca70ee33fcfae48f342f999",
+      "size": 8168
+    },
+    {
+      "path": "src/async-batcher/index.ts",
+      "gitBlob": "71e04b3cf91f82f795f94a3bea9d3bd091668e45",
+      "size": 123
+    },
+    {
+      "path": "src/async-batcher/useAsyncBatchedCallback.ts",
+      "gitBlob": "b037592180d0475ed3bd835f775f1ed0e7cbb6c0",
+      "size": 1972
+    },
+    {
+      "path": "src/async-batcher/useAsyncBatcher.ts",
+      "gitBlob": "a2c55a0e1d4f155869d8158fe8eae2dd261cda58",
+      "size": 11623
+    },
+    {
+      "path": "src/async-debouncer/index.ts",
+      "gitBlob": "ac389c8470f58882ed337be6af4f7c04e748518c",
+      "size": 223
+    },
+    {
+      "path": "src/async-debouncer/useAsyncDebouncedCallback.ts",
+      "gitBlob": "d919357a766933fa01ed1d84a908a0b08ee7a022",
+      "size": 2001
+    },
+    {
+      "path": "src/async-debouncer/useAsyncDebouncer.ts",
+      "gitBlob": "c293bfa8cb6bd5571ad2c83bc54bdf46796a47c7",
+      "size": 11150
+    },
+    {
+      "path": "src/async-queuer/index.ts",
+      "gitBlob": "aed55d4981679647d955451c50a520940e5d29bc",
+      "size": 117
+    },
+    {
+      "path": "src/async-queuer/useAsyncQueuedState.ts",
+      "gitBlob": "8904a7d3727e9631dc1aa500b8fd1229a50d0303",
+      "size": 6090
+    },
+    {
+      "path": "src/async-queuer/useAsyncQueuer.ts",
+      "gitBlob": "6d355f3116ba26e8a68fd93ed571786705bed3ce",
+      "size": 11303
+    },
+    {
+      "path": "src/async-rate-limiter/index.ts",
+      "gitBlob": "14a0cc7e70d66358d7dba4c142a796c9088f3c78",
+      "size": 233
+    },
+    {
+      "path": "src/async-rate-limiter/useAsyncRateLimitedCallback.ts",
+      "gitBlob": "49c8d794fdd56949b807aa8e986184467296bd4d",
+      "size": 3032
+    },
+    {
+      "path": "src/async-rate-limiter/useAsyncRateLimiter.ts",
+      "gitBlob": "09ca5e8d2c758bbb3eace6414af43db228ce1f43",
+      "size": 12047
+    },
+    {
+      "path": "src/async-retryer/index.ts",
+      "gitBlob": "371a59aa0af8aaaa949069b30670298a985fe6cd",
+      "size": 138
+    },
+    {
+      "path": "src/async-throttler/index.ts",
+      "gitBlob": "f557de642a52cfc95ea42f91d1cc397db50b7eca",
+      "size": 223
+    },
+    {
+      "path": "src/async-throttler/useAsyncThrottledCallback.ts",
+      "gitBlob": "d1a8bdd7085a052cf1c828b40b0d49a3211a450e",
+      "size": 2069
+    },
+    {
+      "path": "src/async-throttler/useAsyncThrottler.ts",
+      "gitBlob": "9e93f4e6191d302e8788c2587eb31328d1780651",
+      "size": 11412
+    },
+    {
+      "path": "src/batcher/index.ts",
+      "gitBlob": "f1c8ba98ff5df569cb6b7c0604db546f9fe3c550",
+      "size": 107
+    },
+    {
+      "path": "src/batcher/useBatchedCallback.ts",
+      "gitBlob": "b457fc53f8fe23adf06f5faad851f070264609de",
+      "size": 1652
+    },
+    {
+      "path": "src/batcher/useBatcher.ts",
+      "gitBlob": "a90a7fd8d2c89540a4454785f7393a66365e0904",
+      "size": 8944
+    },
+    {
+      "path": "src/debouncer/index.ts",
+      "gitBlob": "2c872d758701332f4bb4fe1655cb857bf1902695",
+      "size": 273
+    },
+    {
+      "path": "src/debouncer/useDebouncedCallback.ts",
+      "gitBlob": "29cc0ad06388b3ec0d2d825d2749fd46e0a39748",
+      "size": 1696
+    },
+    {
+      "path": "src/debouncer/useDebouncedState.ts",
+      "gitBlob": "3dd64d1f45a2b2e2399f26695181f8f1ec9cdcb1",
+      "size": 4073
+    },
+    {
+      "path": "src/debouncer/useDebouncedValue.ts",
+      "gitBlob": "a4c3df18bf35e957e03eda734189085a48520bfa",
+      "size": 4429
+    },
+    {
+      "path": "src/debouncer/useDebouncer.ts",
+      "gitBlob": "477dac16c3890359cce132ba71e25bc8cda05b1b",
+      "size": 8311
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "7ab02da1c9011e2a733707517f6929abe71a46a7",
+      "size": 1690
+    },
+    {
+      "path": "src/provider/index.ts",
+      "gitBlob": "5f4fe3858f1b23b5798d4a3be268aa30b245368c",
+      "size": 32
+    },
+    {
+      "path": "src/provider/PacerProvider.tsx",
+      "gitBlob": "38ded3a9f10b456477bff4469f22059ffa84104f",
+      "size": 2017
+    },
+    {
+      "path": "src/queuer/index.ts",
+      "gitBlob": "6809bb174032ef5917e98639104f9e590b49eb91",
+      "size": 134
+    },
+    {
+      "path": "src/queuer/useQueuedState.ts",
+      "gitBlob": "89e63c7125270ead1d3335805931cdafc1cc7bea",
+      "size": 5103
+    },
+    {
+      "path": "src/queuer/useQueuedValue.ts",
+      "gitBlob": "7cc7302222b4d92e77290fc7d7e3d0396b108a06",
+      "size": 4762
+    },
+    {
+      "path": "src/queuer/useQueuer.ts",
+      "gitBlob": "6fed633cbe23a7ee873eaccfd5d2aaeeff0b3f90",
+      "size": 9635
+    },
+    {
+      "path": "src/rate-limiter/index.ts",
+      "gitBlob": "a7ab0ab68d07d97e4b25b0c9e7b215be335f59ea",
+      "size": 196
+    },
+    {
+      "path": "src/rate-limiter/useRateLimitedCallback.ts",
+      "gitBlob": "8d80e37283f3f281e89ea3554cae7488efda258e",
+      "size": 2848
+    },
+    {
+      "path": "src/rate-limiter/useRateLimitedState.ts",
+      "gitBlob": "f518ad6997805c60eb5825898ce1ee277c068273",
+      "size": 5331
+    },
+    {
+      "path": "src/rate-limiter/useRateLimitedValue.ts",
+      "gitBlob": "723e8362544abeb521c3fd9b207c0352552a0601",
+      "size": 5114
+    },
+    {
+      "path": "src/rate-limiter/useRateLimiter.ts",
+      "gitBlob": "77ebcd9e858d7e61297e64bb2e3f54f8a9c2998c",
+      "size": 9369
+    },
+    {
+      "path": "src/throttler/index.ts",
+      "gitBlob": "aecd2eeebb19c737674b61a923a9771f28bed96b",
+      "size": 273
+    },
+    {
+      "path": "src/throttler/useThrottledCallback.ts",
+      "gitBlob": "4f10190ae98d2bac76bbe9adf5e9a0acf13ce761",
+      "size": 1880
+    },
+    {
+      "path": "src/throttler/useThrottledState.ts",
+      "gitBlob": "a7e4dd0154926949ff6c06d24e292ae5666b0a77",
+      "size": 4472
+    },
+    {
+      "path": "src/throttler/useThrottledValue.ts",
+      "gitBlob": "e68dee1bb2dc058380908993267bb02050328ebd",
+      "size": 4375
+    },
+    {
+      "path": "src/throttler/useThrottler.ts",
+      "gitBlob": "a9711b43d6930d1cbe8f4d1681ec7d5ed08bdcbb",
+      "size": 8453
+    },
+    {
+      "path": "src/types/index.ts",
+      "gitBlob": "bc0ca24c9a7862484624449836f52096157babc5",
+      "size": 38
+    },
+    {
+      "path": "src/utils/index.ts",
+      "gitBlob": "c5c19a2af7415c079d3ed4c9c4926274bb89989f",
+      "size": 38
+    },
+    {
+      "path": "tsconfig.docs.json",
+      "gitBlob": "20ccb038c65123a48e6c4a3ca2b034073a1b4a28",
+      "size": 148
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "98bb38dfe84397d9d9b315cdd15050379c19a656",
+      "size": 172
+    },
+    {
+      "path": "tsdown.config.ts",
+      "gitBlob": "39c90fab53497ff1b8f89b9da2dfe8ac4a1016cf",
+      "size": 828
+    },
+    {
+      "path": "vitest.config.ts",
+      "gitBlob": "ffea6da67f6abf82fe3c944c62c0961e41b449fe",
+      "size": 381
+    }
+  ],
+  "fingerprint": "3b6aebce826b6ebbcfebdf36f63823b15496347bc0cae070eff1aaec09a9b74a"
+}

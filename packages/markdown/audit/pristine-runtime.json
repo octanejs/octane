@@ -1,440 +1,440 @@
 {
   "schemaVersion": 1,
-  "root": "packages/markdown/upstream/source",
+  "root": "packages/markdown/upstream",
   "snapshots": 0,
   "tests": [
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should allow an empty URL",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should expose the public api",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should fail for both `allowedElements` and `disallowedElements`",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should fail on an invalid component",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should make a `VBSCRIPT:` URL safe",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should make a `file:` URL safe",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should make a `javascript:` URL safe",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should make a `vbscript:` URL safe",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should not fail on a plugin replacing `root`",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should pass `node` to components",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support SVG elements",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `MarkdownAsync` (1)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `MarkdownAsync` (2)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `MarkdownHooks`",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `allowedElements` (drop unlisted nodes)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `allowedElements` as a function",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `components`",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `components` (code)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `components` (headings)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `components` (li)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `components` (ol)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `components` (td, th)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `components` (tr)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `components` (ul)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `components` as functions",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `disallowedElements`",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `fallback`",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `null` as children",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `remarkRehypeOptions`",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `skipHtml`",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `style` properties",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `style` properties w/ vendor prefixes",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `undefined` as children",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `unwrapDisallowed` w/ `allowedElements`",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `unwrapDisallowed` w/ `disallowedElements`",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `urlTransform` (`href` on `a`)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `urlTransform` (`src` on `img`)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support `urlTransform` w/ empty URLs",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a URL w/ uppercase protocol",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a block quote",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a break",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a code (block, flow; fenced)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a code (block, flow; indented)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a delete (GFM)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a footnote (GFM)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a heading",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a link",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a link reference / definition",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a link w/ a title",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a list (ordered) / list item",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a list (unordered) / list item",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a paragraph",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a strong",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a table (GFM)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a table (GFM; w/ align)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support a thematic break",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support ab absolute path",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support an absolute URL",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support an emphasis",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support an html (default)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support an html (w/ `rehype-raw`)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support an image",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support an image reference / definition",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support an image w/ a title",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support aria properties",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support async plugins w/ `MarkdownAsync` (`rehype-starry-night`)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support async plugins w/ `MarkdownHooks` (`rehype-starry-night`)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support broken `style` properties",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support code (text, inline)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support comma separated properties",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support comments (ignore them)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support data properties",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support duplicate definitions",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support hash (`#`) in a URL",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support hash (`&`) in a URL",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support plugins (`remark-gfm`)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support plugins (`remark-toc`)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support plugins that error",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support prototype poluting identifiers",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support rerenders",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support search (`?`) in a URL",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should support table cells w/ style",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should throw w/ `source`",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should throw w/ non-string children (boolean)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should throw w/ non-string children (number)",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should warn w/ `allowDangerousHtml`",
       "status": "passed"
     },
     {
-      "file": "packages/markdown/upstream/source/test.jsx",
+      "file": "packages/markdown/upstream/test.jsx",
       "fullName": "should work",
       "status": "passed"
     }

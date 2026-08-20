@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -58,6 +58,11 @@
       },
       "files": [
         {
+          "path": "packages/draggable/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "5d141f21f011a00ad92b8d3fae5f854c6df79217324972b370102840b08b99b2"
+        },
+        {
           "path": "packages/draggable/audit/pristine-wrapper-runtime.json",
           "role": "support",
           "sha256": "0dd1fa1abb040148492d34f1f214372c44f9ac2a538b545d5a1e8a95bb042942"
@@ -65,7 +70,7 @@
         {
           "path": "packages/draggable/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "761d429492b8e33e92c245fdef6016f9adefdea4279080922c85ed59f5e5bfc7"
+          "sha256": "58519378a4b3562c0ce7ca07889853d310a21bf17389a1b5d95d5d0eb3ad090f"
         },
         {
           "path": "packages/draggable/tests/upstream-original.test.ts",
@@ -75,17 +80,17 @@
         {
           "path": "scripts/react-parity/react-draggable-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "37fa9c3dd78a12b8e8a6675049e3bf93d44363977bae8819b9d3b89779f46c61"
+          "sha256": "a36536560b0c819d6ef781737e330a64a3e2d7c502f9aa2ff835a63fb21e51a9"
         },
         {
-          "path": "packages/draggable/scripts/run-pristine-upstream.mjs",
+          "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "083fb2a55387ae9aae5b045632952c242d8ef2f4b9d5701d3c76f52a8d664808"
+          "sha256": "05b588ad14562a780437a1e023f6c24ceed437e61a5a77ba27197feb898823a0"
         },
         {
           "path": "packages/draggable/tests/upstream-vitest.config.ts",
           "role": "support",
-          "sha256": "022304ee466c5dfa8f98fad80b582aa1ba955f90a35fc4dfe01158cb690ea629"
+          "sha256": "b71c5ffa912e13c8a8e3a0e29f139a557fdedf32c80f3dc657157cd5243c2058"
         }
       ]
     },
@@ -126,7 +131,7 @@
         {
           "path": "packages/draggable/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "04d1b5ff837710dbcc6d22c70a897e0d2d7348cbaf76c87a0bd5394f420945ef",
+          "sha256": "1a38f4c82dc7f6dfa4f02aff3f551198641405dc199f37b6e8391d804c597566",
           "cases": [
             {
               "id": "differential:react-draggable-basic",
@@ -306,10 +311,10 @@
         {
           "path": "packages/draggable/typetests/tsconfig.pristine.json",
           "role": "support",
-          "sha256": "995ccbe831cc476adb53ad8424c76ebcd09820030b7a6759acf16cb8c9f6d360"
+          "sha256": "6c4414b6baa361f3077c09a8a4f852da0c3efa11bfe9479e0ad66dd2c710af69"
         },
         {
-          "path": "packages/draggable/upstream/tag/typings/test.tsx",
+          "path": "packages/draggable/upstream/typings/test.tsx",
           "role": "test",
           "sha256": "7245c84c62b0ae2e5f3d3e2f698d46cabcf79446962fc601fe874b15d684cd77",
           "cases": [
@@ -321,7 +326,7 @@
           ]
         },
         {
-          "path": "packages/draggable/upstream/tag/test/typeCompat/fixture.tsx",
+          "path": "packages/draggable/upstream/test/typeCompat/fixture.tsx",
           "role": "test",
           "sha256": "5d14243c7ed69b5e5c83071facab535a7722c886ae446cf9e6dda2ce6617cbc4",
           "cases": [

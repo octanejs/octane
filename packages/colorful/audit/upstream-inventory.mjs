@@ -126,11 +126,22 @@ export function caseStructuralDigest(source, title) {
 }
 
 export async function buildInventory(root = packageRoot) {
+	// The tag tree lives at upstream/ (lock-verified against upstream git blob
+	// shas) and the unpacked npm artifact at upstream-artifact/; the inventory
+	// keeps the historical tag/ and npm/ identity prefixes.
 	const upstreamRoot = join(root, 'upstream');
-	const artifactPaths = await filesUnder(upstreamRoot);
+	const artifactRoot = join(root, 'upstream-artifact');
+	const artifactAbsolute = (path) =>
+		path.startsWith('npm/')
+			? join(artifactRoot, path.slice('npm/'.length))
+			: join(upstreamRoot, path.slice('tag/'.length));
+	const artifactPaths = [
+		...(await filesUnder(upstreamRoot)).map((path) => `tag/${path}`),
+		...(await filesUnder(artifactRoot)).map((path) => `npm/${path}`),
+	].sort();
 	const artifacts = await Promise.all(
 		artifactPaths.map(async function artifactOf(path) {
-			const bytes = await readFile(join(upstreamRoot, path));
+			const bytes = await readFile(artifactAbsolute(path));
 			return { path, bytes: bytes.length, sha256: sha256(bytes) };
 		}),
 	);
@@ -139,7 +150,7 @@ export async function buildInventory(root = packageRoot) {
 	});
 	const cases = [];
 	for (const file of upstreamTestFiles) {
-		const source = await readFile(join(upstreamRoot, file), 'utf8');
+		const source = await readFile(artifactAbsolute(file), 'utf8');
 		for (const entry of staticCases(source, true)) {
 			cases.push({ id: `${file}::${entry.name}`, file, line: entry.line, name: entry.name });
 		}
@@ -267,9 +278,23 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 		await writeFile(inventoryPath, `${JSON.stringify(inventory, null, 2)}\n`);
 		console.log(`wrote ${relative(packageRoot, inventoryPath)}`);
 	} else {
+		// The committed upstream/ tree also verifies against the lock's
+		// upstream git blob shas.
+		const { execFileSync } = await import('node:child_process');
+		execFileSync(
+			process.execPath,
+			[
+				join(packageRoot, '../../scripts/react-port/materialize.mjs'),
+				'run',
+				'--check',
+				'--package-dir',
+				packageRoot,
+			],
+			{ cwd: join(packageRoot, '../..'), stdio: 'pipe' },
+		);
 		await validate();
 		console.log(
-			`verified ${inventory.artifacts.length} artifacts and ${inventory.upstreamCases.length} upstream cases`,
+			`verified the lock-pinned upstream tree, ${inventory.artifacts.length} artifacts, and ${inventory.upstreamCases.length} upstream cases`,
 		);
 	}
 }

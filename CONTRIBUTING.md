@@ -95,7 +95,7 @@ end-to-end evidence.
 
 An `@octanejs/*` binding is a port of one pinned upstream release, not a
 lookalike written from the upstream README. Before adding or extending one, read
-[`.rulesync/skills/react-library-port/SKILL.md`](./.rulesync/skills/react-library-port/SKILL.md).
+[`.rulesync/skills/octane-react-library-port/SKILL.md`](./.rulesync/skills/octane-react-library-port/SKILL.md).
 The short version:
 
 - Pin an immutable upstream release and record it in `packages/<name>/UPSTREAM.md`

@@ -9,11 +9,9 @@ async function fixture() {
 	const root = await mkdtemp(join(tmpdir(), 'popper-types-'));
 	const upstreamRoot = join(root, 'upstream');
 	const adaptedRoot = join(root, 'adapted');
-	await cp(
-		new URL('../../packages/popper/upstream/tag/typings/tests', import.meta.url),
-		upstreamRoot,
-		{ recursive: true },
-	);
+	await cp(new URL('../../packages/popper/upstream/typings/tests', import.meta.url), upstreamRoot, {
+		recursive: true,
+	});
 	await cp(new URL('../../packages/popper/typetests', import.meta.url), adaptedRoot, {
 		recursive: true,
 	});

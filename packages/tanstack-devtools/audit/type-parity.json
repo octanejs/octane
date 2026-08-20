@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "upstreamRoot": "packages/tanstack-devtools/upstream/package/src",
+  "upstreamRoot": "packages/tanstack-devtools/upstream/src",
   "adaptedRoot": "packages/tanstack-devtools/src",
   "fileMap": [
     {

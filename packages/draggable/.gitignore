@@ -1,1 +1,3 @@
 .pristine-upstream-*/
+# Pristine Vitest cache; never committed.
+/.vite-pristine/

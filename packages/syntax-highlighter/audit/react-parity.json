@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -72,7 +72,12 @@
         {
           "path": "packages/syntax-highlighter/audit/upstream-files.json",
           "role": "support",
-          "sha256": "18f737cf2b465b01db238757e27460e0f34950dcff0368edf8a7994d6356c4b4"
+          "sha256": "b8baa82681de09634af6c1943ac370574b2acf12f6193c2933e5f6bd504f5148"
+        },
+        {
+          "path": "packages/syntax-highlighter/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "aa91426fa8d218c5eac8e44b974ceff9fdb403076b2b29ba094e19223bc52b6b"
         }
       ]
     },
@@ -107,7 +112,7 @@
         {
           "path": "packages/syntax-highlighter/scripts/generate-parity-audit.mjs",
           "role": "support",
-          "sha256": "7532517f76447db09e06026a1ee86213bd93d75ab063539f38167fb8916d4c5a"
+          "sha256": "b34848fb0a139ba1a808b344ee17cef2538578e7a78bcda0a1c1c1e72406f0ad"
         },
         {
           "path": "packages/syntax-highlighter/tests/adapted/__snapshots__/code-style-passed-to-line-numbers.test.ts.snap",

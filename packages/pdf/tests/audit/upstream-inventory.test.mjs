@@ -15,7 +15,7 @@ function clone(value) {
 test('the pinned React PDF authorities and case crosswalk validate', async () => {
 	const inventory = await buildInventory();
 	compareInventories(inventory, clone(inventory));
-	assert.equal(inventory.artifacts.length, 157);
+	assert.equal(inventory.artifacts.length, 94);
 	assert.equal(inventory.upstreamCases.length, 182);
 	assert.equal(
 		inventory.crosswalk.filter(function isPending(entry) {

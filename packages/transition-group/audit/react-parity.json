@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -84,11 +84,6 @@
           "sha256": "63f09b01eda9a9894dd44e053b534f67fe910f7b2314f5f06d7f64e1b5251a38"
         },
         {
-          "path": "packages/transition-group/audit/SHA256SUMS",
-          "role": "support",
-          "sha256": "3d7afd4e95d7ac4fdbbc105c1775556da892de229363736659957ed3c3de40de"
-        },
-        {
           "path": "packages/transition-group/tests/upstream-jest.config.cjs",
           "role": "support",
           "sha256": "db3bb1cb5e8b88aa37b2468bc300be323b28431062f00212f40bb6828a010d30"
@@ -121,7 +116,7 @@
         {
           "path": "scripts/react-parity/react-transition-group-upstream-lib.mjs",
           "role": "support",
-          "sha256": "baf121b3d341ce1b2689261393115cd95c0b09ff344f8ba016cb3f158e436612"
+          "sha256": "a759cf290881820ed5da4de3311587ef4315dde65f700a6195811f68ffbc0a72"
         },
         {
           "path": "scripts/react-parity/react-transition-group-upstream.mjs",
@@ -131,7 +126,7 @@
         {
           "path": "scripts/react-parity/react-transition-group-upstream-lib.test.mjs",
           "role": "support",
-          "sha256": "ff5ac86500475b922f1450e5cafcb6f80aa99a8bfd46b0ddace64fa343c702ec"
+          "sha256": "7238339608539d7cfcae7d5479b33c253a49b43241bb8097a3b9d72d5c1f7982"
         },
         {
           "path": "scripts/react-parity/react-transition-group-timer-order.test.mjs",
@@ -152,6 +147,11 @@
           "path": "packages/transition-group/audit/adapted-case-contracts.json",
           "role": "support",
           "sha256": "aed00ae890e8be96c0800a598df2a0d212c32e917c1e44aad6565b715f5d3c16"
+        },
+        {
+          "path": "packages/transition-group/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "bd3fb092a4f5c9ea3fd96aceda739f737dd5a91b2696438b1428e9e467e42897"
         }
       ]
     },

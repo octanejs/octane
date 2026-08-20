@@ -35,7 +35,8 @@
     "src",
     "README.md",
     "UPSTREAM.md",
-    "LICENSE"
+    "LICENSE",
+    "LICENSE.upstream"
   ],
   "scripts": {
     "test": "pnpm upstream:verify && pnpm test:u2-parity && pnpm test:u3-parity && pnpm test:u4-parity && pnpm test:u5-parity && pnpm test:adoption && pnpm test:packed",

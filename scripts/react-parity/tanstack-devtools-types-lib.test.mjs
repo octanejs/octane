@@ -11,8 +11,8 @@ async function fixture() {
 	await mkdir(join(root, 'packages/tanstack-devtools/typetests/pristine'), { recursive: true });
 	await mkdir(join(root, 'packages/tanstack-devtools/typetests/adapted'), { recursive: true });
 	await cp(
-		new URL('../../packages/tanstack-devtools/upstream/package/src', import.meta.url),
-		join(root, 'packages/tanstack-devtools/upstream/package/src'),
+		new URL('../../packages/tanstack-devtools/upstream/src', import.meta.url),
+		join(root, 'packages/tanstack-devtools/upstream/src'),
 		{ recursive: true },
 	);
 	await cp(

@@ -3,11 +3,11 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 
 import { extractTestCases } from './inventory-lib.mjs';
+import { verifyMaterializedUpstreamEvidence } from './materialized-upstream-lib.mjs';
 
 const PACKAGE_ROOT = 'packages/transition-group';
 const UPSTREAM_ROOT = `${PACKAGE_ROOT}/upstream`;
 const UPSTREAM_TEST_ROOT = `${UPSTREAM_ROOT}/test`;
-const INVENTORY_PATH = `${PACKAGE_ROOT}/audit/SHA256SUMS`;
 const ADAPTED_EVIDENCE_INVENTORY_PATH = `${PACKAGE_ROOT}/audit/adapted-evidence.SHA256SUMS`;
 const CASE_CONTRACTS_PATH = `${PACKAGE_ROOT}/audit/adapted-case-contracts.json`;
 const DISPOSITION_PATH = `${PACKAGE_ROOT}/audit/upstream-test-dispositions.json`;
@@ -676,16 +676,6 @@ function citationForCase(source, caseLine) {
 	return null;
 }
 
-export function renderReactTransitionGroupUpstreamInventory(repoRoot) {
-	const upstreamRoot = resolve(repoRoot, UPSTREAM_ROOT);
-	return `${filesBelow(upstreamRoot)
-		.map(function lineFor(file) {
-			const digest = createHash('sha256').update(readFileSync(file)).digest('hex');
-			return `${digest}  upstream/${portableRelative(upstreamRoot, file)}`;
-		})
-		.join('\n')}\n`;
-}
-
 function listAdaptedEvidenceFiles(repoRoot) {
 	const files = [];
 	for (const root of ADAPTED_EVIDENCE_ROOTS) {
@@ -952,11 +942,10 @@ function verifyCaseCrosswalk(repoRoot, upstreamCases) {
 }
 
 export function verifyReactTransitionGroupUpstream(repoRoot) {
-	const expectedInventory = readFileSync(resolve(repoRoot, INVENTORY_PATH), 'utf8');
-	const actualInventory = renderReactTransitionGroupUpstreamInventory(repoRoot);
-	if (actualInventory !== expectedInventory) {
-		throw new Error('react-transition-group upstream inventory drifted; re-vendor the pinned tag');
-	}
+	// Vendored byte integrity is owned by audit/upstream.lock.json (upstream
+	// git blob shas at the pinned commit); this verifier owns the semantic
+	// disposition, crosswalk, and adapted-evidence layers.
+	verifyMaterializedUpstreamEvidence(repoRoot, 'packages/transition-group');
 
 	const dispositions = JSON.parse(readFileSync(resolve(repoRoot, DISPOSITION_PATH), 'utf8'));
 	if (dispositions.schemaVersion !== 1 || !Array.isArray(dispositions.artifacts)) {

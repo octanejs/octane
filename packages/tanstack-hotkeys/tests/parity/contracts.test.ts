@@ -23,7 +23,13 @@ describe('@octanejs/tanstack-hotkeys parity audit contracts', () => {
 		expect(() =>
 			execFileSync(
 				process.execPath,
-				['packages/tanstack-hotkeys/scripts/check-upstream-ledger.mjs'],
+				[
+					'scripts/react-port/materialize.mjs',
+					'run',
+					'--check',
+					'--package-dir',
+					'packages/tanstack-hotkeys',
+				],
 				{ cwd: root, stdio: 'pipe' },
 			),
 		).not.toThrow();

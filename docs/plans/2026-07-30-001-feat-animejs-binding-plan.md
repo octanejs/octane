@@ -172,7 +172,7 @@ flowchart TB
 
 ### Implementation Constraints
 
-- Read `AGENTS.md`, `.claude/skills/react-library-port/SKILL.md`, `.agents/memories/testing.md`, and `.agents/memories/tsrx-authoring.md` before implementation.
+- Read `AGENTS.md`, `.claude/skills/octane-react-library-port/SKILL.md`, `.agents/memories/testing.md`, and `.agents/memories/tsrx-authoring.md` before implementation.
 - Do not edit generated package, binding-status, CLI, MCP, or website artifacts directly when an owning generator exists.
 - Keep `animejs@4.5.0` exact in the catalog for reproducible surface and adapter behavior, and mark the adapter export as side-effectful.
 - Use manual hook-slot forwarding for plain TypeScript hook source according to the existing `packages/motion` and `packages/usehooks-ts` patterns.
@@ -206,7 +206,7 @@ flowchart TB
 
 ### Sources and Research
 
-- `AGENTS.md` and `.claude/skills/react-library-port/SKILL.md` — binding-port and root-cause rules.
+- `AGENTS.md` and `.claude/skills/octane-react-library-port/SKILL.md` — binding-port and root-cause rules.
 - `.agents/memories/testing.md` — behavioral observation boundaries.
 - `docs/react-library-compat-plan.md` — framework-neutral core reuse, divergence classification, and test methodology.
 - `packages/motion/src/useAnimate.ts` and `packages/motion/tests/conformance/useAnimate.test.ts` — closest scoped-animation hook and cleanup precedent.

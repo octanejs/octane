@@ -8,7 +8,7 @@
 - Annotated tag object: `37b0c4183802fd249d3a05f6da4bcb2b06c14f20`
 - Commit: `f934b60720fc828a61e04b00988eeefb83d273bc`
 - npm tarball SHA-256: `d2f17af8384c1f572cb3133153fe292546f4bb2768afcf30cc02091990ee057f`
-- Selected vendored evidence tree (`packages/apollo-client/upstream/SHA256SUMS`): `042025ab55bc5221b761cadd9d264c9d519390bffa6cd3f4f5b451a43b0a6649`
+- Selected vendored evidence tree: pinned by `audit/upstream.lock.json`, which records each committed `upstream/` file's upstream git blob sha; `pnpm react-port:materialize run --check --package-dir packages/apollo-client` verifies the copy offline against the pinned commit. The upstream MIT license is retained byte-exact as `LICENSE.upstream`, hash-matched to the lock.
 - License: MIT
 - React oracle: workspace React 19.2.7
 

@@ -7,9 +7,15 @@
 - Source commit: `ed1894cd8611d99fbea1c47adcf6ee522b1030fd`
 - License: MIT, copyright 2013 Andrey Popp
 - React oracle: `react@19.2.7`, `react-dom@19.2.7`, `@types/react@19.2.17`, and `@types/react-dom@19.2.3` via catalog `react-textarea-autosize-react-oracle` (exact pins; not `catalog:default`)
-- Published declarations oracle: `upstream/dist/declarations/src/index.d.ts` (sha256 `4b44a78900c844368d8f27ce485bb55bd17ba164cb31e3b8bbc64c6800da506c`), extracted byte-exact from the pinned npm tarball for the pristine type lane
+- Published declarations oracle: `upstream-artifact/dist/declarations/src/index.d.ts` (sha256 `4b44a78900c844368d8f27ce485bb55bd17ba164cb31e3b8bbc64c6800da506c`), extracted byte-exact from the pinned npm tarball for the pristine type lane
 
-The npm artifact supplies the published distribution and package-condition boundary. The exact repository commit supplies the source and two upstream Jest artifacts absent from the tarball. `upstream/` is byte-exact development evidence and is excluded from publication.
+The npm artifact supplies the published distribution and package-condition boundary; its
+byte-pinned evidence (tarball and artifact declarations) lives under `upstream-artifact/`. The exact repository commit supplies the source and two upstream Jest
+artifacts absent from the tarball, vendored under `upstream/` and pinned by
+`audit/upstream.lock.json`: each committed file verifies offline against its upstream git blob
+sha (`pnpm react-port:materialize run --check --package-dir packages/textarea-autosize`). The
+upstream MIT license is retained byte-exact as `LICENSE.upstream`, hash-matched to the lock.
+Both evidence trees are excluded from publication.
 
 ## Public surface crosswalk
 

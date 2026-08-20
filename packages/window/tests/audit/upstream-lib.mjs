@@ -1,8 +1,13 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
+import { fileURLToPath } from 'node:url';
+
 import { extractTestCases } from '../../../../scripts/react-parity/inventory-lib.mjs';
+
+const repoRoot = resolve(fileURLToPath(new URL('../../../..', import.meta.url)));
 
 function fail(message) {
 	throw new Error(`react-window upstream verification failed: ${message}`);
@@ -30,19 +35,6 @@ function sameValues(actual, expected, label) {
 		fail(`${label} differ: expected ${expectedJson}, received ${actualJson}`);
 }
 
-function parseChecksums(source) {
-	return new Map(
-		source
-			.trim()
-			.split('\n')
-			.map((line) => {
-				const match = /^([a-f0-9]{64})  (.+)$/.exec(line);
-				if (!match) fail(`invalid SHA256SUMS entry: ${line}`);
-				return [match[2], match[1]];
-			}),
-	);
-}
-
 function parseExports(source) {
 	const runtime = [];
 	const types = [];
@@ -59,20 +51,39 @@ function parseExports(source) {
 	return { runtime, types };
 }
 
-export function verifyUpstream(packageRoot) {
+export function verifyUpstream(packageRoot, { lock = true } = {}) {
 	const root = resolve(packageRoot);
 	const upstream = join(root, 'upstream');
 	const contract = JSON.parse(readFileSync(join(root, 'audit/upstream-contract.json'), 'utf8'));
-	const checksums = parseChecksums(readFileSync(join(upstream, 'SHA256SUMS'), 'utf8'));
-	const files = walk(upstream)
-		.map((path) => relative(upstream, path))
-		.filter((path) => path !== 'SHA256SUMS');
 
-	sameValues(files, checksums.keys(), 'vendored file inventories');
-	for (const [path, expected] of checksums) {
-		const actual = sha256(readFileSync(join(upstream, path)));
-		if (actual !== expected)
-			fail(`${path} checksum differs: expected ${expected}, received ${actual}`);
+	// The committed upstream/ tree verifies offline against the upstream git
+	// blob shas in audit/upstream.lock.json. The contract checks below stay
+	// independent so semantic drift fails closed even without the lock layer
+	// (the negative-control suite exercises them with { lock: false }).
+	if (lock) {
+		try {
+			execFileSync(
+				process.execPath,
+				[
+					join(repoRoot, 'scripts/react-port/materialize.mjs'),
+					'run',
+					'--check',
+					'--package-dir',
+					root,
+				],
+				{ cwd: repoRoot, stdio: 'pipe' },
+			);
+		} catch (error) {
+			fail(`lock verification failed: ${error.stdout?.toString() ?? error.message}`);
+		}
+	}
+	const files = walk(upstream).map((path) => path.slice(upstream.length + 1));
+
+	// The published npm declaration bundle stays hash-pinned by the contract.
+	for (const artifact of contract.artifactFiles) {
+		const actual = sha256(readFileSync(join(root, artifact.path)));
+		if (actual !== artifact.sha256)
+			fail(`${artifact.path} checksum differs: expected ${artifact.sha256}, received ${actual}`);
 	}
 
 	const metadata = JSON.parse(readFileSync(join(upstream, 'package.json'), 'utf8'));

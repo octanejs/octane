@@ -1211,6 +1211,9 @@ importers:
       rulesync:
         specifier: catalog:default
         version: 8.32.0(supports-color@10.2.2)(valibot@1.4.2(typescript@5.9.3))
+      semver:
+        specifier: 7.8.5
+        version: 7.8.5
       svelte-check:
         specifier: catalog:default
         version: 4.7.3(picomatch@4.0.5)(svelte@5.56.7)(typescript@5.9.3)

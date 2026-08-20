@@ -61,4 +61,3 @@ export const makeTodoMvcReact: (opts?: MakeTodoMvcReactOptions) => Effect.Effect
 
     return { wrapper, store: storeWithReactApi, renderCount }
   })
-

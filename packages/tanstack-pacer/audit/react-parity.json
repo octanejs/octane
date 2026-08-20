@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -84,6 +84,11 @@
       "notes": "Runs the same authored scheduler fixture against @octanejs/tanstack-pacer and the pinned React adapter for counter debounce/throttle, batching, teardown, latest-label debounce/throttle, and useDebouncedValue; upstream provides no adapter runtime suite.",
       "files": [
         {
+          "path": "packages/tanstack-pacer/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "b28baf875e32e429de4b5909379b1c503626cf16134a65697262f925893092e1"
+        },
+        {
           "path": "packages/tanstack-pacer/tests/differential/parity.test.ts",
           "role": "test",
           "sha256": "23cafac582371ee392e55b8dd2aa6932150d3334614aad5cb0b98d0c8992f623",
@@ -116,24 +121,14 @@
           "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
         },
         {
-          "path": "packages/tanstack-pacer/upstream/SHA256SUMS",
-          "role": "support",
-          "sha256": "5b1cbeb30ea05ef50105ab689cb34e6f15f3c6eb305756ad5e1caac36916c13b"
-        },
-        {
           "path": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
           "role": "support",
-          "sha256": "5292360fa37631b4e0cd91ab6b256e9ecc29e07b8133a003d21393ddb8bbfcfc"
+          "sha256": "e23d09170b42bf8849462470f0011da34d075d815483d423386c30a230da97c4"
         },
         {
           "path": "packages/tanstack-pacer/audit/test-classifications.json",
           "role": "support",
           "sha256": "29cce0187ae4ffbe1698e560aa617ce22601c2280d74891d0b1e7b41ad1b580e"
-        },
-        {
-          "path": "packages/tanstack-pacer/scripts/check-upstream-ledger.mjs",
-          "role": "support",
-          "sha256": "cd0f7c45b0277f7fe35c576bff583e65823744f6c7e096b95b94105e3b4bdf77"
         },
         {
           "path": "scripts/react-parity/tanstack-pacer-controls.test.mjs",
@@ -171,17 +166,17 @@
         {
           "path": "packages/tanstack-pacer/typetests/pristine/tsconfig.json",
           "role": "support",
-          "sha256": "d385a025c6c78aff7d83adf6550456a9646e3aef59a23486903de43bfb25d129"
+          "sha256": "dcc663adaf508ebcfab8b23c8eee2298ba99ce81e6002bd2bf8fb2d0564f754d"
         },
         {
           "path": "packages/tanstack-pacer/audit/type-parity.json",
           "role": "support",
-          "sha256": "ee49816da4a15a51320e8e70c3aab82863c67260992946f0932c848b613fa24d"
+          "sha256": "69df399efce5979648c766c2937b940d3b72d39103bf78b0a42920ac5a10b601"
         },
         {
           "path": "packages/tanstack-pacer/typetests/assertions.md",
           "role": "support",
-          "sha256": "285bf3ebd690c64b0f02b156c07a0314da37c94ffd0622a9b0972911be3576bc"
+          "sha256": "976cee99ebe0974528be5bd5a23719101fd5b36599099b1d913f812ae814edb9"
         }
       ]
     },
@@ -219,12 +214,12 @@
         {
           "path": "packages/tanstack-pacer/audit/type-parity.json",
           "role": "support",
-          "sha256": "ee49816da4a15a51320e8e70c3aab82863c67260992946f0932c848b613fa24d"
+          "sha256": "69df399efce5979648c766c2937b940d3b72d39103bf78b0a42920ac5a10b601"
         },
         {
           "path": "packages/tanstack-pacer/typetests/assertions.md",
           "role": "support",
-          "sha256": "285bf3ebd690c64b0f02b156c07a0314da37c94ffd0622a9b0972911be3576bc"
+          "sha256": "976cee99ebe0974528be5bd5a23719101fd5b36599099b1d913f812ae814edb9"
         }
       ]
     }

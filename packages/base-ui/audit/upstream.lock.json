@@ -1,0 +1,5676 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@base-ui/react",
+    "version": "1.6.0",
+    "repository": {
+      "owner": "mui",
+      "repo": "base-ui",
+      "subdirectory": null
+    },
+    "commit": "b34551d644f2e58ebf8fc1050d949f6654ceca6c",
+    "integrity": "sha512-/jzjTWJYXhRFO45Bev9lc3cHbmjzCMpUqbMZ2AgKy/z25mY9B6shGSNcXcjQar9n5doM0KYW1W8fcFv2jZBuMw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "07fc1b39d69d14bc7d40482a628f47226258eb01265db68ae684944b916beb2a"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["LICENSE", "packages/react/package.json", "packages/react/src", "packages/react/test"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "510c55e0f0e2777fe1c55257b71d4c402bd73dca",
+      "size": 1072
+    },
+    {
+      "path": "packages/react/package.json",
+      "gitBlob": "f5707bedc4c636df4b300a99dec6c919f816ada8",
+      "size": 7256
+    },
+    {
+      "path": "packages/react/src/accordion/header/AccordionHeader.test.tsx",
+      "gitBlob": "6e06074639aa3243ee6627bf42602a9432331d4a",
+      "size": 460
+    },
+    {
+      "path": "packages/react/src/accordion/header/AccordionHeader.tsx",
+      "gitBlob": "9a0536b8c4dc768213ab3ad17c9e6b471406493f",
+      "size": 1372
+    },
+    {
+      "path": "packages/react/src/accordion/header/AccordionHeaderDataAttributes.ts",
+      "gitBlob": "9d322ef5f1f017dd45bab33bdcd7337d7e7ad1a8",
+      "size": 322
+    },
+    {
+      "path": "packages/react/src/accordion/index.parts.ts",
+      "gitBlob": "56b2822a55f58608b6a4c15baf972ec871a08d69",
+      "size": 334
+    },
+    {
+      "path": "packages/react/src/accordion/index.ts",
+      "gitBlob": "8efc69a3f554658f140041f4b3829861782143b5",
+      "size": 272
+    },
+    {
+      "path": "packages/react/src/accordion/item/AccordionItem.test.tsx",
+      "gitBlob": "46f572119c4d9d90d843d9846f7696b07a777121",
+      "size": 1408
+    },
+    {
+      "path": "packages/react/src/accordion/item/AccordionItem.tsx",
+      "gitBlob": "c70f139971134f4db7ff91221b143994267edb51",
+      "size": 5913
+    },
+    {
+      "path": "packages/react/src/accordion/item/AccordionItemContext.ts",
+      "gitBlob": "6b4c17cb659387f8ae7d36eabae846ca3add0770",
+      "size": 679
+    },
+    {
+      "path": "packages/react/src/accordion/item/AccordionItemDataAttributes.ts",
+      "gitBlob": "0c2408681c9ae58832f8e83d6cba88ab8149a1da",
+      "size": 320
+    },
+    {
+      "path": "packages/react/src/accordion/item/stateAttributesMapping.ts",
+      "gitBlob": "ccb6afb431b59d330f2c940fa7799a6d248c51ea",
+      "size": 700
+    },
+    {
+      "path": "packages/react/src/accordion/panel/AccordionPanel.test.tsx",
+      "gitBlob": "c8ce7e2b7084b584d197a7b8be097b1d56a6144c",
+      "size": 8208
+    },
+    {
+      "path": "packages/react/src/accordion/panel/AccordionPanel.tsx",
+      "gitBlob": "5cc5faa7a5c6338e814f14bdcea71901c3531456",
+      "size": 4740
+    },
+    {
+      "path": "packages/react/src/accordion/panel/AccordionPanelCssVars.ts",
+      "gitBlob": "6ad351eadd69848c1f78f8b54589c1b4fa0fea34",
+      "size": 275
+    },
+    {
+      "path": "packages/react/src/accordion/panel/AccordionPanelDataAttributes.ts",
+      "gitBlob": "01841a2062b77a2402896f09cc141348a02c639c",
+      "size": 748
+    },
+    {
+      "path": "packages/react/src/accordion/root/AccordionRoot.spec.tsx",
+      "gitBlob": "b10bac6c633587df4557f7cb1aefafddb3aab3e4",
+      "size": 1677
+    },
+    {
+      "path": "packages/react/src/accordion/root/AccordionRoot.test.tsx",
+      "gitBlob": "2ad15dfff2c35e37ab69c786d1e1936ca6829f98",
+      "size": 31760
+    },
+    {
+      "path": "packages/react/src/accordion/root/AccordionRoot.tsx",
+      "gitBlob": "86aca183ec6b350cd3f11ebf1829cc00acbfa21a",
+      "size": 7723
+    },
+    {
+      "path": "packages/react/src/accordion/root/AccordionRootContext.ts",
+      "gitBlob": "e6ef1ce07737ec75b87b68fde327bded35525539",
+      "size": 925
+    },
+    {
+      "path": "packages/react/src/accordion/root/AccordionRootDataAttributes.ts",
+      "gitBlob": "d58d914c7c9322f32fe575982767ef403f9b4c33",
+      "size": 228
+    },
+    {
+      "path": "packages/react/src/accordion/trigger/AccordionTrigger.test.tsx",
+      "gitBlob": "ab76c71fc36c9193650994df25f6392fe0e000e8",
+      "size": 1149
+    },
+    {
+      "path": "packages/react/src/accordion/trigger/AccordionTrigger.tsx",
+      "gitBlob": "fb3d4ecc67ce490915e41a5f6a5fda6488265e04",
+      "size": 2391
+    },
+    {
+      "path": "packages/react/src/accordion/trigger/AccordionTriggerDataAttributes.ts",
+      "gitBlob": "a969ca16f26dfc49475e4bdd10c0530428acdd45",
+      "size": 231
+    },
+    {
+      "path": "packages/react/src/alert-dialog/handle.ts",
+      "gitBlob": "1644f2defa9e0138599111ce7c43dfb3e426a401",
+      "size": 1022
+    },
+    {
+      "path": "packages/react/src/alert-dialog/index.parts.ts",
+      "gitBlob": "8b77d0e7c0481970fbda22cb435888a7b76a80a0",
+      "size": 769
+    },
+    {
+      "path": "packages/react/src/alert-dialog/index.ts",
+      "gitBlob": "df23f75615a0af27271a278cc013902f2afd84ce",
+      "size": 1216
+    },
+    {
+      "path": "packages/react/src/alert-dialog/root/AlertDialogRoot.spec.tsx",
+      "gitBlob": "3640b79bf21f5e7d2754583e458f87cd4bbb42bb",
+      "size": 1337
+    },
+    {
+      "path": "packages/react/src/alert-dialog/root/AlertDialogRoot.test.tsx",
+      "gitBlob": "4d21506a0fadbfcfde16eb709f9210afde6ddb29",
+      "size": 38764
+    },
+    {
+      "path": "packages/react/src/alert-dialog/root/AlertDialogRoot.tsx",
+      "gitBlob": "47ccf545cc317580817be55685b4aba33783be8b",
+      "size": 2293
+    },
+    {
+      "path": "packages/react/src/alert-dialog/trigger/AlertDialogTrigger.tsx",
+      "gitBlob": "4638c873278ef97dc3d249ad6f1539466f4c36d2",
+      "size": 1146
+    },
+    {
+      "path": "packages/react/src/alert-dialog/trigger/AlertDialogTriggerDataAttributes.ts",
+      "gitBlob": "ed4e6c744b55c5e6966e3bd32d8afbeb79a82771",
+      "size": 335
+    },
+    {
+      "path": "packages/react/src/autocomplete/clear/AutocompleteClearDataAttributes.ts",
+      "gitBlob": "1774c2cd72eb0bafcffb4857f7337c56c75d42da",
+      "size": 131
+    },
+    {
+      "path": "packages/react/src/autocomplete/index.parts.ts",
+      "gitBlob": "450bcd40ff1e28044a0a838b7e3fbe4c33c5488d",
+      "size": 1765
+    },
+    {
+      "path": "packages/react/src/autocomplete/index.ts",
+      "gitBlob": "70aa0b2c0bca679087bcbd33599c8a34559eb7a2",
+      "size": 2816
+    },
+    {
+      "path": "packages/react/src/autocomplete/input-group/AutocompleteInputGroup.tsx",
+      "gitBlob": "2ee1e58870959ed653dcd8aa1b80c15165441907",
+      "size": 1570
+    },
+    {
+      "path": "packages/react/src/autocomplete/input-group/AutocompleteInputGroupDataAttributes.ts",
+      "gitBlob": "d95a024156117bfed7cc3b4ac2b89cee7cbe19ba",
+      "size": 1437
+    },
+    {
+      "path": "packages/react/src/autocomplete/item/AutocompleteItem.test.tsx",
+      "gitBlob": "114b4fe7be46778569d55acdcd78df2b996463e0",
+      "size": 3611
+    },
+    {
+      "path": "packages/react/src/autocomplete/item/AutocompleteItem.tsx",
+      "gitBlob": "b6c06d08bd9faf59996b5fe752847751dd6f8798",
+      "size": 1827
+    },
+    {
+      "path": "packages/react/src/autocomplete/item/AutocompleteItemDataAttributes.ts",
+      "gitBlob": "355281e31609f7842c6fe7ae5bf1fe713149cb70",
+      "size": 354
+    },
+    {
+      "path": "packages/react/src/autocomplete/root/AutocompleteRoot.spec.tsx",
+      "gitBlob": "12c7c937d78262ab3f8cdbb7777b926f1c0179d9",
+      "size": 2249
+    },
+    {
+      "path": "packages/react/src/autocomplete/root/AutocompleteRoot.test.tsx",
+      "gitBlob": "b5325a9205c672b77c254caa10c7c89713dfe834",
+      "size": 75455
+    },
+    {
+      "path": "packages/react/src/autocomplete/root/AutocompleteRoot.tsx",
+      "gitBlob": "13656af5b9c6a8438be0c0401a277c50831e7a44",
+      "size": 10383
+    },
+    {
+      "path": "packages/react/src/autocomplete/trigger/AutocompleteTrigger.tsx",
+      "gitBlob": "dedb9b0a822ef8363a0ffbca4e4e5b5c55198dda",
+      "size": 1578
+    },
+    {
+      "path": "packages/react/src/autocomplete/trigger/AutocompleteTriggerDataAttributes.ts",
+      "gitBlob": "4c8b0cce1e230a7d22611aec6e31cb264f406444",
+      "size": 1634
+    },
+    {
+      "path": "packages/react/src/autocomplete/value/AutocompleteValue.test.tsx",
+      "gitBlob": "83bb2c5c00eb9f3438e1dc3db22c5e33633e0e14",
+      "size": 3574
+    },
+    {
+      "path": "packages/react/src/autocomplete/value/AutocompleteValue.tsx",
+      "gitBlob": "9ae6b6b550a53955094c05715f9a3c1d578e669b",
+      "size": 1063
+    },
+    {
+      "path": "packages/react/src/avatar/Avatar.spec.tsx",
+      "gitBlob": "b0336aec5541e3404038862183d587b4fa6ac883",
+      "size": 1032
+    },
+    {
+      "path": "packages/react/src/avatar/fallback/AvatarFallback.test.tsx",
+      "gitBlob": "f6231f0851c27be7cdf5522959131c1ce95b2f80",
+      "size": 8158
+    },
+    {
+      "path": "packages/react/src/avatar/fallback/AvatarFallback.tsx",
+      "gitBlob": "6486fbb6b2d7fde9384bb07c40379028df273a07",
+      "size": 2197
+    },
+    {
+      "path": "packages/react/src/avatar/image/AvatarImage.test.tsx",
+      "gitBlob": "c89ac44707b2b14200b2877654330633c922402c",
+      "size": 11285
+    },
+    {
+      "path": "packages/react/src/avatar/image/AvatarImage.tsx",
+      "gitBlob": "244ed1f0eb79ec2ea82bcb7f590813ed99392fee",
+      "size": 3387
+    },
+    {
+      "path": "packages/react/src/avatar/image/AvatarImageDataAttributes.ts",
+      "gitBlob": "5077bf377dceb0cdbb47347cec769c576e6004fd",
+      "size": 371
+    },
+    {
+      "path": "packages/react/src/avatar/image/useImageLoadingStatus.ts",
+      "gitBlob": "b276bb9478480b5b072d7c2480a0a9ac5e346d83",
+      "size": 1834
+    },
+    {
+      "path": "packages/react/src/avatar/index.parts.ts",
+      "gitBlob": "9fca12b2239136e4c344d5a6f9044f727dd59d27",
+      "size": 188
+    },
+    {
+      "path": "packages/react/src/avatar/index.ts",
+      "gitBlob": "add96c6cdcaaa8d7dfbe6344c8582c0619134ea2",
+      "size": 172
+    },
+    {
+      "path": "packages/react/src/avatar/root/AvatarRoot.test.tsx",
+      "gitBlob": "ff807efa57458fa1303b0e71a88de081da2366ba",
+      "size": 306
+    },
+    {
+      "path": "packages/react/src/avatar/root/AvatarRoot.tsx",
+      "gitBlob": "b17179f4dc1e7b5ed50c5814002744e4f66f4f67",
+      "size": 1746
+    },
+    {
+      "path": "packages/react/src/avatar/root/AvatarRootContext.ts",
+      "gitBlob": "034cb83036a339fd8924df47abca6ccfd3d988c1",
+      "size": 642
+    },
+    {
+      "path": "packages/react/src/avatar/root/stateAttributesMapping.ts",
+      "gitBlob": "f608a89957233a84f9d1ff5f2658293c00200406",
+      "size": 83
+    },
+    {
+      "path": "packages/react/src/button/Button.spec.tsx",
+      "gitBlob": "19f4258eabcade8bc053b6f65145b695faa567a2",
+      "size": 348
+    },
+    {
+      "path": "packages/react/src/button/Button.test.tsx",
+      "gitBlob": "822bec62fce4148ad1837f225131843b44821313",
+      "size": 6180
+    },
+    {
+      "path": "packages/react/src/button/Button.tsx",
+      "gitBlob": "494dbc480cedc1da7f36129c803a6a1f56da0eeb",
+      "size": 1554
+    },
+    {
+      "path": "packages/react/src/button/ButtonDataAttributes.tsx",
+      "gitBlob": "3e702f78f7168ada1d11506fa61d6e77762f6430",
+      "size": 121
+    },
+    {
+      "path": "packages/react/src/button/index.ts",
+      "gitBlob": "faedbad025c98dfafbb39f7d2a74aabab0058635",
+      "size": 67
+    },
+    {
+      "path": "packages/react/src/checkbox-group/CheckboxGroup.test.tsx",
+      "gitBlob": "8082b299bbf6b2b8073e8f6a3d92b200cc7d469f",
+      "size": 37799
+    },
+    {
+      "path": "packages/react/src/checkbox-group/CheckboxGroup.tsx",
+      "gitBlob": "20659b0b655f22ab4659bec57f44dc19a9af7a6c",
+      "size": 6313
+    },
+    {
+      "path": "packages/react/src/checkbox-group/CheckboxGroupContext.ts",
+      "gitBlob": "10033cee9c9666083a1dcc5bb3d8268b35049cd3",
+      "size": 1417
+    },
+    {
+      "path": "packages/react/src/checkbox-group/CheckboxGroupDataAttributes.ts",
+      "gitBlob": "47fc38997a3b8c1c849f24f8f6459807dc365edf",
+      "size": 136
+    },
+    {
+      "path": "packages/react/src/checkbox-group/index.ts",
+      "gitBlob": "01e0eb0eeb2d37f20482298e9b30daeb611f32d3",
+      "size": 87
+    },
+    {
+      "path": "packages/react/src/checkbox-group/useCheckboxGroupParent.test.tsx",
+      "gitBlob": "d9f18b791588dfd7e341765df64495f83c308745",
+      "size": 14758
+    },
+    {
+      "path": "packages/react/src/checkbox-group/useCheckboxGroupParent.ts",
+      "gitBlob": "ff0f933e20b35f150b176d03c4a0151a8045488c",
+      "size": 4663
+    },
+    {
+      "path": "packages/react/src/checkbox/index.parts.ts",
+      "gitBlob": "56cac2a02f5bfabbe8f999edbd3ddb95f1ca68de",
+      "size": 140
+    },
+    {
+      "path": "packages/react/src/checkbox/index.ts",
+      "gitBlob": "0a1170e208ec40d5f82e1be44246e44699f5e2c2",
+      "size": 138
+    },
+    {
+      "path": "packages/react/src/checkbox/indicator/CheckboxIndicator.test.tsx",
+      "gitBlob": "75ab7a120924f9188a8e0b80cbab6f88b2752a65",
+      "size": 8203
+    },
+    {
+      "path": "packages/react/src/checkbox/indicator/CheckboxIndicator.tsx",
+      "gitBlob": "a7b9f55bf0c3f2325159ac0ab15aa36fb1c73873",
+      "size": 2884
+    },
+    {
+      "path": "packages/react/src/checkbox/indicator/CheckboxIndicatorDataAttributes.ts",
+      "gitBlob": "1b56daae4cd580004bbdb76d8197413f70749683",
+      "size": 1646
+    },
+    {
+      "path": "packages/react/src/checkbox/root/CheckboxRoot.test.tsx",
+      "gitBlob": "08361f9b21e1cd645942a60c3e3df663496bc6f2",
+      "size": 48292
+    },
+    {
+      "path": "packages/react/src/checkbox/root/CheckboxRoot.tsx",
+      "gitBlob": "92d9a3ba28a82e0e2955cbf9b414712bbe7637e2",
+      "size": 16779
+    },
+    {
+      "path": "packages/react/src/checkbox/root/CheckboxRootContext.ts",
+      "gitBlob": "34567940bf94c18e1510e72c4acdfcc742c6a44f",
+      "size": 547
+    },
+    {
+      "path": "packages/react/src/checkbox/root/CheckboxRootDataAttributes.ts",
+      "gitBlob": "76921c68f350a1a068b421338ad1944962eb5770",
+      "size": 1286
+    },
+    {
+      "path": "packages/react/src/checkbox/utils/useStateAttributesMapping.ts",
+      "gitBlob": "9064204db4d5593b746f9b0304fb726137954189",
+      "size": 983
+    },
+    {
+      "path": "packages/react/src/collapsible/index.parts.ts",
+      "gitBlob": "93a0c5238a25e7a128691e758a3a4bb24c153c7d",
+      "size": 214
+    },
+    {
+      "path": "packages/react/src/collapsible/index.ts",
+      "gitBlob": "a8c3f341cede5c9f575c3be67e9b4bf2aba427db",
+      "size": 190
+    },
+    {
+      "path": "packages/react/src/collapsible/panel/CollapsiblePanel.test.tsx",
+      "gitBlob": "e4809184821bfe41b867e82f7bab1a14a1ded42c",
+      "size": 36674
+    },
+    {
+      "path": "packages/react/src/collapsible/panel/CollapsiblePanel.tsx",
+      "gitBlob": "e117e3ea47f148baf9e77597083e2126d6b425c8",
+      "size": 4667
+    },
+    {
+      "path": "packages/react/src/collapsible/panel/CollapsiblePanelCssVars.ts",
+      "gitBlob": "b3fe205c6e8d72fdab92686e4121471b70bce7f3",
+      "size": 289
+    },
+    {
+      "path": "packages/react/src/collapsible/panel/CollapsiblePanelDataAttributes.ts",
+      "gitBlob": "6abc74ba4767fe141e3149ab581e981c611462ab",
+      "size": 548
+    },
+    {
+      "path": "packages/react/src/collapsible/panel/useCollapsiblePanel.ts",
+      "gitBlob": "ebe1ec689a6b7a123f188fcacbf8941876e5c26c",
+      "size": 18672
+    },
+    {
+      "path": "packages/react/src/collapsible/root/CollapsibleRoot.spec.tsx",
+      "gitBlob": "5d3f65fe220fc496ced59a5cef7fd455850491ed",
+      "size": 1769
+    },
+    {
+      "path": "packages/react/src/collapsible/root/CollapsibleRoot.test.tsx",
+      "gitBlob": "155485e175441148492f6fdc92f545546492c864",
+      "size": 14117
+    },
+    {
+      "path": "packages/react/src/collapsible/root/CollapsibleRoot.tsx",
+      "gitBlob": "1c66250eea208a946a50b45757963527ff0b0b96",
+      "size": 3511
+    },
+    {
+      "path": "packages/react/src/collapsible/root/CollapsibleRootContext.ts",
+      "gitBlob": "8a2461a0e44f707fe003c1447eb57a8909aa6049",
+      "size": 822
+    },
+    {
+      "path": "packages/react/src/collapsible/root/stateAttributesMapping.ts",
+      "gitBlob": "7e30f9c8920a61c2233e26acf745379bb7670fe6",
+      "size": 483
+    },
+    {
+      "path": "packages/react/src/collapsible/root/useCollapsibleRoot.ts",
+      "gitBlob": "85a11f4e0775d1cf56b37b591b441eeda154716a",
+      "size": 3371
+    },
+    {
+      "path": "packages/react/src/collapsible/trigger/CollapsibleTrigger.test.tsx",
+      "gitBlob": "c6a325e756dba5041f89f587746663a090f692cb",
+      "size": 977
+    },
+    {
+      "path": "packages/react/src/collapsible/trigger/CollapsibleTrigger.tsx",
+      "gitBlob": "15b48d774474d25cf1f9f129a54da111fa9d1239",
+      "size": 2278
+    },
+    {
+      "path": "packages/react/src/collapsible/trigger/CollapsibleTriggerDataAttributes.ts",
+      "gitBlob": "d29498678e4579aa76916a692b721adbf0574d77",
+      "size": 143
+    },
+    {
+      "path": "packages/react/src/combobox/arrow/ComboboxArrow.test.tsx",
+      "gitBlob": "25911a03ca0a13faafbc6d8e038e1479abf22ab7",
+      "size": 540
+    },
+    {
+      "path": "packages/react/src/combobox/arrow/ComboboxArrow.tsx",
+      "gitBlob": "6444a9e6b8928227bf9664850a573a45d23be3d7",
+      "size": 2119
+    },
+    {
+      "path": "packages/react/src/combobox/arrow/ComboboxArrowDataAttributes.ts",
+      "gitBlob": "447a38b3a9b188da5f7224630d1281c12750d5fa",
+      "size": 767
+    },
+    {
+      "path": "packages/react/src/combobox/backdrop/ComboboxBackdrop.test.tsx",
+      "gitBlob": "43cc1fb61a283041b5264406490daacaaed575bc",
+      "size": 479
+    },
+    {
+      "path": "packages/react/src/combobox/backdrop/ComboboxBackdrop.tsx",
+      "gitBlob": "a6a70a09184a32b395d1dfe8cca4939c05c09590",
+      "size": 2274
+    },
+    {
+      "path": "packages/react/src/combobox/backdrop/ComboboxBackdropDataAttributes.ts",
+      "gitBlob": "0694872db12f57690ab292fe49c651f5dca6bc1a",
+      "size": 538
+    },
+    {
+      "path": "packages/react/src/combobox/chip-remove/ComboboxChipRemove.test.tsx",
+      "gitBlob": "f66666a478a14f9fc99214bfc28db6b3072745e3",
+      "size": 9628
+    },
+    {
+      "path": "packages/react/src/combobox/chip-remove/ComboboxChipRemove.tsx",
+      "gitBlob": "d222f3c1542cb5dc448a65a69ab092aa6905fbef",
+      "size": 4336
+    },
+    {
+      "path": "packages/react/src/combobox/chip/ComboboxChip.test.tsx",
+      "gitBlob": "87ed2a1dd7e227723f0c7ecbe98fd1a718f6b82a",
+      "size": 14520
+    },
+    {
+      "path": "packages/react/src/combobox/chip/ComboboxChip.tsx",
+      "gitBlob": "31ddc932e6df706b2f675b87e2b2d7e25f4797d4",
+      "size": 4879
+    },
+    {
+      "path": "packages/react/src/combobox/chip/ComboboxChipContext.ts",
+      "gitBlob": "845f8419ade427599627f46231ad9f5ae24a16a9",
+      "size": 485
+    },
+    {
+      "path": "packages/react/src/combobox/chips/ComboboxChips.test.tsx",
+      "gitBlob": "bf46b2746d5dff97e95419bedf7b27fa8b28e5dd",
+      "size": 8107
+    },
+    {
+      "path": "packages/react/src/combobox/chips/ComboboxChips.tsx",
+      "gitBlob": "15391d38f860f19219c0e9a194bbaf27b2be7680",
+      "size": 2650
+    },
+    {
+      "path": "packages/react/src/combobox/chips/ComboboxChipsContext.ts",
+      "gitBlob": "1b87c1cec7349eb12984751c14b6a83f00092fd4",
+      "size": 484
+    },
+    {
+      "path": "packages/react/src/combobox/clear/ComboboxClear.test.tsx",
+      "gitBlob": "e8616b958d255fbb9e3eee4b1b75e2ebd5d29f7f",
+      "size": 7788
+    },
+    {
+      "path": "packages/react/src/combobox/clear/ComboboxClear.tsx",
+      "gitBlob": "be56ea01a5ed11f1b2d677890ebc0598a2a46b5b",
+      "size": 5398
+    },
+    {
+      "path": "packages/react/src/combobox/clear/ComboboxClearDataAttributes.ts",
+      "gitBlob": "1db0efe14b3910656b41878275256b42ea3ef57b",
+      "size": 672
+    },
+    {
+      "path": "packages/react/src/combobox/collection/ComboboxCollection.test.tsx",
+      "gitBlob": "d6b662cb8227edc2710377b1582ebe59c175f606",
+      "size": 1174
+    },
+    {
+      "path": "packages/react/src/combobox/collection/ComboboxCollection.tsx",
+      "gitBlob": "c54f4365a740036b42bc2ea6c9d817bc35d9cfda",
+      "size": 1200
+    },
+    {
+      "path": "packages/react/src/combobox/collection/GroupCollectionContext.tsx",
+      "gitBlob": "ce9dd43a0412a4f2005404dd456f9d6b60976152",
+      "size": 746
+    },
+    {
+      "path": "packages/react/src/combobox/empty/ComboboxEmpty.test.tsx",
+      "gitBlob": "da6c8034e8f63dbb7682195116a81bf0174a5c00",
+      "size": 7136
+    },
+    {
+      "path": "packages/react/src/combobox/empty/ComboboxEmpty.tsx",
+      "gitBlob": "1ba35b679af695c87cf2901c38453e6a3591d696",
+      "size": 2012
+    },
+    {
+      "path": "packages/react/src/combobox/group-label/ComboboxGroupLabel.test.tsx",
+      "gitBlob": "313f1ad287d1b0b21b70300940d83c7bef13ad81",
+      "size": 1844
+    },
+    {
+      "path": "packages/react/src/combobox/group-label/ComboboxGroupLabel.tsx",
+      "gitBlob": "2dbe4f8fcdad78b78f1041d1bd3bff1a74c46a6d",
+      "size": 1507
+    },
+    {
+      "path": "packages/react/src/combobox/group/ComboboxGroup.test.tsx",
+      "gitBlob": "80d91e91019de756e2f37aca6d1c212489286170",
+      "size": 1796
+    },
+    {
+      "path": "packages/react/src/combobox/group/ComboboxGroup.tsx",
+      "gitBlob": "070081a0d37103eb52301d3065ecf24db4dbdd8b",
+      "size": 1865
+    },
+    {
+      "path": "packages/react/src/combobox/group/ComboboxGroupContext.ts",
+      "gitBlob": "5ddec46075cd8a7bfc48efbc56eb9141c3e6745b",
+      "size": 766
+    },
+    {
+      "path": "packages/react/src/combobox/icon/ComboboxIcon.test.tsx",
+      "gitBlob": "970a518d15c5ec52a3ce72f400aff146c77db573",
+      "size": 393
+    },
+    {
+      "path": "packages/react/src/combobox/icon/ComboboxIcon.tsx",
+      "gitBlob": "023d1ec84c9a89f9d3573ae8c124782837d223d3",
+      "size": 1087
+    },
+    {
+      "path": "packages/react/src/combobox/index.parts.ts",
+      "gitBlob": "39610e7179f0c1ae83163861ba5a0fc466b6e11d",
+      "size": 1919
+    },
+    {
+      "path": "packages/react/src/combobox/index.ts",
+      "gitBlob": "a5fb12d67ecf5dc6c09f16ee89d67fdf57df55ca",
+      "size": 1353
+    },
+    {
+      "path": "packages/react/src/combobox/input-group/ComboboxInputGroup.test.tsx",
+      "gitBlob": "06adcf172de9443b95f1f665bda2f72af45b2038",
+      "size": 6911
+    },
+    {
+      "path": "packages/react/src/combobox/input-group/ComboboxInputGroup.tsx",
+      "gitBlob": "200a49b199e68c62a7182e0e4418de511360f130",
+      "size": 3826
+    },
+    {
+      "path": "packages/react/src/combobox/input-group/ComboboxInputGroupDataAttributes.ts",
+      "gitBlob": "91983c6d9718660b3ad3df877ef5f4ac9b0962c4",
+      "size": 1534
+    },
+    {
+      "path": "packages/react/src/combobox/input/ComboboxInput.test.tsx",
+      "gitBlob": "41d7dbb079aff0b4f0066f3aaf743347a44f4255",
+      "size": 21736
+    },
+    {
+      "path": "packages/react/src/combobox/input/ComboboxInput.tsx",
+      "gitBlob": "47ac9076dcfb1d9e22fd91a4442e58f8dc648aee",
+      "size": 20052
+    },
+    {
+      "path": "packages/react/src/combobox/input/ComboboxInputDataAttributes.ts",
+      "gitBlob": "3f1213bb06c22a8da9208f5f792fefecfe918384",
+      "size": 1624
+    },
+    {
+      "path": "packages/react/src/combobox/item-indicator/ComboboxItemIndicator.test.tsx",
+      "gitBlob": "89b7a73a94857435475ad364c725dd75b74f850a",
+      "size": 486
+    },
+    {
+      "path": "packages/react/src/combobox/item-indicator/ComboboxItemIndicator.tsx",
+      "gitBlob": "aa9c33f965a16fe8ffe61fea47893515c9c50297",
+      "size": 3098
+    },
+    {
+      "path": "packages/react/src/combobox/item-indicator/ComboboxItemIndicatorDataAttributes.ts",
+      "gitBlob": "8b9992e41004c3a299b44d707b4f90a101bfa300",
+      "size": 389
+    },
+    {
+      "path": "packages/react/src/combobox/item/ComboboxItem.test.tsx",
+      "gitBlob": "38717486f8574610f16a61044994a956599860fa",
+      "size": 18302
+    },
+    {
+      "path": "packages/react/src/combobox/item/ComboboxItem.tsx",
+      "gitBlob": "bc843023ce11e5302510857e24b1779d31619e40",
+      "size": 10384
+    },
+    {
+      "path": "packages/react/src/combobox/item/ComboboxItemContext.ts",
+      "gitBlob": "6e0a477497bcc11b78a2e25f106ed41e4ddf4da4",
+      "size": 537
+    },
+    {
+      "path": "packages/react/src/combobox/item/ComboboxItemDataAttributes.ts",
+      "gitBlob": "5a97896fb4832d71458f8c38d3fd66afc68cf303",
+      "size": 298
+    },
+    {
+      "path": "packages/react/src/combobox/label/ComboboxLabel.test.tsx",
+      "gitBlob": "87974889d4f9a8117c2f2164957cd3e501d01ba9",
+      "size": 702
+    },
+    {
+      "path": "packages/react/src/combobox/label/ComboboxLabel.tsx",
+      "gitBlob": "b3be4e62fc51accc2ade34dc25ec462db87b9f25",
+      "size": 3225
+    },
+    {
+      "path": "packages/react/src/combobox/list/ComboboxList.test.tsx",
+      "gitBlob": "5caecb2a1679c3adc9c158fb14e72f64b42df4c7",
+      "size": 1062
+    },
+    {
+      "path": "packages/react/src/combobox/list/ComboboxList.tsx",
+      "gitBlob": "7b66d0297afab24e28c70599a26d0af63410e303",
+      "size": 4987
+    },
+    {
+      "path": "packages/react/src/combobox/popup/ComboboxPopup.test.tsx",
+      "gitBlob": "b8187ad90eb2c472110cb048ccbf8abe31f8859b",
+      "size": 2183
+    },
+    {
+      "path": "packages/react/src/combobox/popup/ComboboxPopup.tsx",
+      "gitBlob": "ae01cbffb9198f4a8da42d6c4294859eb8866819",
+      "size": 7573
+    },
+    {
+      "path": "packages/react/src/combobox/popup/ComboboxPopupDataAttributes.ts",
+      "gitBlob": "ea223cc357f8693e974e614adf043988a49212a3",
+      "size": 1105
+    },
+    {
+      "path": "packages/react/src/combobox/portal/ComboboxPortal.test.tsx",
+      "gitBlob": "7385a0fedc7e246e97c39cb6fec14a54abab64df",
+      "size": 428
+    },
+    {
+      "path": "packages/react/src/combobox/portal/ComboboxPortal.tsx",
+      "gitBlob": "eaf263e69b17ba4e72ed6444b813cbc013df6ec2",
+      "size": 1650
+    },
+    {
+      "path": "packages/react/src/combobox/portal/ComboboxPortalContext.tsx",
+      "gitBlob": "6e6849a73bbba42a6275cf1e4c3d63180dc001a0",
+      "size": 360
+    },
+    {
+      "path": "packages/react/src/combobox/positioner/ComboboxPositioner.test.tsx",
+      "gitBlob": "2b2d71bf0719df59ce45e2ed88d8caa4726ed890",
+      "size": 4907
+    },
+    {
+      "path": "packages/react/src/combobox/positioner/ComboboxPositioner.tsx",
+      "gitBlob": "6ef5865c8761d666545e934fe6e0973c6c993c21",
+      "size": 5081
+    },
+    {
+      "path": "packages/react/src/combobox/positioner/ComboboxPositionerContext.tsx",
+      "gitBlob": "abc175e8e2853fe4d5fbf7214dc8b7e30fc587df",
+      "size": 985
+    },
+    {
+      "path": "packages/react/src/combobox/positioner/ComboboxPositionerCssVars.ts",
+      "gitBlob": "be06c5bed7d91606cab3158e3a0f2a4a4998e844",
+      "size": 690
+    },
+    {
+      "path": "packages/react/src/combobox/positioner/ComboboxPositionerDataAttributes.ts",
+      "gitBlob": "66ca6fab287097497ef3db89fbaf83738a8fb380",
+      "size": 871
+    },
+    {
+      "path": "packages/react/src/combobox/root/AriaCombobox.tsx",
+      "gitBlob": "5f0e9b6a41ae879762a333c8f56015086d79f466",
+      "size": 57180
+    },
+    {
+      "path": "packages/react/src/combobox/root/ComboboxRoot.spec.tsx",
+      "gitBlob": "3557dc11602b232188717dd65744d83a11aca3e1",
+      "size": 5347
+    },
+    {
+      "path": "packages/react/src/combobox/root/ComboboxRoot.test.tsx",
+      "gitBlob": "ac701cba89e00ebfc95456d3002ae9317a952390",
+      "size": 267502
+    },
+    {
+      "path": "packages/react/src/combobox/root/ComboboxRoot.tsx",
+      "gitBlob": "015c785d1880f7e5b4a04e3baa7f7821d9288a0b",
+      "size": 6358
+    },
+    {
+      "path": "packages/react/src/combobox/root/ComboboxRootContext.tsx",
+      "gitBlob": "70bcde8eaca4db46ec25de3ef73c594dbada84df",
+      "size": 1987
+    },
+    {
+      "path": "packages/react/src/combobox/root/utils/constants.ts",
+      "gitBlob": "c1d784d327f7e088fefada3d27577e6479f6618c",
+      "size": 169
+    },
+    {
+      "path": "packages/react/src/combobox/root/utils/index.ts",
+      "gitBlob": "22d7f83b7f7b1ba459c902b94db2ab052f2e5f5e",
+      "size": 2092
+    },
+    {
+      "path": "packages/react/src/combobox/root/utils/useFilter.ts",
+      "gitBlob": "fd1209de757fa7f8b4621f0ccad7dae16c4fc35f",
+      "size": 1547
+    },
+    {
+      "path": "packages/react/src/combobox/root/utils/useFilteredItems.ts",
+      "gitBlob": "a75b2aff2bd40aac7f1f49821be6bd0359bad6fc",
+      "size": 253
+    },
+    {
+      "path": "packages/react/src/combobox/row/ComboboxRow.tsx",
+      "gitBlob": "6079860d47fb4b3784ced54e1470dfe465f38709",
+      "size": 1183
+    },
+    {
+      "path": "packages/react/src/combobox/row/ComboboxRowContext.ts",
+      "gitBlob": "3cb8e5f824990d6b6109c2fb35e9bbfc0bfb49d9",
+      "size": 201
+    },
+    {
+      "path": "packages/react/src/combobox/status/ComboboxStatus.iOS.test.tsx",
+      "gitBlob": "810870c4789db0712a706f509ee98af6e569c5fb",
+      "size": 1566
+    },
+    {
+      "path": "packages/react/src/combobox/status/ComboboxStatus.test.tsx",
+      "gitBlob": "5b0610b8e4666559d4ff56c7e33b593b9684615b",
+      "size": 4444
+    },
+    {
+      "path": "packages/react/src/combobox/status/ComboboxStatus.tsx",
+      "gitBlob": "0fe50b85b83bf1b6c84811ee15b802a99e437362",
+      "size": 1742
+    },
+    {
+      "path": "packages/react/src/combobox/store.ts",
+      "gitBlob": "96bc26d342b479ca538dc8e7cc6f509061c7fcbf",
+      "size": 7102
+    },
+    {
+      "path": "packages/react/src/combobox/trigger/ComboboxTrigger.test.tsx",
+      "gitBlob": "07951ac0e95c56c7907af6e2fd66876af5f7dd86",
+      "size": 26134
+    },
+    {
+      "path": "packages/react/src/combobox/trigger/ComboboxTrigger.tsx",
+      "gitBlob": "7e792d5d69a608e2244066cadcccd3d11e5d6a32",
+      "size": 11314
+    },
+    {
+      "path": "packages/react/src/combobox/trigger/ComboboxTriggerDataAttributes.ts",
+      "gitBlob": "1bb25353c61d57fa5f2140045c3a561f2e742152",
+      "size": 1731
+    },
+    {
+      "path": "packages/react/src/combobox/utils/ComboboxInternalDismissButton.tsx",
+      "gitBlob": "0ac112b701583e45c069bddaf49afd89e0bb1fcc",
+      "size": 1356
+    },
+    {
+      "path": "packages/react/src/combobox/utils/handleInputPress.ts",
+      "gitBlob": "48023fc9d7d9eb3970c7aa5f6d26c74f0e50d099",
+      "size": 1204
+    },
+    {
+      "path": "packages/react/src/combobox/utils/stateAttributesMapping.ts",
+      "gitBlob": "27d845edd0fd197bfe73318ebddafa8bc96e8b5c",
+      "size": 735
+    },
+    {
+      "path": "packages/react/src/combobox/utils/useInitialLiveRegionTextMutation.ts",
+      "gitBlob": "c59455cef46dff2f05285107941b445fefb564a6",
+      "size": 1892
+    },
+    {
+      "path": "packages/react/src/combobox/value/ComboboxValue.test.tsx",
+      "gitBlob": "32317e2ad935e4f69208800164b77b58b5c43f05",
+      "size": 31379
+    },
+    {
+      "path": "packages/react/src/combobox/value/ComboboxValue.tsx",
+      "gitBlob": "0a257f335e0371619d4a7317283eb12dd51eddbb",
+      "size": 2230
+    },
+    {
+      "path": "packages/react/src/context-menu/index.parts.ts",
+      "gitBlob": "fbf15a5ea1c9bb510f3b2f637cea258295b17360",
+      "size": 1505
+    },
+    {
+      "path": "packages/react/src/context-menu/index.ts",
+      "gitBlob": "dd28d55c75fdbd11262c2b1b4e2a3d417b068e05",
+      "size": 2755
+    },
+    {
+      "path": "packages/react/src/context-menu/root/ContextMenuRoot.non-mac.test.tsx",
+      "gitBlob": "2694c018a400cf23a4dc4d6e877bbd1a8515c0f6",
+      "size": 2169
+    },
+    {
+      "path": "packages/react/src/context-menu/root/ContextMenuRoot.test.tsx",
+      "gitBlob": "6ce7a70cba81e5492c48fcaa907f834b2e8b840a",
+      "size": 9997
+    },
+    {
+      "path": "packages/react/src/context-menu/root/ContextMenuRoot.tsx",
+      "gitBlob": "e3d079197354d60e53febd3c8b4c17add89a9f01",
+      "size": 2777
+    },
+    {
+      "path": "packages/react/src/context-menu/root/ContextMenuRootContext.ts",
+      "gitBlob": "a24677bcc5def86985cd28690901a7b2295fcd23",
+      "size": 1375
+    },
+    {
+      "path": "packages/react/src/context-menu/trigger/ContextMenuTrigger.test.tsx",
+      "gitBlob": "e06d2796c70d5acbc8e221fc9a128b28f2f2eff7",
+      "size": 10213
+    },
+    {
+      "path": "packages/react/src/context-menu/trigger/ContextMenuTrigger.tsx",
+      "gitBlob": "742761c2bb67c68227e5dbfc3a7abc6d73c40bc9",
+      "size": 6408
+    },
+    {
+      "path": "packages/react/src/context-menu/trigger/ContextMenuTriggerDataAttributes.ts",
+      "gitBlob": "42a9cb92f333fbff7e85e19873713e019b9c954e",
+      "size": 353
+    },
+    {
+      "path": "packages/react/src/csp-provider/CSPProvider.test.tsx",
+      "gitBlob": "202dd72a77f91df93a0374f939cd456edd50a39e",
+      "size": 2243
+    },
+    {
+      "path": "packages/react/src/csp-provider/CSPProvider.tsx",
+      "gitBlob": "71927266083fe73d639dce3106165e111bf5e25a",
+      "size": 1330
+    },
+    {
+      "path": "packages/react/src/csp-provider/index.parts.ts",
+      "gitBlob": "0cfdf6666b020057d4185349149ad194a316777c",
+      "size": 45
+    },
+    {
+      "path": "packages/react/src/csp-provider/index.ts",
+      "gitBlob": "267a7f66f4471f2ca05357e598c0fcf1c9a59158",
+      "size": 82
+    },
+    {
+      "path": "packages/react/src/dialog/backdrop/DialogBackdrop.test.tsx",
+      "gitBlob": "4b5f26603690d2bbef42b12cc14482a400edfe66",
+      "size": 5140
+    },
+    {
+      "path": "packages/react/src/dialog/backdrop/DialogBackdrop.tsx",
+      "gitBlob": "a6040eb15f8b0a7c84c0e5cbdb5474b937623d53",
+      "size": 2406
+    },
+    {
+      "path": "packages/react/src/dialog/backdrop/DialogBackdropDataAttributes.ts",
+      "gitBlob": "bce969cd15f120539cc6f239bc8481480e60264e",
+      "size": 540
+    },
+    {
+      "path": "packages/react/src/dialog/close/DialogClose.test.tsx",
+      "gitBlob": "2118c1a5295b128544a46ce9e3fc6c59f0e3f9b8",
+      "size": 3696
+    },
+    {
+      "path": "packages/react/src/dialog/close/DialogClose.tsx",
+      "gitBlob": "2dd2a8f5fe342c1ffc8c9793aa0f7ae05c7671f9",
+      "size": 1851
+    },
+    {
+      "path": "packages/react/src/dialog/close/DialogCloseDataAttributes.ts",
+      "gitBlob": "6f4d8445ba205b393b0216b29bd94112e58be825",
+      "size": 126
+    },
+    {
+      "path": "packages/react/src/dialog/description/DialogDescription.test.tsx",
+      "gitBlob": "bd71cd8834732fd8bf7ce8fc1f3d77b9e584fd74",
+      "size": 540
+    },
+    {
+      "path": "packages/react/src/dialog/description/DialogDescription.tsx",
+      "gitBlob": "31ea2fa8e19ac7c827fe92c5ad357b9a3e6eddfb",
+      "size": 1295
+    },
+    {
+      "path": "packages/react/src/dialog/index.parts.ts",
+      "gitBlob": "08fdf054a249ea101cc03c2ab320df9b292ddfc9",
+      "size": 695
+    },
+    {
+      "path": "packages/react/src/dialog/index.ts",
+      "gitBlob": "e1fe4dbc727c6d244aac4d9d92e63ef4f02193a8",
+      "size": 448
+    },
+    {
+      "path": "packages/react/src/dialog/popup/DialogPopup.test.tsx",
+      "gitBlob": "42e0df42d4b5a8a4a31c2bfcf369cddbae354a2b",
+      "size": 32659
+    },
+    {
+      "path": "packages/react/src/dialog/popup/DialogPopup.tsx",
+      "gitBlob": "e7eb08b88aabf1c4359afeb677ea87596a1daa73",
+      "size": 6523
+    },
+    {
+      "path": "packages/react/src/dialog/popup/DialogPopupCssVars.ts",
+      "gitBlob": "fe44faf9dedbd046934f64eac8457a01f8644173",
+      "size": 156
+    },
+    {
+      "path": "packages/react/src/dialog/popup/DialogPopupDataAttributes.ts",
+      "gitBlob": "313366959bbee680d2ba7de7b3c236f7f49a3993",
+      "size": 767
+    },
+    {
+      "path": "packages/react/src/dialog/portal/DialogPortal.test.tsx",
+      "gitBlob": "a0f115341dca74c3c11190dca3809288dd6d7724",
+      "size": 1839
+    },
+    {
+      "path": "packages/react/src/dialog/portal/DialogPortal.tsx",
+      "gitBlob": "4a4a9c8e2281e4e97f957bcb77f2a38db151b9b7",
+      "size": 1986
+    },
+    {
+      "path": "packages/react/src/dialog/portal/DialogPortalContext.ts",
+      "gitBlob": "90ff9a63093fd352774a8a770675e34f7fabfb43",
+      "size": 346
+    },
+    {
+      "path": "packages/react/src/dialog/root/DialogRoot.detached-triggers.test.tsx",
+      "gitBlob": "9244a1ca497532ec24c07783c7cfc40cd2258de9",
+      "size": 26580
+    },
+    {
+      "path": "packages/react/src/dialog/root/DialogRoot.spec.tsx",
+      "gitBlob": "a1aea2594c6247893b614dfd49ab0171a2097d59",
+      "size": 818
+    },
+    {
+      "path": "packages/react/src/dialog/root/DialogRoot.test.tsx",
+      "gitBlob": "dec4c79d281f6cc4129c998ae788a61408445e08",
+      "size": 56661
+    },
+    {
+      "path": "packages/react/src/dialog/root/DialogRoot.tsx",
+      "gitBlob": "64bbd73c853b6e81d09283e3ce0f5b7dfefcbea6",
+      "size": 4533
+    },
+    {
+      "path": "packages/react/src/dialog/root/DialogRootContext.ts",
+      "gitBlob": "b15fd5e2d1f2d059bf703c39cd5b2a528bdf8720",
+      "size": 855
+    },
+    {
+      "path": "packages/react/src/dialog/root/useDialogRoot.ts",
+      "gitBlob": "7576a57406ba3ba42626ce562814f62f772797cd",
+      "size": 5358
+    },
+    {
+      "path": "packages/react/src/dialog/root/useRenderDialogRoot.tsx",
+      "gitBlob": "668287ed45fef679c2e718c8ccfc0c7650844ee3",
+      "size": 3216
+    },
+    {
+      "path": "packages/react/src/dialog/store/DialogHandle.ts",
+      "gitBlob": "9ce56266946229fd02dfcadd02fd9b725d356ccb",
+      "size": 2478
+    },
+    {
+      "path": "packages/react/src/dialog/store/DialogStore.ts",
+      "gitBlob": "0a9dd71b560d38d67e593129000610ed8bc2cc02",
+      "size": 5028
+    },
+    {
+      "path": "packages/react/src/dialog/title/DialogTitle.test.tsx",
+      "gitBlob": "5cad4ce870ad925557fe2e2ac7f034beb6e0f2df",
+      "size": 526
+    },
+    {
+      "path": "packages/react/src/dialog/title/DialogTitle.tsx",
+      "gitBlob": "8a6979587eedd400f2668d1efbf747772a565a40",
+      "size": 1213
+    },
+    {
+      "path": "packages/react/src/dialog/trigger/DialogTrigger.test.tsx",
+      "gitBlob": "ab2c41d4493806dc78489ce8c3cda8c01e62071d",
+      "size": 2199
+    },
+    {
+      "path": "packages/react/src/dialog/trigger/DialogTrigger.tsx",
+      "gitBlob": "0bb93312ef6f47353e07ca1c48623938a82a2fc6",
+      "size": 4342
+    },
+    {
+      "path": "packages/react/src/dialog/trigger/DialogTriggerDataAttributes.ts",
+      "gitBlob": "7732745ceba7debb23ba9dc9fc0c04eb60a3dd74",
+      "size": 324
+    },
+    {
+      "path": "packages/react/src/dialog/viewport/DialogViewport.test.tsx",
+      "gitBlob": "bcea124c0f4f4f2e615e00370d08abcc1652d1df",
+      "size": 2009
+    },
+    {
+      "path": "packages/react/src/dialog/viewport/DialogViewport.tsx",
+      "gitBlob": "c0bb72e0749df5cd0018b640ae74e133f2e2f361",
+      "size": 3153
+    },
+    {
+      "path": "packages/react/src/dialog/viewport/DialogViewportDataAttributes.ts",
+      "gitBlob": "fdd49da340e614a69b20adf5680e33463085edbe",
+      "size": 770
+    },
+    {
+      "path": "packages/react/src/direction-provider/DirectionProvider.spec.tsx",
+      "gitBlob": "655bc214d1eb24658ff96dae54d317fe2a5acd82",
+      "size": 711
+    },
+    {
+      "path": "packages/react/src/direction-provider/DirectionProvider.test.tsx",
+      "gitBlob": "d861d3bfa9e42eef257029ab5bf52b89e3969f8d",
+      "size": 1209
+    },
+    {
+      "path": "packages/react/src/direction-provider/DirectionProvider.tsx",
+      "gitBlob": "b5f2b310893fe1d5a33feb24f53fbe5979ae9e46",
+      "size": 1015
+    },
+    {
+      "path": "packages/react/src/direction-provider/index.parts.ts",
+      "gitBlob": "ae024a9d001eba3219d3dfe01ff84593b33c514f",
+      "size": 237
+    },
+    {
+      "path": "packages/react/src/direction-provider/index.ts",
+      "gitBlob": "834323baa8fad62b2d3b5090ce93bd353bcebe07",
+      "size": 164
+    },
+    {
+      "path": "packages/react/src/drawer/backdrop/DrawerBackdrop.tsx",
+      "gitBlob": "b957625468c9a04d4968e5547626774ffb3e6c3f",
+      "size": 2728
+    },
+    {
+      "path": "packages/react/src/drawer/backdrop/DrawerBackdropCssVars.ts",
+      "gitBlob": "cd92f7ce490f4e2cafa4ff426dbdb552c5b2af6d",
+      "size": 162
+    },
+    {
+      "path": "packages/react/src/drawer/backdrop/DrawerBackdropDataAttributes.ts",
+      "gitBlob": "a22d39374e42c899b6e50b27ed2e6093a1a02932",
+      "size": 540
+    },
+    {
+      "path": "packages/react/src/drawer/close/DrawerClose.tsx",
+      "gitBlob": "c7263511b9aaa0c96c1885536edba4679c681645",
+      "size": 855
+    },
+    {
+      "path": "packages/react/src/drawer/content/DrawerContent.test.tsx",
+      "gitBlob": "607f648f1e2e0bd4ac2552aa80cb52e423e2efdd",
+      "size": 1228
+    },
+    {
+      "path": "packages/react/src/drawer/content/DrawerContent.tsx",
+      "gitBlob": "f53c943542a7880d462aebf25634f834c488c35b",
+      "size": 1172
+    },
+    {
+      "path": "packages/react/src/drawer/content/DrawerContentDataAttributes.ts",
+      "gitBlob": "5ddd57b70ba92fd87d2f94dcbc5357ebe3dd0fd2",
+      "size": 63
+    },
+    {
+      "path": "packages/react/src/drawer/description/DrawerDescription.tsx",
+      "gitBlob": "0c17a3654ce33e31ba261c042c71a55dcf8f43d8",
+      "size": 833
+    },
+    {
+      "path": "packages/react/src/drawer/indent-background/DrawerIndentBackground.test.tsx",
+      "gitBlob": "ca5d558628ca415221a82dc3ca4b95fb0ef3309a",
+      "size": 1076
+    },
+    {
+      "path": "packages/react/src/drawer/indent-background/DrawerIndentBackground.tsx",
+      "gitBlob": "755f743f9b45101a18d435a84c998d552d507ab0",
+      "size": 1840
+    },
+    {
+      "path": "packages/react/src/drawer/indent/DrawerIndent.test.tsx",
+      "gitBlob": "c574c96d2e3bb3393a5881dedbbb99598a530dd9",
+      "size": 1235
+    },
+    {
+      "path": "packages/react/src/drawer/indent/DrawerIndent.tsx",
+      "gitBlob": "d1744d2d8c9582a1350be3991fb36e067a90915a",
+      "size": 3236
+    },
+    {
+      "path": "packages/react/src/drawer/index.parts.ts",
+      "gitBlob": "28f0912e4078379b4d5bc945c65665153c7990fe",
+      "size": 1228
+    },
+    {
+      "path": "packages/react/src/drawer/index.ts",
+      "gitBlob": "df2831c7cdf79df15d8b23f2fa938c9fa8ac466f",
+      "size": 782
+    },
+    {
+      "path": "packages/react/src/drawer/popup/DrawerPopup.test.tsx",
+      "gitBlob": "f21ad4e7f701e1d1e1619b6558f4f3af99582cdc",
+      "size": 19952
+    },
+    {
+      "path": "packages/react/src/drawer/popup/DrawerPopup.tsx",
+      "gitBlob": "a2e5d19c5370076ad2608472d541d8b2c2b48f0c",
+      "size": 15629
+    },
+    {
+      "path": "packages/react/src/drawer/popup/DrawerPopupCssVars.ts",
+      "gitBlob": "b88e50e5ed456c21e8a57711cc582db772c02299",
+      "size": 984
+    },
+    {
+      "path": "packages/react/src/drawer/popup/DrawerPopupDataAttributes.ts",
+      "gitBlob": "8b64ef56dcc966426c4655626db799dd297b83c0",
+      "size": 1201
+    },
+    {
+      "path": "packages/react/src/drawer/portal/DrawerPortal.tsx",
+      "gitBlob": "8dad6f8d06a24b22cfe15b482ef4c4923e796b5a",
+      "size": 1178
+    },
+    {
+      "path": "packages/react/src/drawer/provider/DrawerProvider.tsx",
+      "gitBlob": "c29fb8db689fd789ab08bdf7799cb610ce93aa3c",
+      "size": 3291
+    },
+    {
+      "path": "packages/react/src/drawer/provider/DrawerProviderContext.ts",
+      "gitBlob": "f1f73f11b1560175c7ec6b49ad98570d5bac5127",
+      "size": 1115
+    },
+    {
+      "path": "packages/react/src/drawer/root/DrawerRoot.spec.tsx",
+      "gitBlob": "1ff4e51405f9ba4b74d3d4d9859be63f0c48af19",
+      "size": 1299
+    },
+    {
+      "path": "packages/react/src/drawer/root/DrawerRoot.test.tsx",
+      "gitBlob": "05adb089b678516825dc4617c18fac5ca737a144",
+      "size": 34688
+    },
+    {
+      "path": "packages/react/src/drawer/root/DrawerRoot.tsx",
+      "gitBlob": "406f7f98655479c16c610c5ba38c7b5a10fead18",
+      "size": 15293
+    },
+    {
+      "path": "packages/react/src/drawer/root/DrawerRootContext.ts",
+      "gitBlob": "8766f6c61e90327bb93df848d9aeee8834345d57",
+      "size": 3735
+    },
+    {
+      "path": "packages/react/src/drawer/root/useDrawerSnapPoints.test.ts",
+      "gitBlob": "6565a56852ecbd6f112cdc27561a7eee3e45caec",
+      "size": 766
+    },
+    {
+      "path": "packages/react/src/drawer/root/useDrawerSnapPoints.ts",
+      "gitBlob": "ac8099b163dd659de7cd74b31ae0457051da1bc9",
+      "size": 6007
+    },
+    {
+      "path": "packages/react/src/drawer/swipe-area/DrawerSwipeArea.test.tsx",
+      "gitBlob": "635a92ce3da12745a4fc3906d63f7448e3c3e884",
+      "size": 12635
+    },
+    {
+      "path": "packages/react/src/drawer/swipe-area/DrawerSwipeArea.tsx",
+      "gitBlob": "b1d81e4daf1a501d9949875671d8e3502bde0b40",
+      "size": 15607
+    },
+    {
+      "path": "packages/react/src/drawer/swipe-area/DrawerSwipeAreaDataAttributes.ts",
+      "gitBlob": "f51bf43d3b62a95a73936f0a4518520baf288f8e",
+      "size": 621
+    },
+    {
+      "path": "packages/react/src/drawer/title/DrawerTitle.tsx",
+      "gitBlob": "0fd8da8575ba91dfafb8b939c78cd3c66a94a5cf",
+      "size": 728
+    },
+    {
+      "path": "packages/react/src/drawer/trigger/DrawerTrigger.tsx",
+      "gitBlob": "9c40897e7b8e59c355e6bde44e51b3f4a706d430",
+      "size": 1695
+    },
+    {
+      "path": "packages/react/src/drawer/viewport/DrawerViewport.test.tsx",
+      "gitBlob": "7b481e181c3119e79bcd8a0d1f6d3fcb37628eb6",
+      "size": 71944
+    },
+    {
+      "path": "packages/react/src/drawer/viewport/DrawerViewport.tsx",
+      "gitBlob": "69f338461a76a080314691f26bf136852a8c1fc1",
+      "size": 46513
+    },
+    {
+      "path": "packages/react/src/drawer/viewport/DrawerViewportContext.tsx",
+      "gitBlob": "fd0737115001cef82f4bd6b77bfee83afdf3c750",
+      "size": 847
+    },
+    {
+      "path": "packages/react/src/drawer/viewport/DrawerViewportCssVars.ts",
+      "gitBlob": "18519689fb2c6f99f07fc9653f0989bd446a4dbf",
+      "size": 289
+    },
+    {
+      "path": "packages/react/src/drawer/viewport/DrawerViewportDataAttributes.ts",
+      "gitBlob": "cfca3dd3aea840eaf981d62c5277494647f6a843",
+      "size": 640
+    },
+    {
+      "path": "packages/react/src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardContext.tsx",
+      "gitBlob": "4e36de832fe185aa5f75a40729fb6e28d19cd797",
+      "size": 670
+    },
+    {
+      "path": "packages/react/src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.test.tsx",
+      "gitBlob": "7796c380770532c5b4879ae70a9eea3dd2199b36",
+      "size": 65048
+    },
+    {
+      "path": "packages/react/src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.tsx",
+      "gitBlob": "5a319b756aa9a1cc437a3da10ae91db9946c0b40",
+      "size": 22195
+    },
+    {
+      "path": "packages/react/src/field/control/FieldControl.spec.tsx",
+      "gitBlob": "68ae162c5c4a99d68bfe924c2f9f4ce6df1ae225",
+      "size": 213
+    },
+    {
+      "path": "packages/react/src/field/control/FieldControl.test.tsx",
+      "gitBlob": "02dc737d3716cd6814752216c9fde82be60a06b8",
+      "size": 3295
+    },
+    {
+      "path": "packages/react/src/field/control/FieldControl.tsx",
+      "gitBlob": "1ec0602ab8c5d4415eb20695112018ef2d9099a8",
+      "size": 6166
+    },
+    {
+      "path": "packages/react/src/field/control/FieldControlDataAttributes.ts",
+      "gitBlob": "1501135356cb04fec24d473c94685132a8c923c5",
+      "size": 639
+    },
+    {
+      "path": "packages/react/src/field/description/FieldDescription.test.tsx",
+      "gitBlob": "fc6df38af5fed803dca1c4c93db82560eb4525d3",
+      "size": 1612
+    },
+    {
+      "path": "packages/react/src/field/description/FieldDescription.tsx",
+      "gitBlob": "39f9692b3d7e394cf6be062855cc7d3d685b795c",
+      "size": 2213
+    },
+    {
+      "path": "packages/react/src/field/description/FieldDescriptionDataAttributes.ts",
+      "gitBlob": "9dab08bb29ba739e4cb38d2a99a9582b90e9fd9e",
+      "size": 643
+    },
+    {
+      "path": "packages/react/src/field/error/FieldError.test.tsx",
+      "gitBlob": "30a3d75dfad96abd9591a784f59580742b4e5f6a",
+      "size": 13264
+    },
+    {
+      "path": "packages/react/src/field/error/FieldError.tsx",
+      "gitBlob": "d36688d1ced91d93abd784348e9d88db1ee43653",
+      "size": 4980
+    },
+    {
+      "path": "packages/react/src/field/error/FieldErrorDataAttributes.ts",
+      "gitBlob": "ae64097fa188d97b64add8baac3fa780eec345e3",
+      "size": 982
+    },
+    {
+      "path": "packages/react/src/field/index.parts.ts",
+      "gitBlob": "83d6c2aa86fb128e40e2090e74762a08cad5fe5e",
+      "size": 518
+    },
+    {
+      "path": "packages/react/src/field/index.ts",
+      "gitBlob": "4068c80931a2fe8e66ebb45e4189af6369aca3bb",
+      "size": 346
+    },
+    {
+      "path": "packages/react/src/field/item/FieldItem.test.tsx",
+      "gitBlob": "0ec5c706694d3cb7bf455ae5f1a0816b983f621f",
+      "size": 2864
+    },
+    {
+      "path": "packages/react/src/field/item/FieldItem.tsx",
+      "gitBlob": "450849cc2f01c604c523b5f033358cb1e633106b",
+      "size": 2447
+    },
+    {
+      "path": "packages/react/src/field/item/FieldItemContext.ts",
+      "gitBlob": "a4781ca603d2eca1470cbd794785440197a539fd",
+      "size": 315
+    },
+    {
+      "path": "packages/react/src/field/item/FieldItemDataAttributes.ts",
+      "gitBlob": "b990575d94a714f56533f0160873f265cc139724",
+      "size": 636
+    },
+    {
+      "path": "packages/react/src/field/label/FieldLabel.test.tsx",
+      "gitBlob": "7d0cbf688ea4c10ff384911d366a381d6a336165",
+      "size": 3993
+    },
+    {
+      "path": "packages/react/src/field/label/FieldLabel.tsx",
+      "gitBlob": "fe69a5cb4f15cdfb1f82b216f73cc03a44704508",
+      "size": 4002
+    },
+    {
+      "path": "packages/react/src/field/label/FieldLabelDataAttributes.ts",
+      "gitBlob": "2b5a36b4bfd2746b11e0cbbc798468668ef5812a",
+      "size": 637
+    },
+    {
+      "path": "packages/react/src/field/root/FieldRoot.test.tsx",
+      "gitBlob": "8f2e77162f757ba46471fe8588fc3aa57e24c5f0",
+      "size": 56336
+    },
+    {
+      "path": "packages/react/src/field/root/FieldRoot.tsx",
+      "gitBlob": "d7c126306e77a47d43d9e2916ff5f2256d1f1e93",
+      "size": 9608
+    },
+    {
+      "path": "packages/react/src/field/root/FieldRootDataAttributes.ts",
+      "gitBlob": "46125622d3e27f02ae12406fc7e86da5fa3be5dc",
+      "size": 613
+    },
+    {
+      "path": "packages/react/src/field/root/useFieldValidation.ts",
+      "gitBlob": "26c0ecb57ae72d0e6f0854f2bb344e95063641fd",
+      "size": 11976
+    },
+    {
+      "path": "packages/react/src/field/utils/getCombinedFieldValidityData.ts",
+      "gitBlob": "e45f3344085ece42eac27414ca562c23f09ddaf1",
+      "size": 460
+    },
+    {
+      "path": "packages/react/src/field/validity/FieldValidity.test.tsx",
+      "gitBlob": "21fa3c35b257e0b516e5c54b8993c924064eb2f8",
+      "size": 3500
+    },
+    {
+      "path": "packages/react/src/field/validity/FieldValidity.tsx",
+      "gitBlob": "6d26e68cc63bc94a03a88fab87a21e05307e2acd",
+      "size": 2121
+    },
+    {
+      "path": "packages/react/src/fieldset/index.parts.ts",
+      "gitBlob": "667b0ce2d1b134f4bd093506bfa45455f8a7efab",
+      "size": 128
+    },
+    {
+      "path": "packages/react/src/fieldset/index.ts",
+      "gitBlob": "9b7319890075f9bfcea460f79432b67c3626ac50",
+      "size": 132
+    },
+    {
+      "path": "packages/react/src/fieldset/legend/FieldsetLegend.test.tsx",
+      "gitBlob": "6938e22519e2549b56b882559e8b1ffdfb4c8b21",
+      "size": 2466
+    },
+    {
+      "path": "packages/react/src/fieldset/legend/FieldsetLegend.tsx",
+      "gitBlob": "4390cbeb6227a8ad045947682599c6bc17968d92",
+      "size": 1658
+    },
+    {
+      "path": "packages/react/src/fieldset/root/FieldsetRoot.test.tsx",
+      "gitBlob": "c65fe5a6bb476ee44d2ef82b0c695921eaa4e55b",
+      "size": 2313
+    },
+    {
+      "path": "packages/react/src/fieldset/root/FieldsetRoot.tsx",
+      "gitBlob": "482386c82697bcf7dd003240a8bdc1deb3068808",
+      "size": 1847
+    },
+    {
+      "path": "packages/react/src/fieldset/root/FieldsetRootContext.ts",
+      "gitBlob": "404c5f14005e1637ef3b0287752acee98c4aa77a",
+      "size": 799
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/components/FloatingDelayGroup.test.tsx",
+      "gitBlob": "008ea6e3b1f18f7c67efeb804787a9f6a0638f21",
+      "size": 9558
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/components/FloatingDelayGroup.tsx",
+      "gitBlob": "fb3d155e1bf70462610fe4427732428ed57121d4",
+      "size": 7597
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/components/FloatingFocusManager.test.tsx",
+      "gitBlob": "760d1d5622ec82b9ae43b1929ed940e86a685299",
+      "size": 76831
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/components/FloatingFocusManager.tsx",
+      "gitBlob": "c27a83400261c76b7468bb7f93d59badbbc8435e",
+      "size": 35839
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/components/FloatingPortal.test.tsx",
+      "gitBlob": "9ae1f6e65c10275df23f1d61a536e12b5fd89bfb",
+      "size": 4977
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/components/FloatingPortal.tsx",
+      "gitBlob": "be31a838e8ec2056efac48694d33352a23e23111",
+      "size": 10297
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/components/FloatingRootStore.ts",
+      "gitBlob": "145f0eb84a9e25d5b0c75264ef9ee1e82dfce814",
+      "size": 4691
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/components/FloatingTree.tsx",
+      "gitBlob": "df48366024af023ab71ec5695e712e2c764a554f",
+      "size": 3140
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/components/FloatingTreeStore.ts",
+      "gitBlob": "1c92fe37e4937ab61f10fae4cb00cf5cfd7d39a8",
+      "size": 735
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/gridNavigation.ts",
+      "gitBlob": "a05fb59d4c35299e3bc9560e4ad9411325bbc36d",
+      "size": 1793
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useClick.test.tsx",
+      "gitBlob": "1d5fa0b5dd8352b0022f8c462bfffe8f8dd0865e",
+      "size": 8576
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useClick.ts",
+      "gitBlob": "901f8d60123d63f6e942dc9568e5d37534f8e600",
+      "size": 7043
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useClientPoint.test.tsx",
+      "gitBlob": "1717239c64570cdadf4a639b34b7894e7112527d",
+      "size": 11032
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useClientPoint.ts",
+      "gitBlob": "c25e990398044bb0bc968c0f0243a10e8e900e4e",
+      "size": 7651
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useDismiss.test.tsx",
+      "gitBlob": "f7a8e47867420c9272b8014161a845ff62f32418",
+      "size": 39784
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useDismiss.ts",
+      "gitBlob": "631fb79cbd155b65f2a3f990d9a6f9ee9972f8eb",
+      "size": 24742
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useFloating.test.tsx",
+      "gitBlob": "9da1f123703a9b168e7a80fbf38206c1703ad499",
+      "size": 1461
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useFloating.ts",
+      "gitBlob": "fac5560ea2792b5ddb8ed2ad102c4ee35eb29ec1",
+      "size": 5899
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useFloatingRootContext.ts",
+      "gitBlob": "2c62b8fbee3d43dd0a08d6d13fc3e23fe6158a5c",
+      "size": 2722
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useFocus.ts",
+      "gitBlob": "de8b21e3e3d3b789cb20063ad7f4d00c4934757f",
+      "size": 8053
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useHover.test.tsx",
+      "gitBlob": "c557cdf06bd5ee89192f22a6d0c970769a2845ba",
+      "size": 10819
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useHover.ts",
+      "gitBlob": "91358654f3f7d5f0b95b2e90b3dc71ad6202e1e2",
+      "size": 15372
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useHoverFloatingInteraction.ts",
+      "gitBlob": "ecaaa538e331cd53166f8950e9a3c105d3f6dda2",
+      "size": 8655
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useHoverInteractionSharedState.ts",
+      "gitBlob": "29ad3f90a1a3c9e1475259503ad53d097e4ac681",
+      "size": 4368
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useHoverReferenceInteraction.test.tsx",
+      "gitBlob": "809b754cd3d7735e269865a3f1abd39d9152443c",
+      "size": 10304
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useHoverReferenceInteraction.ts",
+      "gitBlob": "3f290d7e8d95fbdde9348e8995a45e532b3c95e1",
+      "size": 15774
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useHoverShared.ts",
+      "gitBlob": "5af28072931f1e3204574b0642dfbde549c9d6f7",
+      "size": 2086
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useListNavigation.test.tsx",
+      "gitBlob": "9e7daaab8d0de5febd1eec5451c48bcb55b288fc",
+      "size": 56955
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useListNavigation.ts",
+      "gitBlob": "4a89fbb2afbf6702ac19458a72be34b17f4bde37",
+      "size": 29317
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useSyncedFloatingRootContext.ts",
+      "gitBlob": "2f1916ac81da7e6663acc3f3c4b516cb05842cf2",
+      "size": 3584
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useTypeahead.test.tsx",
+      "gitBlob": "aac0cc64057d9bd35cb848ba16d0292d1d92aaa3",
+      "size": 9987
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/hooks/useTypeahead.ts",
+      "gitBlob": "4b650e4bb36e1e73d2b52a27fea70eb86018f00e",
+      "size": 8742
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/index.ts",
+      "gitBlob": "a2b3f5778f206ae369b07c5b9c488b9c07b77c48",
+      "size": 1487
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/middleware/arrow.ts",
+      "gitBlob": "760b9d420acabc363d0a0bf065c3512e5bbbe571",
+      "size": 4435
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/safePolygon.test.ts",
+      "gitBlob": "24eba12de477e98414cfa25756564164fe7dc282",
+      "size": 9539
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/safePolygon.ts",
+      "gitBlob": "446998679b490c952f71946b8ce566862560953e",
+      "size": 13400
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/types.ts",
+      "gitBlob": "63a036a45ed9b5e6e3be21a9ec66a286e1623acf",
+      "size": 5850
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils.ts",
+      "gitBlob": "c185bdd5f073ec2eaa0e6dad0634c40a5c8312da",
+      "size": 164
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/composite.test.ts",
+      "gitBlob": "66eec32fe9d3e2a59bf34aa48033a55031325027",
+      "size": 1639
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/composite.ts",
+      "gitBlob": "b3fa2479d4cfb02d2f4659fc50513b705f143b17",
+      "size": 14554
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/constants.ts",
+      "gitBlob": "2da316debf2fe4df597143c9a4886dcfa02a0db9",
+      "size": 453
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/createAttribute.ts",
+      "gitBlob": "5a4400096dd52ab4374dd4cffbc916755a930b00",
+      "size": 83
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/createEventEmitter.ts",
+      "gitBlob": "94e9f818731c0a2d62f5e9a0b2b62c60dc5a0081",
+      "size": 555
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/element.ts",
+      "gitBlob": "705cc36ec416a6e47f640d939e5e0a983b6e56f1",
+      "size": 2954
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/enqueueFocus.ts",
+      "gitBlob": "3f7506fdbd8d0f8e9f190a2e34bbd141cbd82cff",
+      "size": 886
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/event.ts",
+      "gitBlob": "8f3248be8d600741ff9e583ca43502b6d49f5a76",
+      "size": 1944
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/getEmptyRootContext.ts",
+      "gitBlob": "0c1e0e6ef02da7d851aab272733b7a9ca49324d9",
+      "size": 524
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/markOthers.test.ts",
+      "gitBlob": "18eb034e0e8948ce910de8de6f852bebc1f2e14d",
+      "size": 9470
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/markOthers.ts",
+      "gitBlob": "abe982768a61718cf0d9f03dd06099c00473d999",
+      "size": 5971
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/nodes.test.ts",
+      "gitBlob": "c4fda26da19b41a107611d7959362de110e73b76",
+      "size": 4045
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/nodes.ts",
+      "gitBlob": "507cf48467f3f99369473721cac0ca8a380a4e9f",
+      "size": 1516
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/tabbable.test.ts",
+      "gitBlob": "6789f60f2350e47d93d5476801a9abf9fed02b1a",
+      "size": 12151
+    },
+    {
+      "path": "packages/react/src/floating-ui-react/utils/tabbable.ts",
+      "gitBlob": "6bdddc7f42da080f2c3fa8121a3d94a28dee31b1",
+      "size": 8406
+    },
+    {
+      "path": "packages/react/src/form/Form.spec.tsx",
+      "gitBlob": "8aa4626d803d00fe9669ca214b24fd904216aaef",
+      "size": 395
+    },
+    {
+      "path": "packages/react/src/form/Form.test.tsx",
+      "gitBlob": "4d88aaf0d00fb7b5211f8265f37d569918c8e9a6",
+      "size": 24641
+    },
+    {
+      "path": "packages/react/src/form/Form.tsx",
+      "gitBlob": "776e06bdb4b6c3a3b44cce60c77371722892cdbc",
+      "size": 7202
+    },
+    {
+      "path": "packages/react/src/form/index.ts",
+      "gitBlob": "0253efffb38354bfe8a881606d11d9d41b7e751e",
+      "size": 61
+    },
+    {
+      "path": "packages/react/src/global.d.ts",
+      "gitBlob": "dec6953711127df1d23f77afd063293fcbc40e91",
+      "size": 231
+    },
+    {
+      "path": "packages/react/src/index.test.ts",
+      "gitBlob": "ebc8c4dba9695566e789bd0c0da5736f85bcef7e",
+      "size": 2002
+    },
+    {
+      "path": "packages/react/src/index.ts",
+      "gitBlob": "c2c9c5d56de3fcf331d21ef99a85b809bbb2d9e5",
+      "size": 1228
+    },
+    {
+      "path": "packages/react/src/input/index.ts",
+      "gitBlob": "d4b71df19ef24940fd724f9dcbba38702477f507",
+      "size": 64
+    },
+    {
+      "path": "packages/react/src/input/Input.spec.tsx",
+      "gitBlob": "e55392a379db1f7a5a9d8ba1368788eb8282ed25",
+      "size": 205
+    },
+    {
+      "path": "packages/react/src/input/Input.test.tsx",
+      "gitBlob": "0680a1bb35dc113ee4a8cae0b7a16dd977ff7f88",
+      "size": 355
+    },
+    {
+      "path": "packages/react/src/input/Input.tsx",
+      "gitBlob": "ce141f77f750f3d472d9d7ec9540ab842cde0192",
+      "size": 1527
+    },
+    {
+      "path": "packages/react/src/input/InputDataAttributes.ts",
+      "gitBlob": "7fcb942e292f3c2a0dc69bb056c8033802eef4a7",
+      "size": 798
+    },
+    {
+      "path": "packages/react/src/internals/areArraysEqual.ts",
+      "gitBlob": "e4791eb48627b109f37c8f9e1d2a61ef7d9820de",
+      "size": 346
+    },
+    {
+      "path": "packages/react/src/internals/clamp.test.ts",
+      "gitBlob": "020f4f069dd00ae0914479dab8fd03db3c3f0562",
+      "size": 266
+    },
+    {
+      "path": "packages/react/src/internals/clamp.ts",
+      "gitBlob": "0dfd57f30b26b625e0b1aa7add9b08aaa8ec14d7",
+      "size": 178
+    },
+    {
+      "path": "packages/react/src/internals/composite/composite.ts",
+      "gitBlob": "edd76cb7968efcb25340b8950bbb904cff1cc544",
+      "size": 6448
+    },
+    {
+      "path": "packages/react/src/internals/composite/constants.ts",
+      "gitBlob": "6129a00ca5c773674cb379039449bd9e69a95dc4",
+      "size": 67
+    },
+    {
+      "path": "packages/react/src/internals/composite/index.ts",
+      "gitBlob": "49c266fe0ad1337fa1bdc6d470a6909362733d05",
+      "size": 934
+    },
+    {
+      "path": "packages/react/src/internals/composite/item/CompositeItem.tsx",
+      "gitBlob": "c4bd0420aecb568295adbcf5ed883079e3af73d7",
+      "size": 1768
+    },
+    {
+      "path": "packages/react/src/internals/composite/item/useCompositeItem.ts",
+      "gitBlob": "2c1740b0c79c9b324f151261d7d385d026a19747",
+      "size": 1462
+    },
+    {
+      "path": "packages/react/src/internals/composite/list/CompositeList.test.tsx",
+      "gitBlob": "52b6f89377300d14fc79df611982790eba09734b",
+      "size": 1082
+    },
+    {
+      "path": "packages/react/src/internals/composite/list/CompositeList.tsx",
+      "gitBlob": "9040e8edda2f8e0f1c8ec8337edc423e74ca26f5",
+      "size": 6208
+    },
+    {
+      "path": "packages/react/src/internals/composite/list/CompositeListContext.ts",
+      "gitBlob": "3225cd9ca06138b2b71eddb25cb1138daf6d39be",
+      "size": 810
+    },
+    {
+      "path": "packages/react/src/internals/composite/list/useCompositeListItem.ts",
+      "gitBlob": "5a7c9c0ec3a33b6374ba90ce5363e28c2437211a",
+      "size": 3005
+    },
+    {
+      "path": "packages/react/src/internals/composite/root/CompositeRoot.test.tsx",
+      "gitBlob": "553699cb01e1391479c279af018a696e04c48fa8",
+      "size": 32874
+    },
+    {
+      "path": "packages/react/src/internals/composite/root/CompositeRoot.tsx",
+      "gitBlob": "4dc4cff15de05ce5eb2a305b0603f6dbb5f16f5e",
+      "size": 4402
+    },
+    {
+      "path": "packages/react/src/internals/composite/root/CompositeRootContext.ts",
+      "gitBlob": "20880b4b21095fae4cdfa8a1e0f8199dfe4a69c2",
+      "size": 1289
+    },
+    {
+      "path": "packages/react/src/internals/composite/root/gridNavigation.ts",
+      "gitBlob": "b14c920328faa5a7b50055da46a7bf2c6a9b1718",
+      "size": 3836
+    },
+    {
+      "path": "packages/react/src/internals/composite/root/useCompositeRoot.ts",
+      "gitBlob": "f85448c523915fa8f38dbe9efeccda5ebdf8b2a5",
+      "size": 11902
+    },
+    {
+      "path": "packages/react/src/internals/constants.ts",
+      "gitBlob": "8e0f87debae3466f8a2f62ec3136071c94282113",
+      "size": 1449
+    },
+    {
+      "path": "packages/react/src/internals/createBaseUIEventDetails.spec.ts",
+      "gitBlob": "8db0128d05ac959ab3aa1f735a9a7c272144607d",
+      "size": 585
+    },
+    {
+      "path": "packages/react/src/internals/createBaseUIEventDetails.ts",
+      "gitBlob": "4b647499e480754bec9b3c3cb314eece6c831836",
+      "size": 5212
+    },
+    {
+      "path": "packages/react/src/internals/csp-context/CSPContext.tsx",
+      "gitBlob": "e3d77b3ac85503d2ef9db9357417fd12482828e1",
+      "size": 500
+    },
+    {
+      "path": "packages/react/src/internals/csp-context/index.ts",
+      "gitBlob": "417d872b017c488d2505ac7188c139cf1074da67",
+      "size": 111
+    },
+    {
+      "path": "packages/react/src/internals/direction-context/DirectionContext.tsx",
+      "gitBlob": "883b56967ab2ef5388874b22a0fee6b52451f48f",
+      "size": 400
+    },
+    {
+      "path": "packages/react/src/internals/direction-context/index.ts",
+      "gitBlob": "f3808e242f4b6271b47c4581309d0c7dc1b86237",
+      "size": 168
+    },
+    {
+      "path": "packages/react/src/internals/field-constants/constants.ts",
+      "gitBlob": "5948d620710349b3189b017fab01dfcc08559c84",
+      "size": 1101
+    },
+    {
+      "path": "packages/react/src/internals/field-constants/index.ts",
+      "gitBlob": "67aa287503a29c4509253e24bf69d52e02823ffe",
+      "size": 143
+    },
+    {
+      "path": "packages/react/src/internals/field-register-control/index.ts",
+      "gitBlob": "84000d2cef4a832068d17f2c2a4339d75466bdbc",
+      "size": 269
+    },
+    {
+      "path": "packages/react/src/internals/field-register-control/useFieldControlRegistration.ts",
+      "gitBlob": "68d8232b135a18c2b1030b55878e9c10a3c32841",
+      "size": 4915
+    },
+    {
+      "path": "packages/react/src/internals/field-register-control/useRegisterFieldControl.ts",
+      "gitBlob": "25bc369c59f5c8c194173b937e82e582c2c18c75",
+      "size": 1258
+    },
+    {
+      "path": "packages/react/src/internals/field-root-context/FieldRootContext.ts",
+      "gitBlob": "eb3a424c32649e6b16142a29d0349088244cc7e6",
+      "size": 3086
+    },
+    {
+      "path": "packages/react/src/internals/field-root-context/index.ts",
+      "gitBlob": "dd8f7268d2ac53be56abab866386798fef606fa5",
+      "size": 160
+    },
+    {
+      "path": "packages/react/src/internals/filter.test.ts",
+      "gitBlob": "5e76380e380ab934f51da4b904f68abfb61ae5cb",
+      "size": 354
+    },
+    {
+      "path": "packages/react/src/internals/filter.ts",
+      "gitBlob": "e421df4927e6c1d253a33028572bb589f075aac4",
+      "size": 2566
+    },
+    {
+      "path": "packages/react/src/internals/form-context/FormContext.ts",
+      "gitBlob": "cf0afa573655a2279064fb26d9c0fcf7543bef7f",
+      "size": 1226
+    },
+    {
+      "path": "packages/react/src/internals/form-context/index.ts",
+      "gitBlob": "04cef874bcf4ea83a5b36c321039a0bf7cb66d63",
+      "size": 106
+    },
+    {
+      "path": "packages/react/src/internals/getStateAttributesProps.test.ts",
+      "gitBlob": "db384fe037a48f9e094766248a633fcc2ccd66b4",
+      "size": 1989
+    },
+    {
+      "path": "packages/react/src/internals/getStateAttributesProps.ts",
+      "gitBlob": "58c0c0d0aca15ea171bda1501253a6087c08da79",
+      "size": 830
+    },
+    {
+      "path": "packages/react/src/internals/itemEquality.ts",
+      "gitBlob": "ee26e1fbc65d8d90133a6f7f2d07f25478b41976",
+      "size": 1713
+    },
+    {
+      "path": "packages/react/src/internals/labelable-provider/index.ts",
+      "gitBlob": "2117492ab49784da4be444ef627653126a280579",
+      "size": 317
+    },
+    {
+      "path": "packages/react/src/internals/labelable-provider/LabelableContext.ts",
+      "gitBlob": "5a894eac92788a7539f3d18ea364f9c0fafe3f59",
+      "size": 1296
+    },
+    {
+      "path": "packages/react/src/internals/labelable-provider/LabelableProvider.tsx",
+      "gitBlob": "f2ec310ea4f2140ca4acd669a0a12c32fe421089",
+      "size": 3240
+    },
+    {
+      "path": "packages/react/src/internals/labelable-provider/useAriaLabelledBy.ts",
+      "gitBlob": "50110beb1ed3010988ce7cf94f244b5f4c979756",
+      "size": 2327
+    },
+    {
+      "path": "packages/react/src/internals/labelable-provider/useLabel.ts",
+      "gitBlob": "725aca490f25e7d5592b7b4f88000305f03664ea",
+      "size": 3182
+    },
+    {
+      "path": "packages/react/src/internals/labelable-provider/useLabelableId.ts",
+      "gitBlob": "91ff43d325f75a3d4036a4a160d560f1e8b2b2ae",
+      "size": 2666
+    },
+    {
+      "path": "packages/react/src/internals/noop.ts",
+      "gitBlob": "2e99d7fcc73b11d0ce210c29aabefb4ef09d1b67",
+      "size": 45
+    },
+    {
+      "path": "packages/react/src/internals/reason-parts.ts",
+      "gitBlob": "c364bda5ccd0898fbb5b143b36d68c541fb87d0b",
+      "size": 1730
+    },
+    {
+      "path": "packages/react/src/internals/reasons.ts",
+      "gitBlob": "70f9631f4cb99e76fc28176b0cbe53057bb6fc74",
+      "size": 191
+    },
+    {
+      "path": "packages/react/src/internals/RequestQueue.test.ts",
+      "gitBlob": "93294621f21a773c543acbdb3ead7a261f9abf90",
+      "size": 4845
+    },
+    {
+      "path": "packages/react/src/internals/RequestQueue.ts",
+      "gitBlob": "8fdf5d28bac4269d144caca835ed1d8cde159c25",
+      "size": 3502
+    },
+    {
+      "path": "packages/react/src/internals/resolveValueLabel.test.ts",
+      "gitBlob": "91dc4901df8ad74db7bec38d5143631fcaeffabc",
+      "size": 2576
+    },
+    {
+      "path": "packages/react/src/internals/resolveValueLabel.tsx",
+      "gitBlob": "751a0d228ea96e7e172e7f42261ae3f57ba72cae",
+      "size": 4026
+    },
+    {
+      "path": "packages/react/src/internals/serializeValue.ts",
+      "gitBlob": "d6ecea617e6c22aef5d2d0b9d4879a58eda70edb",
+      "size": 242
+    },
+    {
+      "path": "packages/react/src/internals/shadowDom.ts",
+      "gitBlob": "21252dc799754539adf6da3c7a74746637f4cbb4",
+      "size": 1145
+    },
+    {
+      "path": "packages/react/src/internals/stateAttributesMapping.ts",
+      "gitBlob": "c36371c5a3484d64216f5ef4e92d103813fcafad",
+      "size": 865
+    },
+    {
+      "path": "packages/react/src/internals/temporal-adapter-date-fns/index.ts",
+      "gitBlob": "55c7845308a5b1bbd340743b853ed7f83f441155",
+      "size": 67
+    },
+    {
+      "path": "packages/react/src/internals/temporal-adapter-date-fns/TemporalAdapterDateFns.test.ts",
+      "gitBlob": "9811e4c268c9d20793782aea11a4ac90b1d42c1b",
+      "size": 2539
+    },
+    {
+      "path": "packages/react/src/internals/temporal-adapter-date-fns/TemporalAdapterDateFns.ts",
+      "gitBlob": "4434305aacab37dab6f041269353d8aae8f4ea30",
+      "size": 13789
+    },
+    {
+      "path": "packages/react/src/internals/temporal-adapter-luxon/index.ts",
+      "gitBlob": "e64f8b6024c20941dd6bffab32246b67c9867567",
+      "size": 63
+    },
+    {
+      "path": "packages/react/src/internals/temporal-adapter-luxon/TemporalAdapterLuxon.test.ts",
+      "gitBlob": "aed21eea289a9506e9bbb585735b34782c9e77fd",
+      "size": 615
+    },
+    {
+      "path": "packages/react/src/internals/temporal-adapter-luxon/TemporalAdapterLuxon.ts",
+      "gitBlob": "28f770fbeb136c7598411b68d26fcd9bbca356ee",
+      "size": 10443
+    },
+    {
+      "path": "packages/react/src/internals/temporal/index.ts",
+      "gitBlob": "650e094cec055dcb0db167c318aed17f3aa2c3da",
+      "size": 64
+    },
+    {
+      "path": "packages/react/src/internals/temporal/temporal-adapter.ts",
+      "gitBlob": "b1c0057d1e160bad56e36805c2ce155c208bcdce",
+      "size": 12020
+    },
+    {
+      "path": "packages/react/src/internals/temporal/temporal.ts",
+      "gitBlob": "fd7ac2b1a9a06fc2d517215e23e3f269454364d1",
+      "size": 1787
+    },
+    {
+      "path": "packages/react/src/internals/TimeoutManager.test.ts",
+      "gitBlob": "dd9d0590ca2ccfb5ebf0dc8848fff60a0c02e329",
+      "size": 1902
+    },
+    {
+      "path": "packages/react/src/internals/TimeoutManager.ts",
+      "gitBlob": "97b6c91509042b436a432b5903300738c1254c5a",
+      "size": 642
+    },
+    {
+      "path": "packages/react/src/internals/types.ts",
+      "gitBlob": "b8cd7a0331b9f428070b3ff4be81a1e0865ae63b",
+      "size": 3164
+    },
+    {
+      "path": "packages/react/src/internals/use-button/index.ts",
+      "gitBlob": "95acb7a36d0515ef1ea2612723b02051908fca83",
+      "size": 41
+    },
+    {
+      "path": "packages/react/src/internals/use-button/useButton.test.tsx",
+      "gitBlob": "3347d881fe7ee7eb98f54114e70bfbeff2523182",
+      "size": 26725
+    },
+    {
+      "path": "packages/react/src/internals/use-button/useButton.ts",
+      "gitBlob": "ba43846f687d2eb7302cd8f6e8fdca08fbce5b5a",
+      "size": 9857
+    },
+    {
+      "path": "packages/react/src/internals/useAnimationsFinished.ts",
+      "gitBlob": "8aa71dd76b63b4d33378113b68f8d75d896212d1",
+      "size": 4245
+    },
+    {
+      "path": "packages/react/src/internals/useBaseUiId.ts",
+      "gitBlob": "c46d78204bfcc6743c2fce2fd74ecb683cbe73f6",
+      "size": 359
+    },
+    {
+      "path": "packages/react/src/internals/useOpenChangeComplete.tsx",
+      "gitBlob": "40f35b97cc4ea4ea5c49256d553d7573ad98cb6f",
+      "size": 1381
+    },
+    {
+      "path": "packages/react/src/internals/usePressAndHold.ts",
+      "gitBlob": "5c27febbe2814443715c72d75b53ca0f02816562",
+      "size": 9274
+    },
+    {
+      "path": "packages/react/src/internals/useRenderElement.spec.tsx",
+      "gitBlob": "d2e5d9beb8bd833a5e35346dc24af588abf9a8e7",
+      "size": 723
+    },
+    {
+      "path": "packages/react/src/internals/useRenderElement.test.tsx",
+      "gitBlob": "639ea78e23144c3cf9c185b6c9a51cb538748880",
+      "size": 20753
+    },
+    {
+      "path": "packages/react/src/internals/useRenderElement.tsx",
+      "gitBlob": "7e1bb449998c254206568556a9a8ad55a6bcd155",
+      "size": 10741
+    },
+    {
+      "path": "packages/react/src/internals/useTransitionStatus.ts",
+      "gitBlob": "2bda5f3ac4fb6a70cb521a51664539af299424a3",
+      "size": 2367
+    },
+    {
+      "path": "packages/react/src/internals/useValueChanged.ts",
+      "gitBlob": "c1888bc659afaf3e31861e9662abbb58691518ea",
+      "size": 609
+    },
+    {
+      "path": "packages/react/src/menu/arrow/MenuArrow.test.tsx",
+      "gitBlob": "d04812ff4adb71a840545142efa9daf7a1580df7",
+      "size": 546
+    },
+    {
+      "path": "packages/react/src/menu/arrow/MenuArrow.tsx",
+      "gitBlob": "40907a63e70960eaf2f44b74987b472bc1069a82",
+      "size": 1958
+    },
+    {
+      "path": "packages/react/src/menu/arrow/MenuArrowDataAttributes.ts",
+      "gitBlob": "5e310ff46a55c457fbcd7cc7eb6d1366bdc7b339",
+      "size": 778
+    },
+    {
+      "path": "packages/react/src/menu/backdrop/MenuBackdrop.test.tsx",
+      "gitBlob": "c7be0e158203b4caa89c4b7f806c7a104de4f233",
+      "size": 1615
+    },
+    {
+      "path": "packages/react/src/menu/backdrop/MenuBackdrop.tsx",
+      "gitBlob": "d98a0ff44980212d0136549f9815c141ef2ad678",
+      "size": 2573
+    },
+    {
+      "path": "packages/react/src/menu/backdrop/MenuBackdropDataAttributes.ts",
+      "gitBlob": "11f53ae96f8120a87d68e2500dece5c6b481fcf5",
+      "size": 530
+    },
+    {
+      "path": "packages/react/src/menu/checkbox-item-indicator/MenuCheckboxItemIndicator.test.tsx",
+      "gitBlob": "562474706e6c4ba27e8cef2b9c5700be0116ec2d",
+      "size": 3686
+    },
+    {
+      "path": "packages/react/src/menu/checkbox-item-indicator/MenuCheckboxItemIndicator.tsx",
+      "gitBlob": "69e0c4ab282952d42ef58c4d0f18d6692778c24e",
+      "size": 2626
+    },
+    {
+      "path": "packages/react/src/menu/checkbox-item-indicator/MenuCheckboxItemIndicatorDataAttributes.ts",
+      "gitBlob": "c4992c70f5a409341cee46dc51b9c71d1f6dcc2b",
+      "size": 683
+    },
+    {
+      "path": "packages/react/src/menu/checkbox-item/MenuCheckboxItem.test.tsx",
+      "gitBlob": "49874d845fb89b19b6d9e853420f6dd5f51c550a",
+      "size": 13956
+    },
+    {
+      "path": "packages/react/src/menu/checkbox-item/MenuCheckboxItem.tsx",
+      "gitBlob": "04cdc8bd9958768d20d4a79ef81b978e8d363c83",
+      "size": 5285
+    },
+    {
+      "path": "packages/react/src/menu/checkbox-item/MenuCheckboxItemContext.ts",
+      "gitBlob": "9f4e22cc84234a25744955db294f5b0f4dab12df",
+      "size": 584
+    },
+    {
+      "path": "packages/react/src/menu/checkbox-item/MenuCheckboxItemDataAttributes.ts",
+      "gitBlob": "7ddc511fb5191a07b80c26ee0f687b584c228ca8",
+      "size": 442
+    },
+    {
+      "path": "packages/react/src/menu/group-label/MenuGroupLabel.test.tsx",
+      "gitBlob": "8e37efaa70495720500fe283a9504baee9383ffe",
+      "size": 4431
+    },
+    {
+      "path": "packages/react/src/menu/group-label/MenuGroupLabel.tsx",
+      "gitBlob": "c89945553b7fdbc33a2cb2008410a69720da1fd2",
+      "size": 1472
+    },
+    {
+      "path": "packages/react/src/menu/group/MenuGroup.test.tsx",
+      "gitBlob": "89e3ce103a55251f4721245628a4b514c3778af9",
+      "size": 535
+    },
+    {
+      "path": "packages/react/src/menu/group/MenuGroup.tsx",
+      "gitBlob": "850a63d80b078f6837dfae06e32db00311fc54f5",
+      "size": 1311
+    },
+    {
+      "path": "packages/react/src/menu/group/MenuGroupContext.ts",
+      "gitBlob": "aa838e12a9271ad80f695c863d628d4a9d803676",
+      "size": 509
+    },
+    {
+      "path": "packages/react/src/menu/index.parts.ts",
+      "gitBlob": "0b5815b4588e11eb34c30a4405fc7282955f4026",
+      "size": 1540
+    },
+    {
+      "path": "packages/react/src/menu/index.ts",
+      "gitBlob": "e0acd39203e305f1b4d1fdfbec464ebf77f709bb",
+      "size": 971
+    },
+    {
+      "path": "packages/react/src/menu/item/MenuItem.test.tsx",
+      "gitBlob": "408c9d59b5251a96b3285b0dedbe94aa5499d3b6",
+      "size": 7603
+    },
+    {
+      "path": "packages/react/src/menu/item/MenuItem.tsx",
+      "gitBlob": "6429bfc629d695d0573aaa0e8f7304a65f08b755",
+      "size": 2827
+    },
+    {
+      "path": "packages/react/src/menu/item/MenuItemDataAttributes.ts",
+      "gitBlob": "44aa7ec1b51e5a62c299fee3cfd8b19d88e413f4",
+      "size": 222
+    },
+    {
+      "path": "packages/react/src/menu/item/useMenuItem.ts",
+      "gitBlob": "bfb2349cc3e4d3e43aa11e5d31e6ef5b2cf56da8",
+      "size": 3433
+    },
+    {
+      "path": "packages/react/src/menu/item/useMenuItemCommonProps.ts",
+      "gitBlob": "b64fa7a6f5fb8b1213a77f2d9ab793abddd4a26a",
+      "size": 4242
+    },
+    {
+      "path": "packages/react/src/menu/link-item/MenuLinkItem.test.tsx",
+      "gitBlob": "5f9042e25458ae3affddc903c27dce2674310997",
+      "size": 4488
+    },
+    {
+      "path": "packages/react/src/menu/link-item/MenuLinkItem.tsx",
+      "gitBlob": "95d255484374b7a1922b0f23f8481dd02b061029",
+      "size": 2909
+    },
+    {
+      "path": "packages/react/src/menu/link-item/MenuLinkItemDataAttributes.ts",
+      "gitBlob": "619a6f7b382ff5faf6cd64d9f239ceab29045afc",
+      "size": 134
+    },
+    {
+      "path": "packages/react/src/menu/popup/MenuPopup.test.tsx",
+      "gitBlob": "a1cc1c9dbcd297bd94a211242ebf07b43ea834fd",
+      "size": 6175
+    },
+    {
+      "path": "packages/react/src/menu/popup/MenuPopup.tsx",
+      "gitBlob": "4097ea7fc61d2cbc747d43740e3e907796f2ab7b",
+      "size": 7044
+    },
+    {
+      "path": "packages/react/src/menu/popup/MenuPopupDataAttributes.ts",
+      "gitBlob": "672f327cda0971c74024424c59422e239c888fdf",
+      "size": 1047
+    },
+    {
+      "path": "packages/react/src/menu/portal/MenuPortal.test.tsx",
+      "gitBlob": "de699b5724223dd953dc2ba9f87a1bd12aa9ce73",
+      "size": 411
+    },
+    {
+      "path": "packages/react/src/menu/portal/MenuPortal.tsx",
+      "gitBlob": "eed8f8fd8c574ad2b711d95c08f06b260d573cf4",
+      "size": 1405
+    },
+    {
+      "path": "packages/react/src/menu/portal/MenuPortalContext.ts",
+      "gitBlob": "be11452bb5c26dc0a58cbf5294ec3480c9701188",
+      "size": 338
+    },
+    {
+      "path": "packages/react/src/menu/positioner/MenuPositioner.spec.tsx",
+      "gitBlob": "a38cc2fae2b5db64a0ce5e0230905171d21ef59c",
+      "size": 133
+    },
+    {
+      "path": "packages/react/src/menu/positioner/MenuPositioner.test.tsx",
+      "gitBlob": "5c39089d9872b558061499bd8e35fb7c8315b8b4",
+      "size": 21028
+    },
+    {
+      "path": "packages/react/src/menu/positioner/MenuPositioner.tsx",
+      "gitBlob": "3f72868009d16b58d7e8da585b5f643a1b8bb19e",
+      "size": 12104
+    },
+    {
+      "path": "packages/react/src/menu/positioner/MenuPositionerContext.ts",
+      "gitBlob": "9adcda8451f56e19724358a1e53b7bf3d9b1768e",
+      "size": 915
+    },
+    {
+      "path": "packages/react/src/menu/positioner/MenuPositionerCssVars.ts",
+      "gitBlob": "476764b86d65e050d9ef5c4cfabe77268d3c7ec6",
+      "size": 686
+    },
+    {
+      "path": "packages/react/src/menu/positioner/MenuPositionerDataAttributes.ts",
+      "gitBlob": "bfced5d958fbcb783e80f9de41fac230fdb2df5b",
+      "size": 798
+    },
+    {
+      "path": "packages/react/src/menu/radio-group/MenuRadioGroup.test.tsx",
+      "gitBlob": "f250b2817ca5577728275cc0cc5bd7877a0cfdcb",
+      "size": 550
+    },
+    {
+      "path": "packages/react/src/menu/radio-group/MenuRadioGroup.tsx",
+      "gitBlob": "a8a9a0733722be4e08ada911e8993c4bdc3e1bc6",
+      "size": 3737
+    },
+    {
+      "path": "packages/react/src/menu/radio-group/MenuRadioGroupContext.ts",
+      "gitBlob": "bc3a9fb0649ebfa60e48e505cd5ca849840245e0",
+      "size": 668
+    },
+    {
+      "path": "packages/react/src/menu/radio-item-indicator/MenuRadioItemIndicator.test.tsx",
+      "gitBlob": "e11e3875aebb7e5e3b3a0a617ded629d40b68eec",
+      "size": 4177
+    },
+    {
+      "path": "packages/react/src/menu/radio-item-indicator/MenuRadioItemIndicator.tsx",
+      "gitBlob": "4ea445b1f4f4d59387fe02337f36e2555753b05e",
+      "size": 2576
+    },
+    {
+      "path": "packages/react/src/menu/radio-item-indicator/MenuRadioItemIndicatorDataAttributes.ts",
+      "gitBlob": "dffdd95d24649e452750570732bdeebc9ab0b9a1",
+      "size": 685
+    },
+    {
+      "path": "packages/react/src/menu/radio-item/MenuRadioItem.test.tsx",
+      "gitBlob": "d8d1e999a81ac31c0aa43961d9602e12294a9b82",
+      "size": 16791
+    },
+    {
+      "path": "packages/react/src/menu/radio-item/MenuRadioItem.tsx",
+      "gitBlob": "a9f407547af3c6d8c74d42ae571a3ab0a27cbbdc",
+      "size": 4353
+    },
+    {
+      "path": "packages/react/src/menu/radio-item/MenuRadioItemContext.ts",
+      "gitBlob": "2f410ae38bc3eee3d8efd9f178477ff5c57fd52e",
+      "size": 560
+    },
+    {
+      "path": "packages/react/src/menu/radio-item/MenuRadioItemDataAttributes.ts",
+      "gitBlob": "ea4d842efe26c7fbb1fbb0e68eb4542c13d5a674",
+      "size": 429
+    },
+    {
+      "path": "packages/react/src/menu/root/MenuRoot.detached-triggers.test.tsx",
+      "gitBlob": "6f01b3fa2ef5dc4393aedbcf4dee1cec30874fa9",
+      "size": 39958
+    },
+    {
+      "path": "packages/react/src/menu/root/MenuRoot.test.tsx",
+      "gitBlob": "c6941e659bdea4b993bb4221deb6db00cb525d47",
+      "size": 89077
+    },
+    {
+      "path": "packages/react/src/menu/root/MenuRoot.tsx",
+      "gitBlob": "42b3b6e58706be096ca8aa14e9e7af456fe7cd7f",
+      "size": 21290
+    },
+    {
+      "path": "packages/react/src/menu/root/MenuRootContext.ts",
+      "gitBlob": "e3430e78cbe1339bfdf0ce7bc6b2cc98b9710a0c",
+      "size": 793
+    },
+    {
+      "path": "packages/react/src/menu/store/MenuHandle.ts",
+      "gitBlob": "33449dc1171d1cc15c602e24e7e9217d18ae37da",
+      "size": 1510
+    },
+    {
+      "path": "packages/react/src/menu/store/MenuStore.ts",
+      "gitBlob": "9e665f20754dec961b778af97725807e5ab18b0d",
+      "size": 7915
+    },
+    {
+      "path": "packages/react/src/menu/submenu-root/MenuSubmenuRoot.tsx",
+      "gitBlob": "cbe4eaf5f91eca024d864b6f11589dd04e096768",
+      "size": 1908
+    },
+    {
+      "path": "packages/react/src/menu/submenu-root/MenuSubmenuRootContext.ts",
+      "gitBlob": "1e8af65b65c205b1c566c307ec5f52c6d2520c81",
+      "size": 421
+    },
+    {
+      "path": "packages/react/src/menu/submenu-trigger/MenuSubmenuTrigger.test.tsx",
+      "gitBlob": "c3f04dd4c75e90454d5050e189a1871e90d98d62",
+      "size": 8181
+    },
+    {
+      "path": "packages/react/src/menu/submenu-trigger/MenuSubmenuTrigger.tsx",
+      "gitBlob": "555f31a51cacba946a978ea0e990340a979178ca",
+      "size": 7849
+    },
+    {
+      "path": "packages/react/src/menu/submenu-trigger/MenuSubmenuTriggerDataAttributes.ts",
+      "gitBlob": "b41a6c0669917f736d2b7e7ad0006d474c18d860",
+      "size": 440
+    },
+    {
+      "path": "packages/react/src/menu/trigger/MenuTrigger.test.tsx",
+      "gitBlob": "ab561056898e4fe955ede2eaa908d839f8cdbc03",
+      "size": 13246
+    },
+    {
+      "path": "packages/react/src/menu/trigger/MenuTrigger.tsx",
+      "gitBlob": "ecc6d92984221f28f13ff18dcabb74274d75d823",
+      "size": 13571
+    },
+    {
+      "path": "packages/react/src/menu/trigger/MenuTriggerDataAttributes.ts",
+      "gitBlob": "215c914c8221d00a51322b858ee6b9d76f3a08cf",
+      "size": 338
+    },
+    {
+      "path": "packages/react/src/menu/utils/findRootOwnerId.ts",
+      "gitBlob": "d29af7be21a7fedde1449dc23a6b103f61593c4e",
+      "size": 412
+    },
+    {
+      "path": "packages/react/src/menu/utils/stateAttributesMapping.ts",
+      "gitBlob": "72a6358f2e349136cb4a3ad5eecf347ec2f8d9f9",
+      "size": 599
+    },
+    {
+      "path": "packages/react/src/menu/utils/types.ts",
+      "gitBlob": "9617076621fa5246a4294a02926c9f9aa7b52cce",
+      "size": 216
+    },
+    {
+      "path": "packages/react/src/menu/viewport/MenuViewport.test.tsx",
+      "gitBlob": "4eee6e2204e78e054afe2a6f31a98d044b970ee7",
+      "size": 13785
+    },
+    {
+      "path": "packages/react/src/menu/viewport/MenuViewport.tsx",
+      "gitBlob": "1bb085d90c25276abf96421e5a768115ae2a1673",
+      "size": 2682
+    },
+    {
+      "path": "packages/react/src/menu/viewport/MenuViewportCssVars.ts",
+      "gitBlob": "43b3692f2eba9a52aa95777f3c905803bd58396e",
+      "size": 662
+    },
+    {
+      "path": "packages/react/src/menu/viewport/MenuViewportDataAttributes.ts",
+      "gitBlob": "1b3dd27e170040ec4d8577f9b67f76ec74a1c825",
+      "size": 1008
+    },
+    {
+      "path": "packages/react/src/menubar/index.ts",
+      "gitBlob": "dce5d8d809dd63c1bfaf2ff01cc3559a5fb3d2d7",
+      "size": 70
+    },
+    {
+      "path": "packages/react/src/menubar/Menubar.test.tsx",
+      "gitBlob": "0094c376adeab0971963e0839bff9911f4cfa747",
+      "size": 44663
+    },
+    {
+      "path": "packages/react/src/menubar/Menubar.tsx",
+      "gitBlob": "9d5dad742807c5a72afde7334d0c2693dbfcb554",
+      "size": 4678
+    },
+    {
+      "path": "packages/react/src/menubar/MenubarContext.ts",
+      "gitBlob": "c96f8fcedac4898da31610fc3382ba99d9be0f59",
+      "size": 984
+    },
+    {
+      "path": "packages/react/src/menubar/MenubarDataAttributes.ts",
+      "gitBlob": "32774ec2ab0d34140a62e8767a409f2768c2d03e",
+      "size": 377
+    },
+    {
+      "path": "packages/react/src/merge-props/index.ts",
+      "gitBlob": "e03df598cb287a0228cabb37f2a01e50cb8b2aa1",
+      "size": 30
+    },
+    {
+      "path": "packages/react/src/merge-props/mergeProps.test.ts",
+      "gitBlob": "338e4cf3068612bafb2cfe0c453b2b1919bcbb24",
+      "size": 15355
+    },
+    {
+      "path": "packages/react/src/merge-props/mergeProps.ts",
+      "gitBlob": "165732d6b6ad31efd9027ff56ab6693b70acbdb5",
+      "size": 9247
+    },
+    {
+      "path": "packages/react/src/meter/index.parts.ts",
+      "gitBlob": "c79245c4e1a4669419ec02ea418a78173eda03fd",
+      "size": 302
+    },
+    {
+      "path": "packages/react/src/meter/index.ts",
+      "gitBlob": "06dd198fce49776cd27ffd34f9d62941eda1a04c",
+      "size": 252
+    },
+    {
+      "path": "packages/react/src/meter/indicator/MeterIndicator.test.tsx",
+      "gitBlob": "9627fa4a7955ed4f951189bba8c848887064cfb7",
+      "size": 2516
+    },
+    {
+      "path": "packages/react/src/meter/indicator/MeterIndicator.tsx",
+      "gitBlob": "c9637e6ce2f3a7d245a8e328838669f754532643",
+      "size": 1324
+    },
+    {
+      "path": "packages/react/src/meter/label/MeterLabel.test.tsx",
+      "gitBlob": "009e621fe78620bb9825f2cd0d8702a4ef98f847",
+      "size": 388
+    },
+    {
+      "path": "packages/react/src/meter/label/MeterLabel.tsx",
+      "gitBlob": "ea1fcd55585ed096e0ad92708d5700b8e00bc3eb",
+      "size": 1323
+    },
+    {
+      "path": "packages/react/src/meter/root/MeterRoot.test.tsx",
+      "gitBlob": "6d4a7e5b44a6e82407b6f579dffa5629ee494a5d",
+      "size": 8998
+    },
+    {
+      "path": "packages/react/src/meter/root/MeterRoot.tsx",
+      "gitBlob": "cd4cbb06cf5641b2956c3ccd88333fc56ac59a22",
+      "size": 4027
+    },
+    {
+      "path": "packages/react/src/meter/root/MeterRootContext.ts",
+      "gitBlob": "5305b7d143d6c78f9e1950079219a29c92631527",
+      "size": 729
+    },
+    {
+      "path": "packages/react/src/meter/track/MeterTrack.test.tsx",
+      "gitBlob": "13a2659ba1711153a96bfaedfcd9ce35d51b0739",
+      "size": 387
+    },
+    {
+      "path": "packages/react/src/meter/track/MeterTrack.tsx",
+      "gitBlob": "15a88d919611bb5ec5284e182836cf485e300a23",
+      "size": 1031
+    },
+    {
+      "path": "packages/react/src/meter/value/MeterValue.test.tsx",
+      "gitBlob": "c5a1cd54961a69124ce6ed953fbac84e3aa60fc7",
+      "size": 2734
+    },
+    {
+      "path": "packages/react/src/meter/value/MeterValue.tsx",
+      "gitBlob": "2b01f95388958fca9168912338572d7adac77285",
+      "size": 1425
+    },
+    {
+      "path": "packages/react/src/navigation-menu/arrow/NavigationMenuArrow.test.tsx",
+      "gitBlob": "f3b7c1f82e67382cfabf938cac289c6629928f2d",
+      "size": 602
+    },
+    {
+      "path": "packages/react/src/navigation-menu/arrow/NavigationMenuArrow.tsx",
+      "gitBlob": "1cd64cf4f8fd375e9cb950b988cb3cada02447da",
+      "size": 2325
+    },
+    {
+      "path": "packages/react/src/navigation-menu/arrow/NavigationMenuArrowDataAttributes.ts",
+      "gitBlob": "49a45fe04d5cba5da02398ccada2fe27c673b279",
+      "size": 779
+    },
+    {
+      "path": "packages/react/src/navigation-menu/backdrop/NavigationMenuBackdrop.test.tsx",
+      "gitBlob": "745c33d65417e9f2c892aeb44bdd505eb808a8b9",
+      "size": 432
+    },
+    {
+      "path": "packages/react/src/navigation-menu/backdrop/NavigationMenuBackdrop.tsx",
+      "gitBlob": "2529fd115737594193e7f192fb869fb41d066692",
+      "size": 2174
+    },
+    {
+      "path": "packages/react/src/navigation-menu/backdrop/NavigationMenuBackdropDataAttributes.ts",
+      "gitBlob": "f410e5f6fd3b392efbdf34bfc40d588f22172e3e",
+      "size": 544
+    },
+    {
+      "path": "packages/react/src/navigation-menu/content/NavigationMenuContent.test.tsx",
+      "gitBlob": "d5795cb7d252defce4f906c86a881c31328259f6",
+      "size": 8334
+    },
+    {
+      "path": "packages/react/src/navigation-menu/content/NavigationMenuContent.tsx",
+      "gitBlob": "e34f08016cdaf135d93d6a2b138c76452bbf8574",
+      "size": 6517
+    },
+    {
+      "path": "packages/react/src/navigation-menu/content/NavigationMenuContentDataAttributes.ts",
+      "gitBlob": "b4ba41e2971b25bde5ecb134ffef2a68bfd8a7cc",
+      "size": 715
+    },
+    {
+      "path": "packages/react/src/navigation-menu/icon/NavigationMenuIcon.test.tsx",
+      "gitBlob": "70820caa8a101db4a09a9c12b95f3e7644f7e607",
+      "size": 505
+    },
+    {
+      "path": "packages/react/src/navigation-menu/icon/NavigationMenuIcon.tsx",
+      "gitBlob": "3dfa01faa70395d8d0cdcb9f673c0319464e4f55",
+      "size": 1729
+    },
+    {
+      "path": "packages/react/src/navigation-menu/icon/NavigationMenuIconDataAttributes.ts",
+      "gitBlob": "4ca758a26ad3d919e28c9830036bbaa0b1750de4",
+      "size": 262
+    },
+    {
+      "path": "packages/react/src/navigation-menu/index.parts.ts",
+      "gitBlob": "66da211b675ced7e2151106f8660470fdd7fc377",
+      "size": 1032
+    },
+    {
+      "path": "packages/react/src/navigation-menu/index.ts",
+      "gitBlob": "b15aad37eed66a0dfd4a30db4cd4b3ddc6cdfd33",
+      "size": 722
+    },
+    {
+      "path": "packages/react/src/navigation-menu/item/NavigationMenuItem.test.tsx",
+      "gitBlob": "bb1ae9c753c3ffe8081e82c1fcd584b9bc2ee8a7",
+      "size": 423
+    },
+    {
+      "path": "packages/react/src/navigation-menu/item/NavigationMenuItem.tsx",
+      "gitBlob": "0c195c76db5457e93c525b3243400c0e24431fb0",
+      "size": 1757
+    },
+    {
+      "path": "packages/react/src/navigation-menu/item/NavigationMenuItemContext.ts",
+      "gitBlob": "c3eb1cc55231ba9c23bbf4c790cccc2018c5578b",
+      "size": 500
+    },
+    {
+      "path": "packages/react/src/navigation-menu/link/NavigationMenuLink.test.tsx",
+      "gitBlob": "d92bc192d97d6b056e40aa97f8712b9fc361f6a0",
+      "size": 4643
+    },
+    {
+      "path": "packages/react/src/navigation-menu/link/NavigationMenuLink.tsx",
+      "gitBlob": "49ed79abb1548697f29c3080568db8183903e522",
+      "size": 2919
+    },
+    {
+      "path": "packages/react/src/navigation-menu/link/NavigationMenuLinkDataAttributes.ts",
+      "gitBlob": "623c1a40bc34426275becf6f4f704b2739ea1469",
+      "size": 144
+    },
+    {
+      "path": "packages/react/src/navigation-menu/list/NavigationMenuDismissContext.ts",
+      "gitBlob": "de78f2c630e78306e4718531a8f6a5ead9ab72d5",
+      "size": 327
+    },
+    {
+      "path": "packages/react/src/navigation-menu/list/NavigationMenuList.test.tsx",
+      "gitBlob": "e1b50c17007cfda817ec4ef8543aadbfcff6a03c",
+      "size": 426
+    },
+    {
+      "path": "packages/react/src/navigation-menu/list/NavigationMenuList.tsx",
+      "gitBlob": "08798e5b1dbd7540011b389f494b804db63af5f9",
+      "size": 4528
+    },
+    {
+      "path": "packages/react/src/navigation-menu/popup/NavigationMenuPopup.test.tsx",
+      "gitBlob": "873d44298c03aa8d26d59801762cc52091e34be8",
+      "size": 599
+    },
+    {
+      "path": "packages/react/src/navigation-menu/popup/NavigationMenuPopup.tsx",
+      "gitBlob": "aa58b69ff4363d4d00425b4744220b360f51ba9a",
+      "size": 3654
+    },
+    {
+      "path": "packages/react/src/navigation-menu/popup/NavigationMenuPopupCssVars.ts",
+      "gitBlob": "0ac442cec92173b7462cb16be6e7f1c325184431",
+      "size": 260
+    },
+    {
+      "path": "packages/react/src/navigation-menu/popup/NavigationMenuPopupDataAttributes.ts",
+      "gitBlob": "58816178f9f23a5f0dfaac5d6fbd8966a38b5c44",
+      "size": 1026
+    },
+    {
+      "path": "packages/react/src/navigation-menu/portal/NavigationMenuPortal.test.tsx",
+      "gitBlob": "d5bbfed67a3fd0db2e62c2bc22312ce9ef1926ec",
+      "size": 473
+    },
+    {
+      "path": "packages/react/src/navigation-menu/portal/NavigationMenuPortal.tsx",
+      "gitBlob": "8a4b5b684227e270a9076a954c8445bb8dad333a",
+      "size": 1701
+    },
+    {
+      "path": "packages/react/src/navigation-menu/portal/NavigationMenuPortalContext.ts",
+      "gitBlob": "72ef41e7c2d7789e8f3394c9779d4fa3bf38488a",
+      "size": 378
+    },
+    {
+      "path": "packages/react/src/navigation-menu/positioner/NavigationMenuPositioner.test.tsx",
+      "gitBlob": "0e1bcc1eaf899b52c024bd43d4d61b497f91eff7",
+      "size": 533
+    },
+    {
+      "path": "packages/react/src/navigation-menu/positioner/NavigationMenuPositioner.tsx",
+      "gitBlob": "573ea3ec77254dfa3af8ca2f20ed3f9a544ba7ee",
+      "size": 6636
+    },
+    {
+      "path": "packages/react/src/navigation-menu/positioner/NavigationMenuPositionerContext.ts",
+      "gitBlob": "513941482c088863c2181abcb8aa73314c74f191",
+      "size": 930
+    },
+    {
+      "path": "packages/react/src/navigation-menu/positioner/NavigationMenuPositionerCssVars.ts",
+      "gitBlob": "1192253c13f97bd00ff1ca79f172b71f4147ef45",
+      "size": 943
+    },
+    {
+      "path": "packages/react/src/navigation-menu/positioner/NavigationMenuPositionerDataAttributes.ts",
+      "gitBlob": "ce9e8692f4e0f974c9cf103bb9360dfc630d650b",
+      "size": 888
+    },
+    {
+      "path": "packages/react/src/navigation-menu/root/NavigationMenuRoot.spec.tsx",
+      "gitBlob": "6c7340f7476dfc990c6184b3d11ee433fabb7395",
+      "size": 1763
+    },
+    {
+      "path": "packages/react/src/navigation-menu/root/NavigationMenuRoot.test.tsx",
+      "gitBlob": "ff85f80b5670868d76a2d96ca5659d4aa2ec0dd9",
+      "size": 141009
+    },
+    {
+      "path": "packages/react/src/navigation-menu/root/NavigationMenuRoot.tsx",
+      "gitBlob": "f24f1bbaeae707d03a66586abd1d851409cdcf55",
+      "size": 13099
+    },
+    {
+      "path": "packages/react/src/navigation-menu/root/NavigationMenuRoot.webkit.test.tsx",
+      "gitBlob": "cd4906afc625c80d317caadd6edfd31f4fcf95a9",
+      "size": 4783
+    },
+    {
+      "path": "packages/react/src/navigation-menu/root/NavigationMenuRootContext.ts",
+      "gitBlob": "93ed473775571b09ebaca8bd7f9b492804e0a1e8",
+      "size": 3340
+    },
+    {
+      "path": "packages/react/src/navigation-menu/trigger/NavigationMenuTrigger.test.tsx",
+      "gitBlob": "e3e16c8118ceb78306620b0643334c703d149b3e",
+      "size": 15548
+    },
+    {
+      "path": "packages/react/src/navigation-menu/trigger/NavigationMenuTrigger.tsx",
+      "gitBlob": "d28237051272feca3183bccdfd674bbba455201e",
+      "size": 28761
+    },
+    {
+      "path": "packages/react/src/navigation-menu/trigger/NavigationMenuTriggerDataAttributes.ts",
+      "gitBlob": "43521732a44c5514ddcbe0491e04dcf0c6d444f8",
+      "size": 359
+    },
+    {
+      "path": "packages/react/src/navigation-menu/utils/constants.ts",
+      "gitBlob": "70f2c250eb08dae9ba34cb4ff0ca7b4f0b220239",
+      "size": 151
+    },
+    {
+      "path": "packages/react/src/navigation-menu/utils/isOutsideMenuEvent.ts",
+      "gitBlob": "cc4400be2fc18665457385f73539d9fd611e3d25",
+      "size": 1298
+    },
+    {
+      "path": "packages/react/src/navigation-menu/utils/setSharedFixedSize.ts",
+      "gitBlob": "20a2155aca588360f23a060bd150014cbb230ad4",
+      "size": 728
+    },
+    {
+      "path": "packages/react/src/navigation-menu/viewport/NavigationMenuViewport.test.tsx",
+      "gitBlob": "4804e788ed4266451a46e3d648ceec9df0fabdc9",
+      "size": 432
+    },
+    {
+      "path": "packages/react/src/navigation-menu/viewport/NavigationMenuViewport.tsx",
+      "gitBlob": "1aa8534617827e797ce2c27e4e7d9d2a93188937",
+      "size": 4446
+    },
+    {
+      "path": "packages/react/src/number-field/decrement/NumberFieldDecrement.test.tsx",
+      "gitBlob": "b0e79186eb6a62349ef2b1de12b00596b4d16ea2",
+      "size": 17262
+    },
+    {
+      "path": "packages/react/src/number-field/decrement/NumberFieldDecrement.tsx",
+      "gitBlob": "04a7a18ebd57de1b5a2654865299b268c90dd04b",
+      "size": 1105
+    },
+    {
+      "path": "packages/react/src/number-field/decrement/NumberFieldDecrementDataAttributes.ts",
+      "gitBlob": "f3f569ba265fa7fe3c9bb997a6cd1bf839210ee2",
+      "size": 1116
+    },
+    {
+      "path": "packages/react/src/number-field/group/NumberFieldGroup.test.tsx",
+      "gitBlob": "8c71e5c3979ccc058df9ecb2668cdddc5f51764c",
+      "size": 698
+    },
+    {
+      "path": "packages/react/src/number-field/group/NumberFieldGroup.tsx",
+      "gitBlob": "6dfb0cd0ad2bd8c2f30180739e0bed22fc346bd5",
+      "size": 1394
+    },
+    {
+      "path": "packages/react/src/number-field/group/NumberFieldGroupDataAttributes.ts",
+      "gitBlob": "a4810529b053c3c443c182eca984bfe992c9999a",
+      "size": 1112
+    },
+    {
+      "path": "packages/react/src/number-field/increment/NumberFieldIncrement.test.tsx",
+      "gitBlob": "239143f8a9f5d0b39b50592c0f893ce9f15b262d",
+      "size": 25672
+    },
+    {
+      "path": "packages/react/src/number-field/increment/NumberFieldIncrement.tsx",
+      "gitBlob": "b24ec99dbb84d558abd2826411919fea8182c1a6",
+      "size": 1104
+    },
+    {
+      "path": "packages/react/src/number-field/increment/NumberFieldIncrementDataAttributes.ts",
+      "gitBlob": "c9895584a98f60e5e0353627cd99259a886f14b0",
+      "size": 1116
+    },
+    {
+      "path": "packages/react/src/number-field/index.parts.ts",
+      "gitBlob": "9c69e6a750ba29e289900face713ec44f9505895",
+      "size": 577
+    },
+    {
+      "path": "packages/react/src/number-field/index.ts",
+      "gitBlob": "5039de7a0b6ba501cc3a52e7fc2550e8db6c0f29",
+      "size": 421
+    },
+    {
+      "path": "packages/react/src/number-field/input/NumberFieldInput.test.tsx",
+      "gitBlob": "c719dbf50acd87997b983b6b1552c573986e88b1",
+      "size": 43050
+    },
+    {
+      "path": "packages/react/src/number-field/input/NumberFieldInput.tsx",
+      "gitBlob": "28a5165785cb7ad398ace35c4a52bcf0346263ed",
+      "size": 17474
+    },
+    {
+      "path": "packages/react/src/number-field/input/NumberFieldInputDataAttributes.ts",
+      "gitBlob": "c5d254c8de705b3a5ef33a6a4a9e86e29f8c6f7e",
+      "size": 1112
+    },
+    {
+      "path": "packages/react/src/number-field/root/NumberFieldRoot.spec.tsx",
+      "gitBlob": "846dc0aed71695fb89a7b008034458f8970e3630",
+      "size": 2389
+    },
+    {
+      "path": "packages/react/src/number-field/root/NumberFieldRoot.test.tsx",
+      "gitBlob": "960b3f0a4bc519fb5e31ab107b5840dc7e0b8610",
+      "size": 88732
+    },
+    {
+      "path": "packages/react/src/number-field/root/NumberFieldRoot.tsx",
+      "gitBlob": "8f9193045b01273f67f3c7758f28674458dd2753",
+      "size": 23922
+    },
+    {
+      "path": "packages/react/src/number-field/root/NumberFieldRootContext.ts",
+      "gitBlob": "90e4236bbcdaae638bea04b0514d4e5656f9023e",
+      "size": 2037
+    },
+    {
+      "path": "packages/react/src/number-field/root/NumberFieldRootDataAttributes.ts",
+      "gitBlob": "2cb5984b29932130fc0b96503b081cfc7e9d9a2b",
+      "size": 1111
+    },
+    {
+      "path": "packages/react/src/number-field/root/useNumberFieldButton.ts",
+      "gitBlob": "5d79477df43d794d01c8c07ca8182c425d0805fe",
+      "size": 6330
+    },
+    {
+      "path": "packages/react/src/number-field/root/useNumberFieldStepperButton.ts",
+      "gitBlob": "3a4b5d23ce5e9e2c910b8842a0b068b7a10900b2",
+      "size": 2630
+    },
+    {
+      "path": "packages/react/src/number-field/scrub-area-cursor/NumberFieldScrubAreaCursor.test.tsx",
+      "gitBlob": "a1800e367e361e0419e3bae266dee22a4285cdf7",
+      "size": 6935
+    },
+    {
+      "path": "packages/react/src/number-field/scrub-area-cursor/NumberFieldScrubAreaCursor.tsx",
+      "gitBlob": "206dbb2f911b30cf14ede57e20d031e38cf99559",
+      "size": 2647
+    },
+    {
+      "path": "packages/react/src/number-field/scrub-area-cursor/NumberFieldScrubAreaCursorDataAttributes.ts",
+      "gitBlob": "4f12c7b46e52f2aca66fdd1bc96a6c76eef61464",
+      "size": 1122
+    },
+    {
+      "path": "packages/react/src/number-field/scrub-area/NumberFieldScrubArea.test.tsx",
+      "gitBlob": "d138bfb43305bb0b92fb063bfe31922af1caa66b",
+      "size": 10984
+    },
+    {
+      "path": "packages/react/src/number-field/scrub-area/NumberFieldScrubArea.tsx",
+      "gitBlob": "91cd5341d06ffcbb60593f2994156a3bbe6daf47",
+      "size": 12558
+    },
+    {
+      "path": "packages/react/src/number-field/scrub-area/NumberFieldScrubAreaContext.ts",
+      "gitBlob": "c7307ee3eb30475088adf90d8ad8762617d3b85c",
+      "size": 693
+    },
+    {
+      "path": "packages/react/src/number-field/scrub-area/NumberFieldScrubAreaDataAttributes.ts",
+      "gitBlob": "cd2a7e78110ad9f4c3db61932e7c0ab7b9835e44",
+      "size": 1116
+    },
+    {
+      "path": "packages/react/src/number-field/utils/constants.ts",
+      "gitBlob": "2cfe4c96f9ff6eee2dafe39e6385460719d29787",
+      "size": 137
+    },
+    {
+      "path": "packages/react/src/number-field/utils/getViewportRect.ts",
+      "gitBlob": "fe7690d0fb5d877426186df709abb2e88d4d3809",
+      "size": 934
+    },
+    {
+      "path": "packages/react/src/number-field/utils/parse.test.ts",
+      "gitBlob": "9c0a2e71621c615ec696b054e0e8b0b8260b1e4f",
+      "size": 10915
+    },
+    {
+      "path": "packages/react/src/number-field/utils/parse.ts",
+      "gitBlob": "06bd07c9d44208a562c3cf1b1b2096f9da8b8903",
+      "size": 9141
+    },
+    {
+      "path": "packages/react/src/number-field/utils/stateAttributesMapping.ts",
+      "gitBlob": "b62fd29219d352f54aa34299cf693cc7a2e74059",
+      "size": 397
+    },
+    {
+      "path": "packages/react/src/number-field/utils/subscribeToVisualViewportResize.ts",
+      "gitBlob": "131127b0e8f97ee5693be4f319c4ef3b5bb80861",
+      "size": 653
+    },
+    {
+      "path": "packages/react/src/number-field/utils/types.ts",
+      "gitBlob": "b4d4f6bbc62152a3fa8848b8e0ebd906a268c063",
+      "size": 558
+    },
+    {
+      "path": "packages/react/src/number-field/utils/validate.test.ts",
+      "gitBlob": "4c8c906a8862e9e68c9e54cc7b499610d986b26e",
+      "size": 21506
+    },
+    {
+      "path": "packages/react/src/number-field/utils/validate.ts",
+      "gitBlob": "7aa6e66ba1e8d8b058343c5a30dce997a614f98d",
+      "size": 5684
+    },
+    {
+      "path": "packages/react/src/otp-field/index.parts.ts",
+      "gitBlob": "19c73b7d1fe095d954b65e377c51edee39754515",
+      "size": 176
+    },
+    {
+      "path": "packages/react/src/otp-field/index.ts",
+      "gitBlob": "fee18fd9575711b1371ddcb13dc9cfdb3f04cb54",
+      "size": 130
+    },
+    {
+      "path": "packages/react/src/otp-field/input/OTPFieldInput.spec.tsx",
+      "gitBlob": "13a180d2bb9c6893634b7d9c1b7f060cbfbc34ba",
+      "size": 207
+    },
+    {
+      "path": "packages/react/src/otp-field/input/OTPFieldInput.test.tsx",
+      "gitBlob": "48f7de319ba550724e2f09af86db14caca611666",
+      "size": 24288
+    },
+    {
+      "path": "packages/react/src/otp-field/input/OTPFieldInput.tsx",
+      "gitBlob": "f5f6229a90300cb102834ccb0deaa5fb32ef56a7",
+      "size": 10202
+    },
+    {
+      "path": "packages/react/src/otp-field/input/OTPFieldInputDataAttributes.ts",
+      "gitBlob": "95bd0a1d86b9c22d20e840993e89b45f08b94ce8",
+      "size": 1045
+    },
+    {
+      "path": "packages/react/src/otp-field/root/OTPFieldRoot.spec.tsx",
+      "gitBlob": "e1610e6def21c7a9ded1bbf4117fa352fa55fdb8",
+      "size": 3555
+    },
+    {
+      "path": "packages/react/src/otp-field/root/OTPFieldRoot.test.tsx",
+      "gitBlob": "4152a0528a8ea7523b1d11f9dbd65104dfb4f9ed",
+      "size": 49032
+    },
+    {
+      "path": "packages/react/src/otp-field/root/OTPFieldRoot.tsx",
+      "gitBlob": "65489e82962ec1af68e319901512680129e1e36d",
+      "size": 21337
+    },
+    {
+      "path": "packages/react/src/otp-field/root/OTPFieldRootContext.ts",
+      "gitBlob": "97a425f2258bad922fcf7f9cd16d406cf412d271",
+      "size": 1819
+    },
+    {
+      "path": "packages/react/src/otp-field/root/OTPFieldRootDataAttributes.ts",
+      "gitBlob": "53a29f2f5c66bdc82b2db8f8df00cf38b3f36c21",
+      "size": 1067
+    },
+    {
+      "path": "packages/react/src/otp-field/utils/otp.test.ts",
+      "gitBlob": "62d74cd83fc014a45cad37c1957e74341f0498ae",
+      "size": 3409
+    },
+    {
+      "path": "packages/react/src/otp-field/utils/otp.ts",
+      "gitBlob": "073dad415d605b49fa0a72cd3378cd502d402410",
+      "size": 3881
+    },
+    {
+      "path": "packages/react/src/otp-field/utils/stateAttributesMapping.ts",
+      "gitBlob": "c8941bccf264fb3e1e7f189a96aee6085dd106b3",
+      "size": 621
+    },
+    {
+      "path": "packages/react/src/popover/arrow/PopoverArrow.test.tsx",
+      "gitBlob": "b898ecf50339197367afb1876b45d5d19b2bda99",
+      "size": 635
+    },
+    {
+      "path": "packages/react/src/popover/arrow/PopoverArrow.tsx",
+      "gitBlob": "cb9e38cd8a37484884aa6a169471380bd2874d63",
+      "size": 2022
+    },
+    {
+      "path": "packages/react/src/popover/arrow/PopoverArrowDataAttributes.ts",
+      "gitBlob": "8260924e2f5175d5adb8cdfa1ee63296f15de4a9",
+      "size": 774
+    },
+    {
+      "path": "packages/react/src/popover/backdrop/PopoverBackdrop.test.tsx",
+      "gitBlob": "59b7790c9ebd98023ff25b7d08bb85574f4e9f5b",
+      "size": 1695
+    },
+    {
+      "path": "packages/react/src/popover/backdrop/PopoverBackdrop.tsx",
+      "gitBlob": "e2794a5454ef2eebda2dbad49d3dff84e30b5bdc",
+      "size": 2382
+    },
+    {
+      "path": "packages/react/src/popover/backdrop/PopoverBackdropDataAttributes.ts",
+      "gitBlob": "765055f806333949571fb912c57c839ab9323007",
+      "size": 537
+    },
+    {
+      "path": "packages/react/src/popover/close/PopoverClose.test.tsx",
+      "gitBlob": "a5410a84ac185bbcac0c5732e96bb3885b3d0fbe",
+      "size": 4948
+    },
+    {
+      "path": "packages/react/src/popover/close/PopoverClose.tsx",
+      "gitBlob": "3292ad823751de227cc66cee012d994d3234e878",
+      "size": 1817
+    },
+    {
+      "path": "packages/react/src/popover/description/PopoverDescription.test.tsx",
+      "gitBlob": "62c5eb549ee650128f56b8f9743a775d5fe6dc7c",
+      "size": 1294
+    },
+    {
+      "path": "packages/react/src/popover/description/PopoverDescription.tsx",
+      "gitBlob": "8a00e5146583bc926f871fc0d1c8f8b17eeb35b8",
+      "size": 1341
+    },
+    {
+      "path": "packages/react/src/popover/index.parts.ts",
+      "gitBlob": "22f1b3d43c6a71a31811f1dca25a9680e1428eb8",
+      "size": 865
+    },
+    {
+      "path": "packages/react/src/popover/index.ts",
+      "gitBlob": "fc762c3b9b938f1e6e319aac7c0c3a3f78bd1555",
+      "size": 554
+    },
+    {
+      "path": "packages/react/src/popover/popup/PopoverPopup.test.tsx",
+      "gitBlob": "63a8b4ac6a0fd890b90a91e214035aed2bf717cf",
+      "size": 18868
+    },
+    {
+      "path": "packages/react/src/popover/popup/PopoverPopup.tsx",
+      "gitBlob": "2cd3279426b0d303f34f4193d214f446b1358260",
+      "size": 7619
+    },
+    {
+      "path": "packages/react/src/popover/popup/PopoverPopupCssVars.ts",
+      "gitBlob": "2156d04e2aaa943a03c10129fef26f49d386e977",
+      "size": 185
+    },
+    {
+      "path": "packages/react/src/popover/popup/PopoverPopupDataAttributes.ts",
+      "gitBlob": "b17b35abdffc9d5ca22d46a82d820a3495e8a2be",
+      "size": 1016
+    },
+    {
+      "path": "packages/react/src/popover/portal/PopoverPortal.test.tsx",
+      "gitBlob": "d8d34f1b11a4e643196b4657b165f01db0989ba2",
+      "size": 422
+    },
+    {
+      "path": "packages/react/src/popover/portal/PopoverPortal.tsx",
+      "gitBlob": "afefb2236d6e5170e5d8c9c9faf4ea54ea9edec5",
+      "size": 1459
+    },
+    {
+      "path": "packages/react/src/popover/portal/PopoverPortalContext.ts",
+      "gitBlob": "ab5e3b6829747478ebd0e52e767bd9cbb8d9a79a",
+      "size": 350
+    },
+    {
+      "path": "packages/react/src/popover/positioner/PopoverPositioner.spec.tsx",
+      "gitBlob": "0f16034b91a96f087fa6575fca5b4e44e1851488",
+      "size": 139
+    },
+    {
+      "path": "packages/react/src/popover/positioner/PopoverPositioner.test.tsx",
+      "gitBlob": "2dba8631a9e971fcb3a318a83ce19a5ba984a780",
+      "size": 15251
+    },
+    {
+      "path": "packages/react/src/popover/positioner/PopoverPositioner.tsx",
+      "gitBlob": "8d7f7ccb14197016855009aa7382948f5f76087e",
+      "size": 6017
+    },
+    {
+      "path": "packages/react/src/popover/positioner/PopoverPositionerContext.ts",
+      "gitBlob": "591ac9e849bc410d304034446a34e5a02a1fa887",
+      "size": 813
+    },
+    {
+      "path": "packages/react/src/popover/positioner/PopoverPositionerCssVars.ts",
+      "gitBlob": "ff436d4727db936b746a91d2341c9867f058d68a",
+      "size": 1069
+    },
+    {
+      "path": "packages/react/src/popover/positioner/PopoverPositionerDataAttributes.ts",
+      "gitBlob": "5f1cdce570c511a3d3015cb587675dd6f70b42b1",
+      "size": 791
+    },
+    {
+      "path": "packages/react/src/popover/root/PopoverRoot.detached-triggers.test.tsx",
+      "gitBlob": "2b70090ca265a59d744a7e10f04c97ffb31d4c6b",
+      "size": 33318
+    },
+    {
+      "path": "packages/react/src/popover/root/PopoverRoot.spec.tsx",
+      "gitBlob": "379af4289dfd812ce3c4716039e03047305d095a",
+      "size": 797
+    },
+    {
+      "path": "packages/react/src/popover/root/PopoverRoot.test.tsx",
+      "gitBlob": "6b213737566d2d1f9839f2374fdfce099f0d348f",
+      "size": 77185
+    },
+    {
+      "path": "packages/react/src/popover/root/PopoverRoot.tsx",
+      "gitBlob": "3616d6ed44a5bac71131fbcedb945deab7813c59",
+      "size": 8101
+    },
+    {
+      "path": "packages/react/src/popover/root/PopoverRootContext.ts",
+      "gitBlob": "e43003bf5ccb407ba82f87167fb7fbea807d856f",
+      "size": 774
+    },
+    {
+      "path": "packages/react/src/popover/store/PopoverHandle.ts",
+      "gitBlob": "c756492e37b31e1bda52e910dc8f42d832879361",
+      "size": 1687
+    },
+    {
+      "path": "packages/react/src/popover/store/PopoverStore.ts",
+      "gitBlob": "02e6f51d8bebdfa423c5bae5290eb62d1c6ebb9e",
+      "size": 7059
+    },
+    {
+      "path": "packages/react/src/popover/title/PopoverTitle.test.tsx",
+      "gitBlob": "24afbed49cac553539c96ff6401c7fa52d69be2e",
+      "size": 1265
+    },
+    {
+      "path": "packages/react/src/popover/title/PopoverTitle.tsx",
+      "gitBlob": "a507f38ec51a5e74a3ecf75cb6161bdd2adcc99a",
+      "size": 1294
+    },
+    {
+      "path": "packages/react/src/popover/trigger/PopoverTrigger.test.tsx",
+      "gitBlob": "bfb3c279862372ea61ad8f548b6fba7829227dbe",
+      "size": 11892
+    },
+    {
+      "path": "packages/react/src/popover/trigger/PopoverTrigger.tsx",
+      "gitBlob": "2714a169deb9b060fe84c0b34bf20f52e1b834e8",
+      "size": 7561
+    },
+    {
+      "path": "packages/react/src/popover/trigger/PopoverTriggerDataAttributes.ts",
+      "gitBlob": "f358ae3838771488d588bf2e3ee4bd2d33e53960",
+      "size": 344
+    },
+    {
+      "path": "packages/react/src/popover/utils/constants.ts",
+      "gitBlob": "8a7158161999b5668f73ea50ace21f5ef66530bf",
+      "size": 31
+    },
+    {
+      "path": "packages/react/src/popover/viewport/PopoverViewport.test.tsx",
+      "gitBlob": "e770793be6b88f490f883ed80a2f51f4c687ebaa",
+      "size": 16969
+    },
+    {
+      "path": "packages/react/src/popover/viewport/PopoverViewport.tsx",
+      "gitBlob": "4397a4bb0d9f39ee486655a5aea5b19adeb84ca9",
+      "size": 2748
+    },
+    {
+      "path": "packages/react/src/popover/viewport/PopoverViewportCssVars.ts",
+      "gitBlob": "34d98bf43a7e21eedabeb8492d34fddb33f28c82",
+      "size": 665
+    },
+    {
+      "path": "packages/react/src/popover/viewport/PopoverViewportDataAttributes.ts",
+      "gitBlob": "9585a3d91cd1c7045019a6ba2104a2e258b0ba53",
+      "size": 1011
+    },
+    {
+      "path": "packages/react/src/preview-card/arrow/PreviewCardArrow.test.tsx",
+      "gitBlob": "d234fd046ffd599d1d7e507ea7f8800eae627fb0",
+      "size": 631
+    },
+    {
+      "path": "packages/react/src/preview-card/arrow/PreviewCardArrow.tsx",
+      "gitBlob": "5a9e77b43e84903f2f9239c0b4e328e949855e81",
+      "size": 2099
+    },
+    {
+      "path": "packages/react/src/preview-card/arrow/PreviewCardArrowDataAttributes.ts",
+      "gitBlob": "52f2f861cb081d07acbbe65dd335afae036decf1",
+      "size": 797
+    },
+    {
+      "path": "packages/react/src/preview-card/backdrop/PreviewCardBackdrop.test.tsx",
+      "gitBlob": "4bf8b85296b59fc7e5ba15f99c072f5fdb7e75ed",
+      "size": 1155
+    },
+    {
+      "path": "packages/react/src/preview-card/backdrop/PreviewCardBackdrop.tsx",
+      "gitBlob": "f174753e78602d3c9b7235d5ee758a2b31ae1c5d",
+      "size": 2290
+    },
+    {
+      "path": "packages/react/src/preview-card/backdrop/PreviewCardBackdropDataAttributes.ts",
+      "gitBlob": "7fed9c5de58e430099813b1cec88681712de510f",
+      "size": 569
+    },
+    {
+      "path": "packages/react/src/preview-card/index.parts.ts",
+      "gitBlob": "fbb0fc582ea1b5f7e4c4cceb035da8861c4707f2",
+      "size": 731
+    },
+    {
+      "path": "packages/react/src/preview-card/index.ts",
+      "gitBlob": "76156101bf62f73a746072b665d8917f6f645f5d",
+      "size": 449
+    },
+    {
+      "path": "packages/react/src/preview-card/popup/PreviewCardPopup.test.tsx",
+      "gitBlob": "5e660e4a840f5d6d44533ef5af884f8ef9d9776b",
+      "size": 1028
+    },
+    {
+      "path": "packages/react/src/preview-card/popup/PreviewCardPopup.tsx",
+      "gitBlob": "309377b645d80fa573beec3f1f8171161f138311",
+      "size": 3504
+    },
+    {
+      "path": "packages/react/src/preview-card/popup/PreviewCardPopupDataAttributes.ts",
+      "gitBlob": "db2e26dd656b6d7ab239fc15c703ed81c89e714e",
+      "size": 938
+    },
+    {
+      "path": "packages/react/src/preview-card/portal/PreviewCardPortal.test.tsx",
+      "gitBlob": "ceea59fba9d5bee9110ea01e6b4c26c483d45bab",
+      "size": 459
+    },
+    {
+      "path": "packages/react/src/preview-card/portal/PreviewCardPortal.tsx",
+      "gitBlob": "7422e756d288f1322fc0e19e14fe3be47e0042db",
+      "size": 1544
+    },
+    {
+      "path": "packages/react/src/preview-card/portal/PreviewCardPortalContext.ts",
+      "gitBlob": "691a020de001f2e2ead45f70705b1579e2aaf1a0",
+      "size": 366
+    },
+    {
+      "path": "packages/react/src/preview-card/positioner/PreviewCardPositioner.spec.tsx",
+      "gitBlob": "941f8a03bc51bf24a253f09506c2ae5be241e1ba",
+      "size": 147
+    },
+    {
+      "path": "packages/react/src/preview-card/positioner/PreviewCardPositioner.test.tsx",
+      "gitBlob": "f3f9e4b2bd245005adeffcd3ab519ef452931e9c",
+      "size": 37383
+    },
+    {
+      "path": "packages/react/src/preview-card/positioner/PreviewCardPositioner.tsx",
+      "gitBlob": "94e0b0bfd81b76548f2f6bd9cd362eb3d5705bfe",
+      "size": 4256
+    },
+    {
+      "path": "packages/react/src/preview-card/positioner/PreviewCardPositionerContext.ts",
+      "gitBlob": "eeaa2fc7b441b1ef58fea5510847978bde7c138a",
+      "size": 738
+    },
+    {
+      "path": "packages/react/src/preview-card/positioner/PreviewCardPositionerCssVars.ts",
+      "gitBlob": "ad963910719c36fe8365d16c90774659818f1636",
+      "size": 693
+    },
+    {
+      "path": "packages/react/src/preview-card/positioner/PreviewCardPositionerDataAttributes.ts",
+      "gitBlob": "cc50947e9daddc5a32990b961773fac35a31e21e",
+      "size": 809
+    },
+    {
+      "path": "packages/react/src/preview-card/root/PreviewCardContext.ts",
+      "gitBlob": "370901fd81a318aa09185fe6bd5119a470dccfa4",
+      "size": 819
+    },
+    {
+      "path": "packages/react/src/preview-card/root/PreviewCardRoot.detached-triggers.test.tsx",
+      "gitBlob": "aac903e7a0ea4e3bde3bd46868f0c1c437a039c0",
+      "size": 50782
+    },
+    {
+      "path": "packages/react/src/preview-card/root/PreviewCardRoot.spec.tsx",
+      "gitBlob": "cf56b3ebdca3b70da2b31effadae518c15748278",
+      "size": 842
+    },
+    {
+      "path": "packages/react/src/preview-card/root/PreviewCardRoot.test.tsx",
+      "gitBlob": "9d62e9c31f403f369bee1e60e0a22e11664864be",
+      "size": 36498
+    },
+    {
+      "path": "packages/react/src/preview-card/root/PreviewCardRoot.tsx",
+      "gitBlob": "cc392a8889455c889812b84fdf5d4b19c034c02f",
+      "size": 7019
+    },
+    {
+      "path": "packages/react/src/preview-card/store/PreviewCardHandle.ts",
+      "gitBlob": "50f7127e15b9d4dce098340beba5a68138028a17",
+      "size": 1916
+    },
+    {
+      "path": "packages/react/src/preview-card/store/PreviewCardStore.ts",
+      "gitBlob": "a910289309a629945dfbb23eab8e1798752825e5",
+      "size": 3575
+    },
+    {
+      "path": "packages/react/src/preview-card/trigger/PreviewCardTrigger.test.tsx",
+      "gitBlob": "84c48631cec463aeea832cc62d4ed26a7a58de6b",
+      "size": 420
+    },
+    {
+      "path": "packages/react/src/preview-card/trigger/PreviewCardTrigger.tsx",
+      "gitBlob": "f47d9bcf3264d0d3d16d766f46e638bb50769083",
+      "size": 4748
+    },
+    {
+      "path": "packages/react/src/preview-card/trigger/PreviewCardTriggerDataAttributes.ts",
+      "gitBlob": "fdee0ae65cf3ad48db79e8aea109490c052ed9c4",
+      "size": 250
+    },
+    {
+      "path": "packages/react/src/preview-card/utils/constants.ts",
+      "gitBlob": "a55834acb9ea6ca890ec8f85341060703d39d90f",
+      "size": 63
+    },
+    {
+      "path": "packages/react/src/preview-card/viewport/PreviewCardViewport.test.tsx",
+      "gitBlob": "d73730396dbf85d3cac060bb9b7de9f8b473e13c",
+      "size": 14855
+    },
+    {
+      "path": "packages/react/src/preview-card/viewport/PreviewCardViewport.tsx",
+      "gitBlob": "9b1ae083c9ee64f6b60893c48a40b04bb03140e5",
+      "size": 2826
+    },
+    {
+      "path": "packages/react/src/preview-card/viewport/PreviewCardViewportCssVars.ts",
+      "gitBlob": "4a8cee2a1de0c6870a26a4f07468e55a13e17436",
+      "size": 669
+    },
+    {
+      "path": "packages/react/src/preview-card/viewport/PreviewCardViewportDataAttributes.ts",
+      "gitBlob": "35401a81c3c9a11e0b01cc84c7bd3b47c9aa9d44",
+      "size": 986
+    },
+    {
+      "path": "packages/react/src/progress/index.parts.ts",
+      "gitBlob": "0f90e5db735fb70e556703add8695ac0af9343db",
+      "size": 402
+    },
+    {
+      "path": "packages/react/src/progress/index.ts",
+      "gitBlob": "6a42d1f8f6cc218501b3a9f4d42b022472029470",
+      "size": 270
+    },
+    {
+      "path": "packages/react/src/progress/indicator/ProgressIndicator.test.tsx",
+      "gitBlob": "8b38b2ddb143527e1ac19f3ad74e525a4cdbe0a1",
+      "size": 1802
+    },
+    {
+      "path": "packages/react/src/progress/indicator/ProgressIndicator.tsx",
+      "gitBlob": "ce88ab83e9f5138aa66b60562de71c1e87e4524d",
+      "size": 1850
+    },
+    {
+      "path": "packages/react/src/progress/indicator/ProgressIndicatorDataAttributes.ts",
+      "gitBlob": "d5ca68dce5452d3d955256f4faced34d684e5968",
+      "size": 342
+    },
+    {
+      "path": "packages/react/src/progress/label/ProgressLabel.test.tsx",
+      "gitBlob": "6fcf8daf656618845e3ed7b88c8b3a768ceaf61e",
+      "size": 406
+    },
+    {
+      "path": "packages/react/src/progress/label/ProgressLabel.tsx",
+      "gitBlob": "f375645104c1214d2a3d8571c8a154338298b97d",
+      "size": 1573
+    },
+    {
+      "path": "packages/react/src/progress/label/ProgressLabelDataAttributes.ts",
+      "gitBlob": "f35a1299c91eca9a7e9d7210edbd49f74750ec5c",
+      "size": 338
+    },
+    {
+      "path": "packages/react/src/progress/root/ProgressRoot.test.tsx",
+      "gitBlob": "bf83ce4e057dd5a6264e7912391183f73718657c",
+      "size": 3385
+    },
+    {
+      "path": "packages/react/src/progress/root/ProgressRoot.tsx",
+      "gitBlob": "c46c61e9474060403c0858626143faf712d39f23",
+      "size": 4231
+    },
+    {
+      "path": "packages/react/src/progress/root/ProgressRootContext.tsx",
+      "gitBlob": "690477b607f693b3f9785e84a2f6d4cb19318b01",
+      "size": 940
+    },
+    {
+      "path": "packages/react/src/progress/root/ProgressRootDataAttributes.ts",
+      "gitBlob": "c8455c03c10fe015ac9cd9e222ce67ebd14cb348",
+      "size": 337
+    },
+    {
+      "path": "packages/react/src/progress/root/stateAttributesMapping.ts",
+      "gitBlob": "7be16c643d5f4bb15abc6f61261f2996a96f9aa6",
+      "size": 695
+    },
+    {
+      "path": "packages/react/src/progress/track/ProgressTrack.test.tsx",
+      "gitBlob": "54b52208a9cdbc4e22d432fca63b913fe5aa6f33",
+      "size": 405
+    },
+    {
+      "path": "packages/react/src/progress/track/ProgressTrack.tsx",
+      "gitBlob": "1ac1767146216a41f69b9a0ecc6cff1cee2059f8",
+      "size": 1337
+    },
+    {
+      "path": "packages/react/src/progress/track/ProgressTrackDataAttributes.ts",
+      "gitBlob": "2f2d778f2ec49e5d9ae91456e5ac060605422ae0",
+      "size": 338
+    },
+    {
+      "path": "packages/react/src/progress/value/ProgressValue.test.tsx",
+      "gitBlob": "ae7f8b468094020e90d089cb412a0d53b6f7ebe5",
+      "size": 2715
+    },
+    {
+      "path": "packages/react/src/progress/value/ProgressValue.tsx",
+      "gitBlob": "6663a8e1e8d045129a20f75c486d38cde68cff84",
+      "size": 1882
+    },
+    {
+      "path": "packages/react/src/progress/value/ProgressValueDataAttributes.ts",
+      "gitBlob": "c4951256845d9992ad00af18cae7f47de449186f",
+      "size": 338
+    },
+    {
+      "path": "packages/react/src/radio-group/index.ts",
+      "gitBlob": "9096f7cc428bbcb14fa0258f093a17f2404dfa58",
+      "size": 79
+    },
+    {
+      "path": "packages/react/src/radio-group/RadioGroup.spec.tsx",
+      "gitBlob": "83f02088b40cb6b1b8adcbe23ba618316d0d0d3a",
+      "size": 1191
+    },
+    {
+      "path": "packages/react/src/radio-group/RadioGroup.test.tsx",
+      "gitBlob": "206c201728cdd0c555d4f10662cec4ad514576ba",
+      "size": 45899
+    },
+    {
+      "path": "packages/react/src/radio-group/RadioGroup.tsx",
+      "gitBlob": "1456a48ca08a7111d6a42eec7bf100c454862f68",
+      "size": 9685
+    },
+    {
+      "path": "packages/react/src/radio-group/RadioGroupContext.ts",
+      "gitBlob": "1b612722be9f099be7a9b38477950754666a9ef1",
+      "size": 1121
+    },
+    {
+      "path": "packages/react/src/radio-group/RadioGroupDataAttributes.ts",
+      "gitBlob": "1a5dcf31c6ed3cf20856a66a8f4f8a72f2aec3fc",
+      "size": 130
+    },
+    {
+      "path": "packages/react/src/radio/index.parts.ts",
+      "gitBlob": "dfa90f73ae8b588e6663ea5d93bf24f9b261f2f8",
+      "size": 128
+    },
+    {
+      "path": "packages/react/src/radio/index.ts",
+      "gitBlob": "617f4ed9a1ec94b27ca6d7eaac3cd00801b76b50",
+      "size": 129
+    },
+    {
+      "path": "packages/react/src/radio/indicator/RadioIndicator.test.tsx",
+      "gitBlob": "29a47aba54513c07d7cac68fdf273f27900ca15b",
+      "size": 6806
+    },
+    {
+      "path": "packages/react/src/radio/indicator/RadioIndicator.tsx",
+      "gitBlob": "23693f9e67feb251ac15b4c5e4478642b43b8e8e",
+      "size": 2291
+    },
+    {
+      "path": "packages/react/src/radio/indicator/RadioIndicatorDataAttributes.ts",
+      "gitBlob": "48d76b7a22206e38c2a2b34a7c4b40b3916c40da",
+      "size": 1491
+    },
+    {
+      "path": "packages/react/src/radio/root/RadioRoot.spec.tsx",
+      "gitBlob": "15f154e1a7fb4eb136ae3897f1d5f9474a173f38",
+      "size": 294
+    },
+    {
+      "path": "packages/react/src/radio/root/RadioRoot.test.tsx",
+      "gitBlob": "a6e24867a116d2c88ab97bca9ae98cad3b16be0e",
+      "size": 4244
+    },
+    {
+      "path": "packages/react/src/radio/root/RadioRoot.tsx",
+      "gitBlob": "41209ded7eae4144056805381fe73083e5b96c65",
+      "size": 10034
+    },
+    {
+      "path": "packages/react/src/radio/root/RadioRootContext.ts",
+      "gitBlob": "378f6fd250824b0a0eb744dd70e4a97c9bc9f45c",
+      "size": 508
+    },
+    {
+      "path": "packages/react/src/radio/root/RadioRootDataAttributes.ts",
+      "gitBlob": "02f7820433015ff2d894675e9d3599ef1b2d39b0",
+      "size": 1137
+    },
+    {
+      "path": "packages/react/src/radio/utils/stateAttributesMapping.ts",
+      "gitBlob": "a58b07bf9ec01eab8a9498a4d40b2500c0a1af62",
+      "size": 808
+    },
+    {
+      "path": "packages/react/src/scroll-area/constants.ts",
+      "gitBlob": "1372a9533a6b8b9c03149ff887241b172792b006",
+      "size": 69
+    },
+    {
+      "path": "packages/react/src/scroll-area/content/ScrollAreaContent.test.tsx",
+      "gitBlob": "fd7a7f5eda45c8a4e85a64f510ae2cdee0a89afd",
+      "size": 538
+    },
+    {
+      "path": "packages/react/src/scroll-area/content/ScrollAreaContent.tsx",
+      "gitBlob": "93a8870f8a11b28cf67a73c7fd3f1f6288e91b2b",
+      "size": 2843
+    },
+    {
+      "path": "packages/react/src/scroll-area/content/ScrollAreaContentDataAttributes.ts",
+      "gitBlob": "9571793360c516ecdb996a0e1d864000b5f9b339",
+      "size": 868
+    },
+    {
+      "path": "packages/react/src/scroll-area/corner/ScrollAreaCorner.test.tsx",
+      "gitBlob": "def16ae293059b06b5bf05878f9827a65a0937ed",
+      "size": 2565
+    },
+    {
+      "path": "packages/react/src/scroll-area/corner/ScrollAreaCorner.tsx",
+      "gitBlob": "61fb4a90bcf00a5ac39a0c8849f705f3ce3f1489",
+      "size": 1501
+    },
+    {
+      "path": "packages/react/src/scroll-area/index.parts.ts",
+      "gitBlob": "a754e48d8eee11b80e332de772e611f4895c821e",
+      "size": 444
+    },
+    {
+      "path": "packages/react/src/scroll-area/index.ts",
+      "gitBlob": "4ea5801d9e7e546b00093e05d02064aad4aea3c6",
+      "size": 340
+    },
+    {
+      "path": "packages/react/src/scroll-area/root/ScrollAreaRoot.test.tsx",
+      "gitBlob": "e08daf71cefc1c51aed2b34da1b8b500c63c8f12",
+      "size": 35696
+    },
+    {
+      "path": "packages/react/src/scroll-area/root/ScrollAreaRoot.tsx",
+      "gitBlob": "4deda3e5dcc7ab2740e800783da47e39ecc02080",
+      "size": 12855
+    },
+    {
+      "path": "packages/react/src/scroll-area/root/ScrollAreaRootContext.ts",
+      "gitBlob": "8859da923a4e5a83277f57f34b15853920371dd9",
+      "size": 2141
+    },
+    {
+      "path": "packages/react/src/scroll-area/root/ScrollAreaRootCssVars.ts",
+      "gitBlob": "fb37d7ed970fe8af2afcd6e882fa7631212152c3",
+      "size": 291
+    },
+    {
+      "path": "packages/react/src/scroll-area/root/ScrollAreaRootDataAttributes.ts",
+      "gitBlob": "2f7c35ed1f4a940fb4f126741689febe0a708f27",
+      "size": 865
+    },
+    {
+      "path": "packages/react/src/scroll-area/root/stateAttributes.ts",
+      "gitBlob": "aae986b4a08ec745ba3955a37b89a950f4ef1e32",
+      "size": 944
+    },
+    {
+      "path": "packages/react/src/scroll-area/scrollbar/ScrollAreaScrollbar.test.tsx",
+      "gitBlob": "87b06614b972f02e275cf6811a8cbe2e0d4e8d02",
+      "size": 19836
+    },
+    {
+      "path": "packages/react/src/scroll-area/scrollbar/ScrollAreaScrollbar.tsx",
+      "gitBlob": "3a22ca6d5a42e4321fcceb179bd541f86a9de82a",
+      "size": 9770
+    },
+    {
+      "path": "packages/react/src/scroll-area/scrollbar/ScrollAreaScrollbarContext.ts",
+      "gitBlob": "547a24ed57d16d59312734c01d0d644a7f4dc025",
+      "size": 583
+    },
+    {
+      "path": "packages/react/src/scroll-area/scrollbar/ScrollAreaScrollbarCssVars.ts",
+      "gitBlob": "07a4dc266fda601a19e5ebfcffcd1a91fb37a356",
+      "size": 290
+    },
+    {
+      "path": "packages/react/src/scroll-area/scrollbar/ScrollAreaScrollbarDataAttributes.ts",
+      "gitBlob": "f6ae478b1c3f191ae2a4c15880d2887cc4cd2121",
+      "size": 1103
+    },
+    {
+      "path": "packages/react/src/scroll-area/thumb/ScrollAreaThumb.test.tsx",
+      "gitBlob": "92242431b8ede1fc7e67f1e28e58b16e2f8be263",
+      "size": 7064
+    },
+    {
+      "path": "packages/react/src/scroll-area/thumb/ScrollAreaThumb.tsx",
+      "gitBlob": "b40ff148e02e7cd47708f3f77f32f77371ecf449",
+      "size": 2743
+    },
+    {
+      "path": "packages/react/src/scroll-area/thumb/ScrollAreaThumbDataAttributes.ts",
+      "gitBlob": "da4eb69f0783b4ff820c42211be8387a81e38cba",
+      "size": 285
+    },
+    {
+      "path": "packages/react/src/scroll-area/utils/getOffset.ts",
+      "gitBlob": "64f5c627999c766bfe51dc11b1da13332a9aeadb",
+      "size": 597
+    },
+    {
+      "path": "packages/react/src/scroll-area/viewport/ScrollAreaViewport.test.tsx",
+      "gitBlob": "7eaff03aedc6ecc377bced7eb8292bb891208918",
+      "size": 4008
+    },
+    {
+      "path": "packages/react/src/scroll-area/viewport/ScrollAreaViewport.tsx",
+      "gitBlob": "c4662aeb024986b9d7fda0a0ba36e1996128b1d5",
+      "size": 16928
+    },
+    {
+      "path": "packages/react/src/scroll-area/viewport/ScrollAreaViewportContext.ts",
+      "gitBlob": "0189130ddad7b6f688c38b1007ea95cd91a85534",
+      "size": 567
+    },
+    {
+      "path": "packages/react/src/scroll-area/viewport/ScrollAreaViewportCssVars.ts",
+      "gitBlob": "df06c991fef797a473cb55e721c9439850a7ca92",
+      "size": 646
+    },
+    {
+      "path": "packages/react/src/scroll-area/viewport/ScrollAreaViewportDataAttributes.ts",
+      "gitBlob": "66456be3bf2b8e4f339f74162cfb242e1a83db67",
+      "size": 869
+    },
+    {
+      "path": "packages/react/src/select/arrow/SelectArrow.test.tsx",
+      "gitBlob": "819c89ca5061a193d33b8cc47e0b01b4c2cd6f57",
+      "size": 487
+    },
+    {
+      "path": "packages/react/src/select/arrow/SelectArrow.tsx",
+      "gitBlob": "c52e571d4866c2566d2dd3c86714a243e29323b7",
+      "size": 2502
+    },
+    {
+      "path": "packages/react/src/select/arrow/SelectArrowDataAttributes.ts",
+      "gitBlob": "b7be7122e884b3c15547397a3f10a7d2eafcd494",
+      "size": 795
+    },
+    {
+      "path": "packages/react/src/select/backdrop/SelectBackdrop.test.tsx",
+      "gitBlob": "fa545ea62a9af7be262b5297103a7e1a05a5fad2",
+      "size": 388
+    },
+    {
+      "path": "packages/react/src/select/backdrop/SelectBackdrop.tsx",
+      "gitBlob": "cf5e594799f358f3a97f5ca9647a40819a8a3fcf",
+      "size": 2275
+    },
+    {
+      "path": "packages/react/src/select/backdrop/SelectBackdropDataAttributes.ts",
+      "gitBlob": "9e2f80c96431ec2da539b0ce127f78dc1f6355da",
+      "size": 540
+    },
+    {
+      "path": "packages/react/src/select/group-label/SelectGroupLabel.test.tsx",
+      "gitBlob": "e3d215406a61cc50f57a8865f0c35c3226695f15",
+      "size": 458
+    },
+    {
+      "path": "packages/react/src/select/group-label/SelectGroupLabel.tsx",
+      "gitBlob": "e5e12d6cbda577963f483f777c430c2ab4faf087",
+      "size": 1423
+    },
+    {
+      "path": "packages/react/src/select/group/SelectGroup.test.tsx",
+      "gitBlob": "9c86819b61b51ecd88308bbebc17629d7270d37a",
+      "size": 1602
+    },
+    {
+      "path": "packages/react/src/select/group/SelectGroup.tsx",
+      "gitBlob": "52e818032abbfaca3f02b9158052e45efffc7ce5",
+      "size": 1426
+    },
+    {
+      "path": "packages/react/src/select/group/SelectGroupContext.ts",
+      "gitBlob": "3fc87bae376ec2430e02b66924feac14b1258269",
+      "size": 576
+    },
+    {
+      "path": "packages/react/src/select/icon/SelectIcon.test.tsx",
+      "gitBlob": "64060375cb36ea6bc87e9da6f75f3cb42868040c",
+      "size": 381
+    },
+    {
+      "path": "packages/react/src/select/icon/SelectIcon.tsx",
+      "gitBlob": "0c5d8017ffd7f2db5e8f94fe5cf34b42443bfda1",
+      "size": 1541
+    },
+    {
+      "path": "packages/react/src/select/icon/SelectIconDataAttributes.ts",
+      "gitBlob": "5c7f06ca2ae56fbf439360070dd269d402ef11a3",
+      "size": 235
+    },
+    {
+      "path": "packages/react/src/select/index.parts.ts",
+      "gitBlob": "283cbe5dfd4f622ced488b106a1fdf7e60d77e57",
+      "size": 1303
+    },
+    {
+      "path": "packages/react/src/select/index.ts",
+      "gitBlob": "5d847a8d995b943061d2e338477345df8b0cfaab",
+      "size": 887
+    },
+    {
+      "path": "packages/react/src/select/item-indicator/SelectItemIndicator.test.tsx",
+      "gitBlob": "bc5ad4e782a3bc40d6b725cb916ace8da61dcadd",
+      "size": 610
+    },
+    {
+      "path": "packages/react/src/select/item-indicator/SelectItemIndicator.tsx",
+      "gitBlob": "a580caa6582c574ae95359767cf92b0ee0d12ca7",
+      "size": 3051
+    },
+    {
+      "path": "packages/react/src/select/item-indicator/SelectItemIndicatorDataAttributes.ts",
+      "gitBlob": "dff590c12a205c0bddac5f99ed1049243b4f3dcb",
+      "size": 387
+    },
+    {
+      "path": "packages/react/src/select/item-text/SelectItemText.test.tsx",
+      "gitBlob": "550425472a47388331b68654b4d105a83ee51c74",
+      "size": 524
+    },
+    {
+      "path": "packages/react/src/select/item-text/SelectItemText.tsx",
+      "gitBlob": "cbdf82bd73f7c1986e5a19262ea159f384f43bdb",
+      "size": 1768
+    },
+    {
+      "path": "packages/react/src/select/item/SelectItem.test.tsx",
+      "gitBlob": "6123625a9f2ce23737729c14903bc41c37b55c6f",
+      "size": 24813
+    },
+    {
+      "path": "packages/react/src/select/item/SelectItem.tsx",
+      "gitBlob": "83618d1633eb98c519c759945f876c67e5d75caa",
+      "size": 9926
+    },
+    {
+      "path": "packages/react/src/select/item/SelectItemContext.ts",
+      "gitBlob": "35803a14fd4219ee6a7bef59fc8a49100b545fdb",
+      "size": 592
+    },
+    {
+      "path": "packages/react/src/select/item/SelectItemDataAttributes.ts",
+      "gitBlob": "93450c4cbd6d74981821345dc3ec5577d87b3f81",
+      "size": 317
+    },
+    {
+      "path": "packages/react/src/select/label/SelectLabel.test.tsx",
+      "gitBlob": "52268ea8b302ec0c6a05dd4049a3dcfe00685521",
+      "size": 530
+    },
+    {
+      "path": "packages/react/src/select/label/SelectLabel.tsx",
+      "gitBlob": "f5c09e6b6c5e262aa0a307360f4b9ed37d45d6b7",
+      "size": 2320
+    },
+    {
+      "path": "packages/react/src/select/list/SelectList.test.tsx",
+      "gitBlob": "1aea7b8121ce1a301cce221b0d37b7ffddb55f98",
+      "size": 568
+    },
+    {
+      "path": "packages/react/src/select/list/SelectList.tsx",
+      "gitBlob": "118a01055e71e2fdabe290bdc9de6a63b25ed1bb",
+      "size": 2290
+    },
+    {
+      "path": "packages/react/src/select/popup/SelectPopup.test.tsx",
+      "gitBlob": "404b7dc18e0a6c556c53ac9efebda8bdafe48b33",
+      "size": 38716
+    },
+    {
+      "path": "packages/react/src/select/popup/SelectPopup.tsx",
+      "gitBlob": "b814b866af0c5ef1fdf54afe3355e26f07c9fbdb",
+      "size": 21946
+    },
+    {
+      "path": "packages/react/src/select/popup/SelectPopupDataAttributes.ts",
+      "gitBlob": "0c1fa0009bd71a4d5d06185465a30b20d4f14986",
+      "size": 918
+    },
+    {
+      "path": "packages/react/src/select/popup/utils.ts",
+      "gitBlob": "5476f19431e3946ecc36809399f36f87c60977cc",
+      "size": 311
+    },
+    {
+      "path": "packages/react/src/select/portal/SelectPortal.test.tsx",
+      "gitBlob": "02049ff32906db27c4a07ae85cf2b162f243dd90",
+      "size": 416
+    },
+    {
+      "path": "packages/react/src/select/portal/SelectPortal.tsx",
+      "gitBlob": "499d667bd1b7dcaa32cd03e69ce75010a51a8044",
+      "size": 1382
+    },
+    {
+      "path": "packages/react/src/select/portal/SelectPortalContext.ts",
+      "gitBlob": "308600c40efbb5549858c480d8cacab42a25bd5d",
+      "size": 346
+    },
+    {
+      "path": "packages/react/src/select/positioner/SelectPositioner.spec.tsx",
+      "gitBlob": "d096edb01bd983e3d10bfa04aa55b6a7b77c6fed",
+      "size": 137
+    },
+    {
+      "path": "packages/react/src/select/positioner/SelectPositioner.test.tsx",
+      "gitBlob": "924de096f9075c4b9e1ab90cc029a2fd178a85b6",
+      "size": 8771
+    },
+    {
+      "path": "packages/react/src/select/positioner/SelectPositioner.tsx",
+      "gitBlob": "a9aa1a0633299c3b11f896fb7f93677e81427c63",
+      "size": 9243
+    },
+    {
+      "path": "packages/react/src/select/positioner/SelectPositionerContext.ts",
+      "gitBlob": "a6964663c2a721e26f89df2c59ac9c52ca0991e5",
+      "size": 922
+    },
+    {
+      "path": "packages/react/src/select/positioner/SelectPositionerCssVars.ts",
+      "gitBlob": "5046dffc71fcf083d34a10a8362dec0e3ef0d4b4",
+      "size": 688
+    },
+    {
+      "path": "packages/react/src/select/positioner/SelectPositionerDataAttributes.ts",
+      "gitBlob": "64193ac6e76b50d8e4dbc8719436fa2c7ae97279",
+      "size": 813
+    },
+    {
+      "path": "packages/react/src/select/root/SelectRoot.spec.tsx",
+      "gitBlob": "0b8260365b2968715d29fee3735da3556aff00aa",
+      "size": 5086
+    },
+    {
+      "path": "packages/react/src/select/root/SelectRoot.test.tsx",
+      "gitBlob": "d6b84788970589b6671a33a803c7fcb3732e3773",
+      "size": 179809
+    },
+    {
+      "path": "packages/react/src/select/root/SelectRoot.tsx",
+      "gitBlob": "999705278ca35fd183f755c569d783711f17aba8",
+      "size": 25659
+    },
+    {
+      "path": "packages/react/src/select/root/SelectRootContext.ts",
+      "gitBlob": "3756f6ba0c091b0c91526c7741d732876b0573e7",
+      "size": 2410
+    },
+    {
+      "path": "packages/react/src/select/scroll-arrow/SelectScrollArrow.tsx",
+      "gitBlob": "010455086fd15c8368219d8805198829304449f6",
+      "size": 7192
+    },
+    {
+      "path": "packages/react/src/select/scroll-down-arrow/SelectScrollDownArrow.test.tsx",
+      "gitBlob": "8d53b514506834e8c785e25b1bae3ee1be362024",
+      "size": 6036
+    },
+    {
+      "path": "packages/react/src/select/scroll-down-arrow/SelectScrollDownArrow.tsx",
+      "gitBlob": "17a71cca5ac5f390386fcaa0bb2c20bd2f588a41",
+      "size": 1143
+    },
+    {
+      "path": "packages/react/src/select/scroll-down-arrow/SelectScrollDownArrowDataAttributes.ts",
+      "gitBlob": "e202c129acf0bfa8662864be6cd4c665e8c9756c",
+      "size": 790
+    },
+    {
+      "path": "packages/react/src/select/scroll-up-arrow/SelectScrollUpArrow.test.tsx",
+      "gitBlob": "cc029c3a959e76b87b55032423a872dc7415cb4e",
+      "size": 3275
+    },
+    {
+      "path": "packages/react/src/select/scroll-up-arrow/SelectScrollUpArrow.tsx",
+      "gitBlob": "e746a2bcfcdb894f77d7a0e8966cee16d1170e78",
+      "size": 1121
+    },
+    {
+      "path": "packages/react/src/select/scroll-up-arrow/SelectScrollUpArrowDataAttributes.ts",
+      "gitBlob": "fb862fb1250ff39bdd86fda4b7501852e7be116e",
+      "size": 786
+    },
+    {
+      "path": "packages/react/src/select/store.ts",
+      "gitBlob": "123c864981a0bf50fdf256f516f5a150e5c73ba0",
+      "size": 4574
+    },
+    {
+      "path": "packages/react/src/select/trigger/SelectTrigger.test.tsx",
+      "gitBlob": "c31d55d01e74590e7b1ff0dfc049ff6bb4890f5d",
+      "size": 8894
+    },
+    {
+      "path": "packages/react/src/select/trigger/SelectTrigger.tsx",
+      "gitBlob": "6232aabfbd2740e4d0d5f9098cf9ccf9e2d01ce7",
+      "size": 9375
+    },
+    {
+      "path": "packages/react/src/select/trigger/SelectTriggerDataAttributes.ts",
+      "gitBlob": "454689d28dbd48bc5c4757dc9bf7aa9b788e319e",
+      "size": 1609
+    },
+    {
+      "path": "packages/react/src/select/value/SelectValue.test.tsx",
+      "gitBlob": "fde4d317408fda77a529871ae786930219e5a9d7",
+      "size": 24187
+    },
+    {
+      "path": "packages/react/src/select/value/SelectValue.tsx",
+      "gitBlob": "9df05cafedf7fa7b464d1288007fc1ba210d017e",
+      "size": 3272
+    },
+    {
+      "path": "packages/react/src/select/value/SelectValueDataAttributes.ts",
+      "gitBlob": "319c541cea5daacd9632da085456d598ae1ec0cc",
+      "size": 141
+    },
+    {
+      "path": "packages/react/src/separator/index.ts",
+      "gitBlob": "7fd3fd2b69f92a295ccfe7e96ca32b5c4d110caa",
+      "size": 76
+    },
+    {
+      "path": "packages/react/src/separator/Separator.test.tsx",
+      "gitBlob": "70c54d83f66d5aac81556005cf252f06afc96f7a",
+      "size": 903
+    },
+    {
+      "path": "packages/react/src/separator/Separator.tsx",
+      "gitBlob": "48a07d477a703c3b5ef7dc49431ce43bfc848fa4",
+      "size": 1321
+    },
+    {
+      "path": "packages/react/src/separator/SeparatorDataAttributes.ts",
+      "gitBlob": "61833e06fcd22257d5e0d237389fbd5fbaa50274",
+      "size": 176
+    },
+    {
+      "path": "packages/react/src/slider/control/SliderControl.test.tsx",
+      "gitBlob": "91349f549a1eb0fb1d3c6a14307191118c66bb1a",
+      "size": 797
+    },
+    {
+      "path": "packages/react/src/slider/control/SliderControl.tsx",
+      "gitBlob": "599b185694f2a684685ee832ec6222487c53fc83",
+      "size": 17247
+    },
+    {
+      "path": "packages/react/src/slider/control/SliderControlDataAttributes.ts",
+      "gitBlob": "c7ed04558954d45724afb982be11cc05f48eb6b9",
+      "size": 922
+    },
+    {
+      "path": "packages/react/src/slider/index.parts.ts",
+      "gitBlob": "0183a9e3dc36f4b1a947273af13250ab0e4a2032",
+      "size": 440
+    },
+    {
+      "path": "packages/react/src/slider/index.ts",
+      "gitBlob": "e19cd265093d701fdac9d81dc279b49a81295315",
+      "size": 346
+    },
+    {
+      "path": "packages/react/src/slider/indicator/SliderIndicator.test.tsx",
+      "gitBlob": "f0d2ea7bbe90f5b72385a27c3c17d0be22cf28e4",
+      "size": 390
+    },
+    {
+      "path": "packages/react/src/slider/indicator/SliderIndicator.tsx",
+      "gitBlob": "5e9f811e00f3c3b14215a60537383c6409d8ffc9",
+      "size": 3971
+    },
+    {
+      "path": "packages/react/src/slider/indicator/SliderIndicatorDataAttributes.ts",
+      "gitBlob": "33594d54d8b8117c7b46427e8dda1063a02ec5ab",
+      "size": 924
+    },
+    {
+      "path": "packages/react/src/slider/label/SliderLabel.test.tsx",
+      "gitBlob": "cd72a362b4022165457d7a84195f812bedf05482",
+      "size": 516
+    },
+    {
+      "path": "packages/react/src/slider/label/SliderLabel.tsx",
+      "gitBlob": "9f0faf1d779627e470198d2235f7913b70b78a04",
+      "size": 2490
+    },
+    {
+      "path": "packages/react/src/slider/root/SliderRoot.spec.tsx",
+      "gitBlob": "14e1eacb54e6ee662f9898890c508a0bafd120da",
+      "size": 3195
+    },
+    {
+      "path": "packages/react/src/slider/root/SliderRoot.test.tsx",
+      "gitBlob": "485102cb7423fc566594092e98cc65fc304a3186",
+      "size": 113852
+    },
+    {
+      "path": "packages/react/src/slider/root/SliderRoot.tsx",
+      "gitBlob": "54f5097e2fe4846d3a4198e47253839a974ccc47",
+      "size": 19776
+    },
+    {
+      "path": "packages/react/src/slider/root/SliderRootContext.ts",
+      "gitBlob": "e1f4df72538e6a4c0518aa5bd4e4b7b20a90e349",
+      "size": 3931
+    },
+    {
+      "path": "packages/react/src/slider/root/SliderRootDataAttributes.ts",
+      "gitBlob": "4c250182b73e002b28f20c9471668889aad03dad",
+      "size": 919
+    },
+    {
+      "path": "packages/react/src/slider/root/stateAttributesMapping.ts",
+      "gitBlob": "174253fa6dab5f39daca8ca584665f41a4b9f7c6",
+      "size": 489
+    },
+    {
+      "path": "packages/react/src/slider/thumb/prehydrationScript.min.ts",
+      "gitBlob": "03c0595fbcb722b470425af91e4dc8f63787db07",
+      "size": 1250
+    },
+    {
+      "path": "packages/react/src/slider/thumb/prehydrationScript.template.js",
+      "gitBlob": "be813e2a591951fb5209f8bfbe8c2d3fc1bb0347",
+      "size": 2199
+    },
+    {
+      "path": "packages/react/src/slider/thumb/SliderThumb.test.tsx",
+      "gitBlob": "72ca52a80cf6d5c56e6ebbe1629cb65c457df7ae",
+      "size": 36718
+    },
+    {
+      "path": "packages/react/src/slider/thumb/SliderThumb.tsx",
+      "gitBlob": "ffefe3a06145c362b9a9a7d8f8a5b5d7b411d12e",
+      "size": 18725
+    },
+    {
+      "path": "packages/react/src/slider/thumb/SliderThumbDataAttributes.ts",
+      "gitBlob": "d2468630de99fcc05f512dcdfbd3567ecaa4ac3c",
+      "size": 1012
+    },
+    {
+      "path": "packages/react/src/slider/track/SliderTrack.test.tsx",
+      "gitBlob": "db1f52ac56f0dea844abeacfece6bfaa51530e6c",
+      "size": 382
+    },
+    {
+      "path": "packages/react/src/slider/track/SliderTrack.tsx",
+      "gitBlob": "9ceda0f0cfc1f93deab2833d7e128ebd56ecda7d",
+      "size": 1426
+    },
+    {
+      "path": "packages/react/src/slider/track/SliderTrackDataAttributes.ts",
+      "gitBlob": "acd04888839474b88e78b9c5d73a868170a958cd",
+      "size": 920
+    },
+    {
+      "path": "packages/react/src/slider/utils/asc.ts",
+      "gitBlob": "7ec2016b0288a90b14487b23f16651ac9f8df761",
+      "size": 62
+    },
+    {
+      "path": "packages/react/src/slider/utils/getMidpoint.ts",
+      "gitBlob": "b8f30e401716b02b435bb884ae53eea5d483f07f",
+      "size": 262
+    },
+    {
+      "path": "packages/react/src/slider/utils/getPushedThumbValues.test.ts",
+      "gitBlob": "a1acbea20f36eddde0f7dd60d508641ec3b953f9",
+      "size": 2299
+    },
+    {
+      "path": "packages/react/src/slider/utils/getPushedThumbValues.ts",
+      "gitBlob": "32422a3d28c799dbb0b6cff2174857eb051a82d3",
+      "size": 2102
+    },
+    {
+      "path": "packages/react/src/slider/utils/getSliderValue.test.ts",
+      "gitBlob": "a334c3042d0e2832db2cfc207719f0f54b216067",
+      "size": 1192
+    },
+    {
+      "path": "packages/react/src/slider/utils/getSliderValue.ts",
+      "gitBlob": "6830e0d470c286f1de103c2d9e598b4b8b350de1",
+      "size": 616
+    },
+    {
+      "path": "packages/react/src/slider/utils/replaceArrayItemAtIndex.ts",
+      "gitBlob": "4864f9591e6c5beffabcccf77d0c6f9d9e4d94bd",
+      "size": 220
+    },
+    {
+      "path": "packages/react/src/slider/utils/resolveThumbCollision.test.ts",
+      "gitBlob": "f8853f1b670800402a7acde5a32d83ecc33295db",
+      "size": 6248
+    },
+    {
+      "path": "packages/react/src/slider/utils/resolveThumbCollision.ts",
+      "gitBlob": "97ee855a73c81eb4fea3764d619a6b9a420824c0",
+      "size": 5498
+    },
+    {
+      "path": "packages/react/src/slider/utils/roundValueToStep.test.ts",
+      "gitBlob": "f614f5d211f7de96a0875d07f26ed151653a0cf0",
+      "size": 265
+    },
+    {
+      "path": "packages/react/src/slider/utils/roundValueToStep.ts",
+      "gitBlob": "c9d7db5d423fb586f25b37a6eede5c3241fc554d",
+      "size": 854
+    },
+    {
+      "path": "packages/react/src/slider/utils/test-utils.ts",
+      "gitBlob": "0cb873c5abdf7aac13b8304df49603c6aeef7ba7",
+      "size": 564
+    },
+    {
+      "path": "packages/react/src/slider/utils/validateMinimumDistance.ts",
+      "gitBlob": "04ecad37546a708b344630b85c3e08c6237456d4",
+      "size": 463
+    },
+    {
+      "path": "packages/react/src/slider/utils/valueArrayToPercentages.ts",
+      "gitBlob": "8a054504f54a25694c8de3092d86a98725fcd523",
+      "size": 355
+    },
+    {
+      "path": "packages/react/src/slider/value/SliderValue.test.tsx",
+      "gitBlob": "54700331385b7458f128385d056ed7756a09d258",
+      "size": 2078
+    },
+    {
+      "path": "packages/react/src/slider/value/SliderValue.tsx",
+      "gitBlob": "48de267adeaa1de2e16ab192e03bb4203240d0a7",
+      "size": 2618
+    },
+    {
+      "path": "packages/react/src/slider/value/SliderValueDataAttributes.ts",
+      "gitBlob": "a772bbc295dc40a82660bb4226cefe0450f59052",
+      "size": 920
+    },
+    {
+      "path": "packages/react/src/switch/index.parts.ts",
+      "gitBlob": "cc81006a43148653d8279f201470347ba6d34a83",
+      "size": 116
+    },
+    {
+      "path": "packages/react/src/switch/index.ts",
+      "gitBlob": "e7fb5b63f32cd565e7c8f1d8b5703430b42029ee",
+      "size": 124
+    },
+    {
+      "path": "packages/react/src/switch/root/SwitchRoot.test.tsx",
+      "gitBlob": "b84446ce34222f4de6434d373e3a8628d314c90b",
+      "size": 36742
+    },
+    {
+      "path": "packages/react/src/switch/root/SwitchRoot.tsx",
+      "gitBlob": "789ab4601af765d9073c0439588d8c41a83471f9",
+      "size": 10179
+    },
+    {
+      "path": "packages/react/src/switch/root/SwitchRootContext.ts",
+      "gitBlob": "13486b1a5ded0449bc150e5bd9b02cc2671b593e",
+      "size": 525
+    },
+    {
+      "path": "packages/react/src/switch/root/SwitchRootDataAttributes.ts",
+      "gitBlob": "3118c61a6e16528e6597de7e6295efb9f2a8254f",
+      "size": 1148
+    },
+    {
+      "path": "packages/react/src/switch/stateAttributesMapping.ts",
+      "gitBlob": "5ac6edc87f549533d25762abdbec082a37429393",
+      "size": 621
+    },
+    {
+      "path": "packages/react/src/switch/thumb/SwitchThumb.test.tsx",
+      "gitBlob": "6c11867c9708e3cda00cc7d6a13cc2be637ccf53",
+      "size": 717
+    },
+    {
+      "path": "packages/react/src/switch/thumb/SwitchThumb.tsx",
+      "gitBlob": "8ce0c00c0c1fb119a657a3bd40e11d85ff955dd0",
+      "size": 1264
+    },
+    {
+      "path": "packages/react/src/switch/thumb/SwitchThumbDataAttributes.ts",
+      "gitBlob": "2e45bb682222bdbf7f7f2f18a6f67ff9a05e0831",
+      "size": 1149
+    },
+    {
+      "path": "packages/react/src/tabs/index.parts.ts",
+      "gitBlob": "b63d488656e093ef5ce1b678159da9076394854b",
+      "size": 280
+    },
+    {
+      "path": "packages/react/src/tabs/index.ts",
+      "gitBlob": "7e23fd5a807fe76aba2f3364f1a93af5b9c046a1",
+      "size": 240
+    },
+    {
+      "path": "packages/react/src/tabs/indicator/prehydrationScript.min.ts",
+      "gitBlob": "cf5e76947bdb6010b5007e29fc4f08821d80af0a",
+      "size": 1261
+    },
+    {
+      "path": "packages/react/src/tabs/indicator/prehydrationScript.template.js",
+      "gitBlob": "b24f5cc37afa779d6bd0a5cb11cae235cfca0976",
+      "size": 2516
+    },
+    {
+      "path": "packages/react/src/tabs/indicator/TabsIndicator.test.tsx",
+      "gitBlob": "535b88e9b4b4e588665332f1049b803573dfc44b",
+      "size": 15338
+    },
+    {
+      "path": "packages/react/src/tabs/indicator/TabsIndicator.tsx",
+      "gitBlob": "edb6100203af96e9b8c190f9a8687db538669b22",
+      "size": 5876
+    },
+    {
+      "path": "packages/react/src/tabs/indicator/TabsIndicatorCssVars.ts",
+      "gitBlob": "b6434d5d1fa69be748355b3dfddaec5142341a31",
+      "size": 962
+    },
+    {
+      "path": "packages/react/src/tabs/indicator/TabsIndicatorDataAttributes.ts",
+      "gitBlob": "220165f87e4dfb127128c19f9767ce1eacc495fd",
+      "size": 378
+    },
+    {
+      "path": "packages/react/src/tabs/list/TabsList.test.tsx",
+      "gitBlob": "344c52208a33cadf737100bbcfcd4c120beb2b68",
+      "size": 4063
+    },
+    {
+      "path": "packages/react/src/tabs/list/TabsList.tsx",
+      "gitBlob": "a1259a4e76139c974930206c58b8cc2c1f742ed2",
+      "size": 5171
+    },
+    {
+      "path": "packages/react/src/tabs/list/TabsListContext.ts",
+      "gitBlob": "cafe7d0c9cf097804b30bafb6454665bdd300d4a",
+      "size": 940
+    },
+    {
+      "path": "packages/react/src/tabs/list/TabsListDataAttributes.ts",
+      "gitBlob": "5d2b6e23676693971814da2b3db8f99f2c56fb09",
+      "size": 373
+    },
+    {
+      "path": "packages/react/src/tabs/panel/TabsPanel.test.tsx",
+      "gitBlob": "f6f39e5a72772b7af6efd4da273b66e1832a1261",
+      "size": 5757
+    },
+    {
+      "path": "packages/react/src/tabs/panel/TabsPanel.tsx",
+      "gitBlob": "ef69561740e2c88950ad647e205e78c713137fce",
+      "size": 4385
+    },
+    {
+      "path": "packages/react/src/tabs/panel/TabsPanelDataAttributes.ts",
+      "gitBlob": "edb17307b59c33b91f9f8cc525cc71b7110ba55f",
+      "size": 859
+    },
+    {
+      "path": "packages/react/src/tabs/root/stateAttributesMapping.ts",
+      "gitBlob": "cdc2dea7c5d47c7a847382c9b669d05736fa018a",
+      "size": 389
+    },
+    {
+      "path": "packages/react/src/tabs/root/TabsRoot.test.tsx",
+      "gitBlob": "845e67cbfc905b86f03eb7c83d19f01e8de3eec7",
+      "size": 85191
+    },
+    {
+      "path": "packages/react/src/tabs/root/TabsRoot.tsx",
+      "gitBlob": "1640fa75bfc20b07fa83994ae97d92b014ebe34a",
+      "size": 16971
+    },
+    {
+      "path": "packages/react/src/tabs/root/TabsRootContext.ts",
+      "gitBlob": "993ca7e85e11b929c8f3949068ecc9993efcbd6c",
+      "size": 1832
+    },
+    {
+      "path": "packages/react/src/tabs/root/TabsRootDataAttributes.ts",
+      "gitBlob": "a5b9e167ce0339b0fcd7391967d1d86ea1151042",
+      "size": 373
+    },
+    {
+      "path": "packages/react/src/tabs/tab/TabsTab.test.tsx",
+      "gitBlob": "d6c07dde00818236e9a40e7f439ba41feadb5a92",
+      "size": 2707
+    },
+    {
+      "path": "packages/react/src/tabs/tab/TabsTab.tsx",
+      "gitBlob": "31193ae119318013a172c8fc0fc3c1be1319a4e4",
+      "size": 8087
+    },
+    {
+      "path": "packages/react/src/tabs/tab/TabsTabDataAttributes.ts",
+      "gitBlob": "a36190493c11252c2a86f14a274b50d44092e40e",
+      "size": 528
+    },
+    {
+      "path": "packages/react/src/toast/action/ToastAction.test.tsx",
+      "gitBlob": "a0a0fa363b65bd246d1c5b3586f25a502aaece2e",
+      "size": 1989
+    },
+    {
+      "path": "packages/react/src/toast/action/ToastAction.tsx",
+      "gitBlob": "6dec51b218682fbd96e8dd2cd36266f2214cb94b",
+      "size": 1782
+    },
+    {
+      "path": "packages/react/src/toast/action/ToastActionDataAttributes.ts",
+      "gitBlob": "56781b7337912188320907a15a068fa2b06861b8",
+      "size": 124
+    },
+    {
+      "path": "packages/react/src/toast/arrow/ToastArrow.test.tsx",
+      "gitBlob": "5895244d9c7998e36bed83b147ccae92c0d0217f",
+      "size": 542
+    },
+    {
+      "path": "packages/react/src/toast/arrow/ToastArrow.tsx",
+      "gitBlob": "56fb2fdb96f11b6d7ee4998937618140d562221c",
+      "size": 1641
+    },
+    {
+      "path": "packages/react/src/toast/arrow/ToastArrowDataAttributes.ts",
+      "gitBlob": "9a481f1571be790c97240cd36361d0fbe90daf46",
+      "size": 583
+    },
+    {
+      "path": "packages/react/src/toast/close/ToastClose.test.tsx",
+      "gitBlob": "d43ffcae9593e4535c1286e0782a850d1a346e4b",
+      "size": 1492
+    },
+    {
+      "path": "packages/react/src/toast/close/ToastClose.tsx",
+      "gitBlob": "b46d4960016af870598e3cf07cca1ec8a7809c51",
+      "size": 1992
+    },
+    {
+      "path": "packages/react/src/toast/close/ToastCloseDataAttributes.ts",
+      "gitBlob": "55647c53d9e8da1a15c8ef1b937dc66ddf13fbe3",
+      "size": 123
+    },
+    {
+      "path": "packages/react/src/toast/content/ToastContent.test.tsx",
+      "gitBlob": "9776479579cb9909b422f4d71ee4b7abb8b76883",
+      "size": 2497
+    },
+    {
+      "path": "packages/react/src/toast/content/ToastContent.tsx",
+      "gitBlob": "33f6609248275ef53ccf4aa2ddd1d662a6603009",
+      "size": 2232
+    },
+    {
+      "path": "packages/react/src/toast/content/ToastContentDataAttributes.ts",
+      "gitBlob": "442cfd76b10e8cfbae6c4b150b36de4cc28c4856",
+      "size": 287
+    },
+    {
+      "path": "packages/react/src/toast/createToastManager.spec.tsx",
+      "gitBlob": "d086dffbab8fcda698dd655c030011ac55a73843",
+      "size": 1529
+    },
+    {
+      "path": "packages/react/src/toast/createToastManager.test.tsx",
+      "gitBlob": "d30c0948aea29362d686f54f1a19e6bd3d9896a9",
+      "size": 20491
+    },
+    {
+      "path": "packages/react/src/toast/createToastManager.ts",
+      "gitBlob": "0bffdacd55e3f095aa7587d9874c2baaec5041ae",
+      "size": 2588
+    },
+    {
+      "path": "packages/react/src/toast/description/ToastDescription.test.tsx",
+      "gitBlob": "560aae3897fc92321f81d8fd06c9c8130d8eac46",
+      "size": 2579
+    },
+    {
+      "path": "packages/react/src/toast/description/ToastDescription.tsx",
+      "gitBlob": "8db78c22b62348546ccadb6a0e60976bf6415919",
+      "size": 1971
+    },
+    {
+      "path": "packages/react/src/toast/description/ToastDescriptionDataAttributes.ts",
+      "gitBlob": "3483b7bf892a353a10d8a33a51c473f168d589ba",
+      "size": 129
+    },
+    {
+      "path": "packages/react/src/toast/index.parts.ts",
+      "gitBlob": "ed162a89e4596f1b994bfec0f47274f0bb9190d5",
+      "size": 831
+    },
+    {
+      "path": "packages/react/src/toast/index.ts",
+      "gitBlob": "ad3099a17662ecd4c2b08c82460ea7ecbfcfd770",
+      "size": 615
+    },
+    {
+      "path": "packages/react/src/toast/portal/ToastPortal.test.tsx",
+      "gitBlob": "95d44e21152b9756c5963fc648d29ea6fe19bc83",
+      "size": 378
+    },
+    {
+      "path": "packages/react/src/toast/portal/ToastPortal.tsx",
+      "gitBlob": "3088879a3e85bb331aebff3820c1bcfd1fab3856",
+      "size": 626
+    },
+    {
+      "path": "packages/react/src/toast/positioner/ToastPositioner.test.tsx",
+      "gitBlob": "6792ac89b34c20ae79ba70410b0b5ee8d1ab5478",
+      "size": 485
+    },
+    {
+      "path": "packages/react/src/toast/positioner/ToastPositioner.tsx",
+      "gitBlob": "b72c14e8dc279bb982a9b1cfa6fd588b716daef4",
+      "size": 4711
+    },
+    {
+      "path": "packages/react/src/toast/positioner/ToastPositionerContext.ts",
+      "gitBlob": "5f84e27fd651d6f82e075ca5a723e90c5ae6113b",
+      "size": 704
+    },
+    {
+      "path": "packages/react/src/toast/positioner/ToastPositionerCssVars.ts",
+      "gitBlob": "126bd5c912b4a9d424c8dfe9a6beab823e713a1d",
+      "size": 685
+    },
+    {
+      "path": "packages/react/src/toast/positioner/ToastPositionerDataAttributes.ts",
+      "gitBlob": "12579ec8891ef97ef88da956bd6127c81ac65702",
+      "size": 603
+    },
+    {
+      "path": "packages/react/src/toast/provider/ToastProvider.tsx",
+      "gitBlob": "9ee5c0a6a52e7eae915e397b480fcc86b25472ba",
+      "size": 2885
+    },
+    {
+      "path": "packages/react/src/toast/provider/ToastProviderContext.ts",
+      "gitBlob": "ed63c9376541229e14c22e640159bc166694811f",
+      "size": 436
+    },
+    {
+      "path": "packages/react/src/toast/root/ToastRoot.test.tsx",
+      "gitBlob": "7ef7fde8977474be58171d5c63b363494439dd1d",
+      "size": 27364
+    },
+    {
+      "path": "packages/react/src/toast/root/ToastRoot.tsx",
+      "gitBlob": "9e584df0a01099216d024e570d988708b27f3ead",
+      "size": 20492
+    },
+    {
+      "path": "packages/react/src/toast/root/ToastRootContext.ts",
+      "gitBlob": "e48811771501131068f6a28d24959af73d23330f",
+      "size": 1022
+    },
+    {
+      "path": "packages/react/src/toast/root/ToastRootCssVars.ts",
+      "gitBlob": "56022a2b9ff045b2d9cfee834753201e0ac50407",
+      "size": 691
+    },
+    {
+      "path": "packages/react/src/toast/root/ToastRootDataAttributes.ts",
+      "gitBlob": "3e83a9023c30b5fd18c49f66fbe08669d1085cc9",
+      "size": 958
+    },
+    {
+      "path": "packages/react/src/toast/store.test.ts",
+      "gitBlob": "cae9d20c191958f20c39ceb022931b82d5df7cb5",
+      "size": 5750
+    },
+    {
+      "path": "packages/react/src/toast/store.ts",
+      "gitBlob": "1101ecf44189d1316f051d4ce24e59bb20c5bdde",
+      "size": 15519
+    },
+    {
+      "path": "packages/react/src/toast/title/ToastTitle.test.tsx",
+      "gitBlob": "ed74337f21095c40029abb62655930e831060e41",
+      "size": 2455
+    },
+    {
+      "path": "packages/react/src/toast/title/ToastTitle.tsx",
+      "gitBlob": "871ceb88aab4fcf405ca441fc3650d22468e11c6",
+      "size": 1795
+    },
+    {
+      "path": "packages/react/src/toast/title/ToastTitleDataAttributes.ts",
+      "gitBlob": "9218c8234e092f3bf66c67a59b95d8e342e631c5",
+      "size": 123
+    },
+    {
+      "path": "packages/react/src/toast/useToastManager.spec.tsx",
+      "gitBlob": "f9a02d5f3468bb15ed746b7139fb2d3fc0bce8f8",
+      "size": 1696
+    },
+    {
+      "path": "packages/react/src/toast/useToastManager.test.tsx",
+      "gitBlob": "95be8753e7ad610348402f59c24a718a919c93b2",
+      "size": 58010
+    },
+    {
+      "path": "packages/react/src/toast/useToastManager.ts",
+      "gitBlob": "95f4ea3e335be85428652d3d56cf05094cc6c96f",
+      "size": 4389
+    },
+    {
+      "path": "packages/react/src/toast/utils/focusVisible.ts",
+      "gitBlob": "efb95ba2abe2718b9a05d3977385f0ea8360e02a",
+      "size": 87
+    },
+    {
+      "path": "packages/react/src/toast/utils/resolvePromiseOptions.ts",
+      "gitBlob": "677cb9362a85f124283f8db67a5e70577b746bb1",
+      "size": 616
+    },
+    {
+      "path": "packages/react/src/toast/utils/test-utils.tsx",
+      "gitBlob": "f89d35588169af8aee26064a65b99848552ec3cf",
+      "size": 830
+    },
+    {
+      "path": "packages/react/src/toast/viewport/ToastViewport.test.tsx",
+      "gitBlob": "9bac417078e9e3a825fe11e234f4a46abfce4d1e",
+      "size": 20543
+    },
+    {
+      "path": "packages/react/src/toast/viewport/ToastViewport.tsx",
+      "gitBlob": "1fb482a65548b80986098669b59c9ad79adc8492",
+      "size": 10144
+    },
+    {
+      "path": "packages/react/src/toast/viewport/ToastViewportCssVars.ts",
+      "gitBlob": "318f180c3557e1e9fba571c0c4cc81383341d899",
+      "size": 167
+    },
+    {
+      "path": "packages/react/src/toast/viewport/ToastViewportDataAttributes.ts",
+      "gitBlob": "fc5335939a1d77c9a6828cbfd34141306a16b6c6",
+      "size": 159
+    },
+    {
+      "path": "packages/react/src/toggle-group/index.ts",
+      "gitBlob": "b885ead15ef23a7aeb6b646cda6e48b3862dbb54",
+      "size": 82
+    },
+    {
+      "path": "packages/react/src/toggle-group/ToggleGroup.spec.tsx",
+      "gitBlob": "91df4124b1d7ca1de8c81976457f9a3514cff85c",
+      "size": 771
+    },
+    {
+      "path": "packages/react/src/toggle-group/ToggleGroup.test.tsx",
+      "gitBlob": "8f8147573ae455d005b907e758f9cddfc37b40ce",
+      "size": 16812
+    },
+    {
+      "path": "packages/react/src/toggle-group/ToggleGroup.tsx",
+      "gitBlob": "8d3371d67d57a53985e1838800a62f4b413c8fa5",
+      "size": 6639
+    },
+    {
+      "path": "packages/react/src/toggle-group/ToggleGroupContext.ts",
+      "gitBlob": "f33d825b829b8096c951877b9d5b203ebd34872b",
+      "size": 1217
+    },
+    {
+      "path": "packages/react/src/toggle-group/ToggleGroupDataAttributes.ts",
+      "gitBlob": "da8cace6d92039736252765c86fc6e7bd4a7e98c",
+      "size": 417
+    },
+    {
+      "path": "packages/react/src/toggle/index.ts",
+      "gitBlob": "2cc30b60db4651aefef0b940fd49e8e3e9ab123e",
+      "size": 67
+    },
+    {
+      "path": "packages/react/src/toggle/Toggle.test.tsx",
+      "gitBlob": "aa7b4378cb772877b25eb8b0577b5645250b92f8",
+      "size": 4726
+    },
+    {
+      "path": "packages/react/src/toggle/Toggle.tsx",
+      "gitBlob": "7013c559c0d5f7b61bbe3530bb5bfbd56646eeab",
+      "size": 6102
+    },
+    {
+      "path": "packages/react/src/toggle/ToggleDataAttributes.ts",
+      "gitBlob": "1451a3f8ef9088b8abf7024329cdc0906a232bd2",
+      "size": 216
+    },
+    {
+      "path": "packages/react/src/toolbar/button/ToolbarButton.test.tsx",
+      "gitBlob": "91d12abcda9497ede66f772d5709ebfb9ab91321",
+      "size": 41250
+    },
+    {
+      "path": "packages/react/src/toolbar/button/ToolbarButton.tsx",
+      "gitBlob": "e4499a3637ad93af8b99ed2d94e530244ab27420",
+      "size": 3193
+    },
+    {
+      "path": "packages/react/src/toolbar/button/ToolbarButtonDataAttributes.ts",
+      "gitBlob": "73cd683af9538c6a408664edd749d605c0e76a53",
+      "size": 368
+    },
+    {
+      "path": "packages/react/src/toolbar/group/ToolbarGroup.test.tsx",
+      "gitBlob": "7fcdd245b6fb606f2056c670a21d6f95d7d7195d",
+      "size": 2279
+    },
+    {
+      "path": "packages/react/src/toolbar/group/ToolbarGroup.tsx",
+      "gitBlob": "c2e34a49e0a75d379ea2e9f41757444695d36268",
+      "size": 1814
+    },
+    {
+      "path": "packages/react/src/toolbar/group/ToolbarGroupContext.ts",
+      "gitBlob": "18d26fd94c798541c31b443ef2331aa4b8b1f580",
+      "size": 701
+    },
+    {
+      "path": "packages/react/src/toolbar/group/ToolbarGroupDataAttributes.ts",
+      "gitBlob": "2a60666c30c05d87281fc4b1d16b8ec5613506a7",
+      "size": 260
+    },
+    {
+      "path": "packages/react/src/toolbar/index.parts.ts",
+      "gitBlob": "528becb735bdf27476e6db3caf2e105847d18420",
+      "size": 440
+    },
+    {
+      "path": "packages/react/src/toolbar/index.ts",
+      "gitBlob": "4b88fd9a578baa9b593d879b3f2492ced48c76d1",
+      "size": 357
+    },
+    {
+      "path": "packages/react/src/toolbar/input/ToolbarInput.test.tsx",
+      "gitBlob": "b99bc69b9309c5f9d9367bc8d9a98cba1a9ea9f3",
+      "size": 7797
+    },
+    {
+      "path": "packages/react/src/toolbar/input/ToolbarInput.tsx",
+      "gitBlob": "1906bb295f9bc0d76b7cbe1f42bb65d4b63e2185",
+      "size": 2919
+    },
+    {
+      "path": "packages/react/src/toolbar/input/ToolbarInputDataAttributes.ts",
+      "gitBlob": "a910661773310880f0293af613b9df2b4d712ed5",
+      "size": 365
+    },
+    {
+      "path": "packages/react/src/toolbar/link/ToolbarLink.test.tsx",
+      "gitBlob": "ebd42603ffff5819a6c7abd4d01890b2125295cc",
+      "size": 1527
+    },
+    {
+      "path": "packages/react/src/toolbar/link/ToolbarLink.tsx",
+      "gitBlob": "89372c89a58bec239c152549fc16031c281cf0f1",
+      "size": 1550
+    },
+    {
+      "path": "packages/react/src/toolbar/link/ToolbarLinkDataAttributes.ts",
+      "gitBlob": "25afac5fd9b54be731b2dddbd470972f417a2384",
+      "size": 176
+    },
+    {
+      "path": "packages/react/src/toolbar/root/ToolbarRoot.test.tsx",
+      "gitBlob": "e3d61e56cd89309db998f3d6be245deb856c61b2",
+      "size": 9265
+    },
+    {
+      "path": "packages/react/src/toolbar/root/ToolbarRoot.tsx",
+      "gitBlob": "e3977121ae1ed4fd7a505d2a3813262282bf3caf",
+      "size": 3344
+    },
+    {
+      "path": "packages/react/src/toolbar/root/ToolbarRootContext.ts",
+      "gitBlob": "b2686a42d8b00f833fe83f40a1df73fd49f5ee44",
+      "size": 1032
+    },
+    {
+      "path": "packages/react/src/toolbar/root/ToolbarRootDataAttributes.ts",
+      "gitBlob": "7d27458062cc4ac8bdba81525b18d7845c8ae887",
+      "size": 261
+    },
+    {
+      "path": "packages/react/src/toolbar/separator/ToolbarSeparator.tsx",
+      "gitBlob": "ba195dea2e477ed393bbc9e8c369789e665dd9da",
+      "size": 1491
+    },
+    {
+      "path": "packages/react/src/toolbar/separator/ToolbarSeparatorDataAttributes.ts",
+      "gitBlob": "e331abd187d9583e9fce0df558337dcff9e4ea8b",
+      "size": 222
+    },
+    {
+      "path": "packages/react/src/tooltip/arrow/TooltipArrow.test.tsx",
+      "gitBlob": "7c41b848069f63e317195184e2408d1c01814400",
+      "size": 575
+    },
+    {
+      "path": "packages/react/src/tooltip/arrow/TooltipArrow.tsx",
+      "gitBlob": "cad302a6cb1588cb14f53c77d36fc610d6d9d848",
+      "size": 2208
+    },
+    {
+      "path": "packages/react/src/tooltip/arrow/TooltipArrowDataAttributes.ts",
+      "gitBlob": "65bf70122322423eb8e31f54d6e3915e0ed0195d",
+      "size": 907
+    },
+    {
+      "path": "packages/react/src/tooltip/index.parts.ts",
+      "gitBlob": "f2112b8fb6af3ba12ec7a4a2a5085df597428c6a",
+      "size": 655
+    },
+    {
+      "path": "packages/react/src/tooltip/index.ts",
+      "gitBlob": "6e7492ef246c34f90ed24cdbead3047eb4fd9bf0",
+      "size": 413
+    },
+    {
+      "path": "packages/react/src/tooltip/popup/TooltipPopup.test.tsx",
+      "gitBlob": "6add7fbbd46a4fe465b0fbc5ae90a6a1328db65b",
+      "size": 959
+    },
+    {
+      "path": "packages/react/src/tooltip/popup/TooltipPopup.tsx",
+      "gitBlob": "61ae11053429b11ef258b61307665c4781d233c9",
+      "size": 3424
+    },
+    {
+      "path": "packages/react/src/tooltip/popup/TooltipPopupDataAttributes.ts",
+      "gitBlob": "e30f7757fc515001c289a1a9b3429c17bfde28ca",
+      "size": 1043
+    },
+    {
+      "path": "packages/react/src/tooltip/portal/TooltipPortal.test.tsx",
+      "gitBlob": "34e929be61061c31e5144a5a7147d1303223f370",
+      "size": 422
+    },
+    {
+      "path": "packages/react/src/tooltip/portal/TooltipPortal.tsx",
+      "gitBlob": "7295f22cc7e5ea0b548c2ba35090b8e9a1c88845",
+      "size": 1474
+    },
+    {
+      "path": "packages/react/src/tooltip/portal/TooltipPortalContext.ts",
+      "gitBlob": "890e8709614a6accfbe13a9d26770b163a8714ac",
+      "size": 350
+    },
+    {
+      "path": "packages/react/src/tooltip/positioner/TooltipPositioner.spec.tsx",
+      "gitBlob": "17f0c1ff3fd205f9fe86f3dafcc9e1e1c705e0a8",
+      "size": 139
+    },
+    {
+      "path": "packages/react/src/tooltip/positioner/TooltipPositioner.test.tsx",
+      "gitBlob": "3d6ef3365deea2eed9726831260e0160eae986ec",
+      "size": 9394
+    },
+    {
+      "path": "packages/react/src/tooltip/positioner/TooltipPositioner.tsx",
+      "gitBlob": "e7536d2561b0a722079684739eb92ca9c5c8d77a",
+      "size": 4185
+    },
+    {
+      "path": "packages/react/src/tooltip/positioner/TooltipPositionerContext.ts",
+      "gitBlob": "f8339413bf57b376c66ebd9e7b9d7e0c22d4d62c",
+      "size": 720
+    },
+    {
+      "path": "packages/react/src/tooltip/positioner/TooltipPositionerCssVars.ts",
+      "gitBlob": "e979ee0e571f44b37ee46cf7a9bc17de9838d902",
+      "size": 689
+    },
+    {
+      "path": "packages/react/src/tooltip/positioner/TooltipPositionerDataAttributes.ts",
+      "gitBlob": "17bdce00b37157e7f25a8eccd2a35f200bb62655",
+      "size": 795
+    },
+    {
+      "path": "packages/react/src/tooltip/provider/TooltipProvider.test.tsx",
+      "gitBlob": "b033c42dc310f6f122b680880fee8b3fbb81bda7",
+      "size": 4810
+    },
+    {
+      "path": "packages/react/src/tooltip/provider/TooltipProvider.tsx",
+      "gitBlob": "bd07461bfa54d2aa33e1bdad6e097d24d5f0022b",
+      "size": 1739
+    },
+    {
+      "path": "packages/react/src/tooltip/provider/TooltipProviderContext.ts",
+      "gitBlob": "62133e2acf2f1572a167cdbe0c49fcd5fc109bf9",
+      "size": 402
+    },
+    {
+      "path": "packages/react/src/tooltip/root/TooltipRoot.detached-triggers.test.tsx",
+      "gitBlob": "0edd7f48d551cb8e7ecaa840dc9221537b521c8b",
+      "size": 36424
+    },
+    {
+      "path": "packages/react/src/tooltip/root/TooltipRoot.test.tsx",
+      "gitBlob": "208c36febe77ca98c1f251b182a153bf0e04480f",
+      "size": 91282
+    },
+    {
+      "path": "packages/react/src/tooltip/root/TooltipRoot.tsx",
+      "gitBlob": "2bf0626bd3d1e014cfdf65d5b0a2de59f6f2befe",
+      "size": 9417
+    },
+    {
+      "path": "packages/react/src/tooltip/root/TooltipRootContext.ts",
+      "gitBlob": "9e0def06bb902b49ab278031368e0c35b187ea8b",
+      "size": 754
+    },
+    {
+      "path": "packages/react/src/tooltip/store/TooltipHandle.ts",
+      "gitBlob": "f09feba027b8d9036e4302a90c61541297ac7503",
+      "size": 1838
+    },
+    {
+      "path": "packages/react/src/tooltip/store/TooltipStore.ts",
+      "gitBlob": "e3b006fa0bdbbe18a9af34de69932e1c60b3c3de",
+      "size": 3951
+    },
+    {
+      "path": "packages/react/src/tooltip/trigger/TooltipTrigger.spec.tsx",
+      "gitBlob": "e6cd109a5b2d9d6220dd39dbc0c13fc570c854cf",
+      "size": 254
+    },
+    {
+      "path": "packages/react/src/tooltip/trigger/TooltipTrigger.test.tsx",
+      "gitBlob": "bdcff2c8654900dbe362d0b1649223fe300565c6",
+      "size": 2732
+    },
+    {
+      "path": "packages/react/src/tooltip/trigger/TooltipTrigger.tsx",
+      "gitBlob": "8951164a96e0c461debadede0850d78447ba1f38",
+      "size": 12269
+    },
+    {
+      "path": "packages/react/src/tooltip/trigger/TooltipTriggerDataAttributes.ts",
+      "gitBlob": "ca66e12b42d0903e3c4f5da491661be0c63f0944",
+      "size": 414
+    },
+    {
+      "path": "packages/react/src/tooltip/utils/constants.ts",
+      "gitBlob": "16c23aa3b75f44da900c88d1b7d7cc93606cd90c",
+      "size": 31
+    },
+    {
+      "path": "packages/react/src/tooltip/viewport/TooltipViewport.test.tsx",
+      "gitBlob": "90e486ecccbdb5d37a74f28c44afdd7b0ad3fafd",
+      "size": 14406
+    },
+    {
+      "path": "packages/react/src/tooltip/viewport/TooltipViewport.tsx",
+      "gitBlob": "f1d070b62142cf5cd9d70c91135dd32ca1822b31",
+      "size": 2744
+    },
+    {
+      "path": "packages/react/src/tooltip/viewport/TooltipViewportCssVars.ts",
+      "gitBlob": "5e3f49b7c89cbe2161cf9e2b093d6b0ef6589058",
+      "size": 665
+    },
+    {
+      "path": "packages/react/src/tooltip/viewport/TooltipViewportDataAttributes.ts",
+      "gitBlob": "148333d42fe0a404a5f1ed52e024b6fb440f4067",
+      "size": 992
+    },
+    {
+      "path": "packages/react/src/types/index.ts",
+      "gitBlob": "ae3f6419e86e49e5005fa8aa460c7204180d02e5",
+      "size": 805
+    },
+    {
+      "path": "packages/react/src/unstable-use-media-query/index.ts",
+      "gitBlob": "d023b7e1be6194994e38a14cf6499694ca683af3",
+      "size": 3069
+    },
+    {
+      "path": "packages/react/src/use-render/index.ts",
+      "gitBlob": "45b191a14b3e1e24e63f7fae825630b527431de2",
+      "size": 101
+    },
+    {
+      "path": "packages/react/src/use-render/useRender.spec.tsx",
+      "gitBlob": "6dc42d1daee1d3c0a690c7f994c7ae38ac814dff",
+      "size": 1381
+    },
+    {
+      "path": "packages/react/src/use-render/useRender.test.tsx",
+      "gitBlob": "bc0d6a972425ea092bdc2b62ea2475d58abaaed2",
+      "size": 9553
+    },
+    {
+      "path": "packages/react/src/use-render/useRender.ts",
+      "gitBlob": "313dbabe1bde141f175fc90935de17aa79d8522c",
+      "size": 3949
+    },
+    {
+      "path": "packages/react/src/utils/adaptiveOriginMiddleware.ts",
+      "gitBlob": "46f26e0950b376c7ae5ef455192336be6c77453b",
+      "size": 2050
+    },
+    {
+      "path": "packages/react/src/utils/closePart.tsx",
+      "gitBlob": "bae3c7b4a034c3cd74b6becc3f3aba353ec944d5",
+      "size": 1195
+    },
+    {
+      "path": "packages/react/src/utils/collapsibleOpenStateMapping.ts",
+      "gitBlob": "6ad7321dbfcb4339cf732d4ed711ec17d5ce6278",
+      "size": 890
+    },
+    {
+      "path": "packages/react/src/utils/FloatingPortalLite.tsx",
+      "gitBlob": "38f3a008cb5df0cb32d961a73ef171dc824e5cb0",
+      "size": 1265
+    },
+    {
+      "path": "packages/react/src/utils/FocusGuard.tsx",
+      "gitBlob": "5774da34394a04390b5fca457deb5aab44e61c01",
+      "size": 1167
+    },
+    {
+      "path": "packages/react/src/utils/formatNumber.test.ts",
+      "gitBlob": "41743caa585e863a95646ebf2de31dc5c01294d8",
+      "size": 1424
+    },
+    {
+      "path": "packages/react/src/utils/formatNumber.ts",
+      "gitBlob": "033be89018803db5aa3ea37cd70fbca1317f4be5",
+      "size": 1081
+    },
+    {
+      "path": "packages/react/src/utils/getCssDimensions.ts",
+      "gitBlob": "d37de089a521b80249d49988386d470930458e52",
+      "size": 865
+    },
+    {
+      "path": "packages/react/src/utils/getDisabledMountTransitionStyles.ts",
+      "gitBlob": "d6222fdcc24d48c04dcc5bdf3769feba37b9b3f5",
+      "size": 420
+    },
+    {
+      "path": "packages/react/src/utils/getElementAtPoint.ts",
+      "gitBlob": "dc38f65f749711165dd66867c217369faab8f2d7",
+      "size": 184
+    },
+    {
+      "path": "packages/react/src/utils/getPseudoElementBounds.test.ts",
+      "gitBlob": "d8f08422859337f024add809ee773ce28cb438b1",
+      "size": 1748
+    },
+    {
+      "path": "packages/react/src/utils/getPseudoElementBounds.ts",
+      "gitBlob": "37eac6cb53fc309ede1332988f91002588cfdd36",
+      "size": 1638
+    },
+    {
+      "path": "packages/react/src/utils/hideMiddleware.ts",
+      "gitBlob": "0bb341c98c1670ca28050c669844b882fec9a75f",
+      "size": 511
+    },
+    {
+      "path": "packages/react/src/utils/InternalBackdrop.tsx",
+      "gitBlob": "7f5f90fb43d2ef4cc8d7467c2a967d0a2b20eca0",
+      "size": 1449
+    },
+    {
+      "path": "packages/react/src/utils/popups/index.ts",
+      "gitBlob": "c7a82ad8ccbf3f5af70eb1e544d01e695ccc39c0",
+      "size": 125
+    },
+    {
+      "path": "packages/react/src/utils/popups/inlineRect.test.ts",
+      "gitBlob": "bd6fcc96ab222e6454d2e125e700f541e0ebc86e",
+      "size": 15192
+    },
+    {
+      "path": "packages/react/src/utils/popups/inlineRect.ts",
+      "gitBlob": "71699b9aa3ce34c1f97b37daead92e60ff4442e5",
+      "size": 7765
+    },
+    {
+      "path": "packages/react/src/utils/popups/popupStoreUtils.test.tsx",
+      "gitBlob": "697bab51e95676a63a972a8628d2a45004a1d307",
+      "size": 20472
+    },
+    {
+      "path": "packages/react/src/utils/popups/popupStoreUtils.ts",
+      "gitBlob": "665e6f3f97c658fa246fe78ce825244ad746464a",
+      "size": 18088
+    },
+    {
+      "path": "packages/react/src/utils/popups/popupTriggerMap.test.ts",
+      "gitBlob": "fefe2aec5b27c8b1a0d5e55c5a5a2a759379be6a",
+      "size": 2995
+    },
+    {
+      "path": "packages/react/src/utils/popups/popupTriggerMap.ts",
+      "gitBlob": "10925450a1601acc9775efe9a7bf636116f0f83e",
+      "size": 2759
+    },
+    {
+      "path": "packages/react/src/utils/popups/store.test.ts",
+      "gitBlob": "5200ed6b0c4a8cf1e4ad693c0878c78e83223610",
+      "size": 1585
+    },
+    {
+      "path": "packages/react/src/utils/popups/store.ts",
+      "gitBlob": "4f6b4562a5c5cb7b507fcfad27ae3e980deaecc1",
+      "size": 6842
+    },
+    {
+      "path": "packages/react/src/utils/popups/useTriggerFocusGuards.ts",
+      "gitBlob": "c2f86cf6f306cb54eb1dc4148538d0b695e01809",
+      "size": 2954
+    },
+    {
+      "path": "packages/react/src/utils/popupStateMapping.ts",
+      "gitBlob": "8082a6b8ac6fc756fb5d17b5e76d76fa1d602d14",
+      "size": 2380
+    },
+    {
+      "path": "packages/react/src/utils/resolveAriaLabelledBy.ts",
+      "gitBlob": "622afe24d2cfe7a7fa79a570a98e78154fc49144",
+      "size": 290
+    },
+    {
+      "path": "packages/react/src/utils/resolveClassName.ts",
+      "gitBlob": "486d39cb38116b5072587f4ff15b120243a3f636",
+      "size": 424
+    },
+    {
+      "path": "packages/react/src/utils/resolveRef.ts",
+      "gitBlob": "01bfdfe91ea706f67a66234c4f084e8cb4ce3ebc",
+      "size": 354
+    },
+    {
+      "path": "packages/react/src/utils/resolveStyle.ts",
+      "gitBlob": "39a7284d88642803fa75847d83692964ec56d48f",
+      "size": 419
+    },
+    {
+      "path": "packages/react/src/utils/scrollable.ts",
+      "gitBlob": "a612a4183a17a63c69f850ca7724ed0d6b6880f3",
+      "size": 2219
+    },
+    {
+      "path": "packages/react/src/utils/scrollEdges.test.ts",
+      "gitBlob": "dd6daeb9a8b87a27fb8ad99578ae90063d9cf5e1",
+      "size": 1025
+    },
+    {
+      "path": "packages/react/src/utils/scrollEdges.ts",
+      "gitBlob": "b575ac083be7c7a1060d5047df97bb4a96058ec4",
+      "size": 802
+    },
+    {
+      "path": "packages/react/src/utils/stringifyLocale.test.ts",
+      "gitBlob": "44e7a24bbcd969120f8114b90ac6a619157f7d76",
+      "size": 445
+    },
+    {
+      "path": "packages/react/src/utils/stringifyLocale.ts",
+      "gitBlob": "dd8406e789a5c18883abb9c5df0956c477755260",
+      "size": 248
+    },
+    {
+      "path": "packages/react/src/utils/styles.tsx",
+      "gitBlob": "8e75d7e55c07e9e63098fbf28461745ff6df09cb",
+      "size": 444
+    },
+    {
+      "path": "packages/react/src/utils/useAnchoredPopupScrollLock.ts",
+      "gitBlob": "4b1bddde8fad5f794e9815998db463e59b7f2caa",
+      "size": 1723
+    },
+    {
+      "path": "packages/react/src/utils/useAnchorPositioning.ts",
+      "gitBlob": "ca96d66401ec6a894f0f42ef59ae7e90f17ca90c",
+      "size": 26900
+    },
+    {
+      "path": "packages/react/src/utils/useFocusableWhenDisabled.ts",
+      "gitBlob": "094545bf0b5ba7e099d88fb7480133b890661545",
+      "size": 2608
+    },
+    {
+      "path": "packages/react/src/utils/useIsHydrating.test.tsx",
+      "gitBlob": "4e692cf3415d20629692a41c7aa59efda3a6e5d3",
+      "size": 1159
+    },
+    {
+      "path": "packages/react/src/utils/useIsHydrating.ts",
+      "gitBlob": "6b9d751cb39d7e92553dbeb1b9b5a66995ae06e9",
+      "size": 476
+    },
+    {
+      "path": "packages/react/src/utils/useMixedToggleClickHandler.ts",
+      "gitBlob": "397d18f9a8e14d5b922bb44d54f0d493902e7023",
+      "size": 1884
+    },
+    {
+      "path": "packages/react/src/utils/useOpenInteractionType.ts",
+      "gitBlob": "ded409bfdd25da46a14e0f64a6193b59c93ea47d",
+      "size": 1855
+    },
+    {
+      "path": "packages/react/src/utils/usePopupAutoResize.ts",
+      "gitBlob": "ebffdf72a5de71f43ae529506e195d6a6becdf80",
+      "size": 7908
+    },
+    {
+      "path": "packages/react/src/utils/usePopupViewport.tsx",
+      "gitBlob": "2219ad5354dee9e502b244004389368cea53d28e",
+      "size": 12567
+    },
+    {
+      "path": "packages/react/src/utils/usePositioner.tsx",
+      "gitBlob": "7670520cf861458b51d33244bc21981b22ffccfe",
+      "size": 1450
+    },
+    {
+      "path": "packages/react/src/utils/useRegisteredLabelId.ts",
+      "gitBlob": "6de90fb31c0a064a0bbb51d0e93b5c670dc2a980",
+      "size": 463
+    },
+    {
+      "path": "packages/react/src/utils/useSwipeDismiss.test.tsx",
+      "gitBlob": "a4c70ce60a1291aee6f7723aa0199c609e5ad09b",
+      "size": 34273
+    },
+    {
+      "path": "packages/react/src/utils/useSwipeDismiss.ts",
+      "gitBlob": "83b36470d9fe486965530f340c7e5aee6cccf1fa",
+      "size": 40958
+    },
+    {
+      "path": "packages/react/src/utils/valueToPercent.ts",
+      "gitBlob": "9886ee07f26398bcaa01f035284baf58256a0527",
+      "size": 122
+    },
+    {
+      "path": "packages/react/test/addVitestMatchers.ts",
+      "gitBlob": "c853d49a38f28cd56ee6dea6cd481f3f6bb81822",
+      "size": 1371
+    },
+    {
+      "path": "packages/react/test/conformanceTests/className.tsx",
+      "gitBlob": "3af310c2937d620a50d04152de3465b88eaadaac",
+      "size": 744
+    },
+    {
+      "path": "packages/react/test/conformanceTests/propForwarding.tsx",
+      "gitBlob": "dfcba9d5809e26a22c6df290384bb0e57ba2cc39",
+      "size": 4146
+    },
+    {
+      "path": "packages/react/test/conformanceTests/refForwarding.tsx",
+      "gitBlob": "1fc8a3da1263b70368c50f6fbbf37d4c8434dea2",
+      "size": 1084
+    },
+    {
+      "path": "packages/react/test/conformanceTests/renderProp.tsx",
+      "gitBlob": "33990e43e15f7c5260446b887ac09f2d98367fa1",
+      "size": 5835
+    },
+    {
+      "path": "packages/react/test/conformanceTests/utils.ts",
+      "gitBlob": "88fdc4f707678084a07b8dfbe6c6f18f18568a24",
+      "size": 166
+    },
+    {
+      "path": "packages/react/test/createRenderer.ts",
+      "gitBlob": "66ef6f13deb815e3261cfdb3ac728dd4d414874b",
+      "size": 1431
+    },
+    {
+      "path": "packages/react/test/describeConformance.tsx",
+      "gitBlob": "13f2a7cdd632238efb46ebf7f9587d3eb0ca7e6b",
+      "size": 2273
+    },
+    {
+      "path": "packages/react/test/describeGregorianAdapter/describeGregorianAdapter.ts",
+      "gitBlob": "1b533fa04eb6a0afcb302b20a2405d179ba838e5",
+      "size": 930
+    },
+    {
+      "path": "packages/react/test/describeGregorianAdapter/describeGregorianAdapter.types.ts",
+      "gitBlob": "6ef62dd79e9b5c6821f467799fcc387d45d44e4f",
+      "size": 1126
+    },
+    {
+      "path": "packages/react/test/describeGregorianAdapter/describeGregorianAdapter.utils.ts",
+      "gitBlob": "3f1d8fabd30f4bb3beabde64d02dc0a4a8b09d6e",
+      "size": 118
+    },
+    {
+      "path": "packages/react/test/describeGregorianAdapter/index.ts",
+      "gitBlob": "983c2e9fd7f053cbd585a106a38aa16af543d982",
+      "size": 144
+    },
+    {
+      "path": "packages/react/test/describeGregorianAdapter/testComputations.ts",
+      "gitBlob": "4baa2d29911172a3dfc3c7ed32ea4a42f7f86e7a",
+      "size": 32096
+    },
+    {
+      "path": "packages/react/test/describeGregorianAdapter/testFormats.ts",
+      "gitBlob": "eb181dd183039222d820b2bf7365cfd4208edda3",
+      "size": 1339
+    },
+    {
+      "path": "packages/react/test/describeGregorianAdapter/testLocalization.ts",
+      "gitBlob": "69832159cdf7d851a1fd6dc3208490881e62cf75",
+      "size": 475
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/Button.module.css",
+      "gitBlob": "e9d662d7754e044f77ec2d73ac47ea87e1397cb6",
+      "size": 470
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/Button.tsx",
+      "gitBlob": "be5fea0a036bea1237cf0b5582c089142af46d6c",
+      "size": 411
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/ComplexGrid.module.css",
+      "gitBlob": "dd0ebf8f851aaaa55d491cecaeefc3a3d85b9945",
+      "size": 112
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/ComplexGrid.tsx",
+      "gitBlob": "0d0bfaad61b4bd1b35630df823c920c72ee0b71e",
+      "size": 2854
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/EmojiPicker.module.css",
+      "gitBlob": "1e14b05fad88bc5cd3a9555ab2682d652a8ca8e5",
+      "size": 1262
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/EmojiPicker.tsx",
+      "gitBlob": "12e5c289974a80cfa01c5856e35252de8654df64",
+      "size": 8127
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/Grid.module.css",
+      "gitBlob": "dd0ebf8f851aaaa55d491cecaeefc3a3d85b9945",
+      "size": 112
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/Grid.tsx",
+      "gitBlob": "b57347736e638dbe5c9c687e011b0f5318cf44e7",
+      "size": 2709
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/gridNavigationWithColumns.ts",
+      "gitBlob": "109bb015130078b4b5d8e8b7b9c6ba256481ced2",
+      "size": 500
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/ListboxFocus.tsx",
+      "gitBlob": "9e396bb2b5512240a40c817814e2dd816203c1c9",
+      "size": 3470
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/Menu.module.css",
+      "gitBlob": "1a445815ab04de4d45e4bb3d1284e33454fb1c5b",
+      "size": 1415
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/Menu.tsx",
+      "gitBlob": "3cdcd94c584010445fd9dd4aa60e82b7745ebb6e",
+      "size": 12765
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/MenuOrientation.module.css",
+      "gitBlob": "af851eac37666da2dc480c3a0720794f643145d9",
+      "size": 1477
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/MenuOrientation.tsx",
+      "gitBlob": "8895a200dc123ec170c18f46f889868eca4fd553",
+      "size": 15513
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/Navigation.module.css",
+      "gitBlob": "954ef5ac315e0a319fcf70d7bd6f5ec0160f1a6b",
+      "size": 883
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/Navigation.tsx",
+      "gitBlob": "08823a446cef59d64f1c34e9e718d7d3a37d49f2",
+      "size": 3655
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/Popover.module.css",
+      "gitBlob": "005f39905ef5304ccb540c38de060e432051069d",
+      "size": 692
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/Popover.tsx",
+      "gitBlob": "b935e35ec73f12038f72593419c8ad7c4cb2f8c3",
+      "size": 5643
+    },
+    {
+      "path": "packages/react/test/floating-ui-tests/renderGridRows.tsx",
+      "gitBlob": "c81dba674700860a63f871c9782f18c064aae217",
+      "size": 524
+    },
+    {
+      "path": "packages/react/test/index.ts",
+      "gitBlob": "795087baa9f8d44423c93e1a2dd7a804451b2f2f",
+      "size": 388
+    },
+    {
+      "path": "packages/react/test/popupConformanceTests.tsx",
+      "gitBlob": "cf6b5bc55c428ff982f95c66039fe4a0a358b4ee",
+      "size": 8306
+    },
+    {
+      "path": "packages/react/test/types.d.ts",
+      "gitBlob": "60260a3ad1c9373b101e59746975ad00e7d1763f",
+      "size": 31
+    },
+    {
+      "path": "packages/react/test/useTestInteractions.test.tsx",
+      "gitBlob": "38a9bb740aa7bac59c6f25f3c04830ff88a4765b",
+      "size": 4201
+    },
+    {
+      "path": "packages/react/test/useTestInteractions.ts",
+      "gitBlob": "ff57381c52a4826c339783a6901f13ccd0e331e0",
+      "size": 4878
+    },
+    {
+      "path": "packages/react/test/wait.ts",
+      "gitBlob": "67ae68dfa52507f230ed9032fc1d230685f290df",
+      "size": 380
+    }
+  ],
+  "fingerprint": "bb6a0c29fb5fda7b4d18dbb9065a7a9a8e02fa26088305b028c2e11c41f22737"
+}

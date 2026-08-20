@@ -7,7 +7,7 @@ dedicated `.test-d.ts` assertion files at the pin.
 
 - Compiler: `tsc`
 - Project: `typetests/pristine/tsconfig.json`
-- Includes the vendored `@tanstack/react-pacer@0.22.1` source under `upstream/package/src`
+- Includes the vendored `@tanstack/react-pacer@0.22.1` source under `upstream/src`
 - Inventory: `audit/upstream-types.json` (per-file sha256; empty assertion groups)
 
 ## Adapted

@@ -546,7 +546,7 @@ Mapping (rename for trigger clarity):
 | --- | --- | --- |
 | `octane-core-extend.md` | `octane-core-extend/` | Strip the restated self-review prose (§1.4); reference `core-engineering.md` |
 | `performance-audit.md` | *drop* | Global `perf-audit` skill covers it; keep only Octane-specific benchmark routing, fold into `octane-core-extend` |
-| `react-library-port.md` | `octane-binding-port/` | Complements the global `port-parity` skill |
+| legacy React-library port skill | `octane-react-library-port/` | Complements the global `port-parity` skill |
 | `bug-hunter.md` | *drop* | Global `root-cause` covers it |
 | `triage.md` | `octane-triage/` | Keep: repo-specific area routing |
 | `create-a-pr.md` | *drop* | Global `land` + user's global CLAUDE.md cover it |

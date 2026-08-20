@@ -13,8 +13,12 @@
 - React oracle catalog: `tanstack-devtools-react-oracle`
 - React oracle: `react@19.2.7` / `react-dom@19.2.7` with `@types/react@19.2.17` / `@types/react-dom@19.2.3`
 
-The byte-exact tagged adapter directory and root license are vendored under `upstream/`.
-`SHA256SUMS` authenticates all ten files, including both source files. The tagged package contains
+The byte-exact tagged adapter directory is vendored under `upstream/` and pinned by
+`audit/upstream.lock.json`: each committed file verifies offline against its upstream git blob
+sha at the pinned commit (`pnpm react-port:materialize run --check --package-dir
+packages/tanstack-devtools`). The upstream MIT license is retained byte-exact as
+`LICENSE.upstream`, hash-matched to the lock.
+The lock authenticates all nine adapter files, including both source files. The tagged package contains
 no runtime tests, fixtures, or snapshots; its `test:lib` command explicitly allows no tests.
 
 Upstream `test:types` runs `tsc` over the complete React adapter source with the package config.

@@ -12,6 +12,14 @@ import { lynxRspeedyRenderers } from './packages/lynx/src/config.runtime.js';
 import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.ts';
 import { inkRenderers as INK_RENDERERS } from './packages/ink/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
+import { ensureMaterializedUpstream } from './scripts/react-port/ensure-materialized.mjs';
+
+// Lock-pinned packages regenerate their adapted tests/upstream suites from the
+// committed pristine tree plus audit/upstream-patches/. Test-file globs resolve
+// at config load — before any globalSetup — so the trees must exist now or
+// their suites are silently dropped from collection. Near-free when already
+// present; fully offline for a committed pristine tree.
+ensureMaterializedUpstream(import.meta.dirname);
 
 const requireReactTextareaAutosize = createRequire(
 	resolve(import.meta.dirname, 'packages/textarea-autosize/package.json'),
@@ -1191,11 +1199,17 @@ export default defineConfig({
 			{
 				testExecution: {
 					group: 'react-parity',
-					include: ['packages/tanstack-hotkeys/tests/upstream/**/*.test.ts'],
+					include: [
+						'packages/tanstack-hotkeys/tests/upstream/**/*.test.ts',
+						'packages/tanstack-hotkeys/tests/upstream/**/*.test.tsx',
+					],
 				},
 				test: {
 					name: 'tanstack-hotkeys',
-					include: ['packages/tanstack-hotkeys/tests/**/*.test.ts'],
+					include: [
+						'packages/tanstack-hotkeys/tests/**/*.test.ts',
+						'packages/tanstack-hotkeys/tests/upstream/**/*.test.tsx',
+					],
 					exclude: [
 						'packages/tanstack-hotkeys/tests/upstream-original.test.ts',
 						'packages/tanstack-hotkeys/tests/differential/**/*.test.ts',
@@ -2440,7 +2454,7 @@ export default defineConfig({
 					clearMocks: true,
 					mockReset: true,
 					restoreMocks: true,
-					globals: false,
+					globals: true,
 				},
 				// hook-form's `.ts` hooks are auto-slotted (same as redux); the
 				// testing-library the ported suite mounts through is NOT (its harness
@@ -2514,7 +2528,7 @@ export default defineConfig({
 					name: 'hook-form-server',
 					include: ['packages/hook-form/tests/**/*.server.test.tsx'],
 					environment: 'node',
-					globals: false,
+					globals: true,
 				},
 				plugins: [octane()],
 				resolve: {
@@ -4710,7 +4724,9 @@ export default defineConfig({
 						'packages/zag/tests/upstream-original.test.ts',
 					],
 					environment: 'jsdom',
-					globals: false,
+					// The adapted upstream suite regenerates from the pinned bytes, which
+					// register through Vitest globals exactly as upstream runs them.
+					globals: true,
 				},
 				plugins: [octane()],
 				resolve: {
@@ -4908,12 +4924,20 @@ export default defineConfig({
 					],
 					exclude: ['packages/intersection-observer/tests/upstream/browser.test.tsx'],
 					environment: 'jsdom',
-					globals: false,
-					setupFiles: ['packages/intersection-observer/tests/upstream/_setup.ts'],
+					globals: true,
+					setupFiles: ['packages/intersection-observer/tests/upstream-adapted.setup.ts'],
 				},
 				plugins: [octane()],
 				resolve: {
 					alias: [
+						{
+							find: /^vitest\/browser$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/intersection-observer/tests/_harness/vitest-browser-stub.ts',
+							),
+						},
+
 						{
 							find: /^@octanejs\/intersection-observer$/,
 							replacement: resolve(
@@ -4936,7 +4960,7 @@ export default defineConfig({
 				test: {
 					name: 'intersection-observer-adapted-browser',
 					include: ['packages/intersection-observer/tests/upstream/browser.test.tsx'],
-					globals: false,
+					globals: true,
 					testTimeout: 60_000,
 					hookTimeout: 60_000,
 					browser: {
@@ -6241,11 +6265,11 @@ export default defineConfig({
 				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'dropzone-pristine',
-					include: ['packages/dropzone/upstream/canonical/src/**/*.spec.{ts,tsx}'],
+					include: ['packages/dropzone/upstream/src/**/*.spec.{ts,tsx}'],
 					environment: 'jsdom',
 					globals: true,
 					clearMocks: true,
-					setupFiles: ['packages/dropzone/upstream/canonical/test-setup.js'],
+					setupFiles: ['packages/dropzone/upstream/test-setup.js'],
 					fileParallelism: false,
 				},
 			},

@@ -1,0 +1,335 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-pdf",
+    "version": "10.4.1",
+    "repository": {
+      "owner": "wojtekmaj",
+      "repo": "react-pdf",
+      "subdirectory": null
+    },
+    "commit": "5338e7a24c7ad17d1028146cf8a025a75e0abe79",
+    "integrity": "sha512-kS/35staVCBqS29verTQJQZXw7RfsRCPO3fdJoW1KXylcv7A9dw6DZ3vJXC2w+bIBgLw5FN4pOFvKSQtkQhPfA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "c2ccf44e0692ca362353ee78a13dfabd61bd9af4491b64ec69f01a9ef0038193"
+      },
+      {
+        "path": "packages/react-pdf/LICENSE",
+        "sha256": "c2ccf44e0692ca362353ee78a13dfabd61bd9af4491b64ec69f01a9ef0038193"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["__mocks__", "packages/react-pdf", "test-utils.ts"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "__mocks__/_failing_page.ts",
+      "gitBlob": "fb1f1ec8b4f1e6359d1e46ec76be9ce41bdf8479",
+      "size": 767
+    },
+    {
+      "path": "__mocks__/_failing_pdf.ts",
+      "gitBlob": "146070152cc0217d16aec4523d3ad8b895d6593d",
+      "size": 437
+    },
+    {
+      "path": "__mocks__/_pdf.pdf",
+      "gitBlob": "fc14fe72e7406e543a82348b6977191e83930452",
+      "size": 342905
+    },
+    {
+      "path": "__mocks__/_pdf2.pdf",
+      "gitBlob": "e01c151593a4c86cd25a46b41553398b7948756a",
+      "size": 42432
+    },
+    {
+      "path": "__mocks__/_pdf3.pdf",
+      "gitBlob": "59a38b5d712d51c564f82700463a297d56a9e252",
+      "size": 18116
+    },
+    {
+      "path": "__mocks__/_pdf4.pdf",
+      "gitBlob": "72a38e85af637df57e37fb111891c6f233a64719",
+      "size": 76057
+    },
+    {
+      "path": "__mocks__/_pdf5.pdf",
+      "gitBlob": "5c57495c6833c06ccf0f0f1024da473b81d3221e",
+      "size": 35385
+    },
+    {
+      "path": "__mocks__/_silently_failing_pdf.ts",
+      "gitBlob": "e4297197b0c1c5d28c4f5caa5cba59354f1a1e24",
+      "size": 607
+    },
+    {
+      "path": "__mocks__/_untagged.pdf",
+      "gitBlob": "22ace57cd597df80b82ab93d42844acaf4d34857",
+      "size": 77123
+    },
+    {
+      "path": "packages/react-pdf/LICENSE",
+      "gitBlob": "20dca595b80a42d9dff938d1074248446cc70b4d",
+      "size": 1076
+    },
+    {
+      "path": "packages/react-pdf/package.json",
+      "gitBlob": "50f82aa6d9d2ff340996ad580fcaca2d7cc9cb70",
+      "size": 2429
+    },
+    {
+      "path": "packages/react-pdf/README.md",
+      "gitBlob": "caf45a184027edf3d55ce157af7a467552ad161f",
+      "size": 71788
+    },
+    {
+      "path": "packages/react-pdf/src/Document.spec.tsx",
+      "gitBlob": "9e7d986bc1a29985f030aab1af489db2b4d7a5c6",
+      "size": 24683
+    },
+    {
+      "path": "packages/react-pdf/src/Document.tsx",
+      "gitBlob": "3f3a2bbed1085dfe7649b19e81c2e56a105590cb",
+      "size": 18561
+    },
+    {
+      "path": "packages/react-pdf/src/DocumentContext.tsx",
+      "gitBlob": "c78ba11757a050b9286e14345829230a616a76ad",
+      "size": 255
+    },
+    {
+      "path": "packages/react-pdf/src/index.spec.ts",
+      "gitBlob": "1c38034bb78cbf9673d95e4fc829ae67a2c8c8fc",
+      "size": 850
+    },
+    {
+      "path": "packages/react-pdf/src/index.test.ts",
+      "gitBlob": "7af8b7e86a41fb66e0034ef1d4fe5b25b2480cf5",
+      "size": 747
+    },
+    {
+      "path": "packages/react-pdf/src/index.ts",
+      "gitBlob": "b39ca7bc08d050b3958194e58111b66d96fbde4c",
+      "size": 1165
+    },
+    {
+      "path": "packages/react-pdf/src/LinkService.ts",
+      "gitBlob": "914c38cafa7e62876158295434294cac6ed34f40",
+      "size": 5381
+    },
+    {
+      "path": "packages/react-pdf/src/Message.tsx",
+      "gitBlob": "1973b6e1594ca85675dbdf0e56a4ed4f6d006d2a",
+      "size": 280
+    },
+    {
+      "path": "packages/react-pdf/src/Outline.spec.tsx",
+      "gitBlob": "a2ac708e05dba1d904a7cbfe7b0cbc7e6ad61923",
+      "size": 5837
+    },
+    {
+      "path": "packages/react-pdf/src/Outline.tsx",
+      "gitBlob": "a92bf387ecb74054b33fb578964514d7803bc075",
+      "size": 5564
+    },
+    {
+      "path": "packages/react-pdf/src/OutlineContext.tsx",
+      "gitBlob": "016b44e43fa77e5383cfc7fabcf085f955dd05bc",
+      "size": 248
+    },
+    {
+      "path": "packages/react-pdf/src/OutlineItem.spec.tsx",
+      "gitBlob": "ec1d011e092cc8e8443984838a5c3abe484ab34d",
+      "size": 4231
+    },
+    {
+      "path": "packages/react-pdf/src/OutlineItem.tsx",
+      "gitBlob": "897aded7f23d33923218ab095b507c540023f1c9",
+      "size": 3010
+    },
+    {
+      "path": "packages/react-pdf/src/Page.spec.tsx",
+      "gitBlob": "c3454226c9f2b3fdad22b61099082282a33f81da",
+      "size": 31147
+    },
+    {
+      "path": "packages/react-pdf/src/Page.tsx",
+      "gitBlob": "996a97f745e28bd10db189152ff04665bbca1d9f",
+      "size": 20609
+    },
+    {
+      "path": "packages/react-pdf/src/Page/AnnotationLayer.css",
+      "gitBlob": "058119cf170c0b3200951ea27d8c444d8f3ab847",
+      "size": 9461
+    },
+    {
+      "path": "packages/react-pdf/src/Page/AnnotationLayer.spec.tsx",
+      "gitBlob": "fff33038f8ebec977f371ba2c290240ed5cfab78",
+      "size": 10711
+    },
+    {
+      "path": "packages/react-pdf/src/Page/AnnotationLayer.tsx",
+      "gitBlob": "716c9c91ab4da69843f154615c13e103255929c2",
+      "size": 6169
+    },
+    {
+      "path": "packages/react-pdf/src/Page/Canvas.spec.tsx",
+      "gitBlob": "c9a1746cfcd0542f10b836acf2e81addc22e169d",
+      "size": 4126
+    },
+    {
+      "path": "packages/react-pdf/src/Page/Canvas.tsx",
+      "gitBlob": "50c1be951a00a91c1080cd5728b5f7d266f89b05",
+      "size": 4323
+    },
+    {
+      "path": "packages/react-pdf/src/Page/TextLayer.css",
+      "gitBlob": "703c778ef7e98d1fe3f5accb02fe45d664f33151",
+      "size": 2557
+    },
+    {
+      "path": "packages/react-pdf/src/Page/TextLayer.spec.tsx",
+      "gitBlob": "7d2e8d5b086303e947be14166c7b3c811bcfab2f",
+      "size": 11179
+    },
+    {
+      "path": "packages/react-pdf/src/Page/TextLayer.tsx",
+      "gitBlob": "9f39c3cf6be8201dfdc7aa3253ac061c3993b8db",
+      "size": 8767
+    },
+    {
+      "path": "packages/react-pdf/src/PageContext.tsx",
+      "gitBlob": "28a73b5aea5ba1b9b03807f2654f7b30556806d8",
+      "size": 233
+    },
+    {
+      "path": "packages/react-pdf/src/PasswordResponses.ts",
+      "gitBlob": "8a63b81a16a96ef666af88244067bf46df8ae6b9",
+      "size": 247
+    },
+    {
+      "path": "packages/react-pdf/src/pdf.worker.entry.ts",
+      "gitBlob": "3ae6399315d0d3d399320e6f76a6755af9048c7e",
+      "size": 418
+    },
+    {
+      "path": "packages/react-pdf/src/Ref.spec.ts",
+      "gitBlob": "92919920eb90b192651e1d46934f8981adb1a02c",
+      "size": 490
+    },
+    {
+      "path": "packages/react-pdf/src/Ref.ts",
+      "gitBlob": "8766301676ce44f326466d21700aa036cfad576b",
+      "size": 293
+    },
+    {
+      "path": "packages/react-pdf/src/shared/constants.ts",
+      "gitBlob": "54640494a6974294e38f91057e285bb112ec9a52",
+      "size": 1360
+    },
+    {
+      "path": "packages/react-pdf/src/shared/hooks/useCachedValue.ts",
+      "gitBlob": "49aa580ae1288d65e1c72b49e6517e4937a0cc80",
+      "size": 412
+    },
+    {
+      "path": "packages/react-pdf/src/shared/hooks/useDocumentContext.ts",
+      "gitBlob": "c180fd69b9bdbe31db980b0c580d2a19ca61cc35",
+      "size": 259
+    },
+    {
+      "path": "packages/react-pdf/src/shared/hooks/useOutlineContext.ts",
+      "gitBlob": "ea30d1d86eafa6aceb7c6ee9646003fa3b4f6c84",
+      "size": 253
+    },
+    {
+      "path": "packages/react-pdf/src/shared/hooks/usePageContext.ts",
+      "gitBlob": "22578488e13db3247a8eb54f375128674d902a05",
+      "size": 235
+    },
+    {
+      "path": "packages/react-pdf/src/shared/hooks/useResolver.ts",
+      "gitBlob": "65c9432f0b39dc6938a63ecba002d047551a7c19",
+      "size": 788
+    },
+    {
+      "path": "packages/react-pdf/src/shared/structTreeUtils.ts",
+      "gitBlob": "f801024d0c32ad39924c9653575199ca3d8ab747",
+      "size": 2314
+    },
+    {
+      "path": "packages/react-pdf/src/shared/types.ts",
+      "gitBlob": "5aabdb0d5a09c7e1ec5cfce5cb0569d31749cebc",
+      "size": 5557
+    },
+    {
+      "path": "packages/react-pdf/src/shared/utils.spec.ts",
+      "gitBlob": "7eeaa341b97dc95453dabfcab3c7e4f07297481a",
+      "size": 1846
+    },
+    {
+      "path": "packages/react-pdf/src/shared/utils.ts",
+      "gitBlob": "2d77697a6f0d40e67470673c8c4b30aaa04f273c",
+      "size": 4956
+    },
+    {
+      "path": "packages/react-pdf/src/StructTree.spec.tsx",
+      "gitBlob": "fe2d2c2fd3d860856eb62b9fbd28c6f8aa2f4eac",
+      "size": 4941
+    },
+    {
+      "path": "packages/react-pdf/src/StructTree.tsx",
+      "gitBlob": "7d3bfa9e450de43692a4df74d896c092f36439da",
+      "size": 2869
+    },
+    {
+      "path": "packages/react-pdf/src/StructTreeItem.tsx",
+      "gitBlob": "743e270414b6bc025910b8c2257783a24e61b4d6",
+      "size": 1104
+    },
+    {
+      "path": "packages/react-pdf/src/Thumbnail.spec.tsx",
+      "gitBlob": "8678610ab8d5c4e9bf6fe3ed68d7bf7611177b2d",
+      "size": 21537
+    },
+    {
+      "path": "packages/react-pdf/src/Thumbnail.tsx",
+      "gitBlob": "d8ef390e0bf61732f21af484398ff48bc70fef45",
+      "size": 3517
+    },
+    {
+      "path": "packages/react-pdf/tsconfig.build.json",
+      "gitBlob": "1bb0b6a74de0597c67670aa8a66d1df914924752",
+      "size": 205
+    },
+    {
+      "path": "packages/react-pdf/tsconfig.json",
+      "gitBlob": "72f7513f91c812e212b2ccdec74029ef024807af",
+      "size": 436
+    },
+    {
+      "path": "packages/react-pdf/vitest.config.ts",
+      "gitBlob": "62641bed189be020b4b93996e1eb34e1f2da3b6c",
+      "size": 537
+    },
+    {
+      "path": "packages/react-pdf/vitest.setup.ts",
+      "gitBlob": "427c8ddb4e4971325eb313aaa8ceec6917d85748",
+      "size": 134
+    },
+    {
+      "path": "test-utils.ts",
+      "gitBlob": "ee16335ac089e35c0963aa11f898335eabbd6234",
+      "size": 2669
+    }
+  ],
+  "fingerprint": "45d278b8ebc43298e6a7100e8de21b4a7db5bfa2f48a3fb9bff959aeac8dcb01"
+}

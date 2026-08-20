@@ -153,7 +153,7 @@ function assertionGroups(source, fileName) {
 
 function normalizeSpecifier(specifier) {
 	if (
-		specifier === '../../upstream/dist/declarations/src/index.js' ||
+		specifier === '../../upstream-artifact/dist/declarations/src/index.js' ||
 		specifier === '../src/index.tsrx' ||
 		specifier === '@octanejs/textarea-autosize'
 	) {

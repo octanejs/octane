@@ -51,7 +51,9 @@ async function buildInventory() {
 	const localLicense = await readFile(resolve(packageRoot, 'LICENSE'));
 	if (!license.equals(localLicense))
 		throw new Error('package LICENSE does not match pinned upstream');
-	const tarball = await readFile(resolve(upstreamRoot, 'npm/react-syntax-highlighter-16.1.1.tgz'));
+	const tarball = await readFile(
+		resolve(packageRoot, 'upstream-artifact/react-syntax-highlighter-16.1.1.tgz'),
+	);
 	if (digest('sha1', tarball) !== expected.npmSha1) throw new Error('npm tarball SHA-1 mismatch');
 	const integrity = `sha512-${createHash('sha512').update(tarball).digest('base64')}`;
 	if (integrity !== expected.npmIntegrity) throw new Error('npm tarball integrity mismatch');
@@ -71,6 +73,20 @@ if (mode === '--write') {
 	await writeFile(inventoryPath, serialized);
 	console.log(`wrote ${actual.fileCount} pinned upstream artifacts`);
 } else if (mode === '--check') {
+	// The committed upstream/ tree also verifies offline against the upstream
+	// git blob shas in audit/upstream.lock.json.
+	const { execFileSync } = await import('node:child_process');
+	execFileSync(
+		process.execPath,
+		[
+			resolve(packageRoot, '../../scripts/react-port/materialize.mjs'),
+			'run',
+			'--check',
+			'--package-dir',
+			packageRoot,
+		],
+		{ cwd: resolve(packageRoot, '../..'), stdio: 'pipe' },
+	);
 	const retained = await readFile(inventoryPath, 'utf8');
 	if (retained !== serialized)
 		throw new Error('upstream inventory is stale; run generate:upstream-inventory');

@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "cmdk",
+    "version": "1.1.1",
+    "repository": {
+      "owner": "pacocoursey",
+      "repo": "cmdk",
+      "subdirectory": null
+    },
+    "commit": "fb4ea04e9ec211777fbb39c6104e3c5f2ee107d2",
+    "integrity": "sha512-Vsv7kFaXm+ptHDMZ7izaRsP70GgrW9NBNGswt9OZaVBLlE0SNpDq8eu/VGXyF9r7M0azK3Wy7OlYXsuyYLFzHg=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "b5acfd21b3b61508365224c40ec1b03ec71091248baaf989d4be916551e7d532"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "cmdk",
+    "package.json",
+    "playwright.config.ts",
+    "pnpm-workspace.yaml",
+    "test",
+    "tsconfig.json"
+  ],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "cmdk/package.json",
+      "gitBlob": "487a20db38e8839fb3fbce2fbef4ca075e572b46",
+      "size": 1221
+    },
+    {
+      "path": "cmdk/src/command-score.ts",
+      "gitBlob": "bd46cc8b630180832d1a31b577927bfb4813d117",
+      "size": 5761
+    },
+    {
+      "path": "cmdk/src/index.tsx",
+      "gitBlob": "3131c7b66d82820dc28a38ebf232b35c47adeb08",
+      "size": 32341
+    },
+    {
+      "path": "cmdk/tsup.config.ts",
+      "gitBlob": "96da429cd76d61c1def6c5781d9b890c8c1d11ff",
+      "size": 180
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "203d59ed321179b1938da370d828017f3b9afde9",
+      "size": 811
+    },
+    {
+      "path": "playwright.config.ts",
+      "gitBlob": "c27ef53c476d19090a6ed2e6fe03f733c172a212",
+      "size": 678
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "gitBlob": "9530f4c317e2cc7e36d49e6b7a3961447b313e02",
+      "size": 46
+    },
+    {
+      "path": "test/basic.test.ts",
+      "gitBlob": "107865f0dfe6c1a70c32aacf4579d77be0f4e760",
+      "size": 2882
+    },
+    {
+      "path": "test/dialog.test.ts",
+      "gitBlob": "66b5239da5f39eea5b6217fd7ac76171a4d20b7a",
+      "size": 356
+    },
+    {
+      "path": "test/group.test.ts",
+      "gitBlob": "389a478522f4c1d7ee1cfcd3f3490499cb700a72",
+      "size": 1225
+    },
+    {
+      "path": "test/item.test.ts",
+      "gitBlob": "f67e829678b8cb73f89f23b44ce567b98db48854",
+      "size": 2946
+    },
+    {
+      "path": "test/keybind.test.ts",
+      "gitBlob": "844aa626784166a61d1d8992bd237e0f284d8765",
+      "size": 7218
+    },
+    {
+      "path": "test/next-env.d.ts",
+      "gitBlob": "4f11a03dc6cc37f2b5105c08f2e7b24c603ab2f4",
+      "size": 201
+    },
+    {
+      "path": "test/numeric.test.ts",
+      "gitBlob": "28a0a10b47147cc5042929dd3c720cc8621ec0a7",
+      "size": 962
+    },
+    {
+      "path": "test/package.json",
+      "gitBlob": "c6734b905418fed6c016997f03f26961a3e00a01",
+      "size": 371
+    },
+    {
+      "path": "test/pages/_app.tsx",
+      "gitBlob": "465ec63f2080083dcf3d06e8bf7acabb7bf799e0",
+      "size": 119
+    },
+    {
+      "path": "test/pages/dialog.tsx",
+      "gitBlob": "8ea7dd9f17737e96d36d69dee59873f37e90bd5b",
+      "size": 625
+    },
+    {
+      "path": "test/pages/group.tsx",
+      "gitBlob": "982ebd4bba940035708de83ce6d5c73ae13b0cbe",
+      "size": 1262
+    },
+    {
+      "path": "test/pages/huge.tsx",
+      "gitBlob": "52cbde6c5f63cf20b2cb343e7f59c8c24e7b02a0",
+      "size": 786
+    },
+    {
+      "path": "test/pages/index.tsx",
+      "gitBlob": "0bab4f1cefd8e24a9f765ef78038c1a5b3b56d55",
+      "size": 705
+    },
+    {
+      "path": "test/pages/item-advanced.tsx",
+      "gitBlob": "9ebfce7f776a17ddc77b0c65355e532bc6ad109e",
+      "size": 652
+    },
+    {
+      "path": "test/pages/item.tsx",
+      "gitBlob": "18179debdef9b8b9f6154ad8c8c37491cd269371",
+      "size": 1325
+    },
+    {
+      "path": "test/pages/keybinds.tsx",
+      "gitBlob": "3c119a03fc71ac1b80ea12e191b21d87ad00e092",
+      "size": 1257
+    },
+    {
+      "path": "test/pages/numeric.tsx",
+      "gitBlob": "e05ad7ecfe721131cc23755723d12938dbd1def4",
+      "size": 598
+    },
+    {
+      "path": "test/pages/portal.tsx",
+      "gitBlob": "f4b59ce818f5b5ba096c6cbb6bd431b6098ab32a",
+      "size": 2628
+    },
+    {
+      "path": "test/pages/props.tsx",
+      "gitBlob": "7e9b23b3ef99cd72bb9a4cf50faa2dcfacb6cbb8",
+      "size": 1737
+    },
+    {
+      "path": "test/props.test.ts",
+      "gitBlob": "4815169c1e30ad40a02563b054cd1fe019800622",
+      "size": 2038
+    },
+    {
+      "path": "test/style.css",
+      "gitBlob": "f7611fcbdcdc9053b598b1e3c994b68ff9fba7c9",
+      "size": 52
+    },
+    {
+      "path": "test/tsconfig.json",
+      "gitBlob": "3f381ad20885bd4bc82fb27ff0a447ae4ddf28c4",
+      "size": 531
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "942b8072b27c4a602e892bcef88ca7ff697ba2b4",
+      "size": 534
+    }
+  ],
+  "fingerprint": "6cab521f1e06fc568eb028ce6df2340c99f21e0d460ad955af62c9cb9b008292"
+}

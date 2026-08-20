@@ -32,14 +32,15 @@
   "files": [
     "src",
     "README.md",
-    "UPSTREAM.md"
+    "UPSTREAM.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
     "test": "vitest run",
-    "upstream:verify": "node ./scripts/verify-upstream.mjs",
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir .",
     "parity:inventory": "node ../../scripts/react-parity/alien-signals-runtime-inventory.mjs"
   },
   "dependencies": {

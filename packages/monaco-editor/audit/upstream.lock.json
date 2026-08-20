@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@monaco-editor/react",
+    "version": "4.7.0",
+    "repository": {
+      "owner": "suren-atoyan",
+      "repo": "monaco-react",
+      "subdirectory": null
+    },
+    "commit": "eb120e66378471315620fe5339b73ba003f199ad",
+    "integrity": "sha512-cyzXQCtO47ydzxpQtCGSQGOC8Gk3ZUeBXFAxD+CWXYFo5OqZyZUonFl0DwUlTyAfRHntBfw2p3w4s9R6oe1eCA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "da0f19a87a0a014e0f6e1de99bff8073771b5b6204d8b2671d2648ab8b32cf01"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["package.json", "src"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "package.json",
+      "gitBlob": "788253f228052968795f3bd4e02698282730b2e7",
+      "size": 1855
+    },
+    {
+      "path": "src/DiffEditor/__snapshots__/index.spec.tsx.snap",
+      "gitBlob": "a549ee75e0b081d3db87a323cab6c5a51d7f0ed5",
+      "size": 2752
+    },
+    {
+      "path": "src/DiffEditor/DiffEditor.tsx",
+      "gitBlob": "fd1133e1c43e4c74ff59f7edc98f086678fee1d3",
+      "size": 6024
+    },
+    {
+      "path": "src/DiffEditor/index.spec.tsx",
+      "gitBlob": "d2e4d0f21f9781eb87f4097752a3f98c87eb8029",
+      "size": 288
+    },
+    {
+      "path": "src/DiffEditor/index.ts",
+      "gitBlob": "6f8016ba133f1845ace875918e351f9238b219fc",
+      "size": 130
+    },
+    {
+      "path": "src/DiffEditor/types.ts",
+      "gitBlob": "07912d33f0f8fa20a80da1e7cb3ff29426a12c96",
+      "size": 3083
+    },
+    {
+      "path": "src/Editor/__snapshots__/index.spec.tsx.snap",
+      "gitBlob": "30652f546c3cda36c4e3d64596c10f711e450b5c",
+      "size": 2748
+    },
+    {
+      "path": "src/Editor/Editor.tsx",
+      "gitBlob": "59b93d8bcc503333b1d65b9590976422cc1c1a0e",
+      "size": 7124
+    },
+    {
+      "path": "src/Editor/index.spec.tsx",
+      "gitBlob": "5ed7b0d1f1e908a7c83f30a7265a85a9941597a8",
+      "size": 276
+    },
+    {
+      "path": "src/Editor/index.ts",
+      "gitBlob": "f38551b7de9f625aacd4919708d0d47533214a58",
+      "size": 118
+    },
+    {
+      "path": "src/Editor/types.ts",
+      "gitBlob": "88127895bcdf0939e2938259c5d84ebfe14479a0",
+      "size": 3374
+    },
+    {
+      "path": "src/hooks/useMonaco/index.ts",
+      "gitBlob": "260dd06de1c8edf360f64bc48cc003b8f0082cc9",
+      "size": 508
+    },
+    {
+      "path": "src/hooks/useMount/index.ts",
+      "gitBlob": "bac41ed4b6e2b3a4b1c46fc99c3f23ed9d8eabfd",
+      "size": 154
+    },
+    {
+      "path": "src/hooks/usePrevious/index.ts",
+      "gitBlob": "38e9e8568ad4061c24a80b57e4c547b2cae1edb3",
+      "size": 222
+    },
+    {
+      "path": "src/hooks/useUpdate/index.ts",
+      "gitBlob": "d713c796a833d656e16481f5b49675499ae39155",
+      "size": 399
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "d0b6cd9da88dc2a04915885e5e756d8050403c5c",
+      "size": 512
+    },
+    {
+      "path": "src/Loading/__snapshots__/index.spec.tsx.snap",
+      "gitBlob": "cf23aa3a6a425a6000b78b564aaae921ac9a2999",
+      "size": 2169
+    },
+    {
+      "path": "src/Loading/index.spec.tsx",
+      "gitBlob": "a6dd3ebcc07c7e92fb53d407b57cabe883184c43",
+      "size": 834
+    },
+    {
+      "path": "src/Loading/index.ts",
+      "gitBlob": "a57e39771eb5af6d1d8f7c9a3cd68d79ac210867",
+      "size": 58
+    },
+    {
+      "path": "src/Loading/Loading.tsx",
+      "gitBlob": "12f7704831635ef3c1d94d0214b7cc212c1840d7",
+      "size": 224
+    },
+    {
+      "path": "src/Loading/styles.ts",
+      "gitBlob": "75cd61d6040b3ee269473509458f0cb2cfb66ed8",
+      "size": 256
+    },
+    {
+      "path": "src/MonacoContainer/__snapshots__/index.spec.tsx.snap",
+      "gitBlob": "7971f1ee1145b6729f8aba5bd31dfca966ee4f25",
+      "size": 2661
+    },
+    {
+      "path": "src/MonacoContainer/index.spec.tsx",
+      "gitBlob": "0b4f6b39129f2d75e24545ac962a1e41e8d2e817",
+      "size": 467
+    },
+    {
+      "path": "src/MonacoContainer/index.ts",
+      "gitBlob": "7d825ab23d974feb0a31f38c36186a5f82a2972a",
+      "size": 119
+    },
+    {
+      "path": "src/MonacoContainer/MonacoContainer.tsx",
+      "gitBlob": "a5e81a0e015d484b720c8904a006ca340bd86b99",
+      "size": 788
+    },
+    {
+      "path": "src/MonacoContainer/styles.ts",
+      "gitBlob": "0a2ce7fbfd9d05fe6a1f0290f14fc49e381e6117",
+      "size": 286
+    },
+    {
+      "path": "src/MonacoContainer/types.ts",
+      "gitBlob": "ecea778b39bd03761aab3712bd7fb567d7cfb02f",
+      "size": 283
+    },
+    {
+      "path": "src/utils/index.ts",
+      "gitBlob": "1ba690af00e2af938ce8040d14e1b2db63687d23",
+      "size": 1925
+    }
+  ],
+  "fingerprint": "7be2eae00a05f8fa673543d60c5a8414516bda389e9fa889f940618f55b798d7"
+}

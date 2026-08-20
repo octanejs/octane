@@ -4,7 +4,7 @@ import { configDefaults, defineConfig } from 'vitest/config';
 
 const upstreamRoot = process.env.REACT_PDF_PRISTINE_ROOT
 	? resolve(process.env.REACT_PDF_PRISTINE_ROOT)
-	: resolve(import.meta.dirname, '../upstream/tag');
+	: resolve(import.meta.dirname, '../upstream/packages/react-pdf');
 
 export default defineConfig({
 	cacheDir: resolve(upstreamRoot, '.vite-cache'),

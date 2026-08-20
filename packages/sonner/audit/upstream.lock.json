@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "sonner",
+    "version": "2.0.7",
+    "repository": {
+      "owner": "emilkowalski",
+      "repo": "sonner",
+      "subdirectory": null
+    },
+    "commit": "3ba7aa17ab7e8101b9cf4893936f873b0d4769b3",
+    "integrity": "sha512-W6ZN4p58k8aDKA4XPcx2hpIQXBRAgyiWVkYhT7CvK6D3iAu7xjvVyhQHg2/iaKJZ1XVJ4r7XuwGL+WGEK37i9w=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "da9201378c36ffd81f51ad0b305f3f0981e90bc558789210ad65d1161eec3b7d"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["package.json", "playwright.config.ts", "src", "test"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "package.json",
+      "gitBlob": "09e12b7df39f9d6accd0060b576ed5f5d32639e0",
+      "size": 1670
+    },
+    {
+      "path": "playwright.config.ts",
+      "gitBlob": "20f4cf5e916eea1baf6ee086bc05c55d96d36476",
+      "size": 2058
+    },
+    {
+      "path": "src/assets.tsx",
+      "gitBlob": "e2fed7b0fbfdca69f10c6ae705963d16f87900fe",
+      "size": 2797
+    },
+    {
+      "path": "src/hooks.tsx",
+      "gitBlob": "ef0d5244f4f29fea6b7b6a5bd42028d46c41694d",
+      "size": 438
+    },
+    {
+      "path": "src/index.tsx",
+      "gitBlob": "f64a469ce7c17528d45367caa7fe40851d3e24c3",
+      "size": 30104
+    },
+    {
+      "path": "src/state.ts",
+      "gitBlob": "23aa371767dc15b8c80bcdc0af16be915a2bb91f",
+      "size": 9264
+    },
+    {
+      "path": "src/styles.css",
+      "gitBlob": "7aa00f8edae7dea0ce9bf2054ebd4c0b2a02e7f5",
+      "size": 17464
+    },
+    {
+      "path": "src/types.ts",
+      "gitBlob": "79b9bdc938c5671b95095112028781ecfeba3be4",
+      "size": 5215
+    },
+    {
+      "path": "test/.eslintrc.json",
+      "gitBlob": "bffb357a7122523ec94045523758c4b825b448ef",
+      "size": 40
+    },
+    {
+      "path": "test/.gitignore",
+      "gitBlob": "ec4165f614f4b731aa0a1e26cd8d05b070f666ee",
+      "size": 440
+    },
+    {
+      "path": "test/.npmrc",
+      "gitBlob": "e941d13c202926e022f35d143944c2ac0b2e6148",
+      "size": 29
+    },
+    {
+      "path": "test/.vscode/settings.json",
+      "gitBlob": "d6665e85307e947230e102bbeb82979e63c600ef",
+      "size": 145
+    },
+    {
+      "path": "test/next.config.js",
+      "gitBlob": "658404ac690c0c5da477e6ae09f2303ccf615b1e",
+      "size": 94
+    },
+    {
+      "path": "test/package-lock.json",
+      "gitBlob": "b3c799cc42efbc10334af7ae3fc75a2e528aa953",
+      "size": 219181
+    },
+    {
+      "path": "test/package.json",
+      "gitBlob": "bc7b8f5e4d2918770f1535faeb4131b662973590",
+      "size": 512
+    },
+    {
+      "path": "test/README.md",
+      "gitBlob": "5bc7ca24acf299de79528561f90495d5b8b26d47",
+      "size": 1748
+    },
+    {
+      "path": "test/src/app/action.tsx",
+      "gitBlob": "8d15d81d1c8d2e089e880657347ac5635fbbd640",
+      "size": 409
+    },
+    {
+      "path": "test/src/app/layout.tsx",
+      "gitBlob": "7979310638ae053dbe3b6d677b18a77a423e6fc9",
+      "size": 268
+    },
+    {
+      "path": "test/src/app/page.tsx",
+      "gitBlob": "fc1b5f9a9a4b066df73292ca0681e7aa3f80ee4a",
+      "size": 11479
+    },
+    {
+      "path": "test/tests/basic.spec.ts",
+      "gitBlob": "eca62cb3fe06f5d0792cb4529f1b6246c0dccd35",
+      "size": 13666
+    },
+    {
+      "path": "test/tsconfig.json",
+      "gitBlob": "b6cf55fb54f5c39ae3aa74fe9db7846dce3e1d8a",
+      "size": 669
+    }
+  ],
+  "fingerprint": "bafe5c21fedc561b1dfc9a9d47c6fd432f518a82f669f56e54f301d46615c02e"
+}

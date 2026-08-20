@@ -211,12 +211,34 @@ function normalizeMapping(value) {
 	return value;
 }
 
+// Inventory identities keep the historical tag/, npm/, and support/ prefixes;
+// the trees live at upstream/packages/react-pdf, upstream-artifact/, and the
+// upstream/ root (repo-root fixtures) respectively.
+function aliasedAbsolute(root, path) {
+	if (path.startsWith('npm/')) return join(root, 'upstream-artifact', path.slice('npm/'.length));
+	if (path.startsWith('tag/')) {
+		return join(root, 'upstream/packages/react-pdf', path.slice('tag/'.length));
+	}
+	return join(root, 'upstream', path.slice('support/'.length));
+}
+
+async function aliasedUpstreamFiles(root) {
+	const tag = (await filesUnder(join(root, 'upstream/packages/react-pdf'))).map(
+		(path) => `tag/${path}`,
+	);
+	const npm = (await filesUnder(join(root, 'upstream-artifact'))).map((path) => `npm/${path}`);
+	const support = (await filesUnder(join(root, 'upstream')))
+		.filter((path) => !path.startsWith('packages/'))
+		.map((path) => `support/${path}`);
+	return [...tag, ...npm, ...support].sort();
+}
+
 async function upstreamCases(root, artifactPaths) {
 	const cases = [];
 	for (const file of artifactPaths.filter((path) =>
 		/^tag\/src\/.*\.(?:spec|test)\.tsx?$/.test(path),
 	)) {
-		const source = await readFile(join(root, 'upstream', file), 'utf8');
+		const source = await readFile(aliasedAbsolute(root, file), 'utf8');
 		for (const entry of staticCases(source)) {
 			cases.push({
 				id: `${file}:${entry.line}::${entry.name}`,
@@ -278,17 +300,16 @@ function defaultMapping(entry) {
 }
 
 export async function buildDefaultCaseMap(root = packageRoot) {
-	const paths = await filesUnder(join(root, 'upstream'));
+	const paths = await aliasedUpstreamFiles(root);
 	const cases = await upstreamCases(root, paths);
 	return Object.fromEntries(cases.map((entry) => [entry.id, defaultMapping(entry)]));
 }
 
 export async function buildInventory(root = packageRoot) {
-	const upstreamRoot = join(root, 'upstream');
-	const artifactPaths = await filesUnder(upstreamRoot);
+	const artifactPaths = await aliasedUpstreamFiles(root);
 	const artifacts = await Promise.all(
 		artifactPaths.map(async (path) => {
-			const bytes = await readFile(join(upstreamRoot, path));
+			const bytes = await readFile(aliasedAbsolute(root, path));
 			return { path, bytes: bytes.length, sha256: sha256(bytes) };
 		}),
 	);
@@ -327,7 +348,7 @@ export async function buildInventory(root = packageRoot) {
 				testTitles(evidenceCache.get(path)).has(title),
 				`mapped executable test is missing: ${mapping.evidence}`,
 			);
-			const upstreamSource = await readFile(join(root, 'upstream', entry.file), 'utf8');
+			const upstreamSource = await readFile(aliasedAbsolute(root, entry.file), 'utf8');
 			const digests = compareAdaptedEvidence({
 				upstreamSource,
 				upstreamTitle: entry.name,
@@ -441,9 +462,23 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 			`${destination}: ${inventory.artifacts.length} artifacts, ${inventory.upstreamCases.length} cases`,
 		);
 	} else {
+		// The committed upstream/ tree also verifies against the lock's
+		// upstream git blob shas.
+		const { execFileSync } = await import('node:child_process');
+		execFileSync(
+			process.execPath,
+			[
+				join(packageRoot, '../../scripts/react-port/materialize.mjs'),
+				'run',
+				'--check',
+				'--package-dir',
+				packageRoot,
+			],
+			{ cwd: join(packageRoot, '../..'), stdio: 'pipe' },
+		);
 		const inventory = await validate();
 		console.log(
-			`verified ${inventory.artifacts.length} artifacts and ${inventory.upstreamCases.length} upstream cases`,
+			`verified the lock-pinned upstream tree, ${inventory.artifacts.length} artifacts, and ${inventory.upstreamCases.length} upstream cases`,
 		);
 	}
 }

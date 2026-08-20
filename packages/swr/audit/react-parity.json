@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -80,9 +80,9 @@
           "sha256": "1c94d08482c159da3010c4315c40eb0c0d8edfa9d8267e1810e2e8c738fcd4ac"
         },
         {
-          "path": "packages/swr/upstream/SHA256SUMS",
+          "path": "packages/swr/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "727042f4176dc726c3a3879877a7b4a3846a2b84f8adab9c8e38d2536eea3d1a"
+          "sha256": "1f451d2f93026479a63f02b3493dec5954d37dc7b7a435e807c71f40b528ceb9"
         },
         {
           "path": "scripts/react-parity/jest-full-runner.mjs",
@@ -129,7 +129,7 @@
         {
           "path": "packages/swr/audit/tsconfig-pristine-runtime.json",
           "role": "support",
-          "sha256": "715416bb88eb9d8246af618fbaea85a0186538be31a5a0acdba64addccc1b712"
+          "sha256": "5e508b177bf5590e22653fd266bbda22f4a3f23638eb2b946fea2f32add170d5"
         }
       ]
     },
@@ -161,7 +161,7 @@
         {
           "path": "packages/swr/audit/tsconfig-pristine-types.json",
           "role": "support",
-          "sha256": "1602a810cabf76d02fd0fa12e1740e95ef36d9356f5071602ac7764669ea7448"
+          "sha256": "f8faeefb4b841168539d98d230f9a2bd04d1217b4a0fcb996108f1d64606d8ff"
         }
       ]
     },
@@ -193,7 +193,7 @@
         {
           "path": "packages/swr/audit/tsconfig-pristine-suspense.json",
           "role": "support",
-          "sha256": "6284c9078cdf6163616faa754fe40527828634dd474e96effe937b5ede6e25ea"
+          "sha256": "b7de77db809c16124c3ad4f391fea5a6328a5df7669f69a40c802ecf97b27295"
         }
       ]
     },

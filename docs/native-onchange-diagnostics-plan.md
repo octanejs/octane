@@ -783,7 +783,8 @@ run `pnpm rules:generate` and `pnpm rules:check`. Do not hand-edit generated
 Separately update the non-RuleSync agent/MCP sources:
 
 - `.ai/project-map.md`;
-- `.ai/skills/react-library-port.md` and `.ai/skills/bug-hunter.md` (their
+- `.rulesync/skills/octane-react-library-port/SKILL.md` and
+  `.rulesync/skills/bug-hunter/SKILL.md` (their
   controlled-input wording is stale);
 - `packages/octane-mcp-server/src/bridge.js` and its README;
 - `packages/octane-mcp-server/skills/migrate-react-component.md`,

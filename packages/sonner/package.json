@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "Sonner for the octane renderer — an API- and behavior-compatible port of the opinionated React toast component.",
+  "description": "Sonner for the octane renderer \u2014 an API- and behavior-compatible port of the opinionated React toast component.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -24,7 +24,8 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "sideEffects": [
     "./src/styles.css"

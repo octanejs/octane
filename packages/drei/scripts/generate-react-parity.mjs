@@ -475,6 +475,13 @@ manifest.lanes = [
 					readFileSync(resolve(root, 'packages/drei/audit/upstream-test-artifacts.json')),
 				),
 			},
+			// The whole vendored tree verifies offline against the upstream git
+			// blob shas in the lock.
+			{
+				path: 'packages/drei/audit/upstream.lock.json',
+				role: 'support',
+				sha256: digest(readFileSync(resolve(root, 'packages/drei/audit/upstream.lock.json'))),
+			},
 			{
 				path: 'packages/drei/scripts/check-react-parity.mjs',
 				role: 'support',

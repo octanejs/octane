@@ -1,0 +1,246 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "input-otp",
+    "version": "1.4.2",
+    "repository": {
+      "owner": "guilhermerodz",
+      "repo": "input-otp",
+      "subdirectory": null
+    },
+    "commit": "81ccdb48c010d800b24942aa231909f0c971b1ca",
+    "integrity": "sha512-l3jWwYNvrEa6NTCt7BECfCm48GvwuZzkoeG3gBL2w4CHeOXW3eKFmf9UNYkNfYc3mxMrthMnxjIE07MT0zLBQA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "079031192fea535a245aa64a637d8433c406b82a14f91c3606b1d63e41c00152"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["LICENSE", "README.md", "apps/test", "packages/input-otp"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "apps/test/.eslintrc.json",
+      "gitBlob": "60535487093a20a19d379c919c86c61a2cc81210",
+      "size": 106
+    },
+    {
+      "path": "apps/test/.gitignore",
+      "gitBlob": "fd3dbb571a12a1c3baf000db049e141c888d05a8",
+      "size": 391
+    },
+    {
+      "path": "apps/test/next.config.mjs",
+      "gitBlob": "4678774e6d606704bce1897a5dab960cd798bf66",
+      "size": 92
+    },
+    {
+      "path": "apps/test/package.json",
+      "gitBlob": "b0fba69b4284669bfa25d1de3fd0df489f615efc",
+      "size": 684
+    },
+    {
+      "path": "apps/test/playwright.config.ts",
+      "gitBlob": "b9c9f4557f66da5b6e07ab01cf22a3a564ba2dda",
+      "size": 2220
+    },
+    {
+      "path": "apps/test/postcss.config.js",
+      "gitBlob": "12a703d900da8159c30e75acbd2c4d87ae177f62",
+      "size": 83
+    },
+    {
+      "path": "apps/test/public/next.svg",
+      "gitBlob": "5174b28c565c285e3e312ec5178be64fbeca8398",
+      "size": 1375
+    },
+    {
+      "path": "apps/test/public/vercel.svg",
+      "gitBlob": "d2f84222734f27b623d1c80dda3561b04d1284af",
+      "size": 629
+    },
+    {
+      "path": "apps/test/README.md",
+      "gitBlob": "c4033664f80d3cb9cb687fb5facbc82aedb302f6",
+      "size": 1383
+    },
+    {
+      "path": "apps/test/src/app/base/page.tsx",
+      "gitBlob": "ce08c28d2fe8e811a2f68ddc5b1797884d110ec1",
+      "size": 433
+    },
+    {
+      "path": "apps/test/src/app/favicon.ico",
+      "gitBlob": "718d6fea4835ec2d246af9800eddb7ffb276240c",
+      "size": 25931
+    },
+    {
+      "path": "apps/test/src/app/globals.css",
+      "gitBlob": "875c01e819b90038f0c3e4aee2a4dcc2086b0e14",
+      "size": 606
+    },
+    {
+      "path": "apps/test/src/app/layout.tsx",
+      "gitBlob": "e7aa02ca8589fb0aa6e1070b42249c7e97ea98db",
+      "size": 625
+    },
+    {
+      "path": "apps/test/src/app/page.tsx",
+      "gitBlob": "855b63f5253471fe028871fe7c280000eb9e5217",
+      "size": 227
+    },
+    {
+      "path": "apps/test/src/app/props/page.tsx",
+      "gitBlob": "2b972f82b3e63060168d7ddc8d670c5920cd6d94",
+      "size": 733
+    },
+    {
+      "path": "apps/test/src/app/with-autofocus/page.tsx",
+      "gitBlob": "da4571cabf355cf87cd8c36ef3a525c2477a2c45",
+      "size": 286
+    },
+    {
+      "path": "apps/test/src/app/with-on-complete/page.tsx",
+      "gitBlob": "ec7730eb2790a4fc1aeb2d1b6bdcd47e1e7167ca",
+      "size": 390
+    },
+    {
+      "path": "apps/test/src/components/base-input.tsx",
+      "gitBlob": "386b126fc9d80869b66177fb2710c293c99faa50",
+      "size": 1573
+    },
+    {
+      "path": "apps/test/src/lib/fonts.ts",
+      "gitBlob": "1273e6c77f7bc12203096105511d7855ca0f01e3",
+      "size": 459
+    },
+    {
+      "path": "apps/test/src/lib/utils.ts",
+      "gitBlob": "d084ccade0d8b5bd77fd5174993bcef7b57644c9",
+      "size": 166
+    },
+    {
+      "path": "apps/test/src/tests/base.delete-word.spec.ts",
+      "gitBlob": "d608828b43678e4c412741b139e3b7ccbdea910b",
+      "size": 1689
+    },
+    {
+      "path": "apps/test/src/tests/base.props.spec.ts",
+      "gitBlob": "2fb252bdf2f07ce8fd968f7d23be86feff56888c",
+      "size": 1113
+    },
+    {
+      "path": "apps/test/src/tests/base.render.spec.ts",
+      "gitBlob": "0bd8583babdb2b729f3d6b0f8482b0d1382aaffe",
+      "size": 1133
+    },
+    {
+      "path": "apps/test/src/tests/base.selections.spec.ts",
+      "gitBlob": "689e1bfec957d74ed5dbbb81ef6fd472d4b6b32e",
+      "size": 1290
+    },
+    {
+      "path": "apps/test/src/tests/base.slot.spec.ts",
+      "gitBlob": "5c260befab157ae2c6dbe1e151ccc6db41b4c9a7",
+      "size": 1237
+    },
+    {
+      "path": "apps/test/src/tests/base.typing.spec.ts",
+      "gitBlob": "624625685892b970654f899836167ab4d4295a5d",
+      "size": 862
+    },
+    {
+      "path": "apps/test/src/tests/util/modifier.ts",
+      "gitBlob": "c215bfea8ce0f13f80c11a4b9cbea09cb7ab7ad1",
+      "size": 74
+    },
+    {
+      "path": "apps/test/src/tests/with-autofocus.spec.ts",
+      "gitBlob": "28b20290d2bbb78b11b4421d66bbe1738b281bdf",
+      "size": 314
+    },
+    {
+      "path": "apps/test/src/tests/with-on-complete.spec.ts",
+      "gitBlob": "a53577a283eb68c7b5df0d8f94325d3466cb133a",
+      "size": 466
+    },
+    {
+      "path": "apps/test/tailwind.config.ts",
+      "gitBlob": "e9a0944e7b319989ec1a7327d9695247c5bd1a41",
+      "size": 510
+    },
+    {
+      "path": "apps/test/tsconfig.json",
+      "gitBlob": "7b2858930495fc4a76d7a51d958bacf2d64eb81f",
+      "size": 578
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "3d8feae905f69bb4279c5abe93d005c7ccc5bdf7",
+      "size": 1071
+    },
+    {
+      "path": "packages/input-otp/package.json",
+      "gitBlob": "b791ab3659c3bab0a5177d2710fb9a89fb21a014",
+      "size": 3125
+    },
+    {
+      "path": "packages/input-otp/src/index.ts",
+      "gitBlob": "2db331ce087ec57774a17f557fcbb53c3ccd7c87",
+      "size": 113
+    },
+    {
+      "path": "packages/input-otp/src/input.tsx",
+      "gitBlob": "4df1db91974a4395719551f467c7d366a4a53ab2",
+      "size": 17362
+    },
+    {
+      "path": "packages/input-otp/src/regexp.ts",
+      "gitBlob": "f39b71c83e4e7e1a308abfbaed88a3cbfb0bdad8",
+      "size": 151
+    },
+    {
+      "path": "packages/input-otp/src/sync-timeouts.ts",
+      "gitBlob": "cbc894b3c0c1a541c5b992ff8fd6a49787057342",
+      "size": 218
+    },
+    {
+      "path": "packages/input-otp/src/types.ts",
+      "gitBlob": "0af3b24fb857231a24e7dcd56be61e6e4303c233",
+      "size": 1001
+    },
+    {
+      "path": "packages/input-otp/src/use-previous.ts",
+      "gitBlob": "5cd005be55ff2242f7524b129317a8c72b32f2d4",
+      "size": 185
+    },
+    {
+      "path": "packages/input-otp/src/use-pwm-badge.tsx",
+      "gitBlob": "01d7b4003d534a6804b072aacbfb508dda2487d6",
+      "size": 4291
+    },
+    {
+      "path": "packages/input-otp/tsconfig.json",
+      "gitBlob": "0667e0d9a9dfb711ba47c79435bec93a94f5dde9",
+      "size": 283
+    },
+    {
+      "path": "packages/input-otp/tsup.config.ts",
+      "gitBlob": "733129662890bcbabd6efc671f2d21f463680353",
+      "size": 203
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "1b1ba01e47c53b9c2888285227837efbf3133d01",
+      "size": 14252
+    }
+  ],
+  "fingerprint": "38578de7720eb68ffc5ccdcceabafe8d80f6396430336838d989da1aeb5329ea"
+}

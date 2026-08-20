@@ -12,10 +12,12 @@ This binding targets `react-syntax-highlighter@16.1.1` exactly.
 - license: MIT, copyright Conor Hastings
 
 The retained `upstream/` tree contains the exact source commit's `src/`,
-`__tests__/`, snapshots, `LICENSE`, and `package.json`, plus the exact npm
-tarball under `upstream/npm/`. The tagged repository supplies the test oracle
-that is absent from the published tarball. `audit/upstream-files.json` is the
-deterministic byte inventory for these retained inputs.
+`__tests__/`, snapshots, `LICENSE`, and `package.json`; every file verifies
+offline against the upstream git blob shas recorded in
+`audit/upstream.lock.json`, and the pinned license is republished at the
+package root as `LICENSE.upstream`. The exact npm tarball is retained under
+`upstream-artifact/`, hash-pinned by `audit/upstream-files.json`. The tagged
+repository supplies the test oracle that is absent from the published tarball.
 
 The published Octane package excludes `upstream/`, `audit/`, `scripts/`, tests,
 and type tests. Runtime compatibility is owned by generated Octane entrypoints

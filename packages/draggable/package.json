@@ -24,9 +24,10 @@
   "types": "./src/index.tsrx",
   "files": [
     "src",
+    "LICENSE",
+    "LICENSE.upstream",
     "README.md",
-    "UPSTREAM.md",
-    "LICENSE"
+    "UPSTREAM.md"
   ],
   "exports": {
     ".": {
@@ -41,7 +42,7 @@
     "test": "vitest run --root ../.. --project draggable --project draggable-ssr --project draggable-hydration --project draggable-differential --project draggable-pristine",
     "upstream:verify": "node audit/upstream-inventory.mjs",
     "test:audit": "node --test tests/audit/upstream-inventory.test.mjs",
-    "test:pristine": "node scripts/run-pristine-upstream.mjs"
+    "test:pristine": "node ../../scripts/react-parity/run-pristine.mjs draggable"
   },
   "dependencies": {
     "clsx": "^2.1.1"

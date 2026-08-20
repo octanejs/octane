@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,19 +15,22 @@ function walk(directory) {
 	return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
 		const path = resolve(directory, entry.name);
 		if (entry.isDirectory()) return walk(path);
-		return entry.isFile() && entry.name !== 'SHA256SUMS' ? [path] : [];
+		return entry.isFile() ? [path] : [];
 	});
 }
 
-const expectedChecksums = new Map(
-	readFileSync(resolve(vendoredRoot, 'SHA256SUMS'), 'utf8')
-		.trim()
-		.split('\n')
-		.map((line) => {
-			const match = /^([a-f0-9]{64})  (.+)$/.exec(line);
-			if (!match) throw new Error(`invalid vendored checksum line: ${line}`);
-			return [match[2], match[1]];
-		}),
+// The committed upstream/ tree verifies offline against the upstream git blob
+// shas in audit/upstream.lock.json.
+execFileSync(
+	process.execPath,
+	[
+		resolve(REPO_ROOT, 'scripts/react-port/materialize.mjs'),
+		'run',
+		'--check',
+		'--package-dir',
+		PACKAGE_ROOT,
+	],
+	{ cwd: REPO_ROOT, stdio: 'pipe' },
 );
 const vendoredFiles = walk(vendoredRoot).map((path) =>
 	path
@@ -35,18 +38,7 @@ const vendoredFiles = walk(vendoredRoot).map((path) =>
 		.split('\\')
 		.join('/'),
 );
-if (
-	expectedChecksums.size !== vendoredFiles.length ||
-	vendoredFiles.some((path) => !expectedChecksums.has(path))
-)
-	throw new Error('vendored Base UI file inventory drifted');
-for (const path of vendoredFiles) {
-	const digest = createHash('sha256')
-		.update(readFileSync(resolve(vendoredRoot, path)))
-		.digest('hex');
-	if (digest !== expectedChecksums.get(path))
-		throw new Error(`vendored Base UI bytes drifted: ${path}`);
-}
+if (vendoredFiles.length !== 1129) throw new Error('vendored Base UI file inventory drifted');
 
 const regenerated = buildUpstreamCrosswalk(vendoredRoot, REPO_ROOT);
 if (JSON.stringify(crosswalk) !== JSON.stringify(regenerated))

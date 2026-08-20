@@ -1,0 +1,41 @@
+diff --git a/tests/upstream/useFieldArray/insert.test.tsx b/tests/upstream/useFieldArray/insert.test.tsx
+--- a/tests/upstream/useFieldArray/insert.test.tsx
++++ b/tests/upstream/useFieldArray/insert.test.tsx
+@@ -16,10 +16,18 @@ import { useForm } from '../../../src/useForm';
+ import noop from '../../../src/utils/noop';
+ 
+ vi.useFakeTimers();
++// octane: upstream runs this file under jest fake timers; RTL's waitFor only
++// auto-advances a fake clock when it detects a `jest` global (helpers.js
++// jestFakeTimersAreEnabled). Alias it to vi so waitFor drives vitest's fake
++// clock exactly as it drives jest's.
++(globalThis as { jest?: typeof vi }).jest = vi;
+ 
+ let i = 0;
+ 
+-vi.mock('../../../src/logic/generateId', () => () => String(i++));
++// octane: vitest module mock — path resolved from tests/upstream/useFieldArray/, factory returns { default }
++vi.mock('../../../src/logic/generateId', () => ({
++  default: () => String(i++),
++}));
+ 
+ describe('insert', () => {
+   beforeEach(() => {
+@@ -677,7 +685,7 @@ describe('insert', () => {
+                 name="name"
+                 data-testid="input"
+                 value={value}
+-                onChange={(e) => setValue(e.target.value)}
++                onInput={(e) => setValue(e.target.value)}
+               />
+               <button>submit</button>
+             </form>
+@@ -828,7 +836,7 @@ describe('insert', () => {
+   });
+ 
+   it('should not invoke resolver per register during insert; only array-scoped + final isValid', async () => {
+-    const resolver = jest
++    const resolver = vi
+       .fn()
+       .mockImplementation((values) => ({ values, errors: {} }));
+ 

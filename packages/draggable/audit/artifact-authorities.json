@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "consumerAuthority": {
     "artifact": "npm:react-draggable@4.7.1",
-    "root": "upstream/npm",
+    "root": "upstream-artifact",
     "scope": [
       "published runtime",
       "published declarations",
@@ -15,7 +15,7 @@
     "artifact": "git:https://github.com/react-grid-layout/react-draggable.git#v4.7.1",
     "tagObject": "cec7498ff84e91215987636d3edbb6ca132ee9e5",
     "commit": "bcbaa8eb285aea49865ca8870c0b7b441c2fe6a4",
-    "root": "upstream/tag",
+    "root": "upstream",
     "scope": ["authored source", "unit and type tests", "browser tests", "fixtures", "license"]
   },
   "discrepancies": [

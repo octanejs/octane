@@ -13,5 +13,5 @@
     "allowSyntheticDefaultImports": true,
     "types": ["node"]
   },
-  "include": ["../../upstream/package/src/**/*.ts", "../../upstream/package/src/**/*.tsx"]
+  "include": ["../../upstream/src/**/*.ts", "../../upstream/src/**/*.tsx"]
 }

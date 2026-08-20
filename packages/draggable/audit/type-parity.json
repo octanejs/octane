@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "upstreamRoot": "packages/draggable/upstream/tag",
+  "upstreamRoot": "packages/draggable/upstream",
   "adaptedRoot": "packages/draggable/typetests",
   "inventories": {
     "upstream": "packages/draggable/audit/pristine-types.json",

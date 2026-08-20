@@ -2,39 +2,39 @@
   "schemaVersion": 1,
   "pristine": [
     {
-      "path": "packages/dropzone/upstream/canonical/type-tests/accept.tsx",
+      "path": "packages/dropzone/upstream/type-tests/accept.tsx",
       "sha256": "f52e7a97f82da6e1efa556bf519a21b40e923315ee19bfdbc389688c3150414e"
     },
     {
-      "path": "packages/dropzone/upstream/canonical/type-tests/all.tsx",
+      "path": "packages/dropzone/upstream/type-tests/all.tsx",
       "sha256": "a7ddd9bfb68b056fe8d92d410caf2744e3608047473174c8f45c8da5409be28b"
     },
     {
-      "path": "packages/dropzone/upstream/canonical/type-tests/basic.tsx",
+      "path": "packages/dropzone/upstream/type-tests/basic.tsx",
       "sha256": "be95a61d020449f0d654da19e056f919d521e7b2e277f0d368ef24e87b3e59d5"
     },
     {
-      "path": "packages/dropzone/upstream/canonical/type-tests/events.tsx",
+      "path": "packages/dropzone/upstream/type-tests/events.tsx",
       "sha256": "a845b14e54ae8303828f2575b0a037131763169220f20b368e57f08a765ea3c7"
     },
     {
-      "path": "packages/dropzone/upstream/canonical/type-tests/file-dialog.tsx",
+      "path": "packages/dropzone/upstream/type-tests/file-dialog.tsx",
       "sha256": "210667a22896b6bf96539fc62133c55fd33ba721f230c4cb6f1ec86b1b3c2d52"
     },
     {
-      "path": "packages/dropzone/upstream/canonical/type-tests/hook.tsx",
+      "path": "packages/dropzone/upstream/type-tests/hook.tsx",
       "sha256": "892e57df33dee528bbe7f295319c3683a0bfe2ed859147710b3b83bfebaccb01"
     },
     {
-      "path": "packages/dropzone/upstream/canonical/type-tests/plugin.tsx",
+      "path": "packages/dropzone/upstream/type-tests/plugin.tsx",
       "sha256": "614a2cab0cd0a6e0368fa790bb94084454263c276f35534e69aa2d901907454c"
     },
     {
-      "path": "packages/dropzone/upstream/canonical/type-tests/refs.tsx",
+      "path": "packages/dropzone/upstream/type-tests/refs.tsx",
       "sha256": "ee32ca173fc4621ef0e3618679fccc86fdf5f655805f87fd14318b4136b3cb85"
     },
     {
-      "path": "packages/dropzone/upstream/canonical/type-tests/validator.tsx",
+      "path": "packages/dropzone/upstream/type-tests/validator.tsx",
       "sha256": "a153ade139e09ac391ebd05ac259b540eebafeaf5945ddd632f037afdcc0d8a9"
     }
   ],

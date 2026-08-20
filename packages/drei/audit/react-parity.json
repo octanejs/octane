@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -66,7 +66,7 @@
         {
           "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "75cb27835a432945b7eaa5730b34dc55d18c7aa190373d80743d6e917356b493"
+          "sha256": "20701aea9b5e5f5249a2559f847aac79cb28f9e0bb5d24d3ef50b06101205a02"
         },
         {
           "path": "packages/drei/scripts/pristine-playwright.json",
@@ -184,6 +184,11 @@
           "path": "packages/drei/audit/upstream-test-artifacts.json",
           "role": "support",
           "sha256": "fdc175ffe1f69cd2d3afe99e707c8dc5535b022eb09f6887d11260261c0895fd"
+        },
+        {
+          "path": "packages/drei/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "8203c1a57fa9485acba692c6f1f633910c063d003c9aa3f2a2bbf0a9936efccd"
         },
         {
           "path": "packages/drei/scripts/check-react-parity.mjs",

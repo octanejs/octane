@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -60,7 +60,7 @@
         {
           "path": "packages/dropzone/audit/runtime-inventories/pristine-harness.json",
           "role": "support",
-          "sha256": "06143733ea005a0b021850de9e21b7d3516f742a7395130dcae18153c4c934f4"
+          "sha256": "c3f5af75370841a1111445ee57cdf7d484f17136590fc79f5edd97f2b835f376"
         },
         {
           "path": "scripts/react-parity/react-dropzone-runtime-inventory.mjs",
@@ -95,7 +95,7 @@
         {
           "path": "packages/dropzone/audit/transformation-ledger.json",
           "role": "support",
-          "sha256": "e0e4e5e2444be8e2165c78893b4620705d77068cdba2754a1aeebd0f7ca316f1"
+          "sha256": "553d3ff351cc2bd5b9ab847c26452fd66bfbec4447a7db01c0d470c588cac903"
         },
         {
           "path": "scripts/react-parity/react-dropzone-evidence.mjs",
@@ -119,13 +119,13 @@
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
-        "project": "packages/dropzone/upstream/canonical/tsconfig.build.json"
+        "project": "packages/dropzone/upstream/tsconfig.build.json"
       },
       "files": [
         {
           "path": "packages/dropzone/audit/type-inventories/parity.json",
           "role": "test",
-          "sha256": "f125aa45b88bfbe131e07ebf368d3cd9cbd1e25916b95a482de9991e6a6d569f",
+          "sha256": "9d5729fa65cd33bd251152aa01319000e5fe8d3d987e96529845f990224b3b71",
           "cases": [
             {
               "id": "types:pristine-build",
@@ -135,9 +135,14 @@
           ]
         },
         {
-          "path": "packages/dropzone/upstream/canonical/tsconfig.build.json",
+          "path": "packages/dropzone/upstream/tsconfig.build.json",
           "role": "support",
           "sha256": "bc4b0a77fbc089cb0eea51861450702c134595671defed4ec3922525a579908e"
+        },
+        {
+          "path": "packages/dropzone/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "0bb35fa77e9583aa94ed2e5ce0acb6bada3d407eb95c1faf507f9c936c58bdaf"
         }
       ]
     },
@@ -151,13 +156,13 @@
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
-        "project": "packages/dropzone/upstream/canonical/tsconfig.type-tests.json"
+        "project": "packages/dropzone/upstream/tsconfig.type-tests.json"
       },
       "files": [
         {
           "path": "packages/dropzone/audit/type-inventories/parity.json",
           "role": "test",
-          "sha256": "f125aa45b88bfbe131e07ebf368d3cd9cbd1e25916b95a482de9991e6a6d569f",
+          "sha256": "9d5729fa65cd33bd251152aa01319000e5fe8d3d987e96529845f990224b3b71",
           "cases": [
             {
               "id": "types:pristine-programs",
@@ -167,9 +172,14 @@
           ]
         },
         {
-          "path": "packages/dropzone/upstream/canonical/tsconfig.type-tests.json",
+          "path": "packages/dropzone/upstream/tsconfig.type-tests.json",
           "role": "support",
           "sha256": "0e709729044f1224882d1c303d86595e88c9bdfd9c4ccc04286b21a9e9f06eb0"
+        },
+        {
+          "path": "packages/dropzone/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "0bb35fa77e9583aa94ed2e5ce0acb6bada3d407eb95c1faf507f9c936c58bdaf"
         }
       ]
     },
@@ -189,7 +199,7 @@
         {
           "path": "packages/dropzone/audit/type-inventories/parity.json",
           "role": "test",
-          "sha256": "f125aa45b88bfbe131e07ebf368d3cd9cbd1e25916b95a482de9991e6a6d569f",
+          "sha256": "9d5729fa65cd33bd251152aa01319000e5fe8d3d987e96529845f990224b3b71",
           "cases": [
             {
               "id": "types:adapted-programs",
@@ -217,7 +227,7 @@
         {
           "path": "packages/dropzone/tests/differential/utils.test.ts",
           "role": "test",
-          "sha256": "e20fb393cc1d402d200a79563e3af44954737ad5f64ca5b5a28b5e91a01ec875",
+          "sha256": "f30e51860d71a3422e9ff44585f4cfea348f132c0a5b8039b99616404f3acc3f",
           "cases": [
             {
               "id": "differential:utils-validation",

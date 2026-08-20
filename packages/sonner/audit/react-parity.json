@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8830826d42efe0f20965ea3dd2581b940d532ad6f604fffbd89419c13c4f07e1"
+      "lockfileSha256": "3ec50694cbd8a0eed727b7d2fb8e1d8ee6936f8b40b55258b64341c2f4fdf222"
     }
   },
   "lanes": [
@@ -77,7 +77,7 @@
         {
           "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "75cb27835a432945b7eaa5730b34dc55d18c7aa190373d80743d6e917356b493"
+          "sha256": "20701aea9b5e5f5249a2559f847aac79cb28f9e0bb5d24d3ef50b06101205a02"
         },
         {
           "path": "packages/sonner/upstream/playwright.config.ts",
@@ -93,6 +93,11 @@
           "path": "packages/sonner/upstream/test/src/app/page.tsx",
           "role": "support",
           "sha256": "abbecf9ffbfe58d722bdd9cc9fe713114422975a0103fb00749afa531159bc4c"
+        },
+        {
+          "path": "packages/sonner/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "0d2d63f567c5ce9ae0c6cd023e3539e30820e4e805aa92f1c706f4a8f35aa665"
         }
       ]
     },

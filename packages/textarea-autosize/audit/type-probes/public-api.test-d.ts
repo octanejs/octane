@@ -1,7 +1,7 @@
 import TextareaAutosize, {
 	type TextareaAutosizeProps,
 	type TextareaHeightChangeMeta,
-} from '../../upstream/dist/declarations/src/index.js';
+} from '../../upstream-artifact/dist/declarations/src/index.js';
 
 declare function expectType<T>(value: T): void;
 

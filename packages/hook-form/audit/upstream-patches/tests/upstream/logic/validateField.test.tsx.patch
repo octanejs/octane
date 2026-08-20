@@ -1,0 +1,79 @@
+diff --git a/tests/upstream/logic/validateField.test.tsx b/tests/upstream/logic/validateField.test.tsx
+--- a/tests/upstream/logic/validateField.test.tsx
++++ b/tests/upstream/logic/validateField.test.tsx
+@@ -7,10 +7,10 @@ vi.mock('../../../src/logic/getCheckboxValue');
+ 
+ describe('validateField', () => {
+   it('should return required true when input not filled with required', async () => {
+-    (getRadioValue as vi.Mock).mockImplementation(() => ({
++    (getRadioValue as Mock).mockImplementation(() => ({
+       value: '2',
+     }));
+-    (getCheckboxValue as vi.Mock).mockImplementation(() => ({
++    (getCheckboxValue as Mock).mockImplementation(() => ({
+       value: false,
+       isValid: false,
+     }));
+@@ -321,7 +321,7 @@ describe('validateField', () => {
+       ),
+     ).toEqual({});
+ 
+-    (getCheckboxValue as vi.Mock).mockImplementation(() => ({
++    (getCheckboxValue as Mock).mockImplementation(() => ({
+       value: 'test',
+       isValid: true,
+     }));
+@@ -1593,7 +1593,7 @@ describe('validateField', () => {
+       },
+     });
+ 
+-    (getRadioValue as vi.Mock).mockImplementation(() => {
++    (getRadioValue as Mock).mockImplementation(() => {
+       return {
+         isValid: false,
+         value: 'test',
+@@ -1884,7 +1884,7 @@ describe('validateField', () => {
+   });
+ 
+   it('should return all validation errors', async () => {
+-    (getRadioValue as vi.Mock).mockImplementation(() => ({
++    (getRadioValue as Mock).mockImplementation(() => ({
+       value: '',
+     }));
+ 
+@@ -1963,7 +1963,7 @@ describe('validateField', () => {
+   it('should handle pattern with g flag', async () => {
+     const reusedRe = /a/g;
+ 
+-    (getRadioValue as vi.Mock).mockImplementation(() => ({
++    (getRadioValue as Mock).mockImplementation(() => ({
+       value: '',
+     }));
+     expect(
+@@ -2038,7 +2038,7 @@ describe('validateField', () => {
+   });
+ 
+   it('should return all validation error messages', async () => {
+-    (getRadioValue as vi.Mock).mockImplementation(() => ({
++    (getRadioValue as Mock).mockImplementation(() => ({
+       value: '',
+     }));
+     expect(
+@@ -2280,7 +2280,7 @@ describe('validateField', () => {
+     });
+ 
+     it('should invoke setCustomValidity on all refs for a required radio group', async () => {
+-      (getRadioValue as vi.Mock).mockReturnValue({
++      (getRadioValue as Mock).mockReturnValue({
+         isValid: false,
+         value: undefined,
+       });
+@@ -2325,7 +2325,7 @@ describe('validateField', () => {
+     });
+ 
+     it('should clear setCustomValidity on all refs for a valid radio group', async () => {
+-      (getRadioValue as vi.Mock).mockReturnValue({
++      (getRadioValue as Mock).mockReturnValue({
+         isValid: true,
+         value: 'bar',
+       });

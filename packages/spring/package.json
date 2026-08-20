@@ -31,6 +31,7 @@
   "types": "src/index.ts",
   "files": [
     "src",
+    "LICENSE.upstream",
     "README.md",
     "UPSTREAM.md"
   ],

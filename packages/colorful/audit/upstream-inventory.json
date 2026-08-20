@@ -159,8 +159,8 @@
     },
     {
       "path": "tag/package.json",
-      "bytes": 5739,
-      "sha256": "903aa917b2e53f593b289af758e7a48ce141c49f3c4a773607af7e82d7ec383f"
+      "bytes": 5738,
+      "sha256": "16cd2530b726ef556225e83ce20dab19b6e33834a5c932671efed9cc37359bab"
     },
     {
       "path": "tag/src/components/HexAlphaColorPicker.tsx",
@@ -359,8 +359,8 @@
     },
     {
       "path": "tag/tests/__snapshots__/components.test.js.snap",
-      "bytes": 5647,
-      "sha256": "54106de8733048f4344689f4f0a53f58bc69c60529d0ee60d876deb894c800ff"
+      "bytes": 5629,
+      "sha256": "67df8af4c7b44375f8f56df99ee487aafb909fc3ed1e7fb44b2937fd7961ab9e"
     },
     {
       "path": "tag/tests/components.test.js",

@@ -1,17 +1,16 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, cpSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
+import { planAdaptedFiles, validateUpstreamLock } from '../react-port/materialize-lib.mjs';
 import {
 	assertPristineAdaptedCrosswalk,
 	loadZagRuntimeCaseDispositions,
 	normalizedIdentityKey,
 	verifyZagRuntimeCrosswalk,
 } from './zag-runtime-crosswalk.mjs';
-import { assertZagAdaptedSourceCrosswalk } from '../../packages/zag/scripts/verify-upstream.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -105,34 +104,55 @@ test('dropping a StrictMode disposition fails the crosswalk', () => {
 	}, /missing one-for-one counterparts/);
 });
 
-test('committed adapted sources match pristine after allowed transforms', function sourceCrosswalk() {
-	const summary = assertZagAdaptedSourceCrosswalk(resolve(REPO, 'packages/zag'));
-	assert.equal(summary.pairs, 3);
+test('committed zag lock and patch set cover the pinned adapted surface', function lockCoverage() {
+	const lock = validateUpstreamLock(
+		JSON.parse(readFileSync(resolve(REPO, 'packages/zag/audit/upstream.lock.json'), 'utf8')),
+	);
+	assert.equal(lock.identity.packageName, '@zag-js/react');
+	assert.equal(lock.identity.version, '1.42.0');
+	const planned = planAdaptedFiles(lock);
+	assert.deepEqual(
+		planned.map(function targetOf(entry) {
+			return entry.targetPath;
+		}),
+		[
+			'tests/upstream/machine.test.ts',
+			'tests/upstream/nested-states.test.ts',
+			'tests/upstream/render.ts',
+			'tests/upstream/strict-mode.test.tsx',
+		],
+	);
+	// The lock's mechanical rewrites cover zag's whole adaptation, so a mapped
+	// file normally carries no patch at all: it regenerates as pristine bytes
+	// plus rewrites. A file may carry a divergence patch or a skip rationale,
+	// never both, and the pinned StrictMode suite must stay dispositioned out.
+	const patchesRoot = resolve(REPO, 'packages/zag/audit/upstream-patches');
+	for (const entry of planned) {
+		const hasPatch = existsSync(resolve(patchesRoot, `${entry.targetPath}.patch`));
+		const hasSkip = existsSync(resolve(patchesRoot, `${entry.targetPath}.skip`));
+		assert.ok(
+			!(hasPatch && hasSkip),
+			`${entry.targetPath} cannot have both a patch and a skip rationale`,
+		);
+	}
+	assert.ok(
+		existsSync(resolve(patchesRoot, 'tests/upstream/strict-mode.test.tsx.skip')),
+		'the StrictMode suite must keep its committed skip rationale',
+	);
+	assert.deepEqual(
+		lock.adaptedRewrites.map(function findOf(rewrite) {
+			return rewrite.find;
+		}),
+		['"@testing-library/react"', 'from "../src"'],
+	);
 });
 
-test('deleting an adapted assertion fails the source crosswalk', function assertionDriftRejected() {
-	const root = mkdtempSync(join(tmpdir(), 'zag-adapted-source-'));
-	try {
-		cpSync(resolve(REPO, 'packages/zag/upstream'), join(root, 'upstream'), { recursive: true });
-		cpSync(resolve(REPO, 'packages/zag/tests/upstream'), join(root, 'tests/upstream'), {
-			recursive: true,
-		});
-		cpSync(
-			resolve(REPO, 'packages/zag/audit/adapted-transformations.json'),
-			join(root, 'audit/adapted-transformations.json'),
-		);
-		const adaptedPath = join(root, 'tests/upstream/machine.test.ts');
-		const source = readFileSync(adaptedPath, 'utf8');
-		const mutated = source.replace(
-			/expect\(result\.current\.state\.get\(\)\)\.toBe\('foo'\);/,
-			'expect(true).toBe(true);',
-		);
-		assert.notEqual(mutated, source);
-		writeFileSync(adaptedPath, mutated);
-		assert.throws(function alteredAssertion() {
-			assertZagAdaptedSourceCrosswalk(root);
-		}, /assertion\/fixture hash mismatch/);
-	} finally {
-		rmSync(root, { recursive: true, force: true });
-	}
+test('tampering the committed zag lock fails validation', function lockTamperRejected() {
+	const lock = JSON.parse(
+		readFileSync(resolve(REPO, 'packages/zag/audit/upstream.lock.json'), 'utf8'),
+	);
+	lock.files[0].gitBlob = 'f'.repeat(40);
+	assert.throws(function tampered() {
+		validateUpstreamLock(lock);
+	}, /fingerprint does not match/);
 });
