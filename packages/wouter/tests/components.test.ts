@@ -11,8 +11,11 @@ import {
 	useParams,
 	useRouter,
 	useSearchParams,
+	type AroundNavHandler,
 	type Parser,
+	type RegexRouteParams,
 	type RouterProps,
+	type StringRouteParams,
 } from '@octanejs/wouter';
 import { memoryLocation } from '@octanejs/wouter/memory-location';
 
@@ -263,7 +266,7 @@ describe('Route', () => {
 		const { container } = renderInMemory(
 			h(Route, {
 				path: '/users/:id',
-				children: (params) => h('span', { children: params.id }),
+				children: (params: StringRouteParams<'/users/:id'>) => h('span', { children: params.id }),
 			}),
 			{ path: '/users/42' },
 		);
@@ -271,7 +274,9 @@ describe('Route', () => {
 	});
 
 	it('passes a match param object to the render function', () => {
-		const renderChild = vi.fn((params) => h('span', { children: params.name }));
+		const renderChild = vi.fn((params: StringRouteParams<'/users/:name'>) =>
+			h('span', { children: params.name }),
+		);
 		renderInMemory(h(Route, { path: '/users/:name', children: renderChild }), {
 			path: '/users/alex',
 		});
@@ -321,7 +326,7 @@ describe('Route', () => {
 		const { container } = renderInMemory(
 			h(Route, {
 				path: /[/]users[/](?<id>\d+)/,
-				children: (params) => h('span', { children: params.id }),
+				children: (params: RegexRouteParams) => h('span', { children: params.id }),
 			}),
 			{ path: '/users/42' },
 		);
@@ -332,7 +337,7 @@ describe('Route', () => {
 		const { container } = renderInMemory(
 			h(Route, {
 				path: /[/]users[/](\d+)/,
-				children: (params) => h('span', { children: params[0] }),
+				children: (params: RegexRouteParams) => h('span', { children: params[0] }),
 			}),
 			{ path: '/users/42' },
 		);
@@ -631,10 +636,7 @@ describe('useSearchParams', () => {
 // Per packages/wouter/upstream/canonical/test/view-transitions.test.tsx
 describe('view transitions', () => {
 	test('Link with transition prop triggers aroundNav with transition in options', () => {
-		const aroundNav = vi.fn(
-			(navigate: (to: string, options?: unknown) => void, to: string, options?: unknown) =>
-				navigate(to, options),
-		);
+		const aroundNav: AroundNavHandler = vi.fn((navigate, to, options) => navigate(to, options));
 		const memory = memoryLocation();
 		const { getByRole } = render(
 			h(Router, {
@@ -656,10 +658,7 @@ describe('view transitions', () => {
 	});
 
 	test('useLocation navigate with transition option triggers aroundNav', () => {
-		const aroundNav = vi.fn(
-			(navigate: (to: string, options?: unknown) => void, to: string, options?: unknown) =>
-				navigate(to, options),
-		);
+		const aroundNav: AroundNavHandler = vi.fn((navigate, to, options) => navigate(to, options));
 		const memory = memoryLocation();
 		const { result } = renderHook(() => useLocation(), {
 			wrapper: routerWrapper({ hook: memory.hook, aroundNav }),
@@ -706,7 +705,7 @@ describe('parser', () => {
 				parser,
 				children: h(Route, {
 					path: '/users/:id',
-					children: (params) => h('span', { children: params.id }),
+					children: (params: StringRouteParams<'/users/:id'>) => h('span', { children: params.id }),
 				}),
 			} as RouterProps),
 		);

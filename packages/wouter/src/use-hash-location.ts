@@ -25,7 +25,14 @@ const currentHashLocation = () => '/' + location.hash.replace(/^#?\/?/, '');
 
 export function navigate<S = any>(
 	to: Path,
-	{ state = null, replace = false }: { state?: S; replace?: boolean; transition?: boolean } = {},
+	options?: { state?: S; replace?: boolean; transition?: boolean },
+): void;
+export function navigate<S = any>(
+	to: Path,
+	{
+		state = null,
+		replace = false,
+	}: { state?: S | null; replace?: boolean; transition?: boolean } = {},
 ): void {
 	const oldURL = location.href;
 	const [hash, search] = to.replace(/^#?\/?/, '').split('?');

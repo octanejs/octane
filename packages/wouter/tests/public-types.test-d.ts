@@ -18,7 +18,7 @@ void ambiguousLink;
 
 const typedRoute: RouteProps<undefined, '/users/:id'> = {
 	path: '/users/:id',
-	children(params) {
+	children(params: StringRouteParams<'/users/:id'>) {
 		const id: string | undefined = params.id;
 		return id;
 	},

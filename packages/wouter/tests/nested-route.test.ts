@@ -1,13 +1,7 @@
 import { createElement as h, type OctaneNode } from 'octane';
 import { act, render, renderHook } from '@octanejs/testing-library';
 import { describe, expect, test } from 'vitest';
-import {
-	Route,
-	Router,
-	Switch,
-	useRouter,
-	type RouterProps,
-} from '@octanejs/wouter';
+import { Route, Router, Switch, useRouter, type RouterProps } from '@octanejs/wouter';
 import { memoryLocation } from '@octanejs/wouter/memory-location';
 
 // Per packages/wouter/upstream/canonical/test/nested-route.test.tsx
@@ -131,7 +125,7 @@ describe('when `nest` prop is given', function nestSuite() {
 		const { container, rerender } = render(App, { props: { nested: true } });
 		expect(container.textContent).toBe('matched!');
 
-		rerender({ nested: false });
+		rerender({ props: { nested: false } });
 		expect(container.textContent).toBe('');
 	});
 
@@ -139,7 +133,7 @@ describe('when `nest` prop is given', function nestSuite() {
 		const { hook, navigate } = memoryLocation({ path: '/' });
 
 		function App() {
- mar	return h(Router, {
+			return h(Router, {
 				hook,
 				children: h(Route, {
 					path: '/:version?',

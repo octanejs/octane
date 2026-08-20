@@ -14,6 +14,10 @@
     }
   },
   "description": "wouter for Octane, ported from wouter 3.10.0.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
   "publishConfig": {
     "access": "public"
   },

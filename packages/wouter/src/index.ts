@@ -151,7 +151,8 @@ export function matchRoute(
 		route instanceof RegExp
 			? { keys: false as const, pattern: route }
 			: parser(route || '*', loose);
-	const result = pattern.exec(path) || [];
+	const execResult = pattern.exec(path);
+	const result = execResult || [];
 	const [$base, ...matches] = result;
 
 	return (
@@ -162,8 +163,8 @@ export function matchRoute(
 						const groups =
 							keys !== false
 								? Object.fromEntries(keys.map((key, index) => [key, matches[index]]))
-								: result.groups;
-						const params: DefaultParams = { ...matches };
+								: execResult?.groups;
+						const params = { ...matches } as unknown as DefaultParams;
 						if (groups) {
 							Object.assign(params, groups);
 						}
@@ -376,12 +377,18 @@ export function Link<H extends BaseLocationHook = typeof useBrowserLocation>(
 		transition: _transition,
 		ref,
 		...restProps
-	} = props as LinkProps & {
+	} = props as unknown as {
 		to?: Path;
 		href?: Path;
+		onClick?: (event: MouseEvent) => void;
+		asChild?: boolean;
+		children?: OctaneNode;
+		className?: string | ((isActive: boolean) => string | undefined);
 		replace?: boolean;
 		state?: unknown;
 		transition?: boolean;
+		ref?: Octane.Ref<HTMLAnchorElement>;
+		[key: string]: unknown;
 	};
 
 	const onClick = useEvent((event: MouseEvent) => {

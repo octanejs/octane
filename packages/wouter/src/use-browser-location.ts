@@ -21,7 +21,7 @@ const subscribeToLocationUpdates = (callback: () => void) => {
 
 type Primitive = string | number | bigint | boolean | null | undefined | symbol;
 
-function useLocationPropertyInternal<S extends Primitive>(
+function useLocationPropertyInternal<S>(
 	fn: () => S,
 	ssrFn: (() => S) | undefined,
 	slot: symbol | undefined,
@@ -82,15 +82,22 @@ export function useHistoryState<T = any>(): T;
 export function useHistoryState<T = any>(...rest: [slot?: symbol]): T {
 	const [, slot] = splitSlot(rest);
 	return useLocationPropertyInternal(
-		currentHistoryState,
-		() => null,
+		currentHistoryState as () => T,
+		() => null as T,
 		subSlot(slot, 'history-state'),
-	) as T;
+	);
 }
 
 export function navigate<S = any>(
 	to: string | URL,
-	{ replace = false, state = null }: { replace?: boolean; state?: S; transition?: boolean } = {},
+	options?: { replace?: boolean; state?: S; transition?: boolean },
+): void;
+export function navigate<S = any>(
+	to: string | URL,
+	{
+		replace = false,
+		state = null,
+	}: { replace?: boolean; state?: S | null; transition?: boolean } = {},
 ): void {
 	history[replace ? eventReplaceState : eventPushState](state, '', to);
 }

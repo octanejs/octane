@@ -77,8 +77,8 @@ adapted test is skipped or marked todo.
 | `test/switch.test.tsx` | Adapted descriptor, fallback, array, and Fragment cases in `tests/components.test.ts`; async consistency cases are not yet adapted |
 | `test/use-params.test.tsx` | Adapted default and closest-route cases in `tests/components.test.ts`; nested/reactive cases are not yet adapted |
 | `test/use-location.test.tsx` | Covered by browser, hash, memory, base-path, and navigation tests across the adapted suites; the upstream parameterized file is not duplicated |
-| `test/nested-route.test.tsx` | Not yet adapted; nested runtime behavior remains a declared test gap |
-| `test/ssr.test.tsx` | Not yet adapted into an Octane server-render project; SSR APIs remain a declared test gap |
+| `test/nested-route.test.tsx` | Adapted in `tests/nested-route.test.ts` |
+| `test/ssr.test.tsx` | Adapted in `tests/ssr.test.ts` using `octane/server` `renderToStaticMarkup` |
 | `test/history-patch.test.ts` | Browser patch behavior is exercised through `useBrowserLocation`; the duplicate React/Preact export assertion is not applicable |
 | `test/setup.ts` | Adapted to Vitest/jsdom in `tests/setup.ts` |
 | `test/test-utils.ts` | Not needed by the synchronous jsdom adaptation |
