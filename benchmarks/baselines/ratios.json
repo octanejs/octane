@@ -868,6 +868,70 @@
     "note": "Inferred string children must not exceed the gzipped output of the equivalent explicit-string sentinel."
   },
   {
+    "suite": "codegen-size",
+    "op": "raw",
+    "target": "css-modules-client-proven",
+    "reference": "css-modules-client-control",
+    "maxRatio": 0.75,
+    "note": "Proven immutable CSS strings retain an original stylesheet read while removing repeated client class bindings. Both variants use identical source/provider bytes and verify equal CSS and SSR output."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "css-modules-client-proven",
+    "reference": "css-modules-client-control",
+    "maxRatio": 0.84,
+    "note": "The production CSS-module client sentinel must retain a material minified-code reduction with stylesheet ownership preserved."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "css-modules-client-proven",
+    "reference": "css-modules-client-control",
+    "maxRatio": 0.86,
+    "note": "Same-run compressed client bytes guard the CSS proof optimization without depending on a particular Node/zlib version."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "css-modules-client-proven",
+    "reference": "css-modules-client-control",
+    "maxRatio": 0.86,
+    "note": "Same-run Brotli client bytes guard the CSS proof optimization while the stylesheet and public SSR semantics remain equal."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "raw",
+    "target": "css-modules-server-proven",
+    "reference": "css-modules-server-control",
+    "maxRatio": 0.75,
+    "note": "Proven immutable CSS strings remove repeated server class serialization without dropping the stylesheet dependency."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "css-modules-server-proven",
+    "reference": "css-modules-server-control",
+    "maxRatio": 0.84,
+    "note": "The paired production CSS-module server sentinel must retain a material minified-code reduction."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "css-modules-server-proven",
+    "reference": "css-modules-server-control",
+    "maxRatio": 0.96,
+    "note": "Same-run compressed server bytes guard the CSS proof optimization; source, stylesheet, and SSR HTML are identical in the control."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "brotli",
+    "target": "css-modules-server-proven",
+    "reference": "css-modules-server-control",
+    "maxRatio": 0.96,
+    "note": "Same-run Brotli server bytes retain the CSS proof saving without pinning compressor-specific absolute bytes."
+  },
+  {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",

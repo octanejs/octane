@@ -77,6 +77,7 @@ import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { assertStrongMode } from './strong-mode.js';
 import { createTextTypeFactsLookup } from './text-type-facts.js';
+import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
@@ -7833,9 +7834,9 @@ export function compile(source, filename, options) {
 // always validates authored source and only exposes the hydrate slice that the
 // same compilation already prepared for production void-export classification.
 export function compileForBundler(source, filename, options) {
-	const metadata = { hydrateAst: null };
+	const metadata = { hydrateAst: null, cssModuleConstantImports: [] };
 	const result = compileAuthored(source, filename, options, metadata);
-	return { result, hydrateAst: metadata.hydrateAst };
+	return { result, ...metadata };
 }
 
 function compileAuthored(source, filename, options, bundlerMetadata) {
@@ -7855,11 +7856,23 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 		cleanFilename,
 		options?.textTypeFacts,
 	);
+	let constantAst = textTypedAst;
+	if (typeof options?.resolveCssModuleConstant === 'function') {
+		const constants = applyCssModuleConstants(
+			textTypedAst,
+			options.resolveCssModuleConstant,
+			options.preserveCssModuleReferences,
+		);
+		constantAst = constants.ast;
+		if (bundlerMetadata !== null) {
+			bundlerMetadata.cssModuleConstantImports = constants.imports;
+		}
+	}
 	return compileInternal(
 		source,
 		filename,
 		options,
-		textTypedAst,
+		constantAst,
 		mode,
 		bundlerMetadata,
 		textTypedAst !== analyzedAst,
