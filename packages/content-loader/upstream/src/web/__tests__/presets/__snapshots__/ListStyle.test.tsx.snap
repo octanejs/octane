@@ -1,0 +1,110 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ListStyle renders correctly 1`] = `
+<svg
+  aria-labelledby="ListStyle-aria"
+  role="img"
+  style={{}}
+  viewBox="0 0 400 110"
+>
+  <title
+    id="ListStyle-aria"
+  >
+    Loading...
+  </title>
+  <rect
+    clipPath="url(#ListStyle-diff)"
+    height="100%"
+    role="presentation"
+    style={
+      {
+        "fill": "url(#ListStyle-animated-diff)",
+      }
+    }
+    width="100%"
+    x="0"
+    y="0"
+  />
+  <defs>
+    <clipPath
+      id="ListStyle-diff"
+    >
+      <rect
+        height="10"
+        rx="3"
+        ry="3"
+        width="250"
+        x="0"
+        y="0"
+      />
+      <rect
+        height="10"
+        rx="3"
+        ry="3"
+        width="220"
+        x="20"
+        y="20"
+      />
+      <rect
+        height="10"
+        rx="3"
+        ry="3"
+        width="170"
+        x="20"
+        y="40"
+      />
+      <rect
+        height="10"
+        rx="3"
+        ry="3"
+        width="250"
+        x="0"
+        y="60"
+      />
+      <rect
+        height="10"
+        rx="3"
+        ry="3"
+        width="200"
+        x="20"
+        y="80"
+      />
+      <rect
+        height="10"
+        rx="3"
+        ry="3"
+        width="80"
+        x="20"
+        y="100"
+      />
+    </clipPath>
+    <linearGradient
+      gradientTransform="translate(-2 0)"
+      id="ListStyle-animated-diff"
+    >
+      <stop
+        offset="0%"
+        stopColor="#f5f6f7"
+        stopOpacity={1}
+      />
+      <stop
+        offset="50%"
+        stopColor="#eee"
+        stopOpacity={1}
+      />
+      <stop
+        offset="100%"
+        stopColor="#f5f6f7"
+        stopOpacity={1}
+      />
+      <animateTransform
+        attributeName="gradientTransform"
+        dur="20s"
+        repeatCount="indefinite"
+        type="translate"
+        values="-2 0; 0 0; 2 0"
+      />
+    </linearGradient>
+  </defs>
+</svg>
+`;
