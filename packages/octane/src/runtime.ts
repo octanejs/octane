@@ -3020,6 +3020,23 @@ function flush(): void {
 		}
 		return;
 	}
+	// A discrete event can synchronously drain work after its microtask was
+	// armed. An empty render queue alone is not enough: first mounts/hydration
+	// still need their commit, and refs/Fragment bindings are intentionally not
+	// included in hasPendingWork(). Retained Actions and ViewTransition also
+	// carry flush-finalization work outside those queues.
+	if (
+		!hasPendingWork() &&
+		refDetachQueue.length === 0 &&
+		refAttachQueue.length === 0 &&
+		activeFragments.size === 0 &&
+		FLUSHED_TRANSITION_UPDATES.length === 0 &&
+		VIEW_TRANSITION_DRIVER === null
+	) {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__devtoolsNotifyFlush();
+		return;
+	}
 	// The optional driver owns all concrete ViewTransition state/implementation.
 	// A client that never retains the feature sees only this null check.
 	if (VIEW_TRANSITION_DRIVER?.routeFlush() === true) return;
