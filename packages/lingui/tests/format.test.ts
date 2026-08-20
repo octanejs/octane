@@ -12,7 +12,7 @@ function toRenderable(elements: OctaneNode) {
 	if (Array.isArray(elements)) {
 		return createElement(Fragment, null, elements);
 	}
-	return elements as Parameters<typeof render>[0];
+	return elements as unknown as Parameters<typeof render>[0];
 }
 
 function html(elements: OctaneNode) {

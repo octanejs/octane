@@ -67,7 +67,11 @@ describe('Trans component', function transSuite() {
 								return createElement(Fragment, null, 'default_', props.translation);
 							},
 						},
-						createElement(Trans, { render: renderProp, component, id: 'Some text' }),
+						createElement(Trans, {
+							render: renderProp,
+							component,
+							id: 'Some text',
+						} as TransRenderCallbackOrComponent & { id: string }),
 					),
 				);
 

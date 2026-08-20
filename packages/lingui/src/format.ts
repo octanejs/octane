@@ -85,9 +85,7 @@ function getElementType(element: OctaneNode): unknown {
 	return undefined;
 }
 
-function getElements(
-	parts: string[],
-): Array<readonly [string | undefined, string, string | undefined]> {
+function getElements(parts: string[]): Array<readonly [string, string, string]> {
 	if (!parts.length) return [];
 
 	const paired = parts[0];
@@ -95,7 +93,11 @@ function getElements(
 	const unpaired = parts[2];
 	const after = parts[3];
 
-	const triple = [paired || unpaired, children || '', after] as const;
+	const triple: readonly [string, string, string] = [
+		paired || unpaired || '',
+		children || '',
+		after || '',
+	];
 	return [triple].concat(getElements(parts.slice(4, parts.length)));
 }
 
