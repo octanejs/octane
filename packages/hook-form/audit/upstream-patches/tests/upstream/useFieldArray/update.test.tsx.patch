@@ -1,0 +1,46 @@
+diff --git a/tests/upstream/useFieldArray/update.test.tsx b/tests/upstream/useFieldArray/update.test.tsx
+--- a/tests/upstream/useFieldArray/update.test.tsx
++++ b/tests/upstream/useFieldArray/update.test.tsx
+@@ -16,7 +16,10 @@ import { useForm } from '../../../src/useForm';
+ 
+ let i = 0;
+ 
+-vi.mock('../../../src/logic/generateId', () => () => String(i++));
++// octane: vitest module mock — path resolved from tests/upstream/useFieldArray/, factory returns { default }
++vi.mock('../../../src/logic/generateId', () => ({
++  default: () => String(i++),
++}));
+ 
+ describe('update', () => {
+   beforeEach(() => {
+@@ -244,8 +247,8 @@ describe('update', () => {
+         <div>
+           <input
+             value={field.value.firstName}
+-            onChange={(e) => {
+-              field.onChange({
++            onInput={(e) => {
++              field.onInput({
+                 ...field.value,
+                 firstName: e.target.name,
+               });
+@@ -253,8 +256,8 @@ describe('update', () => {
+           />
+           <input
+             value={field.value.lastName}
+-            onChange={(e) => {
+-              field.onChange({
++            onInput={(e) => {
++              field.onInput({
+                 ...field.value,
+                 lastName: e.target.name,
+               });
+@@ -544,7 +547,7 @@ describe('update', () => {
+     });
+ 
+     it('should not invoke resolver per register during update; only array-scoped + final isValid', async () => {
+-      const resolver = jest
++      const resolver = vi
+         .fn()
+         .mockImplementation((values) => ({ values, errors: {} }));
+ 

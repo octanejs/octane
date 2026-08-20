@@ -23,8 +23,446 @@
     "notices": []
   },
   "scopes": ["LICENSE", "package.json", "scripts/jest", "src", "tsconfig.json"],
-  "adaptedMappings": [],
-  "adaptedRewrites": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "src/__tests__",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "import React, { useEffect, useMemo, useState } from 'react';",
+      "replace": "import * as React from 'octane';\nimport { useEffect, useMemo, useState } from 'octane';"
+    },
+    {
+      "find": "import React, { useEffect, useState } from 'react';",
+      "replace": "import * as React from 'octane';\nimport { useEffect, useState } from 'octane';"
+    },
+    {
+      "find": "import React, { useState } from 'react';",
+      "replace": "import * as React from 'octane';\nimport { useState } from 'octane';"
+    },
+    {
+      "find": "import React from 'react';",
+      "replace": "import * as React from 'octane';"
+    },
+    {
+      "find": "import { renderToString } from 'react-dom/server';",
+      "replace": "import { renderToStaticMarkup } from 'octane/server';"
+    },
+    {
+      "find": "import { flushSync } from 'react-dom';",
+      "replace": "import { flushSync } from 'octane';"
+    },
+    {
+      "find": "from 'react';",
+      "replace": "from 'octane';"
+    },
+    {
+      "find": "'@testing-library/react'",
+      "replace": "'@octanejs/testing-library'"
+    },
+    {
+      "find": "from '../';",
+      "replace": "from '../../src';"
+    },
+    {
+      "find": "from '../..';",
+      "replace": "from '../../../src';"
+    },
+    {
+      "find": "'../../logic/iterateFieldsByAction'",
+      "replace": "'../../../src/logic/iterateFieldsByAction'"
+    },
+    {
+      "find": "'../../logic/shouldRenderFormState'",
+      "replace": "'../../../src/logic/shouldRenderFormState'"
+    },
+    {
+      "find": "'../../logic/shouldSubscribeByName'",
+      "replace": "'../../../src/logic/shouldSubscribeByName'"
+    },
+    {
+      "find": "'../../utils/convertToArrayPayload'",
+      "replace": "'../../../src/utils/convertToArrayPayload'"
+    },
+    {
+      "find": "'../../logic/hasPromiseValidation'",
+      "replace": "'../../../src/logic/hasPromiseValidation'"
+    },
+    {
+      "find": "'../../logic/getResolverOptions'",
+      "replace": "'../../../src/logic/getResolverOptions'"
+    },
+    {
+      "find": "'../../logic/getValidationModes'",
+      "replace": "'../../../src/logic/getValidationModes'"
+    },
+    {
+      "find": "'../../logic/getValueAndMessage'",
+      "replace": "'../../../src/logic/getValueAndMessage'"
+    },
+    {
+      "find": "'../../logic/isNameInFieldArray'",
+      "replace": "'../../../src/logic/isNameInFieldArray'"
+    },
+    {
+      "find": "'../../logic/createFormControl'",
+      "replace": "'../../../src/logic/createFormControl'"
+    },
+    {
+      "find": "'../../logic/getFocusFieldName'",
+      "replace": "'../../../src/logic/getFocusFieldName'"
+    },
+    {
+      "find": "'../../logic/getNodeParentName'",
+      "replace": "'../../../src/logic/getNodeParentName'"
+    },
+    {
+      "find": "'../../logic/schemaErrorLookup'",
+      "replace": "'../../../src/logic/schemaErrorLookup'"
+    },
+    {
+      "find": "'../../utils/extractFormValues'",
+      "replace": "'../../../src/utils/extractFormValues'"
+    },
+    {
+      "find": "'../../utils/isNullOrUndefined'",
+      "replace": "'../../../src/utils/isNullOrUndefined'"
+    },
+    {
+      "find": "'../../utils/isRadioOrCheckbox'",
+      "replace": "'../../../src/utils/isRadioOrCheckbox'"
+    },
+    {
+      "find": "'../../utils/objectHasFunction'",
+      "replace": "'../../../src/utils/objectHasFunction'"
+    },
+    {
+      "find": "'../../logic/getCheckboxValue'",
+      "replace": "'../../../src/logic/getCheckboxValue'"
+    },
+    {
+      "find": "'../../logic/getValidateError'",
+      "replace": "'../../../src/logic/getValidateError'"
+    },
+    {
+      "find": "'../../utils/isMultipleSelect'",
+      "replace": "'../../../src/utils/isMultipleSelect'"
+    },
+    {
+      "find": "'../../logic/getFieldValueAs'",
+      "replace": "'../../../src/logic/getFieldValueAs'"
+    },
+    {
+      "find": "'../../logic/unsetEmptyArray'",
+      "replace": "'../../../src/logic/unsetEmptyArray'"
+    },
+    {
+      "find": "'../../utils/isCheckBoxInput'",
+      "replace": "'../../../src/utils/isCheckBoxInput'"
+    },
+    {
+      "find": "'../../logic/getDirtyFields'",
+      "replace": "'../../../src/logic/getDirtyFields'"
+    },
+    {
+      "find": "'../../logic/skipValidation'",
+      "replace": "'../../../src/logic/skipValidation'"
+    },
+    {
+      "find": "'../../utils/fillEmptyArray'",
+      "replace": "'../../../src/utils/fillEmptyArray'"
+    },
+    {
+      "find": "'../../utils/isEmptyObject'",
+      "replace": "'../../../src/utils/isEmptyObject'"
+    },
+    {
+      "find": "'../../logic/getEventValue'",
+      "replace": "'../../../src/logic/getEventValue'"
+    },
+    {
+      "find": "'../../logic/getFieldValue'",
+      "replace": "'../../../src/logic/getFieldValue'"
+    },
+    {
+      "find": "'../../logic/getRadioValue'",
+      "replace": "'../../../src/logic/getRadioValue'"
+    },
+    {
+      "find": "'../../logic/hasValidation'",
+      "replace": "'../../../src/logic/hasValidation'"
+    },
+    {
+      "find": "'../../logic/validateField'",
+      "replace": "'../../../src/logic/validateField'"
+    },
+    {
+      "find": "'../../utils/createSubject'",
+      "replace": "'../../../src/utils/createSubject'"
+    },
+    {
+      "find": "'../../utils/isHTMLElement'",
+      "replace": "'../../../src/utils/isHTMLElement'"
+    },
+    {
+      "find": "'../../logic/appendErrors'",
+      "replace": "'../../../src/logic/appendErrors'"
+    },
+    {
+      "find": "'../../logic/getRuleValue'",
+      "replace": "'../../../src/logic/getRuleValue'"
+    },
+    {
+      "find": "'../../utils/isRadioInput'",
+      "replace": "'../../../src/utils/isRadioInput'"
+    },
+    {
+      "find": "'../../utils/stringToPath'",
+      "replace": "'../../../src/utils/stringToPath'"
+    },
+    {
+      "find": "'../../utils/cloneObject'",
+      "replace": "'../../../src/utils/cloneObject'"
+    },
+    {
+      "find": "'../../utils/isFileInput'",
+      "replace": "'../../../src/utils/isFileInput'"
+    },
+    {
+      "find": "'../../utils/isPrimitive'",
+      "replace": "'../../../src/utils/isPrimitive'"
+    },
+    {
+      "find": "'../../utils/isUndefined'",
+      "replace": "'../../../src/utils/isUndefined'"
+    },
+    {
+      "find": "'../utils/isPlainObject'",
+      "replace": "'../../src/utils/isPlainObject'"
+    },
+    {
+      "find": "'../../logic/generateId'",
+      "replace": "'../../../src/logic/generateId'"
+    },
+    {
+      "find": "'../../utils/isFunction'",
+      "replace": "'../../../src/utils/isFunction'"
+    },
+    {
+      "find": "'../formStateSubscribe'",
+      "replace": "'../../src/formStateSubscribe.tsrx'"
+    },
+    {
+      "find": "'../../logic/isWatched'",
+      "replace": "'../../../src/logic/isWatched'"
+    },
+    {
+      "find": "'../../utils/deepEqual'",
+      "replace": "'../../../src/utils/deepEqual'"
+    },
+    {
+      "find": "'../../utils/deepMerge'",
+      "replace": "'../../../src/utils/deepMerge'"
+    },
+    {
+      "find": "'../../utils/isBoolean'",
+      "replace": "'../../../src/utils/isBoolean'"
+    },
+    {
+      "find": "'../../useFormContext'",
+      "replace": "'../../../src/useFormContext'"
+    },
+    {
+      "find": "'../../utils/isString'",
+      "replace": "'../../../src/utils/isString'"
+    },
+    {
+      "find": "'../../utils/isObject'",
+      "replace": "'../../../src/utils/isObject'"
+    },
+    {
+      "find": "'../../useController'",
+      "replace": "'../../../src/useController'"
+    },
+    {
+      "find": "'../../useFieldArray'",
+      "replace": "'../../../src/useFieldArray'"
+    },
+    {
+      "find": "'../utils/isFunction'",
+      "replace": "'../../src/utils/isFunction'"
+    },
+    {
+      "find": "'../../utils/compact'",
+      "replace": "'../../../src/utils/compact'"
+    },
+    {
+      "find": "'../../utils/flatten'",
+      "replace": "'../../../src/utils/flatten'"
+    },
+    {
+      "find": "'../../utils/isRegex'",
+      "replace": "'../../../src/utils/isRegex'"
+    },
+    {
+      "find": "'../../utils/prepend'",
+      "replace": "'../../../src/utils/prepend'"
+    },
+    {
+      "find": "'../utils/deepEqual'",
+      "replace": "'../../src/utils/deepEqual'"
+    },
+    {
+      "find": "'../utils/isBoolean'",
+      "replace": "'../../src/utils/isBoolean'"
+    },
+    {
+      "find": "'../../useFormState'",
+      "replace": "'../../../src/useFormState'"
+    },
+    {
+      "find": "'../../utils/append'",
+      "replace": "'../../../src/utils/append'"
+    },
+    {
+      "find": "'../../utils/insert'",
+      "replace": "'../../../src/utils/insert'"
+    },
+    {
+      "find": "'../../utils/remove'",
+      "replace": "'../../../src/utils/remove'"
+    },
+    {
+      "find": "'../../utils/update'",
+      "replace": "'../../../src/utils/update'"
+    },
+    {
+      "find": "'../useFormContext'",
+      "replace": "'../../src/useFormContext'"
+    },
+    {
+      "find": "'../../utils/unset'",
+      "replace": "'../../../src/utils/unset'"
+    },
+    {
+      "find": "'../../utils/sleep'",
+      "replace": "'../../../src/utils/sleep'"
+    },
+    {
+      "find": "'../../utils/isKey'",
+      "replace": "'../../../src/utils/isKey'"
+    },
+    {
+      "find": "'../useFieldArray'",
+      "replace": "'../../src/useFieldArray'"
+    },
+    {
+      "find": "'../../utils/noop'",
+      "replace": "'../../../src/utils/noop'"
+    },
+    {
+      "find": "'../useController'",
+      "replace": "'../../src/useController'"
+    },
+    {
+      "find": "'../../controller'",
+      "replace": "'../../../src/controller.tsrx'"
+    },
+    {
+      "find": "'../../utils/live'",
+      "replace": "'../../../src/utils/live'"
+    },
+    {
+      "find": "'../../utils/move'",
+      "replace": "'../../../src/utils/move'"
+    },
+    {
+      "find": "'../../utils/swap'",
+      "replace": "'../../../src/utils/swap'"
+    },
+    {
+      "find": "'../../constants'",
+      "replace": "'../../../src/constants'"
+    },
+    {
+      "find": "'../useFormState'",
+      "replace": "'../../src/useFormState'"
+    },
+    {
+      "find": "'../../utils/get'",
+      "replace": "'../../../src/utils/get'"
+    },
+    {
+      "find": "'../../utils/set'",
+      "replace": "'../../../src/utils/set'"
+    },
+    {
+      "find": "'../utils/sleep'",
+      "replace": "'../../src/utils/sleep'"
+    },
+    {
+      "find": "'../../useWatch'",
+      "replace": "'../../../src/useWatch'"
+    },
+    {
+      "find": "'../controller'",
+      "replace": "'../../src/controller.tsrx'"
+    },
+    {
+      "find": "'../utils/noop'",
+      "replace": "'../../src/utils/noop'"
+    },
+    {
+      "find": "'../../useForm'",
+      "replace": "'../../../src/useForm'"
+    },
+    {
+      "find": "'../constants'",
+      "replace": "'../../src/constants'"
+    },
+    {
+      "find": "'../useWatch'",
+      "replace": "'../../src/useWatch'"
+    },
+    {
+      "find": "'../../types'",
+      "replace": "'../../../src/types'"
+    },
+    {
+      "find": "'../useForm'",
+      "replace": "'../../src/useForm'"
+    },
+    {
+      "find": "'../types'",
+      "replace": "'../../src/types'"
+    },
+    {
+      "find": "'../watch'",
+      "replace": "'../../src/watch.tsrx'"
+    },
+    {
+      "find": "'../form'",
+      "replace": "'../../src/form.tsrx'"
+    },
+    {
+      "find": "'../..'",
+      "replace": "'../../../src'"
+    },
+    {
+      "find": "jest.",
+      "replace": "vi."
+    },
+    {
+      "find": "fireEvent.change(",
+      "replace": "fireEvent.input("
+    },
+    {
+      "find": "fireEvent.focusOut(",
+      "replace": "fireEvent.blur("
+    }
+  ],
   "files": [
     {
       "path": "LICENSE",
@@ -1262,5 +1700,5 @@
       "size": 757
     }
   ],
-  "fingerprint": "e755b8517b2d70ed0fe0273343af7cd158007eb6d02dccd02fb77d732cb69cca"
+  "fingerprint": "910a3d1b26cdea4d43d9869e67b41a02e8b809084d040bc8ba336901a4a9206e"
 }

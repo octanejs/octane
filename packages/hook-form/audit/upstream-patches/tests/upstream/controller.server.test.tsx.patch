@@ -1,0 +1,11 @@
+diff --git a/tests/upstream/controller.server.test.tsx b/tests/upstream/controller.server.test.tsx
+--- a/tests/upstream/controller.server.test.tsx
++++ b/tests/upstream/controller.server.test.tsx
+@@ -22,6 +22,6 @@ describe('Controller with SSR', () => {
+       );
+     };
+ 
+-    renderToString(<Component />);
++    renderToStaticMarkup(Component);
+   });
+ });

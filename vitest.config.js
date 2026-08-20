@@ -2454,7 +2454,7 @@ export default defineConfig({
 					clearMocks: true,
 					mockReset: true,
 					restoreMocks: true,
-					globals: false,
+					globals: true,
 				},
 				// hook-form's `.ts` hooks are auto-slotted (same as redux); the
 				// testing-library the ported suite mounts through is NOT (its harness
@@ -2528,7 +2528,7 @@ export default defineConfig({
 					name: 'hook-form-server',
 					include: ['packages/hook-form/tests/**/*.server.test.tsx'],
 					environment: 'node',
-					globals: false,
+					globals: true,
 				},
 				plugins: [octane()],
 				resolve: {

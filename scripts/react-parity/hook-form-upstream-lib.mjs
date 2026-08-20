@@ -1,14 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 
 import { extractTestCases } from './inventory-lib.mjs';
 
 const UPSTREAM_TEST_ROOT = 'packages/hook-form/upstream/src/__tests__';
 const PORTED_TEST_ROOT = 'packages/hook-form/tests/upstream';
-const PORTED_INVENTORY_PATH = 'packages/hook-form/audit/upstream-adapted.SHA256SUMS';
 
 const TITLE_REPLACEMENTS = new Map([
 	[
@@ -62,17 +61,21 @@ function testFiles(root) {
 	);
 }
 
-export function renderHookFormAdaptedInventory(repoRoot) {
-	const portedRoot = resolve(repoRoot, PORTED_TEST_ROOT);
-	return `${filesBelow(portedRoot)
-		.map((file) => {
-			const digest = createHash('sha256').update(readFileSync(file)).digest('hex');
-			return `${digest}  ${portableRelative(portedRoot, file)}`;
-		})
-		.join('\n')}\n`;
-}
-
 export function verifyHookFormUpstream(repoRoot, { lock = true } = {}) {
+	// The adapted suite is regenerated (lock rewrites plus committed patches);
+	// materialize it when absent so verification works on a clean checkout.
+	if (lock && !existsSync(resolve(repoRoot, PORTED_TEST_ROOT))) {
+		execFileSync(
+			process.execPath,
+			[
+				fileURLToPath(new URL('../react-port/materialize.mjs', import.meta.url)),
+				'run',
+				'--package-dir',
+				resolve(repoRoot, 'packages/hook-form'),
+			],
+			{ stdio: 'pipe' },
+		);
+	}
 	// The committed upstream/ tree verifies offline against the upstream git
 	// blob shas in audit/upstream.lock.json. The registration checks below stay
 	// independent so semantic drift fails closed even without the lock layer
@@ -135,11 +138,6 @@ export function verifyHookFormUpstream(repoRoot, { lock = true } = {}) {
 		}
 		upstreamCases += upstream.length;
 		portedCases += ported.length;
-	}
-	const expectedPortedInventory = readFileSync(resolve(repoRoot, PORTED_INVENTORY_PATH), 'utf8');
-	const actualPortedInventory = renderHookFormAdaptedInventory(repoRoot);
-	if (actualPortedInventory !== expectedPortedInventory) {
-		throw new Error('react-hook-form adapted test inventory drifted; review and record the change');
 	}
 
 	return {

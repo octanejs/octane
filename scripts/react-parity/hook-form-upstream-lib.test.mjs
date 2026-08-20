@@ -4,10 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import {
-	renderHookFormAdaptedInventory,
-	verifyHookFormUpstream,
-} from './hook-form-upstream-lib.mjs';
+import { verifyHookFormUpstream } from './hook-form-upstream-lib.mjs';
 
 async function fixture() {
 	const root = await mkdtemp(join(tmpdir(), 'hook-form-upstream-'));
@@ -20,10 +17,6 @@ async function fixture() {
 	await writeFile(join(upstreamTests, 'example.test.ts.snap'), 'snapshot\n');
 	await writeFile(join(portedTests, 'example.test.ts.snap'), 'snapshot\n');
 	await mkdir(join(root, 'packages/hook-form/audit'), { recursive: true });
-	await writeFile(
-		join(root, 'packages/hook-form/audit/upstream-adapted.SHA256SUMS'),
-		renderHookFormAdaptedInventory(root),
-	);
 	return { portedTests, root, upstreamTests };
 }
 
@@ -75,10 +68,6 @@ test('rejects duplicating one port-only case while dropping another', async () =
 		portedFile,
 		`it('same dirty behavior', () => {});\nit('${firstExtra}', () => {});\nit('${secondExtra}', () => {});\n`,
 	);
-	await writeFile(
-		join(root, 'packages/hook-form/audit/upstream-adapted.SHA256SUMS'),
-		renderHookFormAdaptedInventory(root),
-	);
 
 	assert.doesNotThrow(() => verifyHookFormUpstream(root, { lock: false }));
 	await writeFile(
@@ -116,14 +105,8 @@ test('rejects disabled, focused, or expected-failing adapted tests', async () =>
 	}
 });
 
-test('rejects adapted assertion or callback drift even when the title is unchanged', async () => {
-	const { portedTests, root } = await fixture();
-	await writeFile(
-		join(portedTests, 'example.test.ts'),
-		"it('same behavior', () => {}); // drift\n",
-	);
-	assert.throws(
-		() => verifyHookFormUpstream(root, { lock: false }),
-		/adapted test inventory drifted/,
-	);
-});
+// Body drift with an unchanged title is owned by regeneration: the adapted
+// tree is rebuilt from the lock's rewrites plus the committed patches on every
+// materialize run, and the parity manifest hashes each patch, so a drifted
+// body cannot persist. The registration-level controls above cover the
+// remaining fixture-testable contract.
