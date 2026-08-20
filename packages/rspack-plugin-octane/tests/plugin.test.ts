@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolve } from 'node:path';
+import { util } from '@rspack/core';
 
 const mocks = vi.hoisted(() => ({
 	createOctaneCompiler: vi.fn(),
@@ -37,12 +38,23 @@ function createCompiler(target: unknown = 'node') {
 			module: { rules: [] as any[] },
 		},
 		hooks: {
+			afterResolvers: hook(),
 			invalid: hook(),
 			watchRun: hook(),
 			thisCompilation: hook(),
 		},
-		webpack: { DefinePlugin },
+		resolverFactory: {
+			get: vi.fn(() => ({
+				resolveSync: (_context: object, _root: string, request: string) => request,
+			})),
+		},
+		webpack: { DefinePlugin, util },
 	};
+}
+
+function applyPlugin(plugin: OctaneRspackPlugin, compiler: ReturnType<typeof createCompiler>) {
+	plugin.apply(compiler as any);
+	compiler.hooks.afterResolvers.call(compiler);
 }
 
 describe('OctaneRspackPlugin', () => {
@@ -68,7 +80,7 @@ describe('OctaneRspackPlugin', () => {
 	it('configures server compilation, runtime resolution, rules, and discovery watching', () => {
 		const compiler = createCompiler();
 		const plugin = new OctaneRspackPlugin();
-		plugin.apply(compiler as any);
+		applyPlugin(plugin, compiler);
 
 		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
 			expect.objectContaining({ root: '/project' }),
@@ -124,7 +136,7 @@ describe('OctaneRspackPlugin', () => {
 		['a custom worker limit', { maxWorkers: 2 }, 2],
 	] as const)('compiles modules in parallel with %s', (_label, parallel, maxWorkers) => {
 		const compiler = createCompiler('web');
-		new OctaneRspackPlugin(parallel === undefined ? {} : { parallel }).apply(compiler as any);
+		applyPlugin(new OctaneRspackPlugin(parallel === undefined ? {} : { parallel }), compiler);
 
 		const use = compiler.options.module.rules[0].use;
 		expect(use).toHaveLength(2);
@@ -140,7 +152,7 @@ describe('OctaneRspackPlugin', () => {
 
 	it('retains the standalone loader pipeline when parallel compilation is disabled', () => {
 		const compiler = createCompiler('web');
-		new OctaneRspackPlugin({ parallel: false }).apply(compiler as any);
+		applyPlugin(new OctaneRspackPlugin({ parallel: false }), compiler);
 
 		expect(compiler.options.module.rules[0].use).toEqual([
 			{
@@ -178,7 +190,7 @@ describe('OctaneRspackPlugin', () => {
 			},
 			transpile: false,
 		});
-		plugin.apply(compiler as any);
+		applyPlugin(plugin, compiler);
 
 		expect(mocks.resolveRuntimeRequest).not.toHaveBeenCalled();
 		const aliases = compiler.options.resolve.alias as Record<string, string>;
@@ -229,7 +241,7 @@ describe('OctaneRspackPlugin', () => {
 
 	it.each([true, false])('forwards strong: %s to discovery and module compilation', (strong) => {
 		const compiler = createCompiler('web');
-		new OctaneRspackPlugin({ strong }).apply(compiler as any);
+		applyPlugin(new OctaneRspackPlugin({ strong }), compiler);
 
 		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
 			expect.objectContaining({ root: '/project', strong }),
@@ -258,7 +270,7 @@ describe('OctaneRspackPlugin', () => {
 			},
 			transpile: false,
 		});
-		plugin.apply(compiler as any);
+		applyPlugin(plugin, compiler);
 
 		expect(mocks.createOctaneCompiler).toHaveBeenCalledTimes(2);
 		expect(mocks.createOctaneCompiler).toHaveBeenNthCalledWith(
@@ -331,7 +343,7 @@ describe('OctaneRspackPlugin', () => {
 				},
 			},
 		});
-		plugin.apply(compiler as any);
+		applyPlugin(plugin, compiler);
 
 		const compilation = { fileDependencies: new Set(), missingDependencies: new Set() };
 		compiler.hooks.thisCompilation.call(compilation);
@@ -366,46 +378,64 @@ describe('OctaneRspackPlugin', () => {
 		const layeredBackground = createCachedCompiler();
 		const layeredMain = createCachedCompiler();
 
-		new OctaneRspackPlugin().apply(dom as any);
-		new OctaneRspackPlugin({
-			renderers: {
-				registry: { object: '/src/object-renderer.js' },
-				default: 'object',
-			},
-		}).apply(object as any);
-		new OctaneRspackPlugin({
-			renderers: {
-				registry: { object: '/src/object-renderer.js' },
-				default: 'object',
-				boundaries: {
-					'/src/object-boundaries.js': {
-						Canvas: {
-							ownerRenderer: 'dom',
-							childRenderer: 'object',
-							prop: 'children',
+		applyPlugin(new OctaneRspackPlugin(), dom);
+		applyPlugin(
+			new OctaneRspackPlugin({
+				renderers: {
+					registry: { object: '/src/object-renderer.js' },
+					default: 'object',
+				},
+			}),
+			object,
+		);
+		applyPlugin(
+			new OctaneRspackPlugin({
+				renderers: {
+					registry: { object: '/src/object-renderer.js' },
+					default: 'object',
+					boundaries: {
+						'/src/object-boundaries.js': {
+							Canvas: {
+								ownerRenderer: 'dom',
+								childRenderer: 'object',
+								prop: 'children',
+							},
 						},
 					},
 				},
-			},
-		}).apply(boundedObject as any);
-		new OctaneRspackPlugin({
-			runtime: '@octanejs/lynx/renderer',
-			universalRuntime: { runtime: 'lynx', thread: 'background' },
-		}).apply(nativeBackground as any);
-		new OctaneRspackPlugin({
-			runtime: '@octanejs/lynx/renderer',
-			universalRuntime: { runtime: 'lynx', thread: 'main-thread' },
-		}).apply(nativeMain as any);
-		new OctaneRspackPlugin({
-			layerSpecializations: {
-				main: { universalRuntime: { runtime: 'lynx', thread: 'background' } },
-			},
-		}).apply(layeredBackground as any);
-		new OctaneRspackPlugin({
-			layerSpecializations: {
-				main: { universalRuntime: { runtime: 'lynx', thread: 'main-thread' } },
-			},
-		}).apply(layeredMain as any);
+			}),
+			boundedObject,
+		);
+		applyPlugin(
+			new OctaneRspackPlugin({
+				runtime: '@octanejs/lynx/renderer',
+				universalRuntime: { runtime: 'lynx', thread: 'background' },
+			}),
+			nativeBackground,
+		);
+		applyPlugin(
+			new OctaneRspackPlugin({
+				runtime: '@octanejs/lynx/renderer',
+				universalRuntime: { runtime: 'lynx', thread: 'main-thread' },
+			}),
+			nativeMain,
+		);
+		applyPlugin(
+			new OctaneRspackPlugin({
+				layerSpecializations: {
+					main: { universalRuntime: { runtime: 'lynx', thread: 'background' } },
+				},
+			}),
+			layeredBackground,
+		);
+		applyPlugin(
+			new OctaneRspackPlugin({
+				layerSpecializations: {
+					main: { universalRuntime: { runtime: 'lynx', thread: 'main-thread' } },
+				},
+			}),
+			layeredMain,
+		);
 
 		expect((dom.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
 		expect((object.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
@@ -424,14 +454,14 @@ describe('OctaneRspackPlugin', () => {
 		// requireDirective flips which modules compile vs pass through, so a
 		// toggle must never reuse cached transform results.
 		const directive = createCachedCompiler();
-		new OctaneRspackPlugin({ requireDirective: true }).apply(directive as any);
+		applyPlugin(new OctaneRspackPlugin({ requireDirective: true }), directive);
 		expect((directive.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
 		expect((directive.options as any).cache.version).not.toBe((dom.options as any).cache.version);
 
 		const strong = createCachedCompiler();
 		const explicitCompatibility = createCachedCompiler();
-		new OctaneRspackPlugin({ strong: true }).apply(strong as any);
-		new OctaneRspackPlugin({ strong: false }).apply(explicitCompatibility as any);
+		applyPlugin(new OctaneRspackPlugin({ strong: true }), strong);
+		applyPlugin(new OctaneRspackPlugin({ strong: false }), explicitCompatibility);
 		expect((strong.options as any).cache.version).not.toBe((dom.options as any).cache.version);
 		expect((explicitCompatibility.options as any).cache.version).toBe(
 			(dom.options as any).cache.version,
@@ -440,7 +470,7 @@ describe('OctaneRspackPlugin', () => {
 
 	it('resolves a relative root from the Rspack context', () => {
 		const compiler = createCompiler('web');
-		new OctaneRspackPlugin({ root: 'apps/site' }).apply(compiler as any);
+		applyPlugin(new OctaneRspackPlugin({ root: 'apps/site' }), compiler);
 		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
 			expect.objectContaining({ root: '/project/apps/site' }),
 		);
