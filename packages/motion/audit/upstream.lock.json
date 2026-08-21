@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "framer-motion",
+    "version": "12.42.2",
+    "repository": {
+      "owner": "motiondivision",
+      "repo": "motion",
+      "subdirectory": "packages/framer-motion"
+    },
+    "commit": "40e8756c63b258c9dd07de9501cb788410eefb02",
+    "integrity": "sha512-5XY9luDiu0oHfHBjpDthFMh0ES+122w6p/papSJBweMkO8Sn+PW2QaEgRblQBpWFnuvZS5qvarpt/hO2pjGmnw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "1bf0dc3f7727723e5a032ed12164a47cf92c05204cb1a3485f123c24e2833ed1"
+      },
+      {
+        "path": "packages/framer-motion/LICENSE.md",
+        "sha256": "5ff46083b88563822b0560dd6221ab89d2f74bc97a52d4c97a75020fd62c6f32"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "src/animation/animators/__tests__/utils.ts",
+    "src/gestures/__tests__/utils.ts",
+    "src/jest.setup.tsx",
+    "src/value/__tests__"
+  ],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "src/animation/animators/__tests__/utils.ts",
+      "gitBlob": "e5fc9e9846fc10434c45bcb72bc8036daaa7a301",
+      "size": 932
+    },
+    {
+      "path": "src/gestures/__tests__/utils.ts",
+      "gitBlob": "bc6bc0b6ab74b275504739accc5ca7f0028814ef",
+      "size": 318
+    },
+    {
+      "path": "src/jest.setup.tsx",
+      "gitBlob": "7e46f504973dab5c4ff2def40d9c2476acd0a25a",
+      "size": 3366
+    },
+    {
+      "path": "src/value/__tests__/motion-value.test.ts",
+      "gitBlob": "b392ba71118a62e0732543bf4f2b722b9798beb8",
+      "size": 1855
+    },
+    {
+      "path": "src/value/__tests__/unwrap-value.test.ts",
+      "gitBlob": "ebf0b72cb27236d5745c9c35b8846714fd7b96d4",
+      "size": 652
+    },
+    {
+      "path": "src/value/__tests__/use-follow-value.test.tsx",
+      "gitBlob": "35e7dd9980e972d754d8d9b1382e4720a72153f5",
+      "size": 10777
+    },
+    {
+      "path": "src/value/__tests__/use-motion-template.test.tsx",
+      "gitBlob": "acac94d8a3780b5d79f8c1fd33b86a4bc46a185d",
+      "size": 3034
+    },
+    {
+      "path": "src/value/__tests__/use-motion-value.test.tsx",
+      "gitBlob": "8f2301c21ace1a5e9bf5661223ceed7aef5c995b",
+      "size": 2155
+    },
+    {
+      "path": "src/value/__tests__/use-scroll.test.tsx",
+      "gitBlob": "fd81ee88d440f7e79b5a672ac976640c53f8aca7",
+      "size": 4119
+    },
+    {
+      "path": "src/value/__tests__/use-spring.test.tsx",
+      "gitBlob": "1300c7d43608320a3cb6e3ef6d61a59e954c36b9",
+      "size": 10315
+    },
+    {
+      "path": "src/value/__tests__/use-transform.test.tsx",
+      "gitBlob": "c565eb7ac2a47992908df3028b05199dc6146371",
+      "size": 15834
+    },
+    {
+      "path": "src/value/__tests__/use-velocity.test.tsx",
+      "gitBlob": "4713647b244d662dc7559e9401babbc8157b2eb9",
+      "size": 4856
+    }
+  ],
+  "fingerprint": "d60de4a3184f223e0c64bc5e0c59fa4b2bbbd9577aa7a45fa8da9f7d72db62cd"
+}

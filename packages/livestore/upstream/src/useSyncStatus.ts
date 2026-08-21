@@ -32,4 +32,3 @@ export const useSyncStatus = (options: { store: Store<any> }): SyncStatus => {
 
   return status
 }
-

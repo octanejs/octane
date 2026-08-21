@@ -74,13 +74,18 @@ import { verifyVaulAdaptedRuntimeStructure } from './vaul-runtime-lib.mjs';
 import { verifyVaulUpstream } from './vaul-upstream-lib.mjs';
 import { verifyVisxTestClassifications } from './visx-classifications-lib.mjs';
 import { verifyVisxTypes } from './visx-types-lib.mjs';
+import { verifyXstateStoreTypes, verifyXstateTypes } from './xstate-types-lib.mjs';
 import { verifyZagTestClassifications } from './zag-classifications-lib.mjs';
 import { verifyZagRuntimeCrosswalk } from './zag-runtime-crosswalk.mjs';
 import { verifyZagTypes } from './zag-types-lib.mjs';
 import { parseShard } from './shard-lib.mjs';
 import { loadRequiredVitestLanes } from './vitest-batch-lib.mjs';
 import { validateVitestContracts } from './vitest-contract.mjs';
-import { verifyZagUpstream } from '../../packages/zag/scripts/verify-upstream.mjs';
+import {
+	discoverMaterializedUpstreamPackages,
+	materializeUpstreamEvidence,
+	verifyMaterializedUpstreamEvidence,
+} from './materialized-upstream-lib.mjs';
 import baseVitestConfig from '../../vitest.config.js';
 import shardedVitestConfig from '../../vitest.ci-sharded.config.js';
 
@@ -113,6 +118,11 @@ const BINDING_MANIFESTS = readdirSync(path.join(REPO, 'packages'), { withFileTyp
 	.map((entry) => `packages/${entry.name}/audit/react-parity.json`)
 	.filter((manifest) => existsSync(path.join(REPO, manifest)))
 	.sort();
+// Lock-pinned packages regenerate their pristine/adapted upstream trees from
+// audit/upstream.lock.json instead of committing the bytes. Materialize them
+// before any verifier, contract walk, or lane reads those paths; an already
+// verified tree is reused offline.
+materializeUpstreamEvidence(REPO);
 const HARNESS_PATH = path.join(REPO, 'scripts/react-parity/harness.mjs');
 // Vitest owns the runner until its parity-wide batch exits. The remaining
 // runners are internally single-process: TypeScript/Node use one process, Jest
@@ -206,7 +216,11 @@ await capture('@octanejs/colorful type evidence', () => verifyReactColorfulTypes
 await capture('@octanejs/colorful test classifications', () =>
 	verifyReactColorfulTestClassifications(REPO),
 );
-await capture('zag upstream evidence', () => verifyZagUpstream(path.join(REPO, 'packages/zag')));
+for (const materializedPackage of discoverMaterializedUpstreamPackages(REPO)) {
+	await capture(`${materializedPackage} materialized upstream evidence`, () =>
+		verifyMaterializedUpstreamEvidence(REPO, materializedPackage),
+	);
+}
 await capture('zag type evidence', () => verifyZagTypes(REPO));
 await capture('zag test classifications', () => verifyZagTestClassifications(REPO));
 await capture('zag runtime inventory crosswalk', () => verifyZagRuntimeCrosswalk(REPO));
@@ -272,6 +286,8 @@ await capture('react-draggable test classifications', () =>
 await capture('@octanejs/popper type evidence', () => verifyPopperTypes(REPO));
 await capture('@octanejs/popper test classifications', () => verifyPopperTestClassifications(REPO));
 await capture('pdf test classifications', () => verifyPdfTestClassifications(REPO));
+await capture('@octanejs/xstate type evidence', () => verifyXstateTypes(REPO));
+await capture('@octanejs/xstate-store type evidence', () => verifyXstateStoreTypes(REPO));
 
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components.

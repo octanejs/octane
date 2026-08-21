@@ -27,6 +27,8 @@ export const KNOWN_BINDINGS = {
 	'@rainbow-me/rainbowkit': '@octanejs/rainbowkit',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
 	'@tanstack/react-store': '@octanejs/tanstack-store',
+	'@xstate/react': '@octanejs/xstate',
+	'@xstate/store-react': '@octanejs/xstate-store',
 	'@tanstack/react-router-ssr-query': '@octanejs/tanstack-router-ssr-query',
 	'@tanstack/react-hotkeys': '@octanejs/tanstack-hotkeys',
 	'@tanstack/react-pacer': '@octanejs/tanstack-pacer',
@@ -183,6 +185,7 @@ export const KNOWN_VANILLA_CORES = {
 	'@dnd-kit/react': '@dnd-kit/dom',
 	'embla-carousel-react': 'embla-carousel',
 	'@xstate/react': 'xstate',
+	'@xstate/store-react': '@xstate/store',
 	'react-redux': 'redux',
 	'@reduxjs/toolkit': 'redux',
 	'react-i18next': 'i18next',
@@ -264,11 +267,11 @@ export const REACT_API_MAP = {
 		note: "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not).",
 	},
 	Component: {
-		status: 'unsupported',
+		status: 'rewrite',
 		note: 'No class components. Rewrite as a function component.',
 	},
 	PureComponent: {
-		status: 'unsupported',
+		status: 'rewrite',
 		note: 'No class components. Rewrite as a function component with memo.',
 	},
 	StrictMode: {
@@ -277,7 +280,7 @@ export const REACT_API_MAP = {
 	},
 	Profiler: { status: 'unsupported', note: 'Not present.' },
 	SuspenseList: { status: 'unsupported', note: 'Not present.' },
-	findDOMNode: { status: 'unsupported', note: 'Removed in React 19 too. Use refs.' },
+	findDOMNode: { status: 'rewrite', note: 'Removed in React 19 too. Use refs.' },
 	renderToString: {
 		status: 'rewrite',
 		note: 'Use renderToString() from octane/server (sync) or prerender() from octane/static (async, awaits Suspense); both return { html, css }.',
@@ -496,8 +499,8 @@ function apiRows(totals) {
 }
 
 function verdictFor(rows, classComponents) {
-	if (classComponents || rows.some((row) => row.status === 'unsupported')) return 'needs-rework';
-	if (rows.some((row) => row.status === 'rewrite' || row.status === 'partial')) {
+	if (rows.some((row) => row.status === 'unsupported')) return 'needs-rework';
+	if (classComponents || rows.some((row) => row.status === 'rewrite' || row.status === 'partial')) {
 		return 'bridgeable-with-rewrites';
 	}
 	return 'bridgeable';

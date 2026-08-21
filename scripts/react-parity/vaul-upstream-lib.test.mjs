@@ -14,6 +14,15 @@ function fixtureRoot() {
 	const root = mkdtempSync(join(tmpdir(), 'vaul-upstream-'));
 	const packageDir = join(root, 'packages/vaul');
 	cpSync(upstreamRoot, join(packageDir, 'upstream'), { recursive: true });
+	cpSync(
+		join(repoRoot, 'packages/vaul/audit/provenance.json'),
+		join(packageDir, 'audit/provenance.json'),
+	);
+	cpSync(
+		join(repoRoot, 'packages/vaul/audit/upstream.lock.json'),
+		join(packageDir, 'audit/upstream.lock.json'),
+	);
+	cpSync(join(repoRoot, 'packages/vaul/LICENSE.upstream'), join(packageDir, 'LICENSE.upstream'));
 	return root;
 }
 
@@ -30,7 +39,7 @@ test('rejects vendored byte drift', function rejectsByteDrift() {
 		writeFileSync(target, `${readFileSync(target, 'utf8')}\n// drift\n`);
 		assert.throws(function mutate() {
 			verifyVaulUpstream(root);
-		}, /Vendored byte drift|inventory differs/);
+		}, /drifted from audit\/upstream\.lock\.json/);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -40,9 +49,14 @@ test('rejects a missing required Playwright artifact', function rejectsMissingAr
 	const root = fixtureRoot();
 	try {
 		rmSync(join(root, 'packages/vaul/upstream/playwright.config.ts'));
+		// The lock layer catches the removal first; the requiredFiles contract
+		// must also fail closed on its own.
 		assert.throws(function remove() {
 			verifyVaulUpstream(root);
-		}, /inventory differs|Missing upstream test artifact/);
+		}, /drifted from audit\/upstream\.lock\.json/);
+		assert.throws(function removeWithoutLock() {
+			verifyVaulUpstream(root, { lock: false });
+		}, /required evidence missing: upstream\/playwright\.config\.ts/);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -54,7 +68,10 @@ test('rejects a missing required demo app page', function rejectsMissingAppPage(
 		rmSync(join(root, 'packages/vaul/upstream/test/src/app/page.tsx'));
 		assert.throws(function remove() {
 			verifyVaulUpstream(root);
-		}, /inventory differs|Missing upstream test artifact/);
+		}, /drifted from audit\/upstream\.lock\.json/);
+		assert.throws(function removeWithoutLock() {
+			verifyVaulUpstream(root, { lock: false });
+		}, /required evidence missing: upstream\/test\/src\/app\/page\.tsx/);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

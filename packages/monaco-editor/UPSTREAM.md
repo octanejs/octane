@@ -5,7 +5,11 @@ This port targets `@monaco-editor/react@4.7.0` at git commit
 
 - repository: `https://github.com/suren-atoyan/monaco-react`
 - package version: `4.7.0`
-- vendored commit: `eb120e66378471315620fe5339b73ba003f199ad`
+- vendored commit: `eb120e66378471315620fe5339b73ba003f199ad`, pinned by
+  `audit/upstream.lock.json` (each committed `upstream/` file verifies offline
+  against its upstream git blob sha: `pnpm react-port:materialize run --check
+  --package-dir packages/monaco-editor`); the upstream MIT license is retained
+  byte-exact as `LICENSE.upstream`, hash-matched to the lock
 - loader: `@monaco-editor/loader@1.7.0` (framework-neutral; imported, not vendored)
 - monaco oracle: `monaco-editor@0.55.1` (catalog / Echo validation pin)
 - license: MIT, Copyright (c) 2018 Suren Atoyan
@@ -29,7 +33,7 @@ pnpm --filter @octanejs/monaco-editor parity:generate
 | `audit/type-transformations.json` | Permitted type-lane transforms ledger |
 | `audit/test-classifications.json` | Disposition for every test and typetest file |
 
-Pristine runtime specs run against **React 19.2.7** via `tests/upstream-pristine.vitest.config.ts` and `scripts/run-pristine-upstream.mjs`.
+Pristine runtime specs run against **React 19.2.7** via `tests/upstream-pristine.vitest.config.ts` via the shared `scripts/react-parity/run-pristine.mjs` CLI.
 
 ## Immutable React oracle
 

@@ -20,7 +20,11 @@ type Upstream = typeof import('@visx/visx');
 // their return the same way (multi-parameter render functions, e.g. Pie's
 // `centroid`, keep their parameter tuple exact and collapse only the return).
 // Everything else must match exactly.
-type ComponentProps<C> = C extends (props: infer P) => any ? P : never;
+type ComponentProps<C> = C extends (props: infer P) => any
+	? P
+	: C extends new (props: infer P, ...args: any[]) => any
+		? P
+		: never;
 type IsUnknown<T> = unknown extends T ? ([T] extends [{}] ? false : true) : false;
 type IsRenderable<T> = IsUnknown<T> extends true ? true : Equal<T, import('react').ReactNode>;
 
@@ -667,7 +671,19 @@ type _CircleProps = Assert<
 type _SplitLinePathPropsShape = Assert<
 	PropsShapeEqual<Local['Shape']['SplitLinePath'], Upstream['Shape']['SplitLinePath']>
 >;
-type _Text = Assert<Equal<Local['Text'], Upstream['Text']>>;
+type TextCarveouts = 'Text' | 'useText';
+type _Text = Assert<
+	Equal<Omit<Local['Text'], TextCarveouts>, Omit<Upstream['Text'], TextCarveouts>>
+>;
+type _TextProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Text']['Text'], Upstream['Text']['Text']>
+>;
+type _UseTextProps = Assert<
+	AttributeBagNormalizedPropsEqual<Local['Text']['useText'], Upstream['Text']['useText']>
+>;
+type _UseTextReturn = Assert<
+	Equal<ReturnType<Local['Text']['useText']>, ReturnType<Upstream['Text']['useText']>>
+>;
 // Threshold nests the bag inside `aboveAreaProps` / `belowAreaProps` and, like
 // the clip-paths above, generates a fallback `id`, so it holds one-directionally.
 // It is the module's only component; the module assert stays as a guard for
@@ -691,8 +707,14 @@ type _TooltipPosition = Assert<
 type _TooltipStyles = Assert<
 	Equal<Local['Tooltip']['defaultStyles'], Upstream['Tooltip']['defaultStyles']>
 >;
-type _TooltipWithBounds = Assert<
-	Equal<Local['Tooltip']['TooltipWithBounds'], Upstream['Tooltip']['TooltipWithBounds']>
+type _TooltipWithBoundsProps = Assert<
+	AttributeBagNormalizedPropsEqual<
+		Local['Tooltip']['TooltipWithBounds'],
+		Upstream['Tooltip']['TooltipWithBounds']
+	>
+>;
+type _TooltipWithBoundsReturn = Assert<
+	Equal<ReturnType<Local['Tooltip']['TooltipWithBounds']>, import('octane').ElementDescriptor>
 >;
 // VoronoiPolygon spreads an octane attribute bag.
 type _Voronoi = Assert<

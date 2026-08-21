@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/react-map-gl",
-  "version": "0.0.13",
+  "version": "0.0.15",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -26,6 +26,7 @@
   "files": [
     "src",
     "LICENSE",
+    "LICENSE.upstream",
     "README.md",
     "UPSTREAM.md"
   ],

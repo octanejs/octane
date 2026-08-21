@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@tanstack/react-store",
+    "version": "0.11.0",
+    "repository": {
+      "owner": "TanStack",
+      "repo": "store",
+      "subdirectory": "packages/react-store"
+    },
+    "commit": "83e2978f627ec53616249b2bda1037749b18b6ab",
+    "integrity": "sha512-tX4YXh3PDkmpvGQWkWqKpzs/MSqbtuwY9dWdWhtV9Q50PmO+jOkUKIWIX4G85dwt7lxdHLXsiaEKPdKmC8F41w=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "cb4a7917af22bd56340e877f10a5c5aa4fded7af2459162630ff7fcb48bb45c7"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["src", "tests"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "src/_useStore.ts",
+      "gitBlob": "47a9d20286b02a157d4fdf8f251fcb80fbfd17bd",
+      "size": 1404
+    },
+    {
+      "path": "src/createStoreContext.tsx",
+      "gitBlob": "ff0c1b0daee94ea7c212e0e143e84e4bb773d9ff",
+      "size": 2276
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "6fd183c97c833922d025aa9ef414f16103d668d6",
+      "size": 409
+    },
+    {
+      "path": "src/useAtom.ts",
+      "gitBlob": "6c16f3484de0c12e803bb4323b78d1b91501dc3d",
+      "size": 628
+    },
+    {
+      "path": "src/useCreateAtom.ts",
+      "gitBlob": "eea0258eb815b4067791f1b8e3005dc7b8950672",
+      "size": 1111
+    },
+    {
+      "path": "src/useCreateStore.ts",
+      "gitBlob": "30db158511e6e50e798bc91551fbb72d1c63ee94",
+      "size": 1549
+    },
+    {
+      "path": "src/useSelector.ts",
+      "gitBlob": "0f2593f0564d33229f6a1c94ecce67e7cbe1e9fe",
+      "size": 1743
+    },
+    {
+      "path": "src/useStore.ts",
+      "gitBlob": "8261620dbc3f032cac08fedd9bf19e68ca42d892",
+      "size": 619
+    },
+    {
+      "path": "tests/index.test.tsx",
+      "gitBlob": "60369d3f04296b6fd348a7fd2197c1eb4c904bb4",
+      "size": 20377
+    },
+    {
+      "path": "tests/test-setup.ts",
+      "gitBlob": "33e431061a5fa8e0b076ada22a8de2a527688d8d",
+      "size": 224
+    },
+    {
+      "path": "tests/test.test-d.ts",
+      "gitBlob": "87e5cf899f563f4510bd5857d6febda5c74fe396",
+      "size": 5636
+    }
+  ],
+  "fingerprint": "ce0754ffb0e2185bc257cf7180a04d8e91fe7035306a725008833bc278ba9080"
+}

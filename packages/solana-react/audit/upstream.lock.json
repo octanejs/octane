@@ -1,0 +1,490 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@solana/react",
+    "version": "7.0.0",
+    "repository": {
+      "owner": "anza-xyz",
+      "repo": "kit",
+      "subdirectory": "packages/react"
+    },
+    "commit": "58df993f4bea388121a872b33038c6af0ca3dd90",
+    "integrity": "sha512-+BDWCUdFpRkD+zGV2iiyEVWrF9AWw7tQsdiqHHAZa8Td/7CLYw+H8IjtuapMYNK2RZQhqKrSK9OWLE8rh63Qdg=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "c181f3e6911f515d2b5d18513f8e24fba252c36856978fa80b01249fa813453f"
+      },
+      {
+        "path": "packages/react/LICENSE",
+        "sha256": "c181f3e6911f515d2b5d18513f8e24fba252c36856978fa80b01249fa813453f"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": ".gitignore",
+      "gitBlob": "aff17b6df4fa57c4200ac4ee56f1081d4a9ebcdb",
+      "size": 13
+    },
+    {
+      "path": ".npmrc",
+      "gitBlob": "b6f27f135954640c8cc5bfd7b8c9922ca6eb2aad",
+      "size": 19
+    },
+    {
+      "path": ".prettierignore",
+      "gitBlob": "2bd5f0063d9bbb33f2125083ff4acb427bc2c3cf",
+      "size": 72
+    },
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "fdbf41143438dc1e0ea7fa637e75fae4bba65cb7",
+      "size": 59444
+    },
+    {
+      "path": "eslint.config.mjs",
+      "gitBlob": "ae14e477d54b2497bfd781ce614e0957609fc9e6",
+      "size": 73
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "ec09953d3c236c37b92a798ae5494816edf80572",
+      "size": 1060
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "4df797284cc9e1d1cf877dc1953996661fe532ea",
+      "size": 7168
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "7cf827460ea61edb8f89a449dc0c09572f520bfc",
+      "size": 52578
+    },
+    {
+      "path": "src/__test-utils__/render.tsx",
+      "gitBlob": "f298e5bdf3fa107249784dbbbe48140456d28d03",
+      "size": 1698
+    },
+    {
+      "path": "src/__tests__/ClientProvider-test.browser.tsx",
+      "gitBlob": "3ac99d6564a1fdff8281e8c40ed3a702d4b35a24",
+      "size": 6099
+    },
+    {
+      "path": "src/__tests__/SelectedWalletAccountContextProvider-test.browser.tsx",
+      "gitBlob": "5bdf3e448ab6094b2b55b938dd171dedcfb50872",
+      "size": 11959
+    },
+    {
+      "path": "src/__tests__/staticStores-test.ts",
+      "gitBlob": "b808175133d7e74acc8539d0122af500d060cbc9",
+      "size": 4167
+    },
+    {
+      "path": "src/__tests__/useAction-test.browser.tsx",
+      "gitBlob": "28c74b81e02da68b8d3b2ca8bd260435eaf15bc7",
+      "size": 8567
+    },
+    {
+      "path": "src/__tests__/useClientCapability-test.browser.tsx",
+      "gitBlob": "5b8bf06f4b788a5b76a4366a33b524ccc30d0d50",
+      "size": 4688
+    },
+    {
+      "path": "src/__tests__/useLatest-test.browser.tsx",
+      "gitBlob": "1384660865750dd6d00a45846c6dab137e440e15",
+      "size": 817
+    },
+    {
+      "path": "src/__tests__/useReactiveStoreLifecycle-test.browser.tsx",
+      "gitBlob": "0eb1440f54ba2e13d828f3283a93f8df9a154abd",
+      "size": 5518
+    },
+    {
+      "path": "src/__tests__/useRequest-test.browser.tsx",
+      "gitBlob": "323964e6054dc439d6b08d07dcbec4dc582240cc",
+      "size": 15714
+    },
+    {
+      "path": "src/__tests__/useSignAndSendTransaction-test.ts",
+      "gitBlob": "9f5e37fe92ce79a30e0a7256dcfc0f39bb5780c1",
+      "size": 9963
+    },
+    {
+      "path": "src/__tests__/useSignIn-test.ts",
+      "gitBlob": "b44965da14f091e81c708d6d3195dc48ebb58f3c",
+      "size": 7550
+    },
+    {
+      "path": "src/__tests__/useSignMessage-test.ts",
+      "gitBlob": "08bae24ce9dd46460d4111478a60cb0e182947c5",
+      "size": 4571
+    },
+    {
+      "path": "src/__tests__/useSignTransaction-test.ts",
+      "gitBlob": "99d04cac54cb5380e8d17333b9ced4c4436d09b5",
+      "size": 9943
+    },
+    {
+      "path": "src/__tests__/useSubscription-test.browser.tsx",
+      "gitBlob": "8c689c52345a9183a3ded6121a54e185f9126e2d",
+      "size": 16335
+    },
+    {
+      "path": "src/__tests__/useTrackedData-test.browser.tsx",
+      "gitBlob": "4e53ebe5966273ecfc25ba5bc6b76a40cc8ef8e8",
+      "size": 18133
+    },
+    {
+      "path": "src/__tests__/useWalletAccountMessageSigner-test.ts",
+      "gitBlob": "1f5ff21e18f3da3069857cab2cd694fbfa1692e5",
+      "size": 14125
+    },
+    {
+      "path": "src/__tests__/useWalletAccountTransactionSendingSigner-test.ts",
+      "gitBlob": "9d9bf94d92b913dd56b2d738d4f994750068a708",
+      "size": 10033
+    },
+    {
+      "path": "src/__tests__/useWalletAccountTransactionSigner-test.ts",
+      "gitBlob": "bb8a859103721b1d48de6814bb22dc45b72ca0ac",
+      "size": 18710
+    },
+    {
+      "path": "src/__typetests__/selectedWalletAccountContextProvider-typetest.ts",
+      "gitBlob": "8118ce817f8aba670d11bdaa9dce75e292c38dad",
+      "size": 2436
+    },
+    {
+      "path": "src/__typetests__/useAction-typetest.ts",
+      "gitBlob": "5774f9f6a904a8ee7ca843f87f0e21fb999a46ac",
+      "size": 1905
+    },
+    {
+      "path": "src/__typetests__/useClient-typetest.ts",
+      "gitBlob": "1aab3fec9d77b0037d03b486ec4b2496d6cbe92b",
+      "size": 949
+    },
+    {
+      "path": "src/__typetests__/useClientCapability-typetest.ts",
+      "gitBlob": "98d8f6b2bbfae404d6cd382a3cd03527b891f1cf",
+      "size": 1541
+    },
+    {
+      "path": "src/__typetests__/useRequest-typetest.ts",
+      "gitBlob": "0481eb9233d82c4d959a71305ccfbdcab7473592",
+      "size": 1147
+    },
+    {
+      "path": "src/__typetests__/useSignAndSendTransaction-typetest.ts",
+      "gitBlob": "c5ca5f9c6fb810044f0948004c478db8e7be05de",
+      "size": 1808
+    },
+    {
+      "path": "src/__typetests__/useSignIn-typetest.ts",
+      "gitBlob": "7a7421866afa54796678dd1cd5faa694010a6bb0",
+      "size": 1708
+    },
+    {
+      "path": "src/__typetests__/useSignTransaction-typetest.ts",
+      "gitBlob": "aac6385e0a49f73f3007b80a118e4f78359e632e",
+      "size": 1703
+    },
+    {
+      "path": "src/__typetests__/useSubscription-typetest.ts",
+      "gitBlob": "29926371ee2bc6a1d5ffe0b1289dfbdf25a9cba0",
+      "size": 2165
+    },
+    {
+      "path": "src/__typetests__/useTrackedData-typetest.ts",
+      "gitBlob": "d0ebe0e2fbd1a0cac1a8ea9352be9f4b41fb4a0b",
+      "size": 2489
+    },
+    {
+      "path": "src/.npmignore",
+      "gitBlob": "b75823c19e875a2a3c3f5dea08fc8dbb84e6e553",
+      "size": 53
+    },
+    {
+      "path": "src/chain.ts",
+      "gitBlob": "e090bdfa06a298a85da618cf55bc65532dd68b24",
+      "size": 261
+    },
+    {
+      "path": "src/ClientProvider.tsx",
+      "gitBlob": "aa2fcab22e0b02b3f4169793022e5a6fb9e14bbc",
+      "size": 2796
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "635cad2433933db448b7f1acbe8ed39de4a05d0d",
+      "size": 741
+    },
+    {
+      "path": "src/query.ts",
+      "gitBlob": "3c1922205dd8a50a6efdf175be7640e4f0520637",
+      "size": 742
+    },
+    {
+      "path": "src/query/__tests__/bridgeStoreToAsyncIterable-test.ts",
+      "gitBlob": "773ca77a07d9b7a4854b3aeab438a7f336b6b8bf",
+      "size": 8127
+    },
+    {
+      "path": "src/query/__tests__/useRequestQuery-test.browser.tsx",
+      "gitBlob": "6509cd44bc5a9ea63f5ce0a7e45e833fa5dfad57",
+      "size": 17441
+    },
+    {
+      "path": "src/query/__tests__/useSubscriptionQuery-test.browser.tsx",
+      "gitBlob": "5763baa734aa5f304205568b07dd9325bdd84856",
+      "size": 18060
+    },
+    {
+      "path": "src/query/__tests__/useTrackedDataQuery-test.browser.tsx",
+      "gitBlob": "d622b490d84801929e1b24a37b817e10fd56430d",
+      "size": 17679
+    },
+    {
+      "path": "src/query/__typetests__/useRequestQuery-typetest.ts",
+      "gitBlob": "f3050e8b62928a1be80067ad0addbbc838dae733",
+      "size": 4186
+    },
+    {
+      "path": "src/query/__typetests__/useSubscriptionQuery-typetest.ts",
+      "gitBlob": "9ab2fb139825f4f8352a1e539e335d3376782ca0",
+      "size": 4717
+    },
+    {
+      "path": "src/query/__typetests__/useTrackedDataQuery-typetest.ts",
+      "gitBlob": "05404704a61f1394d9710e022d78b5b8ea767747",
+      "size": 3971
+    },
+    {
+      "path": "src/query/bridgeStoreToAsyncIterable.ts",
+      "gitBlob": "44388d25f7cc4ff404625c1cc0089eb998aca0a6",
+      "size": 5330
+    },
+    {
+      "path": "src/query/useRequestQuery.ts",
+      "gitBlob": "d6bcd61d8a13428a9978842526be54cae97bc0ba",
+      "size": 6436
+    },
+    {
+      "path": "src/query/useSubscriptionQuery.ts",
+      "gitBlob": "e4d09bb8ee2ee5efd6126f137688be759ac7c44d",
+      "size": 8374
+    },
+    {
+      "path": "src/query/useTrackedDataQuery.ts",
+      "gitBlob": "68a41d5a5053144e01ea56ebb4e415df48d027cf",
+      "size": 10619
+    },
+    {
+      "path": "src/selectedWalletAccountContext.ts",
+      "gitBlob": "35c361aa4898a6351ba30f0e1932211f324f04a4",
+      "size": 711
+    },
+    {
+      "path": "src/SelectedWalletAccountContextProvider.tsx",
+      "gitBlob": "96d12a821744c9ce05019161cff00a302489c6db",
+      "size": 6323
+    },
+    {
+      "path": "src/staticStores.ts",
+      "gitBlob": "88e3a459989f0a1fc718b0c6541ea985dc1c37c2",
+      "size": 2257
+    },
+    {
+      "path": "src/swr.ts",
+      "gitBlob": "0c294783754eaf601fe46987610981c8ca80db69",
+      "size": 633
+    },
+    {
+      "path": "src/swr/__tests__/bridgeStoreToSWR-test.ts",
+      "gitBlob": "6be64bc2774d47fa0dd8199dca98d2e34ae745cb",
+      "size": 5721
+    },
+    {
+      "path": "src/swr/__tests__/useRequestSWR-test.browser.tsx",
+      "gitBlob": "731233f91ca8bf6fe31ebff58f0a31572e6cb28e",
+      "size": 17296
+    },
+    {
+      "path": "src/swr/__tests__/useSubscriptionSWR-test.browser.tsx",
+      "gitBlob": "0c5179f035ea46be025161307ddf9d1510774d7c",
+      "size": 14146
+    },
+    {
+      "path": "src/swr/__tests__/useTrackedDataSWR-test.browser.tsx",
+      "gitBlob": "7e8ca6ba78f66ba600444745726f8f58086000bc",
+      "size": 20143
+    },
+    {
+      "path": "src/swr/__typetests__/useRequestSWR-typetest.ts",
+      "gitBlob": "054cb58a1baef56c68359e8778c599d5eabd887e",
+      "size": 2832
+    },
+    {
+      "path": "src/swr/__typetests__/useSubscriptionSWR-typetest.ts",
+      "gitBlob": "d3c2feaecd51057d13e6090eea4aad077f16821a",
+      "size": 2821
+    },
+    {
+      "path": "src/swr/__typetests__/useTrackedDataSWR-typetest.ts",
+      "gitBlob": "5d65d25f5ac18ed220d6cef02f96bfaa3ebfecf2",
+      "size": 2683
+    },
+    {
+      "path": "src/swr/bridgeStoreToSWR.ts",
+      "gitBlob": "83274e1bf66e68be17aac27c10eb9ec9821fe1d5",
+      "size": 2895
+    },
+    {
+      "path": "src/swr/useRequestSWR.ts",
+      "gitBlob": "25897d4117aa7533e61859294fc3445aa00c4fc7",
+      "size": 4455
+    },
+    {
+      "path": "src/swr/useSubscriptionSWR.ts",
+      "gitBlob": "52530dfc957da0dbaaaaeb29c7291ff440a1d9df",
+      "size": 3766
+    },
+    {
+      "path": "src/swr/useTrackedDataSWR.ts",
+      "gitBlob": "a3d9e92ab2e5c6a8d4b9fd696d9a984a54a51e01",
+      "size": 6494
+    },
+    {
+      "path": "src/test-renderer.tsx",
+      "gitBlob": "363ed1f2ea60a211b494f6fa43e53c3e34dc034e",
+      "size": 2159
+    },
+    {
+      "path": "src/useAction.ts",
+      "gitBlob": "84d3fd7dd3430de5881306a11c031a13a123d406",
+      "size": 6924
+    },
+    {
+      "path": "src/useClient.ts",
+      "gitBlob": "be4328a8f39cd6b319b802254a84c7e99315ef18",
+      "size": 1523
+    },
+    {
+      "path": "src/useClientCapability.ts",
+      "gitBlob": "4fca02a3b14b6dc164cbe32f9da8aa6e34c445b9",
+      "size": 2828
+    },
+    {
+      "path": "src/useIsomorphicLayoutEffect.ts",
+      "gitBlob": "4dd5e2f75bfd2d54c98091bd793cc79d436d3121",
+      "size": 480
+    },
+    {
+      "path": "src/useLatest.ts",
+      "gitBlob": "e08843e1352436a706f9c8efa51a4edaee9ac234",
+      "size": 892
+    },
+    {
+      "path": "src/usePromise.ts",
+      "gitBlob": "bdc52dd6438295b8e468df584240bac29802233e",
+      "size": 2858
+    },
+    {
+      "path": "src/useReactiveStoreLifecycle.ts",
+      "gitBlob": "a7161ad505263e75dcc73d7b17c95c12c0076f9b",
+      "size": 4880
+    },
+    {
+      "path": "src/useRequest.ts",
+      "gitBlob": "e50fe0579288237cf2968e7d9aa5ee140ac0af9c",
+      "size": 6956
+    },
+    {
+      "path": "src/useRequestResult.ts",
+      "gitBlob": "25b2d5bb3da544669c5901289240cac92cc23d28",
+      "size": 1978
+    },
+    {
+      "path": "src/useSignAndSendTransaction.ts",
+      "gitBlob": "d98cf9736803090727f5f5998cd022092d63f280",
+      "size": 6828
+    },
+    {
+      "path": "src/useSignIn.ts",
+      "gitBlob": "f02ac47d0a8a220ebaa0049d07b8fa96f5ce030b",
+      "size": 4991
+    },
+    {
+      "path": "src/useSignMessage.ts",
+      "gitBlob": "9fafc3e0de55d31def66a012cf36d876054495c1",
+      "size": 2811
+    },
+    {
+      "path": "src/useSignTransaction.ts",
+      "gitBlob": "001e71cf5a619186fbc7cdd04a2f5f65b0e87e88",
+      "size": 6306
+    },
+    {
+      "path": "src/useSubscription.ts",
+      "gitBlob": "6f42396b1105c45fa2b7408274c674e523973504",
+      "size": 6896
+    },
+    {
+      "path": "src/useSubscriptionResult.ts",
+      "gitBlob": "8cda231235373c10bcba50b6e0f7ece5c3ed957b",
+      "size": 1786
+    },
+    {
+      "path": "src/useTrackedData.ts",
+      "gitBlob": "f48626c3f69ae1246da3eb5b2c079ea2b8b4c727",
+      "size": 9073
+    },
+    {
+      "path": "src/useTrackedDataResult.ts",
+      "gitBlob": "dfd076c5c94247c2c147bae00f98d7eeac6da0ce",
+      "size": 2187
+    },
+    {
+      "path": "src/useWalletAccountMessageSigner.ts",
+      "gitBlob": "e5d368a8ca7cc380923d048c3425ddd63dc88651",
+      "size": 4517
+    },
+    {
+      "path": "src/useWalletAccountTransactionSendingSigner.ts",
+      "gitBlob": "a60a9569b98a4a0bfc51c32d5763a123ba0948e1",
+      "size": 4689
+    },
+    {
+      "path": "src/useWalletAccountTransactionSigner.ts",
+      "gitBlob": "eded3586a63f4c21177cb27bcb1af7c651cad5ff",
+      "size": 6696
+    },
+    {
+      "path": "tsconfig.declarations.json",
+      "gitBlob": "50b40d34db705da6aa75e2e84d1e20f36ad53ff5",
+      "size": 309
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "8cea1916781eedcb2706e5d426f668cda09f17f6",
+      "size": 348
+    },
+    {
+      "path": "typedoc.json",
+      "gitBlob": "2c830355d709a92061ec4444516c8e68a362e211",
+      "size": 173
+    }
+  ],
+  "fingerprint": "ea18da43e7fec3bf8c9d34288f6fd68a87f7f8c099ed20749dd78333e838072f"
+}

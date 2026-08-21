@@ -227,7 +227,7 @@ const browserFiles = ['packages/syntax-highlighter/tests/browser/rendering.brows
 
 const packageJson = JSON.parse(await readFile(resolve(repoRoot, 'package.json'), 'utf8'));
 const lockfileSha256 = await sha256('pnpm-lock.yaml');
-const tarball = 'packages/syntax-highlighter/upstream/npm/react-syntax-highlighter-16.1.1.tgz';
+const tarball = 'packages/syntax-highlighter/upstream-artifact/react-syntax-highlighter-16.1.1.tgz';
 const adaptedEvidenceFiles = (await walkFiles('packages/syntax-highlighter/tests/adapted'))
 	.filter((path) => path.endsWith('.test.ts') || path.endsWith('.snap'))
 	.sort();
@@ -250,6 +250,9 @@ const lanes = [
 			manifestFile('packages/syntax-highlighter/audit/pristine-runtime.json'),
 			manifestFile('packages/syntax-highlighter/jest.pristine.config.cjs'),
 			manifestFile('packages/syntax-highlighter/audit/upstream-files.json'),
+			// The whole vendored tree verifies offline against the upstream git
+			// blob shas in the lock.
+			manifestFile('packages/syntax-highlighter/audit/upstream.lock.json'),
 		]),
 	},
 	{

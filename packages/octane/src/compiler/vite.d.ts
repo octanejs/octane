@@ -1,4 +1,7 @@
 import type { Plugin } from 'vite';
+import type { OctaneCssModuleConstants } from './index.js';
+
+export type { OctaneCssModuleConstants } from './index.js';
 
 export interface OctaneRendererRuleOptions {
 	/** Glob or globs matched against canonical project-relative module IDs. */
@@ -56,6 +59,16 @@ export interface OctaneRendererConfigOptions {
 	rules?: readonly OctaneRendererRuleOptions[];
 }
 
+/** The fully transformed module in one Vite build environment. */
+export interface OctaneCssModuleConstantModule {
+	/** Exact bundler-resolved identity, including virtual prefixes and queries. */
+	id: string;
+	/** Final JavaScript; no application module is evaluated to obtain it. */
+	code: string;
+	meta: Readonly<Record<string, unknown>>;
+	environment: 'client' | 'server';
+}
+
 export interface OctaneVitePluginOptions {
 	/** Override HMR code generation. It defaults to on while Vite is serving. */
 	hmr?: boolean;
@@ -91,6 +104,17 @@ export interface OctaneVitePluginOptions {
 	requireDirective?: boolean;
 	/** @experimental Declarative renderer selection for this compiler instance. */
 	renderers?: OctaneRendererConfigOptions;
+	/**
+	 * @experimental Authenticate immutable CSS-module exports supplied by a
+	 * trusted CSS provider. Used only in one-shot production builds, never serve
+	 * or watch. Values are checked against the exact final ESM; malformed or stale
+	 * assertions fail the build. Returning null/undefined supplies no additional
+	 * facts; built-in named-string proofs may still apply. This must not be used
+	 * to declare mutable default maps constant.
+	 */
+	cssModuleConstants?: (
+		module: OctaneCssModuleConstantModule,
+	) => OctaneCssModuleConstants | null | undefined;
 }
 
 /** The direct Octane compiler integration for Vite. */

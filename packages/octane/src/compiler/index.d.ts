@@ -19,6 +19,17 @@ export interface CompileRendererBoundary {
 	server?: string;
 }
 
+/**
+ * An explicit provider guarantee, checked against the final module's literal
+ * exports. Each supplied value must already be initialized and remain the same
+ * string for every read. `default` requires own immutable data properties; an
+ * ordinary mutable CSS-module default object does not satisfy that contract.
+ */
+export interface OctaneCssModuleConstants {
+	named?: Readonly<Record<string, string>>;
+	default?: Readonly<Record<string, string>>;
+}
+
 export interface CompileOptions {
 	mode?: 'client' | 'server';
 	hmr?: boolean | 'vite' | 'webpack';
@@ -34,6 +45,23 @@ export interface CompileOptions {
 	dataCallbackHooks?: readonly string[];
 	/** Exact authored-source facts from octane/compiler/typescript. */
 	textTypeFacts?: TextTypeFacts;
+	/**
+	 * Trusted bundler/provider proof of an already initialized, immutable CSS
+	 * class string. `property` is null for a named string import, or the static
+	 * member name for a default/namespace import. Returning undefined leaves the
+	 * expression dynamic. The host must preserve the stylesheet's side effects.
+	 */
+	resolveCssModuleConstant?: (
+		request: string,
+		imported: string,
+		property: string | null,
+	) => string | undefined;
+	/**
+	 * CSS modules whose extraction depends on retaining a live export. Keep one
+	 * original class read in each static host subtree that uses such a module;
+	 * unused/lazy component styles then retain their normal bundler ownership.
+	 */
+	preserveCssModuleReferences?: readonly string[];
 	renderer?: CompileRenderer;
 	rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, CompileRendererBoundary>>>>;
 	rendererRegistry?: Readonly<

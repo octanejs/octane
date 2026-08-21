@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "root": "packages/colorful/upstream/tag",
+  "root": "packages/colorful/upstream",
   "snapshots": 5,
   "tests": [
     {

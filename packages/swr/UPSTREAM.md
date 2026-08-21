@@ -13,11 +13,13 @@
 | npm tarball SHA-256 | `948ad899c51e73ca9555e8182946978f367410406fe6c2acb4d1012c509c9982` |
 
 The canonical `src/`, `test/`, package metadata, Jest configurations, root
-TypeScript configuration, and license are vendored byte-exact under `upstream/`.
-`upstream/SHA256SUMS` locks all 100 vendored evidence files, including the npm
-tarball at `upstream/npm/swr-2.4.2.tgz`. The tarball is retained because it
-contains compiled condition branches and declarations rather than the canonical
-source and tests.
+TypeScript configuration, and license are vendored byte-exact under `upstream/`
+and verify offline against the upstream git blob shas recorded in
+`audit/upstream.lock.json`; the pinned license is republished at the package
+root as `LICENSE.upstream`. The npm tarball is retained at
+`upstream-artifact/swr-2.4.2.tgz`, hash-pinned by `audit/verify-provenance.mjs`,
+because it contains compiled condition branches and declarations rather than the
+canonical source and tests.
 
 The pristine Jest config maps `@testing-library/react` through a narrow harness
 for three `useSWR` mutation race cases. One remote-mutation case starts a 10 ms

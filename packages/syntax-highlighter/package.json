@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/syntax-highlighter",
-  "version": "0.0.7",
+  "version": "0.0.9",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -28,6 +28,7 @@
   "files": [
     "src",
     "LICENSE",
+    "LICENSE.upstream",
     "README.md",
     "UPSTREAM.md"
   ],

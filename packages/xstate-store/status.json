@@ -1,0 +1,17 @@
+{
+  "upstream": { "package": "@xstate/store-react", "version": "2.0.0" },
+  "provenance": {
+    "source": "https://github.com/statelyai/xstate/tree/ddca0ff8c53dc2e85f9173514cc686308d65bd2c/packages/xstate-store-react",
+    "license": "MIT",
+    "commit": "ddca0ff8c53dc2e85f9173514cc686308d65bd2c",
+    "verification": "verified"
+  },
+  "surface": "Complete @xstate/store-react 2.0.0 export surface — `useSelector`, `useStore`, `useAtom`, `useAtomState`, and `createStoreHook` — ported onto Octane hooks, plus the full `@xstate/store@4.2.3` core re-exported unchanged (`createStore`, `createAtom`, `fromStore`, `shallowEqual`, and every type), exactly as upstream re-exports it.",
+  "divergences": [
+    "Upstream calls hooks inside `if` branches in `useSelector` and `useAtom`, which React tolerates only because the branch is stable per call site. Octane keys hooks by call site rather than call order, so the shape is legal here; if a call site does flip branches, Octane keeps independent hook cells per branch and unsubscribes the abandoned one instead of corrupting hook order.",
+    "`useSyncExternalStore` does not re-read `getSnapshot` at commit when the rendered value was unchanged. Octane's synchronous renderer closes the concurrent-interleaving window React guards there; any store that notifies is unaffected.",
+    "During server rendering `getServerSnapshot` is optional and falls back to `getSnapshot`, where React throws. Every hook here supplies one."
+  ],
+  "ssr": "Supported: selectors, stores, and atoms read their current snapshot during server rendering through `getServerSnapshot`, and the binding has no browser-only initialization.",
+  "verified": "2026-08-15"
+}

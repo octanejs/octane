@@ -1,0 +1,18 @@
+{
+  "upstream": { "package": "@xstate/react", "version": "6.1.0" },
+  "provenance": {
+    "source": "https://github.com/statelyai/xstate/tree/d4f8c5b709291d44f70139a7f9ff333abd7c615c/packages/xstate-react",
+    "license": "MIT",
+    "commit": "d4f8c5b709291d44f70139a7f9ff333abd7c615c",
+    "verification": "verified"
+  },
+  "surface": "Complete @xstate/react 6.1.0 export surface — `useActor`, `useActorRef`, `useSelector`, `createActorContext`, `shallowEqual`, and the deprecated `useMachine` alias — ported onto Octane hooks. The framework-agnostic `xstate` actor core is reused unchanged as a peer dependency and is not re-exported, exactly as upstream. Upstream's two npm-only dependencies are replaced by in-repo ports: `use-sync-external-store/shim/with-selector` by a local port of React's selector shim, and `use-isomorphic-layout-effect` by a slot-forwarding equivalent.",
+  "divergences": [
+    "`useSyncExternalStore` does not re-read `getSnapshot` at commit when the rendered value was unchanged. Octane's synchronous renderer closes the concurrent-interleaving window React guards there, so a store that mutates without notifying between render and commit is not re-caught. Any actor that notifies — which xstate always does — is unaffected.",
+    "During server rendering `getServerSnapshot` is optional and falls back to `getSnapshot`, where React throws. `useSelector` and `useActor` always supply one, so this is only reachable through a hand-rolled actor-like object.",
+    "Upstream's suite runs every `useActor`, `useActorRef`, and `useSelector` case twice, once under `StrictMode`. Octane has no StrictMode double-invoke, so the non-strict render, effect, and observer counts are the ported expectations; the strict pass is not applicable.",
+    "`stopRootWithRehydration` is retained verbatim even though its motivating case (React Strict Effects double-invoking the start/stop effect) cannot occur on Octane, because it also governs unmount-then-remount, which stays observable."
+  ],
+  "ssr": "Supported: `useSelector` and `useActor` read their actor snapshot through `getServerSnapshot` during server rendering and the first hydration read, so server markup matches the initial actor snapshot. Effects never run on the server, so actors are not started there.",
+  "verified": "2026-08-15"
+}

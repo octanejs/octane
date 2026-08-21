@@ -1330,7 +1330,7 @@
   ],
   "snapshotFiles": [
     {
-      "file": "upstream/canonical/src/__snapshots__/index.spec.tsx.snap",
+      "file": "upstream/src/__snapshots__/index.spec.tsx.snap",
       "sha256": "4c21c9f0e962ba1b1f40aed92ae6919b3267ad46b279fa1fcaa05103647c2e9b"
     }
   ]

@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "types": ["react"]
   },
-  "include": ["public-api.test-d.ts", "../../upstream/dist/declarations/src/index.d.ts"]
+  "include": ["public-api.test-d.ts", "../../upstream-artifact/dist/declarations/src/index.d.ts"]
 }

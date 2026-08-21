@@ -552,18 +552,23 @@ const PORTAL_TAG = Symbol.for('octane.portal');
 export const Fragment: unique symbol = Symbol.for('octane.Fragment');
 
 /**
- * React-19 `<Activity>` sentinel. Server-compiled template sites lower directly
- * to `ssrActivity`; this export keeps `import { Activity } from 'octane'`
- * resolvable after the server compiler retargets it to `octane/server`.
+ * React-19 `<Activity>` sentinel. Direct template sites lower to `ssrActivity`;
+ * generic component and descriptor sites dispatch by this same symbol identity.
+ * Its public type is component-shaped so aliases and JSX values type-check.
  */
-export const Activity: unique symbol = Symbol.for('octane.Activity');
+export const Activity = Symbol.for('octane.Activity') as unknown as (props: {
+	mode?: 'visible' | 'hidden';
+	children?: unknown;
+	name?: string;
+	key?: string | number | bigint | null | undefined;
+}) => unknown;
 
 interface ElementDescriptor {
 	$$kind: typeof ELEMENT_TAG;
 	// A server ComponentBody (component-value form, e.g. `{<Comp/>}`) OR a host tag
 	// string (`'li'`), produced when host JSX appears at a VALUE position (a
 	// `.map(...)` callback, a render-prop arrow body, an array literal).
-	type: ServerComponent | string | typeof Fragment;
+	type: ServerComponent | string | typeof Fragment | typeof Activity;
 	props: any;
 	// React-style `key`, lifted out of props (consulted by the client's de-opt list
 	// path on hydration; the server only renders it into markup).
@@ -654,7 +659,7 @@ export function createScopedValue(readElement: () => ElementDescriptor): Element
 
 /** Server twin of the compiler-only scope-preserving JSX descriptor factory. */
 export function createScopedElement(
-	type: ServerComponent | string | typeof Fragment,
+	type: ServerComponent | string | typeof Fragment | typeof Activity,
 	props: any,
 	readChildren: () => unknown,
 ): ElementDescriptor {
@@ -697,7 +702,7 @@ export function createScopedElement(
 // literal) to this call in BOTH modes, so the same lowered call resolves to the
 // client-or-server `createElement` per build, and `ssrChild` renders the result.
 export function createElement(
-	type: ServerComponent | string | typeof Fragment,
+	type: ServerComponent | string | typeof Fragment | typeof Activity,
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
@@ -1601,9 +1606,9 @@ function serverDescNeedsBlocks(v: unknown): boolean {
 	if (!isElementDescriptor(v) && childrenIterator(v) !== null) return true;
 	const d = v as ElementDescriptor;
 	if (d.$$kind === ELEMENT_TAG) {
-		// A Fragment below a host descriptor is reconciled by childSlot's
-		// fragment-aware list path, including when all of its leaves are pure hosts.
-		if (d.type === Fragment) return true;
+		// Fragment and Activity descriptors own reconcilable boundaries even when
+		// all of their descendants are pure hosts/text.
+		if (d.type === Fragment || d.type === Activity) return true;
 		return typeof d.type === 'function' || serverDescNeedsBlocks(d.children);
 	}
 	return false;
@@ -1713,6 +1718,16 @@ export function ssrFragmentMarker(open: boolean, _ref?: unknown): string {
  */
 export function ssrActivity(mode: string, render: () => string): string {
 	return ssrBlock(mode === 'hidden' ? '' : render());
+}
+
+/** Cold twin of the client's generic Activity body and its ordinary child slot. */
+function renderActivityDescriptor(
+	props: { mode?: 'visible' | 'hidden'; children?: unknown },
+	scope: SSRScope,
+): string {
+	// Keep the accessor inside the visibility branch: scoped JSX children may
+	// start data work or throw, and hidden server Activities must evaluate neither.
+	return ssrActivity(props.mode ?? 'visible', () => ssrChild(props.children, scope));
 }
 
 /**
@@ -3489,12 +3504,21 @@ function renderComponentFramed(
  */
 export function ssrComponent(
 	parent: SSRScope,
-	comp: ServerComponent | string,
+	comp: ServerComponent | string | typeof Activity,
 	props: any,
 	inherit?: boolean,
 	key?: unknown,
 	identityScoped?: boolean,
 ): string {
+	// A runtime-resolved Activity is a symbol, not a callable component. Keep its
+	// original identity for async keys, then use the stable cold body below. A
+	// spread-only key has not been split into the compiler's explicit key argument.
+	// Unlike the client cold registration, SSR must also accept a public
+	// `octane` Activity descriptor when this server export was tree-shaken away.
+	// The shared Symbol.for identity keeps that mixed-entry path working; retaining
+	// this small string-rendering wrapper does not retain the client Activity engine.
+	const activity = comp === Activity;
+	if (activity && key === undefined) key = props?.key;
 	// Component recursion is one of SSR's hottest and deepest paths. Install the
 	// same async-identity membrane inline instead of recursing back through
 	// ssrComponent from two wrapper callbacks. Besides avoiding callback overhead,
@@ -3508,6 +3532,12 @@ export function ssrComponent(
 	try {
 		const explicitNamespace = NEXT_COMPONENT_NAMESPACE;
 		NEXT_COMPONENT_NAMESPACE = null;
+		if (activity) {
+			comp = renderActivityDescriptor;
+			// The generic component and inner Activity both own hydratable ranges.
+			// This mirrors the client even for a sole-root dynamic Activity tag.
+			inherit = false;
+		}
 		// Boundary builtins decline inherit through their component capability bit —
 		// mirrors componentSlot's
 		// client-side decline exactly (member/aliased/dynamic tags resolving to
@@ -3526,9 +3556,10 @@ export function ssrComponent(
 		// value-position call site (ssrHostElement's content path handles those), or
 		// a render FUNCTION from a template one.
 		if (typeof comp === 'string') {
+			const tag = comp;
 			const inheritedNamespace = explicitNamespace ?? FRAME?.namespace ?? 'html';
 			const childNamespace = parserNamespacesForTag(
-				comp.toLowerCase(),
+				tag.toLowerCase(),
 				inheritedNamespace,
 			).childrenNamespace;
 			return ssrInNamespace(childNamespace, () => {
@@ -3546,10 +3577,10 @@ export function ssrComponent(
 					// like renderComponentFramed normalizes a de-opt body's return.
 					const out = (kids as any)(undefined, parent);
 					const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, parent);
-					const html = ssrHostElement(comp, props, null, parent, inner);
+					const html = ssrHostElement(tag, props, null, parent, inner);
 					return inherit ? html : ssrBlock(html);
 				}
-				const html = ssrHostElement(comp, props, kids, parent);
+				const html = ssrHostElement(tag, props, kids, parent);
 				return inherit ? html : ssrBlock(html);
 			});
 		}
@@ -3585,7 +3616,7 @@ export function ssrComponent(
 		// transition (`<svg>`, `<math>`, or `<foreignObject>`) overrides it for the
 		// next component frame through ssrComponentNS.
 		frame.namespace = explicitNamespace ?? pf?.namespace;
-		return renderComponentFramed(comp, props, parent, frame, inherit);
+		return renderComponentFramed(comp as ServerComponent, props, parent, frame, inherit);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
 	}
@@ -3596,7 +3627,7 @@ let NEXT_COMPONENT_NAMESPACE: 'html' | 'svg' | 'mathml' | null = null;
 /** Compiler ABI for a component call whose output is parsed in foreign content. */
 export function ssrComponentNS(
 	parent: SSRScope,
-	comp: ServerComponent | string,
+	comp: ServerComponent | string | typeof Activity,
 	props: any,
 	namespace: 'html' | 'svg' | 'mathml',
 	inherit?: boolean,

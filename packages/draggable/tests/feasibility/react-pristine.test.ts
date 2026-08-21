@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { describe, expect, it, vi } from 'vitest';
-import DraggableCore from '../../upstream/tag/lib/DraggableCore.tsx';
+import DraggableCore from '../../upstream/lib/DraggableCore.tsx';
 
 function instance(overrides: Record<string, unknown> = {}) {
 	return new DraggableCore({

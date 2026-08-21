@@ -1,5 +1,29 @@
 # @octanejs/app-core
 
+## 0.0.39
+
+### Patch Changes
+
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+  - octane@0.1.43
+
+## 0.0.38
+
+### Patch Changes
+
+- afa3722: Keep stylesheets for route layouts, root fallbacks, and their deferred Hydrate
+  children available before client activation without eagerly preloading their
+  JavaScript.
+- Updated dependencies [1581e1b]
+- Updated dependencies [afa3722]
+- Updated dependencies [231e248]
+- Updated dependencies [2f9b301]
+- Updated dependencies [939c64d]
+  - octane@0.1.42
+
 ## 0.0.37
 
 ### Patch Changes

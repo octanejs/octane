@@ -1,5 +1,48 @@
 # octane
 
+## 0.1.43
+
+### Patch Changes
+
+- 4b590bd: Improve Activity parity across compiled JSX, element descriptors, server rendering,
+  hydration, and universal renderers. Hidden boundaries now disconnect public refs,
+  preserve the latest authored styles and text, hide logically owned portals, and
+  contain suspended work without activating an enclosing visible fallback. Retained
+  insertion effects replay safely after suspended hidden renders, including memoized
+  children and nested boundaries.
+
+  Support Activity aliases, namespaces, spreads, children props, and ordered keys
+  without changing the direct mode-only compiler fast path. Integrate Activity
+  visibility changes with ViewTransition enter/exit animations and expose native
+  pseudo-element animations through the transition instance.
+
+  Coalesce hidden descendant visibility scans once per render wave and keep optional
+  Activity implementation and ref tracking off unrelated application paths. Add
+  production browser benchmarks and deterministic work, ref, and bundle controls.
+  Octane's synchronous hidden-work scheduling and existing structural-transaction
+  limitations remain unchanged.
+
+- c0ff085: Keep boolean renderable children empty when updated from text, and correctly
+  reapply anchored child text after a held transition resumes. Explicit string
+  conversion and typed text bindings retain their existing coercion semantics.
+- 6a68a7d: Fold provider-proven immutable CSS-module class strings before template planning. Production Vite builds retain a live class reference in each static subtree so unused and lazy component styles keep their existing delivery boundaries. Mutable default maps remain dynamic unless their CSS provider supplies an explicit immutable-export contract.
+- 6b97f85: Add opt-in CSS-module constant folding to one-shot Rspack and Rsbuild production builds. Authenticate immutable JavaScript CSS exports from the actual module graph, preserve stylesheet ownership, and keep proof callbacks on the main thread when compiler workers are enabled. Native CSS modules and mutable default maps retain their existing behavior.
+
+## 0.1.42
+
+### Patch Changes
+
+- 1581e1b: Skip already-drained scheduled flushes after synchronous native-event commits. Preserve commit-only effects, refs, Fragment bindings, transition finalization, profiling notifications, and microtask ordering.
+- afa3722: Preserve server-rendered descriptor components when a suspended Hydrate boundary
+  resumes. Claim fallback cleanup ranges only after adoption completes, avoiding
+  false hydration mismatch reports while preserving template-owned checks and
+  removing genuinely unmatched content added during suspension.
+- 231e248: Reduce keyed-row selection work for compiler-proven class-only updates. Preserve full row reconciliation for live renderable children and use the correct class setter for statically known HTML, SVG, and MathML templates. Also avoid unnecessary state-update allocations and focus traversal when a document has no focused control.
+- 2f9b301: Keep keyed row selection updates bounded when a row declares a constant alias for its key before rendering. Preserve the full affected-row bodies, event captures, strict-equality behavior, and transition replay.
+- 939c64d: Keep `useMemo` and `useCallback` on a universal renderer's hook runtime in production builds.
+
+  The closure-free DOM memo optimization could incorrectly lower hooks inside an owning universal renderer component and import `octane/internal/client`. Universal renderers do not have a DOM component scope, so those helpers either failed to resolve in custom build pipelines or crashed at runtime. Universal components now retain their renderer-specific memo hooks, while DOM components keep the optimized path.
+
 ## 0.1.41
 
 ### Patch Changes

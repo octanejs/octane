@@ -1,4 +1,5 @@
 import type { Ref, CSSProperties } from 'react';
+import type { ElementDescriptor } from 'octane';
 import type { Octane } from 'octane/jsx-runtime';
 import type { WithBoundingRectsProps } from '@octanejs/visx/bounds';
 import { withBoundingRects } from '@octanejs/visx/bounds';
@@ -80,4 +81,8 @@ function TooltipWithBounds({
 	</Tooltip>;
 }
 
-export default withBoundingRects(TooltipWithBounds)
+const TooltipWithBoundsComponent = withBoundingRects(TooltipWithBounds) as unknown as (
+	props: TooltipWithBoundsProps,
+) => ElementDescriptor;
+
+export default TooltipWithBoundsComponent;

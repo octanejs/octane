@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-store",
-  "version": "0.0.35",
+  "version": "0.0.37",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -31,16 +31,17 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
     "test": "vitest run",
-    "test:upstream": "node scripts/run-pristine-upstream.mjs",
+    "test:upstream": "node ../../scripts/react-parity/run-pristine.mjs tanstack-store",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
-    "upstream:verify": "node scripts/verify-upstream.mjs"
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "dependencies": {
     "@tanstack/store": "0.11.0"

@@ -30,7 +30,7 @@ test('rejects modified upstream bytes', () => {
 	const { root, target } = fixture();
 	try {
 		writeFileSync(join(target, 'packages/core/src/index.ts'), 'export {}\n');
-		assert.throws(() => verifyReactSpringUpstream(root), /vendored byte drift/);
+		assert.throws(() => verifyReactSpringUpstream(root), /materialize\.mjs run --check/);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -40,7 +40,7 @@ test('rejects missing upstream evidence', () => {
 	const { root, target } = fixture();
 	try {
 		rmSync(join(target, 'targets/web/src/animated.test.tsx'));
-		assert.throws(() => verifyReactSpringUpstream(root), /inventory drifted/);
+		assert.throws(() => verifyReactSpringUpstream(root), /materialize\.mjs run --check/);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

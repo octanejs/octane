@@ -1,6 +1,6 @@
 {
   "source": {
-    "upstream": "upstream/canonical/src/index.tsx",
+    "upstream": "upstream/src/index.tsx",
     "upstreamSha256": "4fc4ce4feb05906e4362ef35b927f13c750134b1d1605ec038c0cc7395fc3d41",
     "runtime": "src/index.tsrx",
     "runtimeSha256": "164322eb48340c89b11a515d61e440827df64de88166d9f361a33500d144b0a2",
