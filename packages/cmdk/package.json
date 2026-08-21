@@ -1,12 +1,12 @@
 {
   "name": "@octanejs/cmdk",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "cmdk for the octane renderer \u2014 the cmdk 1.1.1 command-menu source ported onto octane's hooks and native events: the Command namespace, useCommandState, and the DOM-authoritative filter/selection model, built on @octanejs/radix primitives.",
+  "description": "cmdk for the octane renderer — the cmdk 1.1.1 command-menu source ported onto octane's hooks and native events: the Command namespace, useCommandState, and the DOM-authoritative filter/selection model, built on @octanejs/radix primitives.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"

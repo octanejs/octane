@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-store",
-  "version": "0.0.36",
+  "version": "0.0.37",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "TanStack Store bindings for Octane \u2014 reuses the framework-agnostic @tanstack/store core with an Octane hook adapter.",
+  "description": "TanStack Store bindings for Octane — reuses the framework-agnostic @tanstack/store core with an Octane hook adapter.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"

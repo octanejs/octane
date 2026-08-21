@@ -1,12 +1,12 @@
 {
   "name": "@octanejs/tanstack-hotkeys",
-  "version": "0.0.31",
+  "version": "0.0.32",
   "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "TanStack Hotkeys bindings for Octane \u2014 reuses the framework-agnostic @tanstack/hotkeys core with an Octane hook adapter.",
+  "description": "TanStack Hotkeys bindings for Octane — reuses the framework-agnostic @tanstack/hotkeys core with an Octane hook adapter.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
