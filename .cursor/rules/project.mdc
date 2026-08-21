@@ -161,3 +161,4 @@ Generated agent files come from `.rulesync/rules/`: edit those and run
 `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`, and
 `.cursor/rules/project.mdc`. The other rules carry `globs`, so agents that
 support path-scoped rules load them only when you open a matching file.
+Cursor Cloud VM setup is `.rulesync/rules/cursor-cloud.md`.

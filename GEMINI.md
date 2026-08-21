@@ -1,9 +1,12 @@
 Please also reference the following rules as needed. The list below is provided in TOON format, and `@` stands for the project root directory.
 
-rules[3]:
+rules[4]:
   - path: @.gemini/memories/core-engineering.md
     description: Performance-first engineering and self-review gates for Octane framework fundamentals
     applyTo[5]: packages/octane/src/**,packages/app-core/src/**,packages/vite-plugin-octane/src/**,packages/rspack-plugin-octane/src/**,packages/rsbuild-plugin-octane/src/**
+  - path: @.gemini/memories/cursor-cloud.md
+    description: "Cursor Cloud VM setup: Node PATH, targeted test/typecheck, example dev servers"
+    applyTo[2]: .cursor/**,.cursor/environment.json
   - path: @.gemini/memories/testing.md
     description: Octane test quality and observation-boundary rules
     applyTo[5]: **/*.test.*,**/*.spec.*,**/tests/**,**/_fixtures/**,benchmarks/**
@@ -173,3 +176,4 @@ Generated agent files come from `.rulesync/rules/`: edit those and run
 `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`, and
 `.cursor/rules/project.mdc`. The other rules carry `globs`, so agents that
 support path-scoped rules load them only when you open a matching file.
+Cursor Cloud VM setup is `.rulesync/rules/cursor-cloud.md`.
