@@ -917,7 +917,7 @@ See also: [`docs/remix-router-port-plan.md`](remix-router-port-plan.md)
 
 ## @octanejs/resizable-panels
 
-[`packages/resizable-panels`](../packages/resizable-panels) `0.1.0` — ports `react-resizable-panels@4.12.2`. Status data: [`packages/resizable-panels/status.json`](../packages/resizable-panels/status.json).
+[`packages/resizable-panels`](../packages/resizable-panels) `0.0.1` — ports `react-resizable-panels@4.12.2`. Status data: [`packages/resizable-panels/status.json`](../packages/resizable-panels/status.json).
 
 Group, Panel, Separator, persistence hooks, refs, imperative APIs, layout constraints, pointer and keyboard interaction, ARIA, cursor handling, and ResizeObserver behavior are implemented against react-resizable-panels 4.12.2.
 

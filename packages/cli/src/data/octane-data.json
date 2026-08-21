@@ -674,7 +674,7 @@
     },
     {
       "name": "@octanejs/resizable-panels",
-      "version": "0.1.0",
+      "version": "0.0.1",
       "category": "UI and interaction",
       "upstream": { "package": "react-resizable-panels", "version": "4.12.2" },
       "surface": "Group, Panel, Separator, persistence hooks, refs, imperative APIs, layout constraints, pointer and keyboard interaction, ARIA, cursor handling, and ResizeObserver behavior are implemented against react-resizable-panels 4.12.2.",
