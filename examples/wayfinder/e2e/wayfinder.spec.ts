@@ -177,7 +177,11 @@ test('plans and saves a city with the keyboard, then restores it from the deep-l
 	await month.focus();
 	await page.keyboard.press('a');
 	await expect(page).toHaveURL(/month=apr$/);
-	await expect(page.getByText('18–22 April', { exact: true })).toBeVisible();
+	await expect(
+		page
+			.getByRole('region', { name: 'The shape of the trip.', exact: true })
+			.getByText('18–22 April', { exact: true }),
+	).toBeVisible();
 	const save = page.getByRole('button', { name: 'Save this journey' });
 	await save.focus();
 	await page.keyboard.press('Enter');
