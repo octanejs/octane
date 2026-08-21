@@ -1,5 +1,20 @@
 # @octanejs/rspack-plugin
 
+## 0.1.38
+
+### Patch Changes
+
+- 6b97f85: Add opt-in CSS-module constant folding to one-shot Rspack and Rsbuild production builds. Authenticate immutable JavaScript CSS exports from the actual module graph, preserve stylesheet ownership, and keep proof callbacks on the main thread when compiler workers are enabled. Native CSS modules and mutable default maps retain their existing behavior.
+- 6fbde38: Resolve Octane runtime aliases with Rspack's ESM conditions and keep compiler
+  helpers, server rendering, and profiling on the application's selected Octane
+  package. This fixes callback-ref and linked-package context regressions and
+  prevents the CommonJS runtime graph from being retained in browser bundles.
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+  - octane@0.1.43
+
 ## 0.1.37
 
 ### Patch Changes

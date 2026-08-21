@@ -1,5 +1,12 @@
 # @octanejs/mcp-server
 
+## 0.2.18
+
+### Patch Changes
+
+- 1a99f1b: Add the deterministic React-library port workflow, preserve the previous skill-name alias, and update React rewrite classifications.
+- 409682b: Expose the Activity benchmark through the MCP benchmark tool.
+
 ## 0.2.17
 
 ### Patch Changes

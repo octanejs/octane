@@ -1,5 +1,15 @@
 # @octanejs/monaco-editor
 
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+  - octane@0.1.43
+
 ## 0.0.10
 
 ### Patch Changes
