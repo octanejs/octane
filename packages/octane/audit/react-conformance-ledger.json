@@ -8401,7 +8401,7 @@
     },
     {
       "caseId": "react-case-v1:1babccdd3c0765172a4d",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactSuspense-test.internal.js",
       "title": "pushes out siblings that render faster than throttle",
@@ -8409,7 +8409,19 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Public-DOM adaptation of the 290ms parent and 30ms nested sibling scenario, verified with ReactDOM 19.2.7 and both Octane compile modes. Complete host turns replace upstream mid-render Scheduler stops: the <=10ms cutoff reveals the parent at 290ms, then its recent fallback fill delays the sibling that is ready at 320ms until 590ms. Additional same-root work must also reschedule an earlier staged retry.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "pushes out a fast nested sibling retry after the parent fallback is filled",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "reschedules a staged retry when this root shows a newer sibling fallback (second resolves: %s)",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:1bb15958196a3f863961",
@@ -19199,7 +19211,7 @@
     },
     {
       "caseId": "react-case-v1:3ed5955b4581f0098cb4",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactSuspense-test.internal.js",
       "title": "throttles fallback committing globally",
@@ -19207,7 +19219,19 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Public-DOM adaptation of nested and global fallback coordination: dependent data starts during a hidden retry, the outer fallback stays visible until a coalesced reveal, and a fallback in another root supplies the shared retry deadline. The same authored fixture and clock run without act against ReactDOM 19.2.7 and both Octane compile modes; Scheduler render logs are not ported.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "throttles fallback committing globally while starting dependent data before reveal",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "uses a recently shown fallback in another root as the retry deadline",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:3ed899d41efc027080a4",
@@ -24451,7 +24475,7 @@
     },
     {
       "caseId": "react-case-v1:5061974b06dcb5d267de",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactSuspense-test.internal.js",
       "title": "does not throttle fallback committing for too long",
@@ -24459,7 +24483,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Public-DOM adaptation of the bounded nested fallback wait, compared against ReactDOM 19.2.7 with both Octane compile modes. When the parent resolves at 100ms but nested data stays pending, its content and the inner fallback reveal at 300ms rather than waiting indefinitely. The nested content then observes the new retry window when it resolves.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "does not throttle fallback committing for too long when nested data stays pending",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:507b6b1070a49113c192",
@@ -31911,7 +31942,7 @@
     },
     {
       "caseId": "react-case-v1:691a956bfc6f988a0ff4",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactSuspenseWithNoopRenderer-test.js",
       "title": "top level render",
@@ -31919,7 +31950,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Adapts the enableLegacyCache-gated startTransition/top-level-render declaration to public DOM root.render. The regression shows the initial fallback, resolves it, then keeps committed content and DOM identity through 100000ms of a standalone startTransition before resolving the next page. Both Octane compile modes pass, and restoring the old 5000ms timeout makes the hold assertion fail. No-op Scheduler logs and the disabled legacy-cache harness are not executed.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/transition-timeout.test.ts",
+          "testName": "standalone startTransition holds root.render content through 100000ms and resolves",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:691e069531fc7a829521",
@@ -51367,7 +51405,7 @@
     },
     {
       "caseId": "react-case-v1:abb8cb4e8c483c3341a7",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactSuspenseWithNoopRenderer-test.js",
       "title": "hooks",
@@ -51375,7 +51413,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Adapts the enableLegacyCache-gated startTransition/hooks declaration to a function-component useState setter wrapped in standalone startTransition. After an initial pending mount resolves, committed content and DOM identity survive 100000ms before the next page resolves. Both Octane compile modes pass, and restoring the old 5000ms timeout makes the hold assertion fail. The upstream empty-to-initial-page setup and no-op Scheduler logs are replaced by public DOM observations; the disabled legacy-cache harness is not executed.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/transition-timeout.test.ts",
+          "testName": "standalone startTransition holds useState content through 100000ms and resolves",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:abba5ff5ac0d23db8bd2",
@@ -70174,7 +70219,7 @@
     },
     {
       "caseId": "react-case-v1:e7bde9cf9f174bddb28e",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactSuspenseWithNoopRenderer-test.js",
       "title": "throttles content from appearing if a fallback was shown recently",
@@ -70182,7 +70227,19 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "The upstream declaration is enableLegacyCache-gated in both pinned inventories. Its current retry-throttle outcome is covered as a public-DOM adaptation: fully ready content remains behind a recently shown fallback, including nested retries that coalesce before reveal. The same fixture runs without act against ReactDOM 19.2.7 and both Octane compile modes; this is not execution of the disabled legacy-cache harness or the canary runtime.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "keeps a fallback visible when data resolves at 100ms, then reveals at 300ms",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "throttles fallback committing globally while starting dependent data before reveal",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:e7dfe7bfcae7ecb34315",
@@ -71774,7 +71831,7 @@
     },
     {
       "caseId": "react-case-v1:ece919e3eacf1615b439",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactSuspenseWithNoopRenderer-test.js",
       "title": "throttles content from appearing if a fallback was filled in recently",
@@ -71782,7 +71839,14 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "The upstream declaration is enableLegacyCache-gated in both pinned inventories. A public-DOM adaptation proves that filling one fallback restarts the shared retry window for another boundary, even when that boundary originally suspended much earlier. The same fixture and no-act clock run against ReactDOM 19.2.7 and both Octane compile modes; the disabled legacy-cache harness and canary runtime are not executed.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "throttles content from appearing if a fallback was filled in recently",
+          "modes": ["client", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ecf2cad02434850d2d2e",

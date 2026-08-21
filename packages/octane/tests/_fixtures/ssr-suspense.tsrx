@@ -122,6 +122,20 @@ export function Boundary(props) @{
 	</div>
 }
 
+export function ThrownResourceBoundary(props: { read: () => string; promise: Promise<string> }) @{
+	<div>
+		@try {
+			const resource = props.read();
+			const seeded = use(props.promise);
+			<span class="resource-value">{resource + ':' + seeded as string}</span>
+		} @pending {
+			<span class="resource-loading">loading resource</span>
+		} @catch (error: unknown, _reset: () => void) {
+			<span class="resource-error">{String(error)}</span>
+		}
+	</div>
+}
+
 // Plain async components return a fresh Promise on every server replay. The
 // surrounding boundary must render their eventual descriptor or catch their
 // rejection without leaving a superseded Promise unobserved.

@@ -6,6 +6,7 @@ import { compile } from '../src/compiler/compile.js';
 import { lowerUniversalRendererRegionAst } from '../src/compiler/compile-universal.js';
 import { normalizeRendererConfig } from '../src/compiler/renderers.js';
 import * as UniversalRuntime from '../src/universal.js';
+import { act } from '../src/index.js';
 import {
 	createObjectContainer,
 	createObjectDriver,
@@ -4074,10 +4075,10 @@ describe('mixed DOM and universal ownership', () => {
 		expect(container.instanceCount).toBe(0);
 
 		failRetry = true;
-		resolve('ready');
-		await pending;
-		await Promise.resolve();
-		await Promise.resolve();
+		await act(async () => {
+			resolve('ready');
+			await pending;
+		});
 
 		expect(mounted.find('.caught').textContent).toBe('caught: object retry failed');
 		expect(container.commits).toHaveLength(0);
