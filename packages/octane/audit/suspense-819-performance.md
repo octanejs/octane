@@ -1,10 +1,10 @@
 # Suspense retry coordination: performance evidence
 
-Deterministic baseline: `7e8a1a242f40940bfc8c675add03f268eb1fd2fc`. The baseline runtime and compiler were archived from that commit, and the candidate was remeasured after rebasing onto it. Both revisions use the same installed dependencies, benchmark fixtures, and runners. The earlier SSR timing provenance is retained explicitly below.
+Deterministic baseline: `9b06e47ff702b2ab3ff5ad32feb1ea8ce9ebb8e0`. The baseline runtime and compiler were archived from that commit, and the candidate was remeasured after merging it. Both revisions use the same installed dependencies, benchmark fixtures, and runners. The earlier SSR timing provenance is retained explicitly below.
 
 Measured candidate SHA-256:
 
-- `runtime.ts`: `6cd652192cf7b6f04d2e623916005bff7a6329194b9f0c4e1d626c805d346616`
+- `runtime.ts`: `3cc456380e61fa495c1c4175e6b009fcee0e1905b23080d1bac53b13e119359f`
 - `runtime.server.ts`: `3d62690e95b9d68a2fc0090bf952759d9b6065ace238cf4007da022879c1b4f8`
 
 Environment: macOS arm64, Node 26.4.0, esbuild 0.28.1, Vite 8.1.5, `tsrx-core` 0.1.58. Compilation used the repository's supported browser/WASM parser in both revisions because the configured native parser package was unavailable locally. This validates the selected compiler backend, not a native-parser installation.
@@ -31,6 +31,8 @@ Environment: macOS arm64, Node 26.4.0, esbuild 0.28.1, Vite 8.1.5, `tsrx-core` 0
 
 The behavior-only bundle is byte-identical and still excludes `runtime.ts`. All **993 non-bundle hook-memo metrics** are unchanged, including compiled fixture sizes. Values, callback identities, and observer controls pass; fixture/entry/observer/runner hashes match. The inline declaration dependency-hit case still creates zero function expressions and zero arrays over 32 renders.
 
+The measured client bundles are also byte-identical to the preceding `7e8a1a2` comparison. These export probes do not measure the upstream hydration-text path added by the latest merge.
+
 ## Deterministic controls
 
 Use the existing [hook-memo runner](../../../benchmarks/hook-memo/run.mjs) against each source root:
@@ -50,7 +52,7 @@ Server probes use the same build/compression flags with `platform: "neutral"` an
 
 ## SSR timing results
 
-The timing runs below used the earlier baseline `44c4658757be5bbf080535c667806777c226ce5e`. Its runtime/compiler/benchmark sources are unchanged at `7e8a1a2`. Rebuilding after the rebase produced a byte-identical candidate SSR bundle; the new baseline differs only in twelve `//#region` temporary-directory comments. Canonicalizing only those comment paths produces identical baseline output hashes. The proof is retained in `octane-819-livebase-comparison.json`; these remain the original timing runs, not a new wall-clock experiment.
+The timing runs below used the earlier baseline `44c4658757be5bbf080535c667806777c226ce5e`. Its server runtime, compiler, and benchmark sources are unchanged at `9b06e47`. Rebuilding after the merge produced a byte-identical candidate SSR bundle; the new baseline differs only in twelve `//#region` temporary-directory comments. Canonicalizing only those comment paths produces identical baseline output hashes. The proof is retained in `octane-819-latestbase-comparison.json`; these remain the original timing runs, not a new wall-clock experiment.
 
 Use the existing [SSR-throughput runner and fixtures](../../../benchmarks/ssr-throughput/README.md), with only the selected revision's server/static entry aliases and the supported compiler backend changed during the production build. The benchmark runner itself is unchanged.
 
@@ -75,11 +77,11 @@ Candidate scores lie within the observed baseline ranges. These short desktop sa
 
 The investigation retains full JSON and reproduction helpers under `/private/tmp`:
 
-- `octane-819-hook-memo-{livebase,merged-candidate}.json`
-- `octane-819-runtime-{livebase,merged-candidate}.json` and `octane-819-runtime-probe.mjs`
-- `octane-819-ssr-bundles-{livebase,merged-candidate}.json`
+- `octane-819-hook-memo-{latestbase,latest-candidate}.json`
+- `octane-819-runtime-{latestbase,latest-candidate}.json` and `octane-819-runtime-probe.mjs`
+- `octane-819-ssr-bundles-{latestbase,latest-candidate}.json` and `octane-819-ssr-bundle-probe.mjs`
 - `octane-819-ssr-perf/{baseline,candidate}/provenance.json`, `comparison.json`, and all per-run JSON
-- `octane-819-ssr-livebase-perf/{baseline,candidate}/provenance.json` and `octane-819-livebase-comparison.json`
-- `octane-819-build-ssr-perf.mjs` and `octane-819-build-ssr-livebase-perf.mjs`, preserving the original benchmark runner and fixture files
+- `octane-819-ssr-latestbase-perf/{baseline,candidate}/provenance.json` and `octane-819-latestbase-comparison.json`
+- `octane-819-build-ssr-perf.mjs` and `octane-819-build-ssr-latestbase-perf.mjs`, preserving the original benchmark runner and fixture files
 
-The archived deterministic baseline is `/private/tmp/octane-819-livebase-JmELvp`; the original timing baseline remains `/private/tmp/octane-819-perf-baseline-roy3kglp`. Native dependency installation was not bypassed to obtain these measurements.
+The archived deterministic baseline is `/private/tmp/octane-819-latestbase-bm1dg3`; the original timing baseline remains `/private/tmp/octane-819-perf-baseline-roy3kglp`. Native dependency installation was not bypassed to obtain these measurements.
