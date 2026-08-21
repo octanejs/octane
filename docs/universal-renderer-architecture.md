@@ -916,13 +916,18 @@ boundary.
 
 Visibility is inherited through owner records. Hidden Activity and retained
 Suspense hosts keep logical/public identity, resources, state, and insertion
-effects while layout/passive effects and event delivery disconnect. Activity
-keeps refs attached; retained Suspense cycles refs through null and reattaches
-the same public instance on reveal. A fallback is a coexisting visible owner,
-not a replacement for the hidden primary, and repeated pending renders cannot
-duplicate either range. Host visibility commands are capability-gated and
-transactional, so an aborted or rejected transition leaves the accepted tree
-unchanged.
+effects while public refs, layout/passive effects, and event delivery disconnect.
+Initially hidden hosts do not publish refs; reveal attaches the latest ref to
+the preserved public instance. A recycling driver's physical attachment
+notification cannot reconnect a logically hidden ref. Hidden Activity contains
+suspension and retains its accepted range without activating an outer fallback;
+ordinary errors still reach the enclosing error boundary. Retained Suspense's
+fallback is a coexisting visible owner, not a replacement for its hidden
+primary, and repeated pending renders cannot duplicate either range. Host
+visibility commands are capability-gated and transactional, so an aborted or
+rejected transition leaves the accepted tree unchanged. See the
+[Activity audit](./activity-audit.md) for the React reference and executable
+coverage.
 
 The universal runtime preserves Octane's compiler-assigned slot model,
 dependency inference, current-state getter, and parallel-`use()` behavior.
@@ -1149,8 +1154,8 @@ The object driver and executable fixtures demonstrate:
   template directive, Providers/consumers, early returns, errors, and retained
   suspension;
 - remove followed by resource destroy;
-- public callback/object ref attachment after commit and detachment on change
-  or teardown;
+- public callback/object ref attachment after commit, detachment on accepted
+  hide/change/teardown, and reconnection of the current ref on reveal;
 - insertion/layout/passive effect ordering around the batch;
 - prepared-token abort, render error, and suspension with no public mutation
   and exact staged-resource release;
@@ -1199,7 +1204,7 @@ declare, implement, or reject these independently.
 | Events | Driver classification lowers event props to listener-ID/priority commands; replacement, removal, teardown, owner-routed dispatch, and scoped multi-listener delivery are transactional. The local Three driver supplies the R3F-shaped ray/pointer surface. | A transported renderer must serialize native delivery/priority semantics. There is deliberately no synthetic event layer. |
 | Styles | No renderer-neutral style object or stylesheet lifecycle. | Add typed renderer extensions for material/style application and disposal; do not copy CSS rules into native renderers. |
 | Assets | No prepare-time asset allocation. | Add cancellable/resource-owned capabilities whose acquisition is staged or externally cached. |
-| Visibility / `Activity` | Core-owned Activity and retained Suspense issue capability-gated visibility commands, retain identity/resources/insertion effects, disconnect events and layout/passive effects, and apply their distinct ref contracts. Three maps that state onto `Object3D.visible`, and its client pending/error projection is implemented. | Cross-boundary DOM-owner Activity propagation remains separate from local Three visibility. |
+| Visibility / `Activity` | Core-owned Activity and retained Suspense issue capability-gated visibility commands, retain identity/resources/insertion effects, and disconnect public refs, events, and layout/passive effects. Hidden Activity contains suspension without replacing the visible shell; reveal reconnects the current refs. Three maps visibility onto `Object3D.visible`, and its client pending/error projection is implemented. | Cross-boundary DOM-owner Activity propagation remains separate from local Three visibility. |
 | Portal | `createPortal` creates a logical range whose hosts are placed under an opaque, root-scoped driver target handle. Registration, stable reuse, retarget, retained Suspense, abort, rejected preparation, removal, and teardown are transactional. Three Milestone 6 supplies borrowed `Object3D` targets, R3F-style state/event enclaves, nested context, shared frame/interaction state, and physical Three event bubbling. | Transported renderers must resolve serializable target tokens without sharing local objects; cross-renderer portals remain unsupported. |
 | Hydration / serialization | Client-only renderers preserve server exports, omit declared regions, and expose stable manifest identity for one client mount without serializing the host tree. | A live renderer serializer/adopter must define seed identity and mismatch behavior separately; absence remains valid. |
 | Layout measurement | Local public instances are available after commit. A transported adapter installs a cloned public/layout snapshot before acknowledgement; refs and layout effects run only after that acknowledgement. There is no neutral live measure call. | A native renderer may add an explicitly asynchronous measure capability; it must not imply synchronous access to a remote live object. |
@@ -1234,9 +1239,10 @@ The architecture is acceptable only while these invariants hold:
 9. The committed logical topology advances only with the accepted batch.
 10. Reordering a keyed range preserves compatible survivor host identity and
     produces the requested final order without physical comment markers.
-11. Public refs attach only after their instances exist, detach only after the
-    replacement/removal batch is accepted and before any replacement ref
-    attaches, and never observe an abandoned draft.
+11. Public refs attach only after their instances exist and are logically
+    visible, detach only after the hide/replacement/removal batch is accepted
+    and before any replacement ref attaches, and never observe an abandoned
+    draft. Physical reattachment does not override logical visibility.
 12. A mixed boundary reads context and routes render errors through its owning
     DOM scope; its host commit is gated by that scope's layout commit.
 13. Renderer events become visible only with their accepted host batch;
@@ -1280,7 +1286,7 @@ observation boundaries:
 | Mixed ownership | A DOM parent provides context to an object child; child render errors reach the DOM error owner; ref and effect ordering straddle the single object commit correctly; DOM unmount tears the external root down. |
 | Renderer regions | Imported aliases and stable module/export metadata lower `Canvas`-shaped DOM-to-universal children and explicit-target `DOMRegion` universal-to-DOM children through the same descriptor mechanism. |
 | Events | Registration, replacement, removal, scoped multi-listener dispatch, priority, teardown, and abandoned work are observable on the object driver's public surface. |
-| Retained ownership | Activity and Suspense prove host/state/resource identity, visibility, distinct ref semantics, insertion retention, layout/passive disconnection, event suppression, fallback coexistence, reveal/reject, and capability failure. |
+| Retained ownership | Activity and Suspense prove host/state/resource identity, visibility, ref disconnection/reconnection, insertion retention, layout/passive disconnection, event suppression, hidden-Activity suspension containment, fallback coexistence, reveal/reject, and capability failure. |
 | Client-only graph | Neutral, Vite, Rspack, and Rsbuild builds remove server imports/regions, preserve exports without authored execution, reject live use, and agree on client-reference/manifest identity; raw Rspack proves graph split and Vite/Rsbuild prove one client mount over an adopted DOM shell. |
 | Compiler facilities | Universal maps point to authored TSRX; HMR, profiling, and parallel-`use()` plans remain executable; Volar chooses file-local intrinsics without global merging; the DOM golden stays byte-identical. |
 | Capability gates | Text and Activity/visibility compile only under explicit policies. Portal descriptors materialize normally, renderer metadata may advertise them for tooling, and preparation requires an active driver target capability. Missing capabilities and every unsupported renderer concept fail clearly. |

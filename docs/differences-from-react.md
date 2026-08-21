@@ -702,8 +702,11 @@ Other consequences:
   unchanged values (the concurrent-interleaving window it guards doesn't exist
   here).
 - A hidden `<Activity>` subtree renders synchronously in the same pass — there
-  is no offscreen/idle lane deprioritizing hidden work. Hide/reveal semantics
-  (state preserved, effects unmounted while hidden) match React.
+  is no offscreen/idle lane deprioritizing hidden work. Compatible state and DOM
+  are preserved; refs and layout/passive effects disconnect while hidden and
+  reconnect on reveal. Insertion effects stay connected. Hidden suspension is
+  contained by the Activity, but general structural-deletion atomicity still has
+  the per-swap limitation above. See the [Activity audit](./activity-audit.md).
 - `useId` generates `:<prefix>in-<n>:` identifiers (React 19.2 uses
   `_r_<n>_`). Both are opaque; only the format differs.
 - `version` reports Octane's own package version (`0.x`), not a React version —

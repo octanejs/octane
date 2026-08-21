@@ -1942,8 +1942,8 @@ function rollbackTransitionJournal(checkpoint: number): void {
 // inventing a staged-mutation reconciler mode.
 //
 // Activation model (resolved at the end of the wrapped drain):
-//   enter  — a boundary block REGISTERED during the drain (subtree inserted).
-//   exit   — a pre-drain boundary block DISPOSED by the drain (subtree removed).
+//   enter  — a boundary gains visible hosts (subtree inserted or Activity revealed).
+//   exit   — a boundary loses its visible hosts (subtree removed or Activity hidden).
 //   update — a surviving boundary that was dirtied by a tracked mutation
 //            (setText under the boundary) or whose first element's rect moved.
 // Names: every pre-drain boundary is pre-named before the snapshot (a superset
@@ -2010,7 +2010,9 @@ export class ViewTransitionPseudoElement {
 		return document.documentElement.animate(keyframes, opts);
 	}
 	getAnimations(): Animation[] {
-		const all = document.documentElement.getAnimations?.() ?? [];
+		// Native transition pseudos belong to the document element's pseudo tree,
+		// not its own animation list. Include that subtree before selecting ours.
+		const all = document.documentElement.getAnimations?.({ subtree: true }) ?? [];
 		const out: Animation[] = [];
 		for (const a of all) {
 			const effect = a.effect as { pseudoElement?: string } | null;
@@ -2076,8 +2078,6 @@ interface ViewTransitionDriver {
 let VIEW_TRANSITION_DRIVER: ViewTransitionDriver | null = null;
 /** Mounted boundary blocks; pruned lazily (disposed) + on unmount. */
 const VT_REGISTRY = /* @__PURE__ */ new Set<Block>();
-/** Boundary blocks registered during the CURRENT wrapped drain (→ enter). */
-let VT_ENTERED: Block[] = [];
 /** Boundaries dirtied by tracked mutations during the current wrapped drain. */
 const VT_DIRTY = /* @__PURE__ */ new Set<Block>();
 /** True while the wrapped drain (the update callback's flushWork) runs. */
@@ -2131,18 +2131,30 @@ function vtMarkDirtyFromCurrentBlock(): void {
 	}
 }
 
-/** Top-level ELEMENT nodes of a boundary block's DOM range. */
+/** Whether a retained visibility boundary owns this host or one of its ancestors. */
+function vtHostVisible(element: Element): boolean {
+	if (hiddenDisplayNodes === 0) return true;
+	for (let node: Node | null = element; node !== null; node = node.parentNode) {
+		if (node.nodeType === 1 && HIDDEN_DISPLAYS.has(node as HTMLElement)) return false;
+	}
+	return true;
+}
+
+/** Top-level visible ELEMENT nodes of a boundary block's DOM range. */
 function vtRangeElements(block: Block): Element[] {
 	const els: Element[] = [];
+	if (inInactiveSubtree(block)) return els;
 	if (block.startMarker !== null && block.endMarker !== null) {
 		for (let n = block.startMarker.nextSibling; n !== null && n !== block.endMarker;) {
-			if (n.nodeType === 1) els.push(n as Element);
+			if (n.nodeType === 1 && vtHostVisible(n as Element)) els.push(n as Element);
 			n = n.nextSibling;
 		}
 	} else {
 		// Whole-container regime (root / owns-parent): every element child.
 		const kids = (block.parentNode as Element).children;
-		for (let i = 0; i < kids.length; i++) els.push(kids[i]);
+		for (let i = 0; i < kids.length; i++) {
+			if (vtHostVisible(kids[i])) els.push(kids[i]);
+		}
 	}
 	return els;
 }
@@ -2454,11 +2466,10 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 		queueAllTransition,
 		renderBoundary(block, props) {
 			if (block.vt === null) {
-				// Registration during a wrapped drain is an enter activation; otherwise
-				// the block simply joins the mounted-boundary registry.
+				// Visibility snapshots decide activation: retained Activity boundaries
+				// can enter/exit without changing this mounted-boundary registration.
 				block.vt = props;
 				VT_REGISTRY.add(block);
-				if (VT_DRAIN) VT_ENTERED.push(block);
 			} else {
 				block.vt = props;
 			}
@@ -2881,6 +2892,7 @@ interface ScheduledVisibilityDriver {
 	find: typeof findHiddenRenderOwner;
 	reveal: typeof attemptHiddenReveal;
 	rehide: typeof rehideActivityAfterDescendantRender;
+	retryActivity: typeof renderHiddenActivity;
 }
 
 let SCHEDULED_VISIBILITY_DRIVER: ScheduledVisibilityDriver | null = null;
@@ -2890,6 +2902,7 @@ function ensureScheduledVisibilityDriver(): void {
 		find: findHiddenRenderOwner,
 		reveal: attemptHiddenReveal,
 		rehide: rehideActivityAfterDescendantRender,
+		retryActivity: renderHiddenActivity,
 	};
 }
 
@@ -2902,6 +2915,7 @@ function ensureScheduledVisibilityDriver(): void {
 // failed roots in one flush aggregate like React (AggregateError).
 function drainQueue(): { err: any } | null {
 	let pendingError: { err: any; all: any[] } | null = null;
+	let activitiesToRehide: Set<ActivitySlot> | null = null;
 	const drainId = ++DRAIN_ID;
 	if (QUEUE.length > 1) sortWaveByDepth(QUEUE);
 	// Iterate by index. A render may enqueue MORE work (e.g. a setState during
@@ -2937,6 +2951,19 @@ function drainQueue(): { err: any } | null {
 				block.nestedUpdateError = false;
 				throw maximumUpdateDepthError();
 			}
+			// Guarded render-phase updates (derived state) converge in a couple of
+			// passes; an unguarded one re-queues its own block forever. Cap per-block
+			// renders within one drain so the loop throws (catchable by @try /
+			// ErrorBoundary, like React's equivalent) instead of hanging. A hidden
+			// boundary retry must obey the same limit as an ordinary render.
+			if (block.drainStamp === drainId) {
+				if (++block.drainRenders > RENDER_PHASE_UPDATE_LIMIT) {
+					throw crossRenderUpdate ? maximumUpdateDepthError() : new Error(formatClientError(9));
+				}
+			} else {
+				block.drainStamp = drainId;
+				block.drainRenders = 1;
+			}
 			// An update to a block inside a SUSPENSE-HIDDEN subtree (its boundary's
 			// committed host content is hidden while the fallback shows) must retry
 			// the WHOLE boundary. The hidden render and fallback/reveal decision stay
@@ -2947,24 +2974,17 @@ function drainQueue(): { err: any } | null {
 				visibilityDriver!.reveal(hiddenTry, block.pendingMode ?? 'urgent');
 				continue;
 			}
-			// Guarded render-phase updates (derived state) converge in a couple of
-			// passes; an unguarded one re-queues its own block forever. Cap per-block
-			// renders within one drain so the loop throws (catchable by @try /
-			// ErrorBoundary, like React's equivalent) instead of hanging.
-			if (block.drainStamp === drainId) {
-				if (++block.drainRenders > RENDER_PHASE_UPDATE_LIMIT) {
-					throw crossRenderUpdate ? maximumUpdateDepthError() : new Error(formatClientError(9));
-				}
-			} else {
-				block.drainStamp = drainId;
-				block.drainRenders = 1;
+			if (hiddenActivity !== null && hiddenActivity.pendingThenable !== null) {
+				visibilityDriver!.retryActivity(hiddenActivity, true);
+				continue;
 			}
 			// An urgent render can install its first Suspense driver. Pair both
 			// hooks with the same captured driver rather than rereading it after render.
 			const transitionSwap = TRANSITION_SWAP_DRIVER;
 			const attempt = transitionSwap === null ? null : transitionSwap.begin(block);
 			try {
-				renderBlock(block);
+				if (hiddenActivity !== null) visibilityDriver!.retryActivity(hiddenActivity, false, block);
+				else renderBlock(block);
 			} finally {
 				if (transitionSwap !== null) transitionSwap.end(attempt);
 			}
@@ -3002,10 +3022,16 @@ function drainQueue(): { err: any } | null {
 			// A descendant render can replace an Activity's direct host root. The
 			// Activity itself did not render, so reapply its visual hide after the
 			// complete attempt (including a captured error or Suspense retry).
-			if (hiddenActivity !== null) visibilityDriver!.rehide(hiddenActivity);
+			if (hiddenActivity !== null) (activitiesToRehide ??= new Set()).add(hiddenActivity);
 		}
 	}
 	QUEUE.length = 0;
+	// Several sibling setters can share one hidden range. Re-scan it once after
+	// the complete render wave, before refs or layout effects can observe it.
+	// No Activity update means no collection/allocation on the ordinary path.
+	if (activitiesToRehide !== null) {
+		for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide(activity);
+	}
 	return pendingError;
 }
 
@@ -3446,13 +3472,16 @@ function vtFlush(work: () => void = flushWork): void {
 	// classes ALL resolve 'none' is left unnamed — the correct deactivation
 	// (a name in the old capture animates regardless).
 	const recs: VtRec[] = [];
+	const visibleBefore = new Set<Block>();
 	for (const b of VT_REGISTRY) {
 		if (b.disposed) {
 			VT_REGISTRY.delete(b);
 			continue;
 		}
-		if (vtAllNone(b.vt, types)) continue;
 		const els = vtRangeElements(b);
+		if (els.length === 0) continue;
+		visibleBefore.add(b);
+		if (vtAllNone(b.vt, types)) continue;
 		const rec: VtRec = { block: b, els, rect: null, name: '', cls: '' };
 		if (els.length > 0 && typeof els[0].getBoundingClientRect === 'function') {
 			const r = els[0].getBoundingClientRect();
@@ -3463,7 +3492,6 @@ function vtFlush(work: () => void = flushWork): void {
 		vtApplyStyles(rec, vtPreClass(b.vt, types));
 		recs.push(rec);
 	}
-	VT_ENTERED = [];
 	VT_DIRTY.clear();
 	VT_STATE = VT_PENDING_UPDATE;
 	VT_HANDLE = null;
@@ -3480,15 +3508,26 @@ function vtFlush(work: () => void = flushWork): void {
 			VT_DRAIN = false;
 		}
 		// Resolve activations from what the drain did.
+		// DOM lifetime is not visibility lifetime: Activity preserves both its
+		// ViewTransition blocks and hosts. Compare visible host contributions on
+		// both sides, including a ViewTransition wrapped AROUND an Activity.
+		const visibleAfter = new Map<Block, Element[]>();
+		for (const b of VT_REGISTRY) {
+			if (b.disposed) continue;
+			const els = vtRangeElements(b);
+			if (els.length > 0) visibleAfter.set(b, els);
+		}
+		const exited = (b: Block): boolean => visibleBefore.has(b) && !visibleAfter.has(b);
 		const exits: VtRec[] = [];
 		for (const rec of recs) {
-			if (rec.block.disposed) {
+			const after = visibleAfter.get(rec.block);
+			if (after === undefined) {
 				exits.push(rec);
 			} else {
 				// The drain may have replaced the boundary's elements — re-enumerate
 				// and re-assert the SAME name so the new capture pairs with the old.
 				const before = rec.els;
-				rec.els = vtRangeElements(rec.block);
+				rec.els = after;
 				const changed = VT_DIRTY.has(rec.block) || vtRectChanged(rec);
 				vtApplyStyles(rec, rec.cls === '' ? 'auto' : rec.cls);
 				if (
@@ -3505,17 +3544,19 @@ function vtFlush(work: () => void = flushWork): void {
 		// part of a subtree inserted as ONE unit — only the outermost animates
 		// (React's rule); nested ones stay silent unless they opt into the
 		// parent-enter relay (resolved after share pairing below).
-		const enteredSet = new Set(VT_ENTERED);
+		const enteredSet = new Set<Block>();
+		for (const b of visibleAfter.keys()) {
+			if (!visibleBefore.has(b)) enteredSet.add(b);
+		}
 		const enters: VtRec[] = [];
 		const nestedEntered: Block[] = [];
-		for (const b of VT_ENTERED) {
-			if (b.disposed) continue;
+		for (const b of enteredSet) {
 			const anc = vtNearestBoundaryAncestor(b);
 			if (anc !== null && enteredSet.has(anc)) {
 				nestedEntered.push(b);
 				continue;
 			}
-			const rec: VtRec = { block: b, els: vtRangeElements(b), rect: null, name: '', cls: '' };
+			const rec: VtRec = { block: b, els: visibleAfter.get(b)!, rect: null, name: '', cls: '' };
 			const cls = vtResolveClass(b.vt, 'enter', types);
 			// An explicit name always applies (it may pair a share); an unnamed
 			// 'none' enter is fully inert — skip naming and activation.
@@ -3569,7 +3610,7 @@ function vtFlush(work: () => void = flushWork): void {
 			// outermost fires (React's rule). Share pairing above still gets first
 			// claim (a named nested boundary may pair out of a removed unit).
 			const anc = vtNearestBoundaryAncestor(exitRec.block);
-			if (anc !== null && anc.disposed) continue;
+			if (anc !== null && exited(anc)) continue;
 			if (vtResolveClass(exitRec.block.vt, 'exit', types) !== 'none') {
 				acts.push({ kind: 'exit', rec: exitRec });
 			}
@@ -3584,7 +3625,7 @@ function vtFlush(work: () => void = flushWork): void {
 			if (!vtRelayParticipates(vt, 'parent-exit')) continue;
 			// A boundary consumed by a share pair never also parent-relays.
 			if (sharedBlocks.has(rec.block)) continue;
-			const outer = vtRelayOutermost(rec.block, 'parent-exit', (x) => x.disposed, types);
+			const outer = vtRelayOutermost(rec.block, 'parent-exit', exited, types);
 			if (outer === null || sharedBlocks.has(outer)) continue;
 			if (vtResolveClass(outer.vt, 'exit', types) === 'none') continue;
 			const cls = vtResolveClass(vt, 'parent-exit', types);
@@ -3598,7 +3639,7 @@ function vtFlush(work: () => void = flushWork): void {
 			if (vtResolveClass(outer.vt, 'enter', types) === 'none') continue;
 			const cls = vtResolveClass(b.vt, 'parent-enter', types);
 			if (cls === 'none') continue;
-			const rec: VtRec = { block: b, els: vtRangeElements(b), rect: null, name: '', cls: '' };
+			const rec: VtRec = { block: b, els: visibleAfter.get(b)!, rect: null, name: '', cls: '' };
 			vtApplyStyles(rec, cls);
 			recs.push(rec);
 			acts.push({ kind: 'parent-enter', rec });
@@ -3785,6 +3826,7 @@ const LAYOUT_CASCADE_LIMIT = 50;
  * hopping between elements never ends null, whichever binding updates first.
  */
 export function queueRefAttach(scope: Scope, ref: any, el: Element | FragmentInstance): void {
+	activityRefCreated?.(scope.block, el);
 	(WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue).push({
 		ref,
 		el,
@@ -3817,6 +3859,8 @@ const refDetachQueue: any[] = [];
  */
 export function queueRefDetach(ref: any, el: Element | FragmentInstance | null): void {
 	if (ref == null || isRefDetachSuppressed(el)) return;
+	const activity = el === null ? undefined : activityRefState?.get(el);
+	if (activity?.hidden && activity.connected !== ref) return;
 	// Capture the active teardown boundary (if we're inside an unmount walk) so a
 	// throwing detach at drain time routes there — React's safelyDetachRef →
 	// captureCommitPhaseError (ReactErrorBoundaries:2782).
@@ -3921,6 +3965,11 @@ function drainRefAttaches(): void {
 		// re-run on a torn-down node — firing a callback ref on a dead element and
 		// resurrecting an object ref the cleanup just nulled.
 		if (blockSubtreeDisposed(r.block)) continue;
+		const activity = activityRefState?.get(r.el);
+		if (activity !== undefined && findHiddenActivity(r.block) !== null) {
+			activity.hidden = true;
+			continue;
+		}
 		try {
 			REF_CALLBACK_DEPTH++;
 			try {
@@ -6233,6 +6282,7 @@ function finishEffectRender(scope: Scope): void {
 	for (let i = 0; i < effects.length; i++) {
 		const effect = effects[i];
 		if (effect.renderVersion === CURRENT_EFFECT_RENDER_VERSION) continue;
+		if (effect.phase === INSERTION) invalidateInsertionReplay(effect);
 		if (!effect.active) continue;
 		// Reaching this call site again must recreate even when its authored deps
 		// are unchanged.
@@ -6251,12 +6301,17 @@ function finishEffectRender(scope: Scope): void {
 			phase: effect.phase,
 			seq: commitSeq++,
 		});
+		markEffectReconnectQueued(effect, effect.phase, target);
 	}
 }
 
 function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, phase: Phase): void {
 	const scope = CURRENT_SCOPE!;
 	const prev = scope.hooks?.get(slot) as EffectSlot | undefined;
+	if (phase === INSERTION) {
+		if (prev === undefined) activityInsertionEffectCreated?.(scope.block);
+		else invalidateInsertionReplay(prev);
+	}
 	const renderVersion = ensureEffectRenderVersion();
 	const firstReach = prev !== undefined && prev.renderVersion !== renderVersion;
 	if (firstReach) {
@@ -11353,6 +11408,18 @@ export function sibling(node: Node, n: number = 1): Node | null {
 // these helpers are unconditional "set this now" with internal data check.
 // ---------------------------------------------------------------------------
 
+// Optional visibility overlays must not add a WeakMap lookup to ordinary text
+// or style updates. Their writers are installed only while hidden hosts exist.
+let hiddenTextWriter: ((node: Text, value: string) => boolean) | null = null;
+let hiddenStyleWriter:
+	((el: HTMLElement | SVGElement, value: any, previous: any, property?: string) => boolean) | null =
+	null;
+
+function updateTextValue(node: Text, value: string): void {
+	if (hiddenTextWriter !== null && hiddenTextWriter(node, value)) return;
+	if (node.nodeValue !== value) node.nodeValue = value;
+}
+
 export function setText(node: Text, value: any): void {
 	// Unconditional write: the compiler's only emission site guards every call
 	// with `if (_b._prev$ !== _v)`, and `_prev` mirrors the node's current text
@@ -11370,7 +11437,9 @@ export function setText(node: Text, value: any): void {
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
 	// for the hot text-update path.
-	node.nodeValue = coerceText(value);
+	const text = coerceText(value);
+	if (hiddenTextWriter !== null && hiddenTextWriter(node, text)) return;
+	node.nodeValue = text;
 }
 
 /**
@@ -11599,7 +11668,41 @@ function dangerouslySetInnerHTMLOwnsChild(parent: Node, value: unknown): boolean
 const refCleanups = new WeakMap<(el: any) => unknown, WeakMap<object, () => void>>();
 const refLastCleanupTarget = new WeakMap<(el: any) => unknown, object>();
 
+interface ActivityRefState {
+	connected: any;
+	hidden: boolean;
+}
+
+// Record actual committed ref identities only when an Activity is in use. A
+// hidden render may already have replaced its manifest's ref before cleanup;
+// the committed identity is the one that must be disconnected exactly once.
+let activityRefState: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null;
+let activityRefCreated: ((block: Block, target: Element | FragmentInstance) => void) | null = null;
+let activityInsertionEffectCreated: ((block: Block) => void) | null = null;
+let activityRefOwners: WeakMap<Block, boolean> | null = null;
+let liveActivityCount = 0;
+
 export function attachRef(
+	ref: any,
+	el: Element | FragmentInstance | null,
+	prevTarget?: Element | FragmentInstance | null,
+): void {
+	if (ref == null) return;
+	const target = el ?? prevTarget;
+	const activity = target == null ? undefined : activityRefState?.get(target);
+	if (activity !== undefined) {
+		if (el !== null) {
+			activity.hidden = false;
+			activity.connected = ref;
+		} else if (prevTarget != null) {
+			if (activity.hidden && activity.connected !== ref) return;
+			if (activity.connected === ref) activity.connected = null;
+		}
+	}
+	applyRefValue(ref, el, prevTarget);
+}
+
+function applyRefValue(
 	ref: any,
 	el: Element | FragmentInstance | null,
 	prevTarget?: Element | FragmentInstance | null,
@@ -11631,7 +11734,7 @@ export function attachRef(
 		return;
 	}
 	if (Array.isArray(ref)) {
-		for (let i = 0; i < ref.length; i++) attachRef(ref[i], el, prevTarget);
+		for (let i = 0; i < ref.length; i++) applyRefValue(ref[i], el, prevTarget);
 		return;
 	}
 	ref.current = el;
@@ -11673,13 +11776,29 @@ export const Fragment = Symbol.for('octane.Fragment') as unknown as (props: {
 	ref?: FragmentRefValue;
 }) => unknown;
 
-/**
- * React-19 `<Activity mode="hidden"|"visible">` sentinel. The compiler matches
- * the `Activity` tag by NAME (so this export is only needed so user imports
- * `import { Activity } from 'octane'` resolve); the runtime work happens in
- * `activityBlock`.
- */
-export const Activity: unique symbol = Symbol.for('octane.Activity');
+interface ActivityDescriptorDispatch {
+	type: symbol;
+	body: ComponentBody;
+}
+
+// Generic element reconciliation must not retain the optional Activity engine.
+// Importing the public sentinel installs its cold dispatch capability; direct
+// compiled Activities already call activityBlock and do not need this wrapper.
+let activityDescriptorDispatch: ActivityDescriptorDispatch | null = null;
+
+function initializeActivitySentinel(): symbol {
+	const type = Symbol.for('octane.Activity');
+	activityDescriptorDispatch = { type, body: renderActivityDescriptor };
+	return type;
+}
+
+/** Activity keeps its runtime sentinel identity while accepting ordinary JSX props. */
+export const Activity = /* @__PURE__ */ initializeActivitySentinel() as unknown as (props: {
+	mode?: 'visible' | 'hidden';
+	children?: unknown;
+	name?: string;
+	key?: string | number | bigint | null | undefined;
+}) => unknown;
 
 export class FragmentInstance {
 	/**
@@ -13010,6 +13129,7 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 	// The whole style attribute, not the individual declarations applyStyleValue
 	// is about to touch: restoring the attribute text restores every one of them.
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
+	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, prev)) return;
 	applyStyleValue(el, style, value, prev);
 }
 
@@ -13036,6 +13156,7 @@ export function setStyleProperty(
 	// genuinely absent initial longhand from a preserved suspended-mount retry.
 	if (remove && previous === CURRENT_SCOPE) return;
 	if (TRANSITION_JOURNAL !== null) journalAttr(el, 'style');
+	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, previous, name)) return;
 	const style = (el as HTMLElement).style;
 	if (remove) style.removeProperty(styleName(name));
 	else applyStyleProperty(el, style, name, value);
@@ -16324,6 +16445,7 @@ function renderPortalState(
 			__profileTrackComponent(block, profilePortalComponent(rawBody));
 		}
 		state = { __kind: 'portalSlotSlot', block, target, start, end };
+		activityPortalCreated?.(block);
 		// Portal target hosts handlers stamped via the same `el.$$click = …`
 		// mechanism as the main tree, so it needs the delegated event listeners too.
 		// Refcounted: a target hosting two portals attaches once, detaches when the
@@ -17055,14 +17177,30 @@ export function componentSlot(
 	inherit?: boolean,
 	hasKey?: boolean,
 ): void {
-	if (typeof comp !== 'function' && typeof comp !== 'string') {
+	const dispatch = activityDescriptorDispatch;
+	const activity = dispatch !== null && (comp as unknown) === dispatch.type;
+	if (!activity && typeof comp !== 'function' && typeof comp !== 'string') {
 		throw invalidElementTypeError(comp);
 	}
 	// Dynamic JSX tags can resolve to a host STRING at runtime. Keep this
 	// descriptor/de-opt capability in the generic entry point: compiler-proven
 	// void component calls can then retain the function-only core without also
 	// retaining hostStringTagBody, generic attributes, or return reconciliation.
-	const body = typeof comp === 'string' ? (hostStringTagBody as unknown as ComponentBody) : comp;
+	const body = activity
+		? dispatch!.body
+		: typeof comp === 'string'
+			? (hostStringTagBody as unknown as ComponentBody)
+			: comp;
+	if (activity) {
+		// A runtime-selected sentinel cannot advertise compiler boundary flags.
+		// Keep its ordinary component frame symmetric with the server wrapper.
+		singleRoot = false;
+		inherit = false;
+		if (!hasKey && key === undefined && hasElementConfigKey(props)) {
+			key = props.key;
+			hasKey = true;
+		}
+	}
 	const renderProps =
 		typeof comp === 'string'
 			? ({
@@ -18574,7 +18712,7 @@ function reconcileDeoptNode(
 	if (t === 'string' || t === 'number' || t === 'bigint') {
 		const s = String(value);
 		if (prev !== null && prev.nodeType === 3 /* Text */) {
-			if ((prev as Text).nodeValue !== s) (prev as Text).nodeValue = s;
+			updateTextValue(prev as Text, s);
 			return prev;
 		}
 		return document.createTextNode(s);
@@ -19058,7 +19196,11 @@ function descNeedsBlocks(value: any): boolean {
 		// A Fragment descriptor is reconciled by childSlot's fragment-aware list
 		// path. If it appears below a host descriptor, keep that host on the Block
 		// path so the Fragment boundary is not mistaken for a raw host node.
-		if (value.type === Fragment) return true;
+		if (
+			value.type === Fragment ||
+			(activityDescriptorDispatch !== null && value.type === activityDescriptorDispatch.type)
+		)
+			return true;
 		// A component descriptor (function `type`) always needs a Block; a host
 		// descriptor needs one only if its own children do (recurse).
 		return typeof value.type === 'function' || descNeedsBlocks(value.children);
@@ -20329,10 +20471,12 @@ export function childSlot(
 		comp = value as ComponentBody;
 		isBodyFn = true;
 	} else if (isElementDescriptor(value)) {
-		if (typeof value.type !== 'function' && typeof value.type !== 'string') {
+		const dispatch = activityDescriptorDispatch;
+		const activity = dispatch !== null && (value.type as unknown) === dispatch.type;
+		if (!activity && typeof value.type !== 'function' && typeof value.type !== 'string') {
 			throw invalidElementTypeError(value.type);
 		}
-		comp = value.type as ComponentBody;
+		comp = activity ? dispatch!.body : (value.type as ComponentBody);
 		props = value.props;
 	}
 	if (comp !== null) {
@@ -20589,7 +20733,7 @@ export function childSlot(
 		return;
 	}
 	if (state.text !== null) {
-		if (state.text.nodeValue !== str) state.text.nodeValue = str;
+		updateTextValue(state.text, str);
 		return;
 	}
 	if (hydration !== null) {
@@ -20599,7 +20743,7 @@ export function childSlot(
 		if (n !== null && n !== state.end && n.nodeType === 3) {
 			state.text = n as Text;
 			hydration.node = n.nextSibling;
-			if ((n as Text).nodeValue !== str) (n as Text).nodeValue = str;
+			updateTextValue(n as Text, str);
 			return;
 		}
 	}
@@ -20651,7 +20795,7 @@ export function textSlot(
 	const str =
 		vt === 'string' ? (value as string) : vt === 'boolean' || value == null ? '' : String(value);
 	if (state.text !== null) {
-		if (state.text.nodeValue !== str) state.text.nodeValue = str;
+		updateTextValue(state.text, str);
 		return;
 	}
 	if (str === '') return;
@@ -20728,7 +20872,7 @@ export function childTextHole(
 			return null;
 		}
 		if (cachedNode !== null) {
-			if (cachedNode.nodeValue !== str) cachedNode.nodeValue = str;
+			updateTextValue(cachedNode, str);
 			return cachedNode;
 		}
 		const hydration = activeHydration();
@@ -21279,6 +21423,8 @@ interface SuspenseHiddenDom {
 // restore it only after the last owner reveals, independent of hide/reveal order.
 const HIDDEN_DISPLAYS = new WeakMap<HTMLElement, HiddenDisplay>();
 const HIDDEN_TEXTS = new WeakMap<Text, HiddenText>();
+let hiddenDisplayNodes = 0;
+let hiddenTextNodes = 0;
 let HIDDEN_ACTIVITY_NODES: WeakMap<Node, number> | null = null;
 let hiddenActivityNodeOwners = 0;
 
@@ -21309,16 +21455,75 @@ function fragmentHostVisible(node: Node): boolean {
 
 function enforceHiddenDisplay(el: HTMLElement): void {
 	const hidden = HIDDEN_DISPLAYS.get(el);
-	el.style.setProperty(
-		'display',
-		'none',
-		hidden !== undefined && hidden.importantOwners > 0 ? 'important' : '',
-	);
+	const priority = hidden !== undefined && hidden.importantOwners > 0 ? 'important' : '';
+	const style = el.style;
+	if (
+		style.getPropertyValue('display') !== 'none' ||
+		style.getPropertyPriority('display') !== priority
+	)
+		style.setProperty('display', 'none', priority);
+}
+
+function restoreHiddenDisplayValue(el: HTMLElement | SVGElement, display: HiddenDisplay): void {
+	if (display.value === '') el.style.removeProperty('display');
+	else el.style.setProperty('display', display.value, display.priority);
+	if (!display.hadStyle && el.getAttribute('style') === '') el.removeAttribute('style');
+}
+
+/** Apply an authored style against its real previous value, underneath the hide. */
+function writeHiddenStyle(
+	el: HTMLElement | SVGElement,
+	value: any,
+	previous: any,
+	property?: string,
+): boolean {
+	const hidden = HIDDEN_DISPLAYS.get(el as HTMLElement);
+	if (hidden === undefined) return false;
+	if (TRANSITION_JOURNAL !== null) {
+		TRANSITION_JOURNAL.push(
+			JOURNAL_PROP,
+			hidden,
+			'value',
+			hidden.value,
+			JOURNAL_PROP,
+			hidden,
+			'priority',
+			hidden.priority,
+			JOURNAL_PROP,
+			hidden,
+			'hadStyle',
+			hidden.hadStyle,
+		);
+	}
+	restoreHiddenDisplayValue(el, hidden);
+	try {
+		if (property === undefined) applyStyleValue(el, el.style, value, previous);
+		else if (value == null || typeof value === 'boolean')
+			el.style.removeProperty(styleName(property));
+		else applyStyleProperty(el, el.style, property, value);
+	} finally {
+		hidden.value = el.style.getPropertyValue('display');
+		hidden.priority = el.style.getPropertyPriority('display');
+		hidden.hadStyle = el.hasAttribute('style');
+		enforceHiddenDisplay(el as HTMLElement);
+	}
+	return true;
+}
+
+function writeHiddenText(node: Text, value: string): boolean {
+	const hidden = HIDDEN_TEXTS.get(node);
+	if (hidden === undefined) return false;
+	if (TRANSITION_JOURNAL !== null)
+		TRANSITION_JOURNAL.push(JOURNAL_PROP, hidden, 'data', hidden.data);
+	hidden.data = value;
+	return true;
 }
 
 function retainHiddenDisplay(el: HTMLElement, important: boolean): void {
 	const existing = HIDDEN_DISPLAYS.get(el);
 	if (existing === undefined) {
+		hiddenDisplayNodes++;
+		hiddenStyleWriter = writeHiddenStyle;
 		HIDDEN_DISPLAYS.set(el, {
 			owners: 1,
 			importantOwners: important ? 1 : 0,
@@ -21333,15 +21538,14 @@ function retainHiddenDisplay(el: HTMLElement, important: boolean): void {
 	enforceHiddenDisplay(el);
 }
 
-function releaseHiddenDisplay(el: HTMLElement, important: boolean): void {
+function releaseHiddenDisplay(el: HTMLElement, important: boolean, restore = true): void {
 	const display = HIDDEN_DISPLAYS.get(el);
 	if (display === undefined) return;
 	if (important) display.importantOwners--;
 	if (--display.owners === 0) {
 		HIDDEN_DISPLAYS.delete(el);
-		if (display.value === '') el.style.removeProperty('display');
-		else el.style.setProperty('display', display.value, display.priority);
-		if (!display.hadStyle && el.getAttribute('style') === '') el.removeAttribute('style');
+		if (--hiddenDisplayNodes === 0) hiddenStyleWriter = null;
+		if (restore) restoreHiddenDisplayValue(el, display);
 	} else {
 		enforceHiddenDisplay(el);
 	}
@@ -21353,16 +21557,20 @@ function enforceHiddenText(text: Text): void {
 
 function retainHiddenText(text: Text): void {
 	const existing = HIDDEN_TEXTS.get(text);
-	if (existing === undefined) HIDDEN_TEXTS.set(text, { owners: 1, data: text.data });
-	else existing.owners++;
+	if (existing === undefined) {
+		hiddenTextNodes++;
+		hiddenTextWriter = writeHiddenText;
+		HIDDEN_TEXTS.set(text, { owners: 1, data: text.data });
+	} else existing.owners++;
 }
 
-function releaseHiddenText(text: Text): void {
+function releaseHiddenText(text: Text, restore = true): void {
 	const saved = HIDDEN_TEXTS.get(text);
 	if (saved === undefined) return;
 	if (--saved.owners === 0) {
 		HIDDEN_TEXTS.delete(text);
-		text.data = saved.data;
+		if (--hiddenTextNodes === 0) hiddenTextWriter = null;
+		if (restore) text.data = saved.data;
 	} else {
 		enforceHiddenText(text);
 	}
@@ -22837,14 +23045,14 @@ function findHiddenActivity(block: Block | null): ActivitySlot | null {
  * the reveal (drop the pending arm, reactivate effects + refs — the
  * commitResume choreography) or hide it again and stay on the fallback.
  */
-function snapshotSubtreeEffectDeps(scope: Scope): EffectDepsSnapshot {
+function snapshotSubtreeEffectDeps(scope: Scope, phase?: Phase): EffectDepsSnapshot {
 	const snapshot: EffectDepsSnapshot = new Map();
 	const visit = (current: Scope): void => {
-		const hooks = current.hooks;
-		if (hooks !== null) {
-			for (const slot of hooks.values()) {
-				const effect = slot as EffectSlot | undefined;
-				if (effect?.effect === true) {
+		const effects = current.effectSlots;
+		if (effects !== null) {
+			for (let i = 0; i < effects.length; i++) {
+				const effect = effects[i];
+				if (phase === undefined || effect.phase === phase) {
 					snapshot.set(effect, {
 						deps: effect.deps,
 						revision: effect.revision,
@@ -22860,13 +23068,13 @@ function snapshotSubtreeEffectDeps(scope: Scope): EffectDepsSnapshot {
 }
 
 /** Roll hook-cell deps back after a speculative render whose captured commit was discarded. */
-function restoreSubtreeEffectDeps(scope: Scope, snapshot: EffectDepsSnapshot): void {
+function restoreSubtreeEffectDeps(scope: Scope, snapshot: EffectDepsSnapshot, phase?: Phase): void {
 	const visit = (current: Scope): void => {
-		const hooks = current.hooks;
-		if (hooks !== null) {
-			for (const slot of hooks.values()) {
-				const effect = slot as EffectSlot | undefined;
-				if (effect?.effect !== true) continue;
+		const effects = current.effectSlots;
+		if (effects !== null) {
+			for (let i = 0; i < effects.length; i++) {
+				const effect = effects[i];
+				if (phase !== undefined && effect.phase !== phase) continue;
 				const previous = snapshot.get(effect);
 				if (previous === undefined) {
 					// A slot created only by the discarded attempt remains reusable,
@@ -22886,14 +23094,24 @@ function restoreSubtreeEffectDeps(scope: Scope, snapshot: EffectDepsSnapshot): v
 	visit(scope);
 }
 
+type InsertionEffectReplays = Map<EffectSlot, PendingEffect[]>;
+
 interface EffectReconnectContext {
 	root: Block;
 	queues: [PendingEffect[], PendingEffect[], PendingEffect[]];
 	queuedSlots: Set<EffectSlot>;
+	insertionReplays: InsertionEffectReplays | null;
 	parent: EffectReconnectContext | null;
 }
 
 let EFFECT_RECONNECT_CONTEXT: EffectReconnectContext | null = null;
+
+/** A real hook reach/omission supersedes saved work, even when it queues nothing. */
+function invalidateInsertionReplay(effect: EffectSlot): void {
+	for (let context = EFFECT_RECONNECT_CONTEXT; context !== null; context = context.parent) {
+		context.insertionReplays?.delete(effect);
+	}
+}
 
 /** Keep nested reveal contexts aware of effects enqueued by an inner render. */
 function markEffectReconnectQueued(
@@ -22903,6 +23121,27 @@ function markEffectReconnectQueued(
 ): void {
 	for (let context = EFFECT_RECONNECT_CONTEXT; context !== null; context = context.parent) {
 		if (context.queues[phase] === target) context.queuedSlots.add(effect);
+	}
+}
+
+/** An inner suspended attempt must not leave an outer reveal's dedupe armed. */
+function forgetEffectReconnectQueued(
+	effects: Set<EffectSlot>,
+	phase: Phase,
+	target: PendingEffect[],
+): void {
+	for (let context = EFFECT_RECONNECT_CONTEXT; context !== null; context = context.parent) {
+		if (context.queues[phase] !== target) continue;
+		for (const effect of effects) context.queuedSlots.delete(effect);
+		// Work preceding the failed attempt still owns its queue position. Restore
+		// only entries that survived both queue truncation and hook-cell rollback.
+		for (let i = 0; i < target.length; i++) {
+			const entry = target[i];
+			const effect = entry.scope.hooks?.get(entry.slot) as EffectSlot | undefined;
+			if (effect !== undefined && effects.has(effect) && effect.revision === entry.revision) {
+				context.queuedSlots.add(effect);
+			}
+		}
 	}
 }
 
@@ -22917,19 +23156,21 @@ function reconnectBailedEffects(block: Block): void {
 	if (context === null || (block !== context.root && !blockIsAncestorOf(context.root, block)))
 		return;
 
-	const disconnected: Array<{ scope: Scope; effect: EffectSlot }> = [];
+	const disconnected: Array<{ scope: Scope; effect: EffectSlot; replay: PendingEffect[] | null }> =
+		[];
 	const visit = (scope: Scope): void => {
 		const effects = scope.effectSlots;
 		if (effects !== null) {
 			for (let i = 0; i < effects.length; i++) {
 				const effect = effects[i];
-				if (
-					effect.active &&
-					effect.disconnected &&
-					effect.connectedFn !== null &&
-					!context.queuedSlots.has(effect)
-				) {
-					disconnected.push({ scope, effect });
+				if (context.queuedSlots.has(effect)) continue;
+				const replay = context.insertionReplays?.get(effect);
+				if (replay !== undefined) {
+					disconnected.push({ scope, effect, replay });
+					continue;
+				}
+				if (effect.active && effect.disconnected && effect.connectedFn !== null) {
+					disconnected.push({ scope, effect, replay: null });
 				}
 			}
 		}
@@ -22941,23 +23182,43 @@ function reconnectBailedEffects(block: Block): void {
 	// staggered dependency updates would turn commit time into a false source-order
 	// key and reconnect earlier-declared effects after later ones.
 	for (let i = 0; i < disconnected.length; i++) {
-		const { scope, effect } = disconnected[i];
-		context.queues[effect.phase].push({
-			scope,
-			slot: effect.slot,
-			fn: effect.connectedFn!,
-			order: effect.order,
-			revision: effect.revision,
-			args: effect.connectedArgs,
-			phase: effect.phase,
-			seq: commitSeq++,
-		});
-		context.queuedSlots.add(effect);
+		const { scope, effect, replay } = disconnected[i];
+		const queue = context.queues[effect.phase];
+		if (replay !== null) {
+			// A completed memo/cached child can survive a later sibling's suspend.
+			// Its insertion effect has not committed, so replay the retained body at
+			// this bail position; a real rerender would have queued a fresher body.
+			const last = replay[replay.length - 1];
+			effect.active = last.fn !== null;
+			effect.deps = last.fn === null ? undefined : last.args;
+			const revision = ++effect.revision;
+			// Plain-TypeScript custom-hook composition can enqueue several bodies
+			// through one effective slot. They share a revision and all must commit.
+			for (let j = 0; j < replay.length; j++) {
+				queue.push({ ...replay[j], revision, seq: commitSeq++ });
+			}
+		} else {
+			queue.push({
+				scope,
+				slot: effect.slot,
+				fn: effect.connectedFn!,
+				order: effect.order,
+				revision: effect.revision,
+				args: effect.connectedArgs,
+				phase: effect.phase,
+				seq: commitSeq++,
+			});
+		}
+		markEffectReconnectQueued(effect, effect.phase, queue);
 	}
 }
 
 /** Render a reconnecting reveal while leaving ordinary renders allocation-free. */
-function renderWithEffectReconnect(block: Block, capture: OffscreenCapture | null): void {
+function renderWithEffectReconnect(
+	block: Block,
+	capture: OffscreenCapture | null,
+	insertionReplays: InsertionEffectReplays | null = null,
+): void {
 	const queues = capture === null ? effectQueues : capture.effects;
 	const queuedSlots = new Set<EffectSlot>();
 	for (let phase = 0; phase < queues.length; phase++) {
@@ -22965,11 +23226,11 @@ function renderWithEffectReconnect(block: Block, capture: OffscreenCapture | nul
 		for (let i = 0; i < queue.length; i++) {
 			const pending = queue[i];
 			const effect = pending.scope.hooks?.get(pending.slot) as EffectSlot | undefined;
-			if (effect?.effect === true) queuedSlots.add(effect);
+			if (effect?.effect === true && effect.revision === pending.revision) queuedSlots.add(effect);
 		}
 	}
 	const parent = EFFECT_RECONNECT_CONTEXT;
-	EFFECT_RECONNECT_CONTEXT = { root: block, queues, queuedSlots, parent };
+	EFFECT_RECONNECT_CONTEXT = { root: block, queues, queuedSlots, insertionReplays, parent };
 	try {
 		renderBlock(block);
 	} finally {
@@ -24661,6 +24922,25 @@ export function ifBlock(
 // preserved because the block is never disposed while toggling.
 // ---------------------------------------------------------------------------
 
+/** Cold descriptor/dynamic-tag path; direct compiled Activities call activityBlock. */
+function renderActivityDescriptor(props: any, scope: Scope): void {
+	const block = scope.block;
+	activityBlock(
+		scope,
+		0,
+		block.parentNode,
+		props?.mode ?? 'visible',
+		renderActivityChildren,
+		block.endMarker,
+	);
+}
+
+function renderActivityChildren(_props: unknown, scope: Scope): void {
+	const block = scope.block;
+	// Scoped children must resolve under the Activity, never in its caller.
+	childSlot(scope, 0, block.parentNode, block.parentBlock!.props?.children, block.endMarker);
+}
+
 interface ActivitySlot {
 	__kind: 'activityBlockSlot';
 	block: Block | null;
@@ -24671,14 +24951,135 @@ interface ActivitySlot {
 	commitVersion: number;
 	/** The visible effects still need their commit-phase deactivation. */
 	deactivationPending: boolean;
-	/** Direct child elements for which this Activity owns one shared hide. */
-	hiddenDisplays: Set<HTMLElement>;
-	/**
-	 * Direct child TEXT nodes for which this Activity owns one shared hide. Text
-	 * nodes have no box and can't take `display:none`, so a bare-text Activity child
-	 * (`<Activity mode="hidden">{'…'}</Activity>`) is hidden by blanking its data.
-	 */
-	hiddenTexts: Set<Text>;
+	/** A hidden Activity contains suspension without hiding its visible siblings. */
+	pendingThenable: TrackedThenable<unknown> | null;
+	suspend: ((thenable: TrackedThenable<unknown>) => void) | null;
+	/** Monotone gate: ref-free Activities never walk host-ref manifests. */
+	hasRefs: boolean;
+	/** Insertion-effect rollback is paid only by Activities that contain them. */
+	hasInsertionEffects: boolean;
+	pendingInsertions: InsertionEffectReplays | null;
+	/** Allocated on first hide; scratch sets are reused across visibility updates. */
+	hiddenDom: ActivityHiddenDom | null;
+	/** Logical portal descendants, including portals nested under host elements. */
+	portals: Set<Block> | null;
+}
+
+interface ActivityHiddenDom extends SuspenseHiddenDom {
+	nextDisplays: Set<HTMLElement>;
+	nextTexts: Set<Text>;
+}
+
+// Only applications using Activity retain portal visibility bookkeeping.
+let activityPortalCreated: ((block: Block) => void) | null = null;
+
+function retainActivityTracking(): void {
+	liveActivityCount++;
+	activityPortalCreated ??= registerActivityPortal;
+	activityRefCreated ??= registerActivityRef;
+	activityInsertionEffectCreated ??= registerActivityInsertionEffect;
+	activityRefState ??= new WeakMap();
+	activityRefOwners ??= new WeakMap();
+}
+
+function releaseActivityTracking(): void {
+	if (--liveActivityCount !== 0) return;
+	activityRefCreated = null;
+	activityInsertionEffectCreated = null;
+	activityPortalCreated = null;
+	const refs = activityRefState;
+	// The block's cleanup runs before descendant ref teardowns. Keep their
+	// committed records until this synchronous deletion/commit finishes, then
+	// remove the optional hooks entirely. A new Activity cancels this release.
+	queueMicrotask(() => {
+		if (liveActivityCount === 0 && activityRefState === refs) {
+			activityRefState = null;
+			activityRefOwners = null;
+		}
+	});
+}
+
+function findActivityRefOwners(block: Block): boolean {
+	let owned = false;
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		const owner = (current as any).__activitySlot as ActivitySlot | undefined;
+		if (owner !== undefined && owner.block === current) {
+			owner.hasRefs = true;
+			owned = true;
+		}
+	}
+	return owned;
+}
+
+function registerActivityRef(block: Block, target: Element | FragmentInstance): void {
+	const refs = activityRefState!;
+	if (refs.has(target)) return;
+	const owners = activityRefOwners!;
+	let owned = owners.get(block);
+	if (owned === undefined) {
+		// A Block's logical parent is immutable. Cache both positive and negative
+		// ownership, so unrelated ref-heavy trees never repeat the ancestor walk.
+		owned = findActivityRefOwners(block);
+		owners.set(block, owned);
+	}
+	if (owned) refs.set(target, { connected: null, hidden: false });
+}
+
+function registerActivityInsertionEffect(block: Block): void {
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		const owner = (current as any).__activitySlot as ActivitySlot | undefined;
+		if (owner !== undefined && owner.block === current) owner.hasInsertionEffects = true;
+	}
+}
+
+function registerActivityPortal(block: Block): void {
+	let owners: ActivitySlot[] | null = null;
+	for (let parent = block.parentBlock; parent !== null; parent = parent.parentBlock) {
+		const owner = (parent as any).__activitySlot as ActivitySlot | undefined;
+		if (owner === undefined || owner.block !== parent) continue;
+		(owner.portals ??= new Set()).add(block);
+		(owners ??= []).push(owner);
+	}
+	if (owners !== null) {
+		const retained = owners;
+		(block.cleanups ??= []).push(() => {
+			for (const owner of retained) owner.portals!.delete(block);
+		});
+	}
+}
+
+function hideActivityHostRange(block: Block, hidden: ActivityHiddenDom): void {
+	let node: ChildNode | null = block.startMarker!.nextSibling;
+	while (node !== null && node !== block.endMarker) {
+		// A foreign portal may target this same physical range. Its logical owner
+		// decides visibility; owned portal ranges are visited separately below.
+		const foreignEnd = (node as any).$$portalEnd as Node | undefined;
+		if (foreignEnd !== undefined) {
+			node = nodeAfterPortalRange(node, foreignEnd) as ChildNode | null;
+			continue;
+		}
+		if (node.nodeType === 1) {
+			const el = node as HTMLElement;
+			if (!hidden.nextDisplays.has(el)) {
+				hidden.nextDisplays.add(el);
+				if (!hidden.displays.has(el)) {
+					retainHiddenActivityNode(el);
+					retainHiddenDisplay(el, true);
+				} else enforceHiddenDisplay(el);
+			}
+		} else if (node.nodeType === 3) {
+			const text = node as Text;
+			if (!hidden.nextTexts.has(text)) {
+				hidden.nextTexts.add(text);
+				if (!hidden.texts.has(text)) {
+					retainHiddenActivityNode(text);
+					retainHiddenText(text);
+				}
+				enforceHiddenText(text);
+			}
+		}
+		node = node.nextSibling;
+	}
 }
 
 /**
@@ -24690,52 +25091,44 @@ interface ActivitySlot {
 function hideActivityRange(state: ActivitySlot): void {
 	const b = state.block;
 	if (!b) return;
+	const hidden = (state.hiddenDom ??= {
+		displays: new Set(),
+		texts: new Set(),
+		nextDisplays: new Set(),
+		nextTexts: new Set(),
+	});
 	if (!state.fragmentVisibilityCleanupRegistered) {
 		state.fragmentVisibilityCleanupRegistered = true;
-		(b.cleanups ??= []).push(() => {
-			for (const el of state.hiddenDisplays) releaseHiddenActivityNode(el);
-			for (const text of state.hiddenTexts) releaseHiddenActivityNode(text);
-		});
+		(b.cleanups ??= []).push(() => releaseActivityRange(state, false));
 	}
-	// Branch switches and HMR can replace direct roots while the Activity stays
-	// hidden. Drop detached entries now so a long-hidden, frequently updated
-	// boundary does not retain every outgoing host node until it reveals.
-	for (const el of state.hiddenDisplays) {
-		if (el.parentNode !== b.parentNode) {
-			state.hiddenDisplays.delete(el);
-			releaseHiddenActivityNode(el);
-			releaseHiddenDisplay(el, false);
+	hideActivityHostRange(b, hidden);
+	if (state.portals !== null) {
+		for (const portal of state.portals) {
+			if (!portal.disposed) hideActivityHostRange(portal, hidden);
 		}
 	}
-	for (const text of state.hiddenTexts) {
-		if (text.parentNode !== b.parentNode) {
-			state.hiddenTexts.delete(text);
+	// Reconcile ownership against the live ranges, not just parentNode. This
+	// releases replaced/moved roots and portal targets without retaining dead DOM.
+	for (const el of hidden.displays) {
+		if (!hidden.nextDisplays.has(el)) {
+			releaseHiddenActivityNode(el);
+			releaseHiddenDisplay(el, true);
+		}
+	}
+	for (const text of hidden.texts) {
+		if (!hidden.nextTexts.has(text)) {
 			releaseHiddenActivityNode(text);
 			releaseHiddenText(text);
 		}
 	}
-	let node: ChildNode | null = (b.startMarker as Comment).nextSibling;
-	while (node && node !== b.endMarker) {
-		if (node.nodeType === 1) {
-			const el = node as HTMLElement;
-			if (!state.hiddenDisplays.has(el)) {
-				state.hiddenDisplays.add(el);
-				retainHiddenActivityNode(el);
-				retainHiddenDisplay(el, false);
-			} else {
-				enforceHiddenDisplay(el);
-			}
-		} else if (node.nodeType === 3) {
-			const t = node as Text;
-			if (!state.hiddenTexts.has(t)) {
-				state.hiddenTexts.add(t);
-				retainHiddenActivityNode(t);
-				retainHiddenText(t);
-			}
-			enforceHiddenText(t);
-		}
-		node = node.nextSibling;
-	}
+	const displays = hidden.displays;
+	const texts = hidden.texts;
+	hidden.displays = hidden.nextDisplays;
+	hidden.texts = hidden.nextTexts;
+	hidden.nextDisplays = displays;
+	hidden.nextTexts = texts;
+	displays.clear();
+	texts.clear();
 }
 
 function rehideActivityAfterDescendantRender(state: ActivitySlot): void {
@@ -24748,16 +25141,167 @@ function rehideActivityAfterDescendantRender(state: ActivitySlot): void {
 
 /** Release this Activity's hide ownership, restoring nodes with no other owner. */
 function showActivityRange(state: ActivitySlot): void {
-	for (const el of state.hiddenDisplays) {
+	releaseActivityRange(state, true);
+}
+
+function releaseActivityRange(state: ActivitySlot, restore: boolean): void {
+	const hidden = state.hiddenDom;
+	if (hidden === null) return;
+	for (const el of hidden.displays) {
 		releaseHiddenActivityNode(el);
-		releaseHiddenDisplay(el, false);
+		releaseHiddenDisplay(el, true, restore);
 	}
-	state.hiddenDisplays.clear();
-	for (const text of state.hiddenTexts) {
+	hidden.displays.clear();
+	for (const text of hidden.texts) {
 		releaseHiddenActivityNode(text);
-		releaseHiddenText(text);
+		releaseHiddenText(text, restore);
 	}
-	state.hiddenTexts.clear();
+	hidden.texts.clear();
+}
+
+/** Disconnect the committed identities, including refs replaced by this render. */
+function hideActivityRefs(activity: ActivitySlot): void {
+	if (!activity.hasRefs) return;
+	const block = activity.block!;
+	const state = activityRefState!;
+	const refs: SuspenseRefEntry[] = [];
+	// A render can clear a ref prop before disappearance commits. Include its
+	// still-connected identity even when the current manifest now says null.
+	collectVisibleSubtreeRefs(block, refs, state);
+	for (const entry of refs) {
+		if (blockSubtreeDisposed(entry.scope.block)) continue;
+		let record = state.get(entry.el);
+		if (record === undefined) {
+			record = { connected: null, hidden: false };
+			state.set(entry.el, record);
+		}
+		const connected = record.connected;
+		// Publish hidden ownership before invoking user code: a cleanup may
+		// synchronously unmount this tree or an independent root.
+		record.hidden = true;
+		if (connected !== null) {
+			try {
+				REF_CALLBACK_DEPTH++;
+				try {
+					attachRef(connected, null, entry.el);
+				} finally {
+					REF_CALLBACK_DEPTH--;
+				}
+			} catch (err) {
+				if (err instanceof MaximumUpdateDepthError) throw err;
+				const handler = findTryHandler(entry.scope.block);
+				if (handler !== null) {
+					handler(err);
+					reportCaughtError(entry.scope.block, err);
+				} else if (!reportUncaughtError(entry.scope.block, err)) console.error(err);
+			}
+		}
+	}
+	discardSubtreeRefAttaches(block);
+}
+
+/** Reconnect current visible manifests, not stale attaches from hidden renders. */
+function queueCurrentActivityRefs(activity: ActivitySlot): void {
+	if (!activity.hasRefs) return;
+	const block = activity.block!;
+	if (inInactiveSubtree(block)) return;
+	discardSubtreeRefAttaches(block);
+	const state = activityRefState!;
+	const refs: SuspenseRefEntry[] = [];
+	const seen = new Set<Element | FragmentInstance>();
+	collectVisibleSubtreeRefs(block, refs);
+	for (const entry of refs) {
+		if (seen.has(entry.el) || inInactiveSubtree(entry.scope.block)) continue;
+		seen.add(entry.el);
+		const record = state.get(entry.el);
+		if (record !== undefined && !record.hidden && record.connected === entry.ref) continue;
+		queueRefAttach(
+			entry.scope,
+			entry.el instanceof FragmentInstance ? attachLiveFragmentRef : entry.ref,
+			entry.el,
+		);
+	}
+}
+
+function suspendHiddenActivity(state: ActivitySlot, thenable: TrackedThenable<unknown>): void {
+	if (state.pendingThenable === thenable) return;
+	state.pendingThenable = thenable;
+	const block = state.block!;
+	const retry = (): void => {
+		if (state.pendingThenable !== thenable || !state.hidden || blockSubtreeDisposed(block)) return;
+		scheduleRender(block);
+	};
+	thenable.then(retry, retry);
+}
+
+/** Hidden content is its own suspense boundary; visible content still propagates. */
+function renderHiddenActivity(state: ActivitySlot, replay = false, block = state.block!): void {
+	const previousReplay = RESUME_REPLAY;
+	if (replay) RESUME_REPLAY = true;
+	const insertionQueue = (WIP_CAPTURE === null ? effectQueues : WIP_CAPTURE.effects)[INSERTION];
+	const insertionCheckpoint = insertionQueue.length;
+	const insertionDeps = state.hasInsertionEffects
+		? snapshotSubtreeEffectDeps(block, INSERTION)
+		: null;
+	try {
+		if (state.pendingInsertions === null) renderBlock(block);
+		else renderWithEffectReconnect(block, WIP_CAPTURE, state.pendingInsertions);
+		state.pendingThenable = null;
+		state.pendingInsertions = null;
+	} catch (error) {
+		if (!isSuspenseException(error)) throw error;
+		// An independently scheduled descendant still belongs to its nearest
+		// Suspense boundary. Only capture here when this Activity owns the throw;
+		// nested Suspense keeps its normal fallback/retry transaction.
+		for (
+			let current: Block | null = block;
+			current !== null && current !== state.block;
+			current = current.parentBlock
+		) {
+			if ((current as any).__suspenseHandler) throw error;
+		}
+		let rolledBack: Set<EffectSlot> | null = null;
+		if (insertionQueue.length > insertionCheckpoint) {
+			const next: InsertionEffectReplays = new Map();
+			for (let i = insertionCheckpoint; i < insertionQueue.length; i++) {
+				const entry = insertionQueue[i];
+				const effect = entry.scope.hooks?.get(entry.slot) as EffectSlot | undefined;
+				if (effect?.effect !== true) continue;
+				if (EFFECT_RECONNECT_CONTEXT !== null) (rolledBack ??= new Set()).add(effect);
+				// A later render/presence transition may already have superseded an
+				// earlier enqueue in this attempt. Never revive that stale revision.
+				if (effect.revision !== entry.revision || blockSubtreeDisposed(entry.scope.block)) continue;
+				const entries = next.get(effect);
+				if (entries === undefined) next.set(effect, [entry]);
+				else entries.push(entry);
+			}
+			insertionQueue.length = insertionCheckpoint;
+			// A nested hidden Activity can take over work retained by an outer
+			// failed attempt. Its pending body now owns those entries; an ancestor
+			// memo/context-refresh walk must not replay them before this one resolves.
+			for (const effect of next.keys()) invalidateInsertionReplay(effect);
+			if (state.pendingInsertions === null) state.pendingInsertions = next.size === 0 ? null : next;
+			else for (const [effect, entries] of next) state.pendingInsertions.set(effect, entries);
+		}
+		if (insertionDeps !== null || state.pendingInsertions !== null) {
+			restoreSubtreeEffectDeps(block, insertionDeps ?? new Map(), INSERTION);
+		}
+		if (rolledBack !== null) forgetEffectReconnectQueued(rolledBack, INSERTION, insertionQueue);
+		suspendHiddenActivity(state, error.thenable);
+	} finally {
+		RESUME_REPLAY = previousReplay;
+	}
+}
+
+function setActivitySuspenseHandler(state: ActivitySlot, hidden: boolean): void {
+	const block = state.block!;
+	if (hidden) {
+		state.suspend ??= (thenable) => suspendHiddenActivity(state, thenable);
+		(block as any).__suspenseHandler = state.suspend;
+	} else {
+		state.pendingThenable = null;
+		(block as any).__suspenseHandler = null;
+	}
 }
 
 function queueActivityDeactivation(state: ActivitySlot, block: Block, commitVersion: number): void {
@@ -24779,6 +25323,9 @@ function queueActivityDeactivation(state: ActivitySlot, block: Block, commitVers
 		// Event bodies were published before commit actions drain. Destroy while
 		// the DOM is still connected, then hide the preserved range.
 		deactivateScope(block);
+		if (blockSubtreeDisposed(block) || state.block !== block) return;
+		hideActivityRefs(state);
+		if (blockSubtreeDisposed(block) || state.block !== block) return;
 		hideActivityRange(state);
 		state.deactivationPending = false;
 	});
@@ -24826,6 +25373,8 @@ export function activityBlock(
 			undefined,
 			env,
 		);
+		retainActivityTracking();
+		(b.cleanups ??= []).push(releaseActivityTracking);
 		state = {
 			__kind: 'activityBlockSlot',
 			block: b,
@@ -24833,8 +25382,13 @@ export function activityBlock(
 			fragmentVisibilityCleanupRegistered: false,
 			commitVersion: 0,
 			deactivationPending: false,
-			hiddenDisplays: new Set(),
-			hiddenTexts: new Set(),
+			pendingThenable: null,
+			suspend: null,
+			hasRefs: false,
+			hasInsertionEffects: false,
+			pendingInsertions: null,
+			hiddenDom: null,
+			portals: null,
 		};
 		// Activity is a rare boundary, so keep this back-reference off the
 		// monomorphic Block shape (matching the existing Suspense __trySlot tag).
@@ -24851,9 +25405,10 @@ export function activityBlock(
 		if (serverRangeEmpty && hydration !== null) {
 			b.inactive = wantHidden;
 			state.hidden = wantHidden;
+			if (wantHidden) setActivitySuspenseHandler(state, true);
 			hydration.deferredActivities.push(() => {
 				if (b.disposed) return;
-				hydration.suspend(() => renderBlock(b));
+				hydration.suspend(() => (state!.hidden ? renderHiddenActivity(state!) : renderBlock(b)));
 				if (state!.hidden) hideActivityRange(state!);
 			});
 			hydration.node = bEnd.nextSibling;
@@ -24863,9 +25418,10 @@ export function activityBlock(
 			// Mount while hidden: render children (creates state + DOM) but no
 			// effects — mark inactive BEFORE the render so enqueueEffect skips them.
 			b.inactive = true;
-			renderBlock(b);
-			hideActivityRange(state);
 			state.hidden = true;
+			setActivitySuspenseHandler(state, true);
+			renderHiddenActivity(state);
+			hideActivityRange(state);
 		} else {
 			renderBlock(b);
 		}
@@ -24886,8 +25442,9 @@ export function activityBlock(
 			b.inactive = true;
 			state.hidden = true;
 			state.deactivationPending = true;
+			setActivitySuspenseHandler(state, true);
 			queueActivityDeactivation(state, b, commitVersion);
-			renderBlock(b);
+			renderHiddenActivity(state);
 		} else {
 			// hidden → hidden: prerender (no effects), then hide any new children.
 			// If a prior visible→hidden attempt has not committed yet, replace its
@@ -24895,7 +25452,7 @@ export function activityBlock(
 			if (state.deactivationPending) {
 				queueActivityDeactivation(state, b, commitVersion);
 			}
-			renderBlock(b);
+			renderHiddenActivity(state);
 			if (!state.deactivationPending) hideActivityRange(state);
 		}
 	} else {
@@ -24906,7 +25463,10 @@ export function activityBlock(
 			b.inactive = false;
 			state.hidden = false;
 			state.deactivationPending = false;
-			renderWithEffectReconnect(b, null);
+			setActivitySuspenseHandler(state, false);
+			renderWithEffectReconnect(b, WIP_CAPTURE, state.pendingInsertions);
+			state.pendingInsertions = null;
+			queueCurrentActivityRefs(state);
 		} else {
 			// visible → visible: ordinary re-render in place.
 			renderBlock(b);
@@ -24964,9 +25524,9 @@ function forEachSubtreeChild(
 }
 
 // Detach every host ref in a subtree (object refs → null, callback refs called with
-// null), collecting {ref, el} for later re-attach. Used ONLY by the suspense-hide path
-// (NOT by <Activity>, which intentionally keeps refs) so React's "refs cycle null→node
-// across a suspend, like layout effects" contract holds even though octane preserves the
+// null), collecting {ref, el} for later re-attach. Suspense uses the detach walk;
+// Activity uses the same manifests with its committed-ref visibility tracking.
+// React's refs cycle null→node like layout effects even though Octane preserves the
 // DOM node. Compiled bodies with ref-carrying bindings stamp a REF MANIFEST on their
 // scope (`scope.refFields` — see the Scope interface): flat [kind, field, elField]
 // triads naming the binding-bag fields directly, so discovery is an indexed walk over
@@ -24979,12 +25539,14 @@ function detachSubtreeRefs(
 	shouldDetach: boolean = true,
 	includeHiddenTry: boolean = true,
 	uncommitted: UncommittedRefAttaches | null = null,
+	activityRefs: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null,
 ): void {
 	// A block managing a de-opt host subtree (deoptItemBody / pure-host items):
 	// every node the de-opt reconciler built carries its descriptor (DEOPT_DESC),
 	// whose props may hold a ref — walk the DOM subtree for them.
 	const deoptRoot = (scope as any).deoptNode as Node | null | undefined;
-	if (deoptRoot != null) detachDeoptTreeRefs(deoptRoot, out, shouldDetach, scope, uncommitted);
+	if (deoptRoot != null)
+		detachDeoptTreeRefs(deoptRoot, out, shouldDetach, scope, uncommitted, activityRefs);
 	const rm = scope.refFields;
 	if (rm !== null) {
 		const bag = scope.slots[0];
@@ -24993,19 +25555,19 @@ function detachSubtreeRefs(
 				const kind = rm[j];
 				if (kind === 'r') {
 					// Element ref binding: field holds the ref, partner holds the element.
-					const ref = bag[rm[j + 1]];
-					if (ref == null) continue;
 					const el = bag[rm[j + 2]];
+					const ref = bag[rm[j + 1]] ?? activityRefs?.get(el)?.connected;
+					if (ref == null) continue;
 					out.push({ ref, el, scope });
 					if (shouldDetach && !refAttachWasDiscarded(uncommitted, el, ref)) {
 						attachRef(ref, null, el);
 					}
 				} else if (kind === 's') {
 					// Spread binding: the committed spread object may carry a ref.
-					const ref = bag[rm[j + 1]]?.ref;
-					if (ref == null) continue;
 					const el = bag[rm[j + 2]];
 					if (el == null) continue;
+					const ref = bag[rm[j + 1]]?.ref ?? activityRefs?.get(el)?.connected;
+					if (ref == null) continue;
 					out.push({ ref, el, scope });
 					if (shouldDetach && !refAttachWasDiscarded(uncommitted, el, ref)) {
 						attachRef(ref, null, el);
@@ -25014,10 +25576,12 @@ function detachSubtreeRefs(
 					// 'f' — <Fragment ref>: detach the FragmentInstance's current ref;
 					// reveal re-attaches the same instance.
 					const fi = bag[rm[j + 1]];
-					if (fi == null || fi._currentRef == null) continue;
-					out.push({ ref: fi._currentRef, el: fi, scope });
-					if (shouldDetach && !refAttachWasDiscarded(uncommitted, fi, fi._currentRef)) {
-						attachRef(fi._currentRef, null, fi);
+					if (fi == null) continue;
+					const ref = fi._currentRef ?? activityRefs?.get(fi)?.connected;
+					if (ref == null) continue;
+					out.push({ ref, el: fi, scope });
+					if (shouldDetach && !refAttachWasDiscarded(uncommitted, fi, ref)) {
+						attachRef(ref, null, fi);
 					}
 				}
 			}
@@ -25028,27 +25592,35 @@ function detachSubtreeRefs(
 		const s = slots[i];
 		if (s === null || typeof s !== 'object') continue;
 		// De-opt host element slot (value-position `<tag>` / motion-style): { el, anchor, ref }.
-		if (s.ref != null && s.anchor !== undefined && s.el instanceof Element) {
-			out.push({ ref: s.ref, el: s.el, scope });
-			if (shouldDetach && !refAttachWasDiscarded(uncommitted, s.el, s.ref)) {
-				attachRef(s.ref, null, s.el);
+		if (s.anchor !== undefined && s.el instanceof Element) {
+			const ref = s.ref ?? activityRefs?.get(s.el)?.connected;
+			if (ref != null) {
+				out.push({ ref, el: s.el, scope });
+				if (shouldDetach && !refAttachWasDiscarded(uncommitted, s.el, ref)) {
+					attachRef(ref, null, s.el);
+				}
 			}
 		}
 		// childSlot managing a pure-host de-opt node — same DEOPT_DESC walk.
 		if (s.__kind === 'childSlot' && s.hostNode != null) {
-			detachDeoptTreeRefs(s.hostNode, out, shouldDetach, scope, uncommitted);
+			detachDeoptTreeRefs(s.hostNode, out, shouldDetach, scope, uncommitted, activityRefs);
 		}
 	}
 	forEachSubtreeChild(
 		scope,
-		(child) => detachSubtreeRefs(child, out, shouldDetach, includeHiddenTry, uncommitted),
+		(child) =>
+			detachSubtreeRefs(child, out, shouldDetach, includeHiddenTry, uncommitted, activityRefs),
 		includeHiddenTry,
 	);
 }
 
 /** Collect the refs that belong to the subtree's CURRENT visible branches. */
-function collectVisibleSubtreeRefs(scope: Scope, out: SuspenseRefEntry[]): void {
-	detachSubtreeRefs(scope, out, false, false);
+function collectVisibleSubtreeRefs(
+	scope: Scope,
+	out: SuspenseRefEntry[],
+	activityRefs: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null,
+): void {
+	detachSubtreeRefs(scope, out, false, false, null, activityRefs);
 }
 
 // Walk a de-opt-built DOM subtree detaching every stamped descriptor ref
@@ -25064,11 +25636,12 @@ function detachDeoptTreeRefs(
 	shouldDetach: boolean = true,
 	ownerScope?: Scope,
 	uncommitted: UncommittedRefAttaches | null = null,
+	activityRefs: WeakMap<Element | FragmentInstance, ActivityRefState> | null = null,
 ): void {
 	// No de-opt descriptor ref was ever stamped → nothing to detach or collect
 	// anywhere; skip the subtree scan. (Monotone flag — see noteDeoptRef.)
 	if (!DEOPT_REFS_STAMPED) return;
-	const ref = getDeoptDesc(node)?.props?.ref;
+	const ref = getDeoptDesc(node)?.props?.ref ?? activityRefs?.get(node as Element)?.connected;
 	if (ref != null) {
 		if (out !== null) {
 			// Suspense-hide: detach NOW (the caller re-attaches on reveal).
@@ -25098,7 +25671,7 @@ function detachDeoptTreeRefs(
 			c = nodeAfterPortalRange(c, rangeEnd);
 			continue;
 		}
-		detachDeoptTreeRefs(c, out, shouldDetach, ownerScope, uncommitted);
+		detachDeoptTreeRefs(c, out, shouldDetach, ownerScope, uncommitted, activityRefs);
 		c = c.nextSibling;
 	}
 }
@@ -25112,56 +25685,54 @@ function detachDeoptTreeRefs(
  * effects remain subscribed until actual deletion, matching React's
  * hidden-primary lifetime. A passive effect that never connected is not part of
  * that hidden primary and resets like a layout one (see below). State, DOM, and
- * blocks stay alive in either case. Refs remain attached for Activity; Suspense
- * cycles them separately via detachSubtreeRefs.
+ * blocks stay alive in either case. Both boundaries cycle refs separately from
+ * their effect cleanup walk.
  */
 function deactivateScope(scope: Scope, disconnectPassive: boolean = true): void {
-	const hooks = scope.hooks;
-	if (hooks) {
-		for (const slot of hooks.values()) {
-			if (slot && (slot as EffectSlot).effect === true) {
-				const e = slot as EffectSlot;
-				// INSERTION effects stay CONNECTED while hidden (React parity,
-				// Activity-test.js:1428): no cleanup on hide, deps kept so the
-				// reveal re-render doesn't re-fire them. They own injected styles
-				// that must persist while a tree is merely hidden; only a real
-				// unmount (unmountScope's effect-slot walk) tears them down.
-				//
-				// Suspense's `disconnectPassive=false` spares passive effects for the
-				// same reason — but only ones that ACTUALLY connected. `connectedFn` is
-				// set exclusively by runEffectBody, so a null one has never run: it
-				// belongs to a subtree the boundary rendered but never committed —
-				// siblings ahead of the call that suspended, or children introduced by a
-				// later attempt. There is no subscription to preserve, and its deps are
-				// already stamped from that aborted attempt, so sparing it would let the
-				// reveal re-render compare equal deps and skip the enqueue, stranding the
-				// mount effect — and its cleanup — forever. React fires every mount effect
-				// in the subtree when a suspended mount finally commits, so an
-				// unconnected passive slot resets exactly like a layout one.
-				if (
-					e.phase === INSERTION ||
-					(!disconnectPassive && e.phase === PASSIVE && e.connectedFn !== null)
-				) {
-					continue;
-				}
-				if (typeof e.cleanup === 'function') {
-					const cleanup = e.cleanup;
-					// Clear it BEFORE firing so unmountScope's effect-slot walk sees
-					// no cleanup and won't re-run it.
-					e.cleanup = undefined;
-					try {
-						runEffectCleanupCallback(cleanup);
-					} catch (err) {
-						if (err instanceof MaximumUpdateDepthError) throw err;
-						const handler = findTryHandler(scope.block);
-						if (handler !== null) handler(err);
-						else console.error(err);
-					}
-				}
-				// Force the setup to re-enqueue + re-fire when the subtree reactivates.
-				e.deps = undefined;
-				if (e.connectedFn !== null) e.disconnected = true;
+	const effects = scope.effectSlots;
+	if (effects !== null) {
+		for (let index = 0; index < effects.length; index++) {
+			const e = effects[index];
+			// INSERTION effects stay CONNECTED while hidden (React parity,
+			// Activity-test.js:1428): no cleanup on hide, deps kept so the
+			// reveal re-render doesn't re-fire them. They own injected styles
+			// that must persist while a tree is merely hidden; only a real
+			// unmount (unmountScope's effect-slot walk) tears them down.
+			//
+			// Suspense's `disconnectPassive=false` spares passive effects for the
+			// same reason — but only ones that ACTUALLY connected. `connectedFn` is
+			// set exclusively by runEffectBody, so a null one has never run: it
+			// belongs to a subtree the boundary rendered but never committed —
+			// siblings ahead of the call that suspended, or children introduced by a
+			// later attempt. There is no subscription to preserve, and its deps are
+			// already stamped from that aborted attempt, so sparing it would let the
+			// reveal re-render compare equal deps and skip the enqueue, stranding the
+			// mount effect — and its cleanup — forever. React fires every mount effect
+			// in the subtree when a suspended mount finally commits, so an
+			// unconnected passive slot resets exactly like a layout one.
+			if (
+				e.phase === INSERTION ||
+				(!disconnectPassive && e.phase === PASSIVE && e.connectedFn !== null)
+			) {
+				continue;
 			}
+			if (typeof e.cleanup === 'function') {
+				const cleanup = e.cleanup;
+				// Clear it BEFORE firing so unmountScope's effect-slot walk sees
+				// no cleanup and won't re-run it.
+				e.cleanup = undefined;
+				try {
+					runEffectCleanupCallback(cleanup);
+				} catch (err) {
+					if (err instanceof MaximumUpdateDepthError) throw err;
+					const handler = findTryHandler(scope.block);
+					if (handler !== null) handler(err);
+					else console.error(err);
+				}
+			}
+			// Force the setup to re-enqueue + re-fire when the subtree reactivates.
+			e.deps = undefined;
+			if (e.connectedFn !== null) e.disconnected = true;
 		}
 	}
 	forEachSubtreeChild(scope, (child) => deactivateScope(child, disconnectPassive));
@@ -27451,6 +28022,7 @@ export interface Root {
 	render(
 		element:
 			| ElementDescriptor
+			| PortalDescriptor
 			| string
 			| number
 			| bigint

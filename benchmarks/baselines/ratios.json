@@ -2781,5 +2781,262 @@
     "reference": "runtime-form",
     "maxRatio": 1.02,
     "note": "Same-run clean tree-shaken application plus Octane runtime: closure-free lowering must stay within 2% gzip of the runtime-form control. No instrumentation contributes to these bytes."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_hideActivityRange",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 1,
+    "note": "One public flush updates 256 retained rows under one hidden Activity. The original runtime scanned its range 256 times; the semantically checked candidate scans once. Keep the boundary walk coalesced per drain."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_rehideActivityAfterDescendantRender",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 1,
+    "note": "The 256 hidden descendant setters share one re-hide pass, not one pass per rendered row. Measured 256 calls before and 1 after; every row's state, visibility, DOM identity and reveal result are verified."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_enforceHiddenDisplay",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 1,
+    "note": "Bounds hidden display enforcement to one visit per affected host: 65,536 calls before, 256 after for 256 rows. This is the deterministic linear-work guard, independent of browser timing."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_stateAttributeWrites",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 1,
+    "minRatio": 1,
+    "note": "All 256 distinct retained state updates must reach their public data-local attributes exactly once. The semantic gate separately checks every row's text/state and the latest reveal."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_styleWrites",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "An already-hidden descendant state batch must not rewrite unchanged display styles. Both Octane and React measured zero style mutations while updating every retained row."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_addedRows",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "Hidden descendant state updates preserve all accepted host rows; the MutationObserver must see no inserted rows. The semantic gate also compares every survivor identity."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_removedRows",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "Hidden descendant state updates must not remove retained host rows. This independent DOM observation prevents a fast remount from masquerading as retained hidden work."
+  },
+  {
+    "suite": "activity",
+    "op": "hide_reveal_styleWrites",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 2,
+    "note": "Eight complete visibility cycles over 256 rows measured 4,096 style writes in both revisions and React. Permit at most one hide and one reveal write per row/cycle, with intermediate visibility and final authored display verified."
+  },
+  {
+    "suite": "activity",
+    "op": "hide_reveal_detachSubtreeRefs",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "This effectful Activity fixture has no refs. The hasRefs gate must keep ref-detachment manifest traversal cold during visibility changes; callback-ref semantics are covered by separate conformance tests."
+  },
+  {
+    "suite": "activity",
+    "op": "hide_reveal_collectVisibleSubtreeRefs",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "A ref-free Activity reveal must not walk subtree ref manifests. The measured candidate performs zero such visits while reconnecting every required layout/passive effect."
+  },
+  {
+    "suite": "activity",
+    "op": "nested_hide_reveal_styleWrites",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 2,
+    "note": "Eight complete visibility cycles over 256 rows measured 4,096 style writes in both revisions and React. Permit at most one hide and one reveal write per row/cycle, with intermediate visibility and final authored display verified."
+  },
+  {
+    "suite": "activity",
+    "op": "nested_hide_reveal_detachSubtreeRefs",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "This effectful Activity fixture has no refs. The hasRefs gate must keep ref-detachment manifest traversal cold during visibility changes; callback-ref semantics are covered by separate conformance tests."
+  },
+  {
+    "suite": "activity",
+    "op": "nested_hide_reveal_collectVisibleSubtreeRefs",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "A ref-free Activity reveal must not walk subtree ref manifests. The measured candidate performs zero such visits while reconnecting every required layout/passive effect."
+  },
+  {
+    "suite": "activity",
+    "op": "hide_reveal_snapshotSubtreeEffectDeps",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The fixture has layout/passive effects but no insertion effects or speculative Suspense work. Insertion-abort recovery must not introduce subtree dependency snapshots on this ordinary path; measured zero."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_burst_snapshotSubtreeEffectDeps",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The fixture has layout/passive effects but no insertion effects or speculative Suspense work. Insertion-abort recovery must not introduce subtree dependency snapshots on this ordinary path; measured zero."
+  },
+  {
+    "suite": "activity",
+    "op": "hidden_descendant_updates_snapshotSubtreeEffectDeps",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The fixture has layout/passive effects but no insertion effects or speculative Suspense work. Insertion-abort recovery must not introduce subtree dependency snapshots on this ordinary path; measured zero."
+  },
+  {
+    "suite": "activity",
+    "op": "nested_hide_reveal_snapshotSubtreeEffectDeps",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The fixture has layout/passive effects but no insertion effects or speculative Suspense work. Insertion-abort recovery must not introduce subtree dependency snapshots on this ordinary path; measured zero."
+  },
+  {
+    "suite": "activity",
+    "op": "plain_updates_snapshotSubtreeEffectDeps",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The fixture has layout/passive effects but no insertion effects or speculative Suspense work. Insertion-abort recovery must not introduce subtree dependency snapshots on this ordinary path; measured zero."
+  },
+  {
+    "suite": "activity",
+    "op": "plain_descendant_updates_snapshotSubtreeEffectDeps",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The fixture has layout/passive effects but no insertion effects or speculative Suspense work. Insertion-abort recovery must not introduce subtree dependency snapshots on this ordinary path; measured zero."
+  },
+  {
+    "suite": "activity",
+    "op": "plain_updates_hideActivityRange",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The matched plain-tree control contains no Activity. Its public updates must not enter Activity range hiding; all row state, effects and DOM identities are still verified."
+  },
+  {
+    "suite": "activity",
+    "op": "plain_descendant_updates_hideActivityRange",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "The matched plain-tree control contains no Activity. Its public updates must not enter Activity range hiding; all row state, effects and DOM identities are still verified."
+  },
+  {
+    "suite": "activity",
+    "op": "deep_ref_replacements_registerActivityRef",
+    "target": "octane-tsrx-refs-cold-work",
+    "reference": "activity-ref-model",
+    "maxRatio": 0,
+    "note": "Before any Activity is rendered, 3,072 ordinary ref replacements through sixteen component layers must not register Activity ownership or scan ancestors. Exact callback attachments/cleanups and live target identities are verified."
+  },
+  {
+    "suite": "activity",
+    "op": "deep_ref_replacements_findActivityRefOwners",
+    "target": "octane-tsrx-refs-cold-work",
+    "reference": "activity-ref-model",
+    "maxRatio": 0,
+    "note": "Before any Activity is rendered, 3,072 ordinary ref replacements through sixteen component layers must not register Activity ownership or scan ancestors. Exact callback attachments/cleanups and live target identities are verified."
+  },
+  {
+    "suite": "activity",
+    "op": "deep_ref_replacements_registerActivityRef",
+    "target": "octane-tsrx-refs-after-activity-work",
+    "reference": "activity-ref-model",
+    "maxRatio": 0,
+    "note": "After the last Activity unmounts, the optional ref-ownership hook must be cold again. The deep ordinary-tree control measured zero Activity registration/owner searches across 3,072 correct ref replacements."
+  },
+  {
+    "suite": "activity",
+    "op": "deep_ref_replacements_findActivityRefOwners",
+    "target": "octane-tsrx-refs-after-activity-work",
+    "reference": "activity-ref-model",
+    "maxRatio": 0,
+    "note": "After the last Activity unmounts, the optional ref-ownership hook must be cold again. The deep ordinary-tree control measured zero Activity registration/owner searches across 3,072 correct ref replacements."
+  },
+  {
+    "suite": "activity",
+    "op": "deep_ref_replacements_findActivityRefOwners",
+    "target": "octane-tsrx-refs-live-hidden-activity-work",
+    "reference": "activity-ref-model",
+    "maxRatio": 0,
+    "note": "A separate hidden Activity remains mounted throughout 3,072 ordinary depth-16 ref replacements. Cached negative ownership must avoid repeated ancestor searches; the unrelated hidden root and all ref lifetimes are checked."
+  },
+  {
+    "suite": "activity",
+    "op": "ref_mount_unmount_findActivityRefOwners",
+    "target": "octane-tsrx-refs-live-hidden-activity-work",
+    "reference": "activity-ref-model",
+    "maxRatio": 1,
+    "note": "Fresh ordinary ref-bearing blocks may require one ownership lookup while another root has a live hidden Activity. Eight 256-row mount/unmount cycles measured 2,048 searches for 2,048 new blocks, with balanced ref lifetimes."
+  },
+  {
+    "suite": "activity",
+    "op": "activity_reachable",
+    "target": "activity-bundle-root-static-specialized",
+    "reference": "activity-bundle-model",
+    "maxRatio": 0,
+    "note": "The executed ordinary production bundle must tree-shake the optional Activity implementation. The shared reachability oracle verifies actual behavior before the diagnostic is accepted; existing bundle byte budgets are not loosened."
+  },
+  {
+    "suite": "activity",
+    "op": "activity_reachable",
+    "target": "activity-bundle-root-static",
+    "reference": "activity-bundle-model",
+    "maxRatio": 0,
+    "note": "The executed ordinary production bundle must tree-shake the optional Activity implementation. The shared reachability oracle verifies actual behavior before the diagnostic is accepted; existing bundle byte budgets are not loosened."
+  },
+  {
+    "suite": "activity",
+    "op": "activity_reachable",
+    "target": "activity-bundle-hooks-state",
+    "reference": "activity-bundle-model",
+    "maxRatio": 0,
+    "note": "The executed ordinary production bundle must tree-shake the optional Activity implementation. The shared reachability oracle verifies actual behavior before the diagnostic is accepted; existing bundle byte budgets are not loosened."
+  },
+  {
+    "suite": "activity",
+    "op": "activity_reachable",
+    "target": "activity-bundle-component-owned-effects",
+    "reference": "activity-bundle-model",
+    "maxRatio": 0,
+    "note": "The executed ordinary production bundle must tree-shake the optional Activity implementation. The shared reachability oracle verifies actual behavior before the diagnostic is accepted; existing bundle byte budgets are not loosened."
+  },
+  {
+    "suite": "activity",
+    "op": "activity_reachable",
+    "target": "activity-bundle-root-descriptor",
+    "reference": "activity-bundle-model",
+    "maxRatio": 0,
+    "note": "The executed ordinary production bundle must tree-shake the optional Activity implementation. The shared reachability oracle verifies actual behavior before the diagnostic is accepted; existing bundle byte budgets are not loosened."
   }
 ]

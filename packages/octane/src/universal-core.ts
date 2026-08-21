@@ -2405,7 +2405,8 @@ function ownerSubtreeRetainable(owner: UniversalOwnerRecord): boolean {
 	if (
 		owner.updates.size !== 0 ||
 		owner.visibility !== 'visible' ||
-		(owner.isBoundary && (owner.hasBoundaryError || owner.boundaryThenable !== null)) ||
+		owner.boundaryThenable !== null ||
+		(owner.isBoundary && owner.hasBoundaryError) ||
 		(owner.component as any)?.__warm !== undefined ||
 		(owner.component !== null &&
 			universalComponentRevision(owner.component) !== owner.componentRevision)
@@ -2809,18 +2810,26 @@ function blueprintFromLogical(record: LogicalRecord): BlueprintNode {
 	};
 }
 
-function markDraftOwnerSuspenseHidden(owner: DraftOwner): void {
-	owner.visibility = 'suspense-hidden';
-	for (const child of owner.children) markDraftOwnerSuspenseHidden(child);
+function markDraftOwnerHidden(
+	owner: DraftOwner,
+	visibility: Exclude<UniversalVisibility, 'visible'>,
+): void {
+	// An Activity can retain a tree containing an independently suspended
+	// primary. Keep that stricter lifetime until its own boundary retries.
+	owner.visibility = owner.record.visibility === 'suspense-hidden' ? 'suspense-hidden' : visibility;
+	for (const child of owner.children) markDraftOwnerHidden(child, owner.visibility);
 }
 
-function markBlueprintSuspenseHidden(nodes: readonly BlueprintNode[]): void {
+function markBlueprintHidden(
+	nodes: readonly BlueprintNode[],
+	visibility: Exclude<UniversalVisibility, 'visible'>,
+): void {
 	for (const node of nodes) {
 		if (node.kind === 'host') {
-			node.visibility = 'suspense-hidden';
+			if (node.visibility !== 'suspense-hidden') node.visibility = visibility;
 			markUniversalTreeFeature(UNIVERSAL_TREE_HIDDEN);
 		}
-		markBlueprintSuspenseHidden(node.children);
+		markBlueprintHidden(node.children, visibility);
 	}
 }
 
@@ -2840,10 +2849,39 @@ function retainCommittedTryArm(owner: DraftOwner): BlueprintNode[] | null {
 	owner.claimedChildren.add(childRecord);
 	currentAttempt().owners.push(child);
 	retainCommittedOwnerTree(child);
-	markDraftOwnerSuspenseHidden(child);
+	markDraftOwnerHidden(child, 'suspense-hidden');
 	const nodes = ownerRange(child, range.children.map(blueprintFromLogical));
-	markBlueprintSuspenseHidden(nodes);
+	markBlueprintHidden(nodes, 'suspense-hidden');
 	return nodes;
+}
+
+/**
+ * A hidden Activity is its own suspension boundary. Restore only its accepted
+ * owner/host range, leaving the surrounding render free to commit. The failed
+ * draft stays in attempt.owners for memoized-promise replay; a fresh committed
+ * draft prevents its unapplied hook updates from being consumed by retention.
+ * This allocation and tree walk occur only when background work suspends.
+ */
+function retainCommittedActivity(owner: DraftOwner): BlueprintNode[] {
+	const attempt = currentAttempt();
+	const record = owner.record;
+	const parent = owner.parent!;
+	const range = record.mounted
+		? (record.range ?? findLogicalRange(attempt.root.rootRecordForRetention(), record.rangeKey))
+		: null;
+	resetDraftChildren(owner);
+	const retained = draftOwner(record, parent, owner.replayPath);
+	retained.visibility = owner.visibility;
+	retained.canHandleSuspense = owner.canHandleSuspense;
+	retained.boundaryThenable = owner.boundaryThenable;
+	parent.children[parent.children.indexOf(owner)] = retained;
+	attempt.owners.push(retained);
+	retainCommittedOwnerTree(retained);
+	const visibility = retained.visibility as Exclude<UniversalVisibility, 'visible'>;
+	for (const child of retained.children) markDraftOwnerHidden(child, visibility);
+	const nodes = range === null ? [] : range.children.map(blueprintFromLogical);
+	markBlueprintHidden(nodes, visibility);
+	return ownerRange(retained, nodes);
 }
 
 const OWNERLESS_LEAF_PLAN_CACHE = new WeakMap<UniversalPlan, UniversalHostPlan | null>();
@@ -3087,16 +3125,31 @@ function materializeValue(
 		const parent = CURRENT_OWNER;
 		if (parent === null) throw new Error('Universal Activity requires an owning component.');
 		const owner = claimChildOwner(parent, null, [...path, 'activity'], null);
+		const hidden = activity.mode === 'hidden';
+		owner.canHandleSuspense = hidden;
 		owner.visibility =
 			parent.visibility === 'suspense-hidden'
 				? 'suspense-hidden'
-				: parent.visibility === 'activity-hidden' || activity.mode === 'hidden'
+				: parent.visibility === 'activity-hidden' || hidden
 					? 'activity-hidden'
 					: 'visible';
-		const nodes = executeOwner(owner, () =>
-			materializeValue(activity.body(), expectedRenderer, null, [...path, 'activity-output']),
-		);
-		const range = ownerRange(owner, nodes);
+		const attempt = currentAttempt();
+		const universalIdCheckpoint = attempt.nextUniversalId;
+		let range: BlueprintNode[];
+		try {
+			if (owner.boundaryThenable !== null) throw new UniversalSuspense(owner.boundaryThenable);
+			const nodes = executeOwner(owner, () =>
+				materializeValue(activity.body(), expectedRenderer, null, [...path, 'activity-output']),
+			);
+			range = ownerRange(owner, nodes);
+		} catch (error) {
+			if (!hidden || !(error instanceof UniversalSuspense)) throw error;
+			attempt.nextUniversalId = universalIdCheckpoint;
+			// Routed renderer-region suspensions already installed a settlement
+			// callback; render-origin suspensions use the ordinary local replay.
+			if (owner.boundaryThenable === null) attempt.retryThenables.add(error.thenable);
+			range = retainCommittedActivity(owner);
+		}
 		return key === null ? range : [{ kind: 'range', key, children: range }];
 	}
 	if ((value as UniversalIfValue)?.$$kind === UNIVERSAL_IF) {
@@ -6661,7 +6714,7 @@ function routeUniversalOwnerSuspense(
 	thenable: PromiseLike<unknown>,
 ): boolean {
 	for (let current = owner.parent; current !== null; current = current.parent) {
-		if (!current.isBoundary || !current.canHandleSuspense || current.disposed) continue;
+		if (!current.canHandleSuspense || current.disposed) continue;
 		current.boundaryThenable = thenable;
 		current.boundaryError = undefined;
 		current.hasBoundaryError = false;
@@ -7032,7 +7085,13 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	}
 
 	private attachHostRef(record: LogicalRecord): void {
-		if (this.hostAttachments?.registration == null || this.unmounted) return;
+		if (
+			this.hostAttachments?.registration == null ||
+			this.unmounted ||
+			record.visibility !== 'visible'
+		) {
+			return;
+		}
 		if (!this.readHostAttachment(record.id)) return;
 		const value = this.driver.getPublicInstance(this.container, record.id);
 		// A recycling-aware driver must not publish a ref until both its attachment
@@ -7088,7 +7147,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					records.get(record.id) !== record ||
 					record.ref == null ||
 					record.refAttached ||
-					record.visibility === 'suspense-hidden' ||
+					record.visibility !== 'visible' ||
 					!this.readHostAttachment(record.id)
 				) {
 					return;
@@ -8554,8 +8613,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		// already-active episode keeps its subtree on the full-root path.
 		for (let ancestor = target.parent; ancestor !== null; ancestor = ancestor.parent) {
 			if (
-				ancestor.isBoundary &&
-				(ancestor.hasBoundaryError || ancestor.boundaryThenable !== null)
+				ancestor.boundaryThenable !== null ||
+				(ancestor.isBoundary && ancestor.hasBoundaryError)
 			) {
 				return null;
 			}
@@ -8752,7 +8811,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			) {
 				if (
 					current === null ||
-					(current.isBoundary && (current.hasBoundaryError || current.boundaryThenable !== null))
+					current.boundaryThenable !== null ||
+					(current.isBoundary && current.hasBoundaryError)
 				) {
 					return undefined;
 				}
@@ -11092,16 +11152,14 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				if (draft.record.kind !== 'host') return;
 				const blueprintHost = draft.blueprint as BlueprintHost;
 				const nextRef = blueprintHost.ref;
-				const suspenseHide =
-					draft.record.visibility !== 'suspense-hidden' &&
-					blueprintHost.visibility === 'suspense-hidden';
-				const suspenseReveal =
-					draft.record.visibility === 'suspense-hidden' &&
-					blueprintHost.visibility !== 'suspense-hidden';
+				const hide =
+					draft.record.visibility === 'visible' && blueprintHost.visibility !== 'visible';
+				const reveal =
+					draft.record.visibility !== 'visible' && blueprintHost.visibility === 'visible';
 				if (
 					!draft.isNew &&
 					draft.record.refAttached &&
-					(recreated.has(draft.record) || suspenseHide || !Object.is(draft.record.ref, nextRef))
+					(recreated.has(draft.record) || hide || !Object.is(draft.record.ref, nextRef))
 				) {
 					refDetaches.push({
 						record: draft.record,
@@ -11111,10 +11169,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 				if (
 					nextRef != null &&
-					blueprintHost.visibility !== 'suspense-hidden' &&
+					blueprintHost.visibility === 'visible' &&
 					(draft.isNew ||
 						recreated.has(draft.record) ||
-						suspenseReveal ||
+						reveal ||
 						!draft.record.refAttached ||
 						!Object.is(draft.record.ref, nextRef))
 				) {

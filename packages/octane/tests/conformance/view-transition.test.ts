@@ -27,6 +27,9 @@ import {
 	ExitApp,
 	UpdateApp,
 	PlainApp,
+	ActivityTransitionApp,
+	WrappedActivityTransitionApp,
+	type ActivityTransitionProps,
 	ShareApp,
 	SuspenseRevealApp,
 	NestedUnitApp,
@@ -155,6 +158,86 @@ describe('ReactDOMViewTransition (ported)', () => {
 			expect(exits.length).toBe(1);
 			expect(container.textContent).toBe('');
 		});
+
+		// Per https://react.dev/reference/react/Activity#caveats.
+		it.each([
+			['inside ViewTransition', WrappedActivityTransitionApp],
+			['outside ViewTransition', ActivityTransitionApp],
+		] as const)(
+			'activates enter and exit when Activity %s reveals and hides preserved content',
+			async (_label, Host) => {
+				const calls: string[] = [];
+				const props: ActivityTransitionProps = {
+					mode: 'hidden',
+					text: 'initial',
+					onEnter: () => {
+						calls.push('enter');
+					},
+					onExit: () => {
+						calls.push('exit');
+					},
+					onUpdate: () => {
+						calls.push('update');
+					},
+				};
+				await act(() => root.render(Host, props));
+				const panel = container.querySelector('#activity-transition-panel') as HTMLElement;
+				const input = container.querySelector('#activity-transition-input') as HTMLInputElement;
+				input.value = 'preserved draft';
+				expect(panel.style.display).toBe('none');
+				expect(calls).toEqual([]);
+
+				await act(() =>
+					startTransition(() =>
+						root.render(Host, {
+							...props,
+							mode: 'visible',
+						}),
+					),
+				);
+				expect(calls).toEqual(['enter']);
+				expect(panel.style.display).toBe('');
+				expect(container.querySelector('#activity-transition-input')).toBe(input);
+				expect(input.value).toBe('preserved draft');
+
+				await act(() =>
+					startTransition(() =>
+						root.render(Host, {
+							...props,
+							mode: 'visible',
+							text: 'longer visible content',
+						}),
+					),
+				);
+				expect(calls).toEqual(['enter', 'update']);
+				await act(() => startTransition(() => root.render(Host, props)));
+				expect(calls).toEqual(['enter', 'update', 'exit']);
+				expect(panel.style.display).toBe('none');
+
+				await act(() =>
+					startTransition(() =>
+						root.render(Host, {
+							...props,
+							text: 'background content',
+						}),
+					),
+				);
+				expect(calls).toEqual(['enter', 'update', 'exit']);
+				expect(panel.style.display).toBe('none');
+				await act(() =>
+					startTransition(() =>
+						root.render(Host, {
+							...props,
+							mode: 'visible',
+							text: 'background content',
+						}),
+					),
+				);
+				expect(calls).toEqual(['enter', 'update', 'exit', 'enter']);
+				expect(container.querySelector('#activity-transition-panel')).toBe(panel);
+				expect(input.value).toBe('preserved draft');
+			},
+		);
 
 		// Per ReactDOMViewTransition-test.js:324
 		it('fires onUpdate when content inside a ViewTransition changes', async () => {

@@ -1472,13 +1472,16 @@ function lowerImportedErrorBoundaries(ast) {
 //     the component's boundary capability bit. componentSlot and ssrComponent
 //     read the same bit from the resolved component, so the two sides always
 //     agree without retaining the concrete builtins in the generic component
-//     path. Activity remains a compiler-lowered sentinel rather than a function.
+//     path. Generic Activity sites retain their symbol-aware boundary wrapper.
 // `bodyNodes` is the normalized, HeadHoist-filtered root list of a `@{ … }`
 // (JSXCodeBlock) body — callers gate on the body form.
 function inheritSoleCompRoot(bodyNodes, ctx) {
 	if (bodyNodes.length !== 1) return false;
 	const n = bodyNodes[0];
 	if (n.type !== 'Element' || !isComponentTag(n)) return false;
+	// Returned-JSX extraction can merge an authored key/spread config into one
+	// spread hole. Its descriptor still needs its own keyed reconciliation range.
+	if (n.openingElement?.metadata?.orderedComponentConfig === true) return false;
 	const id = n.openingElement?.name || n.id;
 	if (!id) return false;
 	if (
@@ -8318,6 +8321,7 @@ function compileInternal(
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
 		ctx.foreignImportLocals = imports.foreignLocals;
+		ctx.activityModuleAst = ast;
 	}
 	if (ctx.dev) {
 		for (const node of ast.body) {
@@ -9492,6 +9496,7 @@ function compileServer(
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
 		ctx.foreignImportLocals = imports.foreignLocals;
+		ctx.activityModuleAst = ast;
 	}
 	// M3 inherit-range exclusion set — must match the client compile's
 	// (see inheritSoleCompRoot; both modes read the same import declarations).
@@ -11446,7 +11451,11 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	// this context flag. Only this component's immediate children sub inherits the
 	// returned-fragment mode; control-flow arm subs intentionally reset it.
 	const returnedFragmentTemplate = ctx._returnedFragmentTemplate === true;
-	const compExpr = tagExprNode(node);
+	const activityDescriptor = isActivityLongForm(node, ctx);
+	const descriptorConfig = activityDescriptor || hasKeyedSpreadConfig(node);
+	const compExpr = activityDescriptor
+		? inheritOriginLoc(b.id(requireRuntimeForContext(ctx, 'Activity')), node)
+		: tagExprNode(node);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const propNodes = [];
 	let keyExpr = null;
@@ -11458,7 +11467,7 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const attrName = attr.name.name || attr.name;
 		const val = attr.value;
-		if (attrName === 'key') {
+		if (attrName === 'key' && !descriptorConfig) {
 			if (val != null) {
 				const inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
 				keyExpr = tsrxExprNode(inner, ctx, name, inlinedSubs);
@@ -11517,7 +11526,7 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		);
 	} else if (sourceChildren.length > 0) {
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
-		const opaqueChildren = !isActivityLongForm(node) && !isFragmentLongForm(node, ctx);
+		const opaqueChildren = !activityDescriptor && !isFragmentLongForm(node, ctx);
 		const descriptorChildren =
 			(tagBindingName(node) !== null &&
 				ctx.descriptorChildrenBindings?.has(tagBindingName(node))) ||
@@ -11587,6 +11596,26 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 				),
 			);
 		}
+	}
+	if (descriptorConfig) {
+		// The direct mode-only Activity was lowered to ActivityStatement. Richer
+		// Activity configs and generic explicit-key + spread sites keep one ordered
+		// element config, matching createElement without changing simple call sites.
+		ctx.runtimeNeeded.add('createElement');
+		ctx.runtimeNeeded.add('ssrChild');
+		const descriptor = ssrCall(
+			'createElement',
+			[compExpr, inheritOriginLoc(b.object(propNodes), node)],
+			node,
+		);
+		const child = ssrCall('ssrChild', [descriptor, b.id('__s')], node);
+		if (componentNs === null) return child;
+		ctx.runtimeNeeded.add('ssrInNamespace');
+		return ssrCall(
+			'ssrInNamespace',
+			[b.literal(componentNs, JSON.stringify(componentNs)), ssrThunk(child, node)],
+			node,
+		);
 	}
 	const explicitNamespace = componentNs !== null;
 	const helper = explicitNamespace ? 'ssrComponentNS' : 'ssrComponent';
@@ -16924,9 +16953,32 @@ function hasJsxSpreadAttribute(node) {
 	);
 }
 
-// Merge the complete Fragment config in authored order: object-spread getters,
-// explicit values, key expressions, and the final ref all evaluate exactly once.
-function fragmentSpreadRefExpression(node) {
+// An explicit key cannot be split from a spread config: whichever occurs last
+// wins, and all getters/expressions must run in source order. Extracted templates
+// retain the proof after the complete config becomes a single spread hole.
+function hasKeyedSpreadConfig(node) {
+	if (node.openingElement?.metadata?.orderedComponentConfig === true) return true;
+	const attributes = node.attributes || node.openingElement?.attributes || [];
+	if (attributes.length < 2) return false;
+	let key = false;
+	let spread = false;
+	for (const attribute of attributes) {
+		if (attribute.type === 'SpreadAttribute' || attribute.type === 'JSXSpreadAttribute') {
+			spread = true;
+		} else if (
+			(attribute.type === 'Attribute' || attribute.type === 'JSXAttribute') &&
+			jsxAttrRawName(attribute) === 'key'
+		) {
+			key = true;
+		}
+		if (key && spread) return true;
+	}
+	return false;
+}
+
+// Merge a complete JSX config in authored order. Boundary lowering must not
+// move spread getters after later explicit values or discard ignored props.
+function jsxAttributeConfigExpression(node) {
 	const properties = [];
 	for (const attr of node.attributes || node.openingElement?.attributes || []) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
@@ -16959,7 +17011,12 @@ function fragmentSpreadRefExpression(node) {
 			),
 		);
 	}
-	return inheritOriginLoc(b.member(inheritOriginLoc(b.object(properties), node), 'ref'), node);
+	return inheritOriginLoc(b.object(properties), node);
+}
+
+// Fragment only consumes ref, but every authored config expression still runs.
+function fragmentSpreadRefExpression(node) {
+	return inheritOriginLoc(b.member(jsxAttributeConfigExpression(node), 'ref'), node);
 }
 
 // Activity is always compiler-owned template syntax. Long-form Fragment only
@@ -16967,7 +17024,7 @@ function fragmentSpreadRefExpression(node) {
 // descendant that itself needs normalization. An ordinary/no-ref/keyed Fragment
 // remains a runtime descriptor so its explicit reconciliation boundary survives.
 function isLongFormTemplateSentinel(node, parentNs = 'html', allowHeadHoists = true, ctx = null) {
-	if (isActivityLongForm(node)) return true;
+	if (isActivityLongForm(node, ctx)) return true;
 	if (!isFragmentLongForm(node, ctx)) return false;
 	if (hasJsxAttribute(node, 'ref') || hasJsxSpreadAttribute(node)) return true;
 	return (node.children || []).some((child) =>
@@ -17058,7 +17115,7 @@ function requiresTemplateNormalization(
 	const childAllowsHeadHoists =
 		allowHeadHoists &&
 		tag !== 'noscript' &&
-		(!isComponentTag(node) || isActivityLongForm(node) || isFragmentLongForm(node, ctx));
+		(!isComponentTag(node) || isActivityLongForm(node, ctx) || isFragmentLongForm(node, ctx));
 	return (node.children || []).some((child) =>
 		requiresTemplateNormalization(child, childNs, childAllowsHeadHoists, ctx),
 	);
@@ -17175,6 +17232,11 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const newAttrs = [];
 	const mergedFragmentSpread = isFragmentLongForm(node, ctx) && hasJsxSpreadAttribute(node);
+	const mergedKeyedSpreadConfig =
+		!mergedFragmentSpread && isComponentTag(node) && hasKeyedSpreadConfig(node);
+	const mergedComponentConfig =
+		mergedKeyedSpreadConfig ||
+		(isActivityLongForm(node, ctx) && !isDirectActivityLongForm(node, ctx));
 	if (mergedFragmentSpread) {
 		// Hoisting each spread operand separately delays its getters until the
 		// renderer runs, after later attributes and child holes already evaluated.
@@ -17196,7 +17258,21 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 					),
 		);
 	}
-	for (const attr of mergedFragmentSpread ? [] : attrs) {
+	if (mergedComponentConfig) {
+		// Keep the WHOLE config together at returned-JSX sites. Capturing spread
+		// operands individually would defer their getters until the hoisted
+		// renderer, after subsequent attributes and child expressions had run.
+		const expression = jsxAttributeConfigExpression(node);
+		const hn = `h${holeProps.length}`;
+		holeProps.push(objectProp(hn, rewriteJsxValues(expression, ctx)));
+		newAttrs.push(
+			inheritOriginLoc(
+				b.jsx_spread_attribute(memberProps(hn, expression)),
+				node.openingElement || node,
+			),
+		);
+	}
+	for (const attr of mergedFragmentSpread || mergedComponentConfig ? [] : attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
 			// `{...expr}` — the spread expression is a DYNAMIC input too. Thread it out
 			// as an `hN` hole (exactly like an attribute value) so any prop/local it
@@ -17617,6 +17693,12 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 	// The emission normalizes from `openingElement.attributes`, so update it too.
 	if (node.openingElement) {
 		out.openingElement = { ...node.openingElement, attributes: newAttrs };
+		if (mergedKeyedSpreadConfig) {
+			out.openingElement.metadata = {
+				...node.openingElement.metadata,
+				orderedComponentConfig: true,
+			};
+		}
 	}
 	return out;
 }
@@ -17647,7 +17729,7 @@ function extractFragmentRoot(node, ctx, holeProps, parentNs = 'html') {
 	if (
 		(node.type === 'Element' || node.type === 'JSXElement') &&
 		isComponentTag(node) &&
-		!isActivityLongForm(node) &&
+		!isActivityLongForm(node, ctx) &&
 		!isFragmentLongForm(node, ctx)
 	) {
 		return extractFragmentComponent(node, ctx, holeProps, parentNs);
@@ -18510,15 +18592,18 @@ function autoMemoReturnedProviderChild(node, nameNode, ctx) {
 // component Element node. Recurses into prop values so nested JSX values lower too.
 function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 	const nameNode = node.openingElement?.name || node.id;
-	const componentTag = isComponentTag(node);
+	const activity = isActivityLongForm(node, ctx);
+	const componentTag = activity || isComponentTag(node);
 	// Host (lowercase) tag → string literal (`'li'`) for the de-opt renderer;
 	// component (capitalized / member / dynamic) → the identifier/member ref.
-	const compNode = componentTag
-		? jsxNameToExpr(nameNode)
-		: inheritOriginLoc(
-				b.literal(nameNode.name != null ? nameNode.name : String(nameNode)),
-				nameNode,
-			);
+	const compNode = activity
+		? inheritOriginLoc(b.id(requireRuntimeForContext(ctx, 'Activity')), nameNode)
+		: componentTag
+			? jsxNameToExpr(nameNode)
+			: inheritOriginLoc(
+					b.literal(nameNode.name != null ? nameNode.name : String(nameNode)),
+					nameNode,
+				);
 	if (!componentTag) {
 		rejectVoidElementContent(compNode.value, node, ctx);
 		rejectDangerouslySetInnerHTMLChildren(compNode.value, node, ctx);
@@ -19248,7 +19333,7 @@ function rewriteOpaqueTitles(node, ctx, namespace = 'html') {
 	if (type === 'Element' || type === 'JSXElement') {
 		const tag = jsxTagName(node) || elementTagName(node);
 		const ordinaryComponent =
-			isComponentTag(node) && !isActivityLongForm(node) && !isFragmentLongForm(node, ctx);
+			isComponentTag(node) && !isActivityLongForm(node, ctx) && !isFragmentLongForm(node, ctx);
 		if (
 			!ordinaryComponent &&
 			tag === 'title' &&
@@ -19636,11 +19721,10 @@ function normalizeChildren(nodes, inSvg = false, ctx = null, inNoscript = false)
 				}
 				continue;
 			}
-			// `<Activity mode={…}>…</Activity>` (React 19). Matched by name BEFORE
-			// the generic Element branch (it would otherwise route through
-			// componentSlot). Lower to an ActivityStatement carrying the mode expr
-			// and the raw children (compiled into one body by makeActivityCall).
-			if (isActivityLongForm(n)) {
+			// The mode-only builtin keeps its direct boundary lowering. Richer
+			// configs retain the ordinary element descriptor path below, where keys,
+			// spreads, children props, and authored evaluation order are preserved.
+			if (isDirectActivityLongForm(n, ctx)) {
 				const modeAttr = (n.openingElement.attributes || []).find(
 					(a) =>
 						(a.type === 'Attribute' || a.type === 'JSXAttribute') &&
@@ -19698,6 +19782,9 @@ function normalizeChildren(nodes, inSvg = false, ctx = null, inNoscript = false)
 				selfClosing: n.openingElement.selfClosing,
 				loc: n.loc, // preserve element position for dev hydration LOC (component slots)
 			};
+			// `unstable_Activity` starts with a lowercase letter but is a component
+			// when it resolves to the builtin. Keep that fact on this rare node only.
+			if (isActivityLongForm(n, ctx)) element.activityDescriptor = true;
 			// Preserve @tsrx/core's raw-text script discriminator without changing
 			// the normalized object shape of every ordinary element.
 			if (elementTagName(element) === 'script' && typeof n.content === 'string') {
@@ -25287,14 +25374,77 @@ function makeActivityCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = n
 	};
 }
 
-/** Long-form `<Activity>` tag — matched by name, mirroring isFragmentLongForm. */
-function isActivityLongForm(node) {
+function isActivityName(value) {
+	return value === 'Activity' || value === 'unstable_Activity';
+}
+
+// The component-local set does not include a module callback's parameters or
+// names declared inside nested JavaScript blocks. Resolve those rare builtin
+// candidates against the authored AST's actual scopes. Only modules containing
+// an Activity candidate allocate this analysis; normalized tags retain their
+// original name node, and synthesized names use the conservative fallback.
+function activityReferenceBinding(name, node, ctx) {
+	if (!ctx?.activityModuleAst) return undefined;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope =
+		lexical.nodeScopes.get(name) ??
+		lexical.nodeScopes.get(node.openingElement) ??
+		lexical.nodeScopes.get(node);
+	return scope === undefined ? undefined : lexical.resolveBinding(scope, name.name);
+}
+
+/** Resolve builtin Activity tags without claiming foreign or shadowed names. */
+function isActivityLongForm(node, ctx = null) {
 	const name = node.openingElement?.name || node.id;
 	if (!name) return false;
-	if (name.type !== 'Identifier' && name.type !== 'JSXIdentifier') return false;
-	// `unstable_Activity` mirrors the unstable_ViewTransition alias so React
-	// experimental-channel ports compile unchanged.
-	return name.name === 'Activity' || name.name === 'unstable_Activity';
+	if (name.type === 'Identifier' || name.type === 'JSXIdentifier') {
+		const local = name.name;
+		if (ctx?.currentComponentLocals?.has(local)) return false;
+		const imported = ctx?.octaneImportLocals?.get(local);
+		if (imported !== undefined) {
+			if (!isActivityName(imported)) return false;
+			const binding = activityReferenceBinding(name, node, ctx);
+			return binding === undefined || binding?.importSource?.value === 'octane';
+		}
+		if (!isActivityName(local)) return false;
+		if (ctx?.foreignImportLocals?.has(local)) return false;
+		if (ctx?.componentInfo?.has(local)) return false;
+		const binding = activityReferenceBinding(name, node, ctx);
+		if (binding !== undefined) return binding === null;
+		// A synthesized conventional spelling has no original scope identity.
+		if (ctx?.activityModuleAst) {
+			ctx.activityModuleBindingNames ??= collectModuleLevelBindings(ctx.activityModuleAst.body);
+			if (ctx.activityModuleBindingNames.has(local)) return false;
+		}
+		return true;
+	}
+	if (name.type !== 'MemberExpression' && name.type !== 'JSXMemberExpression') return false;
+	const object = name.object;
+	const property = name.property;
+	if (
+		name.computed !== true &&
+		(object?.type === 'Identifier' || object?.type === 'JSXIdentifier') &&
+		(property?.type === 'Identifier' || property?.type === 'JSXIdentifier') &&
+		isActivityName(property.name) &&
+		ctx?.octaneImportNamespaces?.has(object.name) === true &&
+		!ctx.currentComponentLocals?.has(object.name)
+	) {
+		const binding = activityReferenceBinding(object, node, ctx);
+		return binding === undefined || binding?.importSource?.value === 'octane';
+	}
+	return false;
+}
+
+/** Only a mode-only config can skip ordinary JSX element/key semantics. */
+function isDirectActivityLongForm(node, ctx = null) {
+	if (!isActivityLongForm(node, ctx)) return false;
+	const attrs = node.attributes || node.openingElement?.attributes || [];
+	return (
+		attrs.length === 0 ||
+		(attrs.length === 1 &&
+			(attrs[0].type === 'Attribute' || attrs[0].type === 'JSXAttribute') &&
+			(attrs[0].name?.name || attrs[0].name) === 'mode')
+	);
 }
 
 // ===========================================================================
@@ -25331,6 +25481,7 @@ function isFragmentLongForm(node, ctx = null) {
 }
 
 function isComponentTag(node) {
+	if (node.activityDescriptor === true) return true;
 	const name = node.openingElement?.name || node.id;
 	if (!name) return false;
 	if (name.type === 'MemberExpression' || name.type === 'JSXMemberExpression') return true;
@@ -25580,9 +25731,13 @@ function makeCompCall(
 	const id = ctx.nextHelperId++;
 	const compName = tagBindingName(node);
 	const staticFragmentRenderer = node.openingElement?.metadata?.staticFragmentRenderer;
-	const compNode = staticFragmentRenderer
-		? inheritOriginLoc(b.id(staticFragmentRenderer.name), node.openingElement?.name || node.id)
-		: tagExprNode(node);
+	const activityDescriptor = isActivityLongForm(node, ctx);
+	const descriptorConfig = activityDescriptor || hasKeyedSpreadConfig(node);
+	const compNode = activityDescriptor
+		? inheritOriginLoc(b.id(requireRuntimeForContext(ctx, 'Activity')), node)
+		: staticFragmentRenderer
+			? inheritOriginLoc(b.id(staticFragmentRenderer.name), node.openingElement?.name || node.id)
+			: tagExprNode(node);
 	// `</Card>` emits nothing — lend it the opening name's generated ranges so a
 	// closing tag is reachable for components the way it is for host elements.
 	registerOriginAlias(ctx, node.closingElement?.name, node.id || node.openingElement?.name);
@@ -25596,11 +25751,9 @@ function makeCompCall(
 	let hasSpreadProp = false;
 	let hasChildrenProp = false;
 	const propDependencyNodes = [];
-	// `key={expr}` is consumed by the componentSlot runtime (drives key-driven
-	// remount on identity change), NOT passed as a prop — matches React, where
-	// `props.key` is undefined inside the component body. When `key` follows a
-	// spread, the spread cannot inject `key` either: we filter it out of the
-	// emitted propsExpr but keep its expression for the slot arg.
+	// Simple `key={expr}` sites pass the key separately to componentSlot. When
+	// explicit keys and spreads coexist, keep the complete config ordered and let
+	// createElement extract the effective key without passing it to the component.
 	let keyExpr = null;
 	for (const attr of attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
@@ -25611,7 +25764,7 @@ function makeCompCall(
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const attrName = attr.name.name || attr.name;
 		const val = attr.value;
-		if (attrName === 'key') {
+		if (attrName === 'key' && !descriptorConfig) {
 			// `<Foo key/>` (no value) is meaningless — skip silently.
 			if (val == null) continue;
 			const keyInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
@@ -25666,7 +25819,7 @@ function makeCompCall(
 	} else if (sourceChildren.length > 0) {
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
 		const childrenParentNs =
-			!isActivityLongForm(node) && !isFragmentLongForm(node, ctx) ? 'opaque' : parentNs;
+			!activityDescriptor && !isFragmentLongForm(node, ctx) ? 'opaque' : parentNs;
 		if (compName !== null && ctx.descriptorChildrenBindings?.has(compName)) {
 			const kids = children
 				.map((child) => lowerInspectableJsxChild(child, ctx))
@@ -25718,6 +25871,17 @@ function makeCompCall(
 
 	// The props object as a node; the call-site emit embeds it directly.
 	const propsExpr = staticFragmentRenderer?.props ?? inheritOriginLoc(b.object(propNodes), node);
+	if (descriptorConfig) {
+		ctx.runtimeNeeded.add('createElement');
+		return {
+			id,
+			loc: devLoc(ctx, node),
+			origin: node,
+			isChild: true,
+			anchorlessAppendSafe: true,
+			valueExpr: inheritOriginLoc(b.call('_$createElement', compNode, propsExpr), node),
+		};
+	}
 
 	// Design (c) v0: decide whether the call site can use componentSlotLite
 	// (Scope-only, no Block / no Comment markers / no CompSlot wrapper).

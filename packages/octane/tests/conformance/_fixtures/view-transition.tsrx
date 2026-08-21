@@ -1,4 +1,4 @@
-import { ViewTransition, use } from 'octane';
+import { Activity, ViewTransition, use, type ViewTransitionProps } from 'octane';
 
 // Fixtures for conformance/view-transition.test.ts — ports of facebook/react
 // ReactDOMViewTransition-test.js (see the test file for per-`it` citations).
@@ -46,6 +46,48 @@ export function PlainApp(props) @{
 			</ViewTransition>
 		}
 	</>
+}
+
+export interface ActivityTransitionProps {
+	mode: 'visible' | 'hidden';
+	text: string;
+	onEnter?: ViewTransitionProps['onEnter'];
+	onExit?: ViewTransitionProps['onExit'];
+	onUpdate?: ViewTransitionProps['onUpdate'];
+}
+
+// Activity visibility changes retain the boundary and its hosts, but are still
+// enter/exit activations when committed inside a View Transition.
+export function ActivityTransitionApp(props: ActivityTransitionProps) @{
+	<Activity mode={props.mode}>
+		<ViewTransition
+			name="activity-panel"
+			onEnter={props.onEnter}
+			onExit={props.onExit}
+			onUpdate={props.onUpdate}
+		>
+			<section id="activity-transition-panel">
+				<input id="activity-transition-input" defaultValue="draft" />
+				<span>{props.text as string}</span>
+			</section>
+		</ViewTransition>
+	</Activity>
+}
+
+export function WrappedActivityTransitionApp(props: ActivityTransitionProps) @{
+	<ViewTransition
+		name="activity-panel"
+		onEnter={props.onEnter}
+		onExit={props.onExit}
+		onUpdate={props.onUpdate}
+	>
+		<Activity mode={props.mode}>
+			<section id="activity-transition-panel">
+				<input id="activity-transition-input" defaultValue="draft" />
+				<span>{props.text as string}</span>
+			</section>
+		</Activity>
+	</ViewTransition>
 }
 
 // Per ReactDOMViewTransition-test.js:425 — a ViewTransition around a Suspense
