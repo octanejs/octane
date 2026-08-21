@@ -1606,9 +1606,9 @@ function serverDescNeedsBlocks(v: unknown): boolean {
 	if (!isElementDescriptor(v) && childrenIterator(v) !== null) return true;
 	const d = v as ElementDescriptor;
 	if (d.$$kind === ELEMENT_TAG) {
-		// A Fragment below a host descriptor is reconciled by childSlot's
-		// fragment-aware list path, including when all of its leaves are pure hosts.
-		if (d.type === Fragment) return true;
+		// Fragment and Activity descriptors own reconcilable boundaries even when
+		// all of their descendants are pure hosts/text.
+		if (d.type === Fragment || d.type === Activity) return true;
 		return typeof d.type === 'function' || serverDescNeedsBlocks(d.children);
 	}
 	return false;

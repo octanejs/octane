@@ -532,6 +532,90 @@ describe('<Activity> server rendering and hydration', () => {
 		}
 	});
 
+	for (const initialMode of ['visible', 'hidden'] as const) {
+		for (const content of ['host', 'text'] as const) {
+			it(`hydrates initially ${initialMode} Activity ${content} children inside host descriptors without replacing DOM`, async () => {
+				function App(props: { mode: 'visible' | 'hidden'; label: string }) {
+					return createElement(
+						'main',
+						null,
+						createElement('input', { id: 'before-activity', defaultValue: 'before' }),
+						createElement(
+							'section',
+							null,
+							createElement(
+								Activity,
+								{ mode: props.mode },
+								content === 'host'
+									? createElement('span', { style: { display: 'inline-block' } }, props.label)
+									: props.label,
+							),
+						),
+						createElement('input', { id: 'after-activity', defaultValue: 'after' }),
+					);
+				}
+				const props = { mode: initialMode, label: 'initial' };
+				const host = container();
+				host.innerHTML = Server.renderToString(App, props).html;
+				const shell = host.querySelector('main') as HTMLElement;
+				const activityHost = host.querySelector('section') as HTMLElement;
+				const before = host.querySelector('#before-activity') as HTMLInputElement;
+				const after = host.querySelector('#after-activity') as HTMLInputElement;
+				before.value = 'edited before hydration';
+				after.value = 'edited after hydration';
+				function contentNode(): Node | null {
+					return content === 'host'
+						? activityHost.querySelector('span')
+						: (Array.from(activityHost.childNodes).find(
+								(node) => node.nodeType === Node.TEXT_NODE,
+							) ?? null);
+				}
+				const serverContent = contentNode();
+				if (initialMode === 'hidden') expect(serverContent).toBeNull();
+				else expect(serverContent?.textContent).toBe('initial');
+
+				const recoveries: unknown[] = [];
+				const root = hydrateRoot(host, App, props, {
+					onRecoverableError: (error) => recoveries.push(error),
+				});
+				roots.push(root);
+				flushSync(() => {});
+				await Promise.resolve();
+				expect(recoveries).toEqual([]);
+				const preservedContent = contentNode();
+				expect(preservedContent).not.toBeNull();
+				if (initialMode === 'visible') expect(preservedContent).toBe(serverContent);
+
+				function expectPreserved(mode: 'visible' | 'hidden', label: string) {
+					expect(host.querySelector('main')).toBe(shell);
+					expect(host.querySelector('section')).toBe(activityHost);
+					expect(host.querySelector('#before-activity')).toBe(before);
+					expect(host.querySelector('#after-activity')).toBe(after);
+					expect(Array.from(shell.children)).toEqual([before, activityHost, after]);
+					expect(before.value).toBe('edited before hydration');
+					expect(after.value).toBe('edited after hydration');
+					expect(contentNode()).toBe(preservedContent);
+					if (content === 'host') {
+						expect(preservedContent?.textContent).toBe(label);
+						expect((preservedContent as HTMLElement).style.display).toBe(
+							mode === 'hidden' ? 'none' : 'inline-block',
+						);
+					} else {
+						expect(preservedContent?.textContent).toBe(mode === 'hidden' ? '' : label);
+					}
+				}
+				expectPreserved(initialMode, 'initial');
+				flushSync(() => root.render(App, { mode: 'hidden', label: 'updated' }));
+				expectPreserved('hidden', 'updated');
+				flushSync(() => root.render(App, { mode: 'visible', label: 'updated' }));
+				expectPreserved('visible', 'updated');
+				root.unmount();
+				expect(host.querySelector('main')).toBeNull();
+				expect(host.textContent).toBe('');
+			});
+		}
+	}
+
 	it('hydrates generic hidden ranges without consuming a visible sibling', () => {
 		function serverApp() {
 			return Server.createElement(
