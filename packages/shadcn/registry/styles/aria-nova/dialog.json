@@ -12,8 +12,8 @@
     }
   ],
   "dependencies": [
-    "@octanejs/aria@0.0.37",
-    "@octanejs/lucide@0.1.38"
+    "@octanejs/aria@0.0.38",
+    "@octanejs/lucide@0.1.39"
   ],
   "registryDependencies": [
     "@octane/button",

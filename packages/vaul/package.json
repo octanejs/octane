@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/vaul",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Octane binding for Vaul drawers",
   "type": "module",
   "engines": {

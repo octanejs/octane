@@ -1,5 +1,15 @@
 # octane
 
+## 0.1.44
+
+### Patch Changes
+
+- 9b06e47: Fix duplicated text when hydrating a sole primitive child that the server framed,
+  including spread-bearing hosts and conditional children. Reuse the server Text
+  node while preserving hydration mismatch suppression, native events, and later
+  child updates.
+- 7535acd: Deduplicate binding hook sub-slot derivation behind Octane's shared helper while preserving each binding's slotless and symbol-identity behavior.
+
 ## 0.1.43
 
 ### Patch Changes
