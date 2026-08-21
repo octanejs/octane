@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "resizable-panels-server",
+  "roots": ["packages/resizable-panels/tests"],
+  "files": ["packages/resizable-panels/tests/ssr/persistence.server.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:react-resizable-panels-server:0001",
+      "file": "packages/resizable-panels/tests/ssr/persistence.server.test.ts",
+      "fullName": "react-resizable-panels persistence SSR renders deterministic defaults without resolving or reading browser storage"
+    }
+  ]
+}

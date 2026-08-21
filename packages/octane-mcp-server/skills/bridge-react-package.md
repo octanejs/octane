@@ -39,6 +39,7 @@ of bridging by hand:
 | `@streamdown/mermaid` | `@octanejs/streamdown/mermaid` |
 | `@streamdown/cjk` | `@octanejs/streamdown/cjk` |
 | `recharts` | `@octanejs/recharts` |
+| `react-resizable-panels` | `@octanejs/resizable-panels` |
 | `@react-three/fiber` | `@octanejs/three` |
 | `@visx/*` | `@octanejs/visx` |
 | `react-redux` | `@octanejs/redux` |

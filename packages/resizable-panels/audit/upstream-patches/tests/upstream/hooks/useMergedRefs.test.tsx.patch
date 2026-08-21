@@ -1,0 +1,19 @@
+diff --git a/tests/upstream/hooks/useMergedRefs.test.tsx b/tests/upstream/hooks/useMergedRefs.test.tsx
+--- a/tests/upstream/hooks/useMergedRefs.test.tsx
++++ b/tests/upstream/hooks/useMergedRefs.test.tsx
+@@ -1,12 +1,12 @@
++// Fidelity: exact pinned upstream test identities and assertions; imports and runtime harness are Octane-adapted.
+ import { renderHook } from "@octanejs/testing-library";
+-import { createRef } from "octane";
+ import { describe, expect, test, vi } from "vitest";
+-import { useMergedRefs } from "./useMergedRefs";
++import { useMergedRefs } from "../../../src/hooks/useMergedRefs";
+ 
+ describe("useMergedRefs", () => {
+   test("should support ref objects and callback refs", () => {
+     const callbackRef = vi.fn();
+-    const refObject = createRef<HTMLDivElement | null>();
++    const refObject: { current: HTMLDivElement | null } = { current: null };
+ 
+     const { result } = renderHook(() => useMergedRefs(callbackRef, refObject));
+ 

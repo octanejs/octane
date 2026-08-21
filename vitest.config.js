@@ -2500,6 +2500,96 @@ export default defineConfig({
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
+					name: 'react-resizable-panels-pristine',
+					include: ['packages/resizable-panels/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+				},
+			},
+			{
+				// Adapted upstream suite owns tests/upstream/**; conformance and
+				// hydration persistence contracts are Octane-only and stay in the
+				// ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/resizable-panels/tests/upstream/**/*.test.{ts,tsx,tsrx}'],
+				},
+				test: {
+					name: 'resizable-panels',
+					include: ['packages/resizable-panels/tests/**/*.test.{ts,tsx,tsrx}'],
+					exclude: [
+						'packages/resizable-panels/tests/browser/**',
+						'packages/resizable-panels/tests/differential/**',
+						'packages/resizable-panels/tests/ssr/**',
+						'packages/resizable-panels/tests/upstream-original.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/resizable-panels$/,
+							replacement: resolve(import.meta.dirname, 'packages/resizable-panels/src/index.tsrx'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'resizable-panels-differential',
+					include: ['packages/resizable-panels/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/resizable-panels$/,
+							replacement: resolve(import.meta.dirname, 'packages/resizable-panels/src/index.tsrx'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'resizable-panels-browser',
+					include: ['packages/resizable-panels/tests/browser/**/*.browser.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				test: {
+					name: 'resizable-panels-server',
+					include: ['packages/resizable-panels/tests/**/*.server.test.{ts,tsx,tsrx}'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/resizable-panels$/,
+							replacement: resolve(import.meta.dirname, 'packages/resizable-panels/src/index.tsrx'),
+						},
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
 					name: 'hook-form-pristine',
 					include: ['packages/hook-form/tests/upstream-original.test.ts'],
 					environment: 'node',

@@ -1,0 +1,420 @@
+diff --git a/tests/upstream/components/group/useDefaultLayout.test.tsx b/tests/upstream/components/group/useDefaultLayout.test.tsx
+--- a/tests/upstream/components/group/useDefaultLayout.test.tsx
++++ b/tests/upstream/components/group/useDefaultLayout.test.tsx
+@@ -1,20 +1,42 @@
+-import { render, renderHook } from "@octanejs/testing-library";
+-import { createRef } from "octane";
+-import { describe, expect, test, vi } from "vitest";
+-import { setDefaultElementBounds } from "../../utils/test/mockBoundingClientRect";
+-import { Panel } from "../panel/Panel";
+-import { getStorageKey } from "./auto-save/getStorageKey";
+-import { Group } from "./Group";
+-import type { LegacyLayout } from "./readLegacyLayout";
++import { cleanup, render, renderHook } from "@octanejs/testing-library";
++import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+ import {
+-  type GroupImperativeHandle,
+-  type Layout,
+-  type LayoutStorage
+-} from "./types";
+-import { useDefaultLayout } from "./useDefaultLayout";
++  mockBoundingClientRect,
++  setDefaultElementBounds,
++  unmockBoundingClientRect
++} from "../../utils/test/mockBoundingClientRect";
++import { mockResizeObserver, unmockResizeObserver } from "../../utils/test/mockResizeObserver";
++import { Panel } from "../../../../src/components/panel/Panel";
++import { getStorageKey } from "../../../../src/components/group/auto-save/getStorageKey";
++import { Group } from "../../../../src/components/group/Group";
++import type { LegacyLayout } from "../../../../src/components/group/auto-save/readLegacyLayout";
++import type {
++  GroupImperativeHandle,
++  Layout,
++  LayoutStorage
++} from "../../../../src/components/group/types";
++import { useDefaultLayout } from "../../../../src/components/group/useDefaultLayout";
++
++function createRef<T>() {
++  return { current: null as T | null };
++}
++
++beforeEach(() => {
++  vi.useRealTimers();
++  mockBoundingClientRect();
++  mockResizeObserver();
++});
++
++afterEach(() => {
++  cleanup();
++  unmockResizeObserver();
++  unmockBoundingClientRect();
++  vi.useRealTimers();
++});
+ 
+ describe("useDefaultLayout", () => {
+   describe("modern onLayoutChanged prop", () => {
++    // Fidelity classification: mechanically adapted (framework harness/imports only).
+     test("should read/write from the provided Storage API", () => {
+       const storage: LayoutStorage = {
+         getItem: vi.fn(() => null),
+@@ -52,6 +74,7 @@ describe("useDefaultLayout", () => {
+       );
+     });
+ 
++    // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+     test("should ignore debounce param when using onLayoutChanged", () => {
+       vi.useFakeTimers();
+ 
+@@ -91,6 +114,7 @@ describe("useDefaultLayout", () => {
+ 
+     // See github.com/bvaughn/react-resizable-panels/pull/540
+     describe("should ignore temporarily invalid layouts", () => {
++      // Fidelity classification: mechanically adapted (framework harness/imports only).
+       test("on mount (ids mismatch)", () => {
+         const groupRef = createRef<GroupImperativeHandle>();
+ 
+@@ -109,14 +133,17 @@ describe("useDefaultLayout", () => {
+           </Group>
+         );
+ 
+-        expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(`
++        expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(
++          `
+       {
+         "after": 50,
+         "before": 50,
+       }
+-    `);
++    `
++        );
+       });
+ 
++      // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+       test("on mount (num panels mismatch)", () => {
+         const groupRef = createRef<GroupImperativeHandle>();
+ 
+@@ -136,14 +163,17 @@ describe("useDefaultLayout", () => {
+           </Group>
+         );
+ 
+-        expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(`
++        expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(
++          `
+       {
+         "left": 50,
+         "right": 50,
+       }
+-    `);
++    `
++        );
+       });
+ 
++      // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+       test("after update (num panels mismatch)", () => {
+         const groupRef = createRef<GroupImperativeHandle>();
+ 
+@@ -186,15 +216,18 @@ describe("useDefaultLayout", () => {
+           </Group>
+         );
+ 
+-        expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(`
++        expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(
++          `
+       {
+         "left": 50,
+         "right": 50,
+       }
+-    `);
++    `
++        );
+       });
+     });
+ 
++    // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+     test("should save separate layouts per panel group when panelIds param is present", () => {
+       const storage: LayoutStorage = {
+         getItem: vi.fn(() => null),
+@@ -254,6 +287,7 @@ describe("useDefaultLayout", () => {
+       );
+     });
+ 
++    // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+     test("should ignore invalid layouts (panel ids mismatch)", () => {
+       setDefaultElementBounds(new DOMRect(0, 0, 100, 50));
+ 
+@@ -272,15 +306,18 @@ describe("useDefaultLayout", () => {
+         </Group>
+       );
+ 
+-      expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(`
++      expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(
++        `
+       {
+         "bar": 30,
+         "baz": 70,
+       }
+-    `);
++    `
++      );
+     });
+ 
+     // See https://github.com/bvaughn/react-resizable-panels/issues/656
++    // Fidelity classification: mechanically adapted (framework harness/imports only).
+     test("should support out-of-order panel ids", () => {
+       setDefaultElementBounds(new DOMRect(0, 0, 100, 50));
+ 
+@@ -301,16 +338,19 @@ describe("useDefaultLayout", () => {
+         </Group>
+       );
+ 
+-      expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(`
++      expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(
++        `
+       {
+         "bottom": 50,
+         "middle": 30,
+         "top": 20,
+       }
+-    `);
++    `
++      );
+     });
+ 
+     // See github.com/bvaughn/react-resizable-panels/pull/716
++    // Fidelity classification: mechanically adapted (framework harness/imports only).
+     test("should ignore non-user interactions", () => {
+       const storage: LayoutStorage = {
+         getItem: vi.fn(() => null),
+@@ -346,6 +386,7 @@ describe("useDefaultLayout", () => {
+   });
+ 
+   describe("legacy onLayoutChange prop", () => {
++    // Fidelity classification: mechanically adapted (framework harness/imports only).
+     test("should read/write from the provided Storage API", () => {
+       const storage: LayoutStorage = {
+         getItem: vi.fn(() => null),
+@@ -381,6 +422,7 @@ describe("useDefaultLayout", () => {
+       );
+     });
+ 
++    // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+     test("should support debounced write", () => {
+       vi.useFakeTimers();
+ 
+@@ -420,6 +462,7 @@ describe("useDefaultLayout", () => {
+       );
+     });
+ 
++    // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+     test("should override pending debounce with newer value", () => {
+       vi.useFakeTimers();
+ 
+@@ -467,6 +510,7 @@ describe("useDefaultLayout", () => {
+       );
+     });
+ 
++    // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+     test("should cancel pending debounced write on unmount", () => {
+       vi.useFakeTimers();
+ 
+@@ -503,6 +547,7 @@ describe("useDefaultLayout", () => {
+ 
+     // See github.com/bvaughn/react-resizable-panels/pull/540
+     describe("should ignore temporarily invalid layouts", () => {
++      // Fidelity classification: mechanically adapted (framework harness/imports only).
+       test("on mount (ids mismatch)", () => {
+         const groupRef = createRef<GroupImperativeHandle>();
+ 
+@@ -521,14 +566,17 @@ describe("useDefaultLayout", () => {
+           </Group>
+         );
+ 
+-        expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(`
++        expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(
++          `
+       {
+         "after": 50,
+         "before": 50,
+       }
+-    `);
++    `
++        );
+       });
+ 
++      // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+       test("on mount (num panels mismatch)", () => {
+         const groupRef = createRef<GroupImperativeHandle>();
+ 
+@@ -548,14 +596,17 @@ describe("useDefaultLayout", () => {
+           </Group>
+         );
+ 
+-        expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(`
++        expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(
++          `
+       {
+         "left": 50,
+         "right": 50,
+       }
+-    `);
++    `
++        );
+       });
+ 
++      // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+       test("after update (num panels mismatch)", () => {
+         const groupRef = createRef<GroupImperativeHandle>();
+ 
+@@ -598,15 +649,18 @@ describe("useDefaultLayout", () => {
+           </Group>
+         );
+ 
+-        expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(`
++        expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(
++          `
+       {
+         "left": 50,
+         "right": 50,
+       }
+-    `);
++    `
++        );
+       });
+     });
+ 
++    // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+     test("should save separate layouts per panel group when panelIds param is present", () => {
+       const storage: LayoutStorage = {
+         getItem: vi.fn(() => null),
+@@ -661,6 +715,7 @@ describe("useDefaultLayout", () => {
+       );
+     });
+ 
++    // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+     test("should ignore invalid layouts (panel ids mismatch)", () => {
+       setDefaultElementBounds(new DOMRect(0, 0, 100, 50));
+ 
+@@ -679,16 +734,19 @@ describe("useDefaultLayout", () => {
+         </Group>
+       );
+ 
+-      expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(`
++      expect(groupRef.current?.getLayout()).toMatchInlineSnapshot(
++        `
+       {
+         "bar": 30,
+         "baz": 70,
+       }
+-    `);
++    `
++      );
+     });
+   });
+ 
+   // Test edge case where users spread the result of this method
++  // Fidelity classification: mechanically adapted (framework harness/imports only).
+   test("should only write once if both onLayoutChange and onLayoutChanged props are used", () => {
+     vi.useFakeTimers();
+ 
+@@ -787,6 +845,7 @@ describe("useDefaultLayout", () => {
+     }
+ 
+     describe("with panel ids prop", () => {
++      // Fidelity classification: mechanically adapted (framework harness/imports only).
+       test("skips mismatched legacy layout", () => {
+         const { keyV3, keyV4, storage } = mockLayoutStorage({
+           groupId: "test-group-id",
+@@ -808,6 +867,7 @@ describe("useDefaultLayout", () => {
+         expect(storage.setItem).not.toHaveBeenCalled();
+       });
+ 
++      // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+       test("returns matching legacy layout", () => {
+         const { keyV3, keyV4, storage } = mockLayoutStorage({
+           groupId: "test-group-id",
+@@ -823,17 +883,20 @@ describe("useDefaultLayout", () => {
+           })
+         );
+ 
+-        expect(result.current.defaultLayout).toMatchInlineSnapshot(`
++        expect(result.current.defaultLayout).toMatchInlineSnapshot(
++          `
+           {
+             "left": 50,
+             "right": 50,
+           }
+-        `);
++        `
++        );
+         expect(storage.getItem).toHaveBeenCalledWith(keyV4);
+         expect(storage.getItem).toHaveBeenCalledWith(keyV3);
+         expect(storage.setItem).not.toHaveBeenCalled();
+       });
+ 
++      // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+       test("prefers matching modern layouts if both are present", () => {
+         const { keyV3, keyV4, storage } = mockLayoutStorage({
+           groupId: "test-group-id",
+@@ -864,6 +927,7 @@ describe("useDefaultLayout", () => {
+     });
+ 
+     describe("without panel ids prop", () => {
++      // Fidelity classification: mechanically adapted (framework harness/imports only).
+       test("skips mismatched legacy layout", () => {
+         const { keyV3, keyV4, storage } = mockLayoutStorage({
+           groupId: "test-group-id",
+@@ -883,6 +947,7 @@ describe("useDefaultLayout", () => {
+         expect(storage.setItem).not.toHaveBeenCalled();
+       });
+ 
++      // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+       test("returns matching legacy layout", () => {
+         const { keyV3, keyV4, storage } = mockLayoutStorage({
+           groupId: "test-group-id",
+@@ -902,17 +967,20 @@ describe("useDefaultLayout", () => {
+           })
+         );
+ 
+-        expect(result.current.defaultLayout).toMatchInlineSnapshot(`
++        expect(result.current.defaultLayout).toMatchInlineSnapshot(
++          `
+           {
+             "center": 50,
+             "right": 50,
+           }
+-        `);
++        `
++        );
+         expect(storage.getItem).toHaveBeenCalledWith(keyV4);
+         expect(storage.getItem).toHaveBeenCalledWith(keyV3);
+         expect(storage.setItem).not.toHaveBeenCalled();
+       });
+ 
++      // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+       test("prefers matching modern layouts if both are present", () => {
+         const { keyV4, storage } = mockLayoutStorage({
+           groupId: "test-group-id",
+@@ -927,18 +995,21 @@ describe("useDefaultLayout", () => {
+           })
+         );
+ 
+-        expect(result.current.defaultLayout).toMatchInlineSnapshot(`
++        expect(result.current.defaultLayout).toMatchInlineSnapshot(
++          `
+           {
+             "center": 35,
+             "left": 25,
+             "right": 40,
+           }
+-        `);
++        `
++        );
+         expect(storage.getItem).toHaveBeenCalledWith(keyV4);
+         expect(storage.setItem).not.toHaveBeenCalled();
+       });
+     });
+ 
++    // Fidelity classification: mechanically adapted (framework harness/imports only).\n
+     test("updates persisted modern layout", () => {
+       const { keyV3, keyV4, storage } = mockLayoutStorage({
+         groupId: "test-group-id",

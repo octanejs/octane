@@ -1,0 +1,51 @@
+diff --git a/tests/upstream/components/group/sortByElementOffset.test.ts b/tests/upstream/components/group/sortByElementOffset.test.ts
+--- a/tests/upstream/components/group/sortByElementOffset.test.ts
++++ b/tests/upstream/components/group/sortByElementOffset.test.ts
+@@ -1,6 +1,28 @@
+-import { beforeEach, describe, expect, test } from "vitest";
+-import { setElementBoundsFunction } from "../../utils/test/mockBoundingClientRect";
+-import { sortByElementOffset } from "./sortByElementOffset";
++// Fidelity: exact pinned upstream test identities and assertions; imports and runtime harness are Octane-adapted.
++import { afterEach, beforeEach, describe, expect, test } from "vitest";
++import {
++  mockBoundingClientRect,
++  setElementBoundsFunction,
++  unmockBoundingClientRect
++} from "../../utils/test/mockBoundingClientRect";
++import { sortByElementOffset } from "../../../../src/components/group/sortByElementOffset";
++
++expect.addSnapshotSerializer({
++  serialize(value) {
++    const rect = value as DOMRect;
++    return `${rect.x}, ${rect.y} (${rect.width} x ${rect.height})`;
++  },
++  test(value) {
++    return (
++      value !== null &&
++      typeof value === "object" &&
++      "x" in value &&
++      "y" in value &&
++      "width" in value &&
++      "height" in value
++    );
++  }
++});
+ 
+ function createElementContainer({
+   height = 0,
+@@ -24,6 +46,7 @@ function createElementContainer({
+ 
+ describe("sortByElementOffset", () => {
+   beforeEach(() => {
++    mockBoundingClientRect();
+     setElementBoundsFunction((element) => {
+       const x = parseInt(element.getAttribute("x") ?? "0");
+       const y = parseInt(element.getAttribute("y") ?? "0");
+@@ -33,6 +56,7 @@ describe("sortByElementOffset", () => {
+       return new DOMRect(x, y, width, height);
+     });
+   });
++  afterEach(unmockBoundingClientRect);
+ 
+   describe("orientation: horizontal", () => {
+     test("should handle empty elements array", () => {

@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/global/utils/layoutsEqual.test.ts b/tests/upstream/global/utils/layoutsEqual.test.ts
+--- a/tests/upstream/global/utils/layoutsEqual.test.ts
++++ b/tests/upstream/global/utils/layoutsEqual.test.ts
+@@ -1,6 +1,6 @@
+ import { describe, expect, test } from "vitest";
+-import { layoutsEqual } from "./layoutsEqual";
+-import type { Layout } from "../../components/group/types";
++import { layoutsEqual } from "../../../../src/global/utils/layoutsEqual";
++import type { Layout } from "../../../../src/components/group/types";
+ 
+ const EMPTY: Layout = {};
+ const A: Layout = { a: 25, b: 75 };

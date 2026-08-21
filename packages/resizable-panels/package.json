@@ -1,0 +1,61 @@
+{
+  "name": "@octanejs/resizable-panels",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "Octane port of react-resizable-panels 4.12.2.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/resizable-panels"
+  },
+  "main": "src/index.tsrx",
+  "module": "src/index.tsrx",
+  "types": "src/index.tsrx",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "status.json",
+    "LICENSE.upstream"
+  ],
+  "exports": {
+    ".": "./src/index.tsrx"
+  },
+  "scripts": {
+    "test": "pnpm upstream:materialize && vitest run --root ../.. --project resizable-panels && vitest run --root ../.. --project resizable-panels-server && pnpm test:upstream && vitest run --root ../.. --project resizable-panels-browser",
+    "test:upstream": "vitest run --config vitest.pristine.config.ts",
+    "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs && node audit/verify-provenance.mjs",
+    "upstream:verify:negative-controls": "node audit/verify-provenance.mjs --negative-controls",
+    "typecheck:probes": "tsc --noEmit -p audit/type-probes/tsconfig.pristine.json && tsrx-tsc --noEmit -p typetests/tsconfig.json",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "catalog:default",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "octane": "workspace:*",
+    "jsdom": "26.1.0",
+    "playwright": "catalog:default",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-resizable-panels": "catalog:default",
+    "vite": "catalog:default",
+    "vitest": "3.2.4",
+    "vitest-fail-on-console": "^0.10.1"
+  }
+}

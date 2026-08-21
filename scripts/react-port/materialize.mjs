@@ -12,6 +12,7 @@ import {
 	UPSTREAM_PATCHES_RELATIVE_PATH,
 	applyAdaptedRewrites,
 	findForbiddenReactSpecifiers,
+	findFormattingOnlyHunks,
 	buildUpstreamLock,
 	extractPristineFromArchive,
 	gitBlobSha1,
@@ -321,6 +322,13 @@ function regenerateAdaptedTree(lock, packageDirectory, pristineDirectory, execFi
 				bytes = Buffer.from(applyAdaptedRewrites(bytes.toString('utf8'), lock.adaptedRewrites));
 			}
 			if (existsSync(patchPath)) {
+				const committedPatch = readFileSync(patchPath, 'utf8');
+				const formattingOnly = findFormattingOnlyHunks(committedPatch);
+				if (formattingOnly.length > 0) {
+					throw new Error(
+						`${targetPath}: committed patch contains formatting-only hunks (${formattingOnly.join(' | ')}); keep the pristine tree's formatting so patches carry only genuine divergences`,
+					);
+				}
 				const scratchPath = writeTreeFile(scratch, targetPath, bytes);
 				execFile('git', ['-c', 'core.autocrlf=false', 'apply', '--whitespace=nowarn', patchPath], {
 					cwd: scratch,
@@ -836,6 +844,12 @@ async function commandDiff(options) {
 				unchanged.push(targetPath);
 			}
 			continue;
+		}
+		const formattingOnly = findFormattingOnlyHunks(patch);
+		if (formattingOnly.length > 0) {
+			throw new Error(
+				`${targetPath}: patch contains formatting-only hunks (${formattingOnly.join(' | ')}); keep the pristine tree's formatting so patches carry only genuine divergences`,
+			);
 		}
 		mkdirSync(path.dirname(patchPath), { recursive: true });
 		writeFileSync(patchPath, patch);

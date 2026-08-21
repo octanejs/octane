@@ -1,0 +1,108 @@
+diff --git a/tests/upstream/global/utils/getImperativePanelMethods.test.ts b/tests/upstream/global/utils/getImperativePanelMethods.test.ts
+--- a/tests/upstream/global/utils/getImperativePanelMethods.test.ts
++++ b/tests/upstream/global/utils/getImperativePanelMethods.test.ts
+@@ -1,57 +1,63 @@
+-import {
+-  afterEach,
+-  beforeEach,
+-  describe,
+-  expect,
+-  test,
+-  vi,
+-  type Mock
+-} from "vitest";
++// Fidelity: exact pinned upstream test identities and assertions; imports and DOM harness are Octane-adapted.
++import { afterEach, beforeEach, describe, expect, test, vi, type Mock } from "vitest";
+ import type {
+   PanelConstraints,
+   PanelImperativeHandle
+-} from "../../components/panel/types";
++} from "../../../../src/components/panel/types";
+ import {
+   mockGetComputedStyle,
+-  setDefaultElementStyle
++  setDefaultElementStyle,
++  unmockGetComputedStyle
+ } from "../../utils/test/mockGetComputedStyle";
+-import { mountGroup } from "../mountGroup";
+-import { subscribeToMountedGroup } from "../mutable-state/groups";
+-import { mockGroup } from "../test/mockGroup";
+-import { getImperativePanelMethods } from "./getImperativePanelMethods";
++import { mountGroup } from "../../../../src/global/mountGroup";
++import { subscribeToMountedGroup } from "../../../../src/global/mutable-state/groups";
++import { mockGroup } from "../../global/test/mockGroup";
++import { getImperativePanelMethods } from "../../../../src/global/utils/getImperativePanelMethods";
++import { resetMockGroupIdCounter } from "../../global/test/mockGroup";
++import {
++  mockBoundingClientRect,
++  unmockBoundingClientRect
++} from "../../utils/test/mockBoundingClientRect";
++import { mockResizeObserver, unmockResizeObserver } from "../../utils/test/mockResizeObserver";
++
++beforeEach(() => {
++  mockBoundingClientRect();
++  mockGetComputedStyle();
++  mockResizeObserver();
++});
++
++afterEach(() => {
++  resetMockGroupIdCounter();
++  unmockResizeObserver();
++  unmockGetComputedStyle();
++  unmockBoundingClientRect();
++});
+ 
+ describe("getImperativePanelMethods", () => {
+-  test.each([
+-    ["collapse"],
+-    ["expand"],
+-    ["getSize"],
+-    ["isCollapsed"],
+-    ["resize"]
+-  ])("method %o: throws if group or panel not mounted", (name) => {
+-    const key = name as keyof PanelImperativeHandle;
+-
+-    const group = mockGroup(new DOMRect(), {
+-      id: "group",
+-      orientation: "horizontal"
+-    });
++  test.each([["collapse"], ["expand"], ["getSize"], ["isCollapsed"], ["resize"]])(
++    "method %o: throws if group or panel not mounted",
++    (name) => {
++      const key = name as keyof PanelImperativeHandle;
+ 
+-    const api = getImperativePanelMethods({
+-      groupId: "group",
+-      panelId: "B"
+-    });
++      const group = mockGroup(new DOMRect(), {
++        id: "group",
++        orientation: "horizontal"
++      });
+ 
+-    expect(() => (key === "resize" ? api[key](1) : api[key]())).toThrow(
+-      "Group group not found"
+-    );
++      const api = getImperativePanelMethods({
++        groupId: "group",
++        panelId: "B"
++      });
+ 
+-    const unmountGroup = mountGroup(group);
++      expect(() => (key === "resize" ? api[key](1) : api[key]())).toThrow("Group group not found");
+ 
+-    expect(() => (key === "resize" ? api[key](1) : api[key]())).toThrow(
+-      /not found for Panel B/
+-    );
++      const unmountGroup = mountGroup(group);
+ 
+-    unmountGroup();
+-  });
++      expect(() => (key === "resize" ? api[key](1) : api[key]())).toThrow(/not found for Panel B/);
++
++      unmountGroup();
++    }
++  );
+ 
+   describe("mounted", () => {
+     let onLayoutChange: Mock;

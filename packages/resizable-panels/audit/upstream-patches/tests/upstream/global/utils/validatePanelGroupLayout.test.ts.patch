@@ -1,0 +1,14 @@
+diff --git a/tests/upstream/global/utils/validatePanelGroupLayout.test.ts b/tests/upstream/global/utils/validatePanelGroupLayout.test.ts
+--- a/tests/upstream/global/utils/validatePanelGroupLayout.test.ts
++++ b/tests/upstream/global/utils/validatePanelGroupLayout.test.ts
+@@ -1,7 +1,7 @@
+ import { describe, expect, test } from "vitest";
+-import { validatePanelGroupLayout } from "./validatePanelGroupLayout";
+-import type { PanelConstraints } from "../../components/panel/types";
+-import type { Layout } from "../../components/group/types";
++import { validatePanelGroupLayout } from "../../../../src/global/utils/validatePanelGroupLayout";
++import type { PanelConstraints } from "../../../../src/components/panel/types";
++import type { Layout } from "../../../../src/components/group/types";
+ 
+ function c(partials: Partial<PanelConstraints>[]) {
+   const constraints: PanelConstraints[] = [];

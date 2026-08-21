@@ -60,6 +60,7 @@
       "@octanejs/sonner",
       "@octanejs/draggable",
       "@octanejs/react-error-boundary",
+      "@octanejs/resizable-panels",
       "@octanejs/transition-group",
       "@octanejs/day-picker",
       "@octanejs/textarea-autosize",

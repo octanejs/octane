@@ -1,0 +1,2168 @@
+{
+  "schemaVersion": 1,
+  "project": "resizable-panels",
+  "roots": ["packages/resizable-panels/tests/upstream"],
+  "files": [
+    "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+    "packages/resizable-panels/tests/upstream/components/group/sortByElementOffset.test.ts",
+    "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+    "packages/resizable-panels/tests/upstream/components/panel/Panel.test.tsx",
+    "packages/resizable-panels/tests/upstream/components/separator/Separator.test.tsx",
+    "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+    "packages/resizable-panels/tests/upstream/global/dom/calculateAvailableGroupSize.test.ts",
+    "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+    "packages/resizable-panels/tests/upstream/global/styles/parseSizeAndUnit.test.ts",
+    "packages/resizable-panels/tests/upstream/global/styles/sizeStyleToPixels.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/calculateDefaultLayout.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/calculateSeparatorAriaValues.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/compareLayoutNumbers.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/findMatchingHitRegions.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/getDistanceBetweenPointAndRect.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/getImperativeGroupMethods.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/layoutNumbersEqual.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/layoutsEqual.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/objectsEqual.test.ts",
+    "packages/resizable-panels/tests/upstream/global/utils/validatePanelGroupLayout.test.ts",
+    "packages/resizable-panels/tests/upstream/hooks/useId.test.ts",
+    "packages/resizable-panels/tests/upstream/hooks/useMergedRefs.test.tsx",
+    "packages/resizable-panels/tests/upstream/hooks/useStableCallback.test.tsx",
+    "packages/resizable-panels/tests/upstream/utils/isArrayEqual.test.ts",
+    "packages/resizable-panels/tests/upstream/utils/parseNumericStyleValue.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:react-resizable-panels:0019",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group HTML attributes problematic styles should be suppressed"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0020",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group HTML attributes should expose explicit id and testid"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0021",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group HTML attributes should pass through ...rest attributes"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0008",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group changes to defaultProps or disableCursor should not cause Group to remount"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0009",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group defaultLayout should be ignored if it does not match Panel ids"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0010",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group defaultLayout should be ignored if it does not match Panel ids (mounted within hidden subtree)"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0011",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group defaultLayout should not break the layout if layout Panel ids are in an unexpected order three panel vertical group"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0012",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group defaultLayout should not break the layout if layout Panel ids are in an unexpected order two panel horizontal group"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0013",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group defaultLayout should not require multiple render passes"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0014",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group groupRef should allow layout to be read or written on mount"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0015",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group groupRef should work with an empty Group"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0016",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group groupRef should work within a hidden subtree"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0017",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group groupResizeBehavior preserve-pixel-size preserves pixel size Group size changes"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0018",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group groupResizeBehavior preserve-relative-size preserves relative (percentage based) size Group size changes"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0022",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group in-memory layout cache should not break if right click occurs while left click is active"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0023",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group in-memory layout cache should update when resized via Group imperative API"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0025",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group in-memory layout cache should update when resized via Panel imperative API"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0024",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group in-memory layout cache should update when resized via keyboard"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0026",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group in-memory layout cache should update when resized via pointer"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0027",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group invariants duplicate panel ids"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0028",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group invariants duplicate separator ids"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0029",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group onLayoutChange and onLayoutChanged should be called in response to imperative API"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0030",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group onLayoutChange and onLayoutChanged should be called once per layout change"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0031",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group onLayoutChange and onLayoutChanged should be called when panels change"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0032",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group onLayoutChange and onLayoutChanged should be called with default layout"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0033",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group onLayoutChange and onLayoutChanged should not be called before layout has been initialized"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0034",
+      "file": "packages/resizable-panels/tests/upstream/components/group/Group.test.tsx",
+      "fullName": "Group should support updates to either Group or Panel ids"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0035",
+      "file": "packages/resizable-panels/tests/upstream/components/group/sortByElementOffset.test.ts",
+      "fullName": "sortByElementOffset orientation: horizontal should handle empty elements array"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0036",
+      "file": "packages/resizable-panels/tests/upstream/components/group/sortByElementOffset.test.ts",
+      "fullName": "sortByElementOffset orientation: horizontal should prioritize smaller elements if offsets are the same"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0037",
+      "file": "packages/resizable-panels/tests/upstream/components/group/sortByElementOffset.test.ts",
+      "fullName": "sortByElementOffset orientation: horizontal should sort horizontal elements"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0038",
+      "file": "packages/resizable-panels/tests/upstream/components/group/sortByElementOffset.test.ts",
+      "fullName": "sortByElementOffset orientation: vertical should prioritize smaller elements if offsets are the same"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0039",
+      "file": "packages/resizable-panels/tests/upstream/components/group/sortByElementOffset.test.ts",
+      "fullName": "sortByElementOffset orientation: vertical should sort vertical elements"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0040",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback updates persisted modern layout"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0041",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback with panel ids prop prefers matching modern layouts if both are present"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0042",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback with panel ids prop returns matching legacy layout"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0043",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback with panel ids prop skips mismatched legacy layout"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0044",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback without panel ids prop prefers matching modern layouts if both are present"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0045",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback without panel ids prop returns matching legacy layout"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0046",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback without panel ids prop skips mismatched legacy layout"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0047",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should cancel pending debounced write on unmount"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0048",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should ignore invalid layouts (panel ids mismatch)"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0049",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should ignore temporarily invalid layouts after update (num panels mismatch)"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0050",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should ignore temporarily invalid layouts on mount (ids mismatch)"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0051",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should ignore temporarily invalid layouts on mount (num panels mismatch)"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0052",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should override pending debounce with newer value"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0053",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should read/write from the provided Storage API"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0054",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should save separate layouts per panel group when panelIds param is present"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0055",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should support debounced write"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0056",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should ignore debounce param when using onLayoutChanged"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0057",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should ignore invalid layouts (panel ids mismatch)"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0058",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should ignore non-user interactions"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0059",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should ignore temporarily invalid layouts after update (num panels mismatch)"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0060",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should ignore temporarily invalid layouts on mount (ids mismatch)"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0061",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should ignore temporarily invalid layouts on mount (num panels mismatch)"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0062",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should read/write from the provided Storage API"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0063",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should save separate layouts per panel group when panelIds param is present"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0064",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should support out-of-order panel ids"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0065",
+      "file": "packages/resizable-panels/tests/upstream/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout should only write once if both onLayoutChange and onLayoutChanged props are used"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0098",
+      "file": "packages/resizable-panels/tests/upstream/components/panel/Panel.test.tsx",
+      "fullName": "Panel HTML attributes ARIA attributes should assign an id prop to support the ARIA separator"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0099",
+      "file": "packages/resizable-panels/tests/upstream/components/panel/Panel.test.tsx",
+      "fullName": "Panel HTML attributes ARIA attributes should pass through explicit id prop"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0100",
+      "file": "packages/resizable-panels/tests/upstream/components/panel/Panel.test.tsx",
+      "fullName": "Panel HTML attributes problematic styles should be suppressed"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0101",
+      "file": "packages/resizable-panels/tests/upstream/components/panel/Panel.test.tsx",
+      "fullName": "Panel HTML attributes should expose id as testid"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0102",
+      "file": "packages/resizable-panels/tests/upstream/components/panel/Panel.test.tsx",
+      "fullName": "Panel HTML attributes should pass through ...rest attributes"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0096",
+      "file": "packages/resizable-panels/tests/upstream/components/panel/Panel.test.tsx",
+      "fullName": "Panel disabled prop changes to disabled prop should not cause the Panel to remount"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0097",
+      "file": "packages/resizable-panels/tests/upstream/components/panel/Panel.test.tsx",
+      "fullName": "Panel disabled prop changes to this prop should update Panel behavior"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0103",
+      "file": "packages/resizable-panels/tests/upstream/components/panel/Panel.test.tsx",
+      "fullName": "Panel memoization Panels contents should not re-render on Group layout change"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0104",
+      "file": "packages/resizable-panels/tests/upstream/components/panel/Panel.test.tsx",
+      "fullName": "Panel should throw if rendered outside of a Group"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0107",
+      "file": "packages/resizable-panels/tests/upstream/components/separator/Separator.test.tsx",
+      "fullName": "Separator HTML attributes ARIA attributes should identify its primary panel if and only if it has an explicit id"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0108",
+      "file": "packages/resizable-panels/tests/upstream/components/separator/Separator.test.tsx",
+      "fullName": "Separator HTML attributes should expose id and data-testid"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0109",
+      "file": "packages/resizable-panels/tests/upstream/components/separator/Separator.test.tsx",
+      "fullName": "Separator HTML attributes should pass through ...rest attributes"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0105",
+      "file": "packages/resizable-panels/tests/upstream/components/separator/Separator.test.tsx",
+      "fullName": "Separator disabled prop changes to disabled prop should not cause the Separator to remount"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0106",
+      "file": "packages/resizable-panels/tests/upstream/components/separator/Separator.test.tsx",
+      "fullName": "Separator disabled prop changes to this prop should update Separator behavior"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0110",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 1 -> e-resize"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0111",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 10 -> nw-resize"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0112",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 2 -> w-resize"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0113",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 4 -> s-resize"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0114",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 5 -> se-resize"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0115",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 6 -> sw-resize"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0116",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 8 -> n-resize"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0117",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 9 -> ne-resize"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0118",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active disabled groups"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0119",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active horizontal"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0120",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active horizontal and vertical"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0121",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active vertical"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0122",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: hover cursor flags should be ignored"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0123",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: hover disabled groups"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0124",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: hover horizontal"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0125",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: hover horizontal and vertical"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0126",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: hover vertical"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0127",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: inactive should return null"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0128",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 1 -> grab"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0129",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 10 -> grab"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0130",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 2 -> grab"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0131",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 4 -> grab"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0132",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 5 -> grab"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0133",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 6 -> grab"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0134",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 8 -> grab"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0135",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 9 -> grab"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0136",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active disabled groups"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0137",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active horizontal"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0138",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active horizontal and vertical"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0139",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active vertical"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0140",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: hover cursor flags should be ignored"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0141",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: hover disabled groups"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0142",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: hover horizontal"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0143",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: hover horizontal and vertical"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0144",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: hover vertical"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0145",
+      "file": "packages/resizable-panels/tests/upstream/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: inactive should return null"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0146",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateAvailableGroupSize.test.ts",
+      "fullName": "calculateAvailableGroupSize panel widths"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0147",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateAvailableGroupSize.test.ts",
+      "fullName": "calculateAvailableGroupSize panel widths, excluding flex padding, gap, or margins"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0148",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateAvailableGroupSize.test.ts",
+      "fullName": "calculateAvailableGroupSize panel widths, excluding other DOM elements"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0149",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateAvailableGroupSize.test.ts",
+      "fullName": "calculateAvailableGroupSize panel widths, excluding separators"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0150",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions CSS styles (e.g. padding and flex gap)"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0151",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions empty panels"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0152",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions mixed panels and non-panel children"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0153",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions one panel"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0154",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions out of order children (e.g. dynamic rendering)"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0155",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions panels and explicit separators"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0156",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions panels and some explicit separators"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0157",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions should disable a hit region if the separator is disabled"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0158",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions should disable all hit regions if there is one or fewer enabled panels"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0159",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions should disable panel boundaries if there are no resizable panels after the current boundary"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0160",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions should disable panel boundaries if there are no resizable panels before the current boundary"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0161",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions should not disable a hit region if one or both panels are disabled but there is an enabled separator"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0162",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions should sort elements and separators by offset"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0163",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions three panels"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0164",
+      "file": "packages/resizable-panels/tests/upstream/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions two panels"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0165",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit explicit units % units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0166",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit explicit units em units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0167",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit explicit units px units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0168",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit explicit units rem units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0169",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit explicit units vh units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0170",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit explicit units vw units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0171",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit implicit units % units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0172",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit implicit units px units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0173",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels explicit units % units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0174",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels explicit units em units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0175",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels explicit units px units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0176",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels explicit units rem units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0177",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels explicit units vh units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0178",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels explicit units vw units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0179",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels implicit units % units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0180",
+      "file": "packages/resizable-panels/tests/upstream/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels implicit units px units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0252",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0253",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0254",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0255",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0256",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0257",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0258",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0259",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0260",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0261",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0262",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0263",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0264",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0265",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0266",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0267",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0268",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0269",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0270",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0271",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0272",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0273",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0274",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0275",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0276",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0277",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0278",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0279",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0280",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0281",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0282",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0283",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0284",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0236",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0237",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0238",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0239",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0240",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0241",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0242",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0243",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0244",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0245",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0246",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0247",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0248",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0249",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0250",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0251",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0230",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3++,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0231",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3++,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0232",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3++,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0233",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3++,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0234",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3++,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0235",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3++,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0222",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0223",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0224",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0225",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0226",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0227",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0228",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0229",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0207",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0208",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0209",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0210",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0211",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0212",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0213",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0214",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0215",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0216",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0217",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0218",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0219",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0220",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0221",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0181",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0182",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0183",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0184",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0185",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0186",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0187",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0188",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0189",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0190",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0191",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0192",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0193",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0194",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0195",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0196",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0197",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0198",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0199",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0200",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0201",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0202",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0203",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0204",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0205",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0206",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0285",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds 3-panel layouts edge case discussions/643"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0286",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds 3-panel layouts edge case issues/639"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0287",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds 3-panel layouts edge case issues/650"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0288",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds 3-panel layouts expand left when there are multiple panels"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0289",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds 3-panel layouts expand right when there are multiple panels"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0290",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 close if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0291",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 close if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0292",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 open if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0293",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 re-open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0294",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 remain closed if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0295",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 remain closed if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0296",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 remain open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0297",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 remain open if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0298",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 close if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0299",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 close if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0300",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 open if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0301",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 re-open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0302",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 remain closed if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0303",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 remain closed if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0304",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 remain open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0305",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 remain open if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0306",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 close if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0307",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 close if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0308",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 open if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0309",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 re-open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0310",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 remain closed if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0311",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 remain closed if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0312",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 remain open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0313",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 remain open if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0314",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 close if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0315",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 close if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0316",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 open if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0317",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 re-open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0318",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 remain closed if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0319",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 remain closed if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0320",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 remain open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0321",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 remain open if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0322",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta disabled panels should be resizable via the imperative API"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0323",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta disabled panels should not be resizable if 1 of 3 panels are disabled"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0324",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta disabled panels should not be resizable if 2 of 3 panels are disabled"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0325",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta disabled panels should not be resizable in a 2 panel group"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0326",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta invalid layouts should ignore changes that violate max or min size constraints"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0327",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta should (re)collapse an already-collapsed panel that's been expanded and (re)collapsed as part of a single drag"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0328",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta should fallback to the previous layout if an intermediate layout is invalid"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0329",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/calculateDefaultLayout.test.ts",
+      "fullName": "calculateDefaultLayout explicit"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0330",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/calculateDefaultLayout.test.ts",
+      "fullName": "calculateDefaultLayout inferred"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0331",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/calculateDefaultLayout.test.ts",
+      "fullName": "calculateDefaultLayout mix of explicit and inferred"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0332",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/calculateSeparatorAriaValues.test.ts",
+      "fullName": "calculateSeparatorAriaValues should assign aria-controls if an explicit id was passed as a prop"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0333",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/calculateSeparatorAriaValues.test.ts",
+      "fullName": "calculateSeparatorAriaValues should calculate the correct min/max/now values for collapsible panels"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0334",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/calculateSeparatorAriaValues.test.ts",
+      "fullName": "calculateSeparatorAriaValues should consider other panel constraints when computing min/max values"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0335",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: -50, -100 -> 1"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0336",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: 0, -1 -> 1"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0337",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: 0, 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0338",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: 0, 1 -> -1"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0339",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: 0, 25 -> -1"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0340",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: 50, 100 -> -1"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0341",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: 50, 25 -> 1"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0342",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should handle empty rects"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0343",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support all negative coordinates"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0344",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support fully overlapping rects"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0345",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: -100 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0346",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: -100, y: -100 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0347",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: -25 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0348",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: -25, y: -25 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0349",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: 100 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0350",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: 100, y: 100 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0351",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: 75 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0352",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: 75, y: 75 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0353",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { y: -100 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0354",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { y: -25 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0355",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { y: 100 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0356",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { y: 75 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0357",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support partially overlapping rects: { x: +0 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0358",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support partially overlapping rects: { y: +0 }"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0359",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/findMatchingHitRegions.test.ts",
+      "fullName": "findMatchingHitRegions empty groups"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0360",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/findMatchingHitRegions.test.ts",
+      "fullName": "findMatchingHitRegions group with no separator"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0361",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/findMatchingHitRegions.test.ts",
+      "fullName": "findMatchingHitRegions group with separator"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0362",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/findMatchingHitRegions.test.ts",
+      "fullName": "findMatchingHitRegions nested groups"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0363",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/findMatchingHitRegions.test.ts",
+      "fullName": "findMatchingHitRegions should skip disabled groups"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0364",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0365",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0366",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0367",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0368",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0369",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0370",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0371",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0372",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0373",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0374",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0375",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0376",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0377",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0378",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getDistanceBetweenPointAndRect.test.ts",
+      "fullName": "getDistanceBetweenPointAndRect should report the distance between the nearest border and an external point"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0379",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getDistanceBetweenPointAndRect.test.ts",
+      "fullName": "getDistanceBetweenPointAndRect should report the distance between the nearest border and an external point alt"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0380",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getDistanceBetweenPointAndRect.test.ts",
+      "fullName": "getDistanceBetweenPointAndRect should report the distance between the nearest border and an internal point"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0001",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods getLayout returns the current group layout"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0002",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods getLayout throws if group not mounted"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0003",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods setLayout allows disabled panels to be resized"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0004",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods setLayout ignores a no-op layout update"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0005",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods setLayout ignores an invalid layout update"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0006",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods setLayout throws if group not mounted"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0007",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods setLayout validates and updates the group layout"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0066",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods method 'collapse': throws if group or panel not mounted"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0067",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods method 'expand': throws if group or panel not mounted"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0068",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods method 'getSize': throws if group or panel not mounted"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0069",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods method 'isCollapsed': throws if group or panel not mounted"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0070",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods method 'resize': throws if group or panel not mounted"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0071",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted collapse allows disabled panel to be collapsed"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0072",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted collapse does nothing if panel is already collapsed"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0073",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted collapse does nothing if panel is not collapsible"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0074",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted collapse resizes panel to collapsed size"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0075",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted expand allows disabled panel to be expanded"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0076",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted expand does nothing if panel is not collapsed"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0077",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted expand does nothing if panel is not collapsible"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0078",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted expand edge case: expands panel to a non-zero size if minSize is 0"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0079",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted expand expands panel to the minimum size as a fallback"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0080",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted expand expands the panel to the previous pre-collapse size"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0081",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted getSize returns the current panel size"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0082",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted isCollapsed returns false if collapsible and expanded"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0083",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted isCollapsed returns false if not collapsible"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0084",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted isCollapsed returns true if collapsible and collapsed"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0085",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize allows disabled panel to be resized"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0086",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize edge cases does not throw when resizing the only panel in the group"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0087",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize edge cases last panel can still be resized normally when preceding panels are not all collapsed"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0088",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize edge cases last panel keeps the remainder when all preceding panels are collapsed and it is resized smaller"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0089",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize ignores a no-op size update"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0090",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize ignores an invalid size update"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0091",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize units accepts percentage units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0092",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize units accepts pixel units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0093",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize units accepts rem units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0094",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize units accepts viewport units"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0095",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize validates and updates the panel size"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0381",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: -1, -1 -> true"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0382",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: -1, 1 -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0383",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: 0, -1 -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0384",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: 0, 0 -> true"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0385",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: 0, 1 -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0386",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: 1, -1 -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0387",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: 1, 1 -> true"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0388",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { a: 25, b: 75 }, { a: 25, b: 75 } -> true"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0389",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { a: 25, b: 75 }, { a: 75, b: 25 } -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0390",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { a: 25, b: 75 }, { d: 25, e: 75 } -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0391",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { a: 25, b: 75 }, {} -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0392",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { a: 75, b: 25 }, { a: 25, b: 75 } -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0393",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { a: 75, b: 25 }, { a: 75, b: 25 } -> true"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0394",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { d: 25, e: 75 }, { a: 25, b: 75 } -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0395",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: {}, { a: 25, b: 75 } -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0396",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: {}, {} -> true"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0397",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 25, b: 75 }, { a: 25, b: 75 } -> true"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0398",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 25, b: 75 }, { a: 75 } -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0399",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 25, b: 75 }, { a: 75, b: 25 } -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0400",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 25, b: 75 }, {} -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0401",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 75 }, { a: 25, b: 75 } -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0402",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 75, b: 25 }, { a: 25, b: 75 } -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0403",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 75, b: 25 }, { a: 75, b: 25 } -> true"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0404",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: {}, { a: 25, b: 75 } -> false"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0405",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: {}, {} -> true"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0406",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout collapsible panels should collapse a panel once it drops below the halfway point between collapsed and minimum percentage sizes"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0407",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout collapsible panels should not collapse a panel that's at or above the minimum size"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0408",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout maximum size constraints should account for multiple panels with maximum size constraints"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0409",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout maximum size constraints should adjust the layout to account for maximum percentage sizes"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0410",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout minimum size constraints should account for multiple panels with minimum size constraints"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0411",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout minimum size constraints should adjust the layout to account for minimum percentage sizes"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0412",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout should accept requested layout if there are no constraints provided"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0413",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout should normalize layouts that do not total 100%"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0414",
+      "file": "packages/resizable-panels/tests/upstream/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout should reject layouts that do not match the number of panels"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0415",
+      "file": "packages/resizable-panels/tests/upstream/hooks/useId.test.ts",
+      "fullName": "useId should fallback ot React useId"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0416",
+      "file": "packages/resizable-panels/tests/upstream/hooks/useId.test.ts",
+      "fullName": "useId should prefer explicit id"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0417",
+      "file": "packages/resizable-panels/tests/upstream/hooks/useMergedRefs.test.tsx",
+      "fullName": "useMergedRefs should gracefully ignore undefined refs"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0418",
+      "file": "packages/resizable-panels/tests/upstream/hooks/useMergedRefs.test.tsx",
+      "fullName": "useMergedRefs should support ref objects and callback refs"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0419",
+      "file": "packages/resizable-panels/tests/upstream/hooks/useStableCallback.test.tsx",
+      "fullName": "useStableCallback should call the callback when the event is triggered"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0420",
+      "file": "packages/resizable-panels/tests/upstream/hooks/useStableCallback.test.tsx",
+      "fullName": "useStableCallback should not execute the callback"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0421",
+      "file": "packages/resizable-panels/tests/upstream/utils/isArrayEqual.test.ts",
+      "fullName": "isArrayEqual should work"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0422",
+      "file": "packages/resizable-panels/tests/upstream/utils/parseNumericStyleValue.test.ts",
+      "fullName": "parseNumericStyleValue should handle undefined styles"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0423",
+      "file": "packages/resizable-panels/tests/upstream/utils/parseNumericStyleValue.test.ts",
+      "fullName": "parseNumericStyleValue should ignore string percentage styles"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0424",
+      "file": "packages/resizable-panels/tests/upstream/utils/parseNumericStyleValue.test.ts",
+      "fullName": "parseNumericStyleValue should ignore string relative styles"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0425",
+      "file": "packages/resizable-panels/tests/upstream/utils/parseNumericStyleValue.test.ts",
+      "fullName": "parseNumericStyleValue should parse string pixels styles"
+    },
+    {
+      "id": "runtime:react-resizable-panels:0426",
+      "file": "packages/resizable-panels/tests/upstream/utils/parseNumericStyleValue.test.ts",
+      "fullName": "parseNumericStyleValue should return numeric styles"
+    }
+  ]
+}

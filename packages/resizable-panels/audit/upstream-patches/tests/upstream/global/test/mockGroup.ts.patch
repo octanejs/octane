@@ -1,0 +1,20 @@
+diff --git a/tests/upstream/global/test/mockGroup.ts b/tests/upstream/global/test/mockGroup.ts
+--- a/tests/upstream/global/test/mockGroup.ts
++++ b/tests/upstream/global/test/mockGroup.ts
+@@ -1,13 +1,7 @@
+ import { vi } from "vitest";
+-import type {
+-  Orientation,
+-  RegisteredGroup
+-} from "../../components/group/types";
+-import type {
+-  PanelConstraintProps,
+-  RegisteredPanel
+-} from "../../components/panel/types";
+-import type { RegisteredSeparator } from "../../components/separator/types";
++import type { Orientation, RegisteredGroup } from "../../../../src/components/group/types";
++import type { PanelConstraintProps, RegisteredPanel } from "../../../../src/components/panel/types";
++import type { RegisteredSeparator } from "../../../../src/components/separator/types";
+ import { setElementBounds } from "../../utils/test/mockBoundingClientRect";
+ 
+ export type MockGroup = RegisteredGroup & {

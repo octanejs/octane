@@ -673,6 +673,18 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/resizable-panels",
+      "version": "0.1.0",
+      "category": "UI and interaction",
+      "upstream": { "package": "react-resizable-panels", "version": "4.12.2" },
+      "surface": "Group, Panel, Separator, persistence hooks, refs, imperative APIs, layout constraints, pointer and keyboard interaction, ARIA, cursor handling, and ResizeObserver behavior are implemented against react-resizable-panels 4.12.2.",
+      "divergences": [
+        "useId(undefined) fallback cannot reproduce React's mocked ':r123:' seam; adapted upstream case asserts a non-empty Octane id and is recorded as react-resizable-panels-useId-fallback."
+      ],
+      "ssr": "Deterministic server rendering and live hydration adoption are covered by dedicated executable projects.",
+      "verified": "2026-08-02"
+    },
+    {
       "name": "@octanejs/rxjs",
       "version": "0.1.22",
       "category": "Shared state",
@@ -1370,6 +1382,7 @@
     "react-pdf": "@octanejs/pdf",
     "react-popper": "@octanejs/popper",
     "react-redux": "@octanejs/redux",
+    "react-resizable-panels": "@octanejs/resizable-panels",
     "react-router": "@octanejs/remix-router",
     "react-router-dom": "@octanejs/remix-router",
     "react-stately": "@octanejs/aria",

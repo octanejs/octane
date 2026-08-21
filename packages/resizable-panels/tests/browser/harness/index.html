@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="UTF-8" />
+		<title>Resizable panels browser harness</title>
+		<style>
+			body {
+				font-family: sans-serif;
+				margin: 24px;
+			}
+			.group {
+				width: 600px;
+				height: 180px;
+				border: 1px solid #999;
+			}
+			.panel {
+				display: grid;
+				place-items: center;
+			}
+			.separator {
+				width: 8px;
+				background: #888;
+			}
+			.row {
+				margin-bottom: 24px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="root"></div>
+		<script type="module" src="/main.tsrx"></script>
+	</body>
+</html>

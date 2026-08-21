@@ -1,0 +1,33 @@
+diff --git a/tests/upstream/global/utils/calculateDefaultLayout.test.ts b/tests/upstream/global/utils/calculateDefaultLayout.test.ts
+--- a/tests/upstream/global/utils/calculateDefaultLayout.test.ts
++++ b/tests/upstream/global/utils/calculateDefaultLayout.test.ts
+@@ -1,10 +1,8 @@
+ import { describe, expect, test } from "vitest";
+-import type { PanelConstraints } from "../../components/panel/types";
+-import { calculateDefaultLayout } from "./calculateDefaultLayout";
++import type { PanelConstraints } from "../../../../src/components/panel/types";
++import { calculateDefaultLayout } from "../../../../src/global/utils/calculateDefaultLayout";
+ 
+-const c = (
+-  partial: Partial<PanelConstraints> & { panelId: string }
+-): PanelConstraints => ({
++const c = (partial: Partial<PanelConstraints> & { panelId: string }): PanelConstraints => ({
+   collapsedSize: 0,
+   collapsible: false,
+   defaultSize: undefined,
+@@ -16,13 +14,8 @@ const c = (
+ 
+ describe("calculateDefaultLayout", () => {
+   test("inferred", () => {
+-    expect(
+-      calculateDefaultLayout([
+-        c({ panelId: "a" }),
+-        c({ panelId: "b" }),
+-        c({ panelId: "c" })
+-      ])
+-    ).toMatchInlineSnapshot(`
++    expect(calculateDefaultLayout([c({ panelId: "a" }), c({ panelId: "b" }), c({ panelId: "c" })]))
++      .toMatchInlineSnapshot(`
+       {
+         "a": 33.333,
+         "b": 33.333,

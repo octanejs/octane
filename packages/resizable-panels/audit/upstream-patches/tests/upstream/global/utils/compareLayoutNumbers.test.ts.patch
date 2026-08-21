@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/global/utils/compareLayoutNumbers.test.ts b/tests/upstream/global/utils/compareLayoutNumbers.test.ts
+--- a/tests/upstream/global/utils/compareLayoutNumbers.test.ts
++++ b/tests/upstream/global/utils/compareLayoutNumbers.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, test } from "vitest";
+-import { compareLayoutNumbers } from "./compareLayoutNumbers";
++import { compareLayoutNumbers } from "../../../../src/global/utils/compareLayoutNumbers";
+ 
+ describe("compareLayoutNumbers", () => {
+   test.each([

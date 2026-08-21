@@ -51,6 +51,9 @@ import { verifyReactDraggableTypes } from './react-draggable-types-lib.mjs';
 import { verifyReactDropzoneEvidence } from './react-dropzone-evidence-lib.mjs';
 import { verifyReactMarkdownTestClassifications } from './react-markdown-classifications-lib.mjs';
 import { verifyReactMarkdownTypes } from './react-markdown-types-lib.mjs';
+import { verifyReactResizablePanelsTestClassifications } from './react-resizable-panels-classifications-lib.mjs';
+import { verifyReactResizablePanelsTypes } from './react-resizable-panels-types-lib.mjs';
+import { verifyReactResizablePanelsUpstream } from './react-resizable-panels-upstream-lib.mjs';
 import { verifyReactSpringUpstream } from './react-spring-upstream-lib.mjs';
 import { verifyReactTextareaAutosizeTestClassifications } from './react-textarea-autosize-classifications-lib.mjs';
 import { verifyReactTextareaAutosizeCrosswalk } from './react-textarea-autosize-crosswalk-lib.mjs';
@@ -143,6 +146,7 @@ const SPECIALIZED_CLASSIFICATION_BINDINGS = new Set([
 	'markdown',
 	'pdf',
 	'popper',
+	'resizable-panels',
 	'transition-group',
 	'tanstack-devtools',
 	'tanstack-hotkeys',
@@ -173,6 +177,13 @@ await capture('intersection-observer test classifications', () =>
 	verifyIntersectionObserverTestClassifications(REPO),
 );
 await capture('react-dropzone evidence', () => verifyReactDropzoneEvidence(REPO));
+await capture('react-resizable-panels upstream evidence', () =>
+	verifyReactResizablePanelsUpstream(REPO),
+);
+await capture('react-resizable-panels type evidence', () => verifyReactResizablePanelsTypes(REPO));
+await capture('react-resizable-panels test classifications', () =>
+	verifyReactResizablePanelsTestClassifications(REPO),
+);
 await capture('livestore type evidence', () => verifyLivestoreTypes(REPO));
 await capture('livestore test classifications', () => verifyLivestoreTestClassifications(REPO));
 await capture('alien-signals type evidence', () => verifyAlienSignalsTypes(REPO));

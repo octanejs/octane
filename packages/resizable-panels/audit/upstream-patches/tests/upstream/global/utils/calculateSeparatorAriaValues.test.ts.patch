@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/global/utils/calculateSeparatorAriaValues.test.ts b/tests/upstream/global/utils/calculateSeparatorAriaValues.test.ts
+--- a/tests/upstream/global/utils/calculateSeparatorAriaValues.test.ts
++++ b/tests/upstream/global/utils/calculateSeparatorAriaValues.test.ts
+@@ -1,6 +1,6 @@
+ import { describe, expect, test } from "vitest";
+-import type { PanelConstraints } from "../../components/panel/types";
+-import { calculateSeparatorAriaValues } from "./calculateSeparatorAriaValues";
++import type { PanelConstraints } from "../../../../src/components/panel/types";
++import { calculateSeparatorAriaValues } from "../../../../src/global/utils/calculateSeparatorAriaValues";
+ 
+ const DEFAULT_PANEL_CONSTRAINTS = {
+   collapsedSize: 0,

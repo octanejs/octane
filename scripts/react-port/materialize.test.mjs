@@ -260,6 +260,24 @@ describe('materialize CLI lifecycle', () => {
 		assert.doesNotMatch(patch, /^[+-].*node:test\/reporters/m);
 	});
 
+	test('a formatting-only adaptation fails diff', async () => {
+		const context = scenario();
+		await runCli(LOCK_ARGUMENTS(context));
+		await runCli(['run', '--package-dir', context.packageDirectory]);
+		const adaptedTest = path.join(context.packageDirectory, 'tests', 'upstream', 'index.test.js');
+		// Rewrap a statement without changing its content.
+		const source = readFileSync(adaptedTest, 'utf8');
+		const rewrapped = source.replace(
+			"test('widget', () => {});",
+			"test(\n  'widget',\n  () => {},\n);",
+		);
+		assert.notEqual(rewrapped, source);
+		writeFileSync(adaptedTest, rewrapped);
+		const diffed = await runCli(['diff', '--package-dir', context.packageDirectory]);
+		assert.notEqual(diffed.exitCode, 0);
+		assert.match(diffed.stderr, /formatting-only hunks/);
+	});
+
 	test('a patch that reintroduces a React import fails materialization', async () => {
 		const context = scenario();
 		await runCli(LOCK_ARGUMENTS(context));

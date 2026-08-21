@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/global/dom/calculateAvailableGroupSize.test.ts b/tests/upstream/global/dom/calculateAvailableGroupSize.test.ts
+--- a/tests/upstream/global/dom/calculateAvailableGroupSize.test.ts
++++ b/tests/upstream/global/dom/calculateAvailableGroupSize.test.ts
+@@ -1,6 +1,7 @@
++// Fidelity: exact pinned upstream test identities and assertions; imports and runtime harness are Octane-adapted.
+ import { describe, expect, test } from "vitest";
+ import { mockGroup } from "../test/mockGroup";
+-import { calculateAvailableGroupSize } from "./calculateAvailableGroupSize";
++import { calculateAvailableGroupSize } from "../../../../src/global/dom/calculateAvailableGroupSize";
+ 
+ describe("calculateAvailableGroupSize", () => {
+   test("panel widths", () => {

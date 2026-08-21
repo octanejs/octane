@@ -87,5 +87,7 @@ packages/spring/.pristine-vite-cache/
 # Root `dist` would otherwise ignore packages/*/upstream/dist/.
 !packages/textarea-autosize/upstream/dist/
 !packages/textarea-autosize/upstream/dist/**
+!packages/resizable-panels/upstream-artifact/dist/
+!packages/resizable-panels/upstream-artifact/dist/**
 # Pristine vitest cache for monaco-editor upstream suite
 packages/monaco-editor/.vite-pristine/

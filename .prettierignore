@@ -141,6 +141,9 @@ playground/octane/debug/
 # Markdown is hand-authored — Prettier should not reformat docs (prose wrap, tables)
 **/*.md
 
+# Byte-exact upstream evidence for the react-resizable-panels binding.
+packages/resizable-panels/upstream/
+
 # RuleSync generated files (source lives in .rulesync/; run `pnpm rules:generate`).
 # The .md outputs are already covered above; .cursor/ holds a .mdc with no Prettier parser.
 .cursor/

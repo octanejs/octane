@@ -135,6 +135,73 @@ const REACT_SPECIFIER_PATTERN = /^(?:react|react-dom)(?:\/|$)|^@testing-library\
 const MODULE_SPECIFIER_PATTERN =
 	/(?:\bfrom\s*|\brequire\s*\(\s*|\bimport\s*\(\s*|\bimport\s+)(['"])([^'"\n]+)\1/g;
 
+// A patch hunk that only reformats (rewraps lines, changes indentation, adds
+// or drops trailing commas) hides the real divergences and defeats minimal
+// patches. Normalization preserves every character inside string and template
+// literals — snapshot bodies and string content stay significant — and strips
+// insignificant whitespace and trailing commas outside them. A hunk fragment
+// containing an unbalanced backtick cannot be parsed reliably and is skipped.
+function normalizeCodeFragment(text) {
+	const backticks = (text.match(/(?<!\\)`/g) ?? []).length;
+	if (backticks % 2 === 1) return null;
+	let out = '';
+	let literal = null;
+	for (let index = 0; index < text.length; index += 1) {
+		const char = text[index];
+		if (literal) {
+			out += char;
+			if (char === '\\') {
+				out += text[index + 1] ?? '';
+				index += 1;
+			} else if (char === literal) {
+				literal = null;
+			}
+			continue;
+		}
+		if (char === "'" || char === '"' || char === '`') {
+			literal = char;
+			out += char;
+			continue;
+		}
+		if (/\s/.test(char)) continue;
+		if (char === ',') {
+			let ahead = index + 1;
+			while (ahead < text.length && /\s/.test(text[ahead])) ahead += 1;
+			if (')]}'.includes(text[ahead] ?? '')) continue;
+		}
+		out += char;
+	}
+	return out;
+}
+
+export function findFormattingOnlyHunks(patchText) {
+	const findings = [];
+	let header = null;
+	let removed = [];
+	let added = [];
+	const flush = () => {
+		if (header && removed.length > 0 && added.length > 0) {
+			const before = normalizeCodeFragment(removed.join('\n'));
+			const after = normalizeCodeFragment(added.join('\n'));
+			if (before !== null && after !== null && before === after) findings.push(header);
+		}
+		removed = [];
+		added = [];
+	};
+	for (const line of patchText.split('\n')) {
+		if (line.startsWith('@@')) {
+			flush();
+			header = line;
+		} else if (line.startsWith('-') && !line.startsWith('---')) {
+			removed.push(line.slice(1));
+		} else if (line.startsWith('+') && !line.startsWith('+++')) {
+			added.push(line.slice(1));
+		}
+	}
+	flush();
+	return findings;
+}
+
 // The adapted suite must execute against Octane, never React. Rewrites remove
 // React specifiers mechanically, but a committed patch could reintroduce one;
 // this scan makes that fail at materialization, inside the same gate that

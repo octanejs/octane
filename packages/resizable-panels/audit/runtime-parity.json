@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "upstreamRoot": "packages/resizable-panels/upstream/lib",
+  "adaptedRoot": "packages/resizable-panels/tests/upstream",
+  "permittedTransformations": [
+    {
+      "kind": "formatting",
+      "rule": "Quote style, trailing commas, and insignificant whitespace may differ after TypeScript printer normalization."
+    },
+    {
+      "kind": "import-root",
+      "rule": "Adapted suites import Octane sources and @octanejs/testing-library; pristine suites import relative React upstream modules and @testing-library/react."
+    },
+    {
+      "kind": "extension",
+      "rule": "Adapted test modules preserve their upstream paths and extensions."
+    },
+    {
+      "kind": "jest-dom-attribute",
+      "rule": "expect(node).toHaveAttribute(name, value) maps to expect(node.getAttribute(name)).toBe(value); bare toHaveAttribute(name) maps to hasAttribute(name)).toBe(true)."
+    },
+    {
+      "kind": "error-observation",
+      "rule": "Layout-effect invariant failures observed via React RTL toThrow map to captureLayoutEffectError(...).toBe(true) because Octane reports those exceptions through console.error.",
+      "files": ["components/group/Group.test.tsx"]
+    },
+    {
+      "kind": "profiler-omission",
+      "rule": "React Profiler render-count expects and surrounding Profiler wrappers collapse to the Panel-children re-render invariant Octane can observe without Profiler.",
+      "files": ["components/panel/Panel.test.tsx"],
+      "cases": ["Panel memoization Panels contents should not re-render on Group layout change"]
+    },
+    {
+      "kind": "cssom-zero",
+      "rule": "Numeric style zero may serialize as '0' (React/jsdom) or '0px' (Octane CSSOM normalization) for minHeight/minWidth.",
+      "files": ["components/panel/Panel.test.tsx"]
+    },
+    {
+      "kind": "ref-object-literal",
+      "rule": "createRef<T>() may be written as an explicit { current: null } ref object literal under Octane typings.",
+      "files": ["hooks/useMergedRefs.test.tsx"]
+    },
+    {
+      "kind": "support-import-root",
+      "rule": "Adapted support fixtures may remap relative type imports to Octane package sources under src/."
+    },
+    {
+      "kind": "support-user-event",
+      "rule": "global/test/moveSeparator.ts substitutes @testing-library/user-event and node:assert with tests/upstream/test/userEvent.ts plus the package assert helper; the authored adapter is structurally locked and covered by direct event-dispatch tests.",
+      "files": ["global/test/moveSeparator.ts", "test/userEvent.ts"]
+    }
+  ],
+  "authoredSupportLocks": [
+    {
+      "path": "../support/userEvent.ts",
+      "structuralSha256": "3237c810641f4c7e553d00213a017041babb75244fb87e21b636299531a2d762"
+    }
+  ],
+  "divergences": [
+    {
+      "id": "react-resizable-panels-useId-fallback",
+      "caseIds": ["runtime:react-resizable-panels:0415"],
+      "rule": "Upstream mocks React.useId to return ':r123:'; Octane's useId fallback is framework-owned and cannot reproduce that mock, so the adapted case asserts a non-empty string instead."
+    }
+  ]
+}

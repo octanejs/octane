@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "upstreamRoot": "packages/resizable-panels/audit/type-probes",
+  "adaptedRoot": "packages/resizable-panels/typetests",
+  "inventories": {
+    "upstream": "packages/resizable-panels/audit/pristine-types.json",
+    "adapted": "packages/resizable-panels/audit/adapted-types.json"
+  },
+  "lanes": {
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/resizable-panels/audit/type-probes/tsconfig.pristine.json",
+      "sourcePolicy": "repo-authored React declaration probes against published react-resizable-panels 4.12.2 .d.ts"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/resizable-panels/typetests/tsconfig.json",
+      "sourcePolicy": "structurally equivalent Octane public probes after permitted transformations"
+    }
+  },
+  "permittedTransformations": [
+    {
+      "kind": "import-root",
+      "rule": "React probes import published upstream-artifact dist declarations; Octane probes import the package public entry"
+    },
+    {
+      "kind": "negative-control",
+      "rule": "Matching @ts-expect-error controls must reject the same invalid call shapes on both sides"
+    }
+  ],
+  "divergences": []
+}

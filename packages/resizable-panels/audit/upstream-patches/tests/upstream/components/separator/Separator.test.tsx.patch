@@ -1,0 +1,84 @@
+diff --git a/tests/upstream/components/separator/Separator.test.tsx b/tests/upstream/components/separator/Separator.test.tsx
+--- a/tests/upstream/components/separator/Separator.test.tsx
++++ b/tests/upstream/components/separator/Separator.test.tsx
+@@ -1,11 +1,35 @@
++// Fidelity: exact pinned upstream test identities and assertions; renderer, refs, profiling instrumentation, imports, and DOM harness are Octane-adapted.
+ import { render, screen } from "@octanejs/testing-library";
++import { cleanup } from "@octanejs/testing-library";
++import { afterEach, beforeEach } from "vitest";
+ import { describe, expect, test, vi } from "vitest";
+-import { subscribeToMountedGroup } from "../../global/mutable-state/groups";
++import { subscribeToMountedGroup } from "../../../../src/global/mutable-state/groups";
+ import { moveSeparator } from "../../global/test/moveSeparator";
+ import { setElementBoundsFunction } from "../../utils/test/mockBoundingClientRect";
+-import { Group } from "../group/Group";
+-import { Panel } from "../panel/Panel";
+-import { Separator } from "./Separator";
++import { Group } from "../../../../src/components/group/Group.tsrx";
++import { Panel } from "../../../../src/components/panel/Panel.tsrx";
++import { Separator } from "../../../../src/components/separator/Separator.tsrx";
++import {
++  mockBoundingClientRect,
++  unmockBoundingClientRect
++} from "../../utils/test/mockBoundingClientRect";
++import {
++  mockGetComputedStyle,
++  unmockGetComputedStyle
++} from "../../utils/test/mockGetComputedStyle";
++import { mockResizeObserver, unmockResizeObserver } from "../../utils/test/mockResizeObserver";
++
++beforeEach(() => {
++  mockBoundingClientRect();
++  mockGetComputedStyle();
++  mockResizeObserver();
++});
++afterEach(() => {
++  cleanup();
++  unmockResizeObserver();
++  unmockGetComputedStyle();
++  unmockBoundingClientRect();
++});
+ 
+ describe("Separator", () => {
+   describe("disabled prop", () => {
+@@ -118,11 +142,8 @@ describe("Separator", () => {
+         </Group>
+       );
+ 
+-      expect(screen.getByRole("separator")).toHaveAttribute(
+-        "data-testid",
+-        "separator"
+-      );
+-      expect(screen.getByRole("separator")).toHaveAttribute("id", "separator");
++      expect(screen.getByRole("separator").getAttribute("data-testid")).toBe("separator");
++      expect(screen.getByRole("separator").getAttribute("id")).toBe("separator");
+     });
+ 
+     test("should pass through ...rest attributes", () => {
+@@ -134,8 +155,8 @@ describe("Separator", () => {
+         </Group>
+       );
+ 
+-      expect(screen.getByRole("separator")).toHaveAttribute("data-foo", "abc");
+-      expect(screen.getByRole("separator")).toHaveAttribute("data-bar", "123");
++      expect(screen.getByRole("separator").getAttribute("data-foo")).toBe("abc");
++      expect(screen.getByRole("separator").getAttribute("data-bar")).toBe("123");
+     });
+ 
+     describe("ARIA attributes", () => {
+@@ -150,13 +171,10 @@ describe("Separator", () => {
+           </Group>
+         );
+ 
+-        expect(screen.getByTestId("left-separator")).toHaveAttribute(
+-          "aria-controls",
++        expect(screen.getByTestId("left-separator").getAttribute("aria-controls")).toBe(
+           "left-panel"
+         );
+-        expect(screen.getByTestId("right-separator")).toHaveAttribute(
+-          "aria-controls"
+-        );
++        expect(screen.getByTestId("right-separator").hasAttribute("aria-controls")).toBe(true);
+       });
+     });
+   });

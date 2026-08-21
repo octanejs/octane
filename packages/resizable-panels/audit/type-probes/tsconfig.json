@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": ["./public-api.test-d.ts"],
+  "exclude": ["../../upstream", "../../src", "../../tests"]
+}
