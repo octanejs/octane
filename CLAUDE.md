@@ -42,10 +42,15 @@ trigger first arises, even if it is a later step you chose:
 Each skill is `.rulesync/skills/<name>/SKILL.md`, with a generated per-tool copy;
 read that path directly if your tool cannot load a skill by name.
 
-Without `create-a-pr`: keep and tick provenance for agent work (clear or missing
-asserts human); never apply PR labels. Existing PR body edits must merge,
-preserve `<!-- CURSOR_SUMMARY -->` through `<!-- /CURSOR_SUMMARY -->`
-byte-for-byte, refetch before writing, and verify after.
+## Worktrees and CI
+
+New tasks use a dedicated worktree/non-default branch. Primary checkout and
+local `main`/`master` are read-only.
+
+A pushed PR is not done. Run current-head CI; fix failures until relevant checks
+pass. If draft CI skips, mark ready unless asked not to. Never claim done before
+green CI. Preserve `<!-- CURSOR_SUMMARY -->`…`<!-- /CURSOR_SUMMARY -->`; see
+`create-a-pr`.
 
 ## Your React instincts are the main failure mode here
 
