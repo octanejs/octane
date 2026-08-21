@@ -28,17 +28,42 @@ function renderGroup(mode: 'visible' | 'hidden') {
 	const innerRef: { current: FragmentInstance | null } = { current: null };
 	const wrappedRef: { current: FragmentInstance | null } = { current: null };
 	const props = { mode, fragmentRef, innerRef, wrappedRef };
-	mounted = mount(ActivityFragmentGroup, props);
+	mounted = mount(ActivityFragmentGroup, { ...props, mode: 'visible' });
+	const fragment = fragmentRef.current!;
+	const inner = innerRef.current!;
+	const wrapped = wrappedRef.current!;
+	if (mode === 'hidden') {
+		mounted.update(ActivityFragmentGroup, props);
+		expect(fragmentRef.current).toBe(fragment);
+		expect(innerRef.current).toBeNull();
+		expect(wrappedRef.current).toBeNull();
+	}
 	return {
 		result: mounted,
 		props,
-		fragment: fragmentRef.current!,
-		inner: innerRef.current!,
-		wrapped: wrappedRef.current!,
+		fragment,
+		inner,
+		wrapped,
 	};
 }
 
 describe('Fragment refs and Activity visibility', () => {
+	it('defers initially hidden Fragment refs until their Activity reveals', () => {
+		const fragmentRef: { current: FragmentInstance | null } = { current: null };
+		const innerRef: { current: FragmentInstance | null } = { current: null };
+		const wrappedRef: { current: FragmentInstance | null } = { current: null };
+		const props = { mode: 'hidden' as const, fragmentRef, innerRef, wrappedRef };
+		mounted = mount(ActivityFragmentGroup, props);
+		const outer = fragmentRef.current;
+		expect(outer).toBeInstanceOf(FragmentInstance);
+		expect(innerRef.current).toBeNull();
+		expect(wrappedRef.current).toBeNull();
+		mounted.update(ActivityFragmentGroup, { ...props, mode: 'visible' });
+		expect(fragmentRef.current).toBe(outer);
+		expect(innerRef.current).toBeInstanceOf(FragmentInstance);
+		expect(wrappedRef.current).toBeInstanceOf(FragmentInstance);
+	});
+
 	// Per ReactDOMFragmentRefs-test.js:959.
 	it('excludes hidden Activity children from listeners and fragment ownership', () => {
 		const { result, fragment, inner, wrapped } = renderGroup('hidden');

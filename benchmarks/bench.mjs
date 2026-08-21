@@ -364,6 +364,21 @@ const SUITES = [
 		],
 	},
 	{
+		// Public Activity lifecycle and hidden descendant work. The paired fixture
+		// builds itself, and a separate production-work pass defends the range walk.
+		name: 'activity',
+		cwd: 'activity',
+		servers: [],
+		iter: { normal: 8, quick: 2 },
+		runs: [
+			{ script: 'run.mjs', args: (n) => [String(n)] },
+			{ label: 'work', script: 'work.mjs', args: () => [] },
+			{ label: 'refs', script: 'refs.mjs', args: (n) => [String(n)] },
+			{ label: 'refs-work', script: 'refs-work.mjs', args: () => [] },
+			{ label: 'bundle', script: 'bundle.mjs', args: () => [] },
+		],
+	},
+	{
 		name: 'effectful-list',
 		cwd: 'effectful-list',
 		servers: [
