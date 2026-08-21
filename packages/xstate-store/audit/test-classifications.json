@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/xstate-store/tests/conformance/binding.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane hook-slot isolation per call site, selector bail-out, and the re-exported store-core surface. None of it is same-scenario React execution: React has no per-call-site hook identity to observe."
+    },
+    {
+      "path": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapts the whole of packages/xstate-store-react/src/index.test.tsx from the pinned repository into the TSRX fixture, preserving all 14 case names and assertions. The same 14 identities run unmodified against React in the xstate-store-pristine lane."
+    },
+    {
+      "path": "packages/xstate-store/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs the byte-exact pinned @xstate/store-react@2.0.0 Vitest suite against react@19.2.3 after vendored-byte verification."
+    }
+  ]
+}

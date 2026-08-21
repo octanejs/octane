@@ -1,0 +1,79 @@
+{
+  "name": "@octanejs/xstate",
+  "version": "0.0.1",
+  "description": "XState tools for Octane — reuses the framework-agnostic xstate actor core unchanged and ports the @xstate/react 6.1.0 binding onto Octane hooks.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/xstate"
+  },
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:upstream": "node scripts/run-pristine-upstream.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json",
+    "typecheck:pristine": "tsc --noEmit -p audit/upstream-typetests/tsconfig.pristine.json",
+    "upstream:verify": "node scripts/verify-upstream.mjs"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*",
+    "xstate": "^5.28.0"
+  },
+  "peerDependenciesMeta": {
+    "xstate": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "catalog:xstate-react-oracle",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:xstate-react-oracle",
+    "@types/react-dom": "catalog:xstate-react-oracle",
+    "@types/use-sync-external-store": "^1.5.0",
+    "@xstate/react": "catalog:xstate-react-oracle",
+    "esbuild": "catalog:default",
+    "happy-dom": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:xstate-react-oracle",
+    "react-dom": "catalog:xstate-react-oracle",
+    "rxjs": "catalog:default",
+    "use-isomorphic-layout-effect": "catalog:xstate-react-oracle",
+    "use-sync-external-store": "catalog:xstate-react-oracle",
+    "vitest": "catalog:default",
+    "xstate": "catalog:xstate-react-oracle"
+  }
+}

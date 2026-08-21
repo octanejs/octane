@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "project": "xstate-store-pristine",
+  "roots": ["packages/xstate-store/upstream"],
+  "files": [
+    "packages/xstate-store/upstream/src/index.test.tsx",
+    "packages/xstate-store/upstream/src/types.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:d775bd3e090c4a53",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react createStoreHook should create a reusable store hook"
+    },
+    {
+      "id": "runtime:02480e054d0ba637",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react re-exports should re-export createAtom from @xstate/store"
+    },
+    {
+      "id": "runtime:33a542430258868a",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react re-exports should re-export createStore from @xstate/store"
+    },
+    {
+      "id": "runtime:4f4b46c8a228f414",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react useAtom should create a stable atom value from atom config and input"
+    },
+    {
+      "id": "runtime:278ff9c7d2f013da",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react useAtom should return the atom value"
+    },
+    {
+      "id": "runtime:551ece46ee1d484a",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react useAtom should update when atom changes"
+    },
+    {
+      "id": "runtime:8f4ff129ce206fdf",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react useAtomState should create a stable atom from atom config and input"
+    },
+    {
+      "id": "runtime:f6cc040b1b89f102",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react useAtomState should return the value and existing atom"
+    },
+    {
+      "id": "runtime:371ef39b9fb2a22f",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react useSelector should run compare for falsy selected values"
+    },
+    {
+      "id": "runtime:82c12fbadc772484",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react useSelector should work with a selector"
+    },
+    {
+      "id": "runtime:8077cb0d2e13c6c4",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react useSelector should work with atoms"
+    },
+    {
+      "id": "runtime:fa080aa741ead0c7",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react useSelector should work without a selector (full snapshot)"
+    },
+    {
+      "id": "runtime:9d81bbb74fe40506",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react useStore should create a stable store from store logic and input"
+    },
+    {
+      "id": "runtime:6429b6da6bf77dee",
+      "file": "packages/xstate-store/upstream/src/index.test.tsx",
+      "fullName": "@xstate/store-react useStore should create a stable store reference"
+    },
+    {
+      "id": "runtime:b2b15a30a86ed0ff",
+      "file": "packages/xstate-store/upstream/src/types.test.tsx",
+      "fullName": "@xstate/store-react types infers schemas in createStoreHook"
+    },
+    {
+      "id": "runtime:5bc9228fbde340de",
+      "file": "packages/xstate-store/upstream/src/types.test.tsx",
+      "fullName": "@xstate/store-react types infers schemas in useStore"
+    },
+    {
+      "id": "runtime:c71546c44e4c462a",
+      "file": "packages/xstate-store/upstream/src/types.test.tsx",
+      "fullName": "@xstate/store-react types preserves inferred events when only emitted schemas are declared in useStore"
+    },
+    {
+      "id": "runtime:afdff437db1a4760",
+      "file": "packages/xstate-store/upstream/src/types.test.tsx",
+      "fullName": "@xstate/store-react types uses atom config input in useAtomState"
+    },
+    {
+      "id": "runtime:f28e8092ba472c7e",
+      "file": "packages/xstate-store/upstream/src/types.test.tsx",
+      "fullName": "@xstate/store-react types uses store logic input in useStore"
+    }
+  ],
+  "snapshots": 0
+}

@@ -1,0 +1,436 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/statelyai/xstate.git",
+    "version": "@xstate/react@6.1.0",
+    "commit": "d4f8c5b709291d44f70139a7f9ff333abd7c615c",
+    "sourceRoot": "packages/xstate-react/src",
+    "testRoot": "packages/xstate-react/test",
+    "license": "MIT",
+    "integrity": "sha256:a5da9d58498c9febdba6b5b5c58f9cc1d056caa2a79d6bac449f022b5600a514",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/xstate/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/xstate/tests/conformance"],
+      "include": ["upstream-.*\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 75,
+    "uniqueIdentities": 75,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "9bc978ee04e27457f83c742d8d3d982fd9f0583915ab8be86a8dceb86f03df6b"
+    }
+  },
+  "lanes": [
+    {
+      "id": "xstate-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "xstate-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Spawns the byte-exact @xstate/react@6.1.0 suite in a child Vitest run against react@19.2.3, in upstream's own happy-dom environment with globals:true, after re-hashing every vendored byte. The Vitest project executes one wrapper case; the 144 inner upstream identities it certifies are pinned in audit/pristine-runtime.json.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/xstate/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/xstate/tests/upstream-original.test.ts",
+          "role": "test",
+          "sha256": "bee6296fb85367de47e6b86f9c457e594f48d633b49b349c55b8b1b298a37fce",
+          "cases": [
+            {
+              "id": "pristine:xstate-original-suite",
+              "testName": "runs the pinned @xstate/react 6.1.0 suite unchanged",
+              "fullName": "runs the pinned @xstate/react 6.1.0 suite unchanged"
+            }
+          ]
+        },
+        {
+          "path": "packages/xstate/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "f152cad025427f187f48e2cd935b7460227503d5959832d537a05455185bae11"
+        },
+        {
+          "path": "packages/xstate/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "9933c019c4ac200fcebac19e401a2af3ba4260f36b67f99314110a142f006cd6"
+        },
+        {
+          "path": "scripts/react-parity/xstate-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "5a48da2534089a10c00195012f87c40d28e6040c968bb881aaa7a4ff97dde789"
+        },
+        {
+          "path": "packages/xstate/scripts/run-pristine-upstream.mjs",
+          "role": "support",
+          "sha256": "8d34889a0247056f1b4160feac6012846d0b375145fe30c5a5cff218d27e54a1"
+        },
+        {
+          "path": "packages/xstate/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "95371fc9709591bd51d9fd053d2c3339a335e0a80eaa8f48115a03e5699a78be"
+        },
+        {
+          "path": "packages/xstate/scripts/verify-upstream.mjs",
+          "role": "support",
+          "sha256": "11fd5b20fdf35639ad817fd330a01b825e71a9588b839053b70dbb9c448a7e22"
+        },
+        {
+          "path": "packages/xstate/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "a5da9d58498c9febdba6b5b5c58f9cc1d056caa2a79d6bac449f022b5600a514"
+        }
+      ]
+    },
+    {
+      "id": "xstate-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "xstate",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the one-for-one adapted useActor, useActorRef, useSelector, and createActorContext suites on Octane: 75 cases whose names match the pristine lane's identities exactly. Permitted transformations: @testing-library/react to @octanejs/testing-library; `import * as React from 'react'` to 'octane' (namespace-imported base hooks are slotted directly by the compiler); the '../src/index.ts' import root to '@octanejs/xstate'; './utils.tsx' to the adapted './utils.ts' mode helper; explicit describe/it/expect/vi/afterEach imports because the project runs globals:false; the class ErrorBoundary to a @try/@catch component; an explicit `null` dependency array on four deps-less effects, which is Octane's documented spelling of React's run-after-every-render; .tsx to .tsrx. Upstream's `suiteKey === 'strict' ? \u2026 : \u2026` expressions are left byte-identical and simply evaluate to the non-strict expectations. Octane-only conformance cases share this Vitest project but sit outside adaptedRoots.tests and are not counted as parity evidence.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/xstate/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/xstate/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "e97ee33b8b3f350d6087f8f00d2f8fbb046026396b85b9daf325c527c7e6abcf"
+        },
+        {
+          "path": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+          "role": "support",
+          "sha256": "789d103511774a0f0394341a2a2ebd0fdb252a21b42ce60d0cd0d61342964a8d"
+        },
+        {
+          "path": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+          "role": "support",
+          "sha256": "4f007e50055b3093cb47d6a64450445682d85d9cc09dac809d4b5b0b837a5368"
+        },
+        {
+          "path": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+          "role": "support",
+          "sha256": "42e970bc35fe3d898fe7aa9582ca5554cc1d7f405f3a0ede9d303b30d491f321"
+        },
+        {
+          "path": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+          "role": "support",
+          "sha256": "30c5035aed4207146d165fcf359ed327ffff9a7f473fedad0207be353955b266"
+        },
+        {
+          "path": "packages/xstate/tests/_fixtures/upstream/createActorContext.tsrx",
+          "role": "support",
+          "sha256": "86946399368d36ab6d6d7f21f9e50b193295fa513364a365c2e39532fa04e25f"
+        },
+        {
+          "path": "packages/xstate/tests/_fixtures/upstream/useActor.tsrx",
+          "role": "support",
+          "sha256": "ff661a0846bcaa34604ed580d55dbecb2d2d184305710f739f8c585e54a4885b"
+        },
+        {
+          "path": "packages/xstate/tests/_fixtures/upstream/useActorRef.tsrx",
+          "role": "support",
+          "sha256": "adfe6b33b78bffc678750ed949093122bd1ca7ae337d33f20529011602e2aac8"
+        },
+        {
+          "path": "packages/xstate/tests/_fixtures/upstream/useSelector.tsrx",
+          "role": "support",
+          "sha256": "bc3387fa7fb643645b357dae50dbf448bf2787055f14cf6231fed96afbdacd0c"
+        },
+        {
+          "path": "packages/xstate/tests/_fixtures/upstream/utils.ts",
+          "role": "support",
+          "sha256": "1993fe01673e0e1bd232f6d4ff2cdf021a8ef2915c8a89655222c82761b73fec"
+        },
+        {
+          "path": "packages/xstate/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "a5da9d58498c9febdba6b5b5c58f9cc1d056caa2a79d6bac449f022b5600a514"
+        },
+        {
+          "path": "packages/xstate/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "d6e4d1802259ee405a987d66517ea97dc4706c340a8ec71f6b7bf844fa1b4233"
+        }
+      ]
+    },
+    {
+      "id": "xstate-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "xstate-pristine-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the vendored test/types.test.tsx together with the vendored src using plain tsc against react@19.2.3 and @types/react@19.2.17, reproducing upstream's allowImportingTsExtensions.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/xstate/audit/upstream-typetests/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/xstate/upstream/test/types.test.tsx",
+          "role": "test",
+          "sha256": "36e016b91f0186d15e632873e2c68aabfe5b683977c89385d47a282fa55d5584",
+          "cases": [
+            {
+              "id": "types:xstate-pristine-upstream",
+              "testName": "packages/xstate-react/test/types.test.tsx",
+              "fullName": "packages/xstate-react/test/types.test.tsx"
+            }
+          ]
+        },
+        {
+          "path": "packages/xstate/audit/upstream-typetests/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "8fc03964f675e2199c6d0f8136920270b95033523fb5edbda67704cf01e0683a"
+        },
+        {
+          "path": "packages/xstate/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "a5da9d58498c9febdba6b5b5c58f9cc1d056caa2a79d6bac449f022b5600a514"
+        },
+        {
+          "path": "packages/xstate/audit/pristine-types.json",
+          "role": "support",
+          "sha256": "2b8fa4228d8a883970e4381406bd503942388246396cb3a37d3ba1affbd05c29"
+        },
+        {
+          "path": "packages/xstate/audit/type-parity.json",
+          "role": "support",
+          "sha256": "77d16d78d741236e92a3667bf10f283a346757418f79a440baa4d361e719622b"
+        }
+      ]
+    },
+    {
+      "id": "xstate-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "xstate-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles typetests/types.test-d.tsx with tsrx-tsc against the Octane binding. The file is byte-identical to the vendored upstream suite below its header apart from one line (@testing-library/react to @octanejs/testing-library) and is prettier-ignored so that stays verifiable by diff. It is .tsx rather than .tsrx because comments are stripped before TypeScript sees a lowered .tsrx program, so its @ts-expect-error markers would not survive.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/xstate/typetests/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/xstate/typetests/types.test-d.tsx",
+          "role": "test",
+          "sha256": "f6aff246e7a0d8fba369879d3a5903dff2a03f490f8d62a71eef40be027464cb",
+          "cases": [
+            {
+              "id": "types:xstate-adapted-upstream",
+              "testName": "packages/xstate-react/test/types.test.tsx adapted contract",
+              "fullName": "packages/xstate-react/test/types.test.tsx adapted contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/xstate/typetests/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "ae33127db723cc1293f5d3569555e96f751e41d1cc5f2456b1760d8ec5e8497f"
+        },
+        {
+          "path": "packages/xstate/upstream/test/types.test.tsx",
+          "role": "support",
+          "sha256": "36e016b91f0186d15e632873e2c68aabfe5b683977c89385d47a282fa55d5584"
+        },
+        {
+          "path": "packages/xstate/audit/adapted-types.json",
+          "role": "support",
+          "sha256": "28013ea4fbe95a2742762be3c8552a05f16ef98ebc25a64ddb33e9e24f5907dc"
+        },
+        {
+          "path": "packages/xstate/audit/type-parity.json",
+          "role": "support",
+          "sha256": "77d16d78d741236e92a3667bf10f283a346757418f79a440baa4d361e719622b"
+        }
+      ]
+    },
+    {
+      "id": "xstate-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "xstate-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs one TSRX fixture through this binding on Octane and through the real @xstate/react@6.1.0 on react@19.2.3, asserting byte-identical innerHTML after every click. xstate@5.32.5 is shared by both sides and deliberately not rewritten, so any difference is attributable to the binding.",
+      "files": [
+        {
+          "path": "packages/xstate/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "9888350295fbaa71f3116daa1d6e1190cad6002f5a7520ee007e79433d18aa3d",
+          "cases": [
+            {
+              "id": "differential:xstate-use-machine",
+              "testName": "useMachine: state transitions are byte-identical",
+              "fullName": "differential: @octanejs/xstate vs real @xstate/react useMachine: state transitions are byte-identical"
+            },
+            {
+              "id": "differential:xstate-create-actor-context",
+              "testName": "createActorContext: provider, selectors, and assigns are byte-identical",
+              "fullName": "differential: @octanejs/xstate vs real @xstate/react createActorContext: provider, selectors, and assigns are byte-identical"
+            },
+            {
+              "id": "differential:xstate-unbound-selector",
+              "testName": "unbound useSelector over a context actor is byte-identical",
+              "fullName": "differential: @octanejs/xstate vs real @xstate/react unbound useSelector over a context actor is byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/xstate/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "108e5bf431d37e73fce63afd07456816753b63b0687cc2dcee0ff2bf99da4a8d"
+        },
+        {
+          "path": "packages/xstate/tests/differential/fixture-compiler.ts",
+          "role": "support",
+          "sha256": "ef6156664659a2818b4772250c76f13b87b131c8b5cf40268ec6cf0b004af7a6"
+        },
+        {
+          "path": "packages/xstate/tests/_fixtures/differential/parity.tsrx",
+          "role": "support",
+          "sha256": "2352c7924229c61166c249c300986d8f54b8ac73d649df41930a767e8b410648"
+        },
+        {
+          "path": "packages/xstate/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "d6e4d1802259ee405a987d66517ea97dc4706c340a8ec71f6b7bf844fa1b4233"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3e97762d731f0899f33b4060672dd79f302582b317c0bdf8e8872b9135ee2d64"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "xstate-no-strictmode-double-invoke",
+      "caseIds": [
+        "runtime:7da379d6545503d7",
+        "runtime:b8c2efc4596d561a",
+        "runtime:933b862fcca1bd9e",
+        "runtime:9dced4e1a8f9faff",
+        "runtime:7b1dae050fce6efd",
+        "runtime:39cfa9e6cab042bc",
+        "runtime:5ee1e1c2cff92517",
+        "runtime:757041935aacbe96"
+      ],
+      "upstreamResult": "React StrictMode double-invokes render and effects in development, so upstream parametrizes these suites over a strict and a non-strict mode and eight cases branch their render, effect, and observer counts on `suiteKey === 'strict'`.",
+      "octaneResult": "Octane has no StrictMode double-invoke, so the adapted helper supplies only the non-strict mode. The eight branching expressions are kept byte-identical and evaluate to upstream's own non-strict expectations; the strict pass is not applicable rather than skipped.",
+      "rationale": "StrictMode double-invocation is a React development-mode diagnostic with no Octane counterpart. It is a framework-level absence, not a choice made by this binding.",
+      "consumerImpact": "Fewer renders and effect invocations in development than React under StrictMode. Production counts are identical, because React does not double-invoke in production either.",
+      "classification": "framework-model",
+      "migrationGuidance": "None required. Code that relies on StrictMode to surface impure render logic should keep using React for that diagnostic; Octane never double-invokes.",
+      "owner": "@octanejs/xstate",
+      "reviewCondition": "Review if Octane ever adopts a StrictMode-equivalent development double-invoke."
+    },
+    {
+      "id": "xstate-error-boundary-try-catch",
+      "caseIds": ["runtime:c8ad212ab76dd248", "runtime:c848611ff2bdc188"],
+      "upstreamResult": "Upstream catches an actor's error state with an inline `class ErrorBoundary extends React.Component` using getDerivedStateFromError.",
+      "octaneResult": "Octane has no class components, so the adapted fixtures spell the same boundary as a `@try`/`@catch` template block. It catches the same render-phase throw and renders the same data-testid=\"error\" node with the same message, so the assertion is unchanged.",
+      "rationale": "Class components are not part of Octane's component model; `@try`/`@catch` is its error-boundary primitive.",
+      "classification": "api-shape",
+      "consumerImpact": "An application porting a class error boundary must rewrite it as a `@try`/`@catch` block. The caught errors and the recovery behavior are the same.",
+      "migrationGuidance": "Replace class error boundaries with a `@try`/`@catch` directive block. Hoist the boundary and its guarded child to module scope and name the child directly in the arm: the arms are hoisted templates and cannot read `props.children`.",
+      "owner": "@octanejs/xstate",
+      "reviewCondition": "Review if Octane ever gains class components or a children-transparent boundary component."
+    },
+    {
+      "id": "xstate-sync-external-store-commit-reread",
+      "caseIds": [
+        "ordinary:xstate-sync-external-store-skips-commit-reread",
+        "ordinary:xstate-sync-external-store-notify-reconciles"
+      ],
+      "ordinaryEvidence": [
+        {
+          "path": "packages/xstate/tests/conformance/divergences.test.ts",
+          "id": "ordinary:xstate-sync-external-store-skips-commit-reread",
+          "testName": "skips the commit-time getSnapshot re-read when a store mutates without notifying between render and commit",
+          "fullName": "useSyncExternalStore commit-time re-read skips the commit-time getSnapshot re-read when a store mutates without notifying between render and commit",
+          "sha256": "20a6594417c8ba37e4ba6fa4ea45c138033995ecb8adf0700659420db76ef527"
+        },
+        {
+          "path": "packages/xstate/tests/conformance/divergences.test.ts",
+          "id": "ordinary:xstate-sync-external-store-notify-reconciles",
+          "testName": "reconciles a mutation in the same render-to-commit window when the store notifies, as every xstate actor does",
+          "fullName": "useSyncExternalStore commit-time re-read reconciles a mutation in the same render-to-commit window when the store notifies, as every xstate actor does",
+          "sha256": "20a6594417c8ba37e4ba6fa4ea45c138033995ecb8adf0700659420db76ef527"
+        }
+      ],
+      "upstreamResult": "React's useSyncExternalStore re-reads getSnapshot at commit and forces another render when the value moved, so a store mutated between render and commit without notifying is still reconciled into the committed DOM.",
+      "octaneResult": "Octane gates its commit-time store sync on the value read during render: an unchanged read enqueues nothing, so a mutation that slips into that window without notifying is not reconciled until the store's next notify. The committed DOM can lag the store by one update in exactly that window.",
+      "rationale": "The gate is Octane's runtime design for its own store-sync queue, not a choice made by this binding. The staleness is bounded: the next notify reconciles.",
+      "classification": "framework-model",
+      "consumerImpact": "Unreachable through this binding. Every xstate actor notifies its observers on transition, and the paired control case shows a notifying mutation reconciles inside the same commit window. Only a hand-rolled store that mutates silently can observe it.",
+      "migrationGuidance": "Notify subscribers whenever the snapshot changes, which xstate actors already do. Do not mutate a store's snapshot without emitting.",
+      "owner": "octane runtime",
+      "reviewCondition": "Review if Octane's runtime adopts a commit-time getSnapshot re-read, or if a supported xstate actor ever mutates without notifying."
+    },
+    {
+      "id": "xstate-optional-server-snapshot",
+      "caseIds": [
+        "ordinary:xstate-server-snapshot-fallback",
+        "ordinary:xstate-server-snapshot-preferred"
+      ],
+      "ordinaryEvidence": [
+        {
+          "path": "packages/xstate/tests/ssr/server.test.ts",
+          "id": "ordinary:xstate-server-snapshot-fallback",
+          "testName": "renders from getSnapshot on the server when a hand-rolled actor supplies no getServerSnapshot",
+          "fullName": "@octanejs/xstate SSR renders from getSnapshot on the server when a hand-rolled actor supplies no getServerSnapshot",
+          "sha256": "c0897d0d8cf4181ce80a86ba2b3eb70c9817076605da45fe4958199ac617e840"
+        },
+        {
+          "path": "packages/xstate/tests/ssr/server.test.ts",
+          "id": "ordinary:xstate-server-snapshot-preferred",
+          "testName": "prefers getServerSnapshot over getSnapshot on the server when both are supplied",
+          "fullName": "@octanejs/xstate SSR prefers getServerSnapshot over getSnapshot on the server when both are supplied",
+          "sha256": "c0897d0d8cf4181ce80a86ba2b3eb70c9817076605da45fe4958199ac617e840"
+        }
+      ],
+      "upstreamResult": "React requires getServerSnapshot for server-rendered content and throws \"Missing getServerSnapshot, which is required for server-rendered content\" when it is absent, both during server rendering and on the client while hydrating.",
+      "octaneResult": "Octane's server hook falls back to getSnapshot when no server snapshot is supplied, so the same component renders instead of throwing. When a server snapshot IS supplied it still wins, so the fallback is a genuine fallback rather than two readers agreeing.",
+      "rationale": "Two layers contribute and both are recorded here rather than attributed to the runtime alone. Octane's server runtime defaults the argument, and this port's useSyncExternalStoreWithSelector additionally passes `getServerSelection ?? getSelection` where upstream's use-sync-external-store shim forwards `getServerSelection` unchanged. Upstream's shim is replaced rather than vendored, so this wiring is the port's.",
+      "classification": "framework-model",
+      "consumerImpact": "Unreachable through the package's public exports: both ported hooks always supply a server snapshot, and useSyncExternalStoreWithSelector is not part of the barrel. Only a hand-rolled actor-like object wired straight to the native hook reaches it, and it renders where React would throw.",
+      "migrationGuidance": "Keep supplying getServerSnapshot for anything server-rendered. Code that satisfies React satisfies Octane; the reverse is not guaranteed, so do not rely on the fallback if the same component must also run on React.",
+      "owner": "@octanejs/xstate",
+      "reviewCondition": "Review if Octane's server runtime starts requiring getServerSnapshot, or if the port stops defaulting it. The client-hydration half of the same fallback is untested here because this package has no hydration lane; it belongs in packages/octane/tests/hydration/."
+    }
+  ]
+}

@@ -40,6 +40,22 @@ const REACT_TEXTAREA_AUTOSIZE_USE_ISOMORPHIC_LAYOUT_EFFECT = reactTextareaAutosi
 const requireTanstackStore = createRequire(
 	resolve(import.meta.dirname, 'packages/tanstack-store/package.json'),
 );
+const requireXstate = createRequire(resolve(import.meta.dirname, 'packages/xstate/package.json'));
+// The shared differential rig lives under packages/octane, whose React
+// dependency can differ from this package's pinned oracle. Resolve the renderer
+// and the compiled fixture to one React instance.
+const XSTATE_REACT_ALIASES = [
+	'react',
+	'react/jsx-runtime',
+	'react/jsx-dev-runtime',
+	'react-dom',
+	'react-dom/client',
+].map(function pinXstateReactOracle(specifier) {
+	return {
+		find: new RegExp(`^${specifier.replace('/', '\\/')}$`),
+		replacement: realpathSync(requireXstate.resolve(specifier)),
+	};
+});
 const TANSTACK_STORE_REACT_ALIASES = [
 	'react',
 	'react/jsx-runtime',
@@ -1539,6 +1555,73 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/tanstack-store$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				// Octane-only conformance for the xstate-store binding: hook-slot
+				// independence across selector call sites, selector bail-out, and the
+				// stable-instance contracts for useStore/useAtomState. Parity-owned
+				// lanes are registered separately.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/xstate-store/tests/conformance/upstream-*.test.ts'],
+				},
+				test: {
+					name: 'xstate-store',
+					include: ['packages/xstate-store/tests/conformance/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/xstate-store$/,
+							replacement: resolve(import.meta.dirname, 'packages/xstate-store/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				// Octane-only conformance for the xstate binding: hook-slot
+				// independence across member-form call sites, selector bail-out, and
+				// actor lifecycle — none of which the differential rig can observe
+				// through innerHTML. Parity-owned lanes are registered separately.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/xstate/tests/conformance/upstream-*.test.ts'],
+				},
+				test: {
+					name: 'xstate',
+					include: ['packages/xstate/tests/conformance/**/*.test.ts'],
+					environment: 'jsdom',
+					setupFiles: ['packages/xstate/tests/conformance/test-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/xstate$/,
+							replacement: resolve(import.meta.dirname, 'packages/xstate/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
 						},
 					],
 				},
@@ -5745,6 +5828,76 @@ export default defineConfig({
 				test: {
 					name: 'tanstack-store-pristine',
 					include: ['packages/tanstack-store/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+				},
+			},
+			{
+				// Spawns the vendored @xstate/react@6.1.0 suite in a child Vitest run
+				// against real React, after re-hashing every vendored byte. The wrapper
+				// asserts the child's passing identities against the recorded inventory.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'xstate-pristine',
+					include: ['packages/xstate/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+				},
+			},
+			{
+				test: {
+					name: 'xstate-ssr',
+					include: ['packages/xstate/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/xstate$/,
+							replacement: resolve(import.meta.dirname, 'packages/xstate/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				// parity.test.ts is parity-owned; setup.test.ts stays ordinary CI.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/xstate/tests/differential/parity.test.ts'],
+				},
+				test: {
+					name: 'xstate-differential',
+					include: ['packages/xstate/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/xstate/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						...XSTATE_REACT_ALIASES,
+						{
+							find: /^@octanejs\/xstate$/,
+							replacement: resolve(import.meta.dirname, 'packages/xstate/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				// Same shape for the vendored @xstate/store-react@2.0.0 suite, whose
+				// tests upstream colocates with its source.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'xstate-store-pristine',
+					include: ['packages/xstate-store/tests/upstream-original.test.ts'],
 					environment: 'node',
 					globals: false,
 					sequence: { groupOrder: 1 },

@@ -74,6 +74,7 @@ import { verifyVaulAdaptedRuntimeStructure } from './vaul-runtime-lib.mjs';
 import { verifyVaulUpstream } from './vaul-upstream-lib.mjs';
 import { verifyVisxTestClassifications } from './visx-classifications-lib.mjs';
 import { verifyVisxTypes } from './visx-types-lib.mjs';
+import { verifyXstateStoreTypes, verifyXstateTypes } from './xstate-types-lib.mjs';
 import { verifyZagTestClassifications } from './zag-classifications-lib.mjs';
 import { verifyZagRuntimeCrosswalk } from './zag-runtime-crosswalk.mjs';
 import { verifyZagTypes } from './zag-types-lib.mjs';
@@ -285,6 +286,8 @@ await capture('react-draggable test classifications', () =>
 await capture('@octanejs/popper type evidence', () => verifyPopperTypes(REPO));
 await capture('@octanejs/popper test classifications', () => verifyPopperTestClassifications(REPO));
 await capture('pdf test classifications', () => verifyPdfTestClassifications(REPO));
+await capture('@octanejs/xstate type evidence', () => verifyXstateTypes(REPO));
+await capture('@octanejs/xstate-store type evidence', () => verifyXstateStoreTypes(REPO));
 
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components.

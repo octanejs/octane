@@ -1,0 +1,267 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/statelyai/xstate.git",
+    "version": "@xstate/store-react@2.0.0",
+    "commit": "ddca0ff8c53dc2e85f9173514cc686308d65bd2c",
+    "sourceRoot": "packages/xstate-store-react/src",
+    "testRoot": "packages/xstate-store-react/src",
+    "license": "MIT",
+    "integrity": "sha256:ac92691a04573f5ab47ebc68dadcb60badd8be432389495a344dd51b4bfb3a17",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/xstate-store/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/xstate-store/tests/conformance"],
+      "include": ["upstream-index\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 14,
+    "uniqueIdentities": 14,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "9bc978ee04e27457f83c742d8d3d982fd9f0583915ab8be86a8dceb86f03df6b"
+    }
+  },
+  "lanes": [
+    {
+      "id": "xstate-store-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "xstate-store-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Spawns the byte-exact @xstate/store-react@2.0.0 suite in a child Vitest run against react@19.2.3, in upstream's own happy-dom environment and resolve conditions, after re-hashing every vendored byte. The Vitest project executes one wrapper case; the 19 inner upstream identities it certifies are pinned in audit/pristine-runtime.json.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/xstate-store/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/xstate-store/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "a67d3b17cc84f37c2ceadcc241df067c7f572ff18c4adf357e744140220c8a3f"
+        },
+        {
+          "path": "packages/xstate-store/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "1e203aff598a92a238eb598e9cbf10741e66bd9bc46c1187a186c109ec2b5268"
+        },
+        {
+          "path": "packages/xstate-store/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "f4d356fe9e60d007e05ac22a35e41ba4f910538166d4ec3a33fcb1beccef4222"
+        },
+        {
+          "path": "scripts/react-parity/xstate-store-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "ab02d326c5fc5eb146827246d82bd8c2e1433d64dbe8b64dd0944d3820b04d7b"
+        },
+        {
+          "path": "packages/xstate-store/scripts/run-pristine-upstream.mjs",
+          "role": "support",
+          "sha256": "b2cb91219a6db1c574b5c0459e525f4e03b7ee9bdf4b8ddf9eaa533726dd26fa"
+        },
+        {
+          "path": "packages/xstate-store/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "eb56122f5d7323dd4f158d687c7ce0eaa4432532437c419528884c0f6181605f"
+        },
+        {
+          "path": "packages/xstate-store/scripts/verify-upstream.mjs",
+          "role": "support",
+          "sha256": "814844861715fdbc014ab7b98e0886169967d7c86058e60a3c845d16208ef79c"
+        },
+        {
+          "path": "packages/xstate-store/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "ac92691a04573f5ab47ebc68dadcb60badd8be432389495a344dd51b4bfb3a17"
+        }
+      ]
+    },
+    {
+      "id": "xstate-store-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "xstate-store",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the one-for-one adapted src/index.test.tsx suite on Octane. All 14 upstream case names and assertions are preserved verbatim, so the identity set equals the pristine lane's. Permitted transformations: @testing-library/react to @octanejs/testing-library; the './index.ts' import root to '@octanejs/xstate-store'; explicit describe/it/expect/vi/afterEach imports because the project runs globals:false; an explicit afterEach(cleanup) because under globals:false Testing Library has no global afterEach to self-register auto-cleanup against; .tsx to .tsrx. Octane-only conformance cases share this Vitest project but sit outside adaptedRoots.tests and are not counted as parity evidence.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/xstate-store/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/xstate-store/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "5ab0c5ebc50dc57670a2a267a3b2df0c2f5e5527262ae7b17b12e8bc5e00b181"
+        },
+        {
+          "path": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+          "role": "support",
+          "sha256": "d8eccd71138f1be32d2d7bd3ce5a70b583da2d0e534ccaf0089495c08e6fb090"
+        },
+        {
+          "path": "packages/xstate-store/tests/_fixtures/upstream/index.tsrx",
+          "role": "support",
+          "sha256": "1ff85d4b612c52a4b147a4b200f26b97fe993a5f115bbcfdff717769d3456ee3"
+        },
+        {
+          "path": "packages/xstate-store/upstream/src/index.test.tsx",
+          "role": "support",
+          "sha256": "0e2127856dc69919814fa66cebd33e5a31840a00669b9ede361a5db3615547c6"
+        },
+        {
+          "path": "packages/xstate-store/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "ac92691a04573f5ab47ebc68dadcb60badd8be432389495a344dd51b4bfb3a17"
+        },
+        {
+          "path": "packages/xstate-store/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "26b12839e814dd133ea3ba5fb638f2c77d8441603d030a5c6e6e2315b9152fa0"
+        }
+      ]
+    },
+    {
+      "id": "xstate-store-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "xstate-store-pristine-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the vendored src/types.test.tsx together with the vendored src/index.ts using plain tsc against @xstate/store-react@2.0.0 type dependencies, reproducing upstream's own compiler options.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/xstate-store/audit/upstream-typetests/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/xstate-store/upstream/src/types.test.tsx",
+          "role": "test",
+          "sha256": "fa55c18f0dd1dbb0cf472dc756a25bfe2fc338ceb11f33c4088e0c2e15f622d6",
+          "cases": [
+            {
+              "id": "types:xstate-store-pristine-upstream",
+              "testName": "packages/xstate-store-react/src/types.test.tsx",
+              "fullName": "packages/xstate-store-react/src/types.test.tsx"
+            }
+          ]
+        },
+        {
+          "path": "packages/xstate-store/audit/upstream-typetests/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "261856af05b633c1562ff003058c2d5a41d166f5b769f5bdd79363ecf026055c"
+        },
+        {
+          "path": "packages/xstate-store/upstream/SHA256SUMS",
+          "role": "support",
+          "sha256": "ac92691a04573f5ab47ebc68dadcb60badd8be432389495a344dd51b4bfb3a17"
+        },
+        {
+          "path": "packages/xstate-store/audit/pristine-types.json",
+          "role": "support",
+          "sha256": "502303e3a095f0a040fc326aaea24c7fcddee11b8a338601a410329f08abf8ae"
+        },
+        {
+          "path": "packages/xstate-store/audit/type-parity.json",
+          "role": "support",
+          "sha256": "a9b3eca4dbea70440b5ac600db9e1ddd40f961ee3182560866cd6aef1399a07f"
+        }
+      ]
+    },
+    {
+      "id": "xstate-store-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "xstate-store-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles typetests/types.test-d.tsx with tsrx-tsc against the Octane binding. The file is byte-identical to the vendored upstream suite below its header apart from the import root, and is prettier-ignored so that stays verifiable by diff. All thirteen @ts-expect-error markers are preserved, which is why this suite is .tsx rather than .tsrx: comments are stripped before TypeScript sees a lowered .tsrx program, so an expect-error marker would not survive.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/xstate-store/typetests/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/xstate-store/typetests/types.test-d.tsx",
+          "role": "test",
+          "sha256": "5db8a5f1dd1712d506dea6232859dfd3edf65b3e17ede5dac653b3494646fb49",
+          "cases": [
+            {
+              "id": "types:xstate-store-adapted-upstream",
+              "testName": "packages/xstate-store-react/src/types.test.tsx adapted contract",
+              "fullName": "packages/xstate-store-react/src/types.test.tsx adapted contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/xstate-store/typetests/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "ae33127db723cc1293f5d3569555e96f751e41d1cc5f2456b1760d8ec5e8497f"
+        },
+        {
+          "path": "packages/xstate-store/upstream/src/types.test.tsx",
+          "role": "support",
+          "sha256": "fa55c18f0dd1dbb0cf472dc756a25bfe2fc338ceb11f33c4088e0c2e15f622d6"
+        },
+        {
+          "path": "packages/xstate-store/audit/adapted-types.json",
+          "role": "support",
+          "sha256": "c1560c0dfd1eb2c042c8834d0023d0289ddbffcc1233cfb7ef67b1d926d4fffb"
+        },
+        {
+          "path": "packages/xstate-store/audit/type-parity.json",
+          "role": "support",
+          "sha256": "a9b3eca4dbea70440b5ac600db9e1ddd40f961ee3182560866cd6aef1399a07f"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "xstate-store-call-site-hook-slots",
+      "caseIds": ["ordinary:xstate-store-hook-slot-per-call-site"],
+      "ordinaryEvidence": [
+        {
+          "path": "packages/xstate-store/tests/conformance/binding.test.ts",
+          "id": "ordinary:xstate-store-hook-slot-per-call-site",
+          "testName": "gives each selector call site its own hook slot",
+          "fullName": "useSelector gives each selector call site its own hook slot",
+          "sha256": "140b5e97891aaa41d60759c5e480c290d3de6464b280f460ec323476fd8aa385"
+        }
+      ],
+      "upstreamResult": "React keys hooks by call order, so upstream's hook calls inside the `if` branches of useSelector and useAtom are tolerated only because the branch is stable for a given call site. A call site that flips between the selector and no-selector branch corrupts React's hook order.",
+      "octaneResult": "Octane keys hooks by compiler-assigned call-site slot, so each branch owns an independent hook cell. The branching shape is kept verbatim from upstream and is simply legal here; a flipping call site keeps working and the abandoned branch's subscription is released.",
+      "rationale": "The divergence follows from Octane's slot-keyed hook model, which is a framework-level design decision rather than a choice made by this binding.",
+      "classification": "framework-model",
+      "consumerImpact": "Strictly better-behaved than React on the same source. No supported usage reaches the difference, because both hooks' branch condition is fixed by the argument shape at each call site.",
+      "migrationGuidance": "None required. Code that is correct on React stays correct here.",
+      "owner": "@octanejs/xstate-store",
+      "reviewCondition": "Review if Octane ever adopts call-order hook keying, or if upstream restructures useSelector/useAtom to hoist the hooks out of the branches."
+    }
+  ]
+}

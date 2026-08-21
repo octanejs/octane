@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/xstate/tests/conformance/binding.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane hook-slot isolation for method-form hooks, per-subscriber selector bail-out, and the exported surface. React has no per-call-site hook identity to compare against, so none of it is same-scenario React execution."
+    },
+    {
+      "path": "packages/xstate/tests/conformance/divergences.test.ts",
+      "disposition": "octane-only-divergence",
+      "divergenceIds": ["xstate-sync-external-store-commit-reread"],
+      "reason": "Pins the commit-time getSnapshot re-read divergence that UPSTREAM.md documents, together with the notifying control that proves the reconciliation path is live and correctly timed at that exact point. React would re-read at commit; there is no same-scenario React execution to compare against because the divergence is the absence of that re-read."
+    },
+    {
+      "path": "packages/xstate/tests/conformance/upstream-createActorContext.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapts test/createActorContext.test.tsx from the pinned repository into the TSRX fixture, preserving all 13 case names and assertions. The same identities run unmodified against React in the xstate-pristine lane."
+    },
+    {
+      "path": "packages/xstate/tests/conformance/upstream-useActor.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapts test/useActor.test.tsx from the pinned repository into the TSRX fixture, preserving all 26 case names and assertions. The same identities run unmodified against React in the xstate-pristine lane."
+    },
+    {
+      "path": "packages/xstate/tests/conformance/upstream-useActorRef.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapts test/useActorRef.test.tsx from the pinned repository into the TSRX fixture, preserving all 18 case names and assertions. The same identities run unmodified against React in the xstate-pristine lane."
+    },
+    {
+      "path": "packages/xstate/tests/conformance/upstream-useSelector.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Adapts test/useSelector.test.tsx from the pinned repository into the TSRX fixture, preserving all 18 case names and assertions. The same identities run unmodified against React in the xstate-pristine lane."
+    },
+    {
+      "path": "packages/xstate/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs one TSRX fixture through this binding on Octane and through @xstate/react@6.1.0 on react@19.2.3, asserting byte-identical innerHTML after every click. xstate@5.32.5 is shared by both sides and deliberately not rewritten, so any difference is attributable to the binding."
+    },
+    {
+      "path": "packages/xstate/tests/differential/setup.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks that the differential harness's own React fixture compilation fails closed. It covers the parity machinery, not the binding."
+    },
+    {
+      "path": "packages/xstate/tests/ssr/server.test.ts",
+      "disposition": "octane-only-divergence",
+      "divergenceIds": ["xstate-optional-server-snapshot"],
+      "reason": "Two cases pin the optional-getServerSnapshot divergence: a hand-rolled actor with no server snapshot renders from getSnapshot where React throws, plus the control proving the fallback is a real fallback. The file's other four cases are ordinary Octane SSR framework contract. Upstream ships no SSR suite, so there is no React scenario to run the same fixture against either way."
+    },
+    {
+      "path": "packages/xstate/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs the byte-exact pinned @xstate/react@6.1.0 Vitest suite against react@19.2.3 after vendored-byte verification."
+    }
+  ]
+}

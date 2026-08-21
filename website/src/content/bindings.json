@@ -1,7 +1,7 @@
 [
   {
     "title": "Shared state",
-    "description": "Small stores, atoms, observable state, Redux, RTK Query, and TanStack Store.",
+    "description": "Small stores, atoms, observable state, state machines, Redux, RTK Query, and TanStack Store.",
     "packages": [
       "@octanejs/alien-signals",
       "@octanejs/zustand",
@@ -11,7 +11,9 @@
       "@octanejs/rxjs",
       "@octanejs/redux",
       "@octanejs/redux-toolkit",
-      "@octanejs/tanstack-store"
+      "@octanejs/tanstack-store",
+      "@octanejs/xstate",
+      "@octanejs/xstate-store"
     ]
   },
   {

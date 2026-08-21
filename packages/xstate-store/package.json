@@ -1,0 +1,72 @@
+{
+  "name": "@octanejs/xstate-store",
+  "version": "0.0.1",
+  "description": "XState Store for Octane — re-exports the framework-agnostic @xstate/store core unchanged and ports the @xstate/store-react 2.0.0 binding onto Octane hooks.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/xstate-store"
+  },
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:upstream": "node scripts/run-pristine-upstream.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json",
+    "typecheck:pristine": "tsc --noEmit -p audit/upstream-typetests/tsconfig.pristine.json",
+    "upstream:verify": "node scripts/verify-upstream.mjs"
+  },
+  "dependencies": {
+    "@xstate/store": "catalog:xstate-store-react-oracle"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "catalog:xstate-store-react-oracle",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:xstate-store-react-oracle",
+    "@types/react-dom": "catalog:xstate-store-react-oracle",
+    "@xstate/store-react": "catalog:xstate-store-react-oracle",
+    "esbuild": "catalog:default",
+    "happy-dom": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:xstate-store-react-oracle",
+    "react-dom": "catalog:xstate-store-react-oracle",
+    "vitest": "catalog:default",
+    "zod": "^4.4.3"
+  }
+}

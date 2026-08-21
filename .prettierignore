@@ -37,6 +37,11 @@ packages/solana-react/typetests/query/__typetests__/
 # popper adapted typings mirrors stay printer-identical to upstream.
 packages/popper/typetests/main-test.tsx
 packages/popper/typetests/svg-test.tsx
+# xstate adapted type suites stay byte-identical to the vendored upstream
+# typetests below their header, so the permitted-transformation ledger in each
+# package's audit/type-parity.json is verifiable by diff.
+packages/xstate/typetests/types.test-d.tsx
+packages/xstate-store/typetests/types.test-d.tsx
 packages/shadcn/tests/differential/upstream/
 # The framework-neutral half of @vis.gl/react-mapbox is reused byte-for-byte, so
 # an upstream bump stays a clean diff against packages/react-map-gl/upstream/.

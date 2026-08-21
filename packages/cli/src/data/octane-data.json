@@ -1189,6 +1189,35 @@
       "verified": "2026-08-03"
     },
     {
+      "name": "@octanejs/xstate",
+      "version": "0.0.1",
+      "category": "Shared state",
+      "upstream": { "package": "@xstate/react", "version": "6.1.0" },
+      "surface": "Complete @xstate/react 6.1.0 export surface — `useActor`, `useActorRef`, `useSelector`, `createActorContext`, `shallowEqual`, and the deprecated `useMachine` alias — ported onto Octane hooks. The framework-agnostic `xstate` actor core is reused unchanged as a peer dependency and is not re-exported, exactly as upstream. Upstream's two npm-only dependencies are replaced by in-repo ports: `use-sync-external-store/shim/with-selector` by a local port of React's selector shim, and `use-isomorphic-layout-effect` by a slot-forwarding equivalent.",
+      "divergences": [
+        "`useSyncExternalStore` does not re-read `getSnapshot` at commit when the rendered value was unchanged. Octane's synchronous renderer closes the concurrent-interleaving window React guards there, so a store that mutates without notifying between render and commit is not re-caught. Any actor that notifies — which xstate always does — is unaffected.",
+        "During server rendering `getServerSnapshot` is optional and falls back to `getSnapshot`, where React throws. `useSelector` and `useActor` always supply one, so this is only reachable through a hand-rolled actor-like object.",
+        "Upstream's suite runs every `useActor`, `useActorRef`, and `useSelector` case twice, once under `StrictMode`. Octane has no StrictMode double-invoke, so the non-strict render, effect, and observer counts are the ported expectations; the strict pass is not applicable.",
+        "`stopRootWithRehydration` is retained verbatim even though its motivating case (React Strict Effects double-invoking the start/stop effect) cannot occur on Octane, because it also governs unmount-then-remount, which stays observable."
+      ],
+      "ssr": "Supported: `useSelector` and `useActor` read their actor snapshot through `getServerSnapshot` during server rendering and the first hydration read, so server markup matches the initial actor snapshot. Effects never run on the server, so actors are not started there.",
+      "verified": "2026-08-15"
+    },
+    {
+      "name": "@octanejs/xstate-store",
+      "version": "0.0.1",
+      "category": "Shared state",
+      "upstream": { "package": "@xstate/store-react", "version": "2.0.0" },
+      "surface": "Complete @xstate/store-react 2.0.0 export surface — `useSelector`, `useStore`, `useAtom`, `useAtomState`, and `createStoreHook` — ported onto Octane hooks, plus the full `@xstate/store@4.2.3` core re-exported unchanged (`createStore`, `createAtom`, `fromStore`, `shallowEqual`, and every type), exactly as upstream re-exports it.",
+      "divergences": [
+        "Upstream calls hooks inside `if` branches in `useSelector` and `useAtom`, which React tolerates only because the branch is stable per call site. Octane keys hooks by call site rather than call order, so the shape is legal here; if a call site does flip branches, Octane keeps independent hook cells per branch and unsubscribes the abandoned one instead of corrupting hook order.",
+        "`useSyncExternalStore` does not re-read `getSnapshot` at commit when the rendered value was unchanged. Octane's synchronous renderer closes the concurrent-interleaving window React guards there; any store that notifies is unaffected.",
+        "During server rendering `getServerSnapshot` is optional and falls back to `getSnapshot`, where React throws. Every hook here supplies one."
+      ],
+      "ssr": "Supported: selectors, stores, and atoms read their current snapshot during server rendering through `getServerSnapshot`, and the binding has no browser-only initialization.",
+      "verified": "2026-08-15"
+    },
+    {
       "name": "@octanejs/zag",
       "version": "0.0.9",
       "category": "UI and interaction",
@@ -1307,6 +1336,8 @@
     "@visx/wordcloud": "@octanejs/visx",
     "@visx/xychart": "@octanejs/visx",
     "@visx/zoom": "@octanejs/visx",
+    "@xstate/react": "@octanejs/xstate",
+    "@xstate/store-react": "@octanejs/xstate-store",
     "@zag-js/react": "@octanejs/zag",
     "animejs": "@octanejs/animejs",
     "cmdk": "@octanejs/cmdk",

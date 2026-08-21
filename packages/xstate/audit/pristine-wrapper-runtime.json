@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "xstate-pristine",
+  "roots": ["packages/xstate/tests"],
+  "files": ["packages/xstate/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:de6f0e6eb1fbdf44",
+      "file": "packages/xstate/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned @xstate/react 6.1.0 suite unchanged"
+    }
+  ]
+}

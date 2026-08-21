@@ -73,8 +73,10 @@ website/public/r
 
 # React-parity pristine suite scratch copies
 packages/*/.pristine-upstream-*/
-# Vitest timing/results cache for the TanStack Store pristine upstream suite.
-packages/tanstack-store/.upstream-vitest-cache/
+# Vitest timing/results cache written by any pristine upstream suite. The
+# directory name is fixed by the shared `tests/upstream-vitest.config.ts`
+# convention, so this stays generic like the scratch-copy pattern above.
+packages/*/.upstream-vitest-cache/
 # Pristine vitest cache for tanstack-hotkeys upstream suite
 packages/tanstack-hotkeys/.vite-pristine/
 

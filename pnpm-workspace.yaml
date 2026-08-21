@@ -529,12 +529,30 @@ catalogs:
     "@types/react-dom": 19.2.3
     react: 19.2.3
     react-dom: 19.2.3
+  xstate-react-oracle:
+    "@testing-library/react": 16.3.1
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    "@xstate/react": 6.1.0
+    react: 19.2.3
+    react-dom: 19.2.3
+    use-isomorphic-layout-effect: 1.2.1
+    use-sync-external-store: 1.6.0
+    xstate: 5.32.5
+  xstate-store-react-oracle:
+    "@testing-library/react": 16.3.1
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    "@xstate/store": 4.2.3
+    "@xstate/store-react": 2.0.0
+    react: 19.2.3
+    react-dom: 19.2.3
 
 # patchedDependencies: the @tsrx/core@0.1.37/0.1.40 JSX parse patches are
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37 || 0.1.39
+  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37 || 0.1.39 || 0.1.43
   - react-dropzone@20.0.0
   - '@tanstack/db@0.7.0'
   - '@oxc-tsrx/native-darwin-arm64@0.5.0'

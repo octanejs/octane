@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "project": "xstate-store",
+  "roots": ["packages/xstate-store/tests/conformance"],
+  "files": ["packages/xstate-store/tests/conformance/upstream-index.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:71f51ef875daab76",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react createStoreHook should create a reusable store hook"
+    },
+    {
+      "id": "runtime:822352a21ccb7d04",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react re-exports should re-export createAtom from @xstate/store"
+    },
+    {
+      "id": "runtime:a665dd9a1f0f63aa",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react re-exports should re-export createStore from @xstate/store"
+    },
+    {
+      "id": "runtime:b370583b078ac399",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react useAtom should create a stable atom value from atom config and input"
+    },
+    {
+      "id": "runtime:ebee376d986f35d7",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react useAtom should return the atom value"
+    },
+    {
+      "id": "runtime:2c55defc6ffa1a55",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react useAtom should update when atom changes"
+    },
+    {
+      "id": "runtime:df9ba980e2f48707",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react useAtomState should create a stable atom from atom config and input"
+    },
+    {
+      "id": "runtime:eb1bbf3101d921f2",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react useAtomState should return the value and existing atom"
+    },
+    {
+      "id": "runtime:42860f2d1005c6e3",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react useSelector should run compare for falsy selected values"
+    },
+    {
+      "id": "runtime:e7b6e5acdb7bcd29",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react useSelector should work with a selector"
+    },
+    {
+      "id": "runtime:cbbaf22c0db9288c",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react useSelector should work with atoms"
+    },
+    {
+      "id": "runtime:0abbe30c74400880",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react useSelector should work without a selector (full snapshot)"
+    },
+    {
+      "id": "runtime:abb032ecd7868666",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react useStore should create a stable store from store logic and input"
+    },
+    {
+      "id": "runtime:8d336462a1ff2432",
+      "file": "packages/xstate-store/tests/conformance/upstream-index.test.ts",
+      "fullName": "@xstate/store-react useStore should create a stable store reference"
+    }
+  ]
+}

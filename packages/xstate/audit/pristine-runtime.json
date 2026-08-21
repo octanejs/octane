@@ -1,0 +1,735 @@
+{
+  "schemaVersion": 1,
+  "project": "xstate-pristine",
+  "roots": ["packages/xstate/upstream"],
+  "files": [
+    "packages/xstate/upstream/test/createActorContext.test.tsx",
+    "packages/xstate/upstream/test/types.test.tsx",
+    "packages/xstate/upstream/test/useActor.test.tsx",
+    "packages/xstate/upstream/test/useActorRef.test.tsx",
+    "packages/xstate/upstream/test/useSelector.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:f25a172ff180ef90",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext input can be passed to the provider"
+    },
+    {
+      "id": "runtime:4dda63d2abb7ede0",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext options can be passed to the provider"
+    },
+    {
+      "id": "runtime:87659bcaf799f951",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext should be able to pass interpreter options to the provider"
+    },
+    {
+      "id": "runtime:da5eeb6090505ba4",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext should merge createActorContext options with options passed to the provider"
+    },
+    {
+      "id": "runtime:0ab2347526307ac6",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext should preserve machine's identity when swapping options using in-render `.provide`"
+    },
+    {
+      "id": "runtime:a2c2589a2706069a",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext should work with a provided machine"
+    },
+    {
+      "id": "runtime:ef56abe73eb4c274",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext should work with other types of logic"
+    },
+    {
+      "id": "runtime:6786cdf6aae81559",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext should work with useActorRef"
+    },
+    {
+      "id": "runtime:2295e87d3cf537f5",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext should work with useSelector"
+    },
+    {
+      "id": "runtime:8e282cc81840a460",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext should work with useSelector and a custom comparator"
+    },
+    {
+      "id": "runtime:e773314edc606005",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext the actor should be able to receive events"
+    },
+    {
+      "id": "runtime:6777e0331f122925",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext useActorRef should throw when the actor was not provided"
+    },
+    {
+      "id": "runtime:0c04feccf38c1581",
+      "file": "packages/xstate/upstream/test/createActorContext.test.tsx",
+      "fullName": "createActorContext useSelector should throw when the actor was not provided"
+    },
+    {
+      "id": "runtime:4778aa05b9592fa2",
+      "file": "packages/xstate/upstream/test/types.test.tsx",
+      "fullName": "useActor should not require input when not defined"
+    },
+    {
+      "id": "runtime:2bfdc279892e08e5",
+      "file": "packages/xstate/upstream/test/types.test.tsx",
+      "fullName": "useActor should require input to be specified when defined"
+    },
+    {
+      "id": "runtime:a3424b4d7cc8130b",
+      "file": "packages/xstate/upstream/test/types.test.tsx",
+      "fullName": "useActorRef should not require input when not defined"
+    },
+    {
+      "id": "runtime:da11e9f149acb483",
+      "file": "packages/xstate/upstream/test/types.test.tsx",
+      "fullName": "useActorRef should require input to be specified when defined"
+    },
+    {
+      "id": "runtime:5ce5e76d3c9edf69",
+      "file": "packages/xstate/upstream/test/types.test.tsx",
+      "fullName": "useMachine spawned actors should be typed correctly"
+    },
+    {
+      "id": "runtime:f98c5994a9396278",
+      "file": "packages/xstate/upstream/test/types.test.tsx",
+      "fullName": "useMachine state should not become never after checking state with matches"
+    },
+    {
+      "id": "runtime:19454535e3440375",
+      "file": "packages/xstate/upstream/test/types.test.tsx",
+      "fullName": "useMachine types work for machines with a specified id and state with an after property #5008"
+    },
+    {
+      "id": "runtime:3e42e208c8e8ed16",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) actions should not use stale data in a builtin entry action"
+    },
+    {
+      "id": "runtime:b96dbab5ad0bc66c",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) actions should not use stale data in a builtin transition action"
+    },
+    {
+      "id": "runtime:5bdeb7804cba54f8",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) actions should not use stale data in a custom entry action"
+    },
+    {
+      "id": "runtime:7933afa489efb5a0",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) child component should be able to send an event to a parent immediately in an effect"
+    },
+    {
+      "id": "runtime:21eea7ca41493486",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) custom data should be available right away for the invoked actor"
+    },
+    {
+      "id": "runtime:79e4f58701893de0",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) delayed transitions should work when initializing from a rehydrated state"
+    },
+    {
+      "id": "runtime:8aff4df768e7d12e",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should accept input and provide it to the context factory"
+    },
+    {
+      "id": "runtime:04ff75255035bf46",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should be able to use a delay provided outside of React"
+    },
+    {
+      "id": "runtime:621e5f5463960c01",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should be able to use a guard provided outside of React"
+    },
+    {
+      "id": "runtime:b41d03cd6fc145d8",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should be able to use a service provided outside of React"
+    },
+    {
+      "id": "runtime:cca3c3b05ee4d4b7",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should be able to use an action provided outside of React"
+    },
+    {
+      "id": "runtime:d18c95bd4f257b9b",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should deliver messages sent from an effect to an actor registered in the system"
+    },
+    {
+      "id": "runtime:f220485fc94ee256",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should execute a delayed transition of the initial state"
+    },
+    {
+      "id": "runtime:3a201ad10477f83b",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should maintain the same reference for objects created when resolving initial state"
+    },
+    {
+      "id": "runtime:ebc42c8f78f2ade1",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should not invoke initial services more than once"
+    },
+    {
+      "id": "runtime:2cb6bfdd20dfb7a7",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should not miss initial synchronous updates"
+    },
+    {
+      "id": "runtime:03d129822ff10c81",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should not spawn actors until service is started"
+    },
+    {
+      "id": "runtime:26af14da6e6ec831",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should not use stale data in a guard"
+    },
+    {
+      "id": "runtime:d658ae07b4a9e0ec",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should only render once when initial microsteps are involved"
+    },
+    {
+      "id": "runtime:dda7ea4bd51645a5",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should provide the service"
+    },
+    {
+      "id": "runtime:ecaf9d2144007373",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should successfully spawn actors from the lazily declared context"
+    },
+    {
+      "id": "runtime:be79f6abd7e393dc",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should throw an error to an error boundary when the actor reaches an error state"
+    },
+    {
+      "id": "runtime:961db566622c052f",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should work with `onSnapshot`"
+    },
+    {
+      "id": "runtime:9a57bb61a89131b4",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should work with the useActor hook"
+    },
+    {
+      "id": "runtime:fa3a9369ed158cc9",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should work with the useActor hook (rehydrated state)"
+    },
+    {
+      "id": "runtime:31578d257074fb5c",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (non-strict) should work with the useMachine hook (rehydrated state config)"
+    },
+    {
+      "id": "runtime:e6f674d5135ee26f",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) actions should not use stale data in a builtin entry action"
+    },
+    {
+      "id": "runtime:ca5ea5fff7ae59d5",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) actions should not use stale data in a builtin transition action"
+    },
+    {
+      "id": "runtime:ef96fa9eb44edaac",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) actions should not use stale data in a custom entry action"
+    },
+    {
+      "id": "runtime:2543713212a348b0",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) child component should be able to send an event to a parent immediately in an effect"
+    },
+    {
+      "id": "runtime:32215b9a59b35ef0",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) custom data should be available right away for the invoked actor"
+    },
+    {
+      "id": "runtime:3af3759a61c46ff1",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) delayed transitions should work when initializing from a rehydrated state"
+    },
+    {
+      "id": "runtime:c27ee7f61de7c268",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should accept input and provide it to the context factory"
+    },
+    {
+      "id": "runtime:5a565f55af69e856",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should be able to use a delay provided outside of React"
+    },
+    {
+      "id": "runtime:27444165f430cb0b",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should be able to use a guard provided outside of React"
+    },
+    {
+      "id": "runtime:e06a840d2aa7d67b",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should be able to use a service provided outside of React"
+    },
+    {
+      "id": "runtime:dd397efa6b8a3aa0",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should be able to use an action provided outside of React"
+    },
+    {
+      "id": "runtime:843f6e080608ea03",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should deliver messages sent from an effect to an actor registered in the system"
+    },
+    {
+      "id": "runtime:607ab61087340d47",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should execute a delayed transition of the initial state"
+    },
+    {
+      "id": "runtime:d62e9f3f887869be",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should maintain the same reference for objects created when resolving initial state"
+    },
+    {
+      "id": "runtime:bba562b35597a056",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should not invoke initial services more than once"
+    },
+    {
+      "id": "runtime:fdd5be9252b39771",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should not miss initial synchronous updates"
+    },
+    {
+      "id": "runtime:98c0b0c7a82fb983",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should not spawn actors until service is started"
+    },
+    {
+      "id": "runtime:4fa730c68720a857",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should not use stale data in a guard"
+    },
+    {
+      "id": "runtime:bf5cbabde852f0db",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should only render once when initial microsteps are involved"
+    },
+    {
+      "id": "runtime:b178a4ad3e5279f5",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should provide the service"
+    },
+    {
+      "id": "runtime:3d9969eceb97e1a8",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should successfully spawn actors from the lazily declared context"
+    },
+    {
+      "id": "runtime:d077215ecab4bea0",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should throw an error to an error boundary when the actor reaches an error state"
+    },
+    {
+      "id": "runtime:5e1f4a5691c19156",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should work with `onSnapshot`"
+    },
+    {
+      "id": "runtime:b96dfc49bbf1d4ce",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should work with the useActor hook"
+    },
+    {
+      "id": "runtime:c970d9ab60172cd7",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should work with the useActor hook (rehydrated state)"
+    },
+    {
+      "id": "runtime:f28cddf1c6dda12e",
+      "file": "packages/xstate/upstream/test/useActor.test.tsx",
+      "fullName": "useActor (strict) should work with the useMachine hook (rehydrated state config)"
+    },
+    {
+      "id": "runtime:600070c97a35199d",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) actions created by a layout effect should access the latest closure values"
+    },
+    {
+      "id": "runtime:84634671f97aeffe",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) all commits should be consistent - a value derived in render should be derived from the latest source"
+    },
+    {
+      "id": "runtime:e8cd5afa839cf8cd",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) all renders should be consistent - a value derived in render should be derived from the latest source"
+    },
+    {
+      "id": "runtime:acc4d17e2792748e",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) invoked actor should be able to receive (deferred) events that it replays when active"
+    },
+    {
+      "id": "runtime:b40ad52f10d8b772",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) observer should be called with next state"
+    },
+    {
+      "id": "runtime:00128a836de4a37f",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) should be able to rehydrate an incoming new machine using the persisted state of the previous one"
+    },
+    {
+      "id": "runtime:42b1e2a7f3a1a7d8",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) should be able to rehydrate an inline actor when changing machines"
+    },
+    {
+      "id": "runtime:b7419d3b7594df05",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) should be able to rerender with a new machine"
+    },
+    {
+      "id": "runtime:91a5b00ffc2ea827",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) should change state when started"
+    },
+    {
+      "id": "runtime:8e887f018dacd0c6",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) should change state when started (useMachine)"
+    },
+    {
+      "id": "runtime:cfdef6033cae1fe9",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) should deliver messages sent from an effect to the root actor registered in the system"
+    },
+    {
+      "id": "runtime:9ed109dc41597046",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) should execute action bound to a specific machine's instance when the action is provided in render"
+    },
+    {
+      "id": "runtime:b17d343fac2d1181",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) should execute an initial entry action once"
+    },
+    {
+      "id": "runtime:72efd428fdfa6de9",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) should not create extra rerenders when recreating the actor on the machine change"
+    },
+    {
+      "id": "runtime:85ad9ed88159ef93",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) should rerender OK when only the provided machine implementations have changed"
+    },
+    {
+      "id": "runtime:da9443972d93cf9d",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) should work with a promise actor"
+    },
+    {
+      "id": "runtime:e0dc8dd5fca0b04e",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) should work with a transition actor"
+    },
+    {
+      "id": "runtime:596b85363696626c",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (non-strict) spawned actor should be able to receive (deferred) events that it replays when active"
+    },
+    {
+      "id": "runtime:43416d777c99ed58",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) actions created by a layout effect should access the latest closure values"
+    },
+    {
+      "id": "runtime:e37e05700666e581",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) all commits should be consistent - a value derived in render should be derived from the latest source"
+    },
+    {
+      "id": "runtime:42fef565c4ff9edf",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) all renders should be consistent - a value derived in render should be derived from the latest source"
+    },
+    {
+      "id": "runtime:42d12f7e33fc9961",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) invoked actor should be able to receive (deferred) events that it replays when active"
+    },
+    {
+      "id": "runtime:3b0f750640948ea0",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) observer should be called with next state"
+    },
+    {
+      "id": "runtime:ec60e76c00b0e59e",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) should be able to rehydrate an incoming new machine using the persisted state of the previous one"
+    },
+    {
+      "id": "runtime:362159987fc8bd46",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) should be able to rehydrate an inline actor when changing machines"
+    },
+    {
+      "id": "runtime:37bd473813db2401",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) should be able to rerender with a new machine"
+    },
+    {
+      "id": "runtime:a99c842070e3d4f3",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) should change state when started"
+    },
+    {
+      "id": "runtime:7075f86ee0da9a57",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) should change state when started (useMachine)"
+    },
+    {
+      "id": "runtime:f2a0acb5af0d473a",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) should deliver messages sent from an effect to the root actor registered in the system"
+    },
+    {
+      "id": "runtime:4a792231825a1586",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) should execute action bound to a specific machine's instance when the action is provided in render"
+    },
+    {
+      "id": "runtime:cecfe496427d1cfb",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) should execute an initial entry action once"
+    },
+    {
+      "id": "runtime:87ae51d26b137fec",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) should not create extra rerenders when recreating the actor on the machine change"
+    },
+    {
+      "id": "runtime:68faba5761cf9150",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) should rerender OK when only the provided machine implementations have changed"
+    },
+    {
+      "id": "runtime:7e4a778450992b75",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) should work with a promise actor"
+    },
+    {
+      "id": "runtime:c26f9e72972ae1f3",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) should work with a transition actor"
+    },
+    {
+      "id": "runtime:15bb692ee824fc7b",
+      "file": "packages/xstate/upstream/test/useActorRef.test.tsx",
+      "fullName": "useActorRef (strict) spawned actor should be able to receive (deferred) events that it replays when active"
+    },
+    {
+      "id": "runtime:b25b1caa304c5b1f",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) only rerenders for selected values"
+    },
+    {
+      "id": "runtime:7eeaa8e5a73fcb87",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should compute a stable snapshot internally when selecting from uninitialized service"
+    },
+    {
+      "id": "runtime:960d50595d610db9",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should immediately render snapshot of initially spawned custom actor"
+    },
+    {
+      "id": "runtime:32fafbe5a39046b1",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should keep rendering a new selected value after selector change when the actor doesn't emit"
+    },
+    {
+      "id": "runtime:9ce506bdb0d5a363",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should not log any spurious errors when used with a not-started actor"
+    },
+    {
+      "id": "runtime:bd80fb686304917f",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should only rerender once when the selected value changes"
+    },
+    {
+      "id": "runtime:fdb5ab67a7e1538e",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should render snapshot state when actor changes"
+    },
+    {
+      "id": "runtime:b6325977d7290ed7",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should render snapshot value when actor doesn't emit anything"
+    },
+    {
+      "id": "runtime:1f5fbe8f443177d8",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should rerender with a new value when the selector changes"
+    },
+    {
+      "id": "runtime:b341406608397c34",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should throw an error to an error boundary when the actor reaches an error state"
+    },
+    {
+      "id": "runtime:f87a6667ee81ec1e",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should use a fresh selector for subscription updates after selector change"
+    },
+    {
+      "id": "runtime:420e12d806d8e28c",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should work with a custom comparison function"
+    },
+    {
+      "id": "runtime:bd7c4192de3b6004",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should work with an optional actor"
+    },
+    {
+      "id": "runtime:9ea8f46fc8ac81af",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should work with initially deferred actors spawned in lazy context"
+    },
+    {
+      "id": "runtime:b6181c4f1de55425",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should work with selecting values from initially invoked actors"
+    },
+    {
+      "id": "runtime:39333138aad61d15",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should work with selecting values from initially spawned actors"
+    },
+    {
+      "id": "runtime:e2c72d0d1cdbdef2",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) should work with the shallowEqual comparison function"
+    },
+    {
+      "id": "runtime:82ae54c186323b4f",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (non-strict) shouldn't interfere with spawning actors that are part of the initial state of an actor"
+    },
+    {
+      "id": "runtime:dd8a99e294e675a9",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) only rerenders for selected values"
+    },
+    {
+      "id": "runtime:79ea8e6b6baa2b84",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should compute a stable snapshot internally when selecting from uninitialized service"
+    },
+    {
+      "id": "runtime:7866ac5aee9ee944",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should immediately render snapshot of initially spawned custom actor"
+    },
+    {
+      "id": "runtime:8b7808b4ecbec159",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should keep rendering a new selected value after selector change when the actor doesn't emit"
+    },
+    {
+      "id": "runtime:3adc9a37fc34cd2c",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should not log any spurious errors when used with a not-started actor"
+    },
+    {
+      "id": "runtime:12e324b3e4bca2fa",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should only rerender once when the selected value changes"
+    },
+    {
+      "id": "runtime:59c5896f265e3628",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should render snapshot state when actor changes"
+    },
+    {
+      "id": "runtime:19b63e565bdc3cba",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should render snapshot value when actor doesn't emit anything"
+    },
+    {
+      "id": "runtime:8fbdaeb8c3b06645",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should rerender with a new value when the selector changes"
+    },
+    {
+      "id": "runtime:84d823a718e02b3d",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should throw an error to an error boundary when the actor reaches an error state"
+    },
+    {
+      "id": "runtime:87918c2ac7c6438c",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should use a fresh selector for subscription updates after selector change"
+    },
+    {
+      "id": "runtime:9437f05a235b9661",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should work with a custom comparison function"
+    },
+    {
+      "id": "runtime:32604cbb52ea98b6",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should work with an optional actor"
+    },
+    {
+      "id": "runtime:31e406441a937b7f",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should work with initially deferred actors spawned in lazy context"
+    },
+    {
+      "id": "runtime:dabb6cf62a926e34",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should work with selecting values from initially invoked actors"
+    },
+    {
+      "id": "runtime:891f3cea01b2ead2",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should work with selecting values from initially spawned actors"
+    },
+    {
+      "id": "runtime:06bf0d3f8bf84191",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) should work with the shallowEqual comparison function"
+    },
+    {
+      "id": "runtime:bf87f8858c00b2ab",
+      "file": "packages/xstate/upstream/test/useSelector.test.tsx",
+      "fullName": "useSelector (strict) shouldn't interfere with spawning actors that are part of the initial state of an actor"
+    }
+  ],
+  "snapshots": 0
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "upstream": "packages/xstate-store/upstream/src/types.test.tsx",
+  "adapted": "packages/xstate-store/typetests/types.test-d.tsx",
+  "expectErrorCount": 13,
+  "inventories": {
+    "upstream": "packages/xstate-store/audit/pristine-types.json",
+    "adapted": "packages/xstate-store/audit/adapted-types.json"
+  },
+  "lanes": {
+    "pristine": {
+      "compiler": "tsc",
+      "project": "packages/xstate-store/audit/upstream-typetests/tsconfig.pristine.json",
+      "sourcePolicy": "byte-exact vendored packages/xstate-store-react/src/types.test.tsx compiled with the vendored src/index.ts against @xstate/store-react@2.0.0 type dependencies"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/xstate-store/typetests/tsconfig.adapted.json",
+      "sourcePolicy": "the same suite compiled against the Octane binding source; the file is prettier-ignored so the one-line difference from upstream stays verifiable by diff"
+    }
+  },
+  "permittedTransformations": [
+    {
+      "kind": "import-root",
+      "rule": "upstream's sibling './index.ts' import retargets this package's ported source",
+      "from": "} from './index.ts';",
+      "to": "} from '../src/index.ts';"
+    }
+  ],
+  "headerPolicy": "The adapted file may prepend a leading run of comments and the JSX pragma. Everything below it must equal the vendored upstream file once the transformations above are undone.",
+  "notApplicable": [
+    {
+      "kind": "file-extension",
+      "rule": "The adapted suite stays .tsx rather than .tsrx. Lowering a .tsrx strips comments before TypeScript sees the program, so its thirteen @ts-expect-error markers would never apply and the negative assertions would silently invert."
+    }
+  ]
+}
