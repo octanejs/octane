@@ -10798,6 +10798,18 @@ class HydrationCapability {
 			}
 			return first as Text;
 		}
+		// A sole primitive can be framed by the server (e.g. a spread or ternary
+		// child). Unwrap only an exact text-only frame, then use the same adoption,
+		// mismatch and suppression behavior as bare text, without child-slot state.
+		if (this.isOpen(first)) {
+			const child = first.nextSibling;
+			const end = child?.nextSibling ?? null;
+			if (child?.nodeType === 3 && this.isClose(end) && end.nextSibling === null) {
+				first.remove();
+				end.remove();
+				return this.htext(el, text, loc);
+			}
+		}
 		const created = document.createTextNode(text);
 		el.appendChild(created);
 		return created;
