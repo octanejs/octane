@@ -1,5 +1,5 @@
-import type { HTMLProps } from 'react';
 import type { OctaneNode } from 'octane';
+import type { Octane } from 'octane/jsx-runtime';
 import type { FlexDirection } from '../../types';
 
 export type LegendItemProps = {
@@ -22,7 +22,7 @@ export default function LegendItem({
 	display = 'flex',
 	children,
 	...restProps
-}: LegendItemProps & Omit<HTMLProps<HTMLDivElement>, keyof LegendItemProps>) {
+}: LegendItemProps & Omit<Octane.HTMLAttributes<HTMLDivElement>, keyof LegendItemProps>) {
 	return <div
 		className="visx-legend-item"
 		style={{

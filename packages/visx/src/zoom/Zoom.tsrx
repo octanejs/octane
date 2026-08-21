@@ -1,7 +1,7 @@
 // OCTANE DIVERGENCE[visx-native-zoom-gestures][differential:visx-native-gestures]:
 // Zoom attaches native wheel/pointer/touch listeners rather than @use-gesture/react at runtime.
 import { useState, useRef, useCallback, useEffect } from 'octane';
-import type { ReactElement } from 'react';
+import type { OctaneNode } from 'octane';
 import { localPoint } from '@octanejs/visx/event';
 import {
 	composeMatrices,
@@ -98,7 +98,7 @@ export type ZoomProps<ElementType> = {
 	constrain?: (transform: TransformMatrix, prevTransform: TransformMatrix) => TransformMatrix;
 	/** Initial transform matrix to apply. */
 	initialTransformMatrix?: TransformMatrix;
-	children: (zoom: ZoomType<ElementType>) => ReactElement;
+	children: (zoom: ZoomType<ElementType>) => OctaneNode;
 };
 
 function Zoom<ElementType extends Element>({
@@ -113,8 +113,8 @@ function Zoom<ElementType extends Element>({
 	height,
 	constrain,
 	children,
-}: ZoomProps<ElementType>): ReactElement {
-	const containerRef = useRef<ElementType>(null);
+}: ZoomProps<ElementType>): OctaneNode {
+	const containerRef = useRef<ElementType | null>(null);
 	const matrixStateRef = useRef<TransformMatrix>(initialTransformMatrix);
 	const pointerActiveRef = useRef(false);
 	const lastPinchDistanceRef = useRef(0);
@@ -250,7 +250,8 @@ function Zoom<ElementType extends Element>({
 
 	const handlePinch: ZoomType<ElementType>['handlePinch'] = useCallback((state) => {
 		const { origin: [ox, oy], memo } = state;
-		let currentMemo = memo;
+		type PinchMemo = { top: number; left: number };
+		let currentMemo = memo as PinchMemo | undefined;
 		if (containerRef.current) {
 			const { top, left } = currentMemo ?? containerRef.current.getBoundingClientRect();
 			if (!currentMemo) {
@@ -326,21 +327,22 @@ function Zoom<ElementType extends Element>({
 			lastPinchDistanceRef.current = distance;
 		};
 
-		target.addEventListener('pointerdown', onPointerDown);
-		target.addEventListener('wheel', onWheel, { passive: false });
-		target.addEventListener('touchstart', onTouchStart, { passive: false });
-		target.addEventListener('touchmove', onTouchMove, { passive: false });
-		window.addEventListener('pointermove', onPointerMove);
-		window.addEventListener('pointerup', onPointerUp);
-		window.addEventListener('pointercancel', onPointerUp);
-		return () => {
-			target.removeEventListener('pointerdown', onPointerDown);
-			target.removeEventListener('wheel', onWheel);
-			target.removeEventListener('touchstart', onTouchStart);
-			target.removeEventListener('touchmove', onTouchMove);
-			window.removeEventListener('pointermove', onPointerMove);
-			window.removeEventListener('pointerup', onPointerUp);
-			window.removeEventListener('pointercancel', onPointerUp);
+		const element: Element = target;
+		element.addEventListener('pointerdown', onPointerDown as EventListener);
+		element.addEventListener('wheel', onWheel as EventListener, { passive: false });
+		element.addEventListener('touchstart', onTouchStart as EventListener, { passive: false });
+		element.addEventListener('touchmove', onTouchMove as EventListener, { passive: false });
+		window.addEventListener('pointermove', onPointerMove as EventListener);
+		window.addEventListener('pointerup', onPointerUp as EventListener);
+		window.addEventListener('pointercancel', onPointerUp as EventListener);
+		return function removeZoomListeners() {
+			element.removeEventListener('pointerdown', onPointerDown as EventListener);
+			element.removeEventListener('wheel', onWheel as EventListener);
+			element.removeEventListener('touchstart', onTouchStart as EventListener);
+			element.removeEventListener('touchmove', onTouchMove as EventListener);
+			window.removeEventListener('pointermove', onPointerMove as EventListener);
+			window.removeEventListener('pointerup', onPointerUp as EventListener);
+			window.removeEventListener('pointercancel', onPointerUp as EventListener);
 		};
 	}, [dragEnd, dragMove, dragStart, handlePinch, handleWheel]);
 

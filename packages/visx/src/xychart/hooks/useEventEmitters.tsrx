@@ -1,4 +1,3 @@
-import type { PointerEvent, FocusEvent } from 'react';
 import { useCallback } from 'octane';
 import useEventEmitter from './useEventEmitter.tsrx';
 

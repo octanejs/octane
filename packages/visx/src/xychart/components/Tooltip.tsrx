@@ -237,8 +237,6 @@ function TooltipInner<Datum extends object>({
 			if (isValidNumber(left) && isValidNumber(top)) {
 				const color =
 					(nearestDatumKey && colorScale?.(nearestDatumKey)) ??
-						// @ts-expect-error
-						null ??
 						theme?.gridStyles?.stroke ??
 						theme?.htmlLabel?.color ??
 						'#222';

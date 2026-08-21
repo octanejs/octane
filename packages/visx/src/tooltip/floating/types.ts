@@ -1,5 +1,7 @@
-import type React from 'react';
-import type { OctaneNode } from 'octane';
+import type { CSSProperties } from 'react';
+import type { ElementDescriptor, OctaneNode } from 'octane';
+import type { Octane } from 'octane/jsx-runtime';
+import type { HTMLProps } from '@octanejs/floating-ui';
 import type {
 	Boundary,
 	Delay,
@@ -16,7 +18,6 @@ import type {
 	SizeOptions,
 	Strategy,
 	UseDismissProps,
-	FloatingUiArrowProps,
 	UseFloatingOptions,
 	UseFloatingReturn,
 	UseFocusProps,
@@ -109,12 +110,12 @@ export type UseFloatingTooltipReturn<TData = unknown> = {
 	strategy: Strategy;
 	x: number | null;
 	y: number | null;
-	floatingStyles: React.CSSProperties;
+	floatingStyles: CSSProperties;
 	middlewareData: MiddlewareData;
 
 	refs: UseFloatingReturn<ReferenceElement>['refs'];
 	context: UseFloatingReturn<ReferenceElement>['context'];
-	arrowRef: React.RefCallback<SVGSVGElement>;
+	arrowRef: (node: SVGSVGElement | null) => void;
 
 	setAnchor: (anchor: TooltipAnchor | null) => void;
 	setData: (data: TData | undefined) => void;
@@ -122,9 +123,9 @@ export type UseFloatingTooltipReturn<TData = unknown> = {
 	openTooltip: (data?: TData, anchor?: TooltipAnchor | null) => void;
 	closeTooltip: () => void;
 
-	getReferenceProps: <TProps extends React.HTMLProps<Element>>(props?: TProps) => TProps;
-	getFloatingProps: <TProps extends React.HTMLProps<HTMLElement>>(props?: TProps) => TProps;
-	getArrowProps: <TProps extends React.SVGProps<SVGSVGElement>>(props?: TProps) => TProps;
+	getReferenceProps: <TProps extends HTMLProps<Element>>(props?: TProps) => TProps;
+	getFloatingProps: <TProps extends HTMLProps<HTMLElement>>(props?: TProps) => TProps;
+	getArrowProps: <TProps extends Octane.SVGProps<SVGSVGElement>>(props?: TProps) => TProps;
 };
 
 export type FloatingTooltipProviderProps = {
@@ -149,51 +150,53 @@ export type FloatingTooltipTriggerState = {
 
 export type FloatingTooltipTriggerProps = {
 	render:
-		| React.ReactElement
-		| ((props: React.HTMLProps<Element>, state: FloatingTooltipTriggerState) => React.ReactElement);
+		| ElementDescriptor
+		| ((props: HTMLProps<Element>, state: FloatingTooltipTriggerState) => ElementDescriptor);
 	disabled?: boolean;
 };
 
 export type FloatingTooltipPortalProps = {
-	container?: HTMLElement | ShadowRoot | React.RefObject<HTMLElement | ShadowRoot | null> | null;
+	container?: HTMLElement | ShadowRoot | { current: HTMLElement | ShadowRoot | null } | null;
 	disabled?: boolean;
 	children: OctaneNode;
 };
 
 export type FloatingTooltipPositionerState = FloatingTooltipRootState;
 
-export type FloatingTooltipPositionerProps = React.HTMLAttributes<HTMLDivElement> & {
+export type FloatingTooltipPositionerProps = Octane.HTMLAttributes<HTMLDivElement> & {
 	'data-testid'?: string;
 	render?:
-		| React.ReactElement
+		| ElementDescriptor
 		| ((
-				props: React.HTMLProps<HTMLDivElement>,
+				props: HTMLProps<HTMLDivElement>,
 				state: FloatingTooltipPositionerState,
-		  ) => React.ReactElement);
+		  ) => ElementDescriptor);
 };
 
 export type FloatingTooltipContentState = FloatingTooltipRootState;
 
-export type FloatingTooltipContentProps = React.HTMLAttributes<HTMLDivElement> & {
+export type FloatingTooltipContentProps = Octane.HTMLAttributes<HTMLDivElement> & {
 	render?:
-		| React.ReactElement
-		| ((
-				props: React.HTMLProps<HTMLDivElement>,
-				state: FloatingTooltipContentState,
-		  ) => React.ReactElement);
+		| ElementDescriptor
+		| ((props: HTMLProps<HTMLDivElement>, state: FloatingTooltipContentState) => ElementDescriptor);
 };
 
 export type FloatingTooltipArrowState = FloatingTooltipRootState;
 
 export type FloatingTooltipArrowProps = Omit<
-	FloatingUiArrowProps,
-	'context' | 'padding' | 'ref'
+	Octane.SVGProps<SVGSVGElement>,
+	'width' | 'height' | 'ref'
 > & {
+	width?: number;
+	height?: number;
+	tipRadius?: number;
+	staticOffset?: string | number | null;
+	d?: string;
 	padding?: never;
 	render?:
-		| React.ReactElement
+		| ElementDescriptor
 		| ((
-				props: React.SVGProps<SVGSVGElement>,
+				props: Octane.SVGProps<SVGSVGElement>,
 				state: FloatingTooltipArrowState,
-		  ) => React.ReactElement);
+		  ) => ElementDescriptor);
 };

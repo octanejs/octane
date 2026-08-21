@@ -16,7 +16,7 @@ export type Options = {
         resize?: number;
     };
     scroll?: boolean;
-    polyfill?: ResizeObserverConstructor;
+    polyfill?: ResizeObserverConstructor | (new (callback: ResizeObserverCallback) => ResizeObserver);
     offsetSize?: boolean;
 };
 export default function useMeasure(options?: Options): readonly [(element: HTMLElement | SVGElement | null) => void, RectReadOnly, () => void];

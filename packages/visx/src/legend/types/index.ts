@@ -1,5 +1,6 @@
 import type { AnyD3Scale, ScaleInput } from '@octanejs/visx/scale';
-import type { ComponentClass, CSSProperties, FC } from 'react';
+import type { ComponentBody } from 'octane';
+import type { CSSProperties } from 'react';
 
 export type LabelFormatterFactory<Scale extends AnyD3Scale> = (args: {
 	scale: Scale;
@@ -35,11 +36,7 @@ export type RenderShapeProvidedProps<Data, Output> = {
 };
 
 export type LegendShape<Data, Output> =
-	| 'rect'
-	| 'circle'
-	| 'line'
-	| FC<RenderShapeProvidedProps<Data, Output>>
-	| ComponentClass<RenderShapeProvidedProps<Data, Output>>;
+	'rect' | 'circle' | 'line' | ComponentBody<RenderShapeProvidedProps<Data, Output>>;
 
 export type FillAccessor<Datum, Output> = (
 	label: FormattedLabel<Datum, Output>,

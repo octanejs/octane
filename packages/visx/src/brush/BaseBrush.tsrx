@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'octane';
-import type { PointerEvent } from 'react';
 import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
 import { Group } from '@octanejs/visx/group';
@@ -22,7 +21,7 @@ import type {
 } from './types';
 import { debounce, getPageCoordinates, normalizeBrushStartEnd } from './utils';
 
-type PointerHandlerEvent = PointerEvent<SVGRectElement>;
+type PointerHandlerEvent = PointerEvent | MouseEvent;
 
 const DEFAULT_MARGIN = { left: 0, top: 0, right: 0, bottom: 0 };
 const DEFAULT_RESIZE_TRIGGER_AREAS: ResizeTriggerAreas[] = ['left', 'right'];
@@ -45,7 +44,7 @@ export type BaseBrushProps = {
 	onMouseUp?: (event: PointerHandlerEvent) => void;
 	onMouseMove?: (event: PointerHandlerEvent) => void;
 	onClick?: (event: PointerHandlerEvent) => void;
-	clickSensitivity: number;
+	clickSensitivity?: number;
 	disableDraggingSelection: boolean;
 	disableDraggingOverlay?: boolean;
 	resetOnEnd?: boolean;
@@ -162,7 +161,7 @@ export function BaseBrush(inputProps: BaseBrushProps) {
 			const start = { ...previous.start };
 			const end = { ...previous.end };
 			normalizeBrushStartEnd(start, end, previous.extent);
-			let next = {
+			let next: BaseBrushState = {
 				...previous,
 				start,
 				end,
@@ -330,7 +329,7 @@ export function BaseBrush(inputProps: BaseBrushProps) {
 		const { onBrushEnd, resetOnEnd, useWindowMoveEvents } = propsRef.current;
 		if (useWindowMoveEvents) return;
 		updateBrush((previous) => {
-			let next = {
+			let next: BaseBrushState = {
 				...previous,
 				start: { x: previous.extent.x0, y: previous.extent.y0 },
 				end: { x: previous.extent.x1, y: previous.extent.y1 },
@@ -449,7 +448,7 @@ export function BaseBrush(inputProps: BaseBrushProps) {
 					height={stageHeight}
 					onClick={(event) => {
 						const duration = mouseUpTimeRef.current - mouseDownTimeRef.current;
-						if (onClick && duration < clickSensitivity) onClick(event);
+						if (onClick && duration < (clickSensitivity ?? 200)) onClick(event);
 					}}
 					style={{ cursor: 'default' }}
 				/>
@@ -470,7 +469,7 @@ export function BaseBrush(inputProps: BaseBrushProps) {
 							onDoubleClick={reset}
 							onClick={(event: PointerHandlerEvent) => {
 								const duration = mouseUpTimeRef.current - mouseDownTimeRef.current;
-								if (onClick && duration < clickSensitivity) onClick(event);
+								if (onClick && duration < (clickSensitivity ?? 200)) onClick(event);
 							}}
 							onPointerDown={(event: PointerHandlerEvent) => {
 								mouseDownTimeRef.current = Date.now();

@@ -7,7 +7,7 @@ type UseStackedData<Datum extends object> = {
     children: OctaneNode;
 } & Pick<StackPathConfig<Datum, string>, 'offset' | 'order'>;
 export default function useStackedData<XScale extends AxisScale, YScale extends AxisScale, Datum extends object, ChildrenProps extends SeriesProps<XScale, YScale, Datum>>({ children, order, offset, }: UseStackedData<Datum>): {
-    seriesChildren: import("react").ReactElement<ChildrenProps, string | import("react").JSXElementConstructor<any>>[];
+    seriesChildren: import("octane").ElementDescriptor<ChildrenProps>[];
     dataKeys: string[];
     stackedData: import("d3-shape").Series<CombinedStackData<XScale, YScale>, string>[];
 };

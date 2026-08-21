@@ -1,7 +1,8 @@
-import type { CSSProperties, Ref, SVGAttributes } from 'react';
+import type { CSSProperties, Ref } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 
-type SVGTSpanProps = SVGAttributes<SVGTSpanElement>;
-type SVGTextProps = SVGAttributes<SVGTextElement>;
+type SVGTSpanProps = Octane.SVGProps<SVGTSpanElement>;
+type SVGTextProps = Octane.SVGProps<SVGTextElement>;
 
 type OwnProps = {
 	/** className to apply to the SVGText element. */

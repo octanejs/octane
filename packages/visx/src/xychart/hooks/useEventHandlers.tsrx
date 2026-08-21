@@ -1,5 +1,4 @@
 import type { AxisScale } from '@octanejs/visx/axis';
-import type { PointerEvent, FocusEvent } from 'react';
 import { useCallback, useContext } from 'octane';
 import DataContext from '../context/DataContext.tsrx';
 import { isFocusEvent, isPointerEvent } from '../typeguards/events';

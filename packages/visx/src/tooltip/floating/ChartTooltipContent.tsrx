@@ -1,5 +1,6 @@
-import type React from 'react';
-import type { OctaneNode } from 'octane';
+import type { ComponentBody, OctaneNode } from 'octane';
+import type { CSSProperties } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 
 export type ChartTooltipItem<Datum = unknown> = {
 	key: string;
@@ -19,7 +20,7 @@ export type ChartTooltipItem<Datum = unknown> = {
 export type ChartTooltipConfig<Datum = unknown> = Record<string, {
 		label?: OctaneNode | ((item: ChartTooltipItem<Datum>) => OctaneNode);
 		color?: string | ((item: ChartTooltipItem<Datum>) => string | undefined);
-		icon?: React.ComponentType<{ item: ChartTooltipItem<Datum> }>;
+		icon?: ComponentBody<{ item: ChartTooltipItem<Datum> }>;
 		formatValue?: (value: unknown, item: ChartTooltipItem<Datum>) => OctaneNode;
 		formatLabel?: (item: ChartTooltipItem<Datum>) => OctaneNode;
 		hide?: boolean;
@@ -45,7 +46,7 @@ export type ChartTooltipItemRenderParams<Datum = unknown> = {
 
 export type ChartTooltipValueRenderParams<Datum = unknown> = ChartTooltipItemRenderParams<Datum>;
 
-export type ChartTooltipContentProps<Datum = unknown> = React.HTMLAttributes<HTMLDivElement> & {
+export type ChartTooltipContentProps<Datum = unknown> = Octane.HTMLAttributes<HTMLDivElement> & {
 		label?: OctaneNode;
 		items: ChartTooltipItem<Datum>[];
 		config?: ChartTooltipConfig<Datum>;
@@ -56,7 +57,7 @@ export type ChartTooltipContentProps<Datum = unknown> = React.HTMLAttributes<HTM
 		renderLabel?: (params: ChartTooltipLabelRenderParams<Datum>) => OctaneNode;
 		renderItem?: (params: ChartTooltipItemRenderParams<Datum>) => OctaneNode;
 		renderValue?: (params: ChartTooltipValueRenderParams<Datum>) => OctaneNode;
-		getItemKey?: (item: ChartTooltipItem<Datum>, index: number) => React.Key;
+		getItemKey?: (item: ChartTooltipItem<Datum>, index: number) => string | number;
 		'data-testid'?: string;
 	};
 
@@ -66,7 +67,7 @@ type VisibleItem<Datum> = {
 	item: ChartTooltipItem<Datum>;
 };
 
-type ChartTooltipItemStyle = React.CSSProperties & {
+type ChartTooltipItemStyle = CSSProperties & {
 		'--visx-tooltip-item-color'?: string;
 	};
 

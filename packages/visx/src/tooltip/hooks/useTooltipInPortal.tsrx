@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'octane';
-import type { FC } from 'react';
+import type { ComponentBody } from 'octane';
 import useMeasure from '../../internal/useMeasure.tsrx';
 import type {
 	RectReadOnly,
@@ -23,7 +23,7 @@ export type UseTooltipInPortal = {
 	/** Function to force a refresh of the container bounds. */
 	forceRefreshBounds: () => void;
 	/** Component to render the tooltip in a portal. */
-	TooltipInPortal: FC<TooltipInPortalProps>;
+	TooltipInPortal: ComponentBody<TooltipInPortalProps>;
 };
 
 export type UseTooltipPortalOptions = Pick<PortalProps, 'zIndex'> & {

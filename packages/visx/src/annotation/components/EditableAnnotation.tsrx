@@ -1,9 +1,12 @@
 /* eslint-disable react/jsx-handler-names */
 import { useCallback, useRef } from 'octane';
-import type { MouseEvent, TouchEvent } from 'react';
 import type { Octane } from 'octane/jsx-runtime';
 import type { OctaneNode } from 'octane';
-import type { UseDrag, HandlerArgs as DragHandlerArgs } from '@octanejs/visx/drag';
+import type {
+	UseDrag,
+	HandlerArgs as DragHandlerArgs,
+	MouseTouchOrPointerEvent,
+} from '@octanejs/visx/drag';
 import { useDrag } from '@octanejs/visx/drag';
 import type { AnnotationContextType } from '../types';
 import Annotation from './Annotation.tsrx';
@@ -36,7 +39,7 @@ export type HandlerArgs = {
 	y: number;
 	dx: number;
 	dy: number;
-	event: MouseEvent | TouchEvent;
+	event: MouseTouchOrPointerEvent;
 };
 
 const defaultDragHandleProps = {

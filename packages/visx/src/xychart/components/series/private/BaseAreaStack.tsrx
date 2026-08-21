@@ -1,5 +1,5 @@
-import { Fragment, createElement, useCallback, useContext, useMemo } from 'octane';
-import type { ReactElement, FC } from 'react';
+import { Fragment, useCallback, useContext, useMemo } from 'octane';
+import type { ElementDescriptor } from 'octane';
 import type { Octane } from 'octane/jsx-runtime';
 import type { AxisScale } from '@octanejs/visx/axis';
 import type { SeriesPoint } from 'd3-shape';
@@ -15,6 +15,7 @@ import type {
 	NearestDatumReturnType,
 	SeriesProps,
 } from '../../../types';
+import type { SvgPathComponent } from '../../../types/svgPath';
 import DataContext from '../../../context/DataContext.tsrx';
 import type { BaseAreaSeriesProps } from './BaseAreaSeries.tsrx';
 import { BaseGlyphSeries } from './BaseGlyphSeries.tsrx';
@@ -23,6 +24,7 @@ import { getStackValue } from '../../../utils/combineBarStackData';
 import isValidNumber from '../../../typeguards/isValidNumber';
 import findNearestStackDatum from '../../../utils/findNearestStackDatum';
 import { AREASTACK_EVENT_SOURCE, XYCHART_EVENT_SOURCE } from '../../../constants';
+import type { SeriesEventsParams } from '../../../hooks/useSeriesEvents.tsrx';
 import useSeriesEvents from '../../../hooks/useSeriesEvents.tsrx';
 import defaultRenderGlyph from './defaultRenderGlyph.tsrx';
 import getScaleBandwidth from '../../../utils/getScaleBandwidth';
@@ -36,10 +38,10 @@ type AreaStackDatum<XScale extends AxisScale, YScale extends AxisScale> =
 export type BaseAreaStackProps<XScale extends AxisScale, YScale extends AxisScale, Datum extends object> =
 	{
 		/** `AreaSeries` elements, note we can't strictly enforce this with TS yet. */
-		children: | ReactElement<AreaStackChildProps<XScale, YScale, Datum>>
-		| ReactElement<AreaStackChildProps<XScale, YScale, Datum>>[];
+		children: | ElementDescriptor<AreaStackChildProps<XScale, YScale, Datum>>
+		| ElementDescriptor<AreaStackChildProps<XScale, YScale, Datum>>[];
 		/** Rendered component which is passed path props by BaseAreaStack after processing. */
-		PathComponent?: FC<Omit<Octane.SVGProps<SVGPathElement>, 'ref'>> | 'path';
+		PathComponent?: SvgPathComponent;
 		/** Sets the curve factory (from @octanejs/visx/curve or d3-curve) for the line generator. Defaults to curveLinear. */
 		curve?: AreaProps<Datum>['curve'];
 		/** Whether to render a Line along value of the Area shape (area is fill only). */
@@ -53,7 +55,9 @@ export type BaseAreaStackProps<XScale extends AxisScale, YScale extends AxisScal
 	| 'onFocus'
 	| 'enableEvents'>;
 
-const identity = (_: unknown) => _;
+function identity<T>(value: T): T {
+	return value;
+}
 
 function BaseAreaStack<XScale extends AxisScale, YScale extends AxisScale, Datum extends object>({
 	PathComponent = 'path',
@@ -118,7 +122,7 @@ function BaseAreaStack<XScale extends AxisScale, YScale extends AxisScale, Datum
 	// pull out all area + line props for each dataKey
 	const stacks = useMemo(
 		() => stackedData.map((stack, stackIndex) => {
-			const areaSeries: ReactElement<BaseAreaSeriesProps<XScale, YScale, Datum>> | undefined =
+			const areaSeries: ElementDescriptor<BaseAreaSeriesProps<XScale, YScale, Datum>> | undefined =
 				seriesChildren.find((child) => child.props.dataKey === stack.key);
 			const {
 				data,
@@ -163,9 +167,11 @@ function BaseAreaStack<XScale extends AxisScale, YScale extends AxisScale, Datum
 	const eventEmitters = useSeriesEvents<XScale, YScale, Datum>({
 		dataKey: dataKeys,
 		enableEvents,
-		// @ts-expect-error Datum input + return type are expected to be the same type but they differ
-		// for AreaStack (registry data is StackedDatum, return type is user Datum)
-		findNearestDatum,
+		findNearestDatum: findNearestDatum as unknown as SeriesEventsParams<
+			XScale,
+			YScale,
+			Datum
+		>['findNearestDatum'],
 		onBlur,
 		onFocus,
 		onPointerMove,
@@ -196,22 +202,24 @@ function BaseAreaStack<XScale extends AxisScale, YScale extends AxisScale, Datum
 	if (dataKeys.some((key) => dataRegistry.get(key) == null) || !xScale || !yScale || !colorScale) {
 		return null;
 	}
-	const areaNodes = stacks.map(
-		(stack) => createElement(
-			Area,
-			{ key: stack.key, curve, ...stack.accessors },
-			({ path }: { path: (data: typeof stack.data) => string | null }) => createElement(
-				PathComponent,
-				{
-					className: 'visx-area',
-					stroke: 'transparent',
-					d: path(stack.data) || '',
-					...stack.areaProps,
-					...eventEmitters,
-				},
-			),
-		),
-	);
+	const areaNodes = stacks.map(function (stack) {
+		function renderAreaPath(args: { path: (data: typeof stack.data) => string | null }) {
+			return (
+				<PathComponent
+					className="visx-area"
+					stroke="transparent"
+					d={args.path(stack.data) || ''}
+					{...stack.areaProps}
+					{...eventEmitters}
+				/>
+			);
+		}
+		return (
+			<Area key={stack.key} curve={curve} {...stack.accessors}>
+				{renderAreaPath}
+			</Area>
+		);
+	});
 
 	return <g className="visx-area-stack">
 		{areaNodes}
@@ -249,8 +257,8 @@ function BaseAreaStack<XScale extends AxisScale, YScale extends AxisScale, Datum
 					data={stack.data}
 					xAccessor={stack.accessors.x || stack.accessors.x1}
 					yAccessor={stack.accessors.y || stack.accessors.y1}
-					xScale={identity}
-					yScale={identity}
+					xScale={identity as unknown as XScale}
+					yScale={identity as unknown as YScale}
 					renderGlyphs={renderGlyphs}
 				/>;
 			})}

@@ -1,6 +1,5 @@
 import type { AxisScale } from '@octanejs/visx/axis';
 import { Fragment, useCallback } from 'octane';
-import type { FC } from 'react';
 import type { OctaneNode } from 'octane';
 import type { GlyphProps, GlyphsProps } from '../../types';
 import type { BaseGlyphSeriesProps } from './private/BaseGlyphSeries.tsrx';
@@ -11,7 +10,7 @@ export default function GlyphSeries<XScale extends AxisScale, YScale extends Axi
 	renderGlyph = defaultRenderGlyph,
 	...props
 }: Omit<BaseGlyphSeriesProps<XScale, YScale, Datum>, 'renderGlyphs'> & {
-	renderGlyph?: FC<GlyphProps<Datum>>;
+	renderGlyph?: (props: GlyphProps<Datum>) => OctaneNode;
 }) {
 	const renderGlyphs = useCallback(
 		({

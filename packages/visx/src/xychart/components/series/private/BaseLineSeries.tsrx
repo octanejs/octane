@@ -1,11 +1,11 @@
 import { Fragment, useContext, useCallback, useMemo, useEffect } from 'octane';
-import type { FC } from 'react';
 import type { Octane } from 'octane/jsx-runtime';
 import type { LinePathProps } from '@octanejs/visx/shape';
 import { LinePath } from '@octanejs/visx/shape';
 import type { AxisScale } from '@octanejs/visx/axis';
 import DataContext from '../../../context/DataContext.tsrx';
 import type { DataContextType, GlyphsProps, SeriesProps } from '../../../types';
+import type { SvgPathComponent } from '../../../types/svgPath';
 import getScaledValueFactory from '../../../utils/getScaledValueFactory';
 import isValidNumber from '../../../typeguards/isValidNumber';
 import { LINESERIES_EVENT_SOURCE, XYCHART_EVENT_SOURCE } from '../../../constants';
@@ -16,12 +16,15 @@ import useSeriesEvents from '../../../hooks/useSeriesEvents.tsrx';
 export type BaseLineSeriesProps<XScale extends AxisScale, YScale extends AxisScale, Datum extends object> =
 	SeriesProps<XScale, YScale, Datum> & {
 		/** Rendered component which is passed path props by BaseLineSeries after processing. */
-		PathComponent?: FC<Omit<Octane.SVGProps<SVGPathElement>, 'ref'>> | 'path';
+		PathComponent?: SvgPathComponent;
 		/** Sets the curve factory (from @octanejs/visx/curve or d3-curve) for the line generator. Defaults to curveLinear. */
 		curve?: LinePathProps<Datum>['curve'];
 		/** Given a datakey, returns its color. Falls back to theme color if unspecified or if a null-ish value is returned. */
 		colorAccessor?: (dataKey: string) => string | undefined | null;
-	} & Omit<Octane.SVGProps<SVGPathElement>, 'x' | 'y' | 'x0' | 'x1' | 'y0' | 'y1' | 'ref'>;
+	} & Omit<
+		Octane.SVGProps<SVGPathElement>,
+		'x' | 'y' | 'x0' | 'x1' | 'y0' | 'y1' | 'ref' | 'children'
+	>;
 
 function BaseLineSeries<XScale extends AxisScale, YScale extends AxisScale, Datum extends object>({
 	colorAccessor,

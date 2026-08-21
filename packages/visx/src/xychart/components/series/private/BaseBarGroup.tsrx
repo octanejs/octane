@@ -1,6 +1,5 @@
 import { useContext, useMemo, useEffect, useCallback } from 'octane';
-import type { ReactElement, FC } from 'react';
-import type { OctaneNode } from 'octane';
+import type { ComponentBody, OctaneNode } from 'octane';
 import type { PositionScale } from '@octanejs/visx/shape';
 import { scaleBand } from '@octanejs/visx/scale';
 import type { BaseBarSeriesProps } from './BaseBarSeries.tsrx';
@@ -30,7 +29,7 @@ export type BaseBarGroupProps<XScale extends PositionScale, YScale extends Posit
 		/** Comparator function to sort `dataKeys` within a bar group. By default the DOM rendering order of `BarGroup`s `children` is used. */
 		sortBars?: (dataKeyA: string, dataKeyB: string) => number;
 		/** Rendered component which is passed BarsProps by BaseBarGroup after processing. */
-		BarsComponent: FC<BarsProps<XScale, YScale>>;
+		BarsComponent: ComponentBody<BarsProps<XScale, YScale>>;
 	} & Pick<SeriesProps<XScale, YScale, Datum>, | 'onPointerMove'
 	| 'onPointerOut'
 	| 'onPointerUp'
@@ -149,8 +148,7 @@ export default function BaseBarGroup<XScale extends PositionScale, YScale extend
 		const getWidth = horizontal ? (d: Datum) => Math.abs(getLength(d)) : () => barThickness;
 		const getHeight = horizontal ? () => barThickness : (d: Datum) => Math.abs(getLength(d));
 		// get props from child BarSeries, if available
-		const childBarSeries: ReactElement<BaseBarSeriesProps<XScale, YScale, Datum>> | undefined =
-			barSeriesChildren.find((child) => child.props.dataKey === key);
+		const childBarSeries = barSeriesChildren.find((child) => child.props.dataKey === key);
 		const { colorAccessor, radius, radiusAll, radiusBottom, radiusLeft, radiusRight, radiusTop } =
 			childBarSeries?.props || {};
 
