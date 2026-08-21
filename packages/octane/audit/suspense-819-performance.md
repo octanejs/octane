@@ -1,6 +1,6 @@
 # Suspense retry coordination: performance evidence
 
-Baseline: `44c4658757be5bbf080535c667806777c226ce5e`. The baseline runtime and compiler were archived from that commit; both revisions use the same installed dependencies, benchmark fixtures, and runners.
+Deterministic baseline: `7e8a1a242f40940bfc8c675add03f268eb1fd2fc`. The baseline runtime and compiler were archived from that commit, and the candidate was remeasured after rebasing onto it. Both revisions use the same installed dependencies, benchmark fixtures, and runners. The earlier SSR timing provenance is retained explicitly below.
 
 Measured candidate SHA-256:
 
@@ -19,7 +19,7 @@ Environment: macOS arm64, Node 26.4.0, esbuild 0.28.1, Vite 8.1.5, `tsrx-core` 0
 
 | Surface | Minified bytes, before → after | Gzip bytes, before → after | Gzip delta |
 | --- | ---: | ---: | ---: |
-| `attachBehaviorRoot` | 12,044 → 12,044 | 3,748 → 3,748 | 0 |
+| `attachBehaviorRoot` | 12,044 → 12,044 | 3,745 → 3,745 | 0 |
 | `createRoot` | 122,260 → 122,844 | 39,558 → 39,752 | +194 |
 | Root + state | 125,477 → 126,061 | 40,597 → 40,774 | +177 |
 | Root + Suspense | 145,799 → 149,083 | 46,705 → 47,668 | +963 |
@@ -50,6 +50,8 @@ Server probes use the same build/compression flags with `platform: "neutral"` an
 
 ## SSR timing results
 
+The timing runs below used the earlier baseline `44c4658757be5bbf080535c667806777c226ce5e`. Its runtime/compiler/benchmark sources are unchanged at `7e8a1a2`. Rebuilding after the rebase produced a byte-identical candidate SSR bundle; the new baseline differs only in twelve `//#region` temporary-directory comments. Canonicalizing only those comment paths produces identical baseline output hashes. The proof is retained in `octane-819-livebase-comparison.json`; these remain the original timing runs, not a new wall-clock experiment.
+
 Use the existing [SSR-throughput runner and fixtures](../../../benchmarks/ssr-throughput/README.md), with only the selected revision's server/static entry aliases and the supported compiler backend changed during the production build. The benchmark runner itself is unchanged.
 
 ```sh
@@ -73,10 +75,11 @@ Candidate scores lie within the observed baseline ranges. These short desktop sa
 
 The investigation retains full JSON and reproduction helpers under `/private/tmp`:
 
-- `octane-819-hook-memo-{baseline,candidate}.json`
-- `octane-819-runtime-{baseline,candidate}.json` and `octane-819-runtime-probe.mjs`
-- `octane-819-ssr-bundles.json`
+- `octane-819-hook-memo-{livebase,merged-candidate}.json`
+- `octane-819-runtime-{livebase,merged-candidate}.json` and `octane-819-runtime-probe.mjs`
+- `octane-819-ssr-bundles-{livebase,merged-candidate}.json`
 - `octane-819-ssr-perf/{baseline,candidate}/provenance.json`, `comparison.json`, and all per-run JSON
-- `octane-819-build-ssr-perf.mjs`, preserving the original benchmark runner and fixture files
+- `octane-819-ssr-livebase-perf/{baseline,candidate}/provenance.json` and `octane-819-livebase-comparison.json`
+- `octane-819-build-ssr-perf.mjs` and `octane-819-build-ssr-livebase-perf.mjs`, preserving the original benchmark runner and fixture files
 
-The archived baseline source is `/private/tmp/octane-819-perf-baseline-roy3kglp`. Native dependency installation was not bypassed to obtain these measurements.
+The archived deterministic baseline is `/private/tmp/octane-819-livebase-JmELvp`; the original timing baseline remains `/private/tmp/octane-819-perf-baseline-roy3kglp`. Native dependency installation was not bypassed to obtain these measurements.
