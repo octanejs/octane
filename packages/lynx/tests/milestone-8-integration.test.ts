@@ -341,9 +341,7 @@ describe.sequential('Lynx Milestone 8 retained integration', () => {
 		expect(page.querySelector('#caught')).toBe(firstError);
 		expect(page.querySelector('#activity')).toBe(firstActivity);
 		expect(firstActivity.hasAttribute('hidden')).toBe(true);
-		expect(activityRefs).toHaveLength(1);
-		const activityHandle = activityRefs[0]!;
-		expect(activityHandle).toMatchObject({ active: true, attached: true });
+		expect(activityRefs).toEqual([]);
 		expect(log).not.toContain('activity:layout');
 		expect(log).not.toContain('activity:passive');
 
@@ -378,6 +376,8 @@ describe.sequential('Lynx Milestone 8 retained integration', () => {
 		);
 		expect(page.querySelector('#activity')).toBe(firstActivity);
 		expect(firstActivity.hasAttribute('hidden')).toBe(false);
+		const activityHandle = activityRefs[0]!;
+		expect(activityHandle).toMatchObject({ active: true, attached: true });
 		expect(activityRefs).toEqual([activityHandle]);
 		expect(page.querySelector('#caught')).toBe(firstError);
 		expect(page.querySelector('#healthy')).toBeNull();
@@ -415,7 +415,7 @@ describe.sequential('Lynx Milestone 8 retained integration', () => {
 		await flushBackgroundWork();
 		expect(page.querySelector('#activity')).toBe(firstActivity);
 		expect(firstActivity.hasAttribute('hidden')).toBe(true);
-		expect(activityRefs).toEqual([activityHandle]);
+		expect(activityRefs).toEqual([activityHandle, null]);
 		expect(log).toEqual(
 			expect.arrayContaining(['activity:layout-cleanup', 'activity:passive-cleanup']),
 		);

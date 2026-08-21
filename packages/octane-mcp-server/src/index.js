@@ -68,6 +68,7 @@ export const BENCHMARK_SUITES = [
 	'scaling-curves',
 	'store-selector-fanout',
 	'hook-store-composition',
+	'activity',
 	'effectful-list',
 	'list-clear',
 	'memo-wall',

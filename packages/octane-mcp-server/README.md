@@ -162,7 +162,7 @@ one manifest suite by name (`js-framework`, `todomvc`, `weather-app`,
 `hydration-interactivity`, `hydration-stress`, `lifecycle-memory`,
 `controlled-form`, `external-store-fanout`, `external-store-integrations`,
 `scheduler-responsiveness`, `suspense-recovery`, `event-delegation`,
-`application-composition`, `scaling-curves`, `streaming-ssr`,
+`application-composition`, `scaling-curves`, `activity`, `streaming-ssr`,
 `streaming-backpressure`, `compiler-throughput`, `codegen-size`, `hook-memo`,
 `bundle-size`, `bundle-reachability`, `three-renderer`, `three-bundle-size`, …)
 or every suite with `all`; `quick` selects the reduced-iteration smoke pass. The
