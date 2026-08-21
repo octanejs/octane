@@ -330,14 +330,18 @@ describe('Three universal driver', () => {
 
 		root.render(Scene, { mode: 'hidden' });
 		const parent = scene.children[0] as THREE.Group;
-		const normalObject = normal as unknown as THREE.Object3D;
-		const toolObject = tool as unknown as THREE.Object3D;
-		expect(parent.children).toEqual([normalObject]);
-		expect(normalObject.visible).toBe(false);
+		const retainedNormal = parent.children[0] as THREE.Object3D;
+		expect(normal).toBeNull();
+		expect(tool).toBeNull();
+		expect(parent.children).toEqual([retainedNormal]);
+		expect(retainedNormal.visible).toBe(false);
 		expect(parent.userData.tool).toBeUndefined();
 		expect(log).toEqual([]);
 
 		root.render(Scene, { mode: 'visible' });
+		const normalObject = normal as unknown as THREE.Object3D;
+		const toolObject = tool as unknown as THREE.Object3D;
+		expect(normalObject).toBe(retainedNormal);
 		expect(normal).toBe(normalObject);
 		expect(tool).toBe(toolObject);
 		expect(normalObject.visible).toBe(true);
@@ -345,8 +349,8 @@ describe('Three universal driver', () => {
 		expect(log).toEqual(['attach']);
 
 		root.render(Scene, { mode: 'hidden' });
-		expect(normal).toBe(normalObject);
-		expect(tool).toBe(toolObject);
+		expect(normal).toBeNull();
+		expect(tool).toBeNull();
 		expect(parent.children).toEqual([normalObject]);
 		expect(normalObject.visible).toBe(false);
 		expect(parent.userData.tool).toBeUndefined();
