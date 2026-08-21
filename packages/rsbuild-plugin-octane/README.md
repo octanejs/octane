@@ -75,7 +75,7 @@ includes Samsung Internet 14, which corresponds to Chromium 87. ES levels and
 browser targets cannot be mixed in the same array. Transpilation changes syntax;
 applications remain responsible for any additional Web API polyfills they use.
 
-Options are declarative and cache-stable:
+Common compiler options:
 
 - `hmr` controls browser component handoff;
 - `parallel` controls compiler workers; the default uses up to four, `false`
@@ -88,6 +88,16 @@ Options are declarative and cache-stable:
 Rspack shares one loader worker pool per process, so the first parallel loader
 determines its effective size. Worker startup has a fixed cost, so very small
 builds may be faster with `parallel: false`.
+
+The experimental `cssModuleConstants` option forwards the Rspack class plugin's
+immutable CSS-export contract to both build environments. Use
+`pluginOctane({ cssModuleConstants: true })` with
+`output.cssModules.namedExport: true` and named or namespace CSS imports to fold
+proven strings from Rsbuild's CSS-loader pipeline. Mutable default maps require
+an explicit immutable-provider callback. This is disabled by default, adds a
+bounded extra compile for eligible consumers, and leaves native `css/module`,
+development, HMR, and watch output unchanged. See
+[CSS-module constants](../../docs/compiler-css-module-constants.md).
 
 Enable Strong mode for the whole app in `octane.config.ts`:
 

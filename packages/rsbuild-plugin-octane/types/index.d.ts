@@ -1,4 +1,5 @@
 import type { RsbuildPlugin } from '@rsbuild/core';
+import type { OctaneRspackPluginOptions } from '@octanejs/rspack-plugin';
 
 export * from '@octanejs/app-core';
 export {
@@ -9,6 +10,12 @@ export {
 } from '@octanejs/app-core/config-loader';
 
 export interface OctaneRsbuildPluginOptions {
+	/**
+	 * @experimental Fold authenticated JavaScript CSS-module exports in one-shot
+	 * production builds. Uses the Rspack plugin's exact-source provider contract;
+	 * native `css/module` remains unchanged. Disabled by default.
+	 */
+	cssModuleConstants?: OctaneRspackPluginOptions['cssModuleConstants'];
 	/** Override component HMR in the browser environment. */
 	hmr?: boolean;
 	/**

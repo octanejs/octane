@@ -47,7 +47,13 @@ const LOADER_OPTION_KEYS = new Set([
 	'universalRuntime',
 	'layerSpecializations',
 ]);
-const PLUGIN_OPTION_KEYS = new Set([...LOADER_OPTION_KEYS, 'parallel', 'runtime', 'transpile']);
+const PLUGIN_OPTION_KEYS = new Set([
+	...LOADER_OPTION_KEYS,
+	'parallel',
+	'runtime',
+	'transpile',
+	'cssModuleConstants',
+]);
 const LAYER_SPECIALIZATION_KEYS = new Set(['runtime', 'renderers', 'universalRuntime']);
 
 function normalizeRuntimeRequest(value, label = 'runtime') {
@@ -210,6 +216,16 @@ function normalizeOptions(value, plugin) {
 		throw new TypeError('@octanejs/rspack-plugin: `exclude` must be an array of path strings.');
 	}
 	if (plugin) assertBooleanOption(options, 'transpile');
+	if (
+		plugin &&
+		options.cssModuleConstants !== undefined &&
+		typeof options.cssModuleConstants !== 'boolean' &&
+		typeof options.cssModuleConstants !== 'function'
+	) {
+		throw new TypeError(
+			'@octanejs/rspack-plugin: `cssModuleConstants` must be a boolean or a provider function.',
+		);
+	}
 	const parallel = plugin ? normalizeParallelOption(options.parallel) : undefined;
 	const renderers =
 		options.renderers === undefined ? undefined : normalizeRendererConfig(options.renderers);
@@ -233,6 +249,9 @@ function normalizeOptions(value, plugin) {
 		...(plugin && parallel !== undefined ? { parallel } : null),
 		...(plugin && options.transpile !== undefined ? { transpile: options.transpile } : null),
 		...(plugin && options.runtime !== undefined ? { runtime: options.runtime } : null),
+		...(plugin && options.cssModuleConstants !== undefined
+			? { cssModuleConstants: options.cssModuleConstants }
+			: null),
 	};
 	if (normalized.exclude) Object.freeze(normalized.exclude);
 	return Object.freeze(normalized);

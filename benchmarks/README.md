@@ -248,6 +248,11 @@ per-commit signal (its corpus is FIXED — editing the corpus list invalidates t
 baseline, re-record when you change it), `bundle-size` is the cross-framework
 comparison (all targets built with one normalized minify so solid's
 `minify:false` dev config and octane's terser passes don't skew the compare).
+The separate `codegen-size` CSS targets also build the real Rspack/CssExtract
+adapter with named exports and authenticated immutable default maps. They compare
+identical source with the option off/on, keep framework imports external for byte
+measurement, and verify equal emitted CSS and full-runtime SSR output. Their
+same-run ratios catch an adapter that silently stops supplying compiler proofs.
 `lynx-bundle-size` instead uses the pinned Rspeedy native encoder unchanged and
 bounds the incremental decoded/encoded cost of IFR against the equivalent
 background-rendered preview graph; its semantic checks remain source/build

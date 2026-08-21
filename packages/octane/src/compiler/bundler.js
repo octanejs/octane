@@ -43,6 +43,11 @@ import {
 } from './client-only-server.js';
 
 export { findVoidComponentImports, findVoidRootImports };
+export {
+	isPlainCssModuleId,
+	readCssModuleExports,
+	validateCssModuleConstants,
+} from './css-module-imports.js';
 export { HYDRATE_QUERY_PARAM } from './hydrate-boundaries.js';
 export {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,

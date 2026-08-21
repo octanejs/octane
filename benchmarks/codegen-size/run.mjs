@@ -23,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { measureCssModules } from './css-modules.mjs';
+import { measureRspackCssModules } from './rspack-css-modules.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '../..');
@@ -222,6 +223,9 @@ try {
 // CSS control and candidate use identical source/provider bytes and verify both
 // the emitted stylesheet and public SSR output before reporting their sizes.
 const cssModules = await measureCssModules();
+// The real adapter must keep producing the proven input. A low-level compiler
+// sentinel alone would stay green if graph proof collection became a no-op.
+const rspackCssModules = await measureRspackCssModules();
 
 const payload = {
 	suite: 'codegen-size',
@@ -239,6 +243,7 @@ const payload = {
 		{ name: 'text-types-explicit', ops: textTypes.explicit, meta: textTypes.meta },
 		{ name: 'text-types-inferred', ops: textTypes.inferred, meta: textTypes.meta },
 		...cssModules.targets,
+		...rspackCssModules.targets,
 	],
 };
 
@@ -259,6 +264,15 @@ for (const mode of ['client', 'server']) {
 	console.log(
 		`CSS-module ${mode} sentinel  min ${control.minified} -> ${proven.minified}  gz ${control.gzip} -> ${proven.gzip}  br ${control.brotli} -> ${proven.brotli}`,
 	);
+}
+
+for (const lane of ['named', 'default']) {
+	for (const mode of ['client', 'server']) {
+		const { control, proven } = rspackCssModules.summary.lanes[lane].modes[mode];
+		console.log(
+			`Rspack CSS-module ${lane} ${mode} sentinel  min ${control.minified} -> ${proven.minified}  gz ${control.gzip} -> ${proven.gzip}  br ${control.brotli} -> ${proven.brotli}`,
+		);
+	}
 }
 
 if (process.env.BENCH_JSON) {

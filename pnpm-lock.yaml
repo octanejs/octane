@@ -1511,6 +1511,15 @@ importers:
 
   benchmarks/codegen-size:
     dependencies:
+      '@octanejs/rspack-plugin':
+        specifier: workspace:*
+        version: link:../../packages/rspack-plugin-octane
+      '@rspack/core':
+        specifier: catalog:default
+        version: 2.1.4(@swc/helpers@0.5.23)
+      css-loader:
+        specifier: 6.11.0
+        version: 6.11.0(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -6671,6 +6680,9 @@ importers:
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
+      css-loader:
+        specifier: 6.11.0
+        version: 6.11.0(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20))
       octane:
         specifier: workspace:*
         version: link:../octane

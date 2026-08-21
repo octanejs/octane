@@ -195,6 +195,29 @@ const SEMANTIC_INPUTS = [
 	},
 ];
 
+// Bundler adapters use the same public source and semantic controls without
+// reaching through this benchmark's implementation or mutating its fixture.
+export const CSS_MODULE_FIXTURE = Object.freeze({
+	componentRequest: COMPONENT,
+	moduleRequest: MODULE,
+	stylesheetRequest: STYLESHEET,
+	source: SOURCE,
+	classes: CLASSES,
+	providerSource: PROVIDER,
+	stylesheetSource: CSS,
+	semanticInputs: Object.freeze(
+		SEMANTIC_INPUTS.map(({ props, contains }) =>
+			Object.freeze({
+				props: Object.freeze({
+					...props,
+					rows: Object.freeze(props.rows.map((row) => Object.freeze({ ...row }))),
+				}),
+				contains: Object.freeze([...contains]),
+			}),
+		),
+	),
+});
+
 export async function measureCssModules() {
 	const targets = [];
 	const measured = {};

@@ -8,6 +8,9 @@
     "bench": "node run.mjs"
   },
   "dependencies": {
+    "@octanejs/rspack-plugin": "workspace:*",
+    "@rspack/core": "catalog:default",
+    "css-loader": "6.11.0",
     "esbuild": "catalog:default",
     "octane": "workspace:*"
   }

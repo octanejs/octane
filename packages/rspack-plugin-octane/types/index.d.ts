@@ -1,6 +1,28 @@
 import type { Compiler, RspackPluginInstance } from '@rspack/core';
+import type { OctaneCssModuleConstants } from 'octane/compiler';
+
+export type { OctaneCssModuleConstants } from 'octane/compiler';
 
 export type OctaneRspackEnvironment = 'client' | 'server';
+
+/** Exact JavaScript CSS-provider module from the current Rspack graph. */
+export interface OctaneRspackCssModuleConstantModule {
+	/** Full module identity, including its loader chain, resource query, and layer. */
+	readonly id: string;
+	/** The resolved NormalModule resource, including its query. */
+	readonly resource: string;
+	/** Completed loader output, inspected without evaluating the module. */
+	readonly code: string;
+	/** Provider metadata copied from the module's buildInfo. */
+	readonly meta: Readonly<Record<string, unknown>>;
+	readonly environment: OctaneRspackEnvironment;
+	readonly layer?: string;
+	readonly type: string;
+}
+
+export type OctaneRspackCssModuleConstantsProvider = (
+	module: OctaneRspackCssModuleConstantModule,
+) => OctaneCssModuleConstants | null | undefined;
 
 export interface OctaneRendererRuleOptions {
 	/** Glob or globs matched against canonical project-relative module IDs. */
@@ -152,6 +174,18 @@ export interface OctaneRspackLoaderOptions {
 }
 
 export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
+	/**
+	 * @experimental Fold proven CSS-module strings in one-shot production builds.
+	 * `true` accepts only pure, initialized named ESM string exports. A provider
+	 * may additionally authenticate immutable exports against the exact completed
+	 * loader source; ordinary mutable default maps are not constants. The provider
+	 * runs on the main thread, never in a loader worker. Malformed or stale facts
+	 * fail the build. Native `css/module`, development, HMR, and watch builds keep
+	 * their ordinary compilation. Eligible consumers are rebuilt once and are not
+	 * stored in Rspack's persistent module cache. Requires the class plugin.
+	 * @default false
+	 */
+	cssModuleConstants?: boolean | OctaneRspackCssModuleConstantsProvider;
 	/**
 	 * Compile Octane modules in Rspack worker threads. Enabled by default with
 	 * at most four workers; set `false` to keep compilation on the main thread.
