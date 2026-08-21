@@ -2,7 +2,7 @@
 
 This binding is pinned to [`react-transition-group` v4.4.5](https://github.com/reactjs/react-transition-group/tree/v4.4.5), commit `4cb51a9be0ebf508cb8f6506452097f7ebb874fe`. The pristine runtime oracle uses React 18.3.1 (upstream's supported peer range and the last React that still exposes `findDOMNode`); Octane package tests continue to use the workspace React 19 oracle.
 
-The upstream project and this adapted package are licensed under BSD-3-Clause. The upstream notice is retained in `LICENSE` and `upstream/LICENSE`.
+The upstream project and this adapted package are licensed under BSD-3-Clause. The upstream notice is retained byte-exact as `LICENSE.upstream` (hash-matched to `audit/upstream.lock.json`) beside the package `LICENSE`. The vendored tree is pinned by the lock: each committed `upstream/` file verifies offline against its upstream git blob sha (`pnpm react-port:materialize run --check --package-dir packages/transition-group`).
 
 ## Vendored evidence
 

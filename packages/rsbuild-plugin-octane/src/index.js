@@ -233,6 +233,8 @@ function assertRootPublicPaths(config, clientEnvironment) {
  *
  * @param {{
  *   hmr?: boolean,
+ *   parallel?: boolean | { maxWorkers?: number },
+ *   cssModuleConstants?: import('@octanejs/rspack-plugin').OctaneRspackPluginOptions['cssModuleConstants'],
  *   profile?: boolean,
  *   strong?: boolean,
  *   exclude?: string[],
@@ -546,6 +548,10 @@ export function pluginOctane(inlineOptions = {}) {
 						root,
 						environment,
 						transpile: false,
+						...(inlineOptions.parallel === undefined ? null : { parallel: inlineOptions.parallel }),
+						...(inlineOptions.cssModuleConstants === undefined
+							? null
+							: { cssModuleConstants: inlineOptions.cssModuleConstants }),
 						...(strong === undefined ? null : { strong }),
 						...(inlineOptions.hmr === undefined ? null : { hmr: inlineOptions.hmr }),
 						...(inlineOptions.profile === undefined

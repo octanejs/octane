@@ -1,0 +1,53 @@
+import EventEmitter from 'node:events';
+import test from 'ava';
+import isInCi from 'is-in-ci';
+import {bsu, esu, shouldSynchronize} from '../src/write-synchronized.js';
+
+const createStream = ({tty = false} = {}) => {
+	const stream = new EventEmitter() as unknown as NodeJS.WriteStream;
+	if (tty) {
+		stream.isTTY = true;
+	}
+
+	return stream;
+};
+
+for (const [sequenceName, sequence, expected] of [
+	['bsu', bsu, '\u001B[?2026h'],
+	['esu', esu, '\u001B[?2026l'],
+] as const) {
+	test(`${sequenceName} is the expected synchronized update sequence`, t => {
+		t.is(sequence, expected);
+	});
+}
+
+test('shouldSynchronize returns true for interactive TTY stream', t => {
+	const stream = createStream({tty: true});
+	t.true(shouldSynchronize(stream, true));
+});
+
+test('shouldSynchronize returns false for non-interactive TTY stream', t => {
+	const stream = createStream({tty: true});
+	t.false(shouldSynchronize(stream, false));
+});
+
+test('shouldSynchronize returns false for non-TTY stream', t => {
+	const stream = createStream({tty: false});
+	t.false(shouldSynchronize(stream, true));
+});
+
+test('shouldSynchronize uses CI detection when interactive is not specified', t => {
+	const ttyStream = createStream({tty: true});
+	// When interactive is omitted, shouldSynchronize falls back to is-in-ci.
+	// In CI the result is false (non-interactive by design); outside CI it's true.
+	if (isInCi) {
+		t.false(shouldSynchronize(ttyStream));
+	} else {
+		t.true(shouldSynchronize(ttyStream));
+	}
+});
+
+test('shouldSynchronize returns false for non-TTY stream when interactive is not specified', t => {
+	const stream = createStream({tty: false});
+	t.false(shouldSynchronize(stream));
+});

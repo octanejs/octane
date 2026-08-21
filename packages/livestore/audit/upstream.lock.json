@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@livestore/react",
+    "version": "0.4.0",
+    "repository": {
+      "owner": "livestorejs",
+      "repo": "livestore",
+      "subdirectory": "packages/@livestore/react"
+    },
+    "commit": "c80acb39066b9472da426a35c81969df4919ae2d",
+    "integrity": "sha512-GhgAWk6xQuKfHH3ewvygL4ds4pT6lP+ioz+xa4yiN/JMPlr0AR6/FNq4sdsfPwh+1iKbTfcqdZuXUKppYfSDPg=="
+  },
+  "license": {
+    "spdx": "Apache-2.0",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "9b1397322b4023d6f19ed865d3eda587cf64aacbd9ecbfa5adbc90e3f4352fac"
+      },
+      {
+        "path": "packages/@livestore/react/LICENSE",
+        "sha256": "9b1397322b4023d6f19ed865d3eda587cf64aacbd9ecbfa5adbc90e3f4352fac"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "486cb398a452b0ac75d769f741f549f9cfdff036",
+      "size": 11351
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "96409cdf50986b8f612ccc8a7f95fdd2845a511e",
+      "size": 2731
+    },
+    {
+      "path": "package.json.genie.ts",
+      "gitBlob": "9b34197accacd7afe5f501f5c5db5704f58781d9",
+      "size": 1742
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "c68e6df52644462b1f62d4dd3760697453e75a6f",
+      "size": 19
+    },
+    {
+      "path": "src/__snapshots__/useClientDocument.test.tsx.snap",
+      "gitBlob": "0f7e409021125c61c852823d9ecfe0f65dbd6283",
+      "size": 19850
+    },
+    {
+      "path": "src/__snapshots__/useQuery.test.tsx.snap",
+      "gitBlob": "4ebf87174e015dcb53b32dde69914ec9793fcc5c",
+      "size": 46498
+    },
+    {
+      "path": "src/__tests__/fixture.tsx",
+      "gitBlob": "1efcf80acc559034c2d0eaf93d0efe07c49f7652",
+      "size": 1668
+    },
+    {
+      "path": "src/experimental/components/LiveList.tsx",
+      "gitBlob": "7f2e549bf4b8c3a464e8e6e19d311b75d91251b7",
+      "size": 3228
+    },
+    {
+      "path": "src/experimental/mod.ts",
+      "gitBlob": "b338bca5fe2cd955e4c5e0d76cbb6f6308dece40",
+      "size": 73
+    },
+    {
+      "path": "src/mod.ts",
+      "gitBlob": "38db776ca7cd324a4a4c3c176c3bb6c7f2902036",
+      "size": 638
+    },
+    {
+      "path": "src/StoreRegistryContext.tsx",
+      "gitBlob": "80d8546b970833f42a6364d03b8284969d5cbbf2",
+      "size": 2317
+    },
+    {
+      "path": "src/useClientDocument.test.tsx",
+      "gitBlob": "cd776b72affbeddb28e82e870fde5ba2e52b0c58",
+      "size": 12730
+    },
+    {
+      "path": "src/useClientDocument.ts",
+      "gitBlob": "5b44258df23b615a48d5e37dfbe530aa5f9250ba",
+      "size": 5441
+    },
+    {
+      "path": "src/useQuery.test.tsx",
+      "gitBlob": "7974d1f3effca1a7116a8d5a086f9d4645970c9a",
+      "size": 10394
+    },
+    {
+      "path": "src/useQuery.ts",
+      "gitBlob": "6ed683c039f2dd9c3af30af02a1a26e400cda59d",
+      "size": 5368
+    },
+    {
+      "path": "src/useRcResource.test.tsx",
+      "gitBlob": "abf7b5f3553e36603ce8ae72f13960adcaec15d1",
+      "size": 7342
+    },
+    {
+      "path": "src/useRcResource.ts",
+      "gitBlob": "5ea84e6b1717671080e94527a4aee3dca42dba82",
+      "size": 8014
+    },
+    {
+      "path": "src/useStore.test.tsx",
+      "gitBlob": "9c43a01c3ea768d52750bb21115cbbe1155c878e",
+      "size": 12744
+    },
+    {
+      "path": "src/useStore.ts",
+      "gitBlob": "338ca683809ee55c7d2c04fe84bb0a32e5e2801e",
+      "size": 5773
+    },
+    {
+      "path": "src/useSyncStatus.ts",
+      "gitBlob": "21d154ad9a8db52c72373a0cb90dc7fb7dd8e81b",
+      "size": 1025
+    },
+    {
+      "path": "src/utils/useStateRefWithReactiveInput.ts",
+      "gitBlob": "b30e95f4e73b3b322c903511137ddbc8976ec56d",
+      "size": 2009
+    },
+    {
+      "path": "test/setup.ts",
+      "gitBlob": "9925284213a0beca03a30be790d60066f648b5f1",
+      "size": 1042
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "7aedf8f9e6485eca9e20c37cc651e87a39a35d27",
+      "size": 1732
+    },
+    {
+      "path": "tsconfig.json.genie.ts",
+      "gitBlob": "222cbd627b051740b5292dc8a6a585d43d0142c4",
+      "size": 570
+    },
+    {
+      "path": "vitest.config.ts",
+      "gitBlob": "a7a896a232b27dbbc3849dcc98ead2e074734484",
+      "size": 763
+    }
+  ],
+  "fingerprint": "80f4c1681310380e353043ec6990e9d2f48df9d70791f7ef94ed0d3f230720e9"
+}

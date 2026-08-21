@@ -1,0 +1,916 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "ink",
+    "version": "7.1.1",
+    "repository": {
+      "owner": "vadimdemedes",
+      "repo": "ink",
+      "subdirectory": null
+    },
+    "commit": "70af033dbd2b126a16f144164685612b2c1fd554",
+    "integrity": "sha512-Y43xxa1ZSPvpmfLHcN5o+OdP8Rf8ykkNJEuKYOUNZKT8wXVNLFTtEm1nSDMQkfBH+YANF4Xuu0hhZ4ejqAtN2w=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "license",
+        "sha256": "de84e62e27d9a970b50446d0af1f713c1439a4180faa098adfa5da94f5158a55"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["license", "package.json", "src", "test", "tsconfig.json", "xo.config.ts"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "license",
+      "gitBlob": "fcb8fa9e131348df733a6ce59aa0d5a9c7b6f331",
+      "size": 1202
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "d9af96b4ae7e5b47db5814f9a601a0020c84ea39",
+      "size": 3020
+    },
+    {
+      "path": "src/ansi-tokenizer.ts",
+      "gitBlob": "1b43d51b14b55dc2181f6501c6c7ca2f5f475d1b",
+      "size": 11954
+    },
+    {
+      "path": "src/colorize.ts",
+      "gitBlob": "29faa581e4c9d37c6d57390a952c0482a13f62b2",
+      "size": 1498
+    },
+    {
+      "path": "src/components/AccessibilityContext.ts",
+      "gitBlob": "62a60afc2c23a8758bccda5249cbf0b8defcea20",
+      "size": 125
+    },
+    {
+      "path": "src/components/AnimationContext.ts",
+      "gitBlob": "a88ef253a8e6121dcf743ad5d395aebf8f30c101",
+      "size": 530
+    },
+    {
+      "path": "src/components/App.tsx",
+      "gitBlob": "c9f2ca8cf9d07ea5a6a161bb4c0a075c8be0e18a",
+      "size": 21881
+    },
+    {
+      "path": "src/components/AppContext.ts",
+      "gitBlob": "014b86221f5fdd388e3b6bf81450b219c6c9c247",
+      "size": 2817
+    },
+    {
+      "path": "src/components/BackgroundContext.ts",
+      "gitBlob": "e6b557b84a8edadfe2e46d9ab9ce04315d238d2f",
+      "size": 303
+    },
+    {
+      "path": "src/components/Box.tsx",
+      "gitBlob": "6d7e1df16a67e79a09d128693b33410bcdf56376",
+      "size": 2563
+    },
+    {
+      "path": "src/components/CursorContext.ts",
+      "gitBlob": "03dfe3436ad3684fa5eec97edc695d0fc86cefc0",
+      "size": 520
+    },
+    {
+      "path": "src/components/ErrorBoundary.tsx",
+      "gitBlob": "6f37cc8cff8bce0da753089d198af4c190ac083d",
+      "size": 852
+    },
+    {
+      "path": "src/components/ErrorOverview.tsx",
+      "gitBlob": "1349f88371353264c6418f958cee1875dd7eaf5b",
+      "size": 3827
+    },
+    {
+      "path": "src/components/FocusContext.ts",
+      "gitBlob": "a16240205d53b71ff82d3aa7e91091361d4fe34f",
+      "size": 833
+    },
+    {
+      "path": "src/components/Newline.tsx",
+      "gitBlob": "d6c815e042d2b3bbe37b4e079928b0f4c5a26f4a",
+      "size": 332
+    },
+    {
+      "path": "src/components/Spacer.tsx",
+      "gitBlob": "669ebf84c843f8c505be3fa4c24e78b61a4238f0",
+      "size": 288
+    },
+    {
+      "path": "src/components/Static.tsx",
+      "gitBlob": "8af99240e5fb94ed326827457f8f339c35771a15",
+      "size": 1974
+    },
+    {
+      "path": "src/components/StderrContext.ts",
+      "gitBlob": "aed1959c00eb4cfe968b87f7cd7467e87a1b7cd2",
+      "size": 880
+    },
+    {
+      "path": "src/components/StdinContext.ts",
+      "gitBlob": "7d23d510ffc57f5ccee643d790fa14c0e20facfb",
+      "size": 1842
+    },
+    {
+      "path": "src/components/StdoutContext.ts",
+      "gitBlob": "06952b33e2478857e609a7460ef3ab4a134fc628",
+      "size": 907
+    },
+    {
+      "path": "src/components/Text.tsx",
+      "gitBlob": "d252dc8f86a5f783b9874079ba30694864ae50eb",
+      "size": 3498
+    },
+    {
+      "path": "src/components/Transform.tsx",
+      "gitBlob": "1ac6aaea8e7d3729bb21ff7764377a734a01c2c0",
+      "size": 1492
+    },
+    {
+      "path": "src/cursor-helpers.ts",
+      "gitBlob": "af8d59ad5ba2fefe1a9d8c318f6dab714707bd7b",
+      "size": 2930
+    },
+    {
+      "path": "src/devtools-window-polyfill.ts",
+      "gitBlob": "9fdc40da1ab4fdcb715351b36dc755f35610608a",
+      "size": 1931
+    },
+    {
+      "path": "src/devtools.ts",
+      "gitBlob": "845b13e97e9d8a501cbc1f4434bed03579efc047",
+      "size": 1191
+    },
+    {
+      "path": "src/dom.ts",
+      "gitBlob": "3600563844429ed394cdb94e972d2e5d2677e9e6",
+      "size": 6952
+    },
+    {
+      "path": "src/get-max-width.ts",
+      "gitBlob": "a8b40f38786b8dce084f7ee676c2a1db6bd47a91",
+      "size": 372
+    },
+    {
+      "path": "src/global.d.ts",
+      "gitBlob": "143c745ef5e2f56915cda696de2800565ebb85a9",
+      "size": 904
+    },
+    {
+      "path": "src/hooks/use-animation.ts",
+      "gitBlob": "64472e561d6a2720a1a47b74af0403db3991ee93",
+      "size": 4675
+    },
+    {
+      "path": "src/hooks/use-app.ts",
+      "gitBlob": "5f53f76d2887baa6cf55151eed9f9738d0e9e52b",
+      "size": 256
+    },
+    {
+      "path": "src/hooks/use-box-metrics.ts",
+      "gitBlob": "d9110010c22032300eacd202ef2a987c641f5d03",
+      "size": 3462
+    },
+    {
+      "path": "src/hooks/use-cursor.ts",
+      "gitBlob": "c78ce203d794c329bc3bf2757b6580bdc96acbe6",
+      "size": 1333
+    },
+    {
+      "path": "src/hooks/use-focus-manager.ts",
+      "gitBlob": "79b79974ec1ae27f4beb0ff0871b383e6da5f635",
+      "size": 2012
+    },
+    {
+      "path": "src/hooks/use-focus.ts",
+      "gitBlob": "df6585ba88cfc2707959cb7fafa3282833580926",
+      "size": 2019
+    },
+    {
+      "path": "src/hooks/use-input.ts",
+      "gitBlob": "5071cf1df4a07810ac08790ec3e54f15ac07b181",
+      "size": 6057
+    },
+    {
+      "path": "src/hooks/use-is-screen-reader-enabled.ts",
+      "gitBlob": "32466c12275886439cbb270281b631e3a28777e8",
+      "size": 449
+    },
+    {
+      "path": "src/hooks/use-paste.ts",
+      "gitBlob": "f53da2f7511a33ac0d7bfd99495385009a625b39",
+      "size": 2304
+    },
+    {
+      "path": "src/hooks/use-stderr.ts",
+      "gitBlob": "757f533a08f8068f4981ba0d8fc801a0837f6c40",
+      "size": 224
+    },
+    {
+      "path": "src/hooks/use-stdin.ts",
+      "gitBlob": "5ce11f6885f2921ed26b339ba83733296a50416c",
+      "size": 368
+    },
+    {
+      "path": "src/hooks/use-stdout.ts",
+      "gitBlob": "a03ed9face9b667427eb828f9923561a1180c6a2",
+      "size": 251
+    },
+    {
+      "path": "src/hooks/use-window-size.ts",
+      "gitBlob": "1a8c9894286339026c50bfe187d97f74b8248475",
+      "size": 891
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "971576755a0c821f3425d6d8eb96d1661bd5a093",
+      "size": 2736
+    },
+    {
+      "path": "src/ink.tsx",
+      "gitBlob": "28bbdd9426421208a4b35e5c1eb3330504a39cea",
+      "size": 39771
+    },
+    {
+      "path": "src/input-parser.ts",
+      "gitBlob": "2eeffbe4fe59ecba721db96f0de09563c6ba5c95",
+      "size": 6723
+    },
+    {
+      "path": "src/instances.ts",
+      "gitBlob": "bb9008fedf68f1e6acc77f9861896a68849d26db",
+      "size": 417
+    },
+    {
+      "path": "src/kitty-keyboard.ts",
+      "gitBlob": "b03d5b8e100b097a5be693b5714d6518ce6ba705",
+      "size": 1769
+    },
+    {
+      "path": "src/log-update.ts",
+      "gitBlob": "c129d2863dd0d3f3434e966aeb867e229ea23721",
+      "size": 10310
+    },
+    {
+      "path": "src/measure-element.ts",
+      "gitBlob": "d5d07878c383199609ff5399f2bd62398c6ce870",
+      "size": 1850
+    },
+    {
+      "path": "src/measure-text.ts",
+      "gitBlob": "f310a3d7d71f07b16fa4f48b437497eede05ffa6",
+      "size": 549
+    },
+    {
+      "path": "src/output.ts",
+      "gitBlob": "c3baf92747a0172dc6969bf433a281420c915394",
+      "size": 7163
+    },
+    {
+      "path": "src/parse-keypress.ts",
+      "gitBlob": "04247216c058b5f1ac92a1e9c61e7bd67d367ad5",
+      "size": 12609
+    },
+    {
+      "path": "src/reconciler.ts",
+      "gitBlob": "d73ec96347f48542435526416cda6f9e717d69fa",
+      "size": 10556
+    },
+    {
+      "path": "src/render-background.ts",
+      "gitBlob": "5482fa781cdf582a5e71e8e5e65fff190702b6cc",
+      "size": 1367
+    },
+    {
+      "path": "src/render-border.ts",
+      "gitBlob": "9d4cd96f3bde68db7fed894c197a678af05a5f1b",
+      "size": 3986
+    },
+    {
+      "path": "src/render-node-to-output.ts",
+      "gitBlob": "ec4a0d5ee2637fd18663d8f6306d45bbcc9f28c2",
+      "size": 5679
+    },
+    {
+      "path": "src/render-to-string.ts",
+      "gitBlob": "4e8db948c76d25f4e6b06b5beef765867a8b9402",
+      "size": 5749
+    },
+    {
+      "path": "src/render.ts",
+      "gitBlob": "9d6d5c12a9f0ef438c945f382ce31cf8c30f1833",
+      "size": 8614
+    },
+    {
+      "path": "src/renderer.ts",
+      "gitBlob": "a8424f4e3cd38450f5a8a2f5c51bb68f5aa687df",
+      "size": 1797
+    },
+    {
+      "path": "src/sanitize-ansi.ts",
+      "gitBlob": "da2014dbc80085eacf47877cd71ac354a9659160",
+      "size": 902
+    },
+    {
+      "path": "src/squash-text-nodes.ts",
+      "gitBlob": "17e3ffecd6b389fae8df8d49bfa169a791ada9ac",
+      "size": 1431
+    },
+    {
+      "path": "src/styles.ts",
+      "gitBlob": "4dbcd4e0b91d1092797ef0e638a824c1917d7b03",
+      "size": 19806
+    },
+    {
+      "path": "src/utils.ts",
+      "gitBlob": "9d21a751e845a8d8856828d2b347ca5a00eb65ca",
+      "size": 692
+    },
+    {
+      "path": "src/wrap-text.ts",
+      "gitBlob": "7311e1aaa57c8a5f4e26788d851a121ae7f48727",
+      "size": 1046
+    },
+    {
+      "path": "src/write-synchronized.ts",
+      "gitBlob": "640ef5fc1409c768e23fe85d4f36ea6e8415a562",
+      "size": 356
+    },
+    {
+      "path": "test/alternate-screen-example.tsx",
+      "gitBlob": "ca6813acc6412c20d5b23136b0f80488a51089b8",
+      "size": 2418
+    },
+    {
+      "path": "test/ansi-tokenizer.ts",
+      "gitBlob": "66cc9b74478395d0c5009cc275f0a9c3b0e79d7b",
+      "size": 8449
+    },
+    {
+      "path": "test/background.tsx",
+      "gitBlob": "1a5173b67cdd45586549e6d729843076ce30a3b2",
+      "size": 12767
+    },
+    {
+      "path": "test/border-backgrounds.tsx",
+      "gitBlob": "2fc30e432184b30e33bed355547f3a147ac3c48f",
+      "size": 3676
+    },
+    {
+      "path": "test/borders.tsx",
+      "gitBlob": "40ddaf6a96a19446043864c461a8d2f1205e5d9d",
+      "size": 23149
+    },
+    {
+      "path": "test/build-output.ts",
+      "gitBlob": "021fde3400c1524a0c88ca4d1a5b1633bf72f669",
+      "size": 1789
+    },
+    {
+      "path": "test/components.tsx",
+      "gitBlob": "624f9dbb39cc1fbaadc0fa3d4facce7d69cfb13d",
+      "size": 47378
+    },
+    {
+      "path": "test/cursor-helpers.tsx",
+      "gitBlob": "6afbd554ae7a10e558c76887ad0124739dea95c6",
+      "size": 3882
+    },
+    {
+      "path": "test/cursor.tsx",
+      "gitBlob": "31140c21978c05f91f033d7eba0db5a57498a76f",
+      "size": 16593
+    },
+    {
+      "path": "test/display.tsx",
+      "gitBlob": "791eafc1f7a63d16f9afb86d27ebd235e24d7591",
+      "size": 977
+    },
+    {
+      "path": "test/error-overview.tsx",
+      "gitBlob": "80ce6f85c26417f997232a7c3bee17a762fbec06",
+      "size": 1502
+    },
+    {
+      "path": "test/errors.tsx",
+      "gitBlob": "8a905e39eb556f165fe5199ed4ecbad044dff711",
+      "size": 4108
+    },
+    {
+      "path": "test/exit.tsx",
+      "gitBlob": "7251cb9cb7b1ab94cbef152eaeb90d977cb54b2d",
+      "size": 4187
+    },
+    {
+      "path": "test/fixtures/alternate-screen-full-board-win.tsx",
+      "gitBlob": "fa6053b01a32518c0406a3777712d9dca1649ea5",
+      "size": 810
+    },
+    {
+      "path": "test/fixtures/ci-debug-after-exit.tsx",
+      "gitBlob": "164936850b91d493682b909bd7a210a86bb4e6e1",
+      "size": 241
+    },
+    {
+      "path": "test/fixtures/ci-debug.tsx",
+      "gitBlob": "d9c666a78d9f9408a03655c9c1d035886566d1b5",
+      "size": 120
+    },
+    {
+      "path": "test/fixtures/ci.tsx",
+      "gitBlob": "26f9f9f9d7708b04185137abf56c9a304de827b1",
+      "size": 871
+    },
+    {
+      "path": "test/fixtures/clear.tsx",
+      "gitBlob": "c628cebc4036e5308d34bad9d053d1907dfde0c5",
+      "size": 256
+    },
+    {
+      "path": "test/fixtures/console.tsx",
+      "gitBlob": "1851d966253208314bf444648f5dc9954cf17bb6",
+      "size": 363
+    },
+    {
+      "path": "test/fixtures/erase-with-state-change.tsx",
+      "gitBlob": "d641f0d464ec9180a5b6b5c8b550cd9d6d9f7af2",
+      "size": 562
+    },
+    {
+      "path": "test/fixtures/erase-with-static.tsx",
+      "gitBlob": "4a79ddd1452b36a05bf222e006d0b815fa19c329",
+      "size": 453
+    },
+    {
+      "path": "test/fixtures/erase.tsx",
+      "gitBlob": "c432e897b3b0385dcd22fdf7f283877151e2720f",
+      "size": 314
+    },
+    {
+      "path": "test/fixtures/exit-double-raw-mode.tsx",
+      "gitBlob": "d6c4b50f032cb3e83e7a297f3068f6f2ca40af0c",
+      "size": 596
+    },
+    {
+      "path": "test/fixtures/exit-normally.tsx",
+      "gitBlob": "206e0b0012c8a927dda7f585b22cda6e725e4581",
+      "size": 182
+    },
+    {
+      "path": "test/fixtures/exit-on-exit-with-error-value-property.tsx",
+      "gitBlob": "b3c0cab11c83487e95d42ea4f3a531199caa9523",
+      "size": 496
+    },
+    {
+      "path": "test/fixtures/exit-on-exit-with-error.tsx",
+      "gitBlob": "679e239022084e55abdea9afc331bf393eea53e2",
+      "size": 606
+    },
+    {
+      "path": "test/fixtures/exit-on-exit-with-result.tsx",
+      "gitBlob": "08f3639f0968c42e82abab0616cc914acae3e5b8",
+      "size": 373
+    },
+    {
+      "path": "test/fixtures/exit-on-exit-with-value-object.tsx",
+      "gitBlob": "498a1ae6770dbf362c87af5f1c4ecfb7d313a24c",
+      "size": 414
+    },
+    {
+      "path": "test/fixtures/exit-on-exit.tsx",
+      "gitBlob": "71c8a9fa937f86f4d198be94f1b21d43b97916f8",
+      "size": 517
+    },
+    {
+      "path": "test/fixtures/exit-on-finish.tsx",
+      "gitBlob": "24bfba141856c2cfc73454ad7cb24263b3c60237",
+      "size": 649
+    },
+    {
+      "path": "test/fixtures/exit-on-unmount.tsx",
+      "gitBlob": "5dcdf7cdaaad23cc565c90cdc9dc8d8a602e8523",
+      "size": 498
+    },
+    {
+      "path": "test/fixtures/exit-raw-on-exit-with-error.tsx",
+      "gitBlob": "c23d312b0579ae2400ae0329c1002af61aaf1434",
+      "size": 485
+    },
+    {
+      "path": "test/fixtures/exit-raw-on-exit.tsx",
+      "gitBlob": "d088e7101e69650ca98a03c681ff3bef1494caf6",
+      "size": 395
+    },
+    {
+      "path": "test/fixtures/exit-raw-on-unmount.tsx",
+      "gitBlob": "89f25d16b616ba81954153980cb064bbe6ed40de",
+      "size": 375
+    },
+    {
+      "path": "test/fixtures/exit-with-static.tsx",
+      "gitBlob": "6649b60cd5ac0a370af868458ad5f9886910b9ed",
+      "size": 494
+    },
+    {
+      "path": "test/fixtures/exit-with-thrown-error.tsx",
+      "gitBlob": "3ea7a4b166a8abe8be86ad0603aba72ffd2127f2",
+      "size": 257
+    },
+    {
+      "path": "test/fixtures/full-clear-static-accounting.tsx",
+      "gitBlob": "3ee8c8ecc43596a73e223a19e5aa575cad1fb112",
+      "size": 3461
+    },
+    {
+      "path": "test/fixtures/fullscreen-no-extra-newline.tsx",
+      "gitBlob": "8e8c7a3e4338d57fc5e6ac0c63da07fd7e680f08",
+      "size": 768
+    },
+    {
+      "path": "test/fixtures/issue-442-full-height.tsx",
+      "gitBlob": "f11522754ba61c711f01acbfdcc385eb10396493",
+      "size": 656
+    },
+    {
+      "path": "test/fixtures/issue-450-fixture-helpers.tsx",
+      "gitBlob": "7edddf7504f63d51acec6f16a3db78d2257c5da9",
+      "size": 3349
+    },
+    {
+      "path": "test/fixtures/issue-450-full-height-rerender-with-marker.tsx",
+      "gitBlob": "0891e5aa9b3048efa31f8cbce655f02e6c26fc5b",
+      "size": 197
+    },
+    {
+      "path": "test/fixtures/issue-450-full-height-rerender.tsx",
+      "gitBlob": "b4e3d4998130929934f2b655f89d58b7c7d9e1cf",
+      "size": 140
+    },
+    {
+      "path": "test/fixtures/issue-450-full-height-with-static-rerender.tsx",
+      "gitBlob": "78b659d38a23332d0729dffc64c7730285bac040",
+      "size": 166
+    },
+    {
+      "path": "test/fixtures/issue-450-grow-to-fullscreen-rerender.tsx",
+      "gitBlob": "fd8c523f9f5c0b3ecdc5cb2186f0f070a39b9e82",
+      "size": 248
+    },
+    {
+      "path": "test/fixtures/issue-450-grow-to-overflow-rerender.tsx",
+      "gitBlob": "aa2643e370f39825cda1967a0003192f7a981e3e",
+      "size": 224
+    },
+    {
+      "path": "test/fixtures/issue-450-height-minus-one-rerender.tsx",
+      "gitBlob": "bb851dcf02083b89f65fc1917ad9bf0dbcb89cde",
+      "size": 144
+    },
+    {
+      "path": "test/fixtures/issue-450-initial-fullscreen.tsx",
+      "gitBlob": "e1b631038ab24133507d6ed40fa9fc1742aa346d",
+      "size": 220
+    },
+    {
+      "path": "test/fixtures/issue-450-initial-overflow.tsx",
+      "gitBlob": "a62233f8581cf582d74f0138c179144b4510cc7c",
+      "size": 216
+    },
+    {
+      "path": "test/fixtures/issue-450-shrink-from-fullscreen-rerender.tsx",
+      "gitBlob": "3be7cace5ef0ad8c8f9272bade56fbc5f9d347e6",
+      "size": 184
+    },
+    {
+      "path": "test/fixtures/issue-450-shrink-from-overflow-rerender.tsx",
+      "gitBlob": "dcca0f85e782d43f1b373df5a1e8598a7af20274",
+      "size": 190
+    },
+    {
+      "path": "test/fixtures/issue-450-static-shrink-from-fullscreen-rerender.tsx",
+      "gitBlob": "42f04d1f951625d2c929f5075547feb3b149609d",
+      "size": 210
+    },
+    {
+      "path": "test/fixtures/issue-725-child-process.tsx",
+      "gitBlob": "d12adb30e0581f56a54ab3cf88a7de4300a0f255",
+      "size": 315
+    },
+    {
+      "path": "test/fixtures/issue-969-windows-full-height-rerender.tsx",
+      "gitBlob": "3c779a6e1d676a12e28f68718471513b3a1a43a3",
+      "size": 374
+    },
+    {
+      "path": "test/fixtures/suspend-terminal.tsx",
+      "gitBlob": "12015f0881f10eee8c125f80a385d918e46152f2",
+      "size": 879
+    },
+    {
+      "path": "test/fixtures/use-animation-interactive-false-exit.tsx",
+      "gitBlob": "9b5d95356f857232e5d3229f57d3f45a4ee4061d",
+      "size": 429
+    },
+    {
+      "path": "test/fixtures/use-animation-non-interactive-exit.tsx",
+      "gitBlob": "7ad2eac33f7fb68010df645d89231e066cb4b149",
+      "size": 407
+    },
+    {
+      "path": "test/fixtures/use-input-ctrl-c.tsx",
+      "gitBlob": "1ee9443ed58449d70fb79d3aff8285bc9f37c7b5",
+      "size": 496
+    },
+    {
+      "path": "test/fixtures/use-input-discrete-priority.tsx",
+      "gitBlob": "55c7b9f4e2de30a8873c7b2ad93b05ec5ede7bea",
+      "size": 1446
+    },
+    {
+      "path": "test/fixtures/use-input-kitty.tsx",
+      "gitBlob": "47492089b7b8ebd18a9bc617564fb760b0ecf3db",
+      "size": 2327
+    },
+    {
+      "path": "test/fixtures/use-input-many.tsx",
+      "gitBlob": "9f057413348632ebdb01a910b7450bc83508c61f",
+      "size": 841
+    },
+    {
+      "path": "test/fixtures/use-input-multiple.tsx",
+      "gitBlob": "51508847d534a87abe7c9082338be8587923e0a2",
+      "size": 683
+    },
+    {
+      "path": "test/fixtures/use-input.tsx",
+      "gitBlob": "449dd79cf2127b107abf839b1c0c4eaf2941f5cc",
+      "size": 4445
+    },
+    {
+      "path": "test/fixtures/use-paste.tsx",
+      "gitBlob": "eb9116b386dc85cb5a6e4b2bbce75fd237dcde2f",
+      "size": 1358
+    },
+    {
+      "path": "test/fixtures/use-stdout.tsx",
+      "gitBlob": "ffa6a521918a5cf99449f17336430cc042c175cc",
+      "size": 359
+    },
+    {
+      "path": "test/flex-align-content.tsx",
+      "gitBlob": "4df3b540c05f7f956c67e3723ffa84c5741ff7be",
+      "size": 3842
+    },
+    {
+      "path": "test/flex-align-items.tsx",
+      "gitBlob": "6d98e3b04ef3f60ccc12728d26451d248cdc20c6",
+      "size": 2104
+    },
+    {
+      "path": "test/flex-align-self.tsx",
+      "gitBlob": "d5a2478d442f78930389760e88aa04a30ba9ec0b",
+      "size": 2291
+    },
+    {
+      "path": "test/flex-direction.tsx",
+      "gitBlob": "75594bc77f0476ff3afc9938e32a7a11f58abac5",
+      "size": 1562
+    },
+    {
+      "path": "test/flex-justify-content.tsx",
+      "gitBlob": "3227781cd7a7f89ed632b98845f29b04a7fe492a",
+      "size": 3160
+    },
+    {
+      "path": "test/flex-wrap.tsx",
+      "gitBlob": "6458b697de0079979a7bf36535def24e77687e10",
+      "size": 1405
+    },
+    {
+      "path": "test/flex.tsx",
+      "gitBlob": "98e74f2bda0b679edffae4bd8ff2664899f58f04",
+      "size": 2163
+    },
+    {
+      "path": "test/focus.tsx",
+      "gitBlob": "a0dbfe602197d42d065eaf51145f7df830c8475d",
+      "size": 15753
+    },
+    {
+      "path": "test/gap.tsx",
+      "gitBlob": "6595ff40646cbb321405c7913c55ef78969476b3",
+      "size": 1339
+    },
+    {
+      "path": "test/helpers/create-stdin.ts",
+      "gitBlob": "a2f92e5059cf9bc4292ea56f62c2f587ad59cbe4",
+      "size": 801
+    },
+    {
+      "path": "test/helpers/create-stdout.ts",
+      "gitBlob": "3404edb202713c869afd0ddffac012455df70b45",
+      "size": 619
+    },
+    {
+      "path": "test/helpers/force-colors.ts",
+      "gitBlob": "043847c942d57abea41064ff542ef271664ddb38",
+      "size": 388
+    },
+    {
+      "path": "test/helpers/mock-timer-calls.ts",
+      "gitBlob": "86d6ca7ad8f96a639467a8bca18ab5245d987149",
+      "size": 914
+    },
+    {
+      "path": "test/helpers/reconstruct-terminal.ts",
+      "gitBlob": "d1974268c4e52b618cf8f0b4d59224010a543690",
+      "size": 3906
+    },
+    {
+      "path": "test/helpers/render-to-string.ts",
+      "gitBlob": "14256c3aaa5e03b2a4da0411a39879b6d767991e",
+      "size": 1105
+    },
+    {
+      "path": "test/helpers/run.ts",
+      "gitBlob": "03b75bbf15a579a89cce5d79cbfbc846c8150cfe",
+      "size": 1391
+    },
+    {
+      "path": "test/helpers/term.ts",
+      "gitBlob": "59c82174eb1f2f98b5c2491ae44f413b7a453e89",
+      "size": 1755
+    },
+    {
+      "path": "test/helpers/test-renderer.ts",
+      "gitBlob": "e9abaa07b799a237d539858f08ad2e19ef553024",
+      "size": 2114
+    },
+    {
+      "path": "test/hooks-use-input-kitty.tsx",
+      "gitBlob": "46b6397e0edc085c904f13ae8d8f8c417f0e00e9",
+      "size": 4668
+    },
+    {
+      "path": "test/hooks-use-input-navigation.tsx",
+      "gitBlob": "7fe658f6bf044ee4eba38d3633a0c300ad3f3bd8",
+      "size": 3526
+    },
+    {
+      "path": "test/hooks-use-input.tsx",
+      "gitBlob": "e204ab5527de7068a91e3ee26a7891277110a843",
+      "size": 5526
+    },
+    {
+      "path": "test/hooks-use-paste.tsx",
+      "gitBlob": "8d8d213c8546b729f054025f3972345dc430d72c",
+      "size": 1324
+    },
+    {
+      "path": "test/hooks.tsx",
+      "gitBlob": "672e574c45a42571c37e9e2345b3eac752beedb2",
+      "size": 2554
+    },
+    {
+      "path": "test/input-parser.ts",
+      "gitBlob": "13ee9a6217d93803d6b2a7dfbda5d41ef76cae87",
+      "size": 11227
+    },
+    {
+      "path": "test/kitty-keyboard.tsx",
+      "gitBlob": "c702961ed1da66ee1270fd707533ae0d0b29c535",
+      "size": 27042
+    },
+    {
+      "path": "test/log-update.tsx",
+      "gitBlob": "c00ca6d3fc36b8fd2ccaa7fa27a8253926fae2c9",
+      "size": 20222
+    },
+    {
+      "path": "test/margin.tsx",
+      "gitBlob": "f2c0d7ae8376b2fd1c4f8e1837e8a68da1127fc9",
+      "size": 2416
+    },
+    {
+      "path": "test/measure-element.tsx",
+      "gitBlob": "f3a6b81470fb9f7b4e7c5a14dcbdd3ac1461bea7",
+      "size": 8794
+    },
+    {
+      "path": "test/measure-text.tsx",
+      "gitBlob": "8e55e59e862173234edb425de3f99680efefac3b",
+      "size": 1825
+    },
+    {
+      "path": "test/overflow.tsx",
+      "gitBlob": "009037b72ea94244c9481437681637402beb7fb9",
+      "size": 14122
+    },
+    {
+      "path": "test/padding.tsx",
+      "gitBlob": "0dec7ce84520852337df7f36b7f4b0cc65a7405d",
+      "size": 3045
+    },
+    {
+      "path": "test/parse-keypress.ts",
+      "gitBlob": "dc1857d0bb488858e8a08cce5ce3938f00776df5",
+      "size": 1269
+    },
+    {
+      "path": "test/position.tsx",
+      "gitBlob": "06f5bbd2d44565561dff7c30305d0d33b3741539",
+      "size": 4515
+    },
+    {
+      "path": "test/reconciler.tsx",
+      "gitBlob": "27041e79a22fe6e8e74144a942b25e6d44e24da7",
+      "size": 8577
+    },
+    {
+      "path": "test/render-to-string.tsx",
+      "gitBlob": "bbcb2eda4d90ce959f117b3fbc0a088dad22eb48",
+      "size": 8448
+    },
+    {
+      "path": "test/render.tsx",
+      "gitBlob": "7a614b64eb1e6422f8d5e7f8f39c9af0f3bec003",
+      "size": 51587
+    },
+    {
+      "path": "test/sanitize-ansi.ts",
+      "gitBlob": "aa555c3f622f832d70e7f06aec5e1592f2c4ff8e",
+      "size": 6654
+    },
+    {
+      "path": "test/screen-reader.tsx",
+      "gitBlob": "a0a5b491ecb4952910be08c56202dbc4357fbb9e",
+      "size": 7704
+    },
+    {
+      "path": "test/suspend-terminal.tsx",
+      "gitBlob": "01f615921b2eef252e3846d46dd7284d21bb66ef",
+      "size": 9605
+    },
+    {
+      "path": "test/terminal-resize.tsx",
+      "gitBlob": "6097a427f9a0b0682f1136729ed3a6f4b0331a78",
+      "size": 7366
+    },
+    {
+      "path": "test/text-width.tsx",
+      "gitBlob": "77093b4affd1f9bda6eaed329f675ce2a11fc75b",
+      "size": 5273
+    },
+    {
+      "path": "test/text.tsx",
+      "gitBlob": "3365c86ad1038c29b45e29ec3a77ab06a8af6513",
+      "size": 14170
+    },
+    {
+      "path": "test/tsconfig.json",
+      "gitBlob": "784e2190a3cf7727f35b9032cf02ef51abecfb74",
+      "size": 54
+    },
+    {
+      "path": "test/use-animation.tsx",
+      "gitBlob": "5135645d0682cd93a9f53a0e84fc60556c525722",
+      "size": 39106
+    },
+    {
+      "path": "test/use-box-metrics.tsx",
+      "gitBlob": "61f9ef27f536c63b6f8cf8e3d2e83860ffeb061a",
+      "size": 12637
+    },
+    {
+      "path": "test/width-height.tsx",
+      "gitBlob": "8e745d8821e60b1ab9a298b9c3d3e8f7c41b7c67",
+      "size": 6939
+    },
+    {
+      "path": "test/write-synchronized.tsx",
+      "gitBlob": "df4deae24cd7032c27abda2b634b317ff728a89f",
+      "size": 1664
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "2b34f118666996aa3dfa3a877c71bc071bc310f4",
+      "size": 231
+    },
+    {
+      "path": "xo.config.ts",
+      "gitBlob": "25235015e33c6326c8ef65ed539a2f400dc21f49",
+      "size": 2335
+    }
+  ],
+  "fingerprint": "37a9085a3d9e2fbf7e56fa3f0c0367679ecb1bf0967628085108ce22abd88baa"
+}

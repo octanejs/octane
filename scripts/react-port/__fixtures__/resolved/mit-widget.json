@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "fixture-widget@1.0.0": {
+      "registry": {
+        "name": "fixture-widget",
+        "version": "1.0.0",
+        "repository": {
+          "owner": "octane-fixtures",
+          "repo": "widgets",
+          "subdirectory": "packages/fixture-widget"
+        },
+        "gitHead": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "integrity": "sha512-fixture-only",
+        "manifestLicense": "MIT",
+        "licenseFiles": [
+          {
+            "path": "package/LICENSE",
+            "scope": "package",
+            "content": "MIT License Copyright (c) Fixture Authors. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the Software), to deal in the Software without restriction. The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY."
+          }
+        ],
+        "runtimeDependencies": {
+          "fixture-core": "^1.0.0"
+        }
+      },
+      "source": {
+        "name": "fixture-widget",
+        "version": "1.0.0",
+        "repository": {
+          "owner": "octane-fixtures",
+          "repo": "widgets",
+          "subdirectory": "packages/fixture-widget"
+        },
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "manifestLicense": "MIT",
+        "licenseFiles": [
+          {
+            "path": "LICENSE",
+            "scope": "root",
+            "content": "MIT License Copyright (c) Fixture Authors. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the Software), to deal in the Software without restriction. The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY."
+          }
+        ]
+      }
+    }
+  }
+}

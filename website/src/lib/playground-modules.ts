@@ -8,8 +8,9 @@
 // see playground-sandbox.ts for the CSP that backs it):
 //   ./File[.ext]        → sibling file, rewritten to a `__pg_module:<name>__`
 //                         token the sandbox swaps for a blob URL
-//   octane, octane/react, react family → left bare; the sandbox import map
-//                         resolves them (octane → local runtime blobs)
+//   octane, octane/react, octane/internal/client, react family → left bare;
+//                         the sandbox import map resolves them (Octane's
+//                         public and compiler-only APIs share local blobs)
 //   other octane/*      → error (not available in the playground)
 //   https://esm.sh/*    → allowed verbatim; any other URL → error
 //   any other bare id   → https://esm.sh/<id>?external=octane — `external`
@@ -42,6 +43,7 @@ export interface ModuleGraphFailure {
 /** Import specifiers the sandbox import map resolves — leave them bare. */
 const IMPORT_MAP_SPECIFIERS = new Set([
 	'octane',
+	'octane/internal/client',
 	'octane/react',
 	'react',
 	'react/jsx-runtime',
@@ -193,7 +195,7 @@ export async function buildModuleGraph(
 			} else if (specifier.startsWith('octane/')) {
 				return {
 					ok: false,
-					error: `${file.name}: "${specifier}" is not available in the playground (only "octane" and "octane/react" are).`,
+					error: `${file.name}: "${specifier}" is not available in the playground (only bundled client runtime entry points are supported).`,
 				};
 			} else if (specifier.startsWith('https://esm.sh/')) {
 				// Already an esm.sh URL — allowed verbatim.

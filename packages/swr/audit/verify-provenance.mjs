@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -26,14 +27,20 @@ for (const artifact of upstream.artifacts) {
 	if (actual !== artifact.sha256) throw new Error(`Vendored test drift: ${artifact.file}`);
 }
 
-for (const line of readFileSync(resolve(packageRoot, 'upstream/SHA256SUMS'), 'utf8')
-	.trim()
-	.split('\n')) {
-	const [expectedHash, path] = line.split(/\s+/);
-	const actualHash = hash(readFileSync(resolve(repoRoot, path)));
-	if (actualHash !== expectedHash) throw new Error(`Vendored evidence drift: ${path}`);
-}
-const npmHash = hash(readFileSync(resolve(packageRoot, 'upstream/npm/swr-2.4.2.tgz')));
+// The committed upstream/ tree verifies offline against the upstream git blob
+// shas in audit/upstream.lock.json.
+execFileSync(
+	process.execPath,
+	[
+		resolve(repoRoot, 'scripts/react-port/materialize.mjs'),
+		'run',
+		'--check',
+		'--package-dir',
+		packageRoot,
+	],
+	{ cwd: repoRoot, stdio: 'pipe' },
+);
+const npmHash = hash(readFileSync(resolve(packageRoot, 'upstream-artifact/swr-2.4.2.tgz')));
 if (npmHash !== '948ad899c51e73ca9555e8182946978f367410406fe6c2acb4d1012c509c9982') {
 	throw new Error(`npm tarball drift: ${npmHash}`);
 }

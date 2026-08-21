@@ -28,6 +28,7 @@ import {
 	isWithinDirectory,
 	findPackedTsrxSourceConsumerPackages,
 	findPackedTsrxSourceConsumerSpecifiers,
+	findPackedTsrxBrowserSourceConsumerPackages,
 	findPackedWorkspaceDependencyClosure,
 	findExternalDependencySpecs,
 	NATIVE_GRAPH_FORBIDDEN_MODULE,
@@ -1134,12 +1135,16 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 			}),
 	);
 	const sourceExceptionNames = new Set(packedTsrxSourceExceptions.keys());
+	const browserSourceConsumerPackages = findPackedTsrxBrowserSourceConsumerPackages(
+		packedManifests,
+		[...sourceConsumerSpecifiers.keys()],
+		sourceExceptionNames,
+	);
 	const browserSourceConsumerSpecifiers = new Map(
-		[...sourceConsumerSpecifiers].filter(([packageName]) =>
-			findPackedWorkspaceDependencyClosure(packedManifests, [packageName]).every(
-				(dependencyName) => !sourceExceptionNames.has(dependencyName),
-			),
-		),
+		browserSourceConsumerPackages.map((packageName) => [
+			packageName,
+			sourceConsumerSpecifiers.get(packageName),
+		]),
 	);
 	const validatedPackages = [...sourceConsumerSpecifiers.keys(), 'octane'];
 	const installedPackages = findPackedWorkspaceDependencyClosure(packedManifests, [

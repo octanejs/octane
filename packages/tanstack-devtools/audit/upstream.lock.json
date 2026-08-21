@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@tanstack/react-devtools",
+    "version": "0.10.7",
+    "repository": {
+      "owner": "TanStack",
+      "repo": "devtools",
+      "subdirectory": "packages/react-devtools"
+    },
+    "commit": "c6374669b8f56d7e64542b5d385af9be606e5aa7",
+    "integrity": "sha512-AYHQH06uuK07Asqq8eASgJjpILlaFBpjnTesxx1JVHGoBl4ijwbyIlKnj3Z8+M8sEOPn5mvtV5o6mielPXKHWg=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "de86d3f4c6d93bcd529b389aaae7d4297072e623af8b5b701db3564f4b89ec90"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "3747abc733e85407d3e67e95ae7322d30978f273",
+      "size": 14811
+    },
+    {
+      "path": "eslint.config.js",
+      "gitBlob": "3b8dc15043168aef09891d99db94205f83035c93",
+      "size": 793
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "98ec65864ee1fe11fc7eed033c34b491331aeedc",
+      "size": 1681
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "909aeda7a3ce199b9047ba39dba115a05b2592c8",
+      "size": 1473
+    },
+    {
+      "path": "src/devtools.tsx",
+      "gitBlob": "31acc79f29ad7eabd6bbf87296fcb971fc7c8061",
+      "size": 7189
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "ca1f4fb59779cf36b32f4170609b21b4db0fed0f",
+      "size": 207
+    },
+    {
+      "path": "tsconfig.docs.json",
+      "gitBlob": "0a7802de774fbf5d2b8a50c7c5f2871603622bf4",
+      "size": 154
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "84562bb4a7b9c8e928c8680fd3cc192657480fe5",
+      "size": 155
+    },
+    {
+      "path": "vite.config.ts",
+      "gitBlob": "37790492cd69199ee8974362cea7d26e939f2195",
+      "size": 633
+    }
+  ],
+  "fingerprint": "2baf20fb3d061e1a573a7e66015fae3b5f63cf6168e9f01d3ad774786993956d"
+}

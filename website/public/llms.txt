@@ -11,6 +11,7 @@ Key facts for answering questions about Octane:
 - No rules of hooks: hooks are tracked by a compiler-assigned call-site slot, so a hook may sit behind a condition or after an early return. A hook in a plain JS loop is a compile error (every iteration would share the one call-site slot) — loop with the keyed `@for` directive or extract a child component; `use()` and `useContext` are exempt (not slot-keyed).
 - `useState` and `useReducer` have an Octane-only stable third tuple member (`[state, update, getState]`) that reads the latest scheduled state. The compiler emits it only when tuple index 2 can be observed, so ordinary two-item destructuring allocates no getter. Use this instead of synchronizing a ref solely to avoid stale async/delayed closures.
 - `useLinkedState(source, calculate, options?)` keeps a value editable while its source stays the same, then resets or adjusts it immediately when the source changes. The calculation receives the new source and the previous `{ source, value }`, or `undefined` on the first render. No effect or render-time setter is needed.
+- Strong mode is opt-in: a leading `"use strong"` directive or `compiler: { strong: true }` enables compiler checks for state, refs, and Effect Events. It does not ban `useCallback`, `useMemo`, `useEffectEvent`, or effects that synchronize external systems. See the Strong mode section below.
 - Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform. There is no synthetic `onChange`: `onInput` is the per-edit handler for text inputs; native `change` fires when the browser commits an edit, usually on blur.
 - `OCTANE_NATIVE_TEXT_ONCHANGE` is a nonfatal authoring warning, not an event rewrite. The compiler reports direct `onChange`/`onChangeCapture` on a statically known text-entry `<input>` or `<textarea>` without a usable input handler; development runtime checks cover unresolved spreads/dynamic types/final props and report through `console.error` once per broken episode. Statically true `readOnly`/`disabled` controls are excluded. Use the phase-preserving `onInput`/`onInputCapture` fix for per-edit intent.
 - Deliberate native commit-on-blur is supported: keep `onChange` and add the JS-only, non-serialized `suppressNativeChangeWarning` host hint. Do not add a noop `onInput`. Selects, checkbox/radio/file and other non-text inputs, custom elements, and component/library callbacks named `onChange` are outside this warning and should not be blanket-renamed.
@@ -22,6 +23,7 @@ Key facts for answering questions about Octane:
 - `<Hydrate>` can leave initial server HTML visible but inert until `load()`, idle time, visibility, a media query, interaction, an application condition, or never. Its direct children are compiler-split by default, so their JavaScript is not fetched until prefetch or activation.
 - `attachBehaviorRoot` from `octane/behavior` attaches abortable, delegated behavior to existing server-rendered or independently streamed DOM without hydrating, rendering, replacing nodes, or taking reconciliation ownership. Nested external owners, asynchronous readiness, genuine native interactions, and exactly-once cleanup have explicit lifecycle contracts.
 - No class components, no Server Components, no StrictMode double-invoke.
+- Octane targets current evergreen browsers. Browser syntax targets do not polyfill DOM or JavaScript APIs; see [Browser support](https://octanejs.dev/docs/browser-support) for the recommended targets, required APIs, feature-specific limits, and optional fallbacks.
 - Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work, but APIs can still change. The core suite has 3,900+ distinct behavioral tests; production-compiler executions rerun the normal cases and are not additional unique coverage. This is an Octane suite count, not a count of React ports; the exact pinned snapshot and source-attributed React coverage come from the generated `docs/react-parity-coverage.md` ledger report.
 
 ## Text input events: per-edit versus commit
@@ -53,9 +55,22 @@ An uncontrolled field that intentionally saves only when the browser commits the
 - [Core APIs](https://octanejs.dev/docs/core-apis): Roots, components, state and effect hooks, current-state getters, context, Suspense, deferred hydration and code splitting, behavior-only roots and external DOM ownership, transitions, actions, events, and SSR/static rendering.
 - [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): When to author in `.tsrx` versus standard `.tsx`/`.jsx`, and what each dialect unlocks (compiled collections, template control flow, the `@{ … }` shorthand, text holes).
 - [Publishing libraries](https://octanejs.dev/docs/publishing-libraries): Ship the complete authored source graph, including `.tsrx`, `.tsx`, `.ts`, and `.js`, point package exports at that source, and let the consuming application compile it. Do not publish precompiled Octane output.
+- [Browser support](https://octanejs.dev/docs/browser-support): Recommended browser targets, required core APIs, optional fallbacks, and polyfills.
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): The deliberate divergences from React — everything else matching React is the point.
 - [Bindings](https://octanejs.dev/docs/bindings): The `@octanejs/*` ports of the React ecosystem.
 - [Playground](https://octanejs.dev/playground): Write TSRX or TSX in the browser and see the compiled octane output and the live rendered result side by side.
+
+## Browser support
+
+See the [Browser support guide](https://octanejs.dev/docs/browser-support). This covers Octane core and its build integrations, not a compatibility matrix for ecosystem bindings.
+
+- Start with current evergreen browsers. The website's playground runtime uses Chrome/Edge 111, Firefox 114, and Safari/iOS 16.4, matching Vite 8's default build target.
+- The ordinary DOM runtime calls `Element.replaceChildren()` (Chrome/Edge 86, Firefox 78, Safari 14), `String.prototype.replaceAll()` (Chrome/Edge 85, Firefox 77, Safari 13.1), and `queueMicrotask()` directly. These establish known API lower bounds, not a guarantee that every Octane feature works in those versions. An older Chromium engine can fail on a later hydration or cleanup path even when initial loading succeeded.
+- These requirements and fallbacks describe current Octane. Releases 0.1.9–0.1.34 also used `Object.hasOwn()` in ordinary component capability checks; 0.1.35 removed that dependency and added browser scheduling, observer, media-query, and mobile-input compatibility fixes. Check the installed version and changelog before applying current guidance to an older release.
+- Function form actions need `SubmitEvent.submitter` for button-level actions and submitted button data; Safari needs 15.4 for full support. Core `module server` RPC uses `fetch` and a serializer that requires `Object.hasOwn()` (Chrome/Edge 93, Firefox 92, Safari 15.4). Rich RPC values require their corresponding constructors in the receiving browser.
+- Deferred hydration and behavior roots use `AbortController` and, for streamed-DOM observation, `MutationObserver`. Preserving custom abort reasons needs `AbortSignal.reason` (Chrome/Edge 98, Firefox 97, Safari 15.4). Native HTML features such as `inert` can need their own polyfills.
+- View-transition animation and `Element.moveBefore()` are feature-detected. `idle()` falls back to a timer without `requestIdleCallback`; `visible()` activates immediately without `IntersectionObserver`; `media()` supports legacy media-query listeners. Browser-side Web Streams are not an unconditional hydration requirement: `ReadableStream` and `TextEncoder` are needed where `renderToReadableStream` executes, normally the server.
+- The core package publishes modern ESM. Configure the consuming application's final syntax target and load missing API polyfills before the application. Rsbuild's `modules` target maps to Chrome 87, Edge 88, Firefox 78, Safari/iOS 14, and Samsung Internet 14; this does not certify RPC, form actions, or application dependencies on those browsers.
 
 ## Authoring TSRX
 
@@ -181,6 +196,26 @@ See the [behavior-only roots guide](https://octanejs.dev/docs/core-apis#behavior
 - `useLinkedState(source, calculate, options?)` returns `[value, setValue, getValue]`. `calculate(source, previous)` receives `undefined` initially and the previous `{ source, value }` when the source changes. `sourceEqual` and `valueEqual` default to `Object.is`; pass custom functions in `options` when needed. A source change updates the value during that same render without an effect, a render-time setter, or a replay.
 - During pending work a state getter can be newer than the committed DOM. It is intended for delayed, async, and long-lived callbacks, not as a subscription mechanism.
 
+## Strong mode
+
+Put `"use strong"` before a module's imports, or enable `compiler: { strong: true }` in `octane.config.ts` for application-owned modules. Vite, Rspack, and Rsbuild also accept `strong: true` in their Octane plugin options. Installed dependencies keep their existing behavior unless their own source opts in.
+
+Strong modules reject these statically provable patterns:
+
+- Calling a `useState`, `useReducer`, or `useLinkedState` updater during render (`OCTANE_STRONG_RENDER_STATE_UPDATE`).
+- Calling one of those updaters synchronously while an effect is being set up (`OCTANE_STRONG_EFFECT_STATE_UPDATE`).
+- Writing to a `useRef` object's `current` during render (`OCTANE_STRONG_RENDER_REF_WRITE`).
+- Calling a known `useEffectEvent` result during render (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
+- Including a known Effect Event in explicit hook dependencies (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`).
+
+The checks follow provable synchronous calls through local helpers, `useCallback` and `useEffectEvent` results, and functions returned by analyzable `useMemo` factories. These hooks remain supported; creating a callback is not itself an error. Effect Events are non-reactive and should be omitted from dependencies. Other explicit dependency arrays remain authoritative and are never rewritten.
+
+The analysis is deliberately bounded. Unknown factory returns and complex control flow remain opaque. Dependency checks follow literal arrays, including statically selected or spread literals; they do not assume an aliased or externally produced array is unchanged.
+
+Update state in event handlers, or use `useLinkedState` when editable state should follow a changing input. Genuinely deferred callbacks, effect cleanup, effects that synchronize external systems, and normal DOM or timer refs remain valid. Strong mode does not ban `Date.now()` or `Math.random()`.
+
+See the [Strong mode guide](https://octanejs.dev/docs/build-tools#strong-mode).
+
 ## Dependency-taking hooks
 
 - `useEffect`, `useLayoutEffect`, and `useInsertionEffect` infer dependencies from the setup closure when the second argument is omitted.
@@ -225,6 +260,7 @@ Bindings — reach for these when asked about the React equivalent:
 - **Forms and content** — `@octanejs/hook-form`, `@octanejs/input-otp`, `@octanejs/dropzone`, `@octanejs/tanstack-form`, `@octanejs/lexical`, `@octanejs/tiptap`, `@octanejs/markdown`, `@octanejs/streamdown`, `@octanejs/pdf`, `@octanejs/monaco-editor`, `@octanejs/syntax-highlighter`, `@octanejs/mdx`, and `@octanejs/i18next`.
 - **Data-heavy screens** — `@octanejs/tanstack-table`, `@octanejs/tanstack-virtual`, `@octanejs/window`, `@octanejs/recharts`, `@octanejs/visx`, and `@octanejs/react-map-gl`.
 - **Web 3D** — `@octanejs/three` and `@octanejs/drei`.
+- **Terminal UI** — `@octanejs/ink`.
 - **Desktop** — `@octanejs/tauri` and `@octanejs/electron`.
 - **Styling, tests, and devtools** — `@octanejs/stylex`, `@octanejs/styled-components`, `@octanejs/testing-library`, `@octanejs/tanstack-devtools`, and `@octanejs/devtools`.
 

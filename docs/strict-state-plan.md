@@ -49,12 +49,19 @@ and separate workspace packages retain React-compatible behavior unless their ow
 module opts in. No package compatibility declaration or exception list is needed.
 Vite, Rspack, and Rsbuild also accept `strong: true` in their plugin options.
 
-Opted-in modules reject statically provable updater calls during render or direct
-effect setup, along with render-time `ref.current` writes. Synchronously evaluated
-state initializers, linked-state reconcilers, and linked-state equality callbacks
-are render contexts too. Genuinely deferred callbacks remain valid. There is no
-runtime phase guard, hook-cell policy, runtime-only enforcement, cleanup ban, or
-`stateWrites` configuration in the shipped model.
+Opted-in modules reject statically provable updater calls during render or
+synchronous effect setup, along with render-time `ref.current` writes. The
+analysis follows synchronous calls through `useCallback`, `useEffectEvent`, and
+functions returned by analyzable `useMemo` factories. Statically known Effect
+Event calls during render (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`) and Effect
+Events in explicit hook dependency lists
+(`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`) are also errors. The hooks themselves
+remain supported; other explicit dependency lists keep their existing semantics.
+Synchronously evaluated state initializers, linked-state reconcilers, and
+linked-state equality callbacks are render contexts too. Genuinely deferred
+callbacks and effect cleanup remain valid. There is no runtime phase guard,
+hook-cell policy, runtime-only enforcement, cleanup ban, or `stateWrites`
+configuration in the shipped model.
 
 For current authoring guidance, see [State that follows another
 value](./tsrx-basics.md#state-that-follows-another-value),

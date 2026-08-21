@@ -1,0 +1,96 @@
+{
+  "meta": {
+    "date": "2026-08-16T04:59:54.242Z",
+    "node": "v22.22.2",
+    "cpus": 32,
+    "cpuModel": "Intel(R) Xeon(R) Platinum 8336C CPU @ 2.30GHz",
+    "chromium": "149.0.7827.55",
+    "rows": 1000,
+    "reportable": false
+  },
+  "samples": {
+    "fcp": {
+      "control": [
+        {
+          "rawMs": 221.20000004768372
+        }
+      ],
+      "profile": [
+        {
+          "rawMs": 214.40000009536743,
+          "attribution": {
+            "totalMs": 188.699951171875,
+            "stages": {
+              "mt_slice_eval": 20,
+              "plan_interpretation": 17.90000009536743,
+              "first_screen_render_other": 2.5999999046325684,
+              "first_screen_command_staging": 1.5999999046325684,
+              "first_screen_host_container": 0,
+              "first_screen_host_prepare": 19.5,
+              "papi_element_creation": 57.49999785423279,
+              "first_screen_host_apply_other": 49.50000214576721,
+              "first_screen_capture": 7.3999998569488525,
+              "publication_layout_predicate_residual": 12.699951410293579
+            }
+          },
+          "realms": {
+            "background": {
+              "commits": 1,
+              "commands": 16094,
+              "bytes": 1039233,
+              "selfcheckMs": 0,
+              "dispatchMs": 6.800000190734863,
+              "validateMs": 0,
+              "prepareMs": 0,
+              "applyMs": 0,
+              "ackMs": 0
+            },
+            "main": {
+              "commits": 1,
+              "pacedCommits": 0,
+              "commands": 16094,
+              "bytes": 0,
+              "selfcheckMs": 0,
+              "dispatchMs": 0,
+              "validateMs": 20,
+              "prepareMs": 51,
+              "prepareCheckMs": 0,
+              "applyMs": 15.799999952316284,
+              "ackMs": 29.700000047683716,
+              "papiCreateMs": 57.89999794960022,
+              "mtSliceStartEpochMs": 1786856393548.4,
+              "mtSliceEvalMs": 20,
+              "firstScreenPlanMs": 17.90000009536743,
+              "firstScreenCommandStageMs": 1.5999999046325684,
+              "firstScreenRenderMs": 22.09999990463257,
+              "firstScreenCommands": 1094,
+              "firstScreenHosts": 7041,
+              "firstScreenLogicalIds": 9041,
+              "firstScreenContainerMs": 0,
+              "firstScreenPrepareMs": 19.5,
+              "firstScreenApplyMs": 107,
+              "firstScreenPapiCreateMs": 57.49999785423279,
+              "firstScreenCaptureMs": 7.3999998569488525,
+              "mtExpandMs": 0
+            }
+          }
+        }
+      ]
+    },
+    "create": {
+      "control": [],
+      "profile": [],
+      "vueVdom": []
+    },
+    "replace": {
+      "control": [],
+      "profile": [],
+      "vueVdom": []
+    },
+    "append": {
+      "control": [],
+      "profile": [],
+      "vueVdom": []
+    }
+  }
+}

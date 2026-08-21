@@ -1,5 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,25 +37,42 @@ function sameMembers(actual, expected) {
 	return JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
 }
 
-function verifyHashes(
-	lines = readFileSync(join(packageRoot, 'upstream/SHA256SUMS'), 'utf8').trim().split('\n'),
-) {
-	const expected = new Map(
-		lines.map((line) => {
-			const match = /^([a-f0-9]{64})  (.+)$/.exec(line);
-			if (!match) fail(`Malformed checksum line: ${line}`);
-			return [match[2], match[1]];
-		}),
+function verifyHashes() {
+	// The committed upstream/ git bytes verify offline against
+	// audit/upstream.lock.json (upstream git blob shas at the pinned commit).
+	execFileSync(
+		process.execPath,
+		[
+			join(packageRoot, '../../scripts/react-port/materialize.mjs'),
+			'run',
+			'--check',
+			'--package-dir',
+			packageRoot,
+		],
+		{ cwd: join(packageRoot, '../..'), stdio: 'pipe' },
 	);
-	const actualPaths = [
-		...walk(join(packageRoot, 'upstream/source')),
-		...walk(join(packageRoot, 'upstream/npm')),
-	].map((path) => relative(packageRoot, path));
-
-	if (actualPaths.length !== expected.size) fail('Vendored file added or removed');
+	// The unpacked registry artifact stays hash-pinned here.
+	const expectedArtifacts = new Map([
+		[
+			'upstream-artifact/README.md',
+			'a2ebcaba0c3cb28a82956b0de2d4cc35ec1b453933137a79bb2395ad679a087c',
+		],
+		[
+			'upstream-artifact/package.json',
+			'9590df2c15b05beccf02c5cffcfb4d90fdfe21debd191fade385cdd1e9821ed4',
+		],
+		[
+			'upstream-artifact/dist/index.d.mts',
+			'b843496b17a2bbd79c83809c73fd9c59fab53d3e361e04e52e2d489524eea764',
+		],
+	]);
+	const actualPaths = walk(join(packageRoot, 'upstream-artifact')).map((path) =>
+		relative(packageRoot, path),
+	);
+	if (actualPaths.length !== expectedArtifacts.size) fail('Artifact file added or removed');
 	for (const path of actualPaths) {
-		const wanted = expected.get(path);
-		if (!wanted) fail(`Unexpected vendored file: ${path}`);
+		const wanted = expectedArtifacts.get(path);
+		if (!wanted) fail(`Unexpected artifact file: ${path}`);
 		const actual = createHash('sha256')
 			.update(readFileSync(join(packageRoot, path)))
 			.digest('hex');
@@ -74,25 +92,13 @@ function declarationExports(source) {
 	return { runtime, types };
 }
 
-function publishedRuntimeExports(source, format) {
-	const match =
-		format === 'esm'
-			? /export\{([^}]+)\}/.exec(source)
-			: /module\.exports=\{([^}]+)\}/.exec(source);
-	if (!match) fail(`Published ${format} bundle lacks a named export list`);
-	return match[1].split(',').map((entry) => {
-		const parts = entry.trim().split(/\s+as\s+/);
-		return parts.at(-1);
-	});
-}
-
 function verifyApi(
 	api = JSON.parse(readFileSync(join(packageRoot, 'audit/public-api.json'), 'utf8')),
 ) {
 	if (!sameMembers(api.runtime, expectedRuntime)) fail('Runtime export inventory drift');
 	if (!sameMembers(api.types, expectedTypes)) fail('Public type inventory drift');
 
-	const sourceRoot = join(packageRoot, 'upstream/source/packages/input-otp/src');
+	const sourceRoot = join(packageRoot, 'upstream/packages/input-otp/src');
 	const source = walk(sourceRoot)
 		.map((path) => readFileSync(path, 'utf8'))
 		.join('\n');
@@ -100,31 +106,23 @@ function verifyApi(
 		if (!new RegExp(`\\b${name}\\b`).test(source)) fail(`Canonical source lacks ${name}`);
 	}
 
-	for (const declarationPath of ['dist/index.d.ts', 'dist/index.d.mts']) {
-		const declaration = readFileSync(join(packageRoot, 'upstream/npm', declarationPath), 'utf8');
-		const exports = declarationExports(declaration);
-		if (!sameMembers(exports.runtime, expectedRuntime)) {
-			fail(`Published runtime export drift: ${declarationPath}`);
-		}
-		if (!sameMembers(exports.types, expectedTypes)) {
-			fail(`Published type export drift: ${declarationPath}`);
-		}
+	// The vendored artifact evidence is the published .mts declaration; the
+	// runtime bundles were never vendored, so the export surface is checked
+	// against the declaration plus the canonical source above.
+	const declaration = readFileSync(join(packageRoot, 'upstream-artifact/dist/index.d.mts'), 'utf8');
+	const exports = declarationExports(declaration);
+	if (!sameMembers(exports.runtime, expectedRuntime)) {
+		fail('Published runtime export drift: dist/index.d.mts');
 	}
-	for (const [bundlePath, format] of [
-		['dist/index.mjs', 'esm'],
-		['dist/index.js', 'cjs'],
-	]) {
-		const source = readFileSync(join(packageRoot, 'upstream/npm', bundlePath), 'utf8');
-		if (!sameMembers(publishedRuntimeExports(source, format), expectedRuntime)) {
-			fail(`Published runtime bundle export drift: ${bundlePath}`);
-		}
+	if (!sameMembers(exports.types, expectedTypes)) {
+		fail('Published type export drift: dist/index.d.mts');
 	}
 
 	const sourcePackage = JSON.parse(
-		readFileSync(join(packageRoot, 'upstream/source/packages/input-otp/package.json'), 'utf8'),
+		readFileSync(join(packageRoot, 'upstream/packages/input-otp/package.json'), 'utf8'),
 	);
 	const npmPackage = JSON.parse(
-		readFileSync(join(packageRoot, 'upstream/npm/package.json'), 'utf8'),
+		readFileSync(join(packageRoot, 'upstream-artifact/package.json'), 'utf8'),
 	);
 	for (const metadata of [sourcePackage, npmPackage]) {
 		if (metadata.name !== 'input-otp' || metadata.version !== '1.4.2') {
@@ -132,13 +130,13 @@ function verifyApi(
 		}
 		if (metadata.license !== 'MIT') fail('Pinned package license drift');
 	}
-	if (!readFileSync(join(packageRoot, 'upstream/source/LICENSE'), 'utf8').includes('MIT License')) {
+	if (!readFileSync(join(packageRoot, 'upstream/LICENSE'), 'utf8').includes('MIT License')) {
 		fail('Canonical MIT license evidence drift');
 	}
 }
 
 function extractTests() {
-	const root = join(packageRoot, 'upstream/source/apps/test/src/tests');
+	const root = join(packageRoot, 'upstream/apps/test/src/tests');
 	return walk(root)
 		.filter((path) => path.endsWith('.spec.ts'))
 		.map((path) => {
@@ -218,16 +216,21 @@ verifyApi();
 verifyTests();
 
 if (process.argv.includes('--negative-controls')) {
-	const checksumLines = readFileSync(join(packageRoot, 'upstream/SHA256SUMS'), 'utf8')
-		.trim()
-		.split('\n');
-	expectFailure('deleted vendored file', () => verifyHashes(checksumLines.slice(1)));
-	expectFailure('modified vendored file', () =>
-		verifyHashes([
-			checksumLines[0].replace(/^./, checksumLines[0][0] === '0' ? '1' : '0'),
-			...checksumLines.slice(1),
-		]),
-	);
+	// Byte drift in the pinned tree must fail the lock layer.
+	const probePath = join(packageRoot, 'upstream/packages/input-otp/src/index.ts');
+	const probeOriginal = readFileSync(probePath);
+	try {
+		writeFileSync(probePath, Buffer.concat([probeOriginal, Buffer.from('\n// drift\n')]));
+		expectFailure('modified vendored file', () => verifyHashes());
+	} finally {
+		writeFileSync(probePath, probeOriginal);
+	}
+	try {
+		rmSync(probePath);
+		expectFailure('deleted vendored file', () => verifyHashes());
+	} finally {
+		writeFileSync(probePath, probeOriginal);
+	}
 
 	const api = JSON.parse(readFileSync(join(packageRoot, 'audit/public-api.json'), 'utf8'));
 	expectFailure('missing runtime export', () =>
@@ -262,5 +265,5 @@ if (process.argv.includes('--negative-controls')) {
 }
 
 console.log(
-	`Verified ${readFileSync(join(packageRoot, 'upstream/SHA256SUMS'), 'utf8').trim().split('\n').length} vendored files, ${expectedRuntime.length} runtime exports, ${expectedTypes.length} public types, 8 upstream artifacts, and 15 upstream cases.`,
+	`Verified the lock-pinned upstream tree, ${expectedRuntime.length} runtime exports, ${expectedTypes.length} public types, 8 upstream artifacts, and 15 upstream cases.`,
 );

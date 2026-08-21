@@ -14,6 +14,7 @@ import {
 	useTransition,
 	useDeferredValue,
 	useSyncExternalStore,
+	withSlot,
 } from '../src/index.js';
 
 // The `slot: symbol` argument on every hook is COMPILER-INJECTED.
@@ -55,5 +56,22 @@ describe('slot ergonomics — public signature hides the compiler-injected slot'
 		],
 	])('%s without a slot throws naming the hook', (name, call) => {
 		expect(call).toThrow(new RegExp(`${name} was called without a hook slot`));
+	});
+
+	it.each([
+		['omitted', () => useCallback(() => 0)],
+		['null', () => useCallback(() => 0, null)],
+	])('useCallback with %s dependencies still names the missing hook', (_deps, call) => {
+		expect(call).toThrow(/useCallback was called without a hook slot/);
+	});
+
+	it('restores missing-slot diagnostics after a manual hook throws', () => {
+		const failure = new Error('manual hook failed');
+		expect(() =>
+			withSlot(Symbol('throwing-custom-hook'), () => {
+				throw failure;
+			}),
+		).toThrow(failure);
+		expect(() => useCallback(() => 0, [])).toThrow(/useCallback was called without a hook slot/);
 	});
 });

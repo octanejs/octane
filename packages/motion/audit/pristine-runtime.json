@@ -1,8 +1,157 @@
 {
   "schemaVersion": 1,
-  "root": "packages/motion/upstream",
-  "snapshots": 0,
+  "project": "motion-pristine",
   "tests": [
+    {
+      "file": "src/value/__tests__/motion-value.test.ts",
+      "fullName": "motionValue x animate animationCancel event fires",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/motion-value.test.ts",
+      "fullName": "motionValue x animate animationComplete event fires",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/motion-value.test.ts",
+      "fullName": "motionValue x animate animationStart event fires",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/motion-value.test.ts",
+      "fullName": "motionValue x animate When all change listeners removed, stop animation",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/unwrap-value.test.ts",
+      "fullName": "resolveMotionValue should leave non-motion values alone",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/unwrap-value.test.ts",
+      "fullName": "resolveMotionValue should should unwrap a motion value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue animation events triggers animationComplete event when animation finishes",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue animation events triggers animationStart event when animation begins",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue types can create a motion value from a number",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue types can create a motion value from a number motion value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue types can create a motion value from a string motion value with a unit",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue types can create a motion value from a string with a unit",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with % can create a motion value from a number (default spring)",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with % can create a MotionValue that responds to changes from another MotionValue",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with % creates a spring animation when type is spring",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with % unsubscribes when attached to a new value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with % will not animate if immediate=true (jump)",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with different transition types accepts delay configuration",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with different transition types accepts repeat configuration",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with different transition types accepts spring configuration",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with different transition types accepts tween configuration",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with numbers can create a motion value from a number (default spring)",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with numbers can create a MotionValue that responds to changes from another MotionValue",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with numbers creates a spring animation when type is spring",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with numbers unsubscribes when attached to a new value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-follow-value.test.tsx",
+      "fullName": "useFollowValue with numbers will not animate if immediate=true (jump)",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-motion-template.test.tsx",
+      "fullName": "useMotionTemplate can be re-pointed to another `MotionValue`",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-motion-template.test.tsx",
+      "fullName": "useMotionTemplate respects static values",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-motion-template.test.tsx",
+      "fullName": "useMotionTemplate responds to manual setting from parent value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-motion-template.test.tsx",
+      "fullName": "useMotionTemplate sets initial value",
+      "status": "passed"
+    },
     {
       "file": "src/value/__tests__/use-motion-value.test.tsx",
       "fullName": "useMotionValue accepts new motion values",
@@ -26,6 +175,241 @@
     {
       "file": "src/value/__tests__/use-motion-value.test.tsx",
       "fullName": "useMotionValue sets initial value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-scroll.test.tsx",
+      "fullName": "useScroll accelerate does not set accelerate when ScrollTimeline is not supported",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-scroll.test.tsx",
+      "fullName": "useScroll accelerate does not set accelerate when target has non-preset string offset",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-scroll.test.tsx",
+      "fullName": "useScroll accelerate does not set accelerate when target ref is provided and ViewTimeline is not supported",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-scroll.test.tsx",
+      "fullName": "useScroll accelerate propagates accelerate through useTransform",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-scroll.test.tsx",
+      "fullName": "useScroll accelerate sets accelerate on progress values when ScrollTimeline is supported and no target",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-scroll.test.tsx",
+      "fullName": "useScroll accelerate sets accelerate when target ref is provided and ViewTimeline is supported",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring animation events triggers animationComplete event when spring animation finishes",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring animation events triggers animationStart event when spring animation begins",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring skipInitialAnimation skips animation on first source change when skipInitialAnimation is true",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring types can create a motion value from a number",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring types can create a motion value from a number motion value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring types can create a motion value from a string motion value with a unit",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring types can create a motion value from a string with a unit",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring with % can create a motion value from a number",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring with % can create a MotionValue that responds to changes from another MotionValue",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring with % creates a spring that animates to the subscribed motion value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring with % unsubscribes when attached to a new value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring with % will not animate if immediate=true",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring with numbers can create a motion value from a number",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring with numbers can create a MotionValue that responds to changes from another MotionValue",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring with numbers creates a spring that animates to the subscribed motion value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring with numbers unsubscribes when attached to a new value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-spring.test.tsx",
+      "fullName": "useSpring with numbers will not animate if immediate=true",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as function sets initial value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as function with multiple values sets initial value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as function with no passed MotionValues sets initial value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as input/output range responds to manual setting from parent value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as input/output range sets initial value",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as input/output range updates when values change",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as output map is correctly typed",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as output map maintains keys across renders even if outputMap keys change",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as output map responds to input range changes",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as output map sets initial values",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as output map supports transform options",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as output map updates values when input changes",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as output map works with color values",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "as output map works with mixed types (string and number outputs)",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "can be re-pointed to another `MotionValue`",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "CSS logical properties support numeric values with useTransform",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "CSS logical properties supports inset shorthand with numeric values",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "CSS logical properties supports other CSS logical properties",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "CSS logical properties supports other inset logical properties",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "CSS logical properties updates inset when MotionValue changes",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "CSS logical properties updates paddingBlock when MotionValue changes",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "frame scheduling",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "is correctly typed",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-velocity.test.tsx",
+      "fullName": "useVelocity creates a motion value that updates with the velocity of the provided motion value",
       "status": "passed"
     }
   ]

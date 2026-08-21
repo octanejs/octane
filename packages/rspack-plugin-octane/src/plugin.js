@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto';
-import { realpathSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	createClientReferenceManifest,
 	createOctaneCompiler,
 } from 'octane/compiler/bundler';
+import { installCssModuleConstants } from './css-module-constants.js';
 import {
 	getOctaneRspackBuildInfo,
 	inferRspackEnvironment,
@@ -18,8 +19,17 @@ const PLUGIN_NAME = 'OctaneRspackPlugin';
 const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
 const PLUGIN_VERSION = createRequire(import.meta.url)('../package.json').version;
 const loaderPath = fileURLToPath(new URL('./loader.js', import.meta.url));
+const finalizeLoaderPath = fileURLToPath(new URL('./finalize-loader.js', import.meta.url));
+const parallelLoaderPath = fileURLToPath(new URL('./parallel-loader.js', import.meta.url));
+const DEFAULT_MAX_WORKERS = 4;
 const OCTANE_RULE = /\.(?:tsrx|tsx|ts|js)$/i;
 const TYPESCRIPT_RULE = /\.(?:tsrx|tsx|ts)$/i;
+const RUNTIME_SUBPATHS = [
+	'octane/server',
+	'octane/internal/client',
+	'octane/internal/server',
+	'octane/profiling',
+];
 
 function realRoot(path) {
 	try {
@@ -37,10 +47,10 @@ function addUniqueExtensions(resolveOptions) {
 	];
 }
 
-function resolveRuntimeModule(request, root) {
+function resolveRuntimeModule(resolver, request, root) {
 	if (isAbsolute(request)) return request;
 	try {
-		return createRequire(join(root, 'package.json')).resolve(request);
+		return resolver.resolveSync({}, root, request);
 	} catch {
 		// Let Rspack produce its normal resolution diagnostic. This fallback also
 		// keeps config inspection usable before peer dependencies are installed.
@@ -48,16 +58,80 @@ function resolveRuntimeModule(request, root) {
 	}
 }
 
-function addRuntimeAlias(resolveOptions, request, root) {
-	const aliases = resolveOptions.alias === false ? {} : (resolveOptions.alias ?? {});
-	resolveOptions.alias = {
-		...aliases,
-		octane$: resolveRuntimeModule(request, root),
-		// Compiler-emitted metadata imports this public subpath directly. Pin it
-		// alongside the runtime entry so raw/linked packages with their own nested
-		// Octane copy cannot split metadata registration from runtime recording.
-		'octane/profiling$': resolveRuntimeModule('octane/profiling', root),
+function octanePackageRoot(entry) {
+	if (typeof entry !== 'string' || !isAbsolute(entry)) return undefined;
+	let directory = dirname(entry);
+	while (true) {
+		try {
+			const { name } = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'));
+			if (name === 'octane') return directory;
+			if (name !== undefined) return undefined;
+		} catch {
+			// Entry files may be several directories below their package manifest.
+		}
+		const parent = dirname(directory);
+		if (parent === directory) return undefined;
+		directory = parent;
+	}
+}
+
+function mergeRuntimeAliases(aliases, additions) {
+	return {
+		...additions,
+		...(aliases === false ? {} : aliases),
+		octane$: additions.octane$,
 	};
+}
+
+function addRuntimeAliases(compiler, request, root, explicitRuntime) {
+	const resolveOptions = compiler.options.resolve;
+	// The factory is created before Rspack applies mode/target defaults. Merge
+	// the finalized ESM options (including `...`) before resolving; require
+	// conditions would select Octane's separate, non-tree-shakeable CJS graph.
+	const { byDependency, ...base } = resolveOptions;
+	const esm = compiler.webpack.util.cleverMerge(base, byDependency?.esm ?? {});
+	const resolver = compiler.resolverFactory.get('normal', { ...esm, dependencyType: 'esm' });
+	const packageResolver = compiler.resolverFactory.get('normal', {
+		...esm,
+		alias: false,
+		dependencyType: 'esm',
+	});
+	const selected = resolveRuntimeModule(resolver, 'octane', root);
+	const override = explicitRuntime ? resolveRuntimeModule(resolver, request, root) : undefined;
+	const packageRoot = octanePackageRoot(override) ?? octanePackageRoot(selected) ?? root;
+	const aliases = esm.alias === false ? {} : (esm.alias ?? {});
+	const additions = {};
+	for (const subpath of RUNTIME_SUBPATHS) {
+		// Resolve package self-references without a broad `octane` alias. Linked
+		// packages must share the selected runtime's refs, context, and profiler.
+		// A consumer's explicit subpath override remains authoritative.
+		additions[`${subpath}$`] =
+			aliases[`${subpath}$`] ??
+			aliases[subpath] ??
+			resolveRuntimeModule(packageResolver, subpath, packageRoot);
+	}
+	const runtime = explicitRuntime
+		? override
+		: request === 'octane' || selected === false
+			? selected
+			: (additions[`${request}$`] ?? resolveRuntimeModule(resolver, request, root));
+	additions.octane$ = runtime;
+	// Exact entries precede any existing prefix alias; unrelated Octane subpaths
+	// (including universal renderer entries) keep their normal resolution.
+	resolveOptions.alias = mergeRuntimeAliases(resolveOptions.alias, additions);
+	if (byDependency?.esm?.alias !== undefined && byDependency.esm.alias !== false) {
+		// Rspack applies this map again during module resolution. A package
+		// selection here must not restore its client entry in a server graph.
+		// Preserve `false`: it explicitly disables all aliases for ESM requests.
+		resolveOptions.byDependency = {
+			...byDependency,
+			esm: {
+				...byDependency.esm,
+				alias: mergeRuntimeAliases(byDependency.esm.alias, additions),
+			},
+		};
+	}
+	return resolver;
 }
 
 function projectRendererModule(request, root) {
@@ -271,12 +345,20 @@ export class OctaneRspackPlugin {
 		);
 		const environment = this.options.environment ?? inferRspackEnvironment(compiler.options.target);
 		const profile = environment === 'client' && this.options.profile === true;
-		const hmr =
-			environment === 'client' && hasHotModuleReplacement(compiler) && this.options.hmr !== false;
+		const hotModuleReplacement = hasHotModuleReplacement(compiler);
+		const hmr = environment === 'client' && hotModuleReplacement && this.options.hmr !== false;
 		const dev =
 			environment === 'client' &&
 			(this.options.dev ??
 				(compiler.options.mode === undefined || compiler.options.mode !== 'production'));
+		// Disabling Octane's own HMR wrapper does not make a hot CSS provider's
+		// exports immutable across replacement.
+		const cssModuleConstants =
+			this.options.cssModuleConstants !== undefined &&
+			this.options.cssModuleConstants !== false &&
+			compiler.options.mode === 'production' &&
+			!dev &&
+			!hotModuleReplacement;
 		assertProfilingDefineAvailable(compiler, profile);
 		saltPersistentCacheVersion(compiler, {
 			root,
@@ -294,8 +376,15 @@ export class OctaneRspackPlugin {
 			// transform results must not survive a requireDirective toggle.
 			requireDirective: this.options.requireDirective === true,
 			transpile: this.options.transpile !== false,
+			cssModuleConstants,
 		});
 		installProfilingDefine(compiler, profile);
+		if (cssModuleConstants) {
+			installCssModuleConstants(compiler, {
+				option: this.options.cssModuleConstants,
+				environment,
+			});
+		}
 		const neutralCompiler = createDiscoveryCompiler(this.options, root, profile);
 		const discoveryCompilers = [neutralCompiler];
 		for (const specialization of Object.values(this.options.layerSpecializations ?? {})) {
@@ -306,7 +395,6 @@ export class OctaneRspackPlugin {
 
 		compiler.options.resolve ??= {};
 		addUniqueExtensions(compiler.options.resolve);
-		addRuntimeAlias(compiler.options.resolve, runtimeRequest, root);
 		addProjectRendererAliases(compiler.options.resolve, this.options.renderers, root);
 		for (const specialization of Object.values(this.options.layerSpecializations ?? {})) {
 			addProjectRendererAliases(compiler.options.resolve, specialization.renderers, root);
@@ -337,7 +425,22 @@ export class OctaneRspackPlugin {
 			test: OCTANE_RULE,
 			type: 'javascript/auto',
 			enforce: 'pre',
-			use: [{ loader: loaderPath, options: loaderOptions }],
+			use:
+				this.options.parallel === false
+					? [{ loader: loaderPath, options: loaderOptions }]
+					: [
+							{ loader: finalizeLoaderPath, options: loaderOptions },
+							{
+								loader: parallelLoaderPath,
+								options: loaderOptions,
+								parallel: {
+									maxWorkers:
+										typeof this.options.parallel === 'object'
+											? (this.options.parallel.maxWorkers ?? DEFAULT_MAX_WORKERS)
+											: DEFAULT_MAX_WORKERS,
+								},
+							},
+						],
 		});
 		if (this.options.transpile !== false) {
 			compiler.options.module.rules.push({
@@ -346,17 +449,27 @@ export class OctaneRspackPlugin {
 				use: [{ loader: 'builtin:swc-loader', options: { detectSyntax: 'auto' } }],
 			});
 		}
+		const layerRuntimeAliases = [];
 		for (const [layer, specialization] of Object.entries(this.options.layerSpecializations ?? {})) {
 			if (specialization.runtime === undefined) continue;
+			const alias = { octane$: specialization.runtime };
+			layerRuntimeAliases.push([alias, specialization.runtime]);
 			compiler.options.module.rules.push({
 				issuerLayer: layer,
-				resolve: {
-					alias: {
-						octane$: resolveRuntimeModule(specialization.runtime, root),
-					},
-				},
+				resolve: { alias },
 			});
 		}
+		compiler.hooks.afterResolvers.tap(PLUGIN_NAME, () => {
+			const resolver = addRuntimeAliases(
+				compiler,
+				runtimeRequest,
+				root,
+				this.options.runtime !== undefined,
+			);
+			for (const [alias, request] of layerRuntimeAliases) {
+				alias.octane$ = resolveRuntimeModule(resolver, request, root);
+			}
+		});
 
 		let discovery;
 		const discover = () => {

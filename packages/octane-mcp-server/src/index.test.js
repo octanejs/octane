@@ -77,6 +77,21 @@ describe('@octanejs/mcp-server helpers', () => {
 			.map((line) => line.trim())
 			.filter((line) => line && line !== 'Available suites:');
 		expect(suites).toEqual(BENCHMARK_SUITES);
+
+		// The public MCP schema must accept every runner suite, not just keep
+		// an exported helper list in sync.
+		const server = createServer({ repoRoot });
+		const client = new Client({ name: 'octane-mcp-test', version: '1.0.0' });
+		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+		try {
+			await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+			const tools = await client.listTools();
+			const benchmark = tools.tools.find((tool) => tool.name === 'octane_benchmark');
+			expect(benchmark?.inputSchema.properties?.benchmark?.enum).toEqual(['all', ...suites]);
+		} finally {
+			await client.close();
+			await server.close();
+		}
 	});
 
 	it('classifies every maintained binding and recommends its test project', () => {
@@ -150,7 +165,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			true,
 		);
 
-		expect(plan.requiredSkills).toContain('react-library-port');
+		expect(plan.requiredSkills).toContain('octane-react-library-port');
 		expect(plan.gates.parity.join('\n')).toContain('packages/<name>/UPSTREAM.md');
 		expect(plan.gates.parity.join('\n')).toContain('divergence');
 		expect(plan.gates.parity.join('\n')).toContain("pinned release's own suite");
@@ -160,7 +175,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			true,
 		);
 		expect(applicationPlan.gates.parity).toBeUndefined();
-		expect(applicationPlan.requiredSkills).not.toContain('react-library-port');
+		expect(applicationPlan.requiredSkills).not.toContain('octane-react-library-port');
 	});
 
 	it('blocks framework-core plans when maintainer tools are unavailable', () => {
@@ -268,6 +283,7 @@ describe('@octanejs/mcp-server helpers', () => {
 			.map((entry) => entry.name)
 			.sort();
 
+		expect(REPO_SKILLS['react-library-port']).toBe('.rulesync/skills/react-library-port/SKILL.md');
 		expect(Object.keys(REPO_SKILLS).sort()).toEqual(onDisk);
 
 		for (const file of Object.values(REPO_SKILLS)) {

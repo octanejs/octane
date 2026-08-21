@@ -364,8 +364,8 @@ JavaScript. Only inject source you trust.
 
 ## Strong mode
 
-Strong mode is an optional compiler check for state and refs. Start with one
-module by putting `"use strong"` before its imports:
+Strong mode is an optional compiler check for state, refs, and Effect Events.
+Start with one module by putting `"use strong"` before its imports:
 
 ```tsx
 "use strong";
@@ -396,16 +396,33 @@ options; use the plugin option for a standalone Rspack setup. An explicit plugin
 setting wins over `octane.config.ts`. Dependencies keep their existing behavior
 unless one of their own modules opts in with `"use strong"`.
 
-Three patterns become compile errors:
+These patterns become compile errors:
 
 - Calling a `useState`, `useReducer`, or `useLinkedState` updater during render.
-- Calling one of those updaters directly while an effect is being set up.
+- Calling one of those updaters synchronously while an effect is being set up.
 - Assigning to a `useRef` object's `current` during render.
+- Calling a statically known `useEffectEvent` result during render
+  (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
+- Including a statically known Effect Event in an explicit hook dependency list
+  (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`).
+
+The checks follow provable synchronous calls through local helpers,
+`useCallback` and `useEffectEvent` results, and functions returned by analyzable
+`useMemo` factories. These hooks remain supported; creating a callback is not
+itself an error. Effect Events are non-reactive and should be omitted from hook
+dependencies. Other explicit dependency arrays keep their existing meaning and
+are never rewritten.
+
+The analysis is deliberately bounded. Factories with unknown return values or
+complex control flow remain opaque. Dependency checks follow literal arrays,
+including statically selected or spread literals; they do not assume an aliased
+or externally produced array is unchanged.
 
 Update state in event handlers instead. When state should reset or adjust after
 an input changes, use `useLinkedState`. Effects that connect to external systems,
-and refs used for DOM elements, timers, or event callbacks, remain valid. Strong
-mode does not restrict `Date.now()`, `Math.random()`, or similar values.
+genuinely deferred callbacks, effect cleanup, and refs used for DOM elements,
+timers, or event callbacks remain valid. Strong mode does not restrict
+`Date.now()`, `Math.random()`, or similar values.
 
 `"use strong"` only affects its own module. Put it at the top of the file, before
 imports or other code; comments and other directives may come first. In files

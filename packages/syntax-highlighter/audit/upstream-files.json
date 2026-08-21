@@ -6,7 +6,7 @@
   "npmSha1": "928459855d375f5cfc8e646071e20d541cebcb52",
   "npmIntegrity": "sha512-PjVawBGy80C6YbC5DDZJeUjBmC7skaoEUdvfFQediQHgCL7aKyVHe57SaJGfQsloGDac+gCpTfRdtxzWWKmCXA==",
   "licenseSha256": "a74e9029bdf2e92141bc711a6b17fa77b90c10eeec51193c83279cc69848f5bf",
-  "fileCount": 696,
+  "fileCount": 695,
   "files": [
     {
       "path": "__tests__/__snapshots__/code-style-passed-to-line-numbers.js.snap",
@@ -202,11 +202,6 @@
       "path": "LICENSE",
       "bytes": 1071,
       "sha256": "a74e9029bdf2e92141bc711a6b17fa77b90c10eeec51193c83279cc69848f5bf"
-    },
-    {
-      "path": "npm/react-syntax-highlighter-16.1.1.tgz",
-      "bytes": 229899,
-      "sha256": "8a324f3d4d79e6b40b2f2279ee97285a0a85d552ecdf6f1910f178907cda31aa"
     },
     {
       "path": "package.json",

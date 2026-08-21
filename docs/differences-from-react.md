@@ -331,11 +331,18 @@ Alternatively, enable it across application-owned modules with
 `compiler: { strong: true }` in `octane.config.ts`. Installed dependencies stay
 in compatibility mode unless their own source opts in.
 
-A Strong module cannot call a state updater during render or directly while
-setting up an effect, and it cannot assign to `ref.current` during render.
-Event handlers, effects that synchronize an external system, and normal DOM or
-timer refs remain supported. Replace prop-driven state resets with
-`useLinkedState` instead of calling a setter during render.
+A Strong module cannot call a state updater during render or synchronously while
+setting up an effect, and it cannot assign to `ref.current` during render. The
+checks follow provable synchronous calls through `useCallback`, `useEffectEvent`,
+and functions returned by analyzable `useMemo` factories. Calling a statically
+known Effect Event during render or including it in an explicit hook dependency
+list is also a compile error. The hooks themselves remain supported, and other
+explicit dependency lists retain their existing meaning.
+
+Event handlers, genuinely deferred callbacks, effect cleanup, effects that
+synchronize an external system, and normal DOM or timer refs remain supported.
+Replace prop-driven state resets with `useLinkedState` instead of calling a
+setter during render.
 
 ## JSX values follow the represented render scope
 
@@ -695,8 +702,11 @@ Other consequences:
   unchanged values (the concurrent-interleaving window it guards doesn't exist
   here).
 - A hidden `<Activity>` subtree renders synchronously in the same pass — there
-  is no offscreen/idle lane deprioritizing hidden work. Hide/reveal semantics
-  (state preserved, effects unmounted while hidden) match React.
+  is no offscreen/idle lane deprioritizing hidden work. Compatible state and DOM
+  are preserved; refs and layout/passive effects disconnect while hidden and
+  reconnect on reveal. Insertion effects stay connected. Hidden suspension is
+  contained by the Activity, but general structural-deletion atomicity still has
+  the per-swap limitation above. See the [Activity audit](./activity-audit.md).
 - `useId` generates `:<prefix>in-<n>:` identifiers (React 19.2 uses
   `_r_<n>_`). Both are opaque; only the format differs.
 - `version` reports Octane's own package version (`0.x`), not a React version —

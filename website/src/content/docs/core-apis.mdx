@@ -312,12 +312,18 @@ export function ProfileEditor({ user }) {
 }
 ```
 
-A Strong module cannot update state while rendering, update state directly while
-setting up an effect, or write `ref.current` while rendering. Event handlers can
-still update state. Effects that synchronize external systems and refs for DOM
-nodes or timers are still valid. Use `useLinkedState` when editable state should
-follow an input; it returns the right value immediately without an effect or a
-render-time setter.
+A Strong module cannot update state while rendering, update state synchronously
+while setting up an effect, or write `ref.current` while rendering. The compiler
+also follows provable calls through `useCallback`, `useEffectEvent`, and functions
+returned by analyzable `useMemo` factories. A statically known Effect Event cannot
+be called during render or listed in explicit hook dependencies. These hooks
+remain supported, and other explicit dependency lists keep their existing meaning.
+
+Event handlers can still update state. Genuinely deferred callbacks, effect
+cleanup, effects that synchronize external systems, and refs for DOM nodes or
+timers are still valid. Use `useLinkedState` when editable state should follow an
+input; it returns the right value immediately without an effect or a render-time
+setter.
 
 <details className="deep-dive">
 	<summary>Octane deep dive: state getters and conditional hooks</summary>

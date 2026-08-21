@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
 	canonicalModuleId: vi.fn(),
 	cleanModuleId: vi.fn(),
 	createOctaneCompiler: vi.fn(),
+	findCssModuleImportRequests: vi.fn(),
 	transform: vi.fn(),
 }));
 
@@ -14,11 +15,15 @@ vi.mock('octane/compiler/bundler', () => ({
 }));
 
 import octaneLoader from '../src/loader.js';
+import finalizeOctaneLoader, { pitch as pitchOctaneLoader } from '../src/finalize-loader.js';
+import parallelOctaneLoader from '../src/parallel-loader.js';
+import { CSS_MODULE_CONTEXT_KEY, cssModuleSourceHash } from '../src/css-module-data.js';
 
 interface LoaderResult {
 	error: Error | null;
 	content?: string | Buffer;
 	map?: unknown;
+	metadata?: unknown;
 }
 
 function runLoader({
@@ -30,6 +35,7 @@ function runLoader({
 	resource = '/project/src/App.tsrx?cache=1',
 	source = 'export function App() @{ <div /> }',
 	inputSourceMap,
+	cssModuleData,
 	module = { buildInfo: {} as Record<string, unknown>, layer: undefined as string | undefined },
 }: {
 	options?: Record<string, unknown>;
@@ -40,10 +46,13 @@ function runLoader({
 	resource?: string;
 	source?: string | Buffer;
 	inputSourceMap?: unknown;
+	cssModuleData?: unknown;
 	module?: { buildInfo: Record<string, unknown>; layer?: string };
 } = {}) {
 	const dependencies: string[] = [];
 	const missingDependencies: string[] = [];
+	const contextDependencies: string[] = [];
+	const buildDependencies: string[] = [];
 	let result: LoaderResult | undefined;
 	const context = {
 		rootContext: '/project',
@@ -54,16 +63,89 @@ function runLoader({
 		mode,
 		sourceMap,
 		_module: module,
+		[CSS_MODULE_CONTEXT_KEY]: cssModuleData,
 		cacheable: vi.fn(),
 		getOptions: () => options,
 		addDependency: (dependency: string) => dependencies.push(dependency),
 		addMissingDependency: (dependency: string) => missingDependencies.push(dependency),
+		addContextDependency: (dependency: string) => contextDependencies.push(dependency),
+		addBuildDependency: (dependency: string) => buildDependencies.push(dependency),
 		callback: (error: Error | null, content?: string | Buffer, map?: unknown) => {
 			result = { error, content, map };
 		},
 	};
 	octaneLoader.call(context, source, inputSourceMap);
-	return { context, dependencies, missingDependencies, module, result: result! };
+	return {
+		context,
+		dependencies,
+		missingDependencies,
+		contextDependencies,
+		buildDependencies,
+		module,
+		result: result!,
+	};
+}
+
+function runParallelLoader({
+	options = {},
+	source = 'export function App() @{ <div /> }',
+	inputSourceMap,
+	module = { buildInfo: {} as Record<string, unknown>, layer: undefined as string | undefined },
+}: {
+	options?: Record<string, unknown>;
+	source?: string;
+	inputSourceMap?: unknown;
+	module?: { buildInfo: Record<string, unknown>; layer?: string };
+} = {}) {
+	const dependencies: string[] = [];
+	const missingDependencies: string[] = [];
+	let result: LoaderResult | undefined;
+	const finalizer = {
+		_module: module,
+		data: {} as Record<string, unknown>,
+		addMissingDependency: (dependency: string) => missingDependencies.push(dependency),
+		callback: (
+			error: Error | null,
+			content?: string | Buffer,
+			map?: unknown,
+			metadata?: unknown,
+		) => {
+			result = { error, content, map, ...(metadata === undefined ? {} : { metadata }) };
+		},
+	};
+	pitchOctaneLoader.call(finalizer);
+
+	const workerCallback = (
+		error: Error | null,
+		content?: string | Buffer,
+		map?: unknown,
+		metadata?: unknown,
+	) => {
+		if (error) {
+			result = { error, content, map };
+			return;
+		}
+		finalizeOctaneLoader.call(finalizer, content, map, metadata);
+	};
+	const worker = {
+		rootContext: '/project',
+		resource: '/project/src/App.tsrx?cache=1',
+		resourcePath: '/project/src/App.tsrx',
+		target: 'web',
+		hot: false,
+		mode: 'development',
+		sourceMap: true,
+		_module: { buildInfo: {} as Record<string, unknown>, layer: undefined as string | undefined },
+		loaders: [{ loaderItem: { data: finalizer.data } }, {}],
+		loaderIndex: 1,
+		cacheable: vi.fn(),
+		getOptions: () => options,
+		addDependency: (dependency: string) => dependencies.push(dependency),
+		callback: workerCallback,
+		async: () => workerCallback,
+	};
+	parallelOctaneLoader.call(worker, source, inputSourceMap);
+	return { dependencies, missingDependencies, module, result: result! };
 }
 
 describe('octane Rspack loader', () => {
@@ -71,9 +153,138 @@ describe('octane Rspack loader', () => {
 		mocks.transform.mockReset();
 		mocks.canonicalModuleId.mockReset().mockReturnValue('/src/App.tsrx');
 		mocks.cleanModuleId.mockReset().mockImplementation((id: string) => id.replace(/[?#].*$/, ''));
+		mocks.findCssModuleImportRequests.mockReset().mockReturnValue([]);
 		mocks.createOctaneCompiler.mockReset().mockImplementation(() => ({
 			transform: mocks.transform,
+			findCssModuleImportRequests: mocks.findCssModuleImportRequests,
 		}));
+	});
+
+	it('forwards exact CSS facts and only committed provider dependencies', () => {
+		const source = "import classes from './styles.module.css'; export function App() @{ <div /> }";
+		const request = './styles.module.css';
+		const unusedRequest = './unused.module.css';
+		const dependencies = {
+			files: ['/project/styles.module.css'],
+			contexts: ['/project/themes'],
+			missing: ['/project/theme.config.js'],
+			build: ['/project/css-provider.cjs'],
+		};
+		mocks.findCssModuleImportRequests.mockReturnValue([request, unusedRequest]);
+		mocks.transform.mockImplementation((_source, _id, options) => {
+			const resolve = options.resolveCssModuleConstant;
+			return {
+				kind: 'compile',
+				code: JSON.stringify([
+					resolve?.(request, 'root', null),
+					resolve?.(request, '*', 'root'),
+					resolve?.(request, 'default', 'root'),
+					resolve?.(request, 'default', null),
+					resolve?.(request, '__proto__', null),
+					resolve?.(request, 'constructor', null),
+					resolve?.(request, '*', 'toString'),
+					resolve?.(request, 'default', 'constructor'),
+				]),
+				cssModuleConstantImports: [request],
+			};
+		});
+		const output = runLoader({
+			mode: 'production',
+			source,
+			cssModuleData: {
+				enabled: true,
+				proof: {
+					sourceHash: cssModuleSourceHash(source),
+					imports: [
+						{
+							request,
+							named: [
+								['root', 'named_root'],
+								['default', 'primitive_default'],
+								['__proto__', 'named_proto'],
+							],
+							default: [['root', 'default_root']],
+							dependencies,
+						},
+						{
+							request: unusedRequest,
+							named: [['root', 'unused_root']],
+							default: [],
+							dependencies: { ...dependencies, files: ['/project/unused.module.css'] },
+						},
+					],
+				},
+			},
+		});
+		expect(output.result.error).toBeNull();
+		expect(JSON.parse(String(output.result.content))).toEqual([
+			'named_root',
+			'named_root',
+			'default_root',
+			'primitive_default',
+			'named_proto',
+			null,
+			null,
+			null,
+		]);
+		expect(output.dependencies).toEqual(dependencies.files);
+		expect(output.contextDependencies).toEqual(dependencies.contexts);
+		expect(output.missingDependencies).toEqual(dependencies.missing);
+		expect(output.buildDependencies).toEqual(dependencies.build);
+		expect(output.context.cacheable).toHaveBeenCalledWith(false);
+	});
+
+	it('keeps ordinary output for mismatched or discovery-only CSS facts', () => {
+		const source = "import { root } from './styles.module.css'; export function App() @{ <div /> }";
+		const request = './styles.module.css';
+		mocks.findCssModuleImportRequests.mockReturnValue([request]);
+		mocks.transform.mockImplementation((_source, _id, options) => ({
+			kind: 'compile',
+			code: options.resolveCssModuleConstant?.(request, 'root', null) ?? 'ordinary',
+		}));
+		for (const discoverOnly of [false, true]) {
+			const output = runLoader({
+				mode: 'production',
+				source,
+				cssModuleData: {
+					enabled: true,
+					discoverOnly,
+					proof: {
+						sourceHash: cssModuleSourceHash(discoverOnly ? source : `${source}\n`),
+						imports: [{ request, named: [['root', 'stale_root']], default: [], dependencies: {} }],
+					},
+				},
+			});
+			expect(output.result).toEqual({ error: null, content: 'ordinary', map: undefined });
+			expect(output.dependencies).toEqual([]);
+			if (discoverOnly) expect(output.context.cacheable).not.toHaveBeenCalledWith(false);
+			else expect(output.context.cacheable).toHaveBeenCalledWith(false);
+		}
+	});
+
+	it('does not fold hot CSS modules when Octane HMR codegen is disabled', () => {
+		const source = "import { root } from './styles.module.css'; export function App() @{ <div /> }";
+		const request = './styles.module.css';
+		mocks.findCssModuleImportRequests.mockReturnValue([request]);
+		mocks.transform.mockImplementation((_source, _id, options) => ({
+			kind: 'compile',
+			code: options.resolveCssModuleConstant?.(request, 'root', null) ?? 'ordinary',
+		}));
+		const output = runLoader({
+			mode: 'production',
+			hot: true,
+			options: { hmr: false, dev: false },
+			source,
+			cssModuleData: {
+				enabled: true,
+				proof: {
+					sourceHash: cssModuleSourceHash(source),
+					imports: [{ request, named: [['root', 'stale_root']], default: [], dependencies: {} }],
+				},
+			},
+		});
+		expect(output.result).toEqual({ error: null, content: 'ordinary', map: undefined });
+		expect(output.context.cacheable).not.toHaveBeenCalledWith(false);
 	});
 
 	it('uses webpack HMR, forwards maps, watches manifests, and emits build metadata', () => {
@@ -314,5 +525,118 @@ describe('octane Rspack loader', () => {
 		const output = runLoader();
 		expect(output.result.error).toEqual(new Error('bad TSRX'));
 		expect(output.result.content).toBeUndefined();
+	});
+
+	it('preserves layers, source maps, file watches, and public module metadata in parallel', () => {
+		const map = { version: 3, sources: ['App.tsrx'], mappings: 'AAAA' };
+		const clientReference = {
+			id: 'octane-client-reference-v1:object:/src/App.tsrx',
+			moduleId: '/src/App.tsrx',
+			renderer: 'object',
+		};
+		mocks.transform.mockReturnValue({
+			code: 'export const rendered = true;',
+			map,
+			kind: 'compile',
+			clientReference,
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			dependencies: ['/project/package.json', '/project/package.json'],
+			missingDependencies: ['/project/src/package.json', '/project/src/package.json'],
+		});
+		const module = { buildInfo: {}, layer: 'octane:main-thread' };
+		const output = runParallelLoader({
+			module,
+			options: {
+				universalRuntime: { runtime: 'object', thread: 'background' },
+				layerSpecializations: {
+					'octane:main-thread': {
+						universalRuntime: { runtime: 'object', thread: 'main-thread' },
+					},
+				},
+			},
+		});
+
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
+			expect.objectContaining({ universalRuntime: { runtime: 'object', thread: 'main-thread' } }),
+		);
+		expect(output.result).toEqual({ error: null, content: 'export const rendered = true;', map });
+		expect(output.dependencies).toEqual(['/project/package.json']);
+		expect(output.missingDependencies).toEqual(['/project/src/package.json']);
+		expect(output.module.layer).toBe('octane:main-thread');
+		expect(output.module.buildInfo.octane).toEqual({
+			canonicalId: '/src/App.tsrx',
+			transformKind: 'compile',
+			serverRpc: false,
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			clientReference,
+		});
+	});
+
+	it('clears obsolete parallel-build metadata when a module becomes pass-through', () => {
+		mocks.transform.mockReturnValue({
+			code: 'export const untouched = true;',
+			map: null,
+			kind: 'none',
+			dependencies: ['/project/package.json'],
+			missingDependencies: ['/project/src/package.json'],
+		});
+		const inputSourceMap = { version: 3, sources: ['authored.ts'], mappings: 'AAAA' };
+		const module = {
+			buildInfo: {
+				octane: { canonicalId: '/stale', transformKind: 'compile', serverRpc: false },
+			},
+		};
+		const output = runParallelLoader({
+			module,
+			source: 'export const untouched = true;',
+			inputSourceMap,
+		});
+
+		expect(output.result).toEqual({
+			error: null,
+			content: 'export const untouched = true;',
+			map: inputSourceMap,
+		});
+		expect(output.dependencies).toEqual(['/project/package.json']);
+		expect(output.missingDependencies).toEqual(['/project/src/package.json']);
+		expect(output.module.buildInfo).not.toHaveProperty('octane');
+	});
+
+	it('preserves unrelated loader metadata while restoring worker compilation state', () => {
+		const module = { buildInfo: {} as Record<string, unknown> };
+		const callback = vi.fn();
+		const addMissingDependency = vi.fn();
+		const sourceMap = { version: 3, sources: ['App.tsrx'], mappings: 'AAAA' };
+		const info = { canonicalId: '/src/App.tsrx', transformKind: 'compile', serverRpc: false };
+
+		finalizeOctaneLoader.call(
+			{ _module: module, addMissingDependency, callback },
+			'export const rendered = true;',
+			sourceMap,
+			{
+				upstream: { generated: true },
+				__octaneParallelLoader: {
+					buildInfo: info,
+					missingDependencies: ['/project/src/package.json'],
+				},
+			},
+		);
+
+		expect(module.buildInfo.octane).toEqual(info);
+		expect(addMissingDependency).toHaveBeenCalledWith('/project/src/package.json');
+		expect(callback).toHaveBeenCalledWith(null, 'export const rendered = true;', sourceMap, {
+			upstream: { generated: true },
+		});
+	});
+
+	it('reports parallel compilation errors without attaching incomplete module metadata', () => {
+		mocks.transform.mockImplementation(() => {
+			throw new Error('bad TSRX');
+		});
+		const output = runParallelLoader();
+
+		expect(output.result.error).toEqual(new Error('bad TSRX'));
+		expect(output.result.content).toBeUndefined();
+		expect(output.module.buildInfo).not.toHaveProperty('octane');
 	});
 });

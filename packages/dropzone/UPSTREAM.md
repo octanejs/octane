@@ -10,8 +10,11 @@ The npm tarball SHA-256 is
 `e76faa61389e085518b0d8492a7970e9ce4c060e4a2e9181b1eb089805afb95d` and the
 canonical GitHub commit archive SHA-256 is
 `947a1def85a3f7ef5b3ef74550cd60cc507389f4b08d3a6af1ba7b6646ce6a3e`.
-`upstream/npm` contains all 11 published files byte-for-byte. `upstream/canonical`
-contains the byte-exact license, package/test/type/build configuration, two runtime
+`upstream-artifact` contains all 11 published files byte-for-byte. `upstream`
+is pinned by `audit/upstream.lock.json` — each committed file verifies offline against its
+upstream git blob sha (`pnpm react-port:materialize run --check --package-dir
+packages/dropzone`); the upstream MIT license is retained byte-exact as `LICENSE.upstream` —
+and contains the byte-exact license, package/test/type/build configuration, two runtime
 specs, snapshot, runtime source, and all nine type programs required by U1. The
 vendored evidence is development-only and excluded from package `files`.
 

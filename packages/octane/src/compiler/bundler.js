@@ -34,6 +34,7 @@ import { formatCompileDiagnostic } from './native-change-diagnostics.js';
 import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
 import { rewriteServerRuntimeRequests } from './runtime-requests.js';
 import { assertStrongMode } from './strong-mode.js';
+import { findCssModuleImportRequests } from './css-module-imports.js';
 import {
 	assertNoLiveClientOnlyImports,
 	createClientOnlyServerStub,
@@ -42,6 +43,11 @@ import {
 } from './client-only-server.js';
 
 export { findVoidComponentImports, findVoidRootImports };
+export {
+	isPlainCssModuleId,
+	readCssModuleExports,
+	validateCssModuleConstants,
+} from './css-module-imports.js';
 export { HYDRATE_QUERY_PARAM } from './hydrate-boundaries.js';
 export {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
@@ -480,6 +486,7 @@ class OctaneBundlerCompiler {
 			hmr: normalizeHmrDialect(options.hmr),
 			dev: options.dev,
 			profile: options.profile === true,
+			inlineHookMemo: options.inlineHookMemo !== false,
 			strong: options.strong === true,
 			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
@@ -914,6 +921,32 @@ class OctaneBundlerCompiler {
 		return findStaticRuntimeImportRequests(code, this._canonicalModuleId(id));
 	}
 
+	/** CSS proof discovery uses the same ownership gate as the eventual compile. */
+	findCssModuleImportRequests(code, id, environment = 'client') {
+		if (typeof code !== 'string' || !code.includes('.module.')) return [];
+		// The live-read witness currently follows DOM host ownership only. Even
+		// a DOM-owned module can delegate a JSX-valued prop to another renderer.
+		if (Object.keys(this.renderers.boundaries).length > 0) return [];
+		const file = cleanModuleId(id);
+		const collected = { dependencies: new Set(), missingDependencies: new Set() };
+		if (!this._isFullCompileSource(file, collected)) return [];
+		const filename = this._canonicalModuleId(file);
+		const pragmaOwned =
+			this.requireDirective &&
+			file.endsWith('.tsx') &&
+			this._isProjectOwnedSource(file) &&
+			this._pragmaClaimsOwnership(code);
+		if (!this._passesOwnershipGate(file, filename, pragmaOwned)) return [];
+		const renderer = resolveRendererForFile(this.renderers, filename);
+		if (
+			renderer.target !== 'dom' ||
+			(environment === 'server' && renderer.server === 'client-only')
+		) {
+			return [];
+		}
+		return findCssModuleImportRequests(code, filename);
+	}
+
 	/**
 	 * requireDirective ownership for code-less classification: a project
 	 * `.tsrx` is Octane's by extension; any other project module needs its
@@ -990,6 +1023,7 @@ class OctaneBundlerCompiler {
 		// of both HMR and dev hydration diagnostics. Server transforms stay byte-for-
 		// byte identical even when a shared client/server bundler configuration opts in.
 		const profile = environment === 'client' && (options.profile ?? this.defaults.profile) === true;
+		const inlineHookMemo = (options.inlineHookMemo ?? this.defaults.inlineHookMemo) !== false;
 		// An application's global policy never leaks into installed or linked
 		// compatibility packages, including workspace packages nested inside the
 		// project root. Modules may still opt themselves in with their own
@@ -1077,6 +1111,10 @@ class OctaneBundlerCompiler {
 				};
 			}
 			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
+			const collectCssModuleConstants =
+				renderer.target === 'dom' &&
+				!hasRendererBoundaries &&
+				typeof options.resolveCssModuleConstant === 'function';
 			const compileFilename =
 				hydrateBoundaryPath === null
 					? filename
@@ -1087,6 +1125,7 @@ class OctaneBundlerCompiler {
 				dev,
 				profile,
 				profileFilename,
+				...(inlineHookMemo ? null : { inlineHookMemo: false }),
 				...(strong ? { strong: true } : null),
 				...(universalRuntime === undefined ? null : { universalRuntime }),
 				// Keep the established DOM compiler call byte-for-byte equivalent. A
@@ -1106,15 +1145,27 @@ class OctaneBundlerCompiler {
 				...(typeof options.isDescriptorChildrenImport === 'function'
 					? { isDescriptorChildrenImport: options.isDescriptorChildrenImport }
 					: null),
+				...(collectCssModuleConstants
+					? {
+							resolveCssModuleConstant: options.resolveCssModuleConstant,
+							...(options.preserveCssModuleReferences === undefined
+								? null
+								: { preserveCssModuleReferences: options.preserveCssModuleReferences }),
+						}
+					: null),
 			};
 			const collectVoidComponentExports =
 				environment === 'client' && options.collectVoidComponentExports === true;
 			let out;
 			let voidComponentAst = null;
-			if (collectVoidComponentExports) {
+			let cssModuleConstantImports;
+			if (collectVoidComponentExports || collectCssModuleConstants) {
 				const compilation = compileForBundler(code, compileFilename, compileOptions);
 				out = compilation.result;
-				voidComponentAst = compilation.hydrateAst;
+				if (collectVoidComponentExports) voidComponentAst = compilation.hydrateAst;
+				if (collectCssModuleConstants) {
+					cssModuleConstantImports = compilation.cssModuleConstantImports;
+				}
 			} else {
 				out = compile(code, compileFilename, compileOptions);
 			}
@@ -1132,6 +1183,7 @@ class OctaneBundlerCompiler {
 					: {
 							voidComponentExports: findVoidComponentExports(voidComponentAst, filename),
 						}),
+				...(cssModuleConstantImports === undefined ? null : { cssModuleConstantImports }),
 				descriptorChildrenExports: findDescriptorChildrenExports(code, filename),
 				...finishMetadata(collected),
 			};
@@ -1170,7 +1222,16 @@ class OctaneBundlerCompiler {
 				this._warnUnmarkedOctaneImport(code, filename);
 				return passThrough();
 			}
-			if (this._hasManualHookSlots(file, collected)) {
+			const manualSlots = this._hasManualHookSlots(file, collected);
+			const inlinePlainMemo =
+				inlineHookMemo &&
+				environment === 'client' &&
+				hmr === false &&
+				dev === false &&
+				profile === false &&
+				renderer.target === 'dom' &&
+				universalRuntime === undefined;
+			if (manualSlots && !inlinePlainMemo) {
 				// Hand-slotted bindings still own their authored policy. Opting one
 				// module in must not require changing its established slot ABI.
 				if (strong || code.includes('use strong')) {
@@ -1183,12 +1244,19 @@ class OctaneBundlerCompiler {
 			}
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const specializeVoidRoot =
-				environment === 'client' && hmr === false && dev === false && profile === false;
+				!manualSlots &&
+				environment === 'client' &&
+				hmr === false &&
+				dev === false &&
+				profile === false;
 			const out = slotHooks(code, filename, {
 				environment,
 				hmr: !!hmr,
+				dev,
 				profile,
 				profileFilename,
+				inlineHookMemo: inlinePlainMemo,
+				...(manualSlots ? { manualSlots: true } : null),
 				...(strong ? { strong: true } : null),
 				...(specializeVoidRoot
 					? {

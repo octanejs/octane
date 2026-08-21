@@ -3,6 +3,7 @@ import {
 	mkdtempSync,
 	mkdirSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
@@ -12,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import rspack from '@rspack/core';
+import { compile as compileOctane } from 'octane/compiler';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getOctaneRspackBuildInfo, OctaneRspackPlugin } from '../src/index.js';
 
@@ -20,6 +22,7 @@ const profilerGlobal = '__OCTANE_PROFILER__';
 const runGlobal = '__octane_rspack_profile_bundle_runs__';
 const productionErrorGlobal = '__octane_rspack_production_error__';
 const transpileGlobal = '__octane_rspack_transpiled_value__';
+const slotArgumentCountGlobal = '__octane_rspack_slot_argument_count__';
 const lynxWorkletFeatureGlobal = '__octane_rspack_lynx_worklet_feature__';
 const lynxWorkletHelperGlobal = '__octane_rspack_lynx_worklet_helper__';
 
@@ -189,6 +192,7 @@ export function App() @{
 		Reflect.deleteProperty(globalThis, runGlobal);
 		Reflect.deleteProperty(globalThis, productionErrorGlobal);
 		Reflect.deleteProperty(globalThis, transpileGlobal);
+		Reflect.deleteProperty(globalThis, slotArgumentCountGlobal);
 		Reflect.deleteProperty(globalThis, lynxWorkletFeatureGlobal);
 		Reflect.deleteProperty(globalThis, lynxWorkletHelperGlobal);
 		await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
@@ -322,6 +326,139 @@ ${includeRawBinding ? "export { Raw } from '@fixture/raw';" : ''}
 			expect(map.sources.some((source: string) => source.includes('src/App.tsrx'))).toBe(true);
 			expect(map.sources.some((source: string) => source.includes('@fixture/raw/index.tsx'))).toBe(
 				true,
+			);
+		}
+	}, 30_000);
+
+	it('rebuilds hook ownership when a watched missing package manifest is created', async () => {
+		write(
+			root,
+			'node_modules/octane/server.cjs',
+			`exports.useState = function (...args) {
+	globalThis.${slotArgumentCountGlobal} = args.length;
+	return [args[0]];
+};
+exports.hookSlots = () => 0;\n`,
+		);
+		write(
+			root,
+			'src/pkg/hooks/useValue.ts',
+			`import { useState } from 'octane';
+export function useValue(): number { return useState(1)[0]; }\n`,
+		);
+		write(
+			root,
+			'src/index.js',
+			`import { useValue } from './pkg/hooks/useValue.ts';\nuseValue();\n`,
+		);
+
+		const outputPath = join(root, 'dist-manifest-watch');
+		const compiler = rspack({
+			context: root,
+			mode: 'development',
+			target: 'node',
+			entry: './src/index.js',
+			optimization: { minimize: false },
+			output: { path: outputPath, filename: '[fullhash].cjs' },
+			plugins: [new OctaneRspackPlugin()],
+		} as any) as any;
+		type WatchBuild = { error: Error | null; stats?: any; modifiedFiles: Set<string> };
+		const completed: WatchBuild[] = [];
+		const waiting: Array<(build: WatchBuild) => void> = [];
+		const watching = compiler.watch(
+			{ aggregateTimeout: 20, poll: 50 },
+			(error: Error, stats: any) => {
+				const buildError =
+					error ??
+					(stats?.hasErrors()
+						? new Error(
+								(stats.toJson({ all: false, errors: true }).errors ?? [])
+									.map((entry: any) => entry.message ?? String(entry))
+									.join('\n'),
+							)
+						: null);
+				const build = {
+					error: buildError,
+					stats,
+					modifiedFiles: new Set<string>(compiler.modifiedFiles ?? []),
+				};
+				const next = waiting.shift();
+				if (next) next(build);
+				else completed.push(build);
+			},
+		);
+		const nextBuild = async (modifiedFile?: string) => {
+			const deadline = Date.now() + 10_000;
+			for (;;) {
+				const build =
+					completed.shift() ??
+					(await new Promise<WatchBuild>((resolve, reject) => {
+						const deliver = (result: WatchBuild) => {
+							clearTimeout(timeout);
+							resolve(result);
+						};
+						const timeout = setTimeout(
+							() => {
+								const index = waiting.indexOf(deliver);
+								if (index !== -1) waiting.splice(index, 1);
+								reject(
+									new Error(
+										`Timed out waiting for a Rspack build${modifiedFile ? ` for ${modifiedFile}` : ''}.`,
+									),
+								);
+							},
+							Math.max(0, deadline - Date.now()),
+						);
+						waiting.push(deliver);
+					}));
+				if (build.error) throw build.error;
+				if (modifiedFile === undefined || build.modifiedFiles.has(modifiedFile)) return build.stats;
+			}
+		};
+		const loadBundle = async (stats: any) => {
+			const filename = (stats.toJson({ all: false, assets: true }).assets ?? []).find(
+				(asset: { name: string }) => asset.name.endsWith('.cjs'),
+			)?.name;
+			expect(filename).toBeTypeOf('string');
+			await import(pathToFileURL(join(outputPath, filename)).href);
+		};
+		const hookInfo = (stats: any) =>
+			getOctaneRspackBuildInfo(
+				[...stats.compilation.modules].find((module: any) =>
+					module.resource?.endsWith('/src/pkg/hooks/useValue.ts'),
+				),
+			);
+
+		try {
+			const initial = await nextBuild();
+			const manifest = join(realpathSync(root), 'src/pkg/package.json');
+			expect([...initial.compilation.missingDependencies]).toContain(manifest);
+			expect(hookInfo(initial)).toMatchObject({ transformKind: 'slots' });
+			await loadBundle(initial);
+			expect(globalThis[slotArgumentCountGlobal as keyof typeof globalThis]).toBe(2);
+
+			// Watchers may queue an unrelated rebuild before the manifest changes.
+			// Keep one queued so this test cannot accidentally consume stale stats.
+			await new Promise<void>((resolve, reject) =>
+				watching.invalidate((error: Error | null) => (error ? reject(error) : resolve())),
+			);
+			const rebuild = nextBuild(manifest);
+			write(
+				root,
+				'src/pkg/package.json',
+				'{"name":"nested","octane":{"hookSlots":{"manual":["hooks"]}}}\n',
+			);
+			const updated = await rebuild;
+			expect([...updated.compilation.fileDependencies]).toContain(manifest);
+			expect(hookInfo(updated)).toBeNull();
+			await loadBundle(updated);
+			expect(globalThis[slotArgumentCountGlobal as keyof typeof globalThis]).toBe(1);
+		} finally {
+			await new Promise<void>((resolve, reject) =>
+				watching.close((error: Error | null) => (error ? reject(error) : resolve())),
+			);
+			await new Promise<void>((resolve, reject) =>
+				compiler.close((error: Error | null) => (error ? reject(error) : resolve())),
 			);
 		}
 	}, 30_000);
@@ -593,6 +730,43 @@ export function App() @{ const live = Scene as unknown; <Canvas><Scene /></Canva
 		const bundle = readFileSync(join(outputPath, 'bundle.js'), 'utf8');
 		expect(bundle).toContain('__octaneComponents');
 		expect(bundle).toContain('__webpack_require__.hmrD');
+	}, 30_000);
+
+	it('reports worker compiler warnings and syntax errors through Rspack diagnostics', async () => {
+		write(root, 'src/App.tsrx', `export function App() @{ <input onChange={() => {}} /> }\n`);
+		const build = (name: string) =>
+			compile({
+				context: root,
+				mode: 'development',
+				target: 'web',
+				entry: './src/index.js',
+				optimization: { minimize: false },
+				output: { path: join(root, `dist-${name}`), filename: 'bundle.js' },
+				plugins: [new OctaneRspackPlugin()],
+			});
+
+		const warnings = (await build('worker-warning')).toJson({
+			all: false,
+			warnings: true,
+		}).warnings;
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0].message).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
+		expect(warnings[0].message).toContain('/src/App.tsrx:1:');
+
+		const invalidSource = `export function App() @{ <main>unterminated }\n`;
+		const filename = write(root, 'src/App.tsrx', invalidSource);
+		const compilerError = (() => {
+			try {
+				compileOctane(invalidSource, filename);
+			} catch (error) {
+				return error;
+			}
+			throw new Error('Expected malformed TSRX to fail compilation.');
+		})();
+		expect(compilerError).toBeInstanceOf(SyntaxError);
+		// The loader must preserve the compiler diagnostic, regardless of which
+		// supported parser produced its wording.
+		await expect(build('worker-error')).rejects.toThrow((compilerError as SyntaxError).message);
 	}, 30_000);
 
 	it('erases profiling and full diagnostics from a real production bundle', async () => {

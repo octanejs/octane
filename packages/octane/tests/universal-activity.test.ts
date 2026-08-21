@@ -1,27 +1,42 @@
 import { describe, expect, it } from 'vitest';
+import { type ComponentBody } from '../src/index.js';
 import {
+	type ObjectHostContainer,
 	type ObjectHostInstance,
+	type UniversalHostAttachmentBatch,
+	type UniversalHostDriver,
+	type UniversalRenderable,
 	createObjectContainer,
 	createObjectDriver,
 	createUniversalRoot,
 	defineUniversalComponent,
+	isRendererRegion,
+	rendererRegion,
 	universalActivity,
 	universalComponent,
 	universalPlan,
 	universalProps,
+	universalTry,
 	universalValue,
+	use,
 	useEffect,
 	useInsertionEffect,
 	useLayoutEffect,
 	useState,
 } from '../src/universal.js';
+import { mount as mountDom } from './_helpers';
 import { CompiledUniversalActivity } from './_fixtures/universal-activity.object.tsrx';
+import { ActivityRegionChild } from './conformance/_fixtures/activity-dom.tsrx';
 
 const hostPlan = universalPlan('object', {
 	kind: 'host',
 	type: 'node',
 	propsSlot: 0,
 });
+
+function labeledHost(label: string) {
+	return universalValue(hostPlan, [universalProps([['set', 'label', label]])]);
+}
 
 async function flushUniversalWork(count = 3) {
 	for (let index = 0; index < count; index++) await Promise.resolve();
@@ -37,7 +52,7 @@ describe('universal Activity visibility', () => {
 		root.render(CompiledUniversalActivity, { mode: 'hidden', hostRef });
 		const instance = container.children[0];
 		expect(instance.visible).toBe(false);
-		expect(refs).toEqual([instance]);
+		expect(refs).toEqual([]);
 		root.render(CompiledUniversalActivity, { mode: 'visible', hostRef });
 		expect(container.children[0]).toBe(instance);
 		expect(instance.visible).toBe(true);
@@ -45,7 +60,7 @@ describe('universal Activity visibility', () => {
 		root.unmount();
 	});
 
-	it('preserves the host, state, and ref while disconnecting effects and events', async () => {
+	it('preserves the host and state while disconnecting refs, effects, and events', async () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());
 		const log: string[] = [];
@@ -107,7 +122,7 @@ describe('universal Activity visibility', () => {
 		await flushUniversalWork();
 		const instance = container.children[0];
 		expect(instance.visible).toBe(false);
-		expect(refs).toEqual([instance]);
+		expect(refs).toEqual([]);
 		expect(log).toEqual(['render:0', 'insertion mount:0']);
 		expect(() => container.dispatchEvent(instance, 'press', undefined)).toThrow(
 			/no "press" listener/,
@@ -142,7 +157,7 @@ describe('universal Activity visibility', () => {
 		expect(container.children[0]).toBe(instance);
 		expect(instance.props.value).toBe(1);
 		expect(instance.visible).toBe(false);
-		expect(refs).toEqual([instance]);
+		expect(refs).toEqual([instance, null]);
 		expect(log).toEqual(['render:1', 'layout cleanup', 'passive cleanup']);
 		expect(() => container.dispatchEvent(instance, 'press', undefined)).toThrow(
 			/no "press" listener/,
@@ -150,7 +165,7 @@ describe('universal Activity visibility', () => {
 
 		root.unmount();
 		await flushUniversalWork();
-		expect(refs.at(-1)).toBeNull();
+		expect(refs).toEqual([instance, null]);
 		expect(log.at(-1)).toBe('insertion cleanup:1');
 	});
 
@@ -158,7 +173,7 @@ describe('universal Activity visibility', () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());
 		const log: string[] = [];
-		const effectComponent = (name: string, child: (() => unknown) | null = null) =>
+		const effectComponent = (name: string, child: (() => UniversalRenderable) | null = null) =>
 			defineUniversalComponent('object', () => {
 				useLayoutEffect(
 					() => {
@@ -277,6 +292,326 @@ describe('universal Activity visibility', () => {
 		root.unmount();
 	});
 
+	// Per ReactFiberCommitWork.js:2908/3098 (React 19.2.7).
+	it('reconnects the latest ref after hidden updates without repeating old cleanups', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const calls: string[] = [];
+		const firstObject = { current: null as ObjectHostInstance | null };
+		const nextObject = { current: null as ObjectHostInstance | null };
+		const first = (value: ObjectHostInstance | null) => {
+			if (value === null) {
+				calls.push('first:null');
+				return;
+			}
+			calls.push('first:attach');
+			return () => calls.push('first:cleanup');
+		};
+		const next = (value: ObjectHostInstance | null) => {
+			if (value === null) {
+				calls.push('next:null');
+				return;
+			}
+			calls.push('next:attach');
+			return () => calls.push('next:cleanup');
+		};
+		const Scene = defineUniversalComponent(
+			'object',
+			(props: { mode: 'visible' | 'hidden'; ref: unknown }) =>
+				universalActivity(props.mode, () =>
+					universalValue(hostPlan, [universalProps([['set', 'ref', props.ref]])]),
+				),
+		);
+
+		root.render(Scene, { mode: 'visible', ref: [firstObject, first] });
+		const instance = container.children[0];
+		expect(firstObject.current).toBe(instance);
+		root.render(Scene, { mode: 'hidden', ref: [firstObject, first] });
+		expect(firstObject.current).toBeNull();
+		expect(calls).toEqual(['first:attach', 'first:cleanup']);
+		root.render(Scene, { mode: 'hidden', ref: [nextObject, next] });
+		expect(nextObject.current).toBeNull();
+		expect(calls).toEqual(['first:attach', 'first:cleanup']);
+
+		const abandoned = root.prepare(Scene, { mode: 'visible', ref: [nextObject, next] });
+		expect(abandoned.status).toBe('prepared');
+		abandoned.abort();
+		expect(nextObject.current).toBeNull();
+		expect(instance.visible).toBe(false);
+		root.render(Scene, { mode: 'visible', ref: [nextObject, next] });
+		expect(container.children[0]).toBe(instance);
+		expect(nextObject.current).toBe(instance);
+		expect(calls).toEqual(['first:attach', 'first:cleanup', 'next:attach']);
+
+		root.render(Scene, { mode: 'hidden', ref: [nextObject, next] });
+		root.unmount();
+		expect(nextObject.current).toBeNull();
+		expect(calls).toEqual(['first:attach', 'first:cleanup', 'next:attach', 'next:cleanup']);
+	});
+
+	// A native recycling driver may attach a preserved host while its logical
+	// Activity is hidden. Physical attachment alone must not publish a UI ref.
+	it('keeps refs disconnected across hidden physical attachment notifications', () => {
+		const container = createObjectContainer();
+		let notify!: (batch: UniversalHostAttachmentBatch) => void;
+		const driver: UniversalHostDriver<ObjectHostContainer, ObjectHostInstance> = {
+			...createObjectDriver(),
+			attachments: {
+				subscribe(_target, onChange) {
+					notify = onChange;
+					return { isAttached: () => true, unsubscribe() {} };
+				},
+			},
+		};
+		const root = createUniversalRoot(container, driver);
+		const calls: Array<ObjectHostInstance | null> = [];
+		const ref = (value: ObjectHostInstance | null) => calls.push(value);
+		const Scene = defineUniversalComponent('object', (props: { mode: 'visible' | 'hidden' }) =>
+			universalActivity(props.mode, () =>
+				universalValue(hostPlan, [universalProps([['set', 'ref', ref]])]),
+			),
+		);
+
+		root.render(Scene, { mode: 'hidden' });
+		const instance = container.children[0];
+		expect(calls).toEqual([]);
+		notify({ detached: [instance.id], attached: [instance.id] });
+		expect(calls).toEqual([]);
+		root.render(Scene, { mode: 'visible' });
+		expect(calls).toEqual([instance]);
+		root.render(Scene, { mode: 'hidden' });
+		expect(calls).toEqual([instance, null]);
+		notify({ detached: [instance.id], attached: [instance.id] });
+		expect(calls).toEqual([instance, null]);
+		root.unmount();
+		expect(calls).toEqual([instance, null]);
+	});
+
+	// Per ActivitySuspense-test.js:99/224 (React 19.2.7).
+	it('contains hidden suspension and retries without replacing the visible shell', async () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => (resolve = done));
+		const log: string[] = [];
+		const Child = defineUniversalComponent('object', () => {
+			const value = use(promise);
+			useEffect(
+				() => {
+					log.push('mount');
+					return () => log.push('cleanup');
+				},
+				[],
+				'effect',
+			);
+			return labeledHost(value);
+		});
+		const Scene = defineUniversalComponent('object', (props: { mode: 'visible' | 'hidden' }) =>
+			universalTry(
+				() => [
+					labeledHost('shell'),
+					universalActivity(props.mode, () => universalComponent('object', Child, {})),
+				],
+				() => labeledHost('fallback'),
+			),
+		);
+
+		root.render(Scene, { mode: 'hidden' });
+		const shell = container.children[0];
+		expect(container.children.map((instance) => instance.props.label)).toEqual(['shell']);
+		expect(shell.visible).toBe(true);
+		expect(log).toEqual([]);
+
+		root.render(Scene, { mode: 'visible' });
+		expect(
+			container.children.some(
+				(instance) => instance.props.label === 'fallback' && instance.visible,
+			),
+		).toBe(true);
+		root.render(Scene, { mode: 'hidden' });
+		expect(container.children.map((instance) => instance.props.label)).toEqual(['shell']);
+		expect(container.children[0]).toBe(shell);
+		expect(shell.visible).toBe(true);
+
+		resolve('ready');
+		await promise;
+		await flushUniversalWork(6);
+		const child = container.children[1];
+		expect(container.children.map((instance) => instance.props.label)).toEqual(['shell', 'ready']);
+		expect(child.visible).toBe(false);
+		expect(log).toEqual([]);
+		root.render(Scene, { mode: 'visible' });
+		await flushUniversalWork();
+		expect(container.children).toEqual([shell, child]);
+		expect(child.visible).toBe(true);
+		expect(log).toEqual(['mount']);
+		root.unmount();
+	});
+
+	// Per ActivitySuspense-test.js:293/384 (React 19.2.7).
+	it.each(['component', 'Activity body'] as const)(
+		'preserves accepted hidden hosts and queued state when a later render suspends (%s)',
+		async (stateOwner) => {
+			const container = createObjectContainer();
+			const root = createUniversalRoot(container, createObjectDriver());
+			let pending: Promise<string> | null = null;
+			let resolve!: (value: string) => void;
+			let setCount!: (value: number) => void;
+			const log: string[] = [];
+			const renderChild = () => {
+				const [count, update] = useState(0, 'count');
+				setCount = update;
+				const value = pending === null ? 'ready' : use(pending);
+				useEffect(
+					() => {
+						log.push('mount');
+						return () => log.push('cleanup');
+					},
+					[],
+					'effect',
+				);
+				return labeledHost(`${value}:${count}`);
+			};
+			const Child = defineUniversalComponent('object', renderChild);
+			const Scene = defineUniversalComponent('object', (props: { mode: 'visible' | 'hidden' }) =>
+				universalTry(
+					() => [
+						labeledHost('shell'),
+						universalActivity(props.mode, () =>
+							stateOwner === 'component' ? universalComponent('object', Child, {}) : renderChild(),
+						),
+					],
+					() => labeledHost('fallback'),
+				),
+			);
+
+			root.render(Scene, { mode: 'visible' });
+			await flushUniversalWork();
+			setCount(3);
+			await flushUniversalWork();
+			const [shell, child] = container.children;
+			expect(child.props.label).toBe('ready:3');
+			const abandonedPromise = new Promise<string>((done) => (resolve = done));
+			pending = abandonedPromise;
+			const abandoned = root.prepare(Scene, { mode: 'hidden' });
+			expect(abandoned.status).toBe('prepared');
+			expect(child.visible).toBe(true);
+			expect(log).toEqual(['mount']);
+			abandoned.abort();
+			resolve('abandoned');
+			await abandonedPromise;
+			await flushUniversalWork();
+			expect(container.children).toEqual([shell, child]);
+			expect(child.visible).toBe(true);
+			expect(child.props.label).toBe('ready:3');
+			expect(log).toEqual(['mount']);
+
+			pending = new Promise<string>((done) => (resolve = done));
+			root.render(Scene, { mode: 'hidden' });
+			await flushUniversalWork();
+			expect(container.children).toEqual([shell, child]);
+			expect(shell.visible).toBe(true);
+			expect(child.visible).toBe(false);
+			expect(log).toEqual(['mount', 'cleanup']);
+
+			setCount(4);
+			await flushUniversalWork();
+			expect(container.children).toEqual([shell, child]);
+			expect(child.props.label).toBe('ready:3');
+			resolve('settled');
+			await pending;
+			await flushUniversalWork(6);
+			expect(container.children).toEqual([shell, child]);
+			expect(child.visible).toBe(false);
+			expect(child.props.label).toBe('settled:4');
+			expect(log).toEqual(['mount', 'cleanup']);
+			root.render(Scene, { mode: 'visible' });
+			await flushUniversalWork();
+			expect(child.visible).toBe(true);
+			expect(log).toEqual(['mount', 'cleanup', 'mount']);
+			root.unmount();
+		},
+	);
+
+	// Per ActivitySuspense-test.js:99 (React 19.2.7). Activity contains promises,
+	// not errors: rejection still belongs to the enclosing error boundary.
+	it('routes a rejected hidden render to the enclosing catch boundary', async () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		let reject!: (error: Error) => void;
+		const promise = new Promise<string>((_resolve, fail) => (reject = fail));
+		const Child = defineUniversalComponent('object', () => labeledHost(use(promise)));
+		const Scene = defineUniversalComponent('object', () =>
+			universalTry(
+				() => [
+					labeledHost('shell'),
+					universalActivity('hidden', () => universalComponent('object', Child, {})),
+				],
+				() => labeledHost('fallback'),
+				(error) => labeledHost(`caught:${(error as Error).message}`),
+			),
+		);
+
+		root.render(Scene, undefined);
+		expect(container.children.map((instance) => instance.props.label)).toEqual(['shell']);
+		reject(new Error('background failed'));
+		await promise.catch(() => undefined);
+		await flushUniversalWork(6);
+		expect(container.children.map((instance) => instance.props.label)).toEqual([
+			'caught:background failed',
+		]);
+		expect(container.children[0].visible).toBe(true);
+		root.unmount();
+	});
+
+	it('contains renderer-region suspension inside the owning hidden Activity', async () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		let resolve!: () => void;
+		const thenable = new Promise<void>((done) => (resolve = done));
+		const regionPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'html-region',
+			bindings: [['region', 0]],
+		});
+		const Region = defineUniversalComponent('object', () =>
+			universalValue(regionPlan, [
+				rendererRegion('object', 'dom', ActivityRegionChild, { thenable }),
+			]),
+		);
+		const Scene = defineUniversalComponent('object', (props: { mode: 'visible' | 'hidden' }) =>
+			universalTry(
+				() => [
+					labeledHost('shell'),
+					universalActivity(props.mode, () => universalComponent('object', Region, {})),
+				],
+				() => labeledHost('fallback'),
+			),
+		);
+
+		root.render(Scene, { mode: 'hidden' });
+		const [shell, regionHost] = container.children;
+		const region = regionHost.props.region;
+		if (!isRendererRegion(region)) throw new Error('Expected a committed DOM renderer region.');
+		const dom = mountDom(region.component as ComponentBody<unknown>, region.props);
+		try {
+			await flushUniversalWork(6);
+			expect(container.children).toEqual([shell, regionHost]);
+			expect(shell.visible).toBe(true);
+			expect(regionHost.visible).toBe(false);
+			resolve();
+			await thenable;
+			await flushUniversalWork(6);
+			expect(container.children).toEqual([shell, regionHost]);
+			expect(regionHost.visible).toBe(false);
+			root.render(Scene, { mode: 'visible' });
+			expect(regionHost.visible).toBe(true);
+		} finally {
+			dom.unmount();
+			root.unmount();
+		}
+	});
+
 	it('publishes a hidden recreate atomically after an apply fault and reconnects it on reveal', () => {
 		const container = createObjectContainer();
 		const baseDriver = createObjectDriver();
@@ -383,14 +718,13 @@ describe('universal Activity visibility', () => {
 		expect(replacement).not.toBe(accepted);
 		expect(replacement.id).toBe(acceptedId);
 		expect(replacement.visible).toBe(false);
-		expect(currentRef).toBe(replacement);
+		expect(currentRef).toBeNull();
 		expect(log).toEqual([
 			`attach-cleanup:accepted:current:visible`,
 			`attach:replacement:${acceptedId}:hidden`,
 			'layout:cleanup',
 			'ref:null:accepted',
 			`update:replacement:${acceptedId}:hidden`,
-			`ref:replacement:${acceptedId}:hidden`,
 		]);
 		expect(() => container.dispatchEvent(replacement, 'press', undefined)).toThrow(
 			/no "press" listener/,
@@ -401,7 +735,7 @@ describe('universal Activity visibility', () => {
 		expect(container.children[0]).toBe(replacement);
 		expect(replacement.visible).toBe(true);
 		expect(currentRef).toBe(replacement);
-		expect(log).toEqual(['layout:mount']);
+		expect(log).toEqual([`ref:replacement:${acceptedId}:visible`, 'layout:mount']);
 		container.dispatchEvent(replacement, 'press', undefined);
 		expect(log.at(-1)).toBe('press');
 

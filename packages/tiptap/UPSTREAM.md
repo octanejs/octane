@@ -9,7 +9,7 @@
 - License: MIT
 - npm tarball SHA-256: `92d1d53c119f0e0e6049effd0bba0e94d83508e3a7c7fd8d406e19fe16c49ca5`
 - React oracle: exact `react@19.2.7` / `react-dom@19.2.7` with `@types/react@19.2.17` / `@types/react-dom@19.2.3` (not `catalog:default` ranges)
-- Verification: verified (`packages/tiptap/upstream/` vendored from that npm pin; `pnpm --filter @octanejs/tiptap upstream:verify`)
+- Verification: verified (`packages/tiptap/upstream/` pinned by `audit/upstream.lock.json` against the canonical tag commit's git blob shas; `pnpm react-port:materialize run --check --package-dir packages/tiptap`; the upstream MIT license is retained byte-exact as `LICENSE.upstream`, hash-matched to the lock)
 
 ## Upstream runtime suite
 

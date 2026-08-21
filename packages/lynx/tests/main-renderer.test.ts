@@ -1,4 +1,11 @@
-import type { UniversalHostBatch, UniversalHostDriver } from 'octane/universal/native';
+import { installLynxTestingEnv, uninstallLynxTestingEnv } from '@lynx-js/testing-environment';
+import { JSDOM } from 'jsdom';
+import type {
+	UniversalHostBatch,
+	UniversalHostDriver,
+	UniversalKey,
+	UniversalRenderable,
+} from 'octane/universal/native';
 import {
 	createUniversalRoot,
 	defineUniversalComponent as defineBackgroundUniversalComponent,
@@ -10,7 +17,17 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 import { createLynxNativeResource } from '../src/first-screen.js';
 import {
+	captureLynxFirstTree,
+	createLynxHostContainer,
+	disposeLynxFirstTree,
+	disposeLynxHostContainer,
+	prepareLynxHostBatch,
+} from '../src/core/host-driver.js';
+import { createLynxElementPAPI } from '../src/core/papi.js';
+import { createLynxMainThreadWorkletRegistry } from '../src/core/worklets.js';
+import {
 	createContext,
+	createPortal,
 	defineUniversalComponent,
 	firstScreenEvent,
 	hmrUniversalComponent,
@@ -97,6 +114,61 @@ function normalizeRootScopedUseId(batch: UniversalHostBatch, id: string): unknow
 	};
 }
 
+function normalizeFirstTreeSnapshot(
+	snapshot: NonNullable<ReturnType<typeof captureLynxFirstTree>>['snapshot'],
+): unknown {
+	let listenerBase = Number.POSITIVE_INFINITY;
+	for (const node of snapshot.nodes) {
+		for (const event of node.events) listenerBase = Math.min(listenerBase, event.listener);
+	}
+	if (!Number.isFinite(listenerBase)) listenerBase = 0;
+	return {
+		...snapshot,
+		nodes: snapshot.nodes.map(({ nativeId: _nativeId, ...node }) => ({
+			...node,
+			events: node.events.map((event) => ({
+				...event,
+				listener: event.listener - listenerBase,
+			})),
+		})),
+	};
+}
+
+function applyAndCaptureFirstTree(batch: UniversalHostBatch): {
+	readonly html: string;
+	readonly snapshot: unknown | null;
+} {
+	const dom = new JSDOM('<!doctype html><html><body></body></html>');
+	installLynxTestingEnv(globalThis, {
+		window: dom.window as unknown as Window & typeof globalThis,
+	});
+	globalThis.lynxTestingEnv.switchToMainThread();
+	const worklets = createLynxMainThreadWorkletRegistry();
+	const container = createLynxHostContainer(createLynxElementPAPI(globalThis), {
+		root: 77,
+		worklets,
+	});
+	try {
+		const prepared = prepareLynxHostBatch(container, batch);
+		prepared.apply();
+		const firstTree = captureLynxFirstTree(container);
+		const result = {
+			html: (container.page as unknown as Element).outerHTML,
+			snapshot: firstTree === null ? null : normalizeFirstTreeSnapshot(firstTree.snapshot),
+		};
+		if (firstTree !== null) {
+			expect(disposeLynxFirstTree(firstTree)).toMatchObject({ complete: true });
+		}
+		return result;
+	} finally {
+		if (!container.disposed) disposeLynxHostContainer(container);
+		worklets.close();
+		globalThis.lynxTestingEnv.clearGlobal();
+		uninstallLynxTestingEnv(globalThis);
+		dom.window.close();
+	}
+}
+
 const leafPlan = universalPlan('lynx', {
 	kind: 'host',
 	type: 'text',
@@ -109,6 +181,147 @@ const rowPlan = universalPlan('lynx', {
 	type: 'view',
 	propsSlot: 0,
 });
+
+const scopedRowsPlan = universalPlan('lynx', {
+	kind: 'host',
+	type: 'view',
+	propsSlot: 0,
+	children: [{ kind: 'slot', slot: 1 }],
+});
+
+const scopedRowPlan = universalPlan('lynx', {
+	kind: 'host',
+	type: 'view',
+	bindings: [['id', 0]],
+	children: [
+		{
+			kind: 'host',
+			type: 'text',
+			props: { class: 'col-id' },
+			children: [{ kind: 'slot', slot: 1 }],
+		},
+		{
+			kind: 'host',
+			type: 'text',
+			props: { class: 'col-label' },
+			bindings: [['bindtap', 2]],
+			children: [{ kind: 'slot', slot: 3 }],
+		},
+		{
+			kind: 'host',
+			type: 'text',
+			props: { class: 'col-remove' },
+			bindings: [['bindtap', 2]],
+			children: [{ kind: 'slot', slot: 4 }],
+		},
+	],
+});
+
+const ScopedRow = defineUniversalComponent(
+	'lynx',
+	(props: { id: string; label: string; onTap: () => void }) =>
+		universalValue(scopedRowPlan, [props.id, `id:${props.id}`, props.onTap, props.label, 'x']),
+);
+
+function componentScopeFor<T>(
+	items: Iterable<T>,
+	key: (item: T, index: number) => UniversalKey,
+	render: (item: T, index: number) => UniversalRenderable,
+): UniversalRenderable {
+	return universalFor(
+		items,
+		key,
+		render,
+		null,
+		false,
+		false,
+		undefined,
+		undefined,
+		undefined,
+		true,
+	);
+}
+
+const ScopedRows = defineUniversalComponent(
+	'lynx',
+	(props: { items: readonly string[]; onTap: () => void }) =>
+		universalValue(scopedRowsPlan, [
+			universalProps([
+				['set', 'id', 'rows'],
+				['set', 'bindtap', props.onTap],
+			]),
+			componentScopeFor(
+				props.items,
+				(item) => item,
+				(item) =>
+					universalComponent(
+						'lynx',
+						ScopedRow,
+						universalProps([
+							['set', 'id', item],
+							['set', 'label', `label:${item}`],
+							['set', 'onTap', props.onTap],
+						]),
+					),
+			),
+		]),
+);
+
+const MixedScopedRows = defineUniversalComponent(
+	'lynx',
+	(props: { items: readonly string[]; onTap: () => void }) =>
+		universalValue(scopedRowsPlan, [
+			universalProps([['set', 'id', 'mixed-rows']]),
+			[
+				universalValue(rowPlan, [universalProps([['set', 'id', 'before']])]),
+				componentScopeFor(
+					props.items,
+					(item) => item,
+					(item) =>
+						universalComponent(
+							'lynx',
+							ScopedRow,
+							universalProps([
+								['set', 'id', item],
+								['set', 'label', `label:${item}`],
+								['set', 'onTap', props.onTap],
+							]),
+						),
+				),
+				universalValue(rowPlan, [universalProps([['set', 'id', 'after']])]),
+			],
+		]),
+);
+
+const VariantRow = defineUniversalComponent('lynx', (props: { id: string; text: boolean }) =>
+	props.text
+		? universalValue(leafPlan, [universalProps([['set', 'id', props.id]]), `text:${props.id}`])
+		: universalValue(rowPlan, [universalProps([['set', 'id', props.id]])]),
+);
+
+const VariantRows = defineUniversalComponent(
+	'lynx',
+	(props: { items: readonly string[]; onTap: () => void }) =>
+		universalValue(scopedRowsPlan, [
+			universalProps([
+				['set', 'id', 'variant-rows'],
+				['set', 'bindtap', props.onTap],
+			]),
+			componentScopeFor(
+				props.items,
+				(item) => item,
+				(item, index) =>
+					universalComponent(
+						'lynx',
+						VariantRow,
+						universalProps([
+							['set', 'id', item],
+							['set', 'text', index % 2 === 1],
+						]),
+					),
+			),
+		]),
+);
 
 const Child = defineUniversalComponent('lynx', (props: { readonly value: string }) =>
 	universalValue(leafPlan, [universalProps([['set', 'id', 'label']]), props.value]),
@@ -357,6 +570,292 @@ describe('Lynx main-thread first-screen renderer', () => {
 		);
 	});
 
+	it('preserves background host records and physical order when component scopes use templates', () => {
+		for (const [component, props] of [
+			[ScopedRows, { items: ['a', 'b'], onTap: () => {} }],
+			[MixedScopedRows, { items: ['a', 'b'], onTap: () => {} }],
+			[VariantRows, { items: ['plain', 'text'], onTap: () => {} }],
+		] as const) {
+			const main = renderLynxFirstScreen(component, props);
+			const background = captureBackgroundBatch(component, props);
+
+			expect(applyAndCaptureFirstTree(main.batch)).toEqual(applyAndCaptureFirstTree(background));
+		}
+	});
+
+	it.each([
+		['template create', '__CreateView', 2, 'before'],
+		['template create', '__CreateView', 2, 'after'],
+		['template event', '__AddEvent', 2, 'before'],
+		['template event', '__AddEvent', 2, 'after'],
+		['template placement', '__InsertElementBefore', 1, 'before'],
+		['template placement', '__InsertElementBefore', 1, 'after'],
+		['commit flush', '__FlushElementTree', 1, 'before'],
+		['commit flush', '__FlushElementTree', 1, 'after'],
+	] as const)(
+		'terminally cleans a first-screen template after %s faults %s mutation',
+		(_label, method, occurrence, timing) => {
+			const rendered = renderLynxFirstScreen(ScopedRows, {
+				items: ['a', 'b'],
+				onTap() {},
+			});
+			const dom = new JSDOM('<!doctype html><html><body></body></html>');
+			installLynxTestingEnv(globalThis, {
+				window: dom.window as unknown as Window & typeof globalThis,
+			});
+			globalThis.lynxTestingEnv.switchToMainThread();
+			const target = globalThis as unknown as Record<string, unknown>;
+			const rawCreateView = target.__CreateView as (componentId: number) => object;
+			const rawAddEvent = target.__AddEvent as (
+				node: object,
+				kind: string,
+				name: string,
+				listener: unknown,
+			) => void;
+			const rawInsert = target.__InsertElementBefore as (
+				parent: object,
+				child: object,
+				before?: object,
+			) => void;
+			const rawFlush = target.__FlushElementTree as (...args: unknown[]) => void;
+			const rawSetId = target.__SetID as (node: object, id: string) => void;
+			const calls = new Map<string, number>();
+			const activeEvents = new Map<object, Set<string>>();
+			const failure = new Error(`${method} ${timing} failure`);
+			let hit = false;
+			const invoke = <T>(name: string, mutation: () => T): T => {
+				const count = (calls.get(name) ?? 0) + 1;
+				calls.set(name, count);
+				const selected = name === method && count === occurrence;
+				if (selected && timing === 'before') {
+					hit = true;
+					throw failure;
+				}
+				const result = mutation();
+				if (selected && timing === 'after') {
+					hit = true;
+					throw failure;
+				}
+				return result;
+			};
+			target.__CreateView = (componentId: number) =>
+				invoke('__CreateView', () => rawCreateView.call(target, componentId));
+			target.__AddEvent = (node: object, kind: string, name: string, listener: unknown) =>
+				invoke('__AddEvent', () => {
+					rawAddEvent.call(target, node, kind, name, listener);
+					let events = activeEvents.get(node);
+					if (listener == null) {
+						events?.delete(`${kind}:${name}`);
+					} else {
+						if (events === undefined) activeEvents.set(node, (events = new Set()));
+						events.add(`${kind}:${name}`);
+					}
+				});
+			target.__InsertElementBefore = (parent: object, child: object, before?: object) =>
+				invoke('__InsertElementBefore', () => rawInsert.call(target, parent, child, before));
+			target.__FlushElementTree = (...args: unknown[]) =>
+				invoke('__FlushElementTree', () => rawFlush.apply(target, args));
+
+			const container = createLynxHostContainer(createLynxElementPAPI(globalThis), { root: 78 });
+			const foreign = rawCreateView.call(target, container.pageComponentUniqueId);
+			rawSetId.call(target, foreign, 'foreign');
+			rawInsert.call(target, container.page, foreign);
+			try {
+				const prepared = prepareLynxHostBatch(container, rendered.batch);
+				expect(() => prepared.apply()).toThrow(failure);
+				expect(hit).toBe(true);
+				expect(prepared.mutationStarted).toBe(true);
+				expect(container.acceptedVersion).toBe(1);
+				expect(container.instanceCount).toBe(rendered.hostCount);
+
+				const cleanup = disposeLynxHostContainer(container);
+				expect(cleanup).toMatchObject({ complete: true });
+				expect(container.instanceCount).toBe(0);
+				expect([...activeEvents.values()].reduce((count, events) => count + events.size, 0)).toBe(
+					0,
+				);
+				expect((container.page as unknown as Element).querySelector('#foreign')).toBe(foreign);
+				expect((container.page as unknown as Element).children).toHaveLength(1);
+			} finally {
+				if (!container.disposed) disposeLynxHostContainer(container);
+				globalThis.lynxTestingEnv.clearGlobal();
+				uninstallLynxTestingEnv(globalThis);
+				dom.window.close();
+			}
+		},
+	);
+
+	it('aborts a prepared first-screen template without entering Element PAPI', () => {
+		const batch = renderLynxFirstScreen(ScopedRows, {
+			items: ['a', 'b'],
+			onTap() {},
+		}).batch;
+		const dom = new JSDOM('<!doctype html><html><body></body></html>');
+		installLynxTestingEnv(globalThis, {
+			window: dom.window as unknown as Window & typeof globalThis,
+		});
+		globalThis.lynxTestingEnv.switchToMainThread();
+		const target = globalThis as unknown as Record<string, unknown>;
+		const calls: string[] = [];
+		for (const name of [
+			'__CreateView',
+			'__CreateText',
+			'__CreateRawText',
+			'__AddEvent',
+			'__InsertElementBefore',
+			'__FlushElementTree',
+		] as const) {
+			const original = target[name] as (...args: unknown[]) => unknown;
+			target[name] = (...args: unknown[]) => {
+				calls.push(name);
+				return original.apply(target, args);
+			};
+		}
+		const container = createLynxHostContainer(createLynxElementPAPI(globalThis), { root: 79 });
+		try {
+			const prepared = prepareLynxHostBatch(container, batch);
+			prepared.abort();
+			prepared.abort();
+			prepared.apply();
+			expect(prepared.mutationStarted).toBe(false);
+			expect(container.acceptedVersion).toBe(0);
+			expect(container.instanceCount).toBe(0);
+			expect(calls).toEqual([]);
+			expect((container.page as unknown as Element).children).toHaveLength(0);
+			expect(disposeLynxHostContainer(container)).toMatchObject({ complete: true });
+		} finally {
+			if (!container.disposed) disposeLynxHostContainer(container);
+			globalThis.lynxTestingEnv.clearGlobal();
+			uninstallLynxTestingEnv(globalThis);
+			dom.window.close();
+		}
+	});
+
+	it('matches background first-tree semantics for component-scope edge cases', () => {
+		const listPlan = universalPlan('lynx', { kind: 'host', type: 'list', children: [] });
+		const listItemPlan = universalPlan('lynx', {
+			kind: 'host',
+			type: 'list-item',
+			props: { 'item-key': 'safe-item' },
+		});
+		const listParentPlan = universalPlan('lynx', {
+			kind: 'host',
+			type: 'list',
+			children: [{ kind: 'slot', slot: 0 }],
+		});
+		const mainThreadPlan = universalPlan('lynx', {
+			kind: 'host',
+			type: 'view',
+			props: { 'main-thread:ref': { _wvid: 'unsafe-direct-ref' } },
+		});
+		const protoBindingPlan = universalPlan('lynx', {
+			kind: 'host',
+			type: 'view',
+			bindings: [['__proto__', 0]],
+		});
+		const symbolProp = Symbol('first-screen-static-prop');
+		const symbolPropPlan = universalPlan('lynx', {
+			kind: 'host',
+			type: 'view',
+			props: { [symbolProp]: 'preserved' },
+		});
+		const Safe = defineUniversalComponent('lynx', () =>
+			universalValue(rowPlan, [universalProps([['set', 'id', 'safe']])]),
+		);
+		const SafeListItem = defineUniversalComponent('lynx', () => universalValue(listItemPlan, []));
+		const MultiRoot = defineUniversalComponent('lynx', () => [
+			universalValue(rowPlan, [universalProps([['set', 'id', 'first']])]),
+			universalValue(rowPlan, [universalProps([['set', 'id', 'second']])]),
+		]);
+		const Hidden = defineUniversalComponent('lynx', () =>
+			universalActivity('hidden', () =>
+				universalValue(rowPlan, [universalProps([['set', 'id', 'hidden']])]),
+			),
+		);
+		const NativeList = defineUniversalComponent('lynx', () => universalValue(listPlan, []));
+		const MainThread = defineUniversalComponent('lynx', () => universalValue(mainThreadPlan, []));
+		const ProtoBinding = defineUniversalComponent('lynx', () =>
+			universalValue(protoBindingPlan, ['ignored-by-generic-props']),
+		);
+		const SymbolProp = defineUniversalComponent('lynx', () => universalValue(symbolPropPlan, []));
+		const InnerScope = defineUniversalComponent('lynx', () =>
+			universalValue(scopedRowsPlan, [
+				universalProps([['set', 'id', 'nested']]),
+				componentScopeFor(
+					['inner'],
+					(item) => item,
+					() => universalComponent('lynx', Safe),
+				),
+			]),
+		);
+		const scene = (
+			Item: UniversalComponent<any>,
+			options: { readonly nullKey?: boolean; readonly nativeListParent?: boolean } = {},
+		): UniversalComponent<Record<string, never>> =>
+			defineUniversalComponent('lynx', () => {
+				const loop = componentScopeFor(
+					['item'],
+					(item) => (options.nullKey ? (null as never) : item),
+					() => universalComponent('lynx', Item),
+				);
+				return options.nativeListParent ? universalValue(listParentPlan, [loop]) : loop;
+			});
+		const DirectHost = defineUniversalComponent('lynx', () =>
+			componentScopeFor(
+				['item'],
+				(item) => item,
+				() => universalValue(rowPlan, [universalProps([['set', 'id', 'direct-host']])]),
+			),
+		);
+		const ExplicitComponentKey = defineUniversalComponent('lynx', () =>
+			componentScopeFor(
+				['item'],
+				(item) => item,
+				() => universalComponent('lynx', Safe, null, 'authored-component-key'),
+			),
+		);
+
+		for (const [label, component] of [
+			['non-component body', DirectHost],
+			['explicit component key', ExplicitComponentKey],
+			['multiple physical roots', scene(MultiRoot)],
+			['hidden host', scene(Hidden)],
+			['native-list descendant', scene(NativeList)],
+			['native-list ancestor', scene(SafeListItem, { nativeListParent: true })],
+			['direct main-thread prop', scene(MainThread)],
+			['dynamic __proto__ binding', scene(ProtoBinding)],
+			['static symbol prop', scene(SymbolProp)],
+			['null key', scene(Safe, { nullKey: true })],
+			['nested component scope', scene(InnerScope)],
+		] as const) {
+			const main = renderLynxFirstScreen(component, {});
+			const background = captureBackgroundBatch(component, {});
+			expect(applyAndCaptureFirstTree(main.batch), label).toEqual(
+				applyAndCaptureFirstTree(background),
+			);
+		}
+	});
+
+	it('retains first-screen portal and foreign-renderer rejection inside component scopes', () => {
+		const PortalItem = defineUniversalComponent('lynx', () =>
+			createPortal(universalValue(rowPlan, [universalProps([])]), {}),
+		);
+		const ForeignItem = defineBackgroundUniversalComponent('object', () => null);
+		const scene = (Item: UniversalComponent<any>) =>
+			defineUniversalComponent('lynx', () =>
+				componentScopeFor(
+					['item'],
+					(item) => item,
+					() => universalComponent('lynx', Item),
+				),
+			);
+
+		expect(() => renderLynxFirstScreen(scene(PortalItem), {})).toThrow(/does not support portals/);
+		expect(() => renderLynxFirstScreen(scene(ForeignItem), {})).toThrow(
+			/requires a compiled Lynx component/,
+		);
+	});
+
 	it('matches background range IDs for production-compiled ownerless leaf loops', () => {
 		const ProductionLeafLoop = defineUniversalComponent(
 			'lynx',
@@ -489,10 +988,17 @@ describe('Lynx main-thread first-screen renderer', () => {
 	});
 
 	it('rejects background-scoped native resource props before emitting a first-screen batch', () => {
-		const NativeResource = defineUniversalComponent('lynx', () =>
+		const NativeResourceItem = defineUniversalComponent('lynx', () =>
 			universalValue(rowPlan, [
 				universalProps([['set', 'texture', createLynxNativeResource('hero')]]),
 			]),
+		);
+		const NativeResource = defineUniversalComponent('lynx', () =>
+			componentScopeFor(
+				['item'],
+				(item) => item,
+				() => universalComponent('lynx', NativeResourceItem),
+			),
 		);
 
 		expect(() => renderLynxFirstScreen(NativeResource, {})).toThrow(

@@ -45,6 +45,7 @@ of bridging by hand:
 | `@reduxjs/toolkit` | `@octanejs/redux-toolkit` |
 | `@testing-library/react` | `@octanejs/testing-library` |
 | `@mdx-js/react` | `@octanejs/mdx` |
+| `ink` | `@octanejs/ink` |
 
 The `octane_bindings` tool returns the same map machine-readably. For anything
 else, run the `octane_bridge_react_package` tool to get a scan of the

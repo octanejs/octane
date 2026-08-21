@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tiptap",
-  "version": "0.0.32",
+  "version": "0.0.37",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -39,7 +39,8 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts",
@@ -47,7 +48,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "upstream:verify": "node ./scripts/verify-upstream.mjs"
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "dependencies": {
     "@tiptap/core": "catalog:default",

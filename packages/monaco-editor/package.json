@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/monaco-editor",
-  "version": "0.0.6",
+  "version": "0.0.11",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -27,7 +27,8 @@
     "src",
     "LICENSE",
     "README.md",
-    "UPSTREAM.md"
+    "UPSTREAM.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts"

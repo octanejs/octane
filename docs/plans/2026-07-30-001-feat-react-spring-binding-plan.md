@@ -247,7 +247,7 @@ If U1 passes without a core change, P0 does not exist.
 
 ### Sources and Research
 
-- `AGENTS.md`, `.rulesync/skills/react-library-port/SKILL.md`, and `.rulesync/skills/create-a-pr/SKILL.md` — binding, testing, worktree, branch, and PR conventions.
+- `AGENTS.md`, `.rulesync/skills/octane-react-library-port/SKILL.md`, and `.rulesync/skills/create-a-pr/SKILL.md` — binding, testing, worktree, branch, and PR conventions.
 - `docs/react-library-compat-plan.md` and `docs/differences-from-react.md` — framework-neutral reuse, differential testing, hook slots, refs, native events, and React divergence rules.
 - `packages/motion/` — animated host, direct frame update, context, cleanup, playground-adjacent, and test precedent.
 - `packages/visx/src/react-spring/` and `packages/visx/status.json` — existing repository dependency and the explicit boundary against replacing Visx's deterministic animation contract.

@@ -148,6 +148,7 @@ export const KNOWN_BINDINGS = {
 	'@testing-library/react': '@octanejs/testing-library',
 	'react-i18next': '@octanejs/i18next',
 	'@inertiajs/react': '@octanejs/inertia',
+	ink: '@octanejs/ink',
 	'@mdx-js/react': '@octanejs/mdx',
 	'dexie-react-hooks': '@octanejs/dexie',
 	'@livestore/react': '@octanejs/livestore',
@@ -266,11 +267,11 @@ export const REACT_API_MAP = {
 		note: "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not).",
 	},
 	Component: {
-		status: 'unsupported',
+		status: 'rewrite',
 		note: 'No class components. Rewrite as a function component.',
 	},
 	PureComponent: {
-		status: 'unsupported',
+		status: 'rewrite',
 		note: 'No class components. Rewrite as a function component with memo.',
 	},
 	StrictMode: {
@@ -279,7 +280,7 @@ export const REACT_API_MAP = {
 	},
 	Profiler: { status: 'unsupported', note: 'Not present.' },
 	SuspenseList: { status: 'unsupported', note: 'Not present.' },
-	findDOMNode: { status: 'unsupported', note: 'Removed in React 19 too. Use refs.' },
+	findDOMNode: { status: 'rewrite', note: 'Removed in React 19 too. Use refs.' },
 	renderToString: {
 		status: 'rewrite',
 		note: 'Use renderToString() from octane/server (sync) or prerender() from octane/static (async, awaits Suspense); both return { html, css }.',
@@ -498,8 +499,8 @@ function apiRows(totals) {
 }
 
 function verdictFor(rows, classComponents) {
-	if (classComponents || rows.some((row) => row.status === 'unsupported')) return 'needs-rework';
-	if (rows.some((row) => row.status === 'rewrite' || row.status === 'partial')) {
+	if (rows.some((row) => row.status === 'unsupported')) return 'needs-rework';
+	if (classComponents || rows.some((row) => row.status === 'rewrite' || row.status === 'partial')) {
 		return 'bridgeable-with-rewrites';
 	}
 	return 'bridgeable';

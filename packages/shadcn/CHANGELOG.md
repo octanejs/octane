@@ -1,5 +1,79 @@
 # @octanejs/shadcn
 
+## 0.0.28
+
+### Patch Changes
+
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+  - octane@0.1.43
+  - @octanejs/aria@0.0.37
+  - @octanejs/base-ui@0.1.41
+  - @octanejs/lucide@0.1.38
+  - @octanejs/radix@0.1.42
+  - @octanejs/sonner@0.1.38
+
+## 0.0.27
+
+### Patch Changes
+
+- Updated dependencies [1581e1b]
+- Updated dependencies [afa3722]
+- Updated dependencies [231e248]
+- Updated dependencies [2f9b301]
+- Updated dependencies [939c64d]
+  - octane@0.1.42
+  - @octanejs/aria@0.0.36
+  - @octanejs/base-ui@0.1.40
+  - @octanejs/lucide@0.1.37
+  - @octanejs/radix@0.1.41
+  - @octanejs/sonner@0.1.37
+
+## 0.0.26
+
+### Patch Changes
+
+- Updated dependencies [489a886]
+- Updated dependencies [922b2d4]
+- Updated dependencies [814a3c1]
+  - octane@0.1.41
+  - @octanejs/aria@0.0.35
+  - @octanejs/base-ui@0.1.39
+  - @octanejs/lucide@0.1.36
+  - @octanejs/radix@0.1.40
+  - @octanejs/sonner@0.1.36
+
+## 0.0.25
+
+### Patch Changes
+
+- Updated dependencies [ff9b859]
+- Updated dependencies [14b8b40]
+- Updated dependencies [cc6e5ea]
+  - octane@0.1.40
+  - @octanejs/aria@0.0.34
+  - @octanejs/base-ui@0.1.38
+  - @octanejs/lucide@0.1.35
+  - @octanejs/radix@0.1.39
+  - @octanejs/sonner@0.1.35
+
+## 0.0.24
+
+### Patch Changes
+
+- Updated dependencies [954028b]
+- Updated dependencies [21f4dfb]
+- Updated dependencies [1cb4a19]
+- Updated dependencies [0fc84da]
+  - octane@0.1.39
+  - @octanejs/aria@0.0.33
+  - @octanejs/base-ui@0.1.37
+  - @octanejs/lucide@0.1.34
+  - @octanejs/radix@0.1.38
+  - @octanejs/sonner@0.1.34
+
 ## 0.0.23
 
 ### Patch Changes

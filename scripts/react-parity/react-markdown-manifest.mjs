@@ -79,18 +79,21 @@ const manifest = {
 				'Executes the vendored test.jsx byte-for-byte with Node test, the pinned JSX loader, React 19.0.0, and every declared upstream test dependency; all 87 leaf assertions and interactions must pass.',
 			execution: {
 				kind: 'node-full',
-				root: 'packages/markdown/upstream/source',
-				file: 'packages/markdown/upstream/source/test.jsx',
-				loader: 'packages/markdown/upstream/source/script/load-jsx.js',
+				root: 'packages/markdown/upstream',
+				file: 'packages/markdown/upstream/test.jsx',
+				loader: 'packages/markdown/upstream/script/load-jsx.js',
 				inventory: 'packages/markdown/audit/pristine-runtime.json',
 			},
 			files: [
 				support('packages/markdown/audit/test-inventory.json'),
 				support('packages/markdown/audit/pristine-runtime.json'),
-				support('packages/markdown/upstream/source/test.jsx'),
-				support('packages/markdown/upstream/source/script/load-jsx.js'),
-				support('packages/markdown/upstream/source/package.json'),
+				support('packages/markdown/upstream/test.jsx'),
+				support('packages/markdown/upstream/script/load-jsx.js'),
+				support('packages/markdown/upstream/package.json'),
 				support('scripts/react-parity/node-full-runner.mjs'),
+				// The vendored tree verifies offline against the upstream git blob
+				// shas in the lock.
+				support('packages/markdown/audit/upstream.lock.json'),
 			],
 		},
 		{

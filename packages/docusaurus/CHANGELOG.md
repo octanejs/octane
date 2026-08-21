@@ -1,5 +1,69 @@
 # @octanejs/docusaurus
 
+## 0.0.27
+
+### Patch Changes
+
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+  - octane@0.1.43
+  - @octanejs/mdx@0.1.40
+  - @octanejs/remix-router@0.1.39
+  - @octanejs/seo@0.0.28
+
+## 0.0.26
+
+### Patch Changes
+
+- Updated dependencies [1581e1b]
+- Updated dependencies [afa3722]
+- Updated dependencies [231e248]
+- Updated dependencies [2f9b301]
+- Updated dependencies [939c64d]
+  - octane@0.1.42
+  - @octanejs/mdx@0.1.39
+  - @octanejs/remix-router@0.1.38
+  - @octanejs/seo@0.0.27
+
+## 0.0.25
+
+### Patch Changes
+
+- Updated dependencies [489a886]
+- Updated dependencies [922b2d4]
+- Updated dependencies [814a3c1]
+  - octane@0.1.41
+  - @octanejs/mdx@0.1.38
+  - @octanejs/remix-router@0.1.37
+  - @octanejs/seo@0.0.26
+
+## 0.0.24
+
+### Patch Changes
+
+- Updated dependencies [ff9b859]
+- Updated dependencies [14b8b40]
+- Updated dependencies [cc6e5ea]
+  - octane@0.1.40
+  - @octanejs/mdx@0.1.37
+  - @octanejs/remix-router@0.1.36
+  - @octanejs/seo@0.0.25
+
+## 0.0.23
+
+### Patch Changes
+
+- Updated dependencies [954028b]
+- Updated dependencies [21f4dfb]
+- Updated dependencies [1cb4a19]
+- Updated dependencies [0fc84da]
+  - octane@0.1.39
+  - @octanejs/mdx@0.1.36
+  - @octanejs/remix-router@0.1.35
+  - @octanejs/seo@0.0.24
+
 ## 0.0.22
 
 ### Patch Changes

@@ -1,0 +1,20 @@
+diff --git a/tests/upstream/setup.test.ts b/tests/upstream/setup.test.ts
+--- a/tests/upstream/setup.test.ts
++++ b/tests/upstream/setup.test.ts
+@@ -13,11 +13,14 @@ afterEach(() => {
+ 
+ test("should warn if not running in test env", () => {
+   vi.spyOn(console, "error").mockImplementation(() => {});
++  // Ensure IntersectionObserver is not a mock for this probe.
++  // @ts-expect-error clear mock constructor
++  window.IntersectionObserver = undefined;
+   mockAllIsIntersecting(true);
+   expect(
+     console.error,
+-  ).toHaveBeenCalledWith(`React Intersection Observer was not configured to handle mocking.
+-Outside Jest and Vitest, you might need to manually configure it by calling setupIntersectionMocking() and resetIntersectionMocking() in your test setup file.
++  ).toHaveBeenCalledWith(`@octanejs/intersection-observer was not configured to handle mocking.
++Unlike upstream react-intersection-observer, this binding does not auto-register Vitest/Jest beforeEach/afterEach. Call setupIntersectionMocking() and resetIntersectionMocking() in your test setup file (including under Vitest and Jest).
+ 
+ // test-setup.js
+ import { resetIntersectionMocking, setupIntersectionMocking } from '@octanejs/intersection-observer/test-utils';

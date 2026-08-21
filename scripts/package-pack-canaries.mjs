@@ -231,6 +231,20 @@ export function findPackedWorkspaceDependencyClosure(manifests, rootPackageNames
 	return [...packageNames].sort();
 }
 
+export function findPackedTsrxBrowserSourceConsumerPackages(
+	manifests,
+	packageNames,
+	excludedPackages = new Set(),
+) {
+	return packageNames.filter((packageName) =>
+		findPackedWorkspaceDependencyClosure(manifests, [packageName]).every(
+			(dependencyName) =>
+				!excludedPackages.has(dependencyName) &&
+				manifests.get(dependencyName)?.octane?.sourceEnvironment !== 'node',
+		),
+	);
+}
+
 export function findExternalDependencySpecs(manifests, packageNames) {
 	const dependencySpecs = new Map();
 	const fields = ['peerDependencies', 'optionalDependencies', 'dependencies'];

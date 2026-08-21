@@ -6,17 +6,28 @@
       "name": "octane-lynx",
       "ops": {
         "create_commands_1k": {
-          "score": 16000,
-          "median": 16000,
-          "min": 16000,
-          "mean": 16000,
-          "p95": 16000,
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "mean": 1,
+          "p95": 1,
           "sd": 0,
           "rme": 0,
           "warmupRatio": 1,
           "samples": 2
         },
         "update10th_commands_1k": {
+          "score": 100,
+          "median": 100,
+          "min": 100,
+          "mean": 100,
+          "p95": 100,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update10th_item_renders_1k": {
           "score": 100,
           "median": 100,
           "min": 100,
@@ -44,6 +55,72 @@
           "min": 225,
           "mean": 225,
           "p95": 225,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_item_renders_1k": {
+          "score": 2,
+          "median": 2,
+          "min": 2,
+          "mean": 2,
+          "p95": 2,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_wire_bytes_1k": {
+          "score": 368,
+          "median": 368,
+          "min": 368,
+          "mean": 368,
+          "p95": 368,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_wire_to_main_bytes_1k": {
+          "score": 218,
+          "median": 218,
+          "min": 218,
+          "mean": 218,
+          "p95": 218,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_wire_to_background_bytes_1k": {
+          "score": 150,
+          "median": 150,
+          "min": 150,
+          "mean": 150,
+          "p95": 150,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_item_renders_1k": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "mean": 0,
+          "p95": 0,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_handle_deltas_1k": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "mean": 0,
+          "p95": 0,
           "sd": 0,
           "rme": 0,
           "warmupRatio": 1,
@@ -94,17 +171,28 @@
           "samples": 2
         },
         "create_commands_10k": {
-          "score": 160000,
-          "median": 160000,
-          "min": 160000,
-          "mean": 160000,
-          "p95": 160000,
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "mean": 1,
+          "p95": 1,
           "sd": 0,
           "rme": 0,
           "warmupRatio": 1,
           "samples": 2
         },
         "update10th_commands_10k": {
+          "score": 1000,
+          "median": 1000,
+          "min": 1000,
+          "mean": 1000,
+          "p95": 1000,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update10th_item_renders_10k": {
           "score": 1000,
           "median": 1000,
           "min": 1000,
@@ -132,6 +220,72 @@
           "min": 225,
           "mean": 225,
           "p95": 225,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_item_renders_10k": {
+          "score": 2,
+          "median": 2,
+          "min": 2,
+          "mean": 2,
+          "p95": 2,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_wire_bytes_10k": {
+          "score": 368,
+          "median": 368,
+          "min": 368,
+          "mean": 368,
+          "p95": 368,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_wire_to_main_bytes_10k": {
+          "score": 218,
+          "median": 218,
+          "min": 218,
+          "mean": 218,
+          "p95": 218,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_wire_to_background_bytes_10k": {
+          "score": 150,
+          "median": 150,
+          "min": 150,
+          "mean": 150,
+          "p95": 150,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_item_renders_10k": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "mean": 0,
+          "p95": 0,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_handle_deltas_10k": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "mean": 0,
+          "p95": 0,
           "sd": 0,
           "rme": 0,
           "warmupRatio": 1,
@@ -186,18 +340,94 @@
         "rows_1k": {
           "rows": 1000,
           "createdElements": 7042,
-          "createBytes": 1034598,
-          "update10thBytes": 6974,
-          "updateStormBytes": 279692,
-          "selectStormBytes": 6920
+          "createBytes": 35032,
+          "createItemRenders": 1000,
+          "update10thBytes": 7017,
+          "updateStormBytes": 279546,
+          "updateStormItemRenders": 5000,
+          "selectStormBytes": 6920,
+          "selectStormItemRenders": 60,
+          "swap": {
+            "commands": 2,
+            "commandOps": {
+              "move": 2
+            },
+            "handleOps": {},
+            "messageTypes": {
+              "background-to-main:commit": 1,
+              "main-to-background:ack": 1,
+              "main-to-background:complete": 1
+            },
+            "wireToMainMessages": 1,
+            "wireToBackgroundMessages": 2,
+            "identityChecksum": 332839491,
+            "eventSurvived": true,
+            "stagesMs": {
+              "selfcheck": 0.00020799999992959783,
+              "dispatch": 0.28604199999995217,
+              "validate": 0.005417000000079497,
+              "prepare": 0.1416670000000977,
+              "apply": 0.007000000000061846,
+              "ack": 0.12066699999991215,
+              "destroyRunExpand": 0,
+              "denseValidate": 0,
+              "eventDetach": 0,
+              "papiRemove": 0,
+              "denseRelease": 0
+            },
+            "counts": {
+              "synthesizedCommands": 0,
+              "eventDetachCount": 0,
+              "papiRemoveCount": 0,
+              "denseReleaseHostCount": 0
+            }
+          }
         },
         "rows_10k": {
           "rows": 10000,
           "createdElements": 70042,
-          "createBytes": 10572838,
-          "update10thBytes": 70055,
-          "updateStormBytes": 2791042,
-          "selectStormBytes": 6960
+          "createBytes": 350619,
+          "createItemRenders": 10000,
+          "update10thBytes": 69874,
+          "updateStormBytes": 2789296,
+          "updateStormItemRenders": 50000,
+          "selectStormBytes": 6956,
+          "selectStormItemRenders": 60,
+          "swap": {
+            "commands": 2,
+            "commandOps": {
+              "move": 2
+            },
+            "handleOps": {},
+            "messageTypes": {
+              "background-to-main:commit": 1,
+              "main-to-background:ack": 1,
+              "main-to-background:complete": 1
+            },
+            "wireToMainMessages": 1,
+            "wireToBackgroundMessages": 2,
+            "identityChecksum": 333382340991,
+            "eventSurvived": true,
+            "stagesMs": {
+              "selfcheck": 0.0002090000002681336,
+              "dispatch": 0.33279099999981554,
+              "validate": 0.008791000000201166,
+              "prepare": 0.02250000000003638,
+              "apply": 0.046875,
+              "ack": 0.2333330000001297,
+              "destroyRunExpand": 0,
+              "denseValidate": 0,
+              "eventDetach": 0,
+              "papiRemove": 0,
+              "denseRelease": 0
+            },
+            "counts": {
+              "synthesizedCommands": 0,
+              "eventDetachCount": 0,
+              "papiRemoveCount": 0,
+              "denseReleaseHostCount": 0
+            }
+          }
         }
       }
     },
@@ -205,17 +435,28 @@
       "name": "changed-rows-model",
       "ops": {
         "create_commands_1k": {
-          "score": 16000,
-          "median": 16000,
-          "min": 16000,
-          "mean": 16000,
-          "p95": 16000,
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "mean": 1,
+          "p95": 1,
           "sd": 0,
           "rme": 0,
           "warmupRatio": 1,
           "samples": 2
         },
         "update10th_commands_1k": {
+          "score": 100,
+          "median": 100,
+          "min": 100,
+          "mean": 100,
+          "p95": 100,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update10th_item_renders_1k": {
           "score": 100,
           "median": 100,
           "min": 100,
@@ -243,6 +484,72 @@
           "min": 2048,
           "mean": 2048,
           "p95": 2048,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_item_renders_1k": {
+          "score": 2,
+          "median": 2,
+          "min": 2,
+          "mean": 2,
+          "p95": 2,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_wire_bytes_1k": {
+          "score": 2048,
+          "median": 2048,
+          "min": 2048,
+          "mean": 2048,
+          "p95": 2048,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_wire_to_main_bytes_1k": {
+          "score": 1024,
+          "median": 1024,
+          "min": 1024,
+          "mean": 1024,
+          "p95": 1024,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_wire_to_background_bytes_1k": {
+          "score": 1024,
+          "median": 1024,
+          "min": 1024,
+          "mean": 1024,
+          "p95": 1024,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_item_renders_1k": {
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "mean": 1,
+          "p95": 1,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_handle_deltas_1k": {
+          "score": 2,
+          "median": 2,
+          "min": 2,
+          "mean": 2,
+          "p95": 2,
           "sd": 0,
           "rme": 0,
           "warmupRatio": 1,
@@ -293,17 +600,28 @@
           "samples": 2
         },
         "create_commands_10k": {
-          "score": 160000,
-          "median": 160000,
-          "min": 160000,
-          "mean": 160000,
-          "p95": 160000,
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "mean": 1,
+          "p95": 1,
           "sd": 0,
           "rme": 0,
           "warmupRatio": 1,
           "samples": 2
         },
         "update10th_commands_10k": {
+          "score": 1000,
+          "median": 1000,
+          "min": 1000,
+          "mean": 1000,
+          "p95": 1000,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "update10th_item_renders_10k": {
           "score": 1000,
           "median": 1000,
           "min": 1000,
@@ -331,6 +649,72 @@
           "min": 2048,
           "mean": 2048,
           "p95": 2048,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "select_item_renders_10k": {
+          "score": 2,
+          "median": 2,
+          "min": 2,
+          "mean": 2,
+          "p95": 2,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_wire_bytes_10k": {
+          "score": 2048,
+          "median": 2048,
+          "min": 2048,
+          "mean": 2048,
+          "p95": 2048,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_wire_to_main_bytes_10k": {
+          "score": 1024,
+          "median": 1024,
+          "min": 1024,
+          "mean": 1024,
+          "p95": 1024,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_wire_to_background_bytes_10k": {
+          "score": 1024,
+          "median": 1024,
+          "min": 1024,
+          "mean": 1024,
+          "p95": 1024,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_item_renders_10k": {
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "mean": 1,
+          "p95": 1,
+          "sd": 0,
+          "rme": 0,
+          "warmupRatio": 1,
+          "samples": 2
+        },
+        "swap_handle_deltas_10k": {
+          "score": 2,
+          "median": 2,
+          "min": 2,
+          "mean": 2,
+          "p95": 2,
           "sd": 0,
           "rme": 0,
           "warmupRatio": 1,

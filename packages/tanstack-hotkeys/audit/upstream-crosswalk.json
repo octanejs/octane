@@ -179,7 +179,7 @@
       },
       "classification": "behavioral",
       "reason": "Octane provides the same public useHotkey contract; adapted upstream or local evidence exercises it.",
-      "evidenceTarget": "packages/tanstack-hotkeys/tests/upstream/useHotkey.test.ts"
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/upstream/useHotkey.test.tsx"
     },
     {
       "id": "export:useHotkeyRecorder",
@@ -203,7 +203,7 @@
       },
       "classification": "behavioral",
       "reason": "Octane provides the same public useHotkeyRegistrations contract; adapted upstream or local evidence exercises it.",
-      "evidenceTarget": "packages/tanstack-hotkeys/tests/upstream/useHotkeyRegistrations.test.ts"
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/upstream/useHotkeyRegistrations.test.tsx"
     },
     {
       "id": "export:useHotkeySequence",
@@ -239,7 +239,7 @@
       },
       "classification": "behavioral",
       "reason": "Octane provides the same public useHotkeySequences contract; adapted upstream or local evidence exercises it.",
-      "evidenceTarget": "packages/tanstack-hotkeys/tests/upstream/useHotkeySequences.test.ts"
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/upstream/useHotkeySequences.test.tsx"
     },
     {
       "id": "export:useHotkeys",
@@ -251,7 +251,7 @@
       },
       "classification": "behavioral",
       "reason": "Octane provides the same public useHotkeys contract; adapted upstream or local evidence exercises it.",
-      "evidenceTarget": "packages/tanstack-hotkeys/tests/upstream/useHotkeys.test.ts"
+      "evidenceTarget": "packages/tanstack-hotkeys/tests/upstream/useHotkeys.test.tsx"
     },
     {
       "id": "export:useHotkeysContext",
@@ -289,28 +289,28 @@
       "cases": 9,
       "disposition": "adapted",
       "pristineEvidence": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
-      "adaptedEvidence": "packages/tanstack-hotkeys/tests/upstream/useHotkey.test.ts"
+      "adaptedEvidence": "packages/tanstack-hotkeys/tests/upstream/useHotkey.test.tsx"
     },
     {
       "path": "packages/react-hotkeys/tests/useHotkeyRegistrations.test.tsx",
       "cases": 10,
       "disposition": "adapted",
       "pristineEvidence": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
-      "adaptedEvidence": "packages/tanstack-hotkeys/tests/upstream/useHotkeyRegistrations.test.ts"
+      "adaptedEvidence": "packages/tanstack-hotkeys/tests/upstream/useHotkeyRegistrations.test.tsx"
     },
     {
       "path": "packages/react-hotkeys/tests/useHotkeySequences.test.tsx",
       "cases": 11,
       "disposition": "adapted",
       "pristineEvidence": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
-      "adaptedEvidence": "packages/tanstack-hotkeys/tests/upstream/useHotkeySequences.test.ts"
+      "adaptedEvidence": "packages/tanstack-hotkeys/tests/upstream/useHotkeySequences.test.tsx"
     },
     {
       "path": "packages/react-hotkeys/tests/useHotkeys.test.tsx",
       "cases": 11,
       "disposition": "adapted",
       "pristineEvidence": "packages/tanstack-hotkeys/tests/upstream-original.test.ts",
-      "adaptedEvidence": "packages/tanstack-hotkeys/tests/upstream/useHotkeys.test.ts"
+      "adaptedEvidence": "packages/tanstack-hotkeys/tests/upstream/useHotkeys.test.tsx"
     }
   ],
   "typeSuite": {

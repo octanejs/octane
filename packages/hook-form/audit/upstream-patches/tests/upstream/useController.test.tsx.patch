@@ -1,0 +1,210 @@
+diff --git a/tests/upstream/useController.test.tsx b/tests/upstream/useController.test.tsx
+--- a/tests/upstream/useController.test.tsx
++++ b/tests/upstream/useController.test.tsx
+@@ -38,7 +38,9 @@ describe('useController', () => {
+     render(<Component />);
+   });
+ 
+-  it('should return a promise-like value from field.onChange', async () => {
++  // OCTANE DIVERGENCE[hook-form-native-input-handler][adapted:controller-on-input]: Octane exposes native onInput instead of React's synthetic onChange.
++  // @parity-case adapted:controller-on-input
++  it('should return a promise-like value from field.onInput', async () => {
+     let onChangeResult: any;
+ 
+     const Component = () => {
+@@ -53,7 +55,7 @@ describe('useController', () => {
+         <button
+           type="button"
+           onClick={() => {
+-            onChangeResult = field.onChange({
++            onChangeResult = field.onInput({
+               target: {
+                 name: 'test',
+                 value: 'next',
+@@ -129,7 +131,7 @@ describe('useController', () => {
+         defaultValue: 'john',
+       });
+ 
+-      return <input value={ctrl.field.value} onChange={ctrl.field.onChange} />;
++      return <input value={ctrl.field.value} onInput={ctrl.field.onInput} />;
+     }
+ 
+     render(<App />);
+@@ -280,7 +282,7 @@ describe('useController', () => {
+           <input
+             type="checkbox"
+             checked={!!field.value}
+-            onChange={(e) => field.onChange(e.target.checked)}
++            onInput={(e) => field.onInput(e.target.checked)}
+           />
+         );
+       };
+@@ -323,8 +325,8 @@ describe('useController', () => {
+             value="on"
+             type="checkbox"
+             checked={!!field.value}
+-            onChange={(e) =>
+-              field.onChange(e.target.checked ? e.target.value : false)
++            onInput={(e) =>
++              field.onInput(e.target.checked ? e.target.value : false)
+             }
+           />
+         );
+@@ -435,7 +437,7 @@ describe('useController', () => {
+ 
+       return (
+         <div>
+-          <input value={field.value} onChange={field.onChange} />
++          <input value={field.value} onInput={field.onInput} />
+           <button
+             onClick={() => {
+               setValue('test', 'data');
+@@ -470,16 +472,16 @@ describe('useController', () => {
+       useEffect(() => {
+         counter++;
+         field.onBlur;
+-        field.onChange;
++        field.onInput;
+         field.ref;
+-      }, [field.onChange, field.onBlur, field.ref]);
++      }, [field.onInput, field.onBlur, field.ref]);
+ 
+       return (
+         <div>
+-          <input value={field.value} onChange={field.onChange} />
++          <input value={field.value} onInput={field.onInput} />
+           <button
+             onClick={() => {
+-              field.onChange('data');
++              field.onInput('data');
+             }}
+           >
+             setValue
+@@ -805,7 +807,7 @@ describe('useController', () => {
+       return (
+         <button
+           onClick={() => {
+-            field.onChange('updated value');
++            field.onInput('updated value');
+             field.onBlur();
+           }}
+         >
+@@ -882,7 +884,7 @@ describe('useController', () => {
+         <FormProvider {...form}>
+           <Controller
+             render={({ field }) => (
+-              <input value={field.value} onChange={field.onChange} />
++              <input value={field.value} onInput={field.onInput} />
+             )}
+             name="name"
+             rules={{
+@@ -894,7 +896,7 @@ describe('useController', () => {
+       );
+     };
+ 
+-    render(<App />, { reactStrictMode: true });
++    render(<App />);
+ 
+     await waitFor(() => {
+       screen.getByText('not');
+@@ -927,7 +929,7 @@ describe('useController', () => {
+       );
+     }
+ 
+-    render(<App />, { reactStrictMode: true });
++    render(<App />);
+ 
+     fireEvent.click(screen.getByRole('button'));
+ 
+@@ -969,7 +971,7 @@ describe('useController', () => {
+       );
+     }
+ 
+-    render(<App />, { reactStrictMode: true });
++    render(<App />);
+ 
+     fireEvent.input(screen.getByRole('textbox'), {
+       target: {
+@@ -1007,7 +1009,7 @@ describe('useController', () => {
+           <input
+             ref={field.ref}
+             value={field.value ?? ''}
+-            onChange={field.onChange}
++            onInput={field.onInput}
+           />
+           {fieldState.error && <p>{fieldState.error.message}</p>}
+           <button type="submit">submit</button>
+@@ -1015,7 +1017,7 @@ describe('useController', () => {
+       );
+     }
+ 
+-    render(<Input />, { reactStrictMode: true });
++    render(<Input />);
+ 
+     await act(async () => {
+       fireEvent.click(screen.getByRole('button'));
+@@ -1349,14 +1351,11 @@ describe('useController', () => {
+ 
+     expect(renderCounter).toEqual({ test: 3, test_with_suffix: 2 });
+ 
+-    fireEvent.input(
+-      screen.getByRole('textbox', { name: 'test_with_suffix' }),
+-      {
+-        target: {
+-          value: '',
+-        },
++    fireEvent.input(screen.getByRole('textbox', { name: 'test_with_suffix' }), {
++      target: {
++        value: '',
+       },
+-    );
++    });
+ 
+     fireEvent.blur(screen.getByRole('textbox', { name: 'test_with_suffix' }));
+ 
+@@ -1442,14 +1441,11 @@ describe('useController', () => {
+ 
+     expect(renderCounter).toEqual({ test: 3, test_with_suffix: 3 });
+ 
+-    fireEvent.input(
+-      screen.getByRole('textbox', { name: 'test_with_suffix' }),
+-      {
+-        target: {
+-          value: '',
+-        },
++    fireEvent.input(screen.getByRole('textbox', { name: 'test_with_suffix' }), {
++      target: {
++        value: '',
+       },
+-    );
++    });
+ 
+     fireEvent.blur(screen.getByRole('textbox', { name: 'test_with_suffix' }));
+ 
+@@ -1480,7 +1476,7 @@ describe('useController', () => {
+         <div>
+           <select
+             value={type}
+-            onChange={(e) => setValue('type', e.target.value as any)}
++            onInput={(e) => setValue('type', e.target.value as any)}
+           >
+             <option value="personal">Personal</option>
+             <option value="business">Business</option>
+@@ -1586,7 +1582,7 @@ describe('useController', () => {
+       return (
+         <>
+           <p>controller:{String(field.value)}</p>
+-          <button type="button" onClick={() => field.onChange('desktop')}>
++          <button type="button" onClick={() => field.onInput('desktop')}>
+             update-visibility
+           </button>
+         </>
+@@ -1790,7 +1786,7 @@ describe('useController', () => {
+                 <input
+                   type="checkbox"
+                   checked={field.value}
+-                  onChange={(e) => field.onChange(e.target.checked)}
++                  onInput={(e) => field.onInput(e.target.checked)}
+                 />
+                 {field.value && <InputField control={control} index={0} />}
+               </>

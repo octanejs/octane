@@ -10,7 +10,7 @@
     "noErrorTruncation": true,
     "baseUrl": ".",
     "paths": {
-      "react-window-under-test": ["../upstream/dist/react-window.d.ts"]
+      "react-window-under-test": ["../upstream-artifact/dist/react-window.d.ts"]
     }
   },
   "include": ["./parity.test-d.ts"]

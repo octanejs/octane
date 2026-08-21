@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "motion-pristine",
+  "roots": ["packages/motion/tests"],
+  "files": ["packages/motion/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:cc56f30a8ca42dad",
+      "file": "packages/motion/tests/upstream-original.test.ts",
+      "fullName": "runs the curated Motion useMotionValue Jest suite unchanged"
+    }
+  ]
+}

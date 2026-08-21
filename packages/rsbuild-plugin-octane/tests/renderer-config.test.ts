@@ -116,6 +116,32 @@ describe('Rsbuild renderer configuration', () => {
 		}
 	});
 
+	it('forwards the CSS-module proof option to both Rspack environments', async () => {
+		writeProject(root, true);
+		const provider = () => ({ named: { root: 'mapped_root' } });
+		for (const cssModuleConstants of [true, false, provider]) {
+			const instance = await createRsbuild({
+				cwd: root,
+				rsbuildConfig: {
+					plugins: [pluginOctane({ cssModuleConstants })],
+				},
+			});
+			const configs = await instance.initConfigs({ action: 'build' });
+			const plugins = configs.map((config) =>
+				(config.plugins ?? []).find(
+					(plugin): plugin is OctaneRspackPlugin => plugin instanceof OctaneRspackPlugin,
+				),
+			);
+			expect(plugins.map((plugin) => plugin?.options.environment).sort()).toEqual([
+				'client',
+				'server',
+			]);
+			for (const plugin of plugins) {
+				expect(plugin?.options.cssModuleConstants).toBe(cssModuleConstants);
+			}
+		}
+	});
+
 	it.each([
 		['application configuration', true, undefined, true],
 		['explicit compatibility override', true, false, false],
@@ -143,6 +169,24 @@ describe('Rsbuild renderer configuration', () => {
 
 	it('rejects a non-boolean inline Strong-mode option', () => {
 		expect(() => pluginOctane({ strong: 'yes' } as any)).toThrow(/`strong` must be a boolean/);
+	});
+
+	it.each([
+		['parallel compilation', true],
+		['a custom worker limit', { maxWorkers: 2 }],
+		['serial compilation', false],
+	] as const)('forwards %s to the browser and server compilers', async (_label, parallel) => {
+		writeProject(root, true);
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: { plugins: [pluginOctane({ parallel })] },
+		});
+		const plugins = (await instance.initConfigs({ action: 'build' }))
+			.flatMap((config) => config.plugins ?? [])
+			.filter((plugin): plugin is OctaneRspackPlugin => plugin instanceof OctaneRspackPlugin);
+
+		expect(plugins).toHaveLength(2);
+		for (const plugin of plugins) expect(plugin.options.parallel).toEqual(parallel);
 	});
 
 	it('enables Strong mode for compiler-only projects without an app config', async () => {

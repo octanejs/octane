@@ -313,15 +313,15 @@ describe('CI workflow aggregation', () => {
 		const parity = jobSource('react_parity_shard');
 		const parityAggregate = jobSource('react_parity_checks');
 		const lint = jobSource('lint_checks');
-		assert.match(parity, /name: React parity shard \(\$\{\{ matrix\.shard \}\}\/3\)/);
+		assert.match(parity, /name: React parity shard \(\$\{\{ matrix\.shard \}\}\/4\)/);
 		assert.match(parity, /node-version: 24/);
 		assert.doesNotMatch(parity, /node-version: \[22, 24\]/);
-		assert.match(parity, /shard: \[1, 2, 3\]/);
+		assert.match(parity, /shard: \[1, 2, 3, 4\]/);
 		assert.match(
 			parity,
 			/pnpm --filter website exec playwright install --with-deps chromium(?:\n|$)/,
 		);
-		assert.match(parity, /pnpm react-parity:check --shard \$\{\{ matrix\.shard \}\}\/3/);
+		assert.match(parity, /pnpm react-parity:check --shard \$\{\{ matrix\.shard \}\}\/4/);
 		assert.match(
 			parity,
 			/REACT_PARITY_VITEST_REPORT: \$\{\{ runner\.temp \}\}\/react-parity-vitest\/shard-\$\{\{ matrix\.shard \}\}\.json/,
@@ -340,7 +340,7 @@ describe('CI workflow aggregation', () => {
 			parityAggregate,
 			/node scripts\/react-parity\/verify-vitest-shards\.mjs\s+--reports-directory/,
 		);
-		assert.match(parityAggregate, /--expected-shards 3/);
+		assert.match(parityAggregate, /--expected-shards 4/);
 		assert.doesNotMatch(parityAggregate, /pnpm install|playwright install/);
 		assert.match(lint, /pnpm react-parity:test/);
 		assert.match(lint, /pnpm react-parity:validate/);
@@ -706,6 +706,15 @@ describe('CI workflow aggregation', () => {
 });
 
 describe('Publish workflow validation', () => {
+	test('owns GitHub tag and release reconciliation outside changesets/action', () => {
+		assert.match(publishWorkflow, /createGithubReleases:\s*false/);
+		assert.match(
+			publishWorkflow,
+			/- name: Reconcile GitHub tags and releases[\s\S]*?if: always\(\) && steps\.npm_release\.outcome == 'success'[\s\S]*?run: pnpm release:reconcile/,
+		);
+		assert.match(publishWorkflow, /RELEASE_SHA: \$\{\{ steps\.release\.outputs\.sha \}\}/);
+	});
+
 	test('accepts a successful lightweight run through reusable CI provenance', async () => {
 		const outputs = new Map();
 		const run = {

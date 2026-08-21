@@ -59,12 +59,39 @@ async function productionServerModule<T extends Record<string, unknown>>(
 					],
 	});
 
+	// A runtime failure should name the entry, not print the entire base64 bundle
+	// in every stack frame.
+	const code = result.outputFiles[0].text + '\n//# sourceURL=octane-production-server-bundle.js';
 	return import(
-		`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`
+		`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
 	) as Promise<T>;
 }
 
 describe('production-bundled server rendering', () => {
+	it('renders public client Activity descriptors without retaining the server sentinel export', async () => {
+		const { visible, hidden } = await productionServerModule<{
+			visible: string;
+			hidden: string;
+		}>(`
+import { Activity, createElement } from 'octane';
+import { renderToStaticMarkup } from 'octane/server';
+
+function HiddenChild() {
+	throw new Error('Hidden Activity children must not render on the server');
+}
+
+export const visible = renderToStaticMarkup(() =>
+	createElement(Activity, null, createElement('span', null, 'visible')),
+).html;
+export const hidden = renderToStaticMarkup(() =>
+	createElement(Activity, { mode: 'hidden' }, createElement(HiddenChild)),
+).html;
+`);
+
+		expect(visible).toBe('<span>visible</span>');
+		expect(hidden).toBe('');
+	});
+
 	it('preserves permanent-static markup alongside an explicitly retained deferred boundary', async () => {
 		const component = `
 import { Hydrate } from 'octane';

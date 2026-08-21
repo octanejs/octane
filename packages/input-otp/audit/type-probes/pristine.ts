@@ -1,4 +1,8 @@
-import type { OTPInputProps, RenderProps, SlotProps } from '../../upstream/npm/dist/index.d.mts';
+import type {
+	OTPInputProps,
+	RenderProps,
+	SlotProps,
+} from '../../upstream-artifact/dist/index.d.mts';
 
 declare const props: OTPInputProps;
 declare const render: RenderProps;

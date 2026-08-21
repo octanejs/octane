@@ -13,6 +13,11 @@ import type {
 	UniversalEventPriority,
 	UniversalHostBatch,
 	UniversalHostCommand,
+	UniversalHostTemplateProgram,
+	UniversalHostTemplateProgramBinding,
+	UniversalHostTemplateProgramEvent,
+	UniversalHostTemplateProgramNode,
+	UniversalHostTemplateProgramValue,
 	UniversalKey,
 	UniversalPlan,
 	UniversalPlanNode,
@@ -20,6 +25,7 @@ import type {
 	UniversalRenderable,
 	UniversalRenderContext,
 } from 'octane/universal/native';
+import { hasOwnSymbolFields } from './core/own-symbols.js';
 import { isLynxNativeResource } from './resource.js';
 
 const UNIVERSAL_PLAN = Symbol.for('octane.universal.plan');
@@ -97,15 +103,36 @@ interface FirstScreenRange {
 	key: UniversalKey | null;
 	id: number;
 	readonly children: FirstScreenNode[];
+	readonly componentScope?: true;
+	readonly templateProgram?: FirstScreenProgramTemplate;
 }
 
 type FirstScreenNode = FirstScreenHost | FirstScreenRange;
+
+interface FirstScreenProgramValueSite {
+	readonly slot: number;
+	readonly text: boolean;
+}
+
+interface FirstScreenCompiledProgram {
+	readonly wire: UniversalHostTemplateProgram;
+	readonly values: readonly FirstScreenProgramValueSite[];
+	readonly eventSlots: readonly number[];
+}
+
+interface FirstScreenProgramTemplate {
+	readonly root: FirstScreenHost;
+	readonly program: UniversalHostTemplateProgram;
+	readonly values: readonly UniversalHostTemplateProgramValue[];
+	firstListenerId: number | null;
+}
 
 interface FirstScreenAttempt {
 	owner: FirstScreenOwner;
 	nextId: number;
 	nextListener: number;
 	nextUniversalId: number;
+	hostCount: number;
 }
 
 interface TrackedThenable<T = unknown> extends PromiseLike<T> {
@@ -123,6 +150,10 @@ let NEXT_HOOK_SLOT = 0;
 let FIRST_SCREEN_WARM_DEPTH = 0;
 const SLOT_STACK: unknown[] = [];
 const ACTIVE_FIRST_SCREEN_WARM_PLANS: Array<() => void> = [];
+const FIRST_SCREEN_TEMPLATE_PROGRAMS = new WeakMap<
+	UniversalPlan,
+	FirstScreenCompiledProgram | null
+>();
 
 function currentAttempt(): FirstScreenAttempt {
 	if (CURRENT_ATTEMPT === null) {
@@ -288,7 +319,17 @@ export function universalProps(
 	entries: readonly UniversalPropEntry[],
 	children: unknown = NO_CHILDREN,
 	canonicalizeHostClass = false,
+	compilerOwnedRecord = false,
 ): PropsValue {
+	if (compilerOwnedRecord) {
+		return {
+			$$kind: UNIVERSAL_PROPS,
+			props: Object.freeze(entries as unknown as Record<string, unknown>),
+			key: null,
+			hasKey: false,
+			hasChildren: false,
+		};
+	}
 	const props: Record<string, unknown> = {};
 	for (const entry of entries) {
 		if (entry[0] === 'spread') {
@@ -366,8 +407,21 @@ export function universalFor<T>(
 	empty: (() => UniversalRenderable) | null = null,
 	ownerless = false,
 	compact = false,
+	_hostComponent?: UniversalComponent<any> | true,
+	_leafPlan?: UniversalPlan,
+	_leafSignature?: string,
+	componentScope = false,
 ): UniversalRenderable {
-	return { $$kind: UNIVERSAL_FOR, items, key, render, empty, ownerless, compact } as never;
+	return {
+		$$kind: UNIVERSAL_FOR,
+		items,
+		key,
+		render,
+		empty,
+		ownerless,
+		compact,
+		...(componentScope ? { componentScope: true } : null),
+	} as never;
 }
 
 export function universalTry(
@@ -623,6 +677,150 @@ function eventPriority(name: string): UniversalEventPriority | null {
 			: 'default';
 }
 
+function isTemplateProgramValue(value: unknown): value is UniversalHostTemplateProgramValue {
+	return (
+		value === null ||
+		value === undefined ||
+		typeof value === 'string' ||
+		typeof value === 'number' ||
+		typeof value === 'boolean' ||
+		typeof value === 'bigint'
+	);
+}
+
+function compiledFirstScreenProgram(plan: UniversalPlan): FirstScreenCompiledProgram | null {
+	const cached = FIRST_SCREEN_TEMPLATE_PROGRAMS.get(plan);
+	if (cached !== undefined) return cached;
+	if (plan.renderer !== 'lynx' || plan.root.kind !== 'host') {
+		FIRST_SCREEN_TEMPLATE_PROGRAMS.set(plan, null);
+		return null;
+	}
+	const nodes: UniversalHostTemplateProgramNode[] = [];
+	const events: UniversalHostTemplateProgramEvent[] = [];
+	const values: FirstScreenProgramValueSite[] = [];
+	const eventSlots: number[] = [];
+	const forbiddenProp = (name: string): boolean =>
+		name === 'key' ||
+		name === 'ref' ||
+		name === 'children' ||
+		name === '__proto__' ||
+		name === 'hidden' ||
+		name === 'attach' ||
+		name === 'onUpdate' ||
+		name.startsWith('main-thread:');
+	const visit = (node: UniversalPlanNode, parent: number, parentType: string | null): boolean => {
+		if (node.kind === 'slot' || node.kind === 'text') {
+			if (parentType !== 'text') return false;
+			const slot = node.kind === 'slot' ? node.slot : node.slot;
+			if (slot === undefined) {
+				nodes.push(
+					Object.freeze({
+						type: '#text',
+						parent,
+						props: Object.freeze({ value: String(node.kind === 'text' ? (node.value ?? '') : '') }),
+					}),
+				);
+				return true;
+			}
+			const valueIndex = values.length;
+			values.push(Object.freeze({ slot, text: true }));
+			const binding: UniversalHostTemplateProgramBinding = Object.freeze({
+				name: 'value',
+				valueIndex,
+			});
+			nodes.push(
+				Object.freeze({
+					type: '#text',
+					parent,
+					props: Object.freeze({}),
+					bindings: Object.freeze([binding]),
+				}),
+			);
+			return true;
+		}
+		if (node.kind !== 'host' || node.propsSlot !== undefined) return false;
+		if (node.type.length === 0 || node.type === 'list' || node.type === 'list-item') return false;
+
+		const index = nodes.length;
+		const bindingNames = new Set<string>();
+		for (const [name] of node.bindings ?? []) {
+			if (typeof name !== 'string' || bindingNames.has(name) || forbiddenProp(name)) return false;
+			bindingNames.add(name);
+		}
+		const staticSource = node.props ?? {};
+		if (hasOwnSymbolFields(staticSource)) return false;
+		const staticProps: Record<string, UniversalHostTemplateProgramValue> = {};
+		for (const name of Object.keys(staticSource)) {
+			if (bindingNames.has(name)) continue;
+			const value = staticSource[name];
+			if (forbiddenProp(name) || eventPriority(name) !== null || !isTemplateProgramValue(value)) {
+				return false;
+			}
+			if (name === '__proto__') defineProtoProp(staticProps, value);
+			else staticProps[name] = value;
+		}
+		const bindings: UniversalHostTemplateProgramBinding[] = [];
+		for (const [name, slot] of node.bindings ?? []) {
+			const priority = eventPriority(name);
+			if (priority !== null) {
+				if (index === 0) return false;
+				events.push(Object.freeze({ node: index, type: name, priority }));
+				eventSlots.push(slot);
+				continue;
+			}
+			const valueIndex = values.length;
+			values.push(Object.freeze({ slot, text: false }));
+			bindings.push(Object.freeze({ name, valueIndex }));
+		}
+		nodes.push(
+			Object.freeze({
+				type: node.type,
+				parent,
+				props: Object.freeze(staticProps),
+				...(bindings.length === 0 ? null : { bindings: Object.freeze(bindings) }),
+			}),
+		);
+		for (const child of node.children ?? []) {
+			if (!visit(child, index, node.type)) return false;
+		}
+		return true;
+	};
+	const compiled = visit(plan.root, -1, null)
+		? Object.freeze({
+				wire: Object.freeze({ nodes: Object.freeze(nodes), events: Object.freeze(events) }),
+				values: Object.freeze(values),
+				eventSlots: Object.freeze(eventSlots),
+			})
+		: null;
+	FIRST_SCREEN_TEMPLATE_PROGRAMS.set(plan, compiled);
+	return compiled;
+}
+
+function prepareFirstScreenProgramValues(
+	value: PlanValue,
+	compiled: FirstScreenCompiledProgram,
+): readonly UniversalHostTemplateProgramValue[] | null {
+	for (const slot of compiled.eventSlots) {
+		const event = value.values[slot];
+		if (event !== FIRST_SCREEN_EVENT && typeof event !== 'function') return null;
+	}
+	const values: UniversalHostTemplateProgramValue[] = new Array(compiled.values.length);
+	for (let index = 0; index < compiled.values.length; index++) {
+		const site = compiled.values[index];
+		const source = value.values[site.slot];
+		if (site.text) {
+			if (typeof source !== 'string' && typeof source !== 'number' && typeof source !== 'bigint') {
+				return null;
+			}
+			values[index] = String(source);
+		} else {
+			if (!isTemplateProgramValue(source)) return null;
+			values[index] = source;
+		}
+	}
+	return Object.freeze(values);
+}
+
 function hostNode(
 	type: string,
 	rawProps: Readonly<Record<string, unknown>>,
@@ -658,14 +856,31 @@ function hostNode(
 	};
 }
 
-function range(children: FirstScreenNode[], key: UniversalKey | null = null): FirstScreenRange {
-	return { kind: 'range', key, id: 0, children };
+function range(
+	children: FirstScreenNode[],
+	key: UniversalKey | null = null,
+	componentScope = false,
+	templateProgram?: FirstScreenProgramTemplate,
+): FirstScreenRange {
+	return {
+		kind: 'range',
+		key,
+		id: 0,
+		children,
+		...(componentScope ? { componentScope: true } : null),
+		...(templateProgram === undefined ? null : { templateProgram }),
+	};
 }
 
-function renderComponent(
+interface FirstScreenComponentResult {
+	readonly value: UniversalRenderable;
+	readonly nodes: FirstScreenNode[];
+}
+
+function renderComponentResult(
 	component: UniversalComponent<any>,
 	props: Readonly<Record<string, unknown>>,
-): FirstScreenNode[] {
+): FirstScreenComponentResult {
 	const metadata = componentMetadata(component);
 	if (metadata !== FIRST_SCREEN_LAZY_METADATA && metadata.id !== 'lynx') {
 		throw new Error('Lynx first-screen rendering requires a compiled Lynx component.');
@@ -673,10 +888,41 @@ function renderComponent(
 	const owner = childOwner(currentOwner());
 	const warmPlanCheckpoint = ACTIVE_FIRST_SCREEN_WARM_PLANS.length;
 	try {
-		return withOwner(owner, () => materialize(component(props, componentContext()), null));
+		return withOwner(owner, () => {
+			const value = component(props, componentContext());
+			return { value, nodes: materialize(value, null) };
+		});
 	} finally {
 		ACTIVE_FIRST_SCREEN_WARM_PLANS.length = warmPlanCheckpoint;
 	}
+}
+
+function renderComponent(
+	component: UniversalComponent<any>,
+	props: Readonly<Record<string, unknown>>,
+): FirstScreenNode[] {
+	return renderComponentResult(component, props).nodes;
+}
+
+function firstScreenProgramTemplate(
+	value: UniversalRenderable,
+	nodes: readonly FirstScreenNode[],
+): FirstScreenProgramTemplate | undefined {
+	const planValue = value as PlanValue;
+	if (
+		planValue?.$$kind !== UNIVERSAL_VALUE ||
+		planValue.key !== null ||
+		nodes.length !== 1 ||
+		nodes[0].kind !== 'host'
+	) {
+		return undefined;
+	}
+	const compiled = compiledFirstScreenProgram(planValue.plan);
+	if (compiled === null || compiled.wire.nodes.length === 0) return undefined;
+	const values = prepareFirstScreenProgramValues(planValue, compiled);
+	return values === null
+		? undefined
+		: { root: nodes[0], program: compiled.wire, values, firstListenerId: null };
 }
 
 function renderPlanNode(node: UniversalPlanNode, values: readonly unknown[]): FirstScreenNode[] {
@@ -849,16 +1095,31 @@ function materialize(value: unknown, key: UniversalKey | null): FirstScreenNode[
 			const itemKey = (record.key as (item: unknown, index: number) => UniversalKey)(item, index);
 			if (keys.has(itemKey)) throw new Error(`Duplicate universal child key ${String(itemKey)}.`);
 			keys.add(itemKey);
-			const rendered = materialize(
-				(record.render as (item: unknown, index: number) => UniversalRenderable)(item, index++),
-				null,
+			const itemValue = (record.render as (item: unknown, index: number) => UniversalRenderable)(
+				item,
+				index++,
 			);
+			const component = itemValue as unknown as ComponentValue;
+			const componentScope =
+				record.componentScope === true &&
+				component?.$$kind === UNIVERSAL_COMPONENT_VALUE &&
+				component.renderer === 'lynx' &&
+				!component.hasKey;
+			let rendered: FirstScreenNode[];
+			let templateProgram: FirstScreenProgramTemplate | undefined;
+			if (componentScope) {
+				const result = renderComponentResult(component.component, component.props.props);
+				templateProgram = firstScreenProgramTemplate(result.value, result.nodes);
+				rendered = [range(result.nodes)];
+			} else {
+				rendered = materialize(itemValue, null);
+			}
 			// `ownerless`/`compact` are compiler hints, not unconditional descriptor
 			// semantics. The background Lynx client driver does not advertise the
 			// compilerLeafProps capability, so universal-core deliberately falls back
 			// to one logical owner range per item. The first-screen program must retain
 			// those ranges too or every following host ID diverges during adoption.
-			output.push(range(rendered, itemKey));
+			output.push(range(rendered, itemKey, componentScope, templateProgram));
 		}
 		if (index === 0 && typeof record.empty === 'function') {
 			return [range(materialize((record.empty as () => UniversalRenderable)(), null))];
@@ -910,17 +1171,8 @@ function materialize(value: unknown, key: UniversalKey | null): FirstScreenNode[
 function assignIds(nodes: readonly FirstScreenNode[], attempt: FirstScreenAttempt): void {
 	for (const node of nodes) {
 		node.id = attempt.nextId++;
+		if (node.kind === 'host') attempt.hostCount++;
 		assignIds(node.children, attempt);
-	}
-}
-
-function visitHosts(
-	nodes: readonly FirstScreenNode[],
-	visit: (host: FirstScreenHost) => void,
-): void {
-	for (const node of nodes) {
-		if (node.kind === 'host') visit(node);
-		visitHosts(node.children, visit);
 	}
 }
 
@@ -935,17 +1187,135 @@ function physicalChildren(
 	return output;
 }
 
+function selectFirstScreenTemplates(nodes: readonly FirstScreenNode[]): {
+	readonly ranges: ReadonlyMap<FirstScreenRange, FirstScreenProgramTemplate>;
+	readonly roots: ReadonlyMap<FirstScreenHost, FirstScreenProgramTemplate>;
+} {
+	const ranges = new Map<FirstScreenRange, FirstScreenProgramTemplate>();
+	const roots = new Map<FirstScreenHost, FirstScreenProgramTemplate>();
+	const visit = (
+		children: readonly FirstScreenNode[],
+		insideComponentScope: boolean,
+		insideNativeList: boolean,
+	): void => {
+		for (const node of children) {
+			if (node.kind === 'range') {
+				if (node.componentScope && !insideComponentScope) {
+					const template = node.templateProgram;
+					if (
+						template !== undefined &&
+						node.key !== null &&
+						!insideNativeList &&
+						template.root.visibility === 'visible'
+					) {
+						ranges.set(node, template);
+						roots.set(template.root, template);
+						continue;
+					}
+				}
+				visit(
+					node.children,
+					insideComponentScope || node.componentScope === true,
+					insideNativeList,
+				);
+				continue;
+			}
+			visit(
+				node.children,
+				insideComponentScope,
+				insideNativeList || node.type === 'list' || node.type === 'list-item',
+			);
+		}
+	};
+	visit(nodes, false, false);
+	return { ranges, roots };
+}
+
+function templateCommand(
+	template: FirstScreenProgramTemplate,
+	parent: number | null,
+): UniversalHostCommand {
+	if (template.program.events.length !== 0 && template.firstListenerId === null) {
+		throw new Error('Lynx first-screen template program lost its listener identity range.');
+	}
+	return {
+		op: 'mount-template-range',
+		parent,
+		before: null,
+		program: template.program,
+		firstId: template.root.id,
+		values: template.values,
+		firstListenerId: template.firstListenerId,
+	};
+}
+
 function stagePlacements(
 	nodes: readonly FirstScreenNode[],
 	commands: UniversalHostCommand[],
+	templateRanges: ReadonlyMap<FirstScreenRange, FirstScreenProgramTemplate>,
+	templateRoots: ReadonlyMap<FirstScreenHost, FirstScreenProgramTemplate>,
 ): void {
 	for (const node of nodes) {
-		stagePlacements(node.children, commands);
+		if (node.kind === 'range' && templateRanges.has(node)) continue;
+		stagePlacements(node.children, commands, templateRanges, templateRoots);
 		if (node.kind !== 'host') continue;
 		for (const child of physicalChildren(node.children)) {
-			commands.push({ op: 'insert', parent: node.id, id: child.id, before: null });
+			const template = templateRoots.get(child);
+			commands.push(
+				template === undefined
+					? { op: 'insert', parent: node.id, id: child.id, before: null }
+					: templateCommand(template, node.id),
+			);
 		}
 	}
+}
+
+function stageCreates(
+	nodes: readonly FirstScreenNode[],
+	commands: UniversalHostCommand[],
+	templateRanges: ReadonlyMap<FirstScreenRange, FirstScreenProgramTemplate>,
+): void {
+	for (const node of nodes) {
+		if (node.kind === 'range' && templateRanges.has(node)) continue;
+		if (node.kind === 'host') {
+			commands.push({ op: 'create', id: node.id, type: node.type, props: node.props });
+		}
+		stageCreates(node.children, commands, templateRanges);
+	}
+}
+
+function stageEvents(
+	nodes: readonly FirstScreenNode[],
+	commands: UniversalHostCommand[],
+	templateRanges: ReadonlyMap<FirstScreenRange, FirstScreenProgramTemplate>,
+	attempt: FirstScreenAttempt,
+): void {
+	const visit = (children: readonly FirstScreenNode[]): void => {
+		for (const node of children) {
+			if (node.kind === 'range') {
+				const template = templateRanges.get(node);
+				if (template !== undefined) {
+					if (template.program.events.length !== 0) {
+						template.firstListenerId = attempt.nextListener;
+						attempt.nextListener += template.program.events.length;
+					}
+					continue;
+				}
+			}
+			if (node.kind === 'host') {
+				for (const [type, priority] of node.events) {
+					commands.push({
+						op: 'event',
+						id: node.id,
+						type,
+						listener: { id: attempt.nextListener++, priority },
+					});
+				}
+			}
+			visit(node.children);
+		}
+	};
+	visit(nodes);
 }
 
 function freezeBatch(commands: UniversalHostCommand[]): UniversalHostBatch {
@@ -975,6 +1345,7 @@ export function renderLynxFirstScreen<Props>(
 		// both begin at the same deterministic listener seed.
 		nextListener: 1_000_000,
 		nextUniversalId: 1,
+		hostCount: 0,
 	};
 	CURRENT_ATTEMPT = attempt;
 	ACTIVE_FIRST_SCREEN_WARM_PLANS.length = 0;
@@ -1001,29 +1372,23 @@ export function renderLynxFirstScreen<Props>(
 		CURRENT_ATTEMPT = null;
 	}
 
+	const templates = selectFirstScreenTemplates(nodes);
 	const commands: UniversalHostCommand[] = [];
-	let hostCount = 0;
-	visitHosts(nodes, (host) => {
-		hostCount++;
-		commands.push({ op: 'create', id: host.id, type: host.type, props: host.props });
-	});
-	visitHosts(nodes, (host) => {
-		for (const [type, priority] of host.events) {
-			commands.push({
-				op: 'event',
-				id: host.id,
-				type,
-				listener: { id: attempt.nextListener++, priority },
-			});
-		}
-	});
-	stagePlacements(nodes, commands);
+	stageCreates(nodes, commands, templates.ranges);
+	stageEvents(nodes, commands, templates.ranges, attempt);
+	stagePlacements(nodes, commands, templates.ranges, templates.roots);
 	for (const host of physicalChildren(nodes)) {
-		commands.push({ op: 'insert', parent: null, id: host.id, before: null });
+		const template = templates.roots.get(host);
+		commands.push(
+			template === undefined
+				? { op: 'insert', parent: null, id: host.id, before: null }
+				: templateCommand(template, null),
+		);
 	}
 	const hidden: FirstScreenHost[] = [];
 	const collectHiddenPostOrder = (children: readonly FirstScreenNode[]): void => {
 		for (const child of children) {
+			if (child.kind === 'range' && templates.ranges.has(child)) continue;
 			collectHiddenPostOrder(child.children);
 			if (child.kind === 'host' && child.visibility === 'hidden') hidden.push(child);
 		}
@@ -1032,7 +1397,7 @@ export function renderLynxFirstScreen<Props>(
 	for (const host of hidden) commands.push({ op: 'visibility', id: host.id, state: 'hidden' });
 	return Object.freeze({
 		batch: freezeBatch(commands),
-		hostCount,
+		hostCount: attempt.hostCount,
 		logicalCount: attempt.nextId - 1,
 	});
 }

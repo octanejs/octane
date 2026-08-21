@@ -7,7 +7,7 @@
     "adapted": "packages/colorful/audit/adapted-types.json"
   },
   "programRoots": {
-    "upstream": "packages/colorful/upstream/tag/src",
+    "upstream": "packages/colorful/upstream/src",
     "adapted": "packages/colorful/src"
   },
   "programInventories": {

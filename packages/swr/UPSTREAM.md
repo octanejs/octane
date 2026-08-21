@@ -13,20 +13,23 @@
 | npm tarball SHA-256 | `948ad899c51e73ca9555e8182946978f367410406fe6c2acb4d1012c509c9982` |
 
 The canonical `src/`, `test/`, package metadata, Jest configurations, root
-TypeScript configuration, and license are vendored byte-exact under `upstream/`.
-`upstream/SHA256SUMS` locks all 100 vendored evidence files, including the npm
-tarball at `upstream/npm/swr-2.4.2.tgz`. The tarball is retained because it
-contains compiled condition branches and declarations rather than the canonical
-source and tests.
+TypeScript configuration, and license are vendored byte-exact under `upstream/`
+and verify offline against the upstream git blob shas recorded in
+`audit/upstream.lock.json`; the pinned license is republished at the package
+root as `LICENSE.upstream`. The npm tarball is retained at
+`upstream-artifact/swr-2.4.2.tgz`, hash-pinned by `audit/verify-provenance.mjs`,
+because it contains compiled condition branches and declarations rather than the
+canonical source and tests.
 
 The pristine Jest config maps `@testing-library/react` through a narrow harness
-for two `useSWR` mutation race cases. The remote-mutation case starts a 10 ms
-request and assumes the mutation click wins that wall-clock race; the local-
-mutation case shares a 30 ms initial request with a later subscriber and assumes
-its synchronous `isValidating:true` query wins. The harness holds only those
-initial request completions until the competing mutation or observation has
-happened, then releases them so the unchanged assertions deterministically
-exercise the intended overlap.
+for three `useSWR` mutation race cases. One remote-mutation case starts a 10 ms
+request and assumes the mutation click wins that wall-clock race; the repeated-
+trigger case assumes each 5 ms pause resumes before the superseded 10 ms request;
+and the local-mutation case shares a 30 ms initial request with a later subscriber
+and assumes its synchronous `isValidating:true` query wins. The harness holds
+only those superseded or initial request completions until the competing mutation
+or observation has happened, then releases them so the unchanged assertions
+deterministically exercise the intended overlap.
 
 ## Provenance status
 

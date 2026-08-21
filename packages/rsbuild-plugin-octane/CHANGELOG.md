@@ -1,5 +1,73 @@
 # @octanejs/rsbuild-plugin
 
+## 0.1.38
+
+### Patch Changes
+
+- 6b97f85: Add opt-in CSS-module constant folding to one-shot Rspack and Rsbuild production builds. Authenticate immutable JavaScript CSS exports from the actual module graph, preserve stylesheet ownership, and keep proof callbacks on the main thread when compiler workers are enabled. Native CSS modules and mutable default maps retain their existing behavior.
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+- Updated dependencies [6fbde38]
+  - octane@0.1.43
+  - @octanejs/rspack-plugin@0.1.38
+  - @octanejs/app-core@0.0.39
+
+## 0.1.37
+
+### Patch Changes
+
+- Updated dependencies [1581e1b]
+- Updated dependencies [afa3722]
+- Updated dependencies [afa3722]
+- Updated dependencies [231e248]
+- Updated dependencies [2f9b301]
+- Updated dependencies [939c64d]
+  - octane@0.1.42
+  - @octanejs/app-core@0.0.38
+  - @octanejs/rspack-plugin@0.1.37
+
+## 0.1.36
+
+### Patch Changes
+
+- Updated dependencies [489a886]
+- Updated dependencies [922b2d4]
+- Updated dependencies [814a3c1]
+  - octane@0.1.41
+  - @octanejs/app-core@0.0.37
+  - @octanejs/rspack-plugin@0.1.36
+
+## 0.1.35
+
+### Patch Changes
+
+- 9c00c34: Compile Octane modules in parallel Rspack loader workers by default while
+  preserving compiler source maps, module layers, build metadata, diagnostics,
+  and watched package manifests. Both integrations accept `parallel: false` to
+  disable worker compilation or `parallel: { maxWorkers }` to configure the
+  worker-pool limit.
+- Updated dependencies [ff9b859]
+- Updated dependencies [14b8b40]
+- Updated dependencies [9c00c34]
+- Updated dependencies [cc6e5ea]
+  - octane@0.1.40
+  - @octanejs/rspack-plugin@0.1.35
+  - @octanejs/app-core@0.0.36
+
+## 0.1.34
+
+### Patch Changes
+
+- Updated dependencies [954028b]
+- Updated dependencies [21f4dfb]
+- Updated dependencies [1cb4a19]
+- Updated dependencies [0fc84da]
+  - octane@0.1.39
+  - @octanejs/app-core@0.0.35
+  - @octanejs/rspack-plugin@0.1.34
+
 ## 0.1.33
 
 ### Patch Changes

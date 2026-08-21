@@ -332,6 +332,31 @@ export const docsMeta: DocMeta[] = [
 		],
 	},
 	{
+		slug: 'browser-support',
+		title: 'Browser support',
+		description: 'Choose browser targets and understand required Web APIs and optional fallbacks.',
+		group: 'Explore',
+		searchTerms: [
+			'browser compatibility',
+			'Chromium',
+			'Safari',
+			'WebKit',
+			'Samsung Internet',
+			'WebView',
+		],
+		sections: [
+			{ id: 'support-policy', title: 'Support policy' },
+			{
+				id: 'required-apis',
+				title: 'Required browser APIs',
+				searchTerms: ['replaceChildren', 'replaceAll', 'queueMicrotask', 'polyfills'],
+			},
+			{ id: 'feature-specific-apis', title: 'Feature-specific requirements' },
+			{ id: 'optional-features', title: 'Features with fallbacks' },
+			{ id: 'build-targets', title: 'Choose a build target' },
+		],
+	},
+	{
 		slug: 'bindings',
 		title: 'Bindings',
 		description: `Browse all ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,

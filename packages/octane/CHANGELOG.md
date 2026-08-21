@@ -1,5 +1,161 @@
 # octane
 
+## 0.1.43
+
+### Patch Changes
+
+- 4b590bd: Improve Activity parity across compiled JSX, element descriptors, server rendering,
+  hydration, and universal renderers. Hidden boundaries now disconnect public refs,
+  preserve the latest authored styles and text, hide logically owned portals, and
+  contain suspended work without activating an enclosing visible fallback. Retained
+  insertion effects replay safely after suspended hidden renders, including memoized
+  children and nested boundaries.
+
+  Support Activity aliases, namespaces, spreads, children props, and ordered keys
+  without changing the direct mode-only compiler fast path. Integrate Activity
+  visibility changes with ViewTransition enter/exit animations and expose native
+  pseudo-element animations through the transition instance.
+
+  Coalesce hidden descendant visibility scans once per render wave and keep optional
+  Activity implementation and ref tracking off unrelated application paths. Add
+  production browser benchmarks and deterministic work, ref, and bundle controls.
+  Octane's synchronous hidden-work scheduling and existing structural-transaction
+  limitations remain unchanged.
+
+- c0ff085: Keep boolean renderable children empty when updated from text, and correctly
+  reapply anchored child text after a held transition resumes. Explicit string
+  conversion and typed text bindings retain their existing coercion semantics.
+- 6a68a7d: Fold provider-proven immutable CSS-module class strings before template planning. Production Vite builds retain a live class reference in each static subtree so unused and lazy component styles keep their existing delivery boundaries. Mutable default maps remain dynamic unless their CSS provider supplies an explicit immutable-export contract.
+- 6b97f85: Add opt-in CSS-module constant folding to one-shot Rspack and Rsbuild production builds. Authenticate immutable JavaScript CSS exports from the actual module graph, preserve stylesheet ownership, and keep proof callbacks on the main thread when compiler workers are enabled. Native CSS modules and mutable default maps retain their existing behavior.
+
+## 0.1.42
+
+### Patch Changes
+
+- 1581e1b: Skip already-drained scheduled flushes after synchronous native-event commits. Preserve commit-only effects, refs, Fragment bindings, transition finalization, profiling notifications, and microtask ordering.
+- afa3722: Preserve server-rendered descriptor components when a suspended Hydrate boundary
+  resumes. Claim fallback cleanup ranges only after adoption completes, avoiding
+  false hydration mismatch reports while preserving template-owned checks and
+  removing genuinely unmatched content added during suspension.
+- 231e248: Reduce keyed-row selection work for compiler-proven class-only updates. Preserve full row reconciliation for live renderable children and use the correct class setter for statically known HTML, SVG, and MathML templates. Also avoid unnecessary state-update allocations and focus traversal when a document has no focused control.
+- 2f9b301: Keep keyed row selection updates bounded when a row declares a constant alias for its key before rendering. Preserve the full affected-row bodies, event captures, strict-equality behavior, and transition replay.
+- 939c64d: Keep `useMemo` and `useCallback` on a universal renderer's hook runtime in production builds.
+
+  The closure-free DOM memo optimization could incorrectly lower hooks inside an owning universal renderer component and import `octane/internal/client`. Universal renderers do not have a DOM component scope, so those helpers either failed to resolve in custom build pipelines or crashed at runtime. Universal components now retain their renderer-specific memo hooks, while DOM components keep the optimized path.
+
+## 0.1.41
+
+### Patch Changes
+
+- 489a886: Remove memo factory and dependency-array allocations from more production
+  client cache hits, including nested expressions, returned JSX, custom hooks,
+  plain TypeScript modules, and explicit hook slots. Preserve factory scope,
+  declaration timing, callback identity, and held-transition rollback/promotion,
+  and avoid the extra `useCallback` wrapper closure in every runtime.
+- 922b2d4: Avoid redundant external-store snapshot checks when an urgent DOM render is already queued. Keep universal-renderer subscriptions connected across snapshot and getter changes while preserving committed selectors, cleanup, and error handling. Avoid quadratic projection work for universal state-update queues that end in a replacement value.
+- 814a3c1: Recognize unshadowed String conversions as template text and add an opt-in Node-only TypeScript project adapter for string-child inference. Keep conversion calls intact, reject stale source facts, omit uncertain type proofs, and share the same text classification across client compilation, SSR, and hydration. Publish declarations for the compiler and adapter APIs.
+
+## 0.1.40
+
+### Patch Changes
+
+- ff9b859: Parse authored TSRX modules through the native `oxc-tsrx` compatibility layer in Node to reduce compiler latency while preserving Octane's existing AST, source-map, stylesheet, and diagnostic contracts. Browser and other non-Node compiler consumers continue to use the pure-JavaScript `@tsrx/core` parser.
+- 14b8b40: Update the bundled TSRX compiler to the latest installable release, including fixes for literal less-than text and tokenizer lookahead handling.
+- cc6e5ea: Extend Strong-mode analysis through statically known `useCallback`, `useEffectEvent`, and memo-returned functions. Reject Effect Event calls during render and Effect Events in explicit hook dependency lists, while preserving supported hook usage and compatibility-mode behavior.
+
+## 0.1.39
+
+### Patch Changes
+
+- 954028b: Stop the compiled `@for` path from retaining the entire descriptor renderer.
+
+  `mountItem` decided whether a de-opt list's items render through the plain
+  `deoptItemBody` by comparing the body function by identity. The comparison is
+  correct and cheap at runtime, but `mountItem` sits on the compiled `@for` mount
+  path that every list-rendering application reaches, so naming `deoptItemBody`
+  from it is a live reference a bundler must honour. Retaining `deoptItemBody`
+  retains `childSlot` — the universal renderable-hole dispatcher — and through it
+  the descriptor renderer, `FragmentInstance` and fragment refs, portals,
+  transitions, controlled-form restoration, focus preservation and the DOM
+  attribute tables. Applications that only ever render compiled templates, and
+  never present a generic renderable hole, shipped all of it.
+
+  The fact is now recorded on the `ForSlot` as `plainDeopt`, next to the existing
+  `mappedNative` flag, and stamped by `childSlot` where the body is chosen —
+  inside the graph that already retains those modules. `mountItem` reads the flag
+  instead of naming the function. The recorded value is exactly the identity test
+  it replaces: within the de-opt branch the body is `deoptItemBody` precisely when
+  the compiler supplied no map body and this is not the mapped fallback, because
+  both body-wrapping assignments are guarded by those same two conditions. Both
+  `ForSlot` literals declare the field, so every slot keeps one hidden class and
+  the stamp transitions nothing.
+
+  Normalized production builds, gzip, via `benchmarks/bundle-size`:
+
+  | application       | before |      after |
+  | ----------------- | -----: | ---------: |
+  | js-framework rows | 40,752 | **20,609** |
+  | TodoMVC           | 41,293 | **21,835** |
+  | chat-stream       | 41,530 | **21,968** |
+  | weather-app       | 49,524 | **31,742** |
+
+  The saving is entirely in the framework chunk (rows 38,380 → 18,237 B); every
+  application chunk is unchanged, because no compiler output changed. The rows
+  bundle drops from 559 surviving top-level declarations to 340 — `childSlot`,
+  `FragmentInstance`, `deoptItemBody`, `renderPortalState`, `startTransition` and
+  `setAttribute` all become unreachable, while `reconcileKeyed` and `mountItem`
+  correctly remain. The `octane-tsrx` application, framework, and total budgets in
+  `bundle-size/app-budgets.json`, and the reachability ceilings in
+  `bundle-size/minimal-budgets.json`, are re-recorded against the new floor.
+
+  This restores the reachability that held before the identity tests were
+  introduced; the compiled output and every rendering path are unchanged.
+
+- 21f4dfb: Compact safe keyed component rows in the Lynx main-thread first screen into shared host-template range commands.
+
+  The compiler now marks component-owned loops for the Lynx main renderer without granting it the broader background template-program capability. The first-screen renderer proves a single-root scalar/event host program, reuses its immutable shape, and sends one existing `mount-template-range` command per row while preserving every host ID, logical range, listener ID, first-tree snapshot, and background adoption identity. Unsupported, observable, nested, hidden, native-list, resource, and non-scalar shapes continue through the generic command path.
+
+  In production fresh-page AB/BA runs this reduced 10,000-row public FCP from 1,626.1 ms to 1,411.9 ms (13.2%), exact all-row FCP from 1,596.5 ms to 1,408.4 ms (11.8%), and 30,000-row all-row FCP from 4,704.4 ms to 4,269.2 ms (9.3%). Against the merged main baseline, the controlled rows-zero bundle cost is 1,246 Web gzip bytes (0.92%) and 1,824 Lynx gzip bytes (1.12%).
+
+- 1cb4a19: Give a component that calls a method-style custom hook its own update boundary.
+
+  A component that calls a hook owns that hook's state, so an update the hook
+  schedules re-renders that component and nothing else. That held for
+  `useThing()` but not for `obj.useThing()` — and the object-carried shape is how
+  a large part of the React ecosystem exposes hooks: `route.useLoaderData()`,
+  `api.useGetThingQuery()`, and every hook returned by a `createXContext()`
+  factory.
+
+  The `componentSlotLite` eligibility pre-pass decides whether a same-module
+  component is hookless. Its body walk rejected a component on an unknown call
+  only when the callee was an `Identifier`, and the free-identifier sweep ahead of
+  it only ever sees bare names, so neither test could observe `api.useCounter()`:
+  the receiver is `api`, and the callee is a `MemberExpression`. A component whose
+  only hook was member-form was therefore classified hookless and mounted through
+  `componentSlotLite`, a `LiteBlockImpl` with no block of its own. Its hook cells
+  and their `forceUpdate` belonged to the parent, so updating that hook re-rendered
+  the parent and every sibling under it, and the component could never bail out of
+  a render it should have been isolated from.
+
+  The slot-injection pass already handles these calls — it wraps them as
+  `withSlot(sym, () => obj.useX(...args, sym))` precisely because they are hooks —
+  so the two passes disagreed about the same syntax. The eligibility walk now
+  applies the same `use[A-Z]` convention to the property name, and fails closed:
+  matching only forfeits the lite path, never correctness.
+
+  Components that genuinely have no hooks keep `componentSlotLite` exactly as
+  before. The `benchmarks/codegen-size` corpus compiles byte-identically (raw
+  152564, min 75164, gz 26774 before and after), and compile time over 200
+  repetitions is unchanged within measurement noise (baseline 359.3-366.3 ms,
+  candidate 362.2-372.0 ms across interleaved best-of-7 runs). Where the fix does
+  apply, one `componentSlotLite` call becomes a `componentSlotVoid` call — on the
+  regression fixture, +28 bytes of emitted output for the component that gains a
+  real block.
+
+- 0fc84da: Add `@octanejs/tanstack-db`: Octane live-query bindings for `@tanstack/db`. Re-exports `@tanstack/db@0.7.0` unchanged and ports the React live-query surface of `@tanstack/react-db` (`useLiveQuery`, `useLiveInfiniteQuery`, `useLiveSuspenseQuery`, `useLiveQueryEffect`, `usePacedMutations`) onto Octane hooks. `useLiveQuery`/`useLiveSuspenseQuery` run on db's shared `createLiveQueryObserver` and `useLiveInfiniteQuery` on the coordinated `createLiveQueryWindowController`, so status-only changes are observed, infinite-query windows are coordinated across hooks, and a failed page load rolls back and surfaces an error. Suspense integrates via Octane's `use(thenable)`.
+
+  Allow browser-only TypeScript consumers to compile the reachable Octane client runtime without installing Node ambient types, while preserving the literal development-mode guards used for bundler substitution.
+
 ## 0.1.38
 
 ### Patch Changes

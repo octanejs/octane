@@ -7,7 +7,7 @@
       ]
     }
   },
-  "version": "0.0.7",
+  "version": "0.0.12",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -32,7 +32,8 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts",

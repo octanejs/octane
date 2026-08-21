@@ -1,0 +1,172 @@
+diff --git a/tests/upstream/useWatch.test.tsx b/tests/upstream/useWatch.test.tsx
+--- a/tests/upstream/useWatch.test.tsx
++++ b/tests/upstream/useWatch.test.tsx
+@@ -24,7 +24,10 @@ import noop from '../../src/utils/noop';
+ 
+ let i = 0;
+ 
+-vi.mock('../logic/generateId', () => () => String(i++));
++// octane: vitest module mock — path resolved from tests/upstream/, factory returns { default }
++vi.mock('../../src/logic/generateId', () => ({
++  default: () => String(i++),
++}));
+ 
+ describe('useWatch', () => {
+   beforeEach(() => {
+@@ -164,7 +167,7 @@ describe('useWatch', () => {
+   });
+ 
+   it('should render with FormProvider', () => {
+-    const Provider = ({ children }: { children: React.ReactNode }) => {
++    const Provider = ({ children }: { children?: unknown }) => {
+       const methods = useForm<{ test: string }>();
+       return <FormProvider {...methods}>{children}</FormProvider>;
+     };
+@@ -228,6 +231,12 @@ describe('useWatch', () => {
+     expect(submitData).toEqual({});
+   });
+ 
++  // OCTANE DIVERGENCE[hook-form-native-noop-input][runtime:4ca89a396197cd2e]: upstream fires an input event whose value equals the current value
++  // ('test' → 'test'). React's synthetic-event value tracker swallows that no-op
++  // event entirely (RHF's onChange never runs → 6 renders); octane events are
++  // native, so the `input` event is delivered, RHF notifies its values
++  // subscribers, and useWatch pushes one extra re-render (7 outputs). Intentional
++  // no-synthetic-events divergence, verified against react-hook-form under React 19.
+   it('should return defaultValue with shouldUnregister set to true and keepDefaultValues', () => {
+     const output: unknown[] = [];
+ 
+@@ -270,6 +279,7 @@ describe('useWatch', () => {
+       { test: 'test' },
+       { test: 'test' },
+       { test: 'test' },
++      { test: 'test' },
+     ]);
+   });
+ 
+@@ -533,6 +543,14 @@ describe('useWatch', () => {
+   });
+ 
+   describe('update', () => {
++    // OCTANE DIVERGENCE[hook-form-microtask-batching][runtime:41cfb7f1f622474d]: after handleSubmit, RHF emits two state notifications in SEPARATE
++    // microtasks ({ errors: {} } before `await onValid`, then the final
++    // submitted state). React 18+ coalesces both into ONE committed render
++    // (render work is scheduled on a macrotask after the microtask queue
++    // drains), but octane's scheduler flushes per microtask (see
++    // packages/octane/tests/conformance/scheduling-triage.test.ts), so the
++    // parent commits 2 renders instead of 1 and `waitFor(parentCount === 1)`
++    // never observes 1.
+     it('should partial re-render', async () => {
+       type FormInputs = {
+         child: string;
+@@ -586,8 +604,8 @@ describe('useWatch', () => {
+ 
+       fireEvent.submit(screen.getByRole('button', { name: /submit/i }));
+ 
+-      await waitFor(() => expect(parentCount).toBe(1));
+-      expect(childCount).toBe(1);
++      await waitFor(() => expect(parentCount).toBe(2));
++      expect(childCount).toBe(2);
+ 
+       parentCount = 0;
+       childCount = 0;
+@@ -598,6 +616,9 @@ describe('useWatch', () => {
+       expect(childCount).toBe(1);
+     });
+ 
++    // OCTANE DIVERGENCE[hook-form-microtask-batching][runtime:afb225847a57b345]: same microtask-flush behavior as 'should partial re-render' above —
++    // handleSubmit's two microtask-spaced notifications commit as 2 parent
++    // renders under octane where React coalesces them into 1.
+     it('should partial re-render with array name and exact option', async () => {
+       type FormInputs = {
+         child: string;
+@@ -666,9 +687,9 @@ describe('useWatch', () => {
+ 
+       fireEvent.submit(screen.getByRole('button', { name: /submit/i }));
+ 
+-      await waitFor(() => expect(parentCount).toBe(1));
+-      expect(childCount).toBe(1);
+-      expect(childSecondCount).toBe(1);
++      await waitFor(() => expect(parentCount).toBe(2));
++      expect(childCount).toBe(2);
++      expect(childSecondCount).toBe(2);
+ 
+       parentCount = 0;
+       childCount = 0;
+@@ -1278,6 +1299,12 @@ describe('useWatch', () => {
+         screen.queryByText('Value 2: ShouldBeTHere'),
+       ).not.toBeInTheDocument();
+ 
++      // octane: snapshot regenerated under octane — the settled values after each
++      // interaction match upstream exactly (ids included), but the intermediate
++      // commit grouping differs: octane's scheduler flushes per microtask while
++      // React coalesces microtask-spaced updates into one committed render, so
++      // the Watcher render trace duplicates at different steps (upstream dups the
++      // post-mount entry; octane dups the post-remove entry).
+       expect(watchData).toMatchSnapshot();
+     });
+   });
+@@ -1663,11 +1690,11 @@ describe('useWatch', () => {
+             <Controller
+               control={control}
+               name="test"
+-              render={({ field: { onChange, value } }) => (
++              render={({ field: { onInput: onChange, value } }) => (
+                 <select
+                   data-testid="test-select"
+                   value={value ?? ''}
+-                  onChange={(e) => {
++                  onInput={(e) => {
+                     onChange(e.target.value);
+                   }}
+                 >
+@@ -1838,7 +1865,7 @@ describe('useWatch', () => {
+         );
+       };
+ 
+-      const Component: React.FC = () => {
++      const Component = () => {
+         const form = useForm<FormData>({
+           defaultValues: {
+             one: {
+@@ -1961,6 +1988,14 @@ describe('useWatch', () => {
+   });
+ 
+   describe('compute ', () => {
++    // OCTANE DIVERGENCE[hook-form-eager-equal-bailout][runtime:c01c86279535b2d5]: on the first input ('' → '12') compute yields `false`, equal to the
++    // current useWatch state — React still re-enters the render phase once more
++    // before bailing out on an Object.is-equal setState (fiber double-buffering
++    // probe render), so upstream counts that phantom render (renderCount 4).
++    // Octane's eager bailout skips the extra parent-body run entirely
++    // (documented divergence, packages/octane/tests/conformance/eager-bailout.test.ts),
++    // so renderCount is 3. Verified against react-hook-form under React 19:
++    // distribution React [2 mount, 1 no-op input, 1 flip] vs octane [2, 0, 1].
+     it('should only update when value changed within compute', () => {
+       type FormValue = {
+         test: string;
+@@ -2005,7 +2040,7 @@ describe('useWatch', () => {
+ 
+       screen.getByText('yes');
+ 
+-      expect(renderCount).toEqual(4);
++      expect(renderCount).toEqual(3);
+ 
+       fireEvent.input(screen.getByRole('textbox'), {
+         target: { value: '12' },
+@@ -2013,7 +2048,7 @@ describe('useWatch', () => {
+ 
+       screen.getByText('no');
+ 
+-      expect(renderCount).toEqual(5);
++      expect(renderCount).toEqual(4);
+ 
+       fireEvent.input(screen.getByRole('textbox'), {
+         target: { value: '1' },
+@@ -2021,7 +2056,7 @@ describe('useWatch', () => {
+ 
+       screen.getByText('no');
+ 
+-      expect(renderCount).toEqual(5);
++      expect(renderCount).toEqual(4);
+     });
+   });
+ });
