@@ -8,6 +8,7 @@
  */
 import * as THREE from 'three';
 import {
+	createSubSlot,
 	useContext,
 	useLayoutEffect,
 	useMemo,
@@ -39,25 +40,9 @@ export interface RefObject<T> {
 type EqualityFn<T> = (previous: T, next: T) => boolean;
 type Selector<T> = (state: RootState) => T;
 
-const subSlotCache = new Map<symbol, Map<string, symbol>>();
-
-function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-	// Universal hooks allocate an owner-local implicit slot when an uncompiled
-	// caller provides no symbol. Preserve that fallback; a shared tag-only symbol
-	// would make two direct calls to the same composed hook collide.
-	if (slot === undefined) return undefined;
-	let byTag = subSlotCache.get(slot);
-	if (byTag === undefined) {
-		byTag = new Map();
-		subSlotCache.set(slot, byTag);
-	}
-	let result = byTag.get(tag);
-	if (result === undefined) {
-		result = Symbol.for(`${slot.description ?? ''}:@octanejs/three:${tag}`);
-		byTag.set(tag, result);
-	}
-	return result;
-}
+// Universal hooks preserve their owner-local implicit fallback when an
+// uncompiled caller provides no symbol.
+const subSlot = createSubSlot({ tagPrefix: ':@octanejs/three:' });
 
 function splitSlot(args: readonly unknown[]): [readonly unknown[], symbol | undefined] {
 	const tail = args.at(-1);

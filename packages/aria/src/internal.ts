@@ -9,22 +9,9 @@
 //     const slot = restSlot(args) ?? S('useHover');
 // (Same pattern as the other @octanejs bindings; see packages/floating-ui.)
 
-// Derive a stable, distinct sub-slot from a wrapper's slot, namespaced per hook.
-// Memoized: subSlot runs on EVERY hook call every render, and the naive form
-// pays a string concat + global symbol-registry lookup each time. The cache is
-// keyed by the slot symbol itself; the minted value is byte-identical to the
-// uncached Symbol.for result, so identity is preserved across HMR re-evals and
-// the per-package copies of this helper. Key universe is bounded: slots are
-// per-call-site module constants (never minted per render).
-const subSlotCache = new Map<symbol, Map<string, symbol>>();
-export function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-	if (slot === undefined) return undefined;
-	let byTag = subSlotCache.get(slot);
-	if (byTag === undefined) subSlotCache.set(slot, (byTag = new Map()));
-	let sym = byTag.get(tag);
-	if (sym === undefined) byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':' + tag)));
-	return sym;
-}
+import { subSlot } from 'octane';
+
+export { subSlot };
 
 // Split the compiler-injected trailing slot off a hook's args. Needed when a
 // public hook takes optional user args, so the slot can't be located positionally.
