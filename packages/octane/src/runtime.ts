@@ -1311,7 +1311,7 @@ function endTransitionAttempt(attempt: TransitionAttempt | null): void {
 	if (held !== null && held.size > 0 && entries !== null && entries.length > 0) {
 		// Unwind everything the attempt did: bindings and structure via the
 		// journal, then the work it queued, then the effect cells it advanced.
-		rollbackTransitionJournal(attempt.journalCheckpoint);
+		rollbackTransitionJournal(attempt.journalCheckpoint, attempt.origin);
 		for (let phase = 0; phase < 3; phase++) {
 			effectQueues[phase].length = attempt.effects[phase];
 		}
@@ -1537,6 +1537,7 @@ const JOURNAL_ATTR = 1;
 const JOURNAL_BAG = 2;
 const JOURNAL_PROP = 3;
 const JOURNAL_FOR = 4;
+const JOURNAL_RENDER = 5;
 /** Flat undo log, four slots per entry: kind, target, a, b. */
 let TRANSITION_JOURNAL: any[] | null = null;
 /** Bags already captured in the open window, so each is snapshotted once. */
@@ -1902,8 +1903,8 @@ function flushParkedItems(): void {
 	for (let i = 0; i < parked.length; i++) unmountBlock(parked[i].block, false);
 }
 
-/** Undo every binding write recorded since `checkpoint`, newest first. */
-function rollbackTransitionJournal(checkpoint: number): void {
+/** Undo writes and invalidate their rendered owners since `checkpoint`, newest first. */
+function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 	if (checkpoint < 0) return;
 	const log = TRANSITION_JOURNAL;
 	if (log === null) return;
@@ -1925,6 +1926,11 @@ function rollbackTransitionJournal(checkpoint: number): void {
 			case JOURNAL_FOR:
 				restoreForSlot(target as ForSlot, a, b);
 				TRANSITION_JOURNAL_BAGS!.delete(target);
+				break;
+			case JOURNAL_RENDER:
+				if (!target.disposed && (target === owner || blockIsAncestorOf(owner, target))) {
+					invalidateRender(target, owner);
+				}
 				break;
 			default:
 				for (let k = 0; k < a.length; k++) target[a[k]] = b[k];
@@ -4954,6 +4960,12 @@ function renderBlockInner(block: Block): void {
 	// hidden renders cannot erase work still waiting for their reveal.
 	if (block.renderStatus === RENDER_INVALID) block.renderStatus = RENDER_RETRYING;
 	if (WIP_CAPTURE !== null) recordCapturedRender(WIP_CAPTURE, block);
+	// A held in-place attempt has no capture. Its completed bodies must lose
+	// bailout validity with their rolled-back DOM. Record both owners: a nested
+	// journal can roll back even while its enclosing capture survives.
+	if (TRANSITION_JOURNAL !== null) {
+		TRANSITION_JOURNAL.push(JOURNAL_RENDER, block, null, null);
+	}
 	const prevScope = CURRENT_SCOPE;
 	const prevBlock = CURRENT_BLOCK;
 	const prevEffectRenderVersion = CURRENT_EFFECT_RENDER_VERSION;
@@ -22997,7 +23009,7 @@ function handleSuspense(
 		// suspend, so put back what it changed. Nothing has been painted since —
 		// the render and this undo are the same synchronous flush — so the
 		// boundary simply never shows half of the new screen.
-		rollbackTransitionJournal(journalCheckpoint);
+		rollbackTransitionJournal(journalCheckpoint, state.tryBlock ?? sourceBlock);
 		// A whole-drain attempt is in flight: this hold makes it unwind, and the
 		// boundary joins the held set so promotion and discard can find it.
 		if (ACTIVE_TRANSITION_ATTEMPT !== null) {

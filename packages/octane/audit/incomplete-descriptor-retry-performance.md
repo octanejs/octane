@@ -4,17 +4,25 @@ Measured on 2026-08-22 against baseline commit
 `5b1e6a36afcf87077de159a360f910a3e4c36537`, archived before implementation.
 
 - Baseline `runtime.ts` SHA-256: `4efe7af4b0c2b8aae8a736d392676ee918d1c68b9b154a08205f4584666ba97f`.
-- Candidate `runtime.ts` SHA-256: `01efbc2fe8ff2705e109f16dab3caed1c6c223828f67f5f393a064838ff2da8e`.
+- Candidate `runtime.ts` SHA-256: `a62893efc9de26b4dbd73b4e4568339518247e79407863a6712b72e8d8c88fb1`.
 - Environment: macOS arm64, Node 26.4.0, esbuild 0.28.1, `@tsrx/core` 0.1.58,
   Vite 8.1.5, Playwright 1.61.1, Chromium 149.0.7827.55.
+
+This supersedes the audit for runtime
+`01efbc2fe8ff2705e109f16dab3caed1c6c223828f67f5f393a064838ff2da8e`
+(commit `283c20eba`), following the held-transition rollback correction. The
+baseline commit is unchanged; earlier reports and runners remain archived.
 
 Both revisions use the same task-local, exact-lockfile dependency links and
 already-approved package payloads, copied without changing earlier worktrees.
 Repository-declared patches were verified before measurement. The configured
 registry's native-parser policy block was not bypassed: compilation uses the
 repository's shipped browser parser. These are not native-parser measurements.
-All six compared baseline reports reproduce their earlier JSON results exactly.
-The comparison verifies 193 archived source/benchmark files and the live candidate
+Five unchanged baseline reports reproduce the previous audit's results exactly.
+The expanded retry report was rerun identically and preserves every original
+semantic result and counter. Its added held-transition case and journal-append
+metric are not claimed to be identical to the old full JSON. The comparison
+verifies 193 archived source/benchmark files and the live candidate
 runtime hash; only `runtime.ts` differs between the source snapshots.
 
 ## Cost and lifetime
@@ -26,12 +34,13 @@ before its already-advanced props become reusable.
 | Path                                  | Added cost                                                                                                                                                                                                                                                                                                    |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Block creation                        | One initialized numeric `renderStatus` property, with valid/invalid/retrying states. Its actual heap-byte cost was not measured.                                                                                                                                                                              |
-| Ordinary render                       | A status comparison at entry, a capture-null check, and a status comparison on successful completion. Entry/completion writes occur only for a status transition.                                                                                                                                             |
+| Ordinary render                       | A status comparison at entry, capture/journal-null checks, and a status comparison on successful completion. Entry/completion writes occur only for a status transition.                                                                                                                                      |
 | Memo/identity and compiler cache hits | Direct status reads; compiler cache guards inspect the existing current render owner. No new per-hit map or allocation.                                                                                                                                                                                       |
 | Incomplete render                     | Cold owner/ancestor walks mark the logical path and invalidate existing keyed-item dependency caches. Lite scope proxies do not gain scheduler fields.                                                                                                                                                        |
 | Captured render                       | Two fields on each existing capture and one lazy `Set` for its executed blocks. Recording performs ownership checks and inserts; discard walks recorded blocks and their ancestors. Commit/discard release the capture's set/root references; nested commit transfers records to its surviving outer capture. |
 | First Suspense hide                   | A scan of the current pending layout/passive queues, with ownership/revision checks, restores canceled effect dependencies and invalidates affected paths. It can inspect unrelated queued entries before filtering them; it is not a per-render scan.                                                        |
 | Descriptor writes                     | Changed raw text and descriptor stamps add a journal-null check. An active transition journal records the previous text/descriptor stamp for rollback. Ordinary text updates add no DOM getter beyond the existing comparison; active text journaling reads the old value.                                    |
+| Held transition journal               | Every executed body under an open journal appends four slots to the existing flat log, independently of WIP capture. Rollback checks disposal/ownership and invalidates owned live paths. This follow-up adds no field, set, or capture; log growth may allocate backing storage.                             |
 
 These guards, the permanent field, and capture bookkeeping are real costs, even
 where the work counters below are identical. The focused retry probe has no
@@ -101,28 +110,57 @@ existing offscreen capture, now with executed-block tracking.
 
 The same browser graph also mounts the canonical 2,000-row compiled wall in an
 independent root. Across **nine healthy-update phases**, including the first and
-repeated equal updates after each unrelated suspension/resolution, all **27
+repeated equal updates after each unrelated suspension/resolution, all original **27
 call-count metrics** match baseline. `refreshCachedBlock` and
 `refreshBlockForContext` are both zero, as are row/inner/leaf bodies; all 2,000
 row nodes and their text remain unchanged.
+The new journal-append counter is also zero in all nine phases.
 
 An exploratory global-epoch implementation caused 4,001 cache-refresh visits on
 the first unrelated-root update. That version was rejected. The measured final
 three-state local status removes those visits without disabling healthy bails.
+
+### First held transition without a WIP capture
+
+One focused follow-up case mounts both readers synchronously, then starts a
+transition in which the earlier memo reader finishes with its new value before
+the later memo reader suspends. The baseline leaks the earlier reader's new text
+with its old title, then never finishes the later reader. The candidate keeps
+both original text/title pairs visible while held and publishes both new pairs
+when the promise resolves, preserving the same DOM nodes.
+
+| Phase                | Earlier / later reader bodies, before → after | `renderBlockInner` calls, before → after | Candidate render-journal entries |
+| -------------------- | --------------------------------------------: | ---------------------------------------: | -------------------------------: |
+| First held attempt   |                                 1 / 1 → 1 / 1 |                                  10 → 10 |                               10 |
+| Resolve              |                                 0 / 0 → 1 / 1 |                                    1 → 8 |                                8 |
+| Settled equal update |                                 0 / 0 → 0 / 0 |                                    8 → 8 |                                0 |
+
+The first held attempt creates **zero offscreen captures** and records no
+captured renders, so this exercises the previously missing capture-independent
+path. Its ten `JOURNAL_RENDER` appends add 40 flat-log slots; resolution adds
+eight entries, or 32 slots, while using one existing offscreen capture. The
+unchanged memo and identity siblings execute zero bodies during hold, resolve,
+and the settled equal update. Both changed readers also resume their normal
+memo bailout on that final update.
+
+The append count comes from the innermost V8 detailed-coverage range containing
+the new render-record append to the existing log, after compilation. The
+measurement does not instrument runtime source. Counts describe log entries,
+not backing-store bytes or CPU time.
 
 ## Production bytes
 
 | Retained surface / fixture     | Minified bytes, before → after | Gzip bytes, before → after | Gzip delta |
 | ------------------------------ | -----------------------------: | -------------------------: | ---------: |
 | `attachBehaviorRoot`           |                12,044 → 12,044 |              3,748 → 3,748 |          0 |
-| `createRoot`                   |              112,832 → 113,802 |            36,588 → 36,975 |       +387 |
-| Root + state                   |              115,594 → 116,564 |            37,565 → 37,924 |       +359 |
-| Root + memo                    |              114,619 → 115,589 |            37,247 → 37,557 |       +310 |
-| Root + compiler `errorBlock`   |              116,970 → 117,940 |            37,903 → 38,272 |       +369 |
-| Root + public `ErrorBoundary`  |              139,778 → 141,102 |            44,770 → 45,218 |       +448 |
-| Root + Suspense                |              139,571 → 140,895 |            44,686 → 45,135 |       +449 |
-| hook-memo runtime-form fixture |              141,880 → 142,816 |            44,958 → 45,256 |       +298 |
-| hook-memo inline fixture       |              143,547 → 144,483 |            45,499 → 45,859 |       +360 |
+| `createRoot`                   |              112,832 → 113,904 |            36,588 → 37,006 |       +418 |
+| Root + state                   |              115,594 → 116,666 |            37,565 → 37,954 |       +389 |
+| Root + memo                    |              114,619 → 115,691 |            37,247 → 37,612 |       +365 |
+| Root + compiler `errorBlock`   |              116,970 → 118,042 |            37,903 → 38,310 |       +407 |
+| Root + public `ErrorBoundary`  |              139,778 → 141,218 |            44,770 → 45,282 |       +512 |
+| Root + Suspense                |              139,571 → 141,011 |            44,686 → 45,195 |       +509 |
+| hook-memo runtime-form fixture |              141,880 → 142,918 |            44,958 → 45,324 |       +366 |
+| hook-memo inline fixture       |              143,547 → 144,585 |            45,499 → 45,922 |       +423 |
 
 The behavior-only output is byte-identical and excludes `runtime.ts`. Surface
 probes use esbuild bundling/minification/tree shaking, ESM/browser/ESNext,
@@ -135,10 +173,13 @@ clean, unobserved ES2022 bundles.
 
 Local runners, fixtures, source snapshots, manifests, and JSON results are under
 `/private/tmp/octane-825-perf-20260822-b7t2ifb1`. The immutable source directories
-are `baseline` and `candidate-final-01efbc2fe8ff`.
+are `baseline` and `candidate-final-a62893efc9de`.
 `performance-comparison.json` records the deltas and provenance checks. These
 scratch adapters select a source root for the unchanged repository harnesses;
 they are not shipped benchmark changes.
+The superseded reports, runner copies, and audit are in
+`superseded-01efbc2fe8ff`; the earlier source snapshot remains intact at
+`candidate-final-01efbc2fe8ff`.
 
 From the issue worktree, run the Node probes for each source and result label
 (`baseline-recheck` or `candidate`):
@@ -147,7 +188,7 @@ From the issue worktree, run the Node probes for each source and result label
 AUDIT_DIR=/private/tmp/octane-825-perf-20260822-b7t2ifb1
 AUDIT_DEPS=/Users/domgan/.codex/worktrees/octane-825-incomplete-suspense-retries
 AUDIT_PARSER=/private/tmp/octane-825-browser-parser.mjs
-AUDIT_SOURCE="$AUDIT_DIR/candidate-final-01efbc2fe8ff"
+AUDIT_SOURCE="$AUDIT_DIR/candidate-final-a62893efc9de"
 AUDIT_LABEL=candidate
 
 OCTANE_MEMO_ROOT="$AUDIT_SOURCE" OCTANE_MEMO_EXTERNAL_ROOT="$AUDIT_DEPS" \
@@ -172,9 +213,9 @@ browser or package was downloaded for these runs.
 
 The raw reports record source, fixture, runner, observer, and generated-code
 hashes. In particular, the retry driver SHA-256 is
-`4ac0bdffb416e6d1e83a1b9b9579105870871efad9b45547b8d8ebc073393a6a`
+`3e2d40b0bf26227d94d4bef2dbbf3102b223acbba9bb06067a25692dfc262549`
 and its measurement runner SHA-256 is
-`8ee18c16b2e77ffd3beba8fc399e8c20f98a72bc067e98c7fb5036a051defae2`.
+`19986aa7e349b621c42853ef2d2990a83c03c06544c4d9557d9176b014fb6738`.
 
 These results establish deterministic work and code size, **not latency or
 heap-byte neutrality**. The unminified, jitless coverage runs are not production

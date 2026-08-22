@@ -275,7 +275,7 @@ function descriptorRetryApp(
 	const Suspense = (runtime === 'react' ? ReactSuspense : OctaneSuspense) as typeof ReactSuspense;
 	const memoize = (runtime === 'react' ? reactMemo : octaneMemo) as typeof reactMemo;
 	function Reader(props: DescriptorRetryProps) {
-		const value = read(props.promise);
+		const value = props.readyValue ?? read(props.promise);
 		return h('span', { 'data-value': props.label, title: value }, value);
 	}
 	const Content = content ?? Reader;
@@ -457,36 +457,50 @@ describe.each<Runtime>(['react', 'octane'])('%s descriptor Suspense retries', (r
 		},
 	);
 
-	it('keeps the current descriptor primary visible while a transition suspends again', async () => {
-		const App = descriptorRetryApp(runtime, 'memo ancestor');
-		const first = deferred();
-		const second = deferred();
-		let root!: TimingRoot;
-		await act(runtime, async () => {
-			root = mount(runtime, App, {
-				promise: Promise.resolve('first initial'),
-				second: Promise.resolve('second initial'),
-				label: 'first',
+	it.each(['pending first reader', 'ready first reader'] as const)(
+		'keeps the current descriptor primary visible while a transition suspends again (%s)',
+		async (firstRead) => {
+			const App = descriptorRetryApp(runtime, 'memo ancestor');
+			const first = deferred();
+			const second = deferred();
+			let root!: TimingRoot;
+			await act(runtime, async () => {
+				root = mount(runtime, App, {
+					promise: Promise.resolve('first initial'),
+					second: Promise.resolve('second initial'),
+					label: 'first',
+				});
 			});
-		});
-		expect(visible(root)).toBe('first initial|second initial');
-		const firstNode = root.container.querySelector('[data-value="first"]');
-		const secondNode = root.container.querySelector('[data-value="second"]');
-		expect(firstNode?.getAttribute('title')).toBe('first initial');
-		await act(runtime, async () =>
-			root.transitionUpdate({ promise: first.promise, second: second.promise, label: 'first' }),
-		);
-		expect(visible(root)).toBe('first initial|second initial');
-		expect(firstNode?.getAttribute('title')).toBe('first initial');
-		await act(runtime, async () => first.resolve('first next'));
-		expect(visible(root)).toBe('first initial|second initial');
-		expect(firstNode?.getAttribute('title')).toBe('first initial');
-		await act(runtime, async () => second.resolve('second next'));
-		expect(visible(root)).toBe('first next|second next');
-		expect(firstNode?.getAttribute('title')).toBe('first next');
-		expect(root.container.querySelector('[data-value="first"]')).toBe(firstNode);
-		expect(root.container.querySelector('[data-value="second"]')).toBe(secondNode);
-	});
+			expect(visible(root)).toBe('first initial|second initial');
+			const firstNode = root.container.querySelector('[data-value="first"]');
+			const secondNode = root.container.querySelector('[data-value="second"]');
+			expect(firstNode?.getAttribute('title')).toBe('first initial');
+			expect(secondNode?.getAttribute('title')).toBe('second initial');
+			await act(runtime, async () =>
+				root.transitionUpdate({
+					promise: first.promise,
+					second: second.promise,
+					readyValue: firstRead === 'ready first reader' ? 'first next' : undefined,
+					label: 'first',
+				}),
+			);
+			expect(visible(root)).toBe('first initial|second initial');
+			expect(firstNode?.getAttribute('title')).toBe('first initial');
+			expect(secondNode?.getAttribute('title')).toBe('second initial');
+			if (firstRead === 'pending first reader') {
+				await act(runtime, async () => first.resolve('first next'));
+				expect(visible(root)).toBe('first initial|second initial');
+				expect(firstNode?.getAttribute('title')).toBe('first initial');
+				expect(secondNode?.getAttribute('title')).toBe('second initial');
+			}
+			await act(runtime, async () => second.resolve('second next'));
+			expect(visible(root)).toBe('first next|second next');
+			expect(firstNode?.getAttribute('title')).toBe('first next');
+			expect(secondNode?.getAttribute('title')).toBe('second next');
+			expect(root.container.querySelector('[data-value="first"]')).toBe(firstNode);
+			expect(root.container.querySelector('[data-value="second"]')).toBe(secondNode);
+		},
+	);
 
 	it.each(['older first', 'newer first'] as const)(
 		'retries the newest descriptor input when requests settle %s',
