@@ -911,6 +911,11 @@ routing and report through the same callbacks: boundary-claimed →
 `onCaughtError`, unclaimed → `onUncaughtError` (else the default
 `console.error`).
 
+In non-suspending renders, first-mount and parent-driven catches report the
+original error once after the fallback commits, including its refs and layout
+effects. Inline reports retained by Suspense or Activity wait for reveal, and
+are discarded if their catch is abandoned before that commit.
+
 ## Refs are props
 
 Components receive refs as ordinary props; there is no `forwardRef` wrapper:

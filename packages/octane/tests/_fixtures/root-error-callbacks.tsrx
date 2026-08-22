@@ -2,7 +2,216 @@
 // onUncaughtError on createRoot/hydrateRoot). Each host pairs a thrower with
 // (or without) a boundary so the tests can drive both report channels through
 // the render and passive-effect paths.
-import { ErrorBoundary, useEffect, useState } from 'octane';
+import {
+	Activity,
+	createElement,
+	ErrorBoundary,
+	HYDRATION_RANGE_BOUNDARY,
+	Suspense as CaughtSuspense,
+	use,
+	useEffect,
+	useLayoutEffect,
+	useState,
+} from 'octane';
+import type { ComponentBody } from 'octane';
+
+interface CaughtFallbackOptions {
+	fallbackRef?: { current: HTMLSpanElement | null };
+	onFallbackLayout?: () => void;
+	fallbackError?: Error;
+}
+
+export interface ParentErrorProps extends CaughtFallbackOptions {
+	error: Error | null;
+}
+
+function ParentDrivenThrower(props: ParentErrorProps) @{
+	if (props.error !== null) throw props.error;
+	<span>ok</span>
+}
+
+function caughtRenderText(error: unknown): string {
+	return 'caught:' + (error as Error).message;
+}
+
+export function CaughtRenderFallback(props: { error: unknown } & CaughtFallbackOptions) @{
+	if (props.fallbackError !== undefined) throw props.fallbackError;
+	useLayoutEffect(() => props.onFallbackLayout?.(), [props.onFallbackLayout]);
+	<span data-error-fallback ref={props.fallbackRef}>{caughtRenderText(props.error) as string}</span>
+}
+
+function renderCaughtFallback(error: unknown, props: CaughtFallbackOptions) {
+	return createElement(CaughtRenderFallback, {
+		error,
+		fallbackRef: props.fallbackRef,
+		onFallbackLayout: props.onFallbackLayout,
+		fallbackError: props.fallbackError,
+	});
+}
+
+export function LiteralCaughtParentError(props: ParentErrorProps) @{
+	<ErrorBoundary fallback={(error: unknown) => renderCaughtFallback(error, props)}>
+		<ParentDrivenThrower error={props.error} />
+	</ErrorBoundary>
+}
+
+export function DescriptorCaughtParentError(props: ParentErrorProps) {
+	return createElement(ErrorBoundary, {
+		fallback: (error: unknown) => renderCaughtFallback(error, props),
+		children: createElement(ParentDrivenThrower, { error: props.error }),
+	});
+}
+
+export function InlineCaughtParentError(props: ParentErrorProps) @{
+	@try {
+		<ParentDrivenThrower error={props.error} />
+	} @catch (error: unknown, _reset: () => void) {
+		<CaughtRenderFallback
+			error={error}
+			fallbackRef={props.fallbackRef}
+			onFallbackLayout={props.onFallbackLayout}
+			fallbackError={props.fallbackError}
+		/>
+	}
+}
+
+export function PassthroughCaughtRoot(props: ParentErrorProps) @{
+	<InlineCaughtParentError {...props} />
+}
+
+PassthroughCaughtRoot[HYDRATION_RANGE_BOUNDARY] = 'passthrough';
+
+export function ParentDrivenCaughtHost(
+	props: {
+		boundary: ComponentBody<ParentErrorProps>;
+		error: Error;
+		initiallyThrow: boolean;
+		tailError?: Error;
+	} & CaughtFallbackOptions,
+) @{
+	const [bang, setBang] = useState(props.initiallyThrow);
+	const Boundary = props.boundary;
+	<main>
+		<button data-trigger="boundary-error" onClick={() => setBang(true)}>trigger</button>
+		<Boundary
+			error={bang ? props.error : null}
+			fallbackRef={props.fallbackRef}
+			onFallbackLayout={props.onFallbackLayout}
+			fallbackError={props.fallbackError}
+		/>
+		<CaughtHostTail failed={bang} error={props.tailError} />
+	</main>
+}
+
+function CaughtHostTail(props: { failed: boolean; error?: Error }) @{
+	if (props.failed && props.error !== undefined) throw props.error;
+	<span>
+		{props.failed ? 'tail:failed' : 'tail:ready'}
+	</span>
+}
+
+export function LayoutResetCaughtHost(props: { error: Error } & CaughtFallbackOptions) @{
+	const [failed, setFailed] = useState(true);
+	<main>
+		<ErrorBoundary
+			fallback={(error: unknown, reset: () => void) => renderCaughtFallback(error, {
+				fallbackRef: props.fallbackRef,
+				onFallbackLayout: () => {
+					props.onFallbackLayout?.();
+					setFailed(false);
+					reset();
+				},
+			})}
+		>
+			<ParentDrivenThrower error={failed ? props.error : null} />
+		</ErrorBoundary>
+		<CaughtHostTail failed={failed} />
+	</main>
+}
+
+export interface HiddenCaughtActions {
+	fail: () => void;
+	wait: () => void;
+}
+
+interface HiddenCaughtProps extends CaughtFallbackOptions {
+	api: HiddenCaughtActions;
+	error: Error;
+	initial: Promise<string>;
+	pending: Promise<string>;
+}
+
+function IndependentlyCaughtOwner(props: HiddenCaughtProps) @{
+	const [failed, setFailed] = useState(false);
+	props.api.fail = () => setFailed(true);
+	@try {
+		<ParentDrivenThrower error={failed ? props.error : null} />
+	} @catch (error: unknown, _reset: () => void) {
+		<CaughtRenderFallback
+			error={error}
+			fallbackRef={props.fallbackRef}
+			onFallbackLayout={props.onFallbackLayout}
+		/>
+	}
+}
+
+function IndependentlyPendingSibling(props: HiddenCaughtProps) @{
+	const [promise, setPromise] = useState(props.initial);
+	props.api.wait = () => setPromise(props.pending);
+	const value = use(promise);
+	<span>{value as string}</span>
+}
+
+export function HiddenInlineCaughtHost(props: HiddenCaughtProps) @{
+	@try {
+		<main>
+			<IndependentlyCaughtOwner {...props} />
+			<span>|</span>
+			<IndependentlyPendingSibling {...props} />
+		</main>
+	} @pending {
+		<span>outer loading</span>
+	}
+}
+
+interface InterruptedActivityCaughtProps extends ParentErrorProps {
+	mode: 'hidden' | 'visible';
+	promise: Promise<string> | null;
+	siblingOutside: boolean;
+}
+
+function ActivityCaughtPendingSibling(props: { promise: Promise<string> | null }) @{
+	const value =
+		props.promise === null ? 'initial' : use(props.promise);
+	<span>{'|' + value as string}</span>
+}
+
+function ActivityCaughtContents(props: InterruptedActivityCaughtProps) @{
+	<section>
+		<DescriptorCaughtParentError
+			error={props.error}
+			fallbackRef={props.fallbackRef}
+			onFallbackLayout={props.onFallbackLayout}
+		/>
+		@if (!props.siblingOutside) {
+			<ActivityCaughtPendingSibling promise={props.promise} />
+		}
+	</section>
+}
+
+export function InterruptedActivityCaughtHost(props: InterruptedActivityCaughtProps) @{
+	<CaughtSuspense fallback={<span>outer loading</span>}>
+		<main>
+			<span>shell|</span>
+			<Activity mode={props.mode}>
+				<ActivityCaughtContents {...props} />
+			</Activity>
+			@if (props.siblingOutside) {
+				<ActivityCaughtPendingSibling promise={props.promise} />
+			}
+		</main>
+	</CaughtSuspense>
+}
 
 let bumpRender: (() => void) | null = null;
 export function triggerRenderThrow(): void {
@@ -19,7 +228,7 @@ function RenderThrower() @{
 }
 
 export function CaughtHost() @{
-	<ErrorBoundary fallback={(e) => 'caught:' + (e as Error).message}>
+	<ErrorBoundary fallback={(e: unknown) => 'caught:' + (e as Error).message}>
 		<RenderThrower />
 	</ErrorBoundary>
 }
