@@ -1,5 +1,15 @@
 # @octanejs/recharts
 
+## 0.1.41
+
+### Patch Changes
+
+- 7535acd: Deduplicate binding hook sub-slot derivation behind Octane's shared helper while preserving each binding's slotless and symbol-identity behavior.
+- Updated dependencies [9b06e47]
+- Updated dependencies [7535acd]
+  - octane@0.1.44
+  - @octanejs/redux@0.1.41
+
 ## 0.1.40
 
 ### Patch Changes

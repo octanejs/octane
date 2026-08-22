@@ -1,5 +1,14 @@
 # @octanejs/tanstack-db
 
+## 0.0.7
+
+### Patch Changes
+
+- 7535acd: Deduplicate binding hook sub-slot derivation behind Octane's shared helper while preserving each binding's slotless and symbol-identity behavior.
+- Updated dependencies [9b06e47]
+- Updated dependencies [7535acd]
+  - octane@0.1.44
+
 ## 0.0.6
 
 ### Patch Changes
