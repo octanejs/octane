@@ -2512,8 +2512,10 @@ const effectEventQueue: PendingEffectEvent[] = [];
 // Commit actions that must run after the callback bodies above publish. Activity
 // uses this for visible→hidden deactivation+DOM hiding so its cleanup sees the
 // fresh body while the range is still connected. Actions share the render/WIP
-// transaction below, so an aborted enclosing render drops them.
-const effectEventCommitActions: Array<() => void> = [];
+// transaction below, so an aborted enclosing render drops them. An inline catch
+// can return a report for this commit's post-layout phase, after its refs connect.
+type EffectEventCommitAction = () => InlineCaughtErrorReport | void;
+const effectEventCommitActions: EffectEventCommitAction[] = [];
 let passiveScheduled = false;
 // Monotonic enqueue counter — tags each PendingEffect with its DFS pre-order position
 // so the effect drains can reconstruct React's post-order (see comparePostOrder).
@@ -2612,7 +2614,7 @@ function attachLiveFragmentRef(instance: FragmentInstance): void {
 interface OffscreenCapture {
 	effects: [PendingEffect[], PendingEffect[], PendingEffect[]];
 	events: PendingEffectEvent[];
-	eventActions: Array<() => void>;
+	eventActions: EffectEventCommitAction[];
 	refs: RefAttach[];
 	// uSES store-syncs enqueued during this off-screen render (see storeSyncQueue).
 	// Spliced into the live queue on commit, dropped on dispose — a WIP that never
@@ -4098,7 +4100,7 @@ function commitEffects(): void {
 	// Activity visible→hidden work is transactionally deferred until the event
 	// bodies above publish. Its layout cleanup therefore sees the fresh body while
 	// the preserved DOM range is still connected, then the action hides that range.
-	drainEffectEventCommitActions();
+	const caughtReports = drainEffectEventCommitActions();
 	// Controlled-form commit work FIRST: select projections must see the
 	// options this render just built, and the dev missing-onInput check must
 	// see the element's full listener set (see drainControlledSyncs).
@@ -4117,6 +4119,7 @@ function commitEffects(): void {
 	// cleanup already fired in the mutation walk, ref attaches just landed, so a
 	// layout body sees populated refs and connected DOM.
 	if (mutationBatch !== null) runLayoutEffects(mutationBatch);
+	if (caughtReports !== null) publishInlineCaughtErrorReports(caughtReports);
 	// After layout effects (so a sibling layout effect that mutates+notifies the
 	// store has already run), reconcile each uSES consumer's committed snapshot
 	// against the store and re-render any that tore. Mirrors React draining its
@@ -4506,16 +4509,19 @@ function drainPassivePhase(): void {
 	}
 }
 
-function drainEffectEventCommitActions(): void {
-	if (effectEventCommitActions.length === 0) return;
+function drainEffectEventCommitActions(): InlineCaughtErrorReport[] | null {
+	if (effectEventCommitActions.length === 0) return null;
 	const q = effectEventCommitActions.splice(0);
+	let reports: InlineCaughtErrorReport[] | null = null;
 	for (let i = 0; i < q.length; i++) {
 		try {
-			q[i]();
+			const report = q[i]();
+			if (report !== undefined) (reports ??= []).push(report);
 		} catch (err) {
 			console.error(err);
 		}
 	}
+	return reports;
 }
 
 // Passive destroys of DELETED scopes, deferred past the sync phase (React
@@ -4892,7 +4898,7 @@ function enqueueEffectEventUpdate(entry: PendingEffectEvent): void {
 	EFFECT_EVENT_RENDER_TARGET.push(entry);
 }
 
-function enqueueEffectEventCommitAction(action: () => void): void {
+function enqueueEffectEventCommitAction(action: EffectEventCommitAction): void {
 	EFFECT_EVENT_ACTION_TARGET.push(action);
 }
 
@@ -5877,21 +5883,41 @@ interface LinkedStateSlot<Source, Value> {
 type LinkedStateTuple<Value> = [Value, StateSetter<Value>, () => Value];
 
 // A sibling may finish before another sibling suspends their shared boundary.
-// Keep linked-state publication and caught-error reports with that boundary:
-// their completed bodies may bail when the preserved primary finally reveals.
-let SUSPENSE_REVEAL_ACTIONS: WeakMap<TrySlot, Array<() => void>> | null = null;
+// Keep linked-state publication and caught-error reports with their hidden owner
+// (Suspense or Activity): completed bodies may bail when that owner reveals.
+let HIDDEN_REVEAL_ACTIONS: WeakMap<HiddenRenderOwner, EffectEventCommitAction[]> | null = null;
 
-function deferSuspenseRevealAction(boundary: TrySlot, action: () => void): void {
-	const deferred = (SUSPENSE_REVEAL_ACTIONS ??= new WeakMap());
+function deferHiddenRevealAction(
+	boundary: HiddenRenderOwner,
+	action: EffectEventCommitAction,
+): void {
+	const deferred = (HIDDEN_REVEAL_ACTIONS ??= new WeakMap());
 	const actions = deferred.get(boundary);
 	if (actions === undefined) deferred.set(boundary, [action]);
 	else actions.push(action);
 }
 
-function publishSuspenseRevealActions(boundary: TrySlot): void {
-	const actions = SUSPENSE_REVEAL_ACTIONS?.get(boundary);
+function publishHiddenRevealActions(boundary: HiddenRenderOwner): void {
+	const actions = HIDDEN_REVEAL_ACTIONS?.get(boundary);
 	if (actions === undefined) return;
-	SUSPENSE_REVEAL_ACTIONS!.delete(boundary);
+	if (boundary.__kind === 'activityBlockSlot') {
+		// A visible Activity render can still be discarded by an outer Suspense.
+		// Keep its parked work until a surviving commit consumes it; a retry may
+		// already see visible mode even though the first reveal never committed.
+		for (let i = 0; i < actions.length; i++) {
+			const action = actions[i];
+			enqueueEffectEventCommitAction(() => {
+				if (HIDDEN_REVEAL_ACTIONS?.get(boundary) !== actions) return;
+				const index = actions.indexOf(action);
+				if (index === -1) return;
+				actions.splice(index, 1);
+				if (actions.length === 0) HIDDEN_REVEAL_ACTIONS!.delete(boundary);
+				return action();
+			});
+		}
+		return;
+	}
+	HIDDEN_REVEAL_ACTIONS!.delete(boundary);
 	for (let i = 0; i < actions.length; i++) enqueueEffectEventCommitAction(actions[i]);
 }
 
@@ -5945,7 +5971,7 @@ export function useLinkedState<Source, Value>(
 						const publish = state!.renderPublish;
 						if (hiddenBoundary !== null && publish !== undefined) {
 							state!.renderParked = true;
-							deferSuspenseRevealAction(hiddenBoundary, publish);
+							deferHiddenRevealAction(hiddenBoundary, publish);
 							updatingParkedDraft = true;
 						}
 					}
@@ -6052,7 +6078,7 @@ export function useLinkedState<Source, Value>(
 		const hiddenBoundary = findSuspenseHiddenTry(block);
 		if (hiddenBoundary !== null) {
 			current.renderParked = true;
-			deferSuspenseRevealAction(hiddenBoundary, publish);
+			deferHiddenRevealAction(hiddenBoundary, publish);
 			return;
 		}
 		current.source = current.renderSource as Source;
@@ -21830,7 +21856,7 @@ function releaseHiddenText(text: Text, restore = true): void {
 // The visible arm must still unmount before its preserved hidden primary.
 function teardownTrySlot(state: TrySlot, detachDom: boolean): void {
 	cancelSuspenseRetry(state);
-	SUSPENSE_REVEAL_ACTIONS?.delete(state);
+	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	if (state.block !== null) unmountBlock(state.block, detachDom);
 	discardOffscreenCapture(state.stagedCapture);
 	state.stagedCapture = null;
@@ -22005,7 +22031,7 @@ function clearPassthroughTry(state: TrySlot): void {
 	state.tryBlock = null;
 }
 
-function mountPassthroughCatch(state: TrySlot, error: unknown): void {
+function mountPassthroughCatch(state: TrySlot, error: unknown, reportInline = false): void {
 	clearPassthroughTry(state);
 	state.pendingThenable = null;
 	setTryBranch(state, 0);
@@ -22022,7 +22048,11 @@ function mountPassthroughCatch(state: TrySlot, error: unknown): void {
 		state.env,
 	);
 	state.block = block;
-	renderBlock(block);
+	try {
+		renderBlock(block);
+	} finally {
+		if (reportInline) enqueueInlineCaughtError(state);
+	}
 }
 
 function mountPassthroughPending(state: TrySlot, thenable: TrackedThenable<unknown>): void {
@@ -22110,7 +22140,7 @@ function renderPassthroughTry(state: TrySlot): void {
 			if (state.propagateSuspense) throw error;
 			mountPassthroughPending(state, error.thenable);
 		} else {
-			mountPassthroughCatch(state, error);
+			mountPassthroughCatch(state, error, true);
 		}
 	}
 }
@@ -22197,7 +22227,7 @@ export function errorBlock(
 			renderBlock(current);
 		} catch (error) {
 			if (isHostContextRequest(error) || isSuspenseException(error)) throw error;
-			switchErrorToCatch(state, error);
+			switchErrorToCatch(state, error, true);
 		}
 		return state.reset;
 	}
@@ -22253,6 +22283,7 @@ export function errorBlock(
 		switchErrorToCatch(
 			state,
 			error,
+			true,
 			adoptServerCatch && start !== null ? start : undefined,
 			adoptServerCatch && end !== null ? end : undefined,
 		);
@@ -22263,6 +22294,7 @@ export function errorBlock(
 function switchErrorToCatch(
 	state: ErrorSlot,
 	error: any,
+	reportInline = false,
 	adoptedStart?: Node,
 	adoptedEnd?: Node,
 ): void {
@@ -22331,6 +22363,8 @@ function switchErrorToCatch(
 		const parent = findTryHandler(state.parentBlock);
 		if (parent !== null) parent(propagated);
 		else console.error('catch body threw, no outer tryBlock:', nextError);
+	} finally {
+		if (reportInline) enqueueInlineCaughtError(state);
 	}
 }
 
@@ -22480,7 +22514,7 @@ export function tryBlock(
 			if (isSuspenseException(err)) {
 				if (s.propagateSuspense) throw err;
 				handleSuspense(s, err.thenable, s.tryBlock, journalCheckpoint);
-			} else switchToCatch(s, err);
+			} else switchToCatch(s, err, true);
 		} finally {
 			disarmTransitionJournal(journalCheckpoint);
 		}
@@ -22518,7 +22552,7 @@ function createTryBody(state: TrySlot, start: Node, end: Node): Block {
 
 /** New inputs abandon an initial primary that has never committed, not its fallback. */
 function restartUncommittedTry(state: TrySlot): Block | null {
-	SUSPENSE_REVEAL_ACTIONS?.delete(state);
+	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	const old = state.tryBlock!;
 	const refs: SuspenseRefEntry[] = [];
 	collectVisibleSubtreeRefs(old, refs);
@@ -22546,7 +22580,7 @@ function mountHiddenTryBody(state: TrySlot): Block {
 
 function mountTry(state: TrySlot): void {
 	cancelSuspenseRetry(state);
-	SUSPENSE_REVEAL_ACTIONS?.delete(state);
+	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	const wasPending = state.branch === 2;
 	const hydration = activeHydration();
 	discardOffscreenCapture(state.stagedCapture);
@@ -22677,6 +22711,7 @@ function mountTry(state: TrySlot): void {
 			switchToCatch(
 				state,
 				err,
+				true,
 				adoptServerCatch ? bStart : undefined,
 				adoptServerCatch ? bEnd : undefined,
 			);
@@ -23257,7 +23292,7 @@ function commitResumeInner(state: TrySlot): void {
 			}
 			if (state.branch === 1) {
 				if (wasPending) recordSuspenseCommit(state);
-				publishSuspenseRevealActions(state);
+				publishHiddenRevealActions(state);
 				// Reveal: re-attach the host refs detached on hide (same preserved nodes),
 				// before commitEffects fires recreated layout effects. Enumerating now
 				// ensures an aborted A→B hidden retry never resurrects stale ref A.
@@ -23735,7 +23770,7 @@ function attemptHiddenRevealInner(
 		state.pendingThenable = null;
 		spliceOffscreenCapture(hiddenCapture);
 		recordSuspenseCommit(state);
-		publishSuspenseRevealActions(state);
+		publishHiddenRevealActions(state);
 		queueCurrentHiddenRefs(state);
 		if (state.transitionTimeoutId !== null) {
 			clearTimeout(state.transitionTimeoutId);
@@ -24540,9 +24575,15 @@ function forwardFallbackSuspension(fallbackBlock: Block, error: unknown): boolea
 	return true;
 }
 
-function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd?: Node): void {
+function switchToCatch(
+	state: TrySlot,
+	err: any,
+	reportInline = false,
+	adoptedStart?: Node,
+	adoptedEnd?: Node,
+): void {
 	cancelSuspenseRetry(state);
-	SUSPENSE_REVEAL_ACTIONS?.delete(state);
+	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	const hydration = activeHydration();
 	discardOffscreenCapture(state.stagedCapture);
 	state.stagedCapture = null;
@@ -24704,6 +24745,8 @@ function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd
 		const parent = findTryHandler(state.parentBlock);
 		if (parent) parent(propagated);
 		else console.error('catch body threw, no outer tryBlock:', e2);
+	} finally {
+		if (reportInline) enqueueInlineCaughtError(state);
 	}
 }
 
@@ -25549,6 +25592,7 @@ function showActivityRange(state: ActivitySlot): void {
 }
 
 function releaseActivityRange(state: ActivitySlot, restore: boolean): void {
+	if (!restore) HIDDEN_REVEAL_ACTIONS?.delete(state);
 	const hidden = state.hiddenDom;
 	if (hidden === null) return;
 	for (const el of hidden.displays) {
@@ -25874,6 +25918,7 @@ export function activityBlock(
 			// visible → visible: ordinary re-render in place.
 			renderBlock(b);
 		}
+		publishHiddenRevealActions(state);
 	}
 }
 
@@ -28452,6 +28497,9 @@ export interface RootOptions {
 	 * stacks are not part of Octane's API, matching the SSR `onError` shape).
 	 * Deletion-phase teardown errors report here too once their enclosing
 	 * boundary claims them (the routing itself is unchanged).
+	 * First-mount and parent-driven catches in non-suspending renders report
+	 * after their fallback's refs and layout effects commit. Retained hidden
+	 * reports wait for reveal; abandoning their catch cancels them.
 	 */
 	onCaughtError?: (error: unknown) => void;
 	/**
@@ -28534,16 +28582,116 @@ function reportCaughtError(block: Block | null, err: unknown, caught?: Block | n
 				if (caught.disposed) return;
 				const stillHidden = findSuspenseHiddenTry(caught);
 				if (stillHidden !== null) {
-					deferSuspenseRevealAction(stillHidden, publish);
+					deferHiddenRevealAction(stillHidden, publish);
 					return;
 				}
 				invokeRootErrorHandler(h, err);
 			};
-			deferSuspenseRevealAction(hiddenBoundary, publish);
+			deferHiddenRevealAction(hiddenBoundary, publish);
 			return;
 		}
 	}
 	invokeRootErrorHandler(h, err);
+}
+
+interface InlineCaughtErrorReport {
+	state: TrySlot | ErrorSlot;
+	block: Block;
+	error: unknown;
+	handler: (error: unknown) => void;
+	resume: EffectEventCommitAction;
+}
+
+/** Retained catches belong to the reveal even while its retry temporarily shows DOM. */
+function inlineCaughtErrorOwner(block: Block): HiddenRenderOwner | null {
+	const hidden = findHiddenRenderOwner(block, true);
+	if (hidden !== null) return hidden;
+	// A reconnecting primary is temporarily visible during speculative render.
+	// Keep its catch with that owner until reveal, even if a later sibling suspends.
+	for (let context = EFFECT_RECONNECT_CONTEXT; context !== null; context = context.parent) {
+		const root = context.root;
+		if (root !== block && !blockIsAncestorOf(root, block)) continue;
+		const suspense = (root as any).__trySlot as TrySlot | undefined;
+		if (suspense !== undefined && suspense.tryBlock === root) return suspense;
+		const activity = (root as any).__activitySlot as ActivitySlot | undefined;
+		if (activity !== undefined && activity.block === root) return activity;
+	}
+	if (!block.mounted) {
+		// An incomplete fallback may be unwinding a suspension to its enclosing
+		// Suspense, before that owner has hidden its primary. An ordinary fallback
+		// error instead disposes this catch and cancels its parked report.
+		for (let parent = block.parentBlock; parent !== null; parent = parent.parentBlock) {
+			const suspense = (parent as any).__trySlot as TrySlot | undefined;
+			if (suspense !== undefined && suspense.tryBlock === parent && !suspense.propagateSuspense) {
+				return suspense;
+			}
+		}
+	}
+	return null;
+}
+
+/** Inline boundary catches have no scheduled-error caller to report for them. */
+function enqueueInlineCaughtError(state: TrySlot | ErrorSlot): void {
+	if (ROOT_ERROR_HANDLERS === null || state.branch !== 0) return;
+	const block = state.block;
+	if (block === null) return;
+	const handler = rootErrorHandlersFor(block)?.onCaughtError;
+	if (handler === undefined) return;
+	const error = state.err;
+	let parkedOwner: HiddenRenderOwner | null = null;
+	let cleanupRegistered = false;
+	// Reuse render/WIP rollback: a later sibling can still abandon this catch.
+	// The returned record belongs to one commit's local list, so a nested commit
+	// during another action cannot publish it before this fallback's refs/layout.
+	const action = (owner?: HiddenRenderOwner): InlineCaughtErrorReport | void => {
+		parkedOwner = null;
+		if (block.disposed || state.block !== block) return;
+		const hidden = owner ?? findHiddenRenderOwner(block, true);
+		if (hidden !== null) {
+			parkedOwner = hidden;
+			if (!cleanupRegistered) {
+				cleanupRegistered = true;
+				// A child can be replaced while its hidden owner stays alive. Release
+				// this report then, rather than retaining it until a future reveal.
+				(block.cleanups ??= []).push(() => {
+					const owner = parkedOwner;
+					parkedOwner = null;
+					if (owner === null) return;
+					const actions = HIDDEN_REVEAL_ACTIONS?.get(owner);
+					if (actions === undefined) return;
+					const index = actions.indexOf(action);
+					if (index !== -1) actions.splice(index, 1);
+					if (actions.length === 0) HIDDEN_REVEAL_ACTIONS!.delete(owner);
+				});
+			}
+			deferHiddenRevealAction(hidden, action);
+			return;
+		}
+		return { state, block, error, handler, resume: action };
+	};
+	const owner = inlineCaughtErrorOwner(block);
+	if (owner !== null) {
+		// The fallback or a later sibling can suspend again. Keep this report with
+		// its reveal owner, outside the discarded retry's commit-action checkpoint.
+		action(owner);
+	} else {
+		enqueueEffectEventCommitAction(action);
+	}
+}
+
+function publishInlineCaughtErrorReports(reports: InlineCaughtErrorReport[]): void {
+	for (let i = 0; i < reports.length; i++) {
+		const report = reports[i];
+		if (report.block.disposed || report.state.block !== report.block) continue;
+		const hidden = findHiddenRenderOwner(report.block, true);
+		if (hidden !== null) {
+			report.resume();
+			continue;
+		}
+		// A layout effect may request reset without replacing this committed arm.
+		// Report the captured error, not the slot's now-reset branch or error value.
+		invokeRootErrorHandler(report.handler, report.error);
+	}
 }
 
 /** True when the owning root's onUncaughtError consumed the report (callers skip their default). */

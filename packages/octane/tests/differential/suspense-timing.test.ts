@@ -1055,16 +1055,37 @@ describe.each<Runtime>(['react', 'octane'])('%s suspending fallback renders', (r
 				return setup;
 			}
 
-			it('suspends an error fallback to an outer Suspense with no outer error boundary', async () => {
-				const { fallback, props } = errorResources();
-				let root!: TimingRoot;
-				await act(runtime, async () => {
-					root = mount(runtime, 'ErrorFallbackBoundary', props);
-				});
-				expect(visible(root)).toBe('outer loading');
-				await act(runtime, async () => fallback.resolve('fallback ready'));
-				expect(visible(root)).toBe('fallback ready:0');
-			});
+			it.each(['first mount', 'parent update'] as const)(
+				'reports a %s error only after its suspended fallback commits',
+				async (entry) => {
+					const { primary, fallback, props } = errorResources();
+					const layouts: string[] = [];
+					const reportedLayouts: string[][] = [];
+					props.onFallbackLayout = (value) => layouts.push(value);
+					if (entry === 'parent update') primary.resolve('primary ready');
+					let root!: TimingRoot;
+					await act(runtime, async () => {
+						root = mount(
+							runtime,
+							'ErrorFallbackBoundary',
+							{ ...props, primaryError: entry === 'first mount' ? props.primaryError : undefined },
+							{ onCaughtError: () => reportedLayouts.push([...layouts]) },
+						);
+					});
+					if (entry === 'parent update') {
+						expect(visible(root)).toBe('primary ready');
+						await act(runtime, async () => root.update(props));
+					}
+					expect(visible(root)).toBe('outer loading');
+					expect(root.caughtErrors).toEqual([]);
+					expect(layouts).toEqual([]);
+					await act(runtime, async () => fallback.resolve('fallback ready'));
+					expect(visible(root)).toBe('fallback ready:0');
+					expect(root.caughtErrors).toHaveLength(1);
+					expect(root.caughtErrors[0]).toBe(props.primaryError);
+					expect(reportedLayouts).toEqual([['fallback ready']]);
+				},
+			);
 
 			it('preserves committed error fallback state when refreshed data suspends', async () => {
 				const { props } = errorResources('fallback initial');
@@ -1131,22 +1152,38 @@ describe.each<Runtime>(['react', 'octane'])('%s suspending fallback renders', (r
 				expect(root.caughtErrors[0]).toBe(fallbackError);
 			});
 
-			it.each(['unmount', 'replacement'] as const)(
-				'discards a detached error report on %s before its fallback resolves',
-				async (cancellation) => {
+			it.each([
+				['unmount', 'first mount'],
+				['replacement', 'first mount'],
+				['unmount', 'parent update'],
+				['replacement', 'parent update'],
+				['unmount', 'scheduled rejection'],
+				['replacement', 'scheduled rejection'],
+			] as const)(
+				'discards an error report on %s before its fallback resolves (%s)',
+				async (cancellation, entry) => {
 					const { primary, fallback, props } = errorResources();
-					const suspendedProps = { ...props, primaryError: undefined };
+					const initialProps = {
+						...props,
+						primaryError: entry === 'first mount' ? props.primaryError : undefined,
+					};
+					if (entry === 'parent update') primary.resolve('primary ready');
 					let root!: TimingRoot;
 					await act(runtime, async () => {
-						root = mount(runtime, 'ErrorFallbackBoundary', suspendedProps);
+						root = mount(runtime, 'ErrorFallbackBoundary', initialProps);
 					});
-					expect(visible(root)).toBe('primary loading');
-					await act(runtime, async () => primary.reject(new Error('primary failed')));
+					if (entry === 'parent update') {
+						expect(visible(root)).toBe('primary ready');
+						await act(runtime, async () => root.update(props));
+					} else if (entry === 'scheduled rejection') {
+						expect(visible(root)).toBe('primary loading');
+						await act(runtime, async () => primary.reject(props.primaryError!));
+					}
 					expect(visible(root)).toBe('outer loading');
 					expect(root.caughtErrors).toEqual([]);
 					await act(runtime, async () => {
 						if (cancellation === 'unmount') root.unmount();
-						else root.update({ ...suspendedProps, replacement: 'replacement ready' });
+						else root.update({ ...props, replacement: 'replacement ready' });
 					});
 					const expected = cancellation === 'unmount' ? '' : 'replacement ready';
 					expect(visible(root)).toBe(expected);
