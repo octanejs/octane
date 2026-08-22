@@ -829,7 +829,10 @@ describe('Form actions example — attributes with no baked HTML', () => {
 			'a boolean prop bound from a hook',
 			'disabled',
 			'disabled={status.pending}',
-			{ client: ['_$setBooleanAttribute', "'disabled'"], server: ['_$ssrAttr', '"disabled"'] },
+			{
+				client: ['_$setBooleanAttributeIfChanged', "'disabled'"],
+				server: ['_$ssrAttr', '"disabled"'],
+			},
 		],
 	];
 
