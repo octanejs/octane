@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.2.19
+
+### Patch Changes
+
+- 7535acd: Deduplicate binding hook sub-slot derivation behind Octane's shared helper while preserving each binding's slotless and symbol-identity behavior.
+
 ## 0.2.18
 
 ### Patch Changes
