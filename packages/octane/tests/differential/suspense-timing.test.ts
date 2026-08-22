@@ -5,6 +5,10 @@ import {
 	act as reactAct,
 	Component,
 	createElement,
+	memo as reactMemo,
+	startTransition as reactStartTransition,
+	Suspense as ReactSuspense,
+	use as reactUse,
 	type ComponentType,
 	type ReactNode,
 } from 'react';
@@ -12,9 +16,14 @@ import { createRoot as createReactRoot } from 'react-dom/client';
 import { flushSync as reactFlushSync } from 'react-dom';
 import {
 	act as octaneAct,
+	createElement as createOctaneElement,
 	createRoot as createOctaneRoot,
 	flushSync as octaneFlushSync,
 	ErrorBoundary as OctaneErrorBoundary,
+	memo as octaneMemo,
+	startTransition as octaneStartTransition,
+	Suspense as OctaneSuspense,
+	use as octaneUse,
 } from '../../src/index.js';
 import { normaliseHtml, preloadDifferentialFixture } from './_rig.js';
 import type {
@@ -60,6 +69,7 @@ type FixtureName =
 	| 'MemoizedFallbackSibling';
 type Props =
 	| TimingProps
+	| DescriptorRetryProps
 	| TimingPairProps
 	| NestedTimingProps
 	| RawTimingProps
@@ -72,6 +82,7 @@ interface TimingRoot {
 	container: HTMLDivElement;
 	caughtErrors: unknown[];
 	update(props: Props): void;
+	transitionUpdate(props: Props): void;
 	click(selector: string): void;
 	unmount(): void;
 }
@@ -138,10 +149,10 @@ function reader(resource: ReturnType<typeof deferred>): () => string {
 	};
 }
 
-function mount(
+function mount<P extends Props>(
 	runtime: Runtime,
-	name: FixtureName,
-	props: Props,
+	name: FixtureName | ((props: P) => unknown),
+	props: P,
 	errorOptions: {
 		onCaughtError?: (error: unknown) => void;
 		onUncaughtError?: (error: unknown) => void;
@@ -149,7 +160,8 @@ function mount(
 ): TimingRoot {
 	const container = document.createElement('div');
 	document.body.appendChild(container);
-	const fixture = (runtime === 'react' ? reactFixture : octaneFixture)[name];
+	const fixture =
+		typeof name === 'function' ? name : (runtime === 'react' ? reactFixture : octaneFixture)[name];
 	const caughtErrors: unknown[] = [];
 	const options = {
 		...errorOptions,
@@ -163,22 +175,28 @@ function mount(
 			? createReactRoot(container, options)
 			: createOctaneRoot(container, options);
 	const flush = runtime === 'react' ? reactFlushSync : octaneFlushSync;
-	const render = (next: Props) => {
-		flush(() => {
+	const transition = runtime === 'react' ? reactStartTransition : octaneStartTransition;
+	const render = (next: Props, concurrent = false) => {
+		const update = () => {
 			if (runtime === 'react') {
 				(root as ReturnType<typeof createReactRoot>).render(
 					createElement(fixture as ComponentType<Props>, next),
 				);
+			} else if (typeof name === 'function') {
+				(root as ReturnType<typeof createOctaneRoot>).render(createOctaneElement(fixture, next));
 			} else {
 				(root as ReturnType<typeof createOctaneRoot>).render(fixture, next);
 			}
-		});
+		};
+		if (concurrent) transition(update);
+		else flush(update);
 	};
 	let mounted = true;
 	const result: TimingRoot = {
 		container,
 		caughtErrors,
 		update: render,
+		transitionUpdate: (next) => render(next, true),
 		click(selector) {
 			const button = container.querySelector<HTMLButtonElement>(selector);
 			if (!button) throw new Error(`No button matching ${selector}`);
@@ -236,6 +254,367 @@ function otherInitialValues(root: TimingRoot): Array<string | null | undefined> 
 		content?.getAttribute(attribute),
 	);
 }
+
+type DescriptorRetryShape =
+	'host' | 'nested' | 'cached descriptor' | 'memo ancestor' | 'memo reader';
+
+interface DescriptorRetryProps extends TimingProps {
+	second?: Promise<string>;
+	readyValue?: string;
+	onPassive?: (value: string) => void;
+}
+
+function descriptorRetryApp(
+	runtime: Runtime,
+	shape: DescriptorRetryShape,
+	content?: ComponentType<DescriptorRetryProps>,
+	catchErrors = false,
+) {
+	const h = (runtime === 'react' ? createElement : createOctaneElement) as typeof createElement;
+	const read = runtime === 'react' ? reactUse : octaneUse;
+	const Suspense = (runtime === 'react' ? ReactSuspense : OctaneSuspense) as typeof ReactSuspense;
+	const memoize = (runtime === 'react' ? reactMemo : octaneMemo) as typeof reactMemo;
+	function Reader(props: DescriptorRetryProps) {
+		const value = props.readyValue ?? read(props.promise);
+		return h('span', { 'data-value': props.label, title: value }, value);
+	}
+	const Content = content ?? Reader;
+	function Nested(props: DescriptorRetryProps) {
+		return h('section', null, h('article', null, h(Content, props)));
+	}
+	const descriptors = new WeakMap<DescriptorRetryProps, ReturnType<typeof h>>();
+	function Cached(props: DescriptorRetryProps) {
+		let child = descriptors.get(props);
+		if (child === undefined) {
+			child = h(Nested, props);
+			descriptors.set(props, child);
+		}
+		return child;
+	}
+	const Child =
+		shape === 'memo ancestor'
+			? memoize(Nested)
+			: shape === 'memo reader'
+				? memoize(Content)
+				: shape === 'cached descriptor'
+					? Cached
+					: shape === 'nested'
+						? Nested
+						: Content;
+	return function App(props: DescriptorRetryProps) {
+		const main =
+			props.second === undefined
+				? h('main', null, h(Child, props))
+				: h(
+						'main',
+						null,
+						h(Child, props),
+						h(Child, { ...props, promise: props.second, label: 'second', readyValue: undefined }),
+					);
+		const body = h(
+			Suspense,
+			{ fallback: h('span', { 'data-fallback': 'reader' }, 'loading') },
+			main,
+		);
+		if (!catchErrors) return body;
+		const Boundary = (
+			runtime === 'react' ? ReactFallbackBoundary : OctaneErrorBoundary
+		) as typeof ReactFallbackBoundary;
+		return h(Boundary, {
+			children: body,
+			fallback: (error: unknown) =>
+				h('span', { 'data-error': props.label }, String((error as Error).message)),
+		});
+	};
+}
+
+describe.each<Runtime>(['react', 'octane'])('%s descriptor Suspense retries', (runtime) => {
+	const statefulContent = (runtime === 'react' ? reactFixture : octaneFixture)
+		.DescriptorRetryContent;
+
+	it.each<DescriptorRetryShape>([
+		'host',
+		'nested',
+		'cached descriptor',
+		'memo ancestor',
+		'memo reader',
+	])('reveals the new value through a %s after its update suspends', async (shape) => {
+		const App = descriptorRetryApp(runtime, shape);
+		let root!: TimingRoot;
+		await act(runtime, async () => {
+			root = mount(runtime, App, { promise: Promise.resolve('initial'), label: 'reader' });
+		});
+		expect(visible(root)).toBe('initial');
+		const main = root.container.querySelector('main');
+		const reader = root.container.querySelector('[data-value="reader"]');
+		for (const value of ['next', 'last']) {
+			const next = deferred();
+			await act(runtime, async () => root.update({ promise: next.promise, label: 'reader' }));
+			expect(visible(root)).toBe('loading');
+			await act(runtime, async () => next.resolve(value));
+			expect(visible(root)).toBe(value);
+			expect(root.container.querySelector('main')).toBe(main);
+			expect(root.container.querySelector('[data-value="reader"]')).toBe(reader);
+		}
+	});
+
+	it('connects a new ready sibling’s refs and effects when the first suspended mount reveals', async () => {
+		const App = descriptorRetryApp(runtime, 'memo ancestor', statefulContent);
+		const pending = deferred();
+		const layouts: string[] = [];
+		const passives: string[] = [];
+		const attached: HTMLSpanElement[] = [];
+		let root!: TimingRoot;
+		await act(runtime, async () => {
+			root = mount(runtime, App, {
+				promise: pending.promise,
+				second: pending.promise,
+				readyValue: 'ready',
+				label: 'first',
+				onLayout: (value: string) => layouts.push(value),
+				onPassive: (value: string) => passives.push(value),
+				onRef: (node: HTMLSpanElement | null) => {
+					if (node !== null) attached.push(node);
+				},
+			});
+		});
+		expect(visible(root)).toBe('loading');
+		expect(layouts).toEqual([]);
+		expect(passives).toEqual([]);
+		expect(attached).toEqual([]);
+		await act(runtime, async () => pending.resolve('second ready'));
+		expect(visible(root)).toBe('ready:0|second ready:0');
+		expect(layouts).toEqual(['ready', 'second ready']);
+		expect(passives).toEqual(['ready', 'second ready']);
+		expect(attached).toEqual([
+			root.container.querySelector('[data-value="first"]'),
+			root.container.querySelector('[data-value="second"]'),
+		]);
+	});
+
+	it.each(['pending first reader', 'ready first reader'] as const)(
+		'commits the earlier reader’s new layout only when its later sibling also finishes (%s)',
+		async (firstRead) => {
+			const App = descriptorRetryApp(runtime, 'memo ancestor', statefulContent);
+			const first = deferred();
+			const second = deferred();
+			const attached: HTMLSpanElement[] = [];
+			const layouts: Array<{ value: string; view: string }> = [];
+			const passives: string[] = [];
+			let root!: TimingRoot;
+			const callbacks = {
+				onRef: (node: HTMLSpanElement | null) => {
+					if (node !== null) attached.push(node);
+				},
+				onLayout: (value: string) => layouts.push({ value, view: visible(root) }),
+				onPassive: (value: string) => passives.push(value),
+			};
+			await act(runtime, async () => {
+				root = mount(runtime, App, {
+					promise: Promise.resolve('first initial'),
+					second: Promise.resolve('second initial'),
+					label: 'first',
+					...callbacks,
+				});
+			});
+			await act(runtime, async () => root.click('[data-value="first"]'));
+			expect(visible(root)).toBe('first initial:1|second initial:0');
+			const firstNode = root.container.querySelector('[data-value="first"]');
+			const secondNode = root.container.querySelector('[data-value="second"]');
+			attached.length = 0;
+			layouts.length = 0;
+			passives.length = 0;
+			await act(runtime, async () =>
+				root.update({
+					promise: first.promise,
+					second: second.promise,
+					readyValue: firstRead === 'ready first reader' ? 'first next' : undefined,
+					label: 'first',
+					...callbacks,
+				}),
+			);
+			expect(visible(root)).toBe('loading');
+			if (firstRead === 'pending first reader') {
+				await act(runtime, async () => first.resolve('first next'));
+			}
+			expect(visible(root)).toBe('loading');
+			expect(layouts).toEqual([]);
+			expect(passives).toEqual([]);
+			expect(attached).toEqual([]);
+			expect(root.caughtErrors).toEqual([]);
+			await act(runtime, async () => second.resolve('second next'));
+			const view = 'first next:1|second next:0';
+			expect(visible(root)).toBe(view);
+			expect(root.container.querySelector('[data-value="first"]')).toBe(firstNode);
+			expect(root.container.querySelector('[data-value="second"]')).toBe(secondNode);
+			expect(attached).toEqual([firstNode, secondNode]);
+			expect(layouts).toEqual([
+				{ value: 'first next', view },
+				{ value: 'second next', view },
+			]);
+			expect(passives).toEqual(['first next', 'second next']);
+			expect(root.caughtErrors).toEqual([]);
+		},
+	);
+
+	it.each(['pending first reader', 'ready first reader'] as const)(
+		'keeps the current descriptor primary visible while a transition suspends again (%s)',
+		async (firstRead) => {
+			const App = descriptorRetryApp(runtime, 'memo ancestor');
+			const first = deferred();
+			const second = deferred();
+			let root!: TimingRoot;
+			await act(runtime, async () => {
+				root = mount(runtime, App, {
+					promise: Promise.resolve('first initial'),
+					second: Promise.resolve('second initial'),
+					label: 'first',
+				});
+			});
+			expect(visible(root)).toBe('first initial|second initial');
+			const firstNode = root.container.querySelector('[data-value="first"]');
+			const secondNode = root.container.querySelector('[data-value="second"]');
+			expect(firstNode?.getAttribute('title')).toBe('first initial');
+			expect(secondNode?.getAttribute('title')).toBe('second initial');
+			await act(runtime, async () =>
+				root.transitionUpdate({
+					promise: first.promise,
+					second: second.promise,
+					readyValue: firstRead === 'ready first reader' ? 'first next' : undefined,
+					label: 'first',
+				}),
+			);
+			expect(visible(root)).toBe('first initial|second initial');
+			expect(firstNode?.getAttribute('title')).toBe('first initial');
+			expect(secondNode?.getAttribute('title')).toBe('second initial');
+			if (firstRead === 'pending first reader') {
+				await act(runtime, async () => first.resolve('first next'));
+				expect(visible(root)).toBe('first initial|second initial');
+				expect(firstNode?.getAttribute('title')).toBe('first initial');
+				expect(secondNode?.getAttribute('title')).toBe('second initial');
+			}
+			await act(runtime, async () => second.resolve('second next'));
+			expect(visible(root)).toBe('first next|second next');
+			expect(firstNode?.getAttribute('title')).toBe('first next');
+			expect(secondNode?.getAttribute('title')).toBe('second next');
+			expect(root.container.querySelector('[data-value="first"]')).toBe(firstNode);
+			expect(root.container.querySelector('[data-value="second"]')).toBe(secondNode);
+		},
+	);
+
+	it.each(['older first', 'newer first'] as const)(
+		'retries the newest descriptor input when requests settle %s',
+		async (order) => {
+			const App = descriptorRetryApp(runtime, 'cached descriptor');
+			const older = deferred();
+			const newer = deferred();
+			let root!: TimingRoot;
+			await act(runtime, async () => {
+				root = mount(runtime, App, { promise: Promise.resolve('initial'), label: 'reader' });
+			});
+			await act(runtime, async () => root.update({ promise: older.promise, label: 'reader' }));
+			expect(visible(root)).toBe('loading');
+			await act(runtime, async () => root.update({ promise: newer.promise, label: 'reader' }));
+			if (order === 'older first') {
+				await act(runtime, async () => older.resolve('stale'));
+				expect(visible(root)).toBe('loading');
+			}
+			await act(runtime, async () => newer.resolve('current'));
+			expect(visible(root)).toBe('current');
+			if (order === 'newer first') {
+				await act(runtime, async () => older.resolve('stale'));
+				expect(visible(root)).toBe('current');
+			}
+		},
+	);
+
+	it('reports a descriptor reader rejection only after its catch commits', async () => {
+		const App = descriptorRetryApp(runtime, 'memo ancestor', undefined, true);
+		const next = deferred();
+		const error = new Error('reader failed');
+		const onUncaughtError = vi.fn();
+		let root!: TimingRoot;
+		await act(runtime, async () => {
+			root = mount(
+				runtime,
+				App,
+				{ promise: Promise.resolve('initial'), label: 'reader' },
+				{ onUncaughtError },
+			);
+		});
+		await act(runtime, async () => root.update({ promise: next.promise, label: 'reader' }));
+		expect(visible(root)).toBe('loading');
+		expect(root.caughtErrors).toEqual([]);
+		await act(runtime, async () => next.reject(error));
+		expect(visible(root)).toBe('reader failed');
+		expect(root.caughtErrors).toHaveLength(1);
+		expect(root.caughtErrors[0]).toBe(error);
+		expect(onUncaughtError).not.toHaveBeenCalled();
+	});
+
+	it('does not reconnect a descriptor reader after its suspended root unmounts', async () => {
+		const App = descriptorRetryApp(runtime, 'memo ancestor', statefulContent);
+		const next = deferred();
+		const layouts: string[] = [];
+		const attached: HTMLSpanElement[] = [];
+		const callbacks = {
+			onLayout: (value: string) => layouts.push(value),
+			onRef: (node: HTMLSpanElement | null) => {
+				if (node !== null) attached.push(node);
+			},
+		};
+		let root!: TimingRoot;
+		await act(runtime, async () => {
+			root = mount(runtime, App, {
+				promise: Promise.resolve('initial'),
+				label: 'reader',
+				...callbacks,
+			});
+		});
+		layouts.length = 0;
+		attached.length = 0;
+		await act(runtime, async () =>
+			root.update({ promise: next.promise, label: 'reader', ...callbacks }),
+		);
+		expect(visible(root)).toBe('loading');
+		await act(runtime, async () => root.unmount());
+		await act(runtime, async () => next.resolve('discarded'));
+		expect(root.container.textContent).toBe('');
+		expect(layouts).toEqual([]);
+		expect(attached).toEqual([]);
+		expect(root.caughtErrors).toEqual([]);
+	});
+
+	it('retries independent roots without revealing another root’s stale content', async () => {
+		const App = descriptorRetryApp(runtime, 'memo ancestor');
+		const first = deferred();
+		const second = deferred();
+		let firstRoot!: TimingRoot;
+		let secondRoot!: TimingRoot;
+		await act(runtime, async () => {
+			firstRoot = mount(runtime, App, {
+				promise: Promise.resolve('first initial'),
+				label: 'reader',
+			});
+			secondRoot = mount(runtime, App, {
+				promise: Promise.resolve('second initial'),
+				label: 'reader',
+			});
+		});
+		await act(runtime, async () => {
+			firstRoot.update({ promise: first.promise, label: 'reader' });
+			secondRoot.update({ promise: second.promise, label: 'reader' });
+		});
+		expect(visible(firstRoot)).toBe('loading');
+		expect(visible(secondRoot)).toBe('loading');
+		await act(runtime, async () => first.resolve('first next'));
+		expect(visible(firstRoot)).toBe('first next');
+		expect(visible(secondRoot)).toBe('loading');
+		await act(runtime, async () => second.resolve('second next'));
+		expect(visible(firstRoot)).toBe('first next');
+		expect(visible(secondRoot)).toBe('second next');
+	});
+});
 
 describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime) => {
 	it('keeps a fallback visible when data resolves at 100ms, then reveals at 300ms', async () => {

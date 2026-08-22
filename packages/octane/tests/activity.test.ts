@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { mount, flushEffects } from './_helpers';
-import { flushSync } from '../src/index.js';
+import {
+	act,
+	Activity,
+	createElement,
+	createRoot,
+	ErrorBoundary,
+	flushSync,
+	useEffect,
+	useLayoutEffect,
+	useState,
+} from '../src/index.js';
 import {
 	ActivityHost,
 	InsertionActivityHost,
@@ -76,6 +86,117 @@ describe('<Activity> — hidden', () => {
 });
 
 describe('<Activity> — toggling visibility', () => {
+	it.each(['fresh', 'same'] as const)(
+		'registers a %s descriptor fallback’s deferred effects on reveal',
+		async (identity) => {
+			const container = document.createElement('div');
+			document.body.append(container);
+			const error = new Error('hidden primary');
+			const stateSlot = Symbol('state');
+			const layoutSlot = Symbol('layout');
+			const passiveSlot = Symbol('passive');
+			let ref: HTMLButtonElement | null = null;
+			let layout: number | null = null;
+			let passive: number | null = null;
+			const setups: number[] = [];
+			const cleanups: number[] = [];
+			const caught: Array<{ error: unknown; connected: boolean; layout: number | null }> = [];
+			const root = createRoot(container, {
+				onCaughtError: (error) =>
+					caught.push({ error, connected: ref?.isConnected === true, layout }),
+			});
+			const attach = (node: HTMLButtonElement | null) => {
+				ref = node;
+			};
+			function Primary(): never {
+				throw error;
+			}
+			function Fallback() {
+				const [value, setValue] = useState(0, stateSlot);
+				useLayoutEffect(
+					() => {
+						layout = value;
+						setups.push(value);
+						return () => {
+							layout = null;
+							cleanups.push(value);
+						};
+					},
+					[value],
+					layoutSlot,
+				);
+				useEffect(
+					() => {
+						passive = value;
+						return () => {
+							passive = null;
+						};
+					},
+					[value],
+					passiveSlot,
+				);
+				return createElement('button', {
+					ref: attach,
+					onClick: () => setValue(value + 1),
+					children: `caught:${value}`,
+				});
+			}
+			const child = () =>
+				createElement(ErrorBoundary, {
+					children: createElement(Primary, {}),
+					fallback: createElement(Fallback, {}),
+				});
+			const cached = child();
+			const render = (mode: 'visible' | 'hidden') =>
+				root.render(
+					createElement(Activity, { mode, children: identity === 'same' ? cached : child() }),
+				);
+			try {
+				await act(async () => render('hidden'));
+				const button = container.querySelector('button')!;
+				expect(button.style.display).toBe('none');
+				expect(ref).toBeNull();
+				expect(layout).toBeNull();
+				expect(passive).toBeNull();
+				expect(setups).toEqual([]);
+				expect(caught).toEqual([]);
+
+				await act(async () => render('visible'));
+				expect(container.querySelector('button')).toBe(button);
+				expect(button.style.display).toBe('');
+				expect(ref).toBe(button);
+				expect(layout).toBe(0);
+				expect(passive).toBe(0);
+				expect(caught).toEqual([{ error, connected: true, layout: 0 }]);
+
+				await act(async () => button.click());
+				expect(button.textContent).toBe('caught:1');
+				expect(layout).toBe(1);
+				expect(passive).toBe(1);
+				await act(async () => render('hidden'));
+				expect(ref).toBeNull();
+				expect(layout).toBeNull();
+				expect(passive).toBeNull();
+				await act(async () => render('visible'));
+				expect(container.querySelector('button')).toBe(button);
+				expect(button.textContent).toBe('caught:1');
+				expect(layout).toBe(1);
+				expect(passive).toBe(1);
+				expect(setups).toEqual([0, 1, 1]);
+				expect(caught).toHaveLength(1);
+				await act(async () => root.unmount());
+				expect(cleanups).toEqual([0, 1, 1]);
+				expect(ref).toBeNull();
+				expect(layout).toBeNull();
+				expect(passive).toBeNull();
+				expect(container.textContent).toBe('');
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
 	it('unmounts effects on hide and re-mounts them on show, preserving state + DOM', () => {
 		const t = setup('visible');
 		// Build up some state while visible.

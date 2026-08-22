@@ -592,6 +592,10 @@ function removeHydrationRange(start: Node, end: Node): void {
 
 type BlockKind = 'root' | 'control-flow' | 'dynamic' | 'portal';
 
+const RENDER_VALID = 0;
+const RENDER_INVALID = 1;
+const RENDER_RETRYING = 2;
+
 type OutputHandler = (block: Block, value: unknown) => void;
 
 interface RootIdState {
@@ -638,6 +642,11 @@ export interface Block extends Scope {
 	memoInChain: boolean;
 	pending: boolean;
 	disposed: boolean;
+	/**
+	 * RENDER_VALID / RENDER_INVALID / RENDER_RETRYING, separate from mount lifetime.
+	 * Kept numeric because nested renders can invalidate an active retry in place.
+	 */
+	renderStatus: number;
 	/**
 	 * The single pure-host DOM node this Block manages on the de-opt path, REUSED
 	 * across re-renders so DOM-resident state survives (no rebuild). Set by
@@ -1302,7 +1311,7 @@ function endTransitionAttempt(attempt: TransitionAttempt | null): void {
 	if (held !== null && held.size > 0 && entries !== null && entries.length > 0) {
 		// Unwind everything the attempt did: bindings and structure via the
 		// journal, then the work it queued, then the effect cells it advanced.
-		rollbackTransitionJournal(attempt.journalCheckpoint);
+		rollbackTransitionJournal(attempt.journalCheckpoint, attempt.origin);
 		for (let phase = 0; phase < 3; phase++) {
 			effectQueues[phase].length = attempt.effects[phase];
 		}
@@ -1528,6 +1537,7 @@ const JOURNAL_ATTR = 1;
 const JOURNAL_BAG = 2;
 const JOURNAL_PROP = 3;
 const JOURNAL_FOR = 4;
+const JOURNAL_RENDER = 5;
 /** Flat undo log, four slots per entry: kind, target, a, b. */
 let TRANSITION_JOURNAL: any[] | null = null;
 /** Bags already captured in the open window, so each is snapshotted once. */
@@ -1893,8 +1903,8 @@ function flushParkedItems(): void {
 	for (let i = 0; i < parked.length; i++) unmountBlock(parked[i].block, false);
 }
 
-/** Undo every binding write recorded since `checkpoint`, newest first. */
-function rollbackTransitionJournal(checkpoint: number): void {
+/** Undo writes and invalidate their rendered owners since `checkpoint`, newest first. */
+function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 	if (checkpoint < 0) return;
 	const log = TRANSITION_JOURNAL;
 	if (log === null) return;
@@ -1916,6 +1926,11 @@ function rollbackTransitionJournal(checkpoint: number): void {
 			case JOURNAL_FOR:
 				restoreForSlot(target as ForSlot, a, b);
 				TRANSITION_JOURNAL_BAGS!.delete(target);
+				break;
+			case JOURNAL_RENDER:
+				if (!target.disposed && (target === owner || blockIsAncestorOf(owner, target))) {
+					invalidateRender(target, owner);
+				}
 				break;
 			default:
 				for (let k = 0; k < a.length; k++) target[a[k]] = b[k];
@@ -2612,6 +2627,9 @@ function attachLiveFragmentRef(instance: FragmentInstance): void {
 // after the new nodes are connected). The off-screen render is synchronous and
 // single-threaded, so every effect enqueued while the buffer is set belongs to the WIP.
 interface OffscreenCapture {
+	/** Executed bodies whose output/commit work is reusable only if this capture survives. */
+	renderRoot: Block | null;
+	renderedBlocks: Set<Block> | null;
 	effects: [PendingEffect[], PendingEffect[], PendingEffect[]];
 	events: PendingEffectEvent[];
 	eventActions: EffectEventCommitAction[];
@@ -2643,6 +2661,8 @@ export function scheduleRenderCleanup(
 
 function createOffscreenCapture(): OffscreenCapture {
 	return {
+		renderRoot: null,
+		renderedBlocks: null,
 		effects: [[], [], []],
 		events: [],
 		eventActions: [],
@@ -4684,6 +4704,7 @@ class BlockImpl {
 	pending: boolean;
 	disposed: boolean;
 	mounted: boolean;
+	renderStatus: number;
 	pendingMode: 'urgent' | 'transition' | null;
 	currentRenderMode: 'urgent' | 'transition' | null;
 	pendingDeferred: boolean;
@@ -4777,6 +4798,7 @@ class BlockImpl {
 		this.pending = false;
 		this.disposed = false;
 		this.mounted = false;
+		this.renderStatus = RENDER_VALID;
 		this.pendingMode = null;
 		this.currentRenderMode = null;
 		this.pendingDeferred = false;
@@ -4902,7 +4924,48 @@ function enqueueEffectEventCommitAction(action: EffectEventCommitAction): void {
 	EFFECT_EVENT_ACTION_TARGET.push(action);
 }
 
+/**
+ * Props advance before a body renders. An incomplete attempt therefore cannot
+ * reuse equal props as proof of completed output. Invalidate its logical path,
+ * including ancestors absent from an independently scheduled child's stack.
+ * Lifetime and hook state remain mounted; untouched sibling caches stay valid.
+ */
+function invalidateRender(block: Block, owner: Block | null = null): void {
+	if (block.disposed) return;
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		// Lite component scopes carry a DOM/context proxy in this chain, not a
+		// schedulable Block. Their real owning ancestor controls the retry.
+		if (current.block === current) {
+			current.renderStatus = RENDER_INVALID;
+			if (current.forSlot !== null) current.forSlot.cachedDeps = null;
+		}
+		// Hidden work belongs to that visibility owner, not its already-committed
+		// outer tree. A later enclosing rollback may invalidate a longer path.
+		if (current === owner || (owner === null && current.inactive)) break;
+	}
+}
+
+function recordCapturedRender(capture: OffscreenCapture, block: Block): void {
+	const root = (capture.renderRoot ??= block);
+	// An independently mounted root can run synchronously inside another root's
+	// speculative render. Its completed work is not owned by this capture.
+	if (block === root || blockIsAncestorOf(root, block)) {
+		(capture.renderedBlocks ??= new Set()).add(block);
+	}
+}
+
 function renderBlockInner(block: Block): void {
+	// Keep retries visible to compiler-owned cache hits throughout the body. A
+	// fresh invalidation during this attempt replaces RETRYING, so successful
+	// hidden renders cannot erase work still waiting for their reveal.
+	if (block.renderStatus === RENDER_INVALID) block.renderStatus = RENDER_RETRYING;
+	if (WIP_CAPTURE !== null) recordCapturedRender(WIP_CAPTURE, block);
+	// A held in-place attempt has no capture. Its completed bodies must lose
+	// bailout validity with their rolled-back DOM. Record both owners: a nested
+	// journal can roll back even while its enclosing capture survives.
+	if (TRANSITION_JOURNAL !== null) {
+		TRANSITION_JOURNAL.push(JOURNAL_RENDER, block, null, null);
+	}
 	const prevScope = CURRENT_SCOPE;
 	const prevBlock = CURRENT_BLOCK;
 	const prevEffectRenderVersion = CURRENT_EFFECT_RENDER_VERSION;
@@ -5005,6 +5068,7 @@ function renderBlockInner(block: Block): void {
 		if (out !== undefined && block.outputHandler !== null) block.outputHandler(block, out);
 		finishEffectRender(block);
 		if (!block.mounted) block.mounted = true;
+		if (block.renderStatus === RENDER_RETRYING) block.renderStatus = RENDER_VALID;
 		if (block.effectEventRenderVersion !== 0) {
 			block.effectEventCompletedVersion = block.effectEventRenderVersion;
 		}
@@ -5037,9 +5101,25 @@ function renderBlockInner(block: Block): void {
 		)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
 		if (!renderCompleted) {
-			// A suspended or throwing keyed survivor already received its next item.
-			// Its incomplete body must run on retry instead of taking a stale pure bail.
-			if (block.forSlot !== null) block.forSlot.cachedDeps = null;
+			// A descendant may already have invalidated this live render stack.
+			// A separately scheduled reader instead marks its logical ancestors up
+			// to the actual Suspense owner, passing through catch-only boundaries.
+			if (block.renderStatus !== RENDER_INVALID) {
+				let owner: Block | null = null;
+				const suspension = isSuspenseException(profileThrown);
+				if (suspension || !isHostContextRequest(profileThrown)) {
+					for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+						const claims = suspension
+							? (current as any).__suspenseHandler
+							: (current as any).$$tryHandler && (current as any).__trySlot?.catchBody !== null;
+						if (claims) {
+							owner = current;
+							break;
+						}
+					}
+				}
+				invalidateRender(block, owner);
+			}
 			effectEventTarget.length = effectEventCheckpoint;
 			effectEventActionTarget.length = effectEventActionCheckpoint;
 		}
@@ -6376,6 +6456,9 @@ function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, ph
 	// INSERTION effects are exempt (React: they stay connected while hidden and an
 	// update in a hidden-but-rendered subtree still fires them — Activity-test.js:1428).
 	if (phase !== INSERTION && inInactiveSubtree(scope.block)) {
+		// No effect body is registered here. A cached descriptor on reveal must
+		// revisit this render, even if the hidden DOM completed successfully.
+		invalidateRender(scope.block);
 		if (prev && !prev.active) {
 			// A hidden re-reach supersedes teardown from an earlier completed
 			// hidden render. Advance the presence revision so its fn:null entry
@@ -11503,7 +11586,12 @@ let hiddenStyleWriter:
 
 function updateTextValue(node: Text, value: string): void {
 	if (hiddenTextWriter !== null && hiddenTextWriter(node, value)) return;
-	if (node.nodeValue !== value) node.nodeValue = value;
+	if (node.nodeValue !== value) {
+		// Descriptor text updates participate in the same held-transition undo
+		// window as compiled text bindings.
+		if (TRANSITION_JOURNAL !== null) journalText(node);
+		node.nodeValue = value;
+	}
 }
 
 export function setText(node: Text, value: any): void {
@@ -17959,6 +18047,13 @@ function renderOffscreen(
 // (which adopt the WIP's markers in place, so no DOM move is needed).
 
 function spliceOffscreenCapture(capture: OffscreenCapture): void {
+	const rendered = capture.renderedBlocks;
+	capture.renderedBlocks = null;
+	capture.renderRoot = null;
+	if (rendered !== null && WIP_CAPTURE !== null) {
+		// An inner success is still speculative until its enclosing capture commits.
+		for (const block of rendered) recordCapturedRender(WIP_CAPTURE, block);
+	}
 	for (let p = 0 as Phase; p < 3; p++) {
 		const src = capture.effects[p];
 		const target = WIP_CAPTURE !== null ? WIP_CAPTURE.effects[p] : effectQueues[p];
@@ -18001,6 +18096,16 @@ function spliceWipCapture(wip: OffscreenWip): void {
 /** Drop captured commit work that never became visible. */
 function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	if (capture === null) return;
+	const rendered = capture.renderedBlocks;
+	const owner = capture.renderRoot;
+	capture.renderedBlocks = null;
+	capture.renderRoot = null;
+	if (rendered !== null) {
+		// A completed earlier sibling may have had its effects/bindings rolled
+		// back by a later suspension. Its preserved props are not a valid bailout.
+		// Dispose paths have already unmounted their blocks and are ignored.
+		for (const block of rendered) invalidateRender(block, owner);
+	}
 	for (let i = 0; i < capture.stores.length; i++) capture.stores[i].queued = false;
 	const cleanups = capture.renderCleanups;
 	if (cleanups !== undefined) {
@@ -18537,6 +18642,11 @@ function setDeoptDesc(el: Element, d: ElementDescriptor): void {
 	// would make both sides of the next prop diff observe the new record and
 	// would run user code outside render while Suspense detaches subtree refs.
 	const resolveScopedRecord = (d as ScopedValueDescriptor<any>)[SCOPED_VALUE_RECORD];
+	// A held descriptor retry restores host props too. Restore their comparison
+	// record with them or the final retry will mistake aborted props for live ones.
+	if (TRANSITION_JOURNAL !== null) {
+		TRANSITION_JOURNAL.push(JOURNAL_PROP, el, DEOPT_DESC, getDeoptDesc(el));
+	}
 	(el as Element & DeoptStamped)[DEOPT_DESC] =
 		resolveScopedRecord === undefined ? d : resolveScopedRecord();
 }
@@ -21081,7 +21191,7 @@ function tryMemoBail(block: Block, comp: any, props: any): boolean {
 	// A memo body that suspended or threw on its initial attempt has no committed
 	// props/output to reuse. This also makes lazy-resolved memo metadata safe to
 	// publish during that attempt: the retry must execute until the Block mounts.
-	if (!block.mounted) return false;
+	if (!block.mounted || block.renderStatus !== RENDER_VALID) return false;
 	const compare = (comp as any).__compare as ((prev: any, next: any) => boolean) | undefined;
 	// React.memo's optional comparator: returns true when props are equal
 	// (→ skip the render). Falls back to a shallow Object.is comparison.
@@ -21108,7 +21218,7 @@ function tryImplicitBail(block: Block): boolean {
 	if (block.$$implicitBail !== true) return false;
 	// A first attempt that suspended or threw has no committed output to reuse.
 	// Its identity-equal retry must execute until this Block mounts successfully.
-	if (!block.mounted) return false;
+	if (!block.mounted || block.renderStatus !== RENDER_VALID) return false;
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
 	restampCtxDeps(block);
@@ -21213,6 +21323,12 @@ function refreshBlockForContext(block: Block): void {
 	}
 }
 
+/** Revisit incomplete work without refreshing unrelated, still-valid cached subtrees. */
+function refreshCachedBlock(block: Block, contextChanged: boolean): void {
+	if (block.renderStatus !== RENDER_VALID) renderBlock(block);
+	else if (contextChanged) refreshBlockForContext(block);
+}
+
 /**
  * Compiler ABI for a flat output-cache hit. Context consumers are normally
  * reached while their parent slot reconciles; a cache hit intentionally skips
@@ -21236,10 +21352,13 @@ export function compilerCacheContext(
 	if (previous === undefined) return current;
 	const reconnect = EFFECT_RECONNECT_CONTEXT !== null;
 	const restamp = restampMemoAncestors && scope.block.memoInChain;
-	if (previous === current && !reconnect && !restamp) return current;
+	// CURRENT_BLOCK is the real render owner even inside a compiler-lite scope.
+	// A retry is local: it must not stale every cache epoch in unrelated roots.
+	const retrying = CURRENT_BLOCK !== null && CURRENT_BLOCK.renderStatus !== RENDER_VALID;
+	if (previous === current && !reconnect && !restamp && !retrying) return current;
 	const slot = scope.slots[slotKey];
 	if (slot === undefined || slot === null) return current;
-	if (reconnect) {
+	if (reconnect || retrying) {
 		const contextChanged = previous !== current;
 		const list =
 			slot.__kind === 'forBlockSlot'
@@ -21251,18 +21370,18 @@ export function compilerCacheContext(
 			// Map insertion order stays unchanged when keyed survivors reorder;
 			// effects must reconnect in the live linked chain's source order.
 			for (let item: Block | null = list.head; item !== null; item = item.nextSibling) {
-				if (contextChanged) refreshBlockForContext(item);
-				reconnectBailedEffects(item);
+				refreshCachedBlock(item, contextChanged);
+				if (reconnect) reconnectBailedEffects(item);
 			}
 			if (list.emptyBlock !== null) {
-				if (contextChanged) refreshBlockForContext(list.emptyBlock);
-				reconnectBailedEffects(list.emptyBlock);
+				refreshCachedBlock(list.emptyBlock, contextChanged);
+				if (reconnect) reconnectBailedEffects(list.emptyBlock);
 			}
 		} else {
 			const block = slot.block ?? (slot.__kind === 'childSlot' ? slot.portal?.block : null);
 			if (block !== undefined && block !== null) {
-				if (contextChanged) refreshBlockForContext(block);
-				reconnectBailedEffects(block);
+				refreshCachedBlock(block, contextChanged);
+				if (reconnect) reconnectBailedEffects(block);
 			}
 		}
 		if (restamp) restampCachedSlotContext(slot);
@@ -22890,7 +23009,7 @@ function handleSuspense(
 		// suspend, so put back what it changed. Nothing has been painted since —
 		// the render and this undo are the same synchronous flush — so the
 		// boundary simply never shows half of the new screen.
-		rollbackTransitionJournal(journalCheckpoint);
+		rollbackTransitionJournal(journalCheckpoint, state.tryBlock ?? sourceBlock);
 		// A whole-drain attempt is in flight: this hold makes it unwind, and the
 		// boundary joins the held set so promotion and discard can find it.
 		if (ACTIVE_TRANSITION_ATTEMPT !== null) {
@@ -22951,6 +23070,30 @@ function handleSuspense(
 	// contract. (The transition HOLD path keeps content visible and does NOT
 	// come here, so its effects correctly stay live.)
 	hideTryContentAndMountPending(state, thenable);
+}
+
+/**
+ * The first ordinary suspension has no offscreen capture. Earlier siblings may
+ * already have queued fresh lifecycle work, but only their previous connected
+ * effects belong to the preserved primary. Cancel those pending revisions and
+ * revisit their bodies on reveal; unchanged memo siblings remain reusable.
+ */
+function invalidatePendingSuspenseEffects(owner: Block): void {
+	const queues = WIP_CAPTURE === null ? effectQueues : WIP_CAPTURE.effects;
+	for (let phase = LAYOUT; phase <= PASSIVE; phase++) {
+		const queue = queues[phase];
+		for (let i = 0; i < queue.length; i++) {
+			const pending = queue[i];
+			const block = pending.scope.block;
+			if (block.disposed || (block !== owner && !blockIsAncestorOf(owner, block))) continue;
+			const effect = pending.scope.hooks?.get(pending.slot) as EffectSlot | undefined;
+			if (effect === undefined || effect.revision !== pending.revision) continue;
+			effect.revision++;
+			effect.active = effect.connectedFn !== null;
+			effect.deps = effect.connectedFn === null ? undefined : effect.connectedArgs;
+			invalidateRender(block, owner);
+		}
+	}
 }
 
 /**
@@ -23028,6 +23171,7 @@ function hideTryContentAndMountPending(
 		// exact canceled pairs also tell the detach walk which current refs never
 		// committed, without retaining a witness for every callback ref in the app.
 		const uncommittedRefs = discardSubtreeRefAttaches(persistent);
+		invalidatePendingSuspenseEffects(persistent);
 		deactivateScope(persistent, false);
 		// Effect cleanups are user code and may synchronously replace/unmount this
 		// root. Never continue a half-finished fallback commit into detached markers.
