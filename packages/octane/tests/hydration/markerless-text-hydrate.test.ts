@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { join } from 'node:path';
 import { createElement, createRoot, hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
-import { loadServerFixture } from '../_server-fixture';
+import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 import {
 	Counter,
 	ConditionalChild,
@@ -291,4 +291,88 @@ describe('hydrateRoot — only-child renderable text', () => {
 			}
 		},
 	);
+
+	for (const dev of [false, true]) {
+		it(`preserves primitive transitions and context behind stable children (${dev ? 'dev' : 'prod'})`, () => {
+			const source = `
+				import { createContext, useContext, useState } from 'octane';
+				const Theme = createContext('default');
+				function Consumer() @{
+					const theme = useContext(Theme);
+					const [count, setCount] = useState(0);
+					<button onClick={() => setCount(count + 1)}>{theme as string}{count as string}</button>
+				}
+				export const child = <Consumer />;
+				export function App(props) @{
+					<Theme.Provider value={props.theme}>
+						<div>
+							<output id="only">{props.value}</output>
+							<p id="mixed">{'before:'}{props.value}{':after'}</p>
+						</div>
+					</Theme.Provider>
+				}
+			`;
+			const compileOptions = { hmr: false, dev };
+			const serverModule = loadCompiledFixtureSource(source, {
+				id: 'stable-children.tsrx',
+				mode: 'server',
+				compileOptions,
+			});
+			const clientModule = loadCompiledFixtureSource(source, {
+				id: 'stable-children.tsrx',
+				mode: 'client',
+				compileOptions,
+			});
+			container.innerHTML = ServerRT.renderToString(serverModule.App, {
+				theme: 'light',
+				value: 'first',
+			}).html;
+			const only = container.querySelector('#only')!;
+			const mixed = container.querySelector('#mixed')!;
+			const firstText = Array.from(only.childNodes).find((node) => node.nodeType === 3);
+			const root = hydrateRoot(container, clientModule.App, { theme: 'light', value: 'first' });
+			try {
+				expect(container.querySelector('#only')).toBe(only);
+				expect(container.querySelector('#mixed')).toBe(mixed);
+				expect(Array.from(only.childNodes)).toContain(firstText);
+				const update = (value: unknown, theme = 'light') => {
+					flushSync(() => root.render(clientModule.App, { theme, value }));
+				};
+				update('second');
+				expect(Array.from(only.childNodes)).toContain(firstText);
+				expect(only.textContent).toBe('second');
+				expect(mixed.textContent).toBe('before:second:after');
+				for (const value of [true, false, null, undefined, '', 0, 4n, 'last']) {
+					update(value);
+					const text = value == null || typeof value === 'boolean' ? '' : String(value);
+					expect(only.textContent).toBe(text);
+					expect(mixed.textContent).toBe(`before:${text}:after`);
+				}
+				const children = ['array'];
+				update(children);
+				expect(only.textContent).toBe('array');
+				children.push(' changed');
+				update(children);
+				expect(only.textContent).toBe('array changed');
+				expect(mixed.textContent).toBe('before:array changed:after');
+				update(clientModule.child);
+				const onlyButton = only.querySelector('button')!;
+				const mixedButton = mixed.querySelector('button')!;
+				flushSync(() => onlyButton.click());
+				expect(onlyButton.textContent).toBe('light1');
+				expect(mixedButton.textContent).toBe('light0');
+				// The same descriptor must still propagate its changed provider value.
+				update(clientModule.child, 'dark');
+				expect(only.querySelector('button')).toBe(onlyButton);
+				expect(mixed.querySelector('button')).toBe(mixedButton);
+				expect(onlyButton.textContent).toBe('dark1');
+				expect(mixedButton.textContent).toBe('dark0');
+				update('restored');
+				expect(only.textContent).toBe('restored');
+				expect(mixed.textContent).toBe('before:restored:after');
+			} finally {
+				root.unmount();
+			}
+		});
+	}
 });

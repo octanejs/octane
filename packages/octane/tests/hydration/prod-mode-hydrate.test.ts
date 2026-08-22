@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import * as ClientRT from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import { loadCompiledFixtureSource } from '../_server-fixture';
 import { App as DevApp } from './_fixtures/prod-hooks.tsrx';
 
 // PROD-compile-mode smoke test. Every fixture in this suite is otherwise
@@ -30,22 +30,17 @@ import { App as DevApp } from './_fixtures/prod-hooks.tsrx';
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/prod-hooks.tsrx');
 const SOURCE = readFileSync(FIXTURE, 'utf8');
 
-// Compile with EXPLICIT options and execute against the given runtime
-// namespace — same technique as the other hydration suites' serverModule().
-function evalModule(mode: 'client' | 'server', rt: Record<string, any>): Record<string, any> {
-	const from = mode === 'server' ? 'octane\\/server' : 'octane';
-	let { code } = compile(SOURCE, 'prod-hooks.tsrx', { mode, hmr: false, dev: false });
-	code = code.replace(
-		new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*['"]${from}['"];?`, 'g'),
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(rt, {});
+// Compile with EXPLICIT options and execute against the matching runtime.
+function evalModule(mode: 'client' | 'server'): Record<string, any> {
+	return loadCompiledFixtureSource(SOURCE, {
+		id: 'prod-hooks.tsrx',
+		mode,
+		compileOptions: { hmr: false, dev: false },
+	});
 }
 
-const server = evalModule('server', ServerRT);
-const prodClient = evalModule('client', ClientRT);
+const server = evalModule('server');
+const prodClient = evalModule('client');
 
 let container: HTMLElement;
 beforeEach(() => {

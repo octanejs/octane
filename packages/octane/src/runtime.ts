@@ -11028,7 +11028,6 @@ class HydrationCapability {
 	}
 
 	allowAttribute(el: Element, name: string, next: string | null): boolean {
-		const mode = hydrationMismatchMode(el);
 		// Parser normalization is symmetric: the server DOM may contain U+FFFD even
 		// when the client value does not. Read once in production too so either side's
 		// CR/NUL/replacement artifacts can compare equal before the normal patch path.
@@ -11036,8 +11035,11 @@ class HydrationCapability {
 		const server = ns
 			? el.getAttributeNS(ns, name.indexOf(':') >= 0 ? name.slice(name.indexOf(':') + 1) : name)
 			: el.getAttribute(name);
-		if (server === next) return true;
+		// Adoption already owns the desired value, including an absent attribute.
+		// Keep the ordinary setter from repeating a same-value DOM mutation.
+		if (server === next) return false;
 		if (next !== null && isAttributeParserNormalizedMatch(server, next)) return false;
+		const mode = hydrationMismatchMode(el);
 		if (mode === 0) return true;
 		if (mode === 1) return false;
 		if (process.env.NODE_ENV !== 'production')
@@ -11573,8 +11575,9 @@ export function sibling(node: Node, n: number = 1): Node | null {
 }
 
 // ---------------------------------------------------------------------------
-// Patch helpers — `prev !== next` guards are emitted by the compiler/author;
-// these helpers are unconditional "set this now" with internal data check.
+// Patch helpers — low-level writers apply values with their required coercion
+// and DOM checks. Raw-value guards live in compiled/authored callers or the
+// guarded scalar-binding and renderable-text wrappers.
 // ---------------------------------------------------------------------------
 
 // Optional visibility overlays must not add a WeakMap lookup to ordinary text
@@ -11595,15 +11598,14 @@ function updateTextValue(node: Text, value: string): void {
 }
 
 export function setText(node: Text, value: any): void {
-	// Unconditional write: the compiler's only emission site guards every call
-	// with `if (_b._prev$ !== _v)`, and `_prev` mirrors the node's current text
-	// (seeded at mount, updated on each write), so the node's text always equals
-	// `_prev` — an internal recheck is provably always true. Skipping it avoids a
-	// text-getter read, which materializes a fresh JS string from the DOM on every
-	// call (a measurable cost + GC pressure on text-heavy updates).
+	// Unconditional writer: explicit text bindings guard cached raw values inline;
+	// textHoleUpdate and childTextHoleUpdate do the equivalent primitive check
+	// before using a cached Text node. The cache stores the raw input, not its
+	// coerced DOM string, so different raw values may still produce the same text.
+	// Do not read nodeValue here: the binding paths already chose this write, and
+	// a DOM text getter can materialize an extra string on every update.
 	//
-	// View-transition dirty tracking: setText is the compiler's single text-
-	// mutation choke point AND is prev-guarded (only ACTUAL changes reach it).
+	// View-transition dirty tracking and journaling remain at this write boundary.
 	// The optional driver marks the innermost boundary only during a wrapped drain.
 	VIEW_TRANSITION_DRIVER?.markDirty();
 	if (TRANSITION_JOURNAL !== null) journalText(node);
@@ -11614,6 +11616,70 @@ export function setText(node: Text, value: any): void {
 	const text = coerceText(value);
 	if (hiddenTextWriter !== null && hiddenTextWriter(node, text)) return;
 	node.nodeValue = text;
+}
+
+/**
+ * Compact compiler binding ABI. Evaluate the authored value first, compare its
+ * raw identity, then call the ordinary writer. Returning only after that writer
+ * succeeds keeps the caller's previous-value publication after coercion, errors,
+ * and transition journaling. The binding bag and its direct field reads stay at
+ * the call site; these helpers allocate nothing and never index a bag dynamically.
+ * Controlled form properties deliberately do not use this identity guard.
+ */
+export function setAttributeIfChanged(
+	value: unknown,
+	previous: unknown,
+	el: Element,
+	name: string,
+): unknown {
+	if (previous === value) return previous;
+	setAttribute(el, name, value);
+	return value;
+}
+
+export function setStringDataIfChanged(
+	value: unknown,
+	previous: unknown,
+	el: Element,
+	name: string,
+): unknown {
+	if (previous === value) return previous;
+	setStringData(el, name, value);
+	return value;
+}
+
+export function setBooleanAttributeIfChanged(
+	value: unknown,
+	previous: unknown,
+	el: Element,
+	name: string,
+): unknown {
+	if (previous === value) return previous;
+	setBooleanAttribute(el, name, value);
+	return value;
+}
+
+export function setAriaAttributeIfChanged(
+	value: unknown,
+	previous: unknown,
+	el: Element,
+	name: string,
+): unknown {
+	if (previous === value) return previous;
+	setAriaAttribute(el, name, value);
+	return value;
+}
+
+export function setClassNameIfChanged(value: unknown, previous: unknown, el: Element): unknown {
+	if (previous === value) return previous;
+	setClassName(el, value);
+	return value;
+}
+
+export function setClassAttrIfChanged(value: unknown, previous: unknown, el: Element): unknown {
+	if (previous === value) return previous;
+	setClassAttr(el, value);
+	return value;
 }
 
 /**
@@ -12856,12 +12922,10 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// toString() runs exactly once across validation, hydration comparison, and
 	// the final write. The same helper is used by compiler-baked and SSR attrs.
 	if (next !== null) next = sanitizeURLAttribute(el.localName, name, next);
-	// Hydration VALUE-mismatch handling. The normal write below already PATCHES the adopted
-	// element to the client value (so prod recovers for free); here we only (dev) warn on a
-	// server/client divergence and (dev+prod) honor `suppressHydrationWarning` by keeping the
-	// server attribute. `hydrationMismatchMode` skips the server-attr read entirely when
-	// neither applies — so a non-suppressed prod hydration adds no `getAttribute` cost.
-	// Guarded by `hydrating`, so steady-state re-renders are untouched.
+	// Hydration compares the final coerced value before writing: exact and parser-normalized
+	// matches preserve the server attribute. A divergence patches to the client value and
+	// warns in dev, unless `suppressHydrationWarning` keeps the server value instead.
+	// The capability guard keeps these DOM reads out of ordinary client updates.
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
 	const ns = attrNamespace(name);
@@ -20056,6 +20120,231 @@ export function mapSlot(
 	}
 }
 
+// List-only reconciliation is separate from childSlot's text/function path so
+// its first-use compilation can remain deferred until a list value reaches it.
+// Slot registration and upgrade ownership have already been established.
+function renderPreparedChildList(
+	state: ChildSlot,
+	parentBlock: Block,
+	domParent: Node,
+	preparedList: { items: any[]; keys: any[] | null },
+	hydration: HydrationCapability | null,
+	upgradeArmed: boolean,
+	upgradeChildren: any,
+	compiledMapBody?: (item: any, scope: Scope) => void,
+	compiledMapKey?: (item: any, index: number) => any,
+	compiledMapFlags?: number,
+	compiledMapDeps?: any[],
+	mappedFallback?: boolean,
+): void {
+	if (state.forSlot === null) {
+		// Drop any prior block/text content — EXCEPT while hydrating, where the
+		// server emitted one `<!--[-->…<!--]-->` range per item between our adopted
+		// markers and `reconcileKeyed`/`mountItem` ADOPT those ranges off the
+		// cursor. Sweeping here would delete the very item DOM (and break the
+		// hydrateNode chain) the de-opt list is about to adopt. The pure-host →
+		// blocks upgrade adopts the SAME way (the element's raw children ARE the
+		// incoming items), so it must not sweep either.
+		if (hydration === null && !upgradeArmed) clearChildContent(state);
+		// A text-mode sole-child write wiped the host wholesale and took the
+		// minted markers with it. Anchoring the new list on those detached
+		// comments would insert into a null parent — drop them and re-mint.
+		if (state.end !== null && state.end.parentNode === null) {
+			state.end = null;
+			state.start = null;
+		}
+		if (state.end === null) {
+			// OWNS-PARENT slot entering array mode: ForSlot requires a real
+			// marker pair (reconcileKeyed anchors on it) — mint it lazily,
+			// appended at the element's tail. One-way, like the promotion above.
+			state.end = document.createComment('');
+			domParent.insertBefore(state.end, null);
+		}
+		if (state.start === null) {
+			state.start = document.createComment('');
+			// Upgrade adoption: the element's existing raw children must sit
+			// INSIDE [start, end] (they become the items) — mint start before
+			// the first of them, not at the tail.
+			domParent.insertBefore(state.start, upgradeArmed ? domParent.firstChild : state.end);
+		}
+		state.forSlot = {
+			__kind: 'forBlockSlot',
+			start: state.start,
+			// Non-null: an anchorless slot was promoted to markers above.
+			end: state.end!,
+			items: new Map(),
+			head: null,
+			tail: null,
+			size: 0,
+			cachedDeps: null,
+			emptyBlock: null,
+			env: undefined,
+			adopt: null,
+			plainDeopt: false,
+		};
+		if (upgradeArmed) {
+			state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start, state.end!);
+		}
+	}
+	const { items, keys } = preparedList;
+	const markerlessMappedFallback =
+		mappedFallback === true && hydration !== null && !hydration.isOpen(hydration.node);
+	const getKey = compiledMapKey
+		? (item: any, index: number) => 'k' + String(compiledMapKey(item, index))
+		: (_item: any, i: number) => keys![i];
+	const wasMappedNative = state.forSlot.mappedNative === true;
+	let body =
+		compiledMapBody || (mappedFallback === true ? mappedDeoptItemBody : (deoptItemBody as any));
+	if (compiledMapBody === undefined && wasMappedNative && state.forSlot.size > 0) {
+		for (let index = 0; index < items.length; index++) {
+			const item = items[index];
+			if (!isHostDescriptor(item)) continue;
+			const block = state.forSlot.items.get(getKey(item, index));
+			if (
+				block !== undefined &&
+				block.startMarker !== null &&
+				block.startMarker === block.endMarker &&
+				block.startMarker.nodeType === 1 &&
+				(block.startMarker as Element).localName === item.type
+			) {
+				const root = block.startMarker as Element;
+				const text = root.firstChild;
+				if (text?.nodeType === 3 && text.nextSibling === null) {
+					const children = Object.getOwnPropertyDescriptor(item, 'children');
+					const primitive =
+						children !== undefined &&
+						'value' in children &&
+						(typeof children.value === 'string' ||
+							typeof children.value === 'number' ||
+							typeof children.value === 'bigint');
+					if (primitive) {
+						(text as any).$$deoptKey = 0;
+					} else if (children?.get !== undefined) {
+						// Scoped JSX descriptors defer children until their represented
+						// render scope. Prove this node came from the compiled binding bag
+						// without invoking that scope-sensitive accessor in the parent.
+						const bag = block.slots[0];
+						if (bag !== null && bag !== undefined) {
+							for (const field in bag) {
+								if (bag[field] === text) {
+									(text as any).$$deoptKey = 0;
+									break;
+								}
+							}
+						}
+					}
+				}
+				block.deoptNode = block.startMarker;
+			}
+		}
+	}
+	if (compiledMapBody !== undefined) {
+		if (state.forSlot.mappedNative === false) {
+			body = (item: any, scope: Scope, extra?: any[]): void => {
+				const adopted = scope.slots[0] === undefined ? scope.block.deoptNode : null;
+				if (adopted === null || adopted.nodeType !== 1) {
+					(compiledMapBody as any)(item, scope, extra);
+					return;
+				}
+				const previous = MAPPED_ITEM_ADOPTION;
+				const adoption = { node: adopted };
+				MAPPED_ITEM_ADOPTION = adoption;
+				try {
+					(compiledMapBody as any)(item, scope, extra);
+					if (adoption.node === null) scope.block.deoptNode = null;
+				} finally {
+					MAPPED_ITEM_ADOPTION = previous;
+				}
+			};
+		}
+		state.forSlot.mappedNative = true;
+	}
+	if (markerlessMappedFallback) {
+		const descriptorBody = body;
+		body = (item: any, scope: Scope): void => {
+			const root = scope.block.startMarker;
+			if (
+				root !== null &&
+				root === scope.block.endMarker &&
+				root.nodeType === 1 &&
+				scope.block.deoptNode === null
+			) {
+				scope.block.deoptNode = root;
+			}
+			descriptorBody(item, scope);
+		};
+	}
+	// `body` is `deoptItemBody` exactly when the compiler supplied no map body
+	// and this is not the mapped fallback — both wrapper assignments above are
+	// guarded by those two conditions. Record it on the slot rather than
+	// re-deriving it by identity in mountItem (see ForSlot.plainDeopt).
+	const plainDeopt = compiledMapBody === undefined && mappedFallback !== true;
+	state.forSlot.plainDeopt = plainDeopt;
+	const fastFlags = compiledMapFlags || 0;
+	const ssrMarkerless =
+		compiledMapBody === undefined ? markerlessMappedFallback || plainDeopt : (fastFlags & 16) !== 0;
+	let pure = (fastFlags & 1) !== 0;
+	let lite = false;
+	if (compiledMapBody !== undefined) {
+		state.forSlot.env = compiledMapDeps;
+		if ((fastFlags & 4) !== 0 && compiledMapDeps !== undefined) {
+			if (
+				state.forSlot.cachedDeps !== null &&
+				depsEqual(state.forSlot.cachedDeps, compiledMapDeps)
+			) {
+				pure = true;
+			} else {
+				lite = true;
+			}
+			state.forSlot.cachedDeps = compiledMapDeps;
+		}
+	}
+	// singleRoot=2 (marker-elision M4): pure single-element items self-mark —
+	// no `it` pair per item — resolved per item value in mountItem; shape
+	// flips promote to a minted pair in place (deoptItemBody).
+	// First fill dispatches to the linear pass directly (see mountItemsLinear)
+	// so a de-opt list's hydration adopt skips the full reconciler too.
+	if (state.forSlot.size === 0) {
+		mountItemsLinear(
+			parentBlock,
+			state.forSlot,
+			items,
+			getKey,
+			body,
+			compiledMapBody === undefined ? 2 : (fastFlags & 2) !== 0,
+			ssrMarkerless,
+		);
+	} else {
+		reconcileKeyed(
+			parentBlock,
+			state.forSlot,
+			items,
+			getKey,
+			body,
+			pure,
+			compiledMapBody === undefined ? 2 : (fastFlags & 2) !== 0,
+			lite,
+			(fastFlags & 8) !== 0,
+			ssrMarkerless,
+		);
+	}
+	// Upgrade adoption: nodes the empty→fill mount didn't consume (old
+	// children whose keys have no new item) are orphans inside the range —
+	// sweep them now.
+	if (state.forSlot.adopt !== null) {
+		const leftovers = state.forSlot.adopt;
+		for (let i = 0; i < leftovers.length; i++) {
+			const n = leftovers[i].node;
+			if (n.parentNode !== null) {
+				detachDeoptTreeRefs(n, null);
+				n.parentNode.removeChild(n);
+			}
+		}
+		state.forSlot.adopt = null;
+	}
+	return;
+}
+
 export function childSlot(
 	parentScope: Scope,
 	slotKey: number,
@@ -20383,213 +20672,20 @@ export function childSlot(
 	// element share one keyed-list regime. Keeping a keyed single child in this
 	// regime is what lets it retain state when a sibling is added around it.
 	if (preparedList !== null) {
-		if (state.forSlot === null) {
-			// Drop any prior block/text content — EXCEPT while hydrating, where the
-			// server emitted one `<!--[-->…<!--]-->` range per item between our adopted
-			// markers and `reconcileKeyed`/`mountItem` ADOPT those ranges off the
-			// cursor. Sweeping here would delete the very item DOM (and break the
-			// hydrateNode chain) the de-opt list is about to adopt. The pure-host →
-			// blocks upgrade adopts the SAME way (the element's raw children ARE the
-			// incoming items), so it must not sweep either.
-			if (hydration === null && !upgradeArmed) clearChildContent(state);
-			// A text-mode sole-child write wiped the host wholesale and took the
-			// minted markers with it. Anchoring the new list on those detached
-			// comments would insert into a null parent — drop them and re-mint.
-			if (state.end !== null && state.end.parentNode === null) {
-				state.end = null;
-				state.start = null;
-			}
-			if (state.end === null) {
-				// OWNS-PARENT slot entering array mode: ForSlot requires a real
-				// marker pair (reconcileKeyed anchors on it) — mint it lazily,
-				// appended at the element's tail. One-way, like the promotion above.
-				state.end = document.createComment('');
-				domParent.insertBefore(state.end, null);
-			}
-			if (state.start === null) {
-				state.start = document.createComment('');
-				// Upgrade adoption: the element's existing raw children must sit
-				// INSIDE [start, end] (they become the items) — mint start before
-				// the first of them, not at the tail.
-				domParent.insertBefore(state.start, upgradeArmed ? domParent.firstChild : state.end);
-			}
-			state.forSlot = {
-				__kind: 'forBlockSlot',
-				start: state.start,
-				// Non-null: an anchorless slot was promoted to markers above.
-				end: state.end!,
-				items: new Map(),
-				head: null,
-				tail: null,
-				size: 0,
-				cachedDeps: null,
-				emptyBlock: null,
-				env: undefined,
-				adopt: null,
-				plainDeopt: false,
-			};
-			if (upgradeArmed) {
-				state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start, state.end!);
-			}
-		}
-		const { items, keys } = preparedList;
-		const markerlessMappedFallback =
-			mappedFallback === true && hydration !== null && !hydration.isOpen(hydration.node);
-		const getKey = compiledMapKey
-			? (item: any, index: number) => 'k' + String(compiledMapKey(item, index))
-			: (_item: any, i: number) => keys![i];
-		const wasMappedNative = state.forSlot.mappedNative === true;
-		let body =
-			compiledMapBody || (mappedFallback === true ? mappedDeoptItemBody : (deoptItemBody as any));
-		if (compiledMapBody === undefined && wasMappedNative && state.forSlot.size > 0) {
-			for (let index = 0; index < items.length; index++) {
-				const item = items[index];
-				if (!isHostDescriptor(item)) continue;
-				const block = state.forSlot.items.get(getKey(item, index));
-				if (
-					block !== undefined &&
-					block.startMarker !== null &&
-					block.startMarker === block.endMarker &&
-					block.startMarker.nodeType === 1 &&
-					(block.startMarker as Element).localName === item.type
-				) {
-					const root = block.startMarker as Element;
-					const text = root.firstChild;
-					if (text?.nodeType === 3 && text.nextSibling === null) {
-						const children = Object.getOwnPropertyDescriptor(item, 'children');
-						const primitive =
-							children !== undefined &&
-							'value' in children &&
-							(typeof children.value === 'string' ||
-								typeof children.value === 'number' ||
-								typeof children.value === 'bigint');
-						if (primitive) {
-							(text as any).$$deoptKey = 0;
-						} else if (children?.get !== undefined) {
-							// Scoped JSX descriptors defer children until their represented
-							// render scope. Prove this node came from the compiled binding bag
-							// without invoking that scope-sensitive accessor in the parent.
-							const bag = block.slots[0];
-							if (bag !== null && bag !== undefined) {
-								for (const field in bag) {
-									if (bag[field] === text) {
-										(text as any).$$deoptKey = 0;
-										break;
-									}
-								}
-							}
-						}
-					}
-					block.deoptNode = block.startMarker;
-				}
-			}
-		}
-		if (compiledMapBody !== undefined) {
-			if (state.forSlot.mappedNative === false) {
-				body = (item: any, scope: Scope, extra?: any[]): void => {
-					const adopted = scope.slots[0] === undefined ? scope.block.deoptNode : null;
-					if (adopted === null || adopted.nodeType !== 1) {
-						(compiledMapBody as any)(item, scope, extra);
-						return;
-					}
-					const previous = MAPPED_ITEM_ADOPTION;
-					const adoption = { node: adopted };
-					MAPPED_ITEM_ADOPTION = adoption;
-					try {
-						(compiledMapBody as any)(item, scope, extra);
-						if (adoption.node === null) scope.block.deoptNode = null;
-					} finally {
-						MAPPED_ITEM_ADOPTION = previous;
-					}
-				};
-			}
-			state.forSlot.mappedNative = true;
-		}
-		if (markerlessMappedFallback) {
-			const descriptorBody = body;
-			body = (item: any, scope: Scope): void => {
-				const root = scope.block.startMarker;
-				if (
-					root !== null &&
-					root === scope.block.endMarker &&
-					root.nodeType === 1 &&
-					scope.block.deoptNode === null
-				) {
-					scope.block.deoptNode = root;
-				}
-				descriptorBody(item, scope);
-			};
-		}
-		// `body` is `deoptItemBody` exactly when the compiler supplied no map body
-		// and this is not the mapped fallback — both wrapper assignments above are
-		// guarded by those two conditions. Record it on the slot rather than
-		// re-deriving it by identity in mountItem (see ForSlot.plainDeopt).
-		const plainDeopt = compiledMapBody === undefined && mappedFallback !== true;
-		state.forSlot.plainDeopt = plainDeopt;
-		const fastFlags = compiledMapFlags || 0;
-		const ssrMarkerless =
-			compiledMapBody === undefined
-				? markerlessMappedFallback || plainDeopt
-				: (fastFlags & 16) !== 0;
-		let pure = (fastFlags & 1) !== 0;
-		let lite = false;
-		if (compiledMapBody !== undefined) {
-			state.forSlot.env = compiledMapDeps;
-			if ((fastFlags & 4) !== 0 && compiledMapDeps !== undefined) {
-				if (
-					state.forSlot.cachedDeps !== null &&
-					depsEqual(state.forSlot.cachedDeps, compiledMapDeps)
-				) {
-					pure = true;
-				} else {
-					lite = true;
-				}
-				state.forSlot.cachedDeps = compiledMapDeps;
-			}
-		}
-		// singleRoot=2 (marker-elision M4): pure single-element items self-mark —
-		// no `it` pair per item — resolved per item value in mountItem; shape
-		// flips promote to a minted pair in place (deoptItemBody).
-		// First fill dispatches to the linear pass directly (see mountItemsLinear)
-		// so a de-opt list's hydration adopt skips the full reconciler too.
-		if (state.forSlot.size === 0) {
-			mountItemsLinear(
-				parentBlock,
-				state.forSlot,
-				items,
-				getKey,
-				body,
-				compiledMapBody === undefined ? 2 : (fastFlags & 2) !== 0,
-				ssrMarkerless,
-			);
-		} else {
-			reconcileKeyed(
-				parentBlock,
-				state.forSlot,
-				items,
-				getKey,
-				body,
-				pure,
-				compiledMapBody === undefined ? 2 : (fastFlags & 2) !== 0,
-				lite,
-				(fastFlags & 8) !== 0,
-				ssrMarkerless,
-			);
-		}
-		// Upgrade adoption: nodes the empty→fill mount didn't consume (old
-		// children whose keys have no new item) are orphans inside the range —
-		// sweep them now.
-		if (state.forSlot.adopt !== null) {
-			const leftovers = state.forSlot.adopt;
-			for (let i = 0; i < leftovers.length; i++) {
-				const n = leftovers[i].node;
-				if (n.parentNode !== null) {
-					detachDeoptTreeRefs(n, null);
-					n.parentNode.removeChild(n);
-				}
-			}
-			state.forSlot.adopt = null;
-		}
+		renderPreparedChildList(
+			state,
+			parentBlock,
+			domParent,
+			preparedList,
+			hydration,
+			upgradeArmed,
+			upgradeChildren,
+			compiledMapBody,
+			compiledMapKey,
+			compiledMapFlags,
+			compiledMapDeps,
+			mappedFallback,
+		);
 		return;
 	}
 	// Value is NOT an array — if we were in array mode, tear the list down first.
@@ -21018,16 +21114,10 @@ export function textSlot(
 	state.text = tn;
 }
 
-// Slow path for the compiler's INLINE text-hole codegen. The compiled `.tsx`
-// `{expr}` value hole caches its text node on the binding bag and, on update,
-// calls `setText` directly when the value is a primitive and a node already
-// exists, normalizing `true` to empty to preserve renderable-child semantics.
-// It only calls here when that inline fast path doesn't apply: `_v` is an
-// object/function (component / element / array), or there's no cached node yet
-// (first render, hydration, or a prior non-text render). We hand off to the full
-// `childSlot` for classification + slot-state management, then return the text
-// node it settled on (or null when it now holds a Block / array / host node) so
-// the caller can cache it for the next fast update.
+// General path for a compiled renderable binding. The shared textHoleUpdate
+// fast path (or an older compiler's inline equivalent) reaches here for objects,
+// functions, first render/hydration, and text-mode switches. Return the settled
+// text node for the next primitive update; childSlot owns all other content.
 export function textHole(
 	parentScope: Scope,
 	slotKey: number,
@@ -21044,6 +21134,54 @@ export function textHole(
 		: null;
 }
 
+/**
+ * Shared primitive fast paths for compiler-owned renderable bindings. Stable
+ * objects/functions must still reach childSlot: an unchanged descriptor can
+ * contain consumers of a changed context. Null also takes the ordinary mode
+ * switch so existing child content is released. The caller publishes its raw
+ * value only after this returns, preserving the setters' rollback snapshots.
+ */
+export function textHoleUpdate(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	value: unknown,
+	cachedNode: Text | null,
+	previous: unknown,
+	anchor?: Node | null,
+	ownEnd?: boolean,
+	compactable?: boolean,
+): Text | null {
+	const complex = value !== null && (typeof value === 'object' || typeof value === 'function');
+	if (!complex) {
+		if (previous === value) return cachedNode;
+		if (cachedNode != null && value !== null) {
+			setText(cachedNode, value === true ? '' : value);
+			return cachedNode;
+		}
+	}
+	return textHole(parentScope, slotKey, domParent, value, anchor, ownEnd, compactable);
+}
+
+export function childTextHoleUpdate(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	value: unknown,
+	cachedNode: Text | null,
+	previous: unknown,
+): Text | null {
+	const complex = value !== null && (typeof value === 'object' || typeof value === 'function');
+	if (!complex) {
+		if (previous === value) return cachedNode;
+		if (cachedNode != null && value !== null) {
+			setText(cachedNode, value === true ? '' : value);
+			return cachedNode;
+		}
+	}
+	return childTextHole(parentScope, slotKey, domParent, value, cachedNode);
+}
+
 // Slow path for an ONLY-CHILD `{expr}` value hole (the value hole is the sole
 // content of `domParent`). When the value is a primitive this is FULLY markerless
 // and stateless — a single Text node appended to the host, exactly like a `.tsrx`
@@ -21051,8 +21189,8 @@ export function textHole(
 // state, no end marker). Only when the value is an object/function (component /
 // element / array) does it fall back to the full `childSlot`, which lazily mints
 // the markers + slot state it needs (the host's sole-child invariant means it can
-// safely append). The compiler's inline fast path handles the steady-state
-// primitive update (`setText` on the cached node); this runs on first render,
+// safely append). childTextHoleUpdate handles the steady-state primitive
+// update (`setText` on the cached node); this runs on first render,
 // empty↔non-empty, and a primitive↔object mode switch. Returns the text node to
 // cache (or null when in object/empty mode).
 export function childTextHole(
