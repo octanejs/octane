@@ -715,10 +715,17 @@ Other consequences:
   [Suspense retry timing](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#5-retry-reveal-throttling--distinct-from-transition-shell-retention).
 - Resource readers can suspend by throwing a thenable during render inside an
   enclosing Suspense/`@pending` boundary, on the client and during SSR; `use()` is
-  not required. Client suspension **without** such a boundary remains a known
+  not required. Pending and error fallback renders can also suspend to an outer
+  boundary; promises thrown by effects remain application errors.
+  Client suspension **without** such a boundary remains a known
   bug: the root unmounts instead of holding and retrying. This is tracked in
   [issue #821](https://github.com/octanejs/octane/issues/821), not an intentional
   divergence.
+- Incomplete descriptor retries can still reveal stale content
+  ([issue #825](https://github.com/octanejs/octane/issues/825)), and some ordinary
+  first-mount/parent-driven catches omit `onCaughtError`
+  ([issue #824](https://github.com/octanejs/octane/issues/824)). These are verified
+  pre-existing bugs, not intentional React differences.
 - Same-identity synchronous rendering remains per-swap rather than using a
   global React-style work-in-progress tree. See
   [Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md).

@@ -1,4 +1,5 @@
 import {
+	Suspense,
 	startTransition,
 	use,
 	useInsertionEffect,
@@ -34,6 +35,22 @@ export function TimeoutFallback(props) @{
 			<span id="fallback">{'pending-shown'}</span>
 		}
 	</div>
+}
+
+function TimedPendingResource(props: { read: () => string }) @{
+	const value = props.read();
+	<span id="timed-inner-fallback">{value as string}</span>
+}
+
+export function TimedSuspendingFallback(props: {
+	promise: Promise<string>;
+	readFallback: () => string;
+}) @{
+	<Suspense fallback={<span id="timed-outer-fallback">{'outer loading'}</span>}>
+		<Suspense fallback={<TimedPendingResource read={props.readFallback} />}>
+			<SuspendingLeaf promise={props.promise} />
+		</Suspense>
+	</Suspense>
 }
 
 export function TransitionAddsNestedBoundary(props: {

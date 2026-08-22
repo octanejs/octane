@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { flushSync } from 'octane';
 import { act, flushEffects, mount, nextPaint } from './_helpers';
 import {
 	SuspenseHost,
 	SuspenseHostJsx,
 	ErrorHost,
+	SuspendingErrorFallbackHost,
 	ResetErrorHost,
 	RetainedResetErrorHost,
 	RetainedResetSuspenseHost,
@@ -52,6 +53,51 @@ describe('<ErrorBoundary> component', () => {
 		expect(r.container.textContent).toContain('caught:boom');
 		r.unmount();
 	});
+
+	it.each(['raw resource', 'use'] as const)(
+		'lets an imported ErrorBoundary error fallback suspend through outer Suspense (%s)',
+		async (readMode) => {
+			let resolved = false;
+			let resolve!: (value: string) => void;
+			const promise = new Promise<string>((done) => {
+				resolve = done;
+			});
+			const read = () => {
+				if (!resolved) throw promise;
+				return 'error fallback ready';
+			};
+			const log: string[] = [];
+			const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const r = mount(SuspendingErrorFallbackHost, {
+				promise,
+				read,
+				usePromise: readMode === 'use',
+				log,
+			});
+			try {
+				expect(r.find('#outer-error-pending').textContent).toBe('outer loading');
+				expect(r.container.querySelector('#suspended-error-fallback')).toBeNull();
+				expect(log).toEqual([]);
+				expect(consoleError).not.toHaveBeenCalled();
+
+				await act(async () => {
+					resolved = true;
+					resolve('error fallback ready');
+					await promise;
+				});
+				expect(r.container.querySelector('#outer-error-pending')).toBeNull();
+				expect(r.find('#suspended-error-fallback').textContent).toBe('error fallback ready');
+				expect(log).toEqual(['mount']);
+				expect(consoleError).not.toHaveBeenCalled();
+			} finally {
+				r.unmount();
+				consoleError.mockRestore();
+			}
+			expect(log).toEqual(['mount', 'unmount']);
+			expect(r.container.childNodes).toHaveLength(0);
+		},
+	);
+
 	it('passes reset to an inline compiled fallback', () => {
 		const state = { failed: true };
 		const r = mount(ResetErrorHost, { state });

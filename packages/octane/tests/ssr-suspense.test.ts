@@ -71,6 +71,33 @@ function resourceReader<T>(promise: Promise<T>, wakeable: PromiseLike<T> = promi
 }
 
 describe('SSR — resource-thrown thenables', () => {
+	function streamResourceFallback() {
+		const primary = deferred<string>();
+		const fallback = deferred<string>();
+		const collector = createPipeableCollector();
+		const errors: unknown[] = [];
+		let shellReady!: () => void;
+		const shell = new Promise<void>((resolve) => {
+			shellReady = resolve;
+		});
+		const stream = RT.renderToPipeableStream(
+			m.ThrownResourceFallbackBoundary,
+			{
+				primaryRead: resourceReader(primary.promise),
+				fallbackRead: resourceReader(fallback.promise),
+			},
+			{
+				// An obsolete fallback must not keep the response open until its
+				// request deadline. Bound a regression through the public API.
+				timeoutMs: 1000,
+				onShellReady: shellReady,
+				onError: (error) => errors.push(error),
+			},
+		);
+		stream.pipe(collector.destination);
+		return { primary, fallback, collector, errors, stream, shell };
+	}
+
 	it('renders the pending arm in synchronous server output', () => {
 		const pending = deferred<string>();
 		const out = RT.renderToString(m.ThrownResourceBoundary, {
@@ -241,6 +268,64 @@ describe('SSR — resource-thrown thenables', () => {
 			stream.abort();
 			container.remove();
 			resetStreamRuntimeGlobals();
+		}
+	});
+
+	it('completes a streamed primary without waiting for its resource-thrown fallback', async () => {
+		const { primary, collector, errors, stream, shell } = streamResourceFallback();
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		try {
+			await shell;
+			expect(collector.chunks.join('')).toContain('loading outer resource');
+			primary.resolve('primary ready');
+			container.innerHTML = await collector.ended;
+			activateStreamedMarkup(container);
+			expect(container.querySelector('.resource-primary')?.textContent).toBe('primary ready');
+			expect(container.querySelector('.resource-outer-loading')).toBeNull();
+			expect(container.querySelector('.resource-fallback')).toBeNull();
+			expect(errors).toEqual([]);
+		} finally {
+			stream.abort();
+			container.remove();
+			resetStreamRuntimeGlobals();
+		}
+	});
+
+	it('routes a streamed resource fallback rejection to the outer catch arm', async () => {
+		const { fallback, collector, errors, stream, shell } = streamResourceFallback();
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		try {
+			await shell;
+			fallback.reject(new Error('fallback failed'));
+			container.innerHTML = await collector.ended;
+			activateStreamedMarkup(container);
+			expect(container.querySelector('.resource-outer-error')?.textContent).toBe(
+				'Error: fallback failed',
+			);
+			expect(container.querySelector('.resource-inner-error')).toBeNull();
+			expect(container.querySelector('.resource-outer-loading')).toBeNull();
+			expect(errors).toEqual([]);
+		} finally {
+			stream.abort();
+			container.remove();
+			resetStreamRuntimeGlobals();
+		}
+	});
+
+	it('aborts a stream while its resource fallback is suspended', async () => {
+		const { collector, errors, stream, shell } = streamResourceFallback();
+		try {
+			await shell;
+			const reason = new Error('cancelled fallback request');
+			stream.abort(reason);
+			const html = await collector.ended;
+			expect(html).toContain('loading outer resource');
+			expect(errors).toContain(reason);
+			expect(errors.every((error) => error === reason)).toBe(true);
+		} finally {
+			stream.abort();
 		}
 	});
 });

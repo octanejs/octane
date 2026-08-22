@@ -12,6 +12,7 @@ import {
 	TimedHiddenRejection,
 	TimedNestedRefOrder,
 	TimedResumeEffectRollback,
+	TimedSuspendingFallback,
 	TimeoutFallback,
 	TransitionAddsNestedBoundary,
 } from './_fixtures/transition-timeout.tsrx';
@@ -108,6 +109,63 @@ describe('useTransition — transition-timeout fallback', () => {
 	});
 	afterEach(() => {
 		vi.useRealTimers();
+	});
+
+	it('shows outer Suspense immediately when a finite-timeout fallback suspends', async () => {
+		const previousTimeout = getTransitionFallbackTimeout();
+		setTransitionFallbackTimeout(100);
+		const primary = deferred<string>();
+		const fallback = deferred<string>();
+		let fallbackReady = false;
+		const readFallback = () => {
+			if (!fallbackReady) throw fallback.promise;
+			return 'inner loading';
+		};
+		const r = mount(TimedSuspendingFallback, {
+			promise: fulfilled('first'),
+			readFallback,
+		});
+		try {
+			const leaf = r.find('.leaf') as HTMLElement;
+			expect(leaf.textContent).toBe('first');
+			expect(leaf.style.display).toBe('');
+			await act(() => {
+				startTransition(() => {
+					r.update(TimedSuspendingFallback, { promise: primary.promise, readFallback });
+				});
+			});
+			await vi.advanceTimersByTimeAsync(99);
+			expect(r.find('.leaf')).toBe(leaf);
+			expect(leaf.style.display).toBe('');
+			expect(r.findAll('#timed-outer-fallback')).toHaveLength(0);
+
+			// The timeout runs outside a render stack. Once the inner primary is
+			// hidden, its suspending fallback must not start another transition hold
+			// on that now-blank subtree; the outer fallback is urgent at this deadline.
+			await vi.advanceTimersByTimeAsync(1);
+			expect(r.find('#timed-outer-fallback').textContent).toBe('outer loading');
+			expect(leaf.isConnected).toBe(true);
+			expect(leaf.style.display).toBe('none');
+			expect(r.findAll('#timed-inner-fallback')).toHaveLength(0);
+
+			await act(() => {
+				fallbackReady = true;
+				fallback.resolve('inner loading');
+			});
+			expect(r.findAll('#timed-outer-fallback')).toHaveLength(0);
+			expect(r.find('#timed-inner-fallback').textContent).toBe('inner loading');
+			expect(leaf.style.display).toBe('none');
+
+			await act(() => primary.resolve('second'));
+			expect(r.findAll('#timed-outer-fallback')).toHaveLength(0);
+			expect(r.findAll('#timed-inner-fallback')).toHaveLength(0);
+			expect(r.find('.leaf')).toBe(leaf);
+			expect(leaf.style.display).toBe('');
+			expect(leaf.textContent).toBe('second');
+		} finally {
+			r.unmount();
+			setTransitionFallbackTimeout(previousTimeout);
+		}
 	});
 
 	it('eventually swaps to @pending after the configured timeout AND restores try DOM on resolve', async () => {

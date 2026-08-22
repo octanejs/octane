@@ -7066,6 +7066,9 @@ export function ssrTry(
 			} catch (error) {
 				// A direct suspension has no nested pending arm whose HTML can be kept.
 				// The outer template remains balanced with an empty fallback range.
+				// Inline resource reads can throw before a component normalizes them;
+				// the finally below discards their registration along with use() work.
+				error = normalizeThrownServerThenable(error);
 				if (!ssrIsSuspense(error)) throw error;
 				fallback = '';
 			} finally {

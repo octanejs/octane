@@ -1,13 +1,20 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolve } from 'node:path';
 import { setImmediate as nextHostTurn } from 'node:timers/promises';
-import { act as reactAct, createElement, type ComponentType } from 'react';
+import {
+	act as reactAct,
+	Component,
+	createElement,
+	type ComponentType,
+	type ReactNode,
+} from 'react';
 import { createRoot as createReactRoot } from 'react-dom/client';
 import { flushSync as reactFlushSync } from 'react-dom';
 import {
 	act as octaneAct,
 	createRoot as createOctaneRoot,
 	flushSync as octaneFlushSync,
+	ErrorBoundary as OctaneErrorBoundary,
 } from '../../src/index.js';
 import { normaliseHtml, preloadDifferentialFixture } from './_rig.js';
 import type {
@@ -17,6 +24,8 @@ import type {
 	RawTimingProps,
 	InitialStateTimingProps,
 	ActivityTimingProps,
+	SuspendingFallbackProps,
+	FallbackSiblingProps,
 } from '../_fixtures/suspense-timing.tsrx';
 
 // React captures its host timers when it imports. Install the clock before its
@@ -44,14 +53,20 @@ type FixtureName =
 	| 'InitialStateTimedBoundary'
 	| 'StatefulFallbackTimedBoundary'
 	| 'ActivityTimedBoundary'
-	| 'NestedActivityTimedBoundary';
+	| 'NestedActivityTimedBoundary'
+	| 'PendingFallbackBoundary'
+	| 'ErrorFallbackBoundary'
+	| 'CatchingErrorFallbackBoundary'
+	| 'MemoizedFallbackSibling';
 type Props =
 	| TimingProps
 	| TimingPairProps
 	| NestedTimingProps
 	| RawTimingProps
 	| InitialStateTimingProps
-	| ActivityTimingProps;
+	| ActivityTimingProps
+	| SuspendingFallbackProps
+	| FallbackSiblingProps;
 
 interface TimingRoot {
 	container: HTMLDivElement;
@@ -127,7 +142,10 @@ function mount(
 	runtime: Runtime,
 	name: FixtureName,
 	props: Props,
-	errorOptions: { onUncaughtError?: (error: unknown) => void } = {},
+	errorOptions: {
+		onCaughtError?: (error: unknown) => void;
+		onUncaughtError?: (error: unknown) => void;
+	} = {},
 ): TimingRoot {
 	const container = document.createElement('div');
 	document.body.appendChild(container);
@@ -135,7 +153,10 @@ function mount(
 	const caughtErrors: unknown[] = [];
 	const options = {
 		...errorOptions,
-		onCaughtError: (error: unknown) => caughtErrors.push(error),
+		onCaughtError: (error: unknown) => {
+			caughtErrors.push(error);
+			errorOptions.onCaughtError?.(error);
+		},
 	};
 	const root =
 		runtime === 'react'
@@ -184,7 +205,7 @@ async function advance(ms = 0): Promise<void> {
 	for (let turn = 0; turn < 4; turn++) await nextHostTurn();
 }
 
-async function act(runtime: Runtime, fn: () => void): Promise<void> {
+async function act(runtime: Runtime, fn: () => void | Promise<void>): Promise<void> {
 	const previous = environment.IS_REACT_ACT_ENVIRONMENT;
 	environment.IS_REACT_ACT_ENVIRONMENT = true;
 	try {
@@ -867,5 +888,291 @@ describe.each<Runtime>(['react', 'octane'])('%s Suspense retry timing', (runtime
 		await advance(200);
 		expect(visible(root)).toBe('resource failed');
 		expect(root.caughtErrors).toEqual([error]);
+	});
+});
+
+// Fallbacks are render work too: a wakeable must reach an enclosing Suspense
+// boundary rather than becoming an application error in the fallback's owner.
+// These cases use public act for settlement and make no wall-clock assertions.
+// https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberSuspenseContext.js#L102
+class ReactFallbackBoundary extends Component<
+	{ children?: ReactNode; fallback: (error: unknown) => ReactNode },
+	{ error: unknown }
+> {
+	state = { error: null as unknown };
+
+	static getDerivedStateFromError(error: unknown) {
+		return { error };
+	}
+
+	render() {
+		return this.state.error === null ? this.props.children : this.props.fallback(this.state.error);
+	}
+}
+
+function fallbackResource(initial?: string) {
+	const resource = deferred();
+	const read = reader(resource);
+	if (initial !== undefined) {
+		Object.assign(resource.promise, { status: 'fulfilled', value: initial });
+		resource.resolve(initial);
+		return { ...resource, read: () => initial };
+	}
+	return { ...resource, read };
+}
+
+describe.each<Runtime>(['react', 'octane'])('%s suspending fallback renders', (runtime) => {
+	it('reports a memoized error fallback only after its later sibling reveals', async () => {
+		const primary = deferred();
+		const fallback = deferred();
+		const sibling = deferred();
+		const primaryError = new Error('primary failed');
+		const props: FallbackSiblingProps = {
+			primary: primary.promise,
+			fallback: fallback.promise,
+			sibling: fulfilled('sibling initial'),
+		};
+		const reportedViews: string[] = [];
+		let root!: TimingRoot;
+		await act(runtime, async () => {
+			root = mount(runtime, 'MemoizedFallbackSibling', props, {
+				onCaughtError: () => reportedViews.push(visible(root)),
+			});
+		});
+		expect(visible(root)).toBe('inner loading|sibling initial');
+		await act(runtime, async () => primary.reject(primaryError));
+		expect(visible(root)).toBe('outer loading');
+		expect(root.caughtErrors).toEqual([]);
+		await act(runtime, async () => root.update({ ...props, sibling: sibling.promise }));
+		expect(visible(root)).toBe('outer loading');
+		expect(root.caughtErrors).toEqual([]);
+		await act(runtime, async () => fallback.resolve('error fallback ready'));
+		expect(visible(root)).toBe('outer loading');
+		expect(root.caughtErrors).toEqual([]);
+		await act(runtime, async () => sibling.resolve('sibling next'));
+		expect(visible(root)).toBe('error fallback ready|sibling next');
+		expect(root.caughtErrors).toHaveLength(1);
+		expect(root.caughtErrors[0]).toBe(primaryError);
+		expect(reportedViews).toEqual(['error fallback ready|sibling next']);
+	});
+
+	describe.each(['raw', 'use'] as const)('%s resource reads', (readMode) => {
+		function resources(initialFallback?: string) {
+			const primary = fallbackResource();
+			const fallback = fallbackResource(initialFallback);
+			const props: SuspendingFallbackProps = {
+				primary,
+				fallback,
+				readMode,
+				primaryError: new Error('primary failed'),
+			};
+			return { primary, fallback, props };
+		}
+
+		it('suspends a pending fallback through the outer boundary and then reveals its primary', async () => {
+			const { primary, fallback, props } = resources();
+			let root!: TimingRoot;
+			await act(runtime, async () => {
+				root = mount(runtime, 'PendingFallbackBoundary', props);
+			});
+			expect(visible(root)).toBe('outer loading');
+			await act(runtime, async () => fallback.resolve('fallback ready'));
+			expect(visible(root)).toBe('fallback ready:0');
+			await act(runtime, async () => primary.resolve('primary ready'));
+			expect(visible(root)).toBe('primary ready');
+		});
+
+		it('keeps the outer fallback until its wakeable settles when the discarded primary resolves first', async () => {
+			const { primary, fallback, props } = resources();
+			let root!: TimingRoot;
+			await act(runtime, async () => {
+				root = mount(runtime, 'PendingFallbackBoundary', props);
+			});
+			expect(visible(root)).toBe('outer loading');
+			await act(runtime, async () => primary.resolve('primary ready'));
+			expect(visible(root)).toBe('outer loading');
+			await act(runtime, async () => fallback.resolve('fallback ready'));
+			expect(visible(root)).toBe('primary ready');
+		});
+
+		it('routes a rejected pending fallback resource to its enclosing catch', async () => {
+			const { fallback, props } = resources();
+			let root!: TimingRoot;
+			await act(runtime, async () => {
+				root = mount(runtime, 'PendingFallbackBoundary', props);
+			});
+			expect(visible(root)).toBe('outer loading');
+			await act(runtime, async () => fallback.reject(new Error('fallback failed')));
+			expect(visible(root)).toBe('fallback failed');
+		});
+
+		it('preserves a committed pending fallback counter when its replacement resource suspends', async () => {
+			const { props } = resources('fallback initial');
+			let root!: TimingRoot;
+			await act(runtime, async () => {
+				root = mount(runtime, 'PendingFallbackBoundary', props);
+			});
+			expect(visible(root)).toBe('fallback initial:0');
+			await act(runtime, async () => root.click('[data-value="suspending-fallback"]'));
+			expect(visible(root)).toBe('fallback initial:1');
+			const next = fallbackResource();
+			await act(runtime, async () => root.update({ ...props, fallback: next }));
+			expect(visible(root)).toBe('outer loading');
+			await act(runtime, async () => next.resolve('fallback next'));
+			expect(visible(root)).toBe('fallback next:1');
+		});
+
+		it('does not mount a pending fallback after the outer boundary is unmounted', async () => {
+			const { primary, fallback, props } = resources();
+			const layouts: string[] = [];
+			let root!: TimingRoot;
+			await act(runtime, async () => {
+				root = mount(runtime, 'PendingFallbackBoundary', {
+					...props,
+					onFallbackLayout: (value) => layouts.push(value),
+				});
+			});
+			expect(visible(root)).toBe('outer loading');
+			await act(runtime, async () => root.unmount());
+			await act(runtime, async () => {
+				fallback.resolve('fallback ready');
+				primary.resolve('primary ready');
+			});
+			expect(root.container.textContent).toBe('');
+			expect(layouts).toEqual([]);
+		});
+
+		describe.each(['template', 'JSX'] as const)('%s error boundary', (kind) => {
+			function errorResources(initialFallback?: string) {
+				const setup = resources(initialFallback);
+				if (kind === 'JSX') {
+					// Both fixtures render a public boundary component; React needs its
+					// native class form while Octane provides the ErrorBoundary component.
+					setup.props.boundary = (runtime === 'react'
+						? ReactFallbackBoundary
+						: OctaneErrorBoundary) as unknown as SuspendingFallbackProps['boundary'];
+				}
+				return setup;
+			}
+
+			it('suspends an error fallback to an outer Suspense with no outer error boundary', async () => {
+				const { fallback, props } = errorResources();
+				let root!: TimingRoot;
+				await act(runtime, async () => {
+					root = mount(runtime, 'ErrorFallbackBoundary', props);
+				});
+				expect(visible(root)).toBe('outer loading');
+				await act(runtime, async () => fallback.resolve('fallback ready'));
+				expect(visible(root)).toBe('fallback ready:0');
+			});
+
+			it('preserves committed error fallback state when refreshed data suspends', async () => {
+				const { props } = errorResources('fallback initial');
+				let root!: TimingRoot;
+				await act(runtime, async () => {
+					root = mount(runtime, 'ErrorFallbackBoundary', props);
+				});
+				expect(visible(root)).toBe('fallback initial:0');
+				await act(runtime, async () => root.click('[data-value="suspending-fallback"]'));
+				expect(visible(root)).toBe('fallback initial:1');
+				const next = fallbackResource();
+				await act(runtime, async () => root.update({ ...props, fallback: next }));
+				expect(visible(root)).toBe('outer loading');
+				await act(runtime, async () => next.resolve('fallback next'));
+				expect(visible(root)).toBe('fallback next:1');
+			});
+
+			it('renders a rejected error fallback resource through the outer catch', async () => {
+				const { fallback, props } = errorResources();
+				let root!: TimingRoot;
+				await act(runtime, async () => {
+					root = mount(runtime, 'CatchingErrorFallbackBoundary', props);
+				});
+				expect(visible(root)).toBe('outer loading');
+				await act(runtime, async () => fallback.reject(new Error('fallback failed')));
+				expect(visible(root)).toBe('fallback failed');
+			});
+
+			it('suspends an error fallback when a pending primary rejects after commit', async () => {
+				const { primary, fallback, props } = errorResources();
+				const primaryError = new Error('primary failed');
+				let root!: TimingRoot;
+				await act(runtime, async () => {
+					root = mount(runtime, 'ErrorFallbackBoundary', { ...props, primaryError: undefined });
+				});
+				expect(visible(root)).toBe('primary loading');
+				await act(runtime, async () => primary.reject(primaryError));
+				expect(visible(root)).toBe('outer loading');
+				expect(root.caughtErrors).toEqual([]);
+				await act(runtime, async () => fallback.resolve('fallback ready'));
+				expect(visible(root)).toBe('fallback ready:0');
+				expect(root.caughtErrors).toHaveLength(1);
+				expect(root.caughtErrors[0]).toBe(primaryError);
+			});
+
+			it('reports only the replacement error when a detached retry error fallback rejects', async () => {
+				const { primary, fallback, props } = errorResources();
+				const primaryError = new Error('primary failed');
+				const fallbackError = new Error('fallback failed');
+				let root!: TimingRoot;
+				await act(runtime, async () => {
+					root = mount(runtime, 'CatchingErrorFallbackBoundary', {
+						...props,
+						primaryError: undefined,
+					});
+				});
+				expect(visible(root)).toBe('primary loading');
+				await act(runtime, async () => primary.reject(primaryError));
+				expect(visible(root)).toBe('outer loading');
+				expect(root.caughtErrors).toEqual([]);
+				await act(runtime, async () => fallback.reject(fallbackError));
+				expect(visible(root)).toBe('fallback failed');
+				expect(root.caughtErrors).toHaveLength(1);
+				expect(root.caughtErrors[0]).toBe(fallbackError);
+			});
+
+			it.each(['unmount', 'replacement'] as const)(
+				'discards a detached error report on %s before its fallback resolves',
+				async (cancellation) => {
+					const { primary, fallback, props } = errorResources();
+					const suspendedProps = { ...props, primaryError: undefined };
+					let root!: TimingRoot;
+					await act(runtime, async () => {
+						root = mount(runtime, 'ErrorFallbackBoundary', suspendedProps);
+					});
+					expect(visible(root)).toBe('primary loading');
+					await act(runtime, async () => primary.reject(new Error('primary failed')));
+					expect(visible(root)).toBe('outer loading');
+					expect(root.caughtErrors).toEqual([]);
+					await act(runtime, async () => {
+						if (cancellation === 'unmount') root.unmount();
+						else root.update({ ...suspendedProps, replacement: 'replacement ready' });
+					});
+					const expected = cancellation === 'unmount' ? '' : 'replacement ready';
+					expect(visible(root)).toBe(expected);
+					expect(root.caughtErrors).toEqual([]);
+					await act(runtime, async () => fallback.resolve('fallback ready'));
+					expect(visible(root)).toBe(expected);
+					expect(root.caughtErrors).toEqual([]);
+				},
+			);
+
+			it('does not publish error fallback effects after the suspended root is unmounted', async () => {
+				const { fallback, props } = errorResources();
+				const layouts: string[] = [];
+				let root!: TimingRoot;
+				await act(runtime, async () => {
+					root = mount(runtime, 'ErrorFallbackBoundary', {
+						...props,
+						onFallbackLayout: (value) => layouts.push(value),
+					});
+				});
+				expect(visible(root)).toBe('outer loading');
+				await act(runtime, async () => root.unmount());
+				await act(runtime, async () => fallback.resolve('fallback ready'));
+				expect(root.container.textContent).toBe('');
+				expect(layouts).toEqual([]);
+			});
+		});
 	});
 });

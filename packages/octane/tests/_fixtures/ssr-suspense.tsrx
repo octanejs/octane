@@ -136,6 +136,27 @@ export function ThrownResourceBoundary(props: { read: () => string; promise: Pro
 	</div>
 }
 
+export function ThrownResourceFallbackBoundary(props: {
+	primaryRead: () => string;
+	fallbackRead: () => string;
+}) @{
+	<div>
+		@try {
+			@try {
+				<span class="resource-primary">{props.primaryRead() as string}</span>
+			} @pending {
+				<span class="resource-fallback">{props.fallbackRead() as string}</span>
+			} @catch (error: unknown, _reset: () => void) {
+				<span class="resource-inner-error">{String(error)}</span>
+			}
+		} @pending {
+			<span class="resource-outer-loading">loading outer resource</span>
+		} @catch (error: unknown, _reset: () => void) {
+			<span class="resource-outer-error">{String(error)}</span>
+		}
+	</div>
+}
+
 // Plain async components return a fresh Promise on every server replay. The
 // surrounding boundary must render their eventual descriptor or catch their
 // rejection without leaving a superseded Promise unobserved.

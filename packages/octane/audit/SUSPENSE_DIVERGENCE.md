@@ -324,10 +324,24 @@ registers the pending boundary without inventing a `use()` slot or hydration
 seed for the resource reader. Native promises and custom thenables are covered;
 this does not fix client suspension without an enclosing boundary (see #10).
 
+Pending and error fallbacks are render work too. A wakeable thrown there suspends
+to an enclosing Suspense boundary, rather than entering the fallback's own catch
+arm or destroying its state. This follows React's
+[fallback-handler context](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberSuspenseContext.js#L102-L107).
+An error report produced by a detached retry stays deferred while its error
+fallback is suspended; replacement or unmount cancels that report. Finite-timeout
+fallbacks use the priority of the fallback render, not the earlier transition.
+On the server, a completed primary does not wait for an obsolete pending fallback
+that throws a raw wakeable.
+
 **Evidence:** [suspense.test.ts](../tests/suspense.test.ts) covers raw resource
 reads, resolution, rejection, and the effect-throw error control;
 [differential/suspense-timing.test.ts](../tests/differential/suspense-timing.test.ts)
-checks their retry timing against React; and
+checks retry timing, suspending fallback state, rejection, and deferred error
+reporting against React. [boundary.test.ts](../tests/boundary.test.ts) also covers
+the literal imported JSX ErrorBoundary, and
+[transition-timeout.test.ts](../tests/transition-timeout.test.ts) covers a suspending
+fallback at an explicit finite deadline. Finally,
 [ssr-suspense.test.ts](../tests/ssr-suspense.test.ts) covers buffered and streamed
 rendering, sequential wakeables, rejection, abort, and hydration adoption.
 
@@ -345,6 +359,29 @@ Tracked separately in [issue #821](https://github.com/octanejs/octane/issues/821
 Closing it requires root-level retry and atomic commit ownership; the
 boundary-local timing and resource-thenable fixes above do not provide that
 contract.
+
+---
+
+## 11. Incomplete descriptor retry bailouts — open bug
+
+A previously committed descriptor subtree can skip an incomplete update on
+retry, removing the fallback but revealing the old value. This also affects
+some memoized ancestors. The same public `createElement`/`use` reproduction fails
+on the unchanged base, without error boundaries or raw resource throws.
+
+Tracked separately in [issue #825](https://github.com/octanejs/octane/issues/825).
+The fix needs correct incomplete-render invalidation while preserving legitimate
+memo and identity bailouts; disabling those bailouts for every retry is not the
+intended solution. This is a known compatibility bug, not a divergence contract.
+
+## 12. Ordinary first-mount error reporting — open bug
+
+First-mount and parent-driven inline catches can render the correct error fallback
+without calling the root's `onCaughtError`. This reproduces on the unchanged base
+without Suspense or promises. The detached-retry reporting fix in #9 does not
+claim to close this separate entry-path gap.
+
+Tracked in [issue #824](https://github.com/octanejs/octane/issues/824).
 
 ---
 

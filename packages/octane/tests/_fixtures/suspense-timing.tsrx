@@ -1,6 +1,7 @@
 import {
 	Activity,
-	Suspense,
+	Suspense as TimingSuspense,
+	memo,
 	use,
 	useLayoutEffect,
 	useMemo,
@@ -8,6 +9,7 @@ import {
 	useRef,
 	useState,
 } from 'octane';
+import type { ComponentBody } from 'octane';
 
 export interface TimingProps {
 	promise: Promise<string>;
@@ -27,7 +29,7 @@ function TimedContent(props: TimingProps) @{
 }
 
 export function TimedBoundary(props: TimingProps) @{
-	<Suspense fallback={<span data-fallback={props.label}>{props.label + ' loading'}</span>}>
+	<TimingSuspense fallback={<span data-fallback={props.label}>{props.label + ' loading'}</span>}>
 		<TimedContent
 			promise={props.promise}
 			label={props.label}
@@ -35,7 +37,7 @@ export function TimedBoundary(props: TimingProps) @{
 			onRef={props.onRef}
 			renderValue={props.renderValue}
 		/>
-	</Suspense>
+	</TimingSuspense>
 }
 
 export function CatchingTimedBoundary(props: TimingProps) @{
@@ -104,9 +106,9 @@ function NestedContent(props: NestedTimingProps) @{
 }
 
 export function TimedNested(props: NestedTimingProps) @{
-	<Suspense fallback={<span data-fallback="outer">{'outer loading'}</span>}>
+	<TimingSuspense fallback={<span data-fallback="outer">{'outer loading'}</span>}>
 		<NestedContent first={props.first} loadSecond={props.loadSecond} onLayout={props.onLayout} />
-	</Suspense>
+	</TimingSuspense>
 }
 
 export interface RawTimingProps {
@@ -126,9 +128,11 @@ function RawTimedContent(props: RawTimingProps) @{
 export function RawTimedBoundary(props: RawTimingProps) @{
 	<>
 		@try {
-			<Suspense fallback={<span data-fallback={props.label}>{props.label + ' loading'}</span>}>
+			<TimingSuspense
+				fallback={<span data-fallback={props.label}>{props.label + ' loading'}</span>}
+			>
 				<RawTimedContent read={props.read} label={props.label} onLayout={props.onLayout} />
-			</Suspense>
+			</TimingSuspense>
 		} @catch (error: unknown, _reset: () => void) {
 			<span data-error={props.label}>{String((error as Error).message)}</span>
 		}
@@ -156,9 +160,9 @@ function InitialStateContent(props: InitialStateTimingProps) @{
 }
 
 export function InitialStateTimedBoundary(props: InitialStateTimingProps) @{
-	<Suspense fallback={<span data-fallback={props.label}>{props.label + ' loading'}</span>}>
+	<TimingSuspense fallback={<span data-fallback={props.label}>{props.label + ' loading'}</span>}>
 		<InitialStateContent promise={props.promise} label={props.label} initial={props.initial} />
-	</Suspense>
+	</TimingSuspense>
 }
 
 function InteractiveTimedFallback(props: { label: string }) @{
@@ -172,9 +176,9 @@ function InteractiveTimedFallback(props: { label: string }) @{
 }
 
 export function StatefulFallbackTimedBoundary(props: InitialStateTimingProps) @{
-	<Suspense fallback={<InteractiveTimedFallback label={props.label} />}>
+	<TimingSuspense fallback={<InteractiveTimedFallback label={props.label} />}>
 		<InitialStateContent promise={props.promise} label={props.label} initial={props.initial} />
-	</Suspense>
+	</TimingSuspense>
 }
 
 export interface ActivityTimingProps extends TimingProps {
@@ -193,4 +197,145 @@ export function NestedActivityTimedBoundary(props: ActivityTimingProps) @{
 			<TimedBoundary promise={props.promise} label={props.label} />
 		</Activity>
 	</Activity>
+}
+
+export interface FallbackResource {
+	promise: Promise<string>;
+	read: () => string;
+}
+
+export interface SuspendingFallbackProps {
+	primary: FallbackResource;
+	fallback: FallbackResource;
+	readMode: 'raw' | 'use';
+	primaryError?: Error;
+	replacement?: string;
+	boundary?: ComponentBody<{
+		children: unknown;
+		fallback: (error: unknown) => unknown;
+	}>;
+	onFallbackLayout?: (value: string) => void;
+}
+
+function FallbackPrimary(props: SuspendingFallbackProps) @{
+	const value =
+		props.readMode === 'use' ? use(props.primary.promise) : props.primary.read();
+	<span data-value="fallback-primary">{value as string}</span>
+}
+
+function SuspendingFallback(props: SuspendingFallbackProps) @{
+	const [count, setCount] = useState(0);
+	const value =
+		props.readMode === 'use' ? use(props.fallback.promise) : props.fallback.read();
+	useLayoutEffect(() => {
+		props.onFallbackLayout?.(value);
+	}, [value, props.onFallbackLayout]);
+	<button data-value="suspending-fallback" onClick={() => setCount(count + 1)}>
+		{value + ':' + count}
+	</button>
+}
+
+export function PendingFallbackBoundary(props: SuspendingFallbackProps) @{
+	<TimingSuspense fallback={<span data-fallback="outer">outer loading</span>}>
+		<>
+			@try {
+				<FallbackPrimary {...props} />
+			} @pending {
+				<SuspendingFallback {...props} />
+			} @catch (error: unknown, _reset: () => void) {
+				<span data-error="inner">{String((error as Error).message)}</span>
+			}
+		</>
+	</TimingSuspense>
+}
+
+function FallbackPrimaryError(props: SuspendingFallbackProps) {
+	throw props.primaryError;
+}
+
+function ErrorFallbackPrimary(props: SuspendingFallbackProps) @{
+	@if (props.primaryError !== undefined) {
+		<FallbackPrimaryError {...props} />
+	} @else {
+		<TimingSuspense fallback={<span data-fallback="primary">primary loading</span>}>
+			<FallbackPrimary {...props} />
+		</TimingSuspense>
+	}
+}
+
+function ErrorFallbackContent(props: SuspendingFallbackProps) @{
+	@if (props.boundary) {
+		const Boundary = props.boundary;
+		<Boundary fallback={(_error: unknown) => <SuspendingFallback {...props} />}>
+			<ErrorFallbackPrimary {...props} />
+		</Boundary>
+	} @else {
+		@try {
+			<ErrorFallbackPrimary {...props} />
+		} @catch (_error: unknown, _reset: () => void) {
+			<SuspendingFallback {...props} />
+		}
+	}
+}
+
+export function ErrorFallbackBoundary(props: SuspendingFallbackProps) @{
+	<TimingSuspense fallback={<span data-fallback="outer">outer loading</span>}>
+		@if (props.replacement !== undefined) {
+			<span data-value="fallback-replacement">{props.replacement as string}</span>
+		} @else {
+			<ErrorFallbackContent {...props} />
+		}
+	</TimingSuspense>
+}
+
+export function CatchingErrorFallbackBoundary(props: SuspendingFallbackProps) @{
+	<>
+		@try {
+			<ErrorFallbackBoundary {...props} />
+		} @catch (error: unknown, _reset: () => void) {
+			<span data-error="outer">{String((error as Error).message)}</span>
+		}
+	</>
+}
+
+export interface FallbackSiblingProps {
+	primary: Promise<string>;
+	fallback: Promise<string>;
+	sibling: Promise<string>;
+}
+
+function FallbackSiblingReader(props: { promise: Promise<string> }) @{
+	const value = use(props.promise);
+	<span data-value="fallback-sibling-reader">{value as string}</span>
+}
+
+function ReadyFallbackView(props: { value: string }) @{
+	<span data-value="memoized-error-fallback">{props.value as string}</span>
+}
+
+const ReadyFallback = memo(ReadyFallbackView);
+
+function MemoizedErrorFallback(props: { promise: Promise<string> }) @{
+	const value = use(props.promise);
+	<ReadyFallback value={value} />
+}
+
+export function MemoizedFallbackSibling(props: FallbackSiblingProps) @{
+	@try {
+		<main>
+			@try {
+				@try {
+					<FallbackSiblingReader promise={props.primary} />
+				} @pending {
+					<span data-fallback="primary">inner loading</span>
+				}
+			} @catch (_error: unknown, _reset: () => void) {
+				<MemoizedErrorFallback promise={props.fallback} />
+			}
+			<span>|</span>
+			<FallbackSiblingReader promise={props.sibling} />
+		</main>
+	} @pending {
+		<span data-fallback="outer">outer loading</span>
+	}
 }
