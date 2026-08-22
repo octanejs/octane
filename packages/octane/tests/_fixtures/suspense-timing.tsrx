@@ -1,8 +1,10 @@
 import {
 	Activity,
+	createElement,
 	Suspense as TimingSuspense,
 	memo,
 	use,
+	useEffect,
 	useLayoutEffect,
 	useMemo,
 	useReducer,
@@ -26,6 +28,32 @@ function TimedContent(props: TimingProps) @{
 		props.onLayout?.(value);
 	}, [value, props.onLayout]);
 	<span data-value={props.label} ref={props.onRef}>{value as string}</span>
+}
+
+export interface DescriptorRetryContentProps extends TimingProps {
+	readyValue?: string;
+	onPassive?: (value: string) => void;
+}
+
+export function DescriptorRetryContent(props: DescriptorRetryContentProps) @{
+	const [count, setCount] = useState(0);
+	const value = props.readyValue ?? use(props.promise);
+	useLayoutEffect(() => {
+		props.onLayout?.(value);
+	}, [value, props.onLayout]);
+	useEffect(() => {
+		props.onPassive?.(value);
+	}, [value, props.onPassive]);
+	<button data-value={props.label} ref={props.onRef} onClick={() => setCount(count + 1)}>
+		{value + ':' + count}
+	</button>
+}
+
+export function DescriptorRetryBoundary(props: TimingProps) {
+	return createElement(TimingSuspense, {
+		fallback: createElement('span', { 'data-fallback': props.label }, 'loading'),
+		children: createElement('main', null, createElement(DescriptorRetryContent, props)),
+	});
 }
 
 export function TimedBoundary(props: TimingProps) @{

@@ -721,11 +721,11 @@ Other consequences:
   bug: the root unmounts instead of holding and retrying. This is tracked in
   [issue #821](https://github.com/octanejs/octane/issues/821), not an intentional
   divergence.
-- Incomplete descriptor retries can still reveal stale content
-  ([issue #825](https://github.com/octanejs/octane/issues/825)), and some ordinary
-  first-mount/parent-driven catches omit `onCaughtError`
-  ([issue #824](https://github.com/octanejs/octane/issues/824)). These are verified
-  pre-existing bugs, not intentional React differences.
+- Incomplete descriptor and memoized subtrees retry before Suspense reveals
+  them, preserving mounted state and DOM identity. Completed siblings whose
+  speculative commit work was discarded are revisited; unaffected memo and
+  identity bailouts remain eligible. See
+  [descriptor retry coverage](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#11-incomplete-descriptor-retry-bailouts).
 - Same-identity synchronous rendering remains per-swap rather than using a
   global React-style work-in-progress tree. See
   [Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md).

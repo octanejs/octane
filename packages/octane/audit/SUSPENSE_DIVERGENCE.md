@@ -114,11 +114,11 @@ boundary. These were previously filed as separate gaps; they are not. Both need 
 transition render to become a deferred commit unit, for two reasons found while attempting
 the first:
 
-1. *Reveal scope.* Reverting content outside the boundary strands it. The reveal path
+1. _Reveal scope._ Reverting content outside the boundary strands it. The reveal path
    re-renders the try block only, so a restored bag outside it is never re-patched and the
    content stays on the old value permanently. The hold would have to record the block the
    transition originated from and re-render that instead.
-2. *Destruction is not undoable* — ✅ CLOSED for keyed lists (2026-07-29). A keyed removal
+2. _Destruction is not undoable_ — ✅ CLOSED for keyed lists (2026-07-29). A keyed removal
    used to dispose the row outright before the hold was decided, so a held boundary could
    show a list with a row missing — DOM, hook state and cleanups already gone. Removals now
    split: the DOM detach happens immediately (the reconciler needs the nodes out of the way)
@@ -165,8 +165,8 @@ one thing: rolling the attempt back also reverted `isPending`, turning the pendi
 straight back off. Fifteen existing transition tests caught it.
 
 The cause is deliberate and is spelled out at `startTransition` in runtime.ts: the priority
-flag is raised BEFORE `tickTransitionCount`, *"so any scheduleRender calls fired by the
-listener notification (and by fn itself) are tagged as transition"*. The pending cue is
+flag is raised BEFORE `tickTransitionCount`, _"so any scheduleRender calls fired by the
+listener notification (and by fn itself) are tagged as transition"_. The pending cue is
 therefore transition-priority work in the same block as the content it describes, and in
 octane both are one render pass. Skipping urgent writes inside an attempt does not help,
 because the cue render is not urgent. Re-rendering after the unwind to restore the cue
@@ -362,26 +362,42 @@ contract.
 
 ---
 
-## 11. Incomplete descriptor retry bailouts — open bug
+## 11. Incomplete descriptor retry bailouts
 
-A previously committed descriptor subtree can skip an incomplete update on
-retry, removing the fallback but revealing the old value. This also affects
-some memoized ancestors. The same public `createElement`/`use` reproduction fails
-on the unchanged base, without error boundaries or raw resource throws.
+Previously, incoming descriptor props could become the bailout comparison before
+their render completed. A retry then removed the fallback but revealed the old
+value. [Issue #825](https://github.com/octanejs/octane/issues/825) reproduces this
+with public `createElement` and `use`, without a compiler or error boundary.
 
-Tracked separately in [issue #825](https://github.com/octanejs/octane/issues/825).
-The fix needs correct incomplete-render invalidation while preserving legitimate
-memo and identity bailouts; disabling those bailouts for every retry is not the
-intended solution. This is a known compatibility bug, not a divergence contract.
+Render validity is now independent of mount lifetime. Failed paths and bodies
+whose speculative commit work was discarded must run again, including through
+memoized ancestors and compiler-cached output. Successful, unaffected memo and
+identity bailouts remain eligible. Revalidation stays local to the active render;
+one root's suspension does not invalidate another root's output-cache epoch.
 
-## 12. Ordinary first-mount error reporting — open bug
+[Differential tests](../tests/differential/suspense-timing.test.ts) compare native
+promise updates with React in development and production: repeated suspension,
+later-sibling completion, committed refs/effects, supersession, rejection, unmount,
+independent roots, and held descriptor text/prop rollback. The
+[hydration test](../tests/hydration/suspense-hydrate.test.ts) preserves adopted DOM
+and edited state through a suspended update. The related initially-hidden
+Activity case is covered by [Activity lifecycle tests](../tests/activity.test.ts).
+Costs and limitations are recorded in the
+[performance audit](./incomplete-descriptor-retry-performance.md).
 
-First-mount and parent-driven inline catches can render the correct error fallback
-without calling the root's `onCaughtError`. This reproduces on the unchanged base
-without Suspense or promises. The detached-retry reporting fix in #9 does not
-claim to close this separate entry-path gap.
+This does not add global structural work-in-progress semantics (#4), root-level
+suspension without a boundary (#10), or general replay of discarded caught-error
+reports.
 
-Tracked in [issue #824](https://github.com/octanejs/octane/issues/824).
+## 12. Ordinary first-mount error reporting
+
+[PR #828](https://github.com/octanejs/octane/pull/828) fixed
+[issue #824](https://github.com/octanejs/octane/issues/824): ordinary non-suspending
+first-mount and parent-driven catches report the original error once after the
+fallback's refs and layout effects commit. Existing scheduled-error reporting is
+unchanged. [Root callback tests](../tests/root-error-callbacks.test.ts) cover the
+public descriptor, JSX, and template forms; this does not claim general
+transactional reporting for a catch abandoned by a later suspension.
 
 ---
 

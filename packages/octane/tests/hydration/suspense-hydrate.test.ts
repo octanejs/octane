@@ -12,10 +12,11 @@ import {
 import * as ServerRT from 'octane/server';
 import { condition } from 'octane/hydration';
 import { prerender } from 'octane/static';
-import { loadCompiledFixtureSource } from '../_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
 // CLIENT-compiled components (normal .tsrx import path). Importing AsyncCounter
 // (which has an onClick) makes this module register click delegation at load.
 import { AsyncLeaf, AsyncCounter, AsyncUndef } from '../_fixtures/ssr-suspense.tsrx';
+import { DescriptorRetryBoundary } from '../_fixtures/suspense-timing.tsrx';
 
 // SSR Phase 4 — client hydration seeds the server-resolved use(thenable) values
 // from the inline data <script>, so a hydrating use() returns synchronously
@@ -166,6 +167,42 @@ beforeEach(() => {
 afterEach(() => container.remove());
 
 describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
+	it('preserves adopted descriptor DOM and state when an update suspends', async () => {
+		const descriptorServer = loadServerFixture(
+			'packages/octane/tests/_fixtures/suspense-timing.tsrx',
+		);
+		const props = { promise: Promise.resolve('initial'), label: 'reader' };
+		const { html } = await prerender(descriptorServer.DescriptorRetryBoundary, props);
+		container.innerHTML = html;
+		const button = container.querySelector<HTMLButtonElement>('[data-value="reader"]')!;
+		expect(button.textContent).toBe('initial:0');
+		const onRecoverableError = vi.fn();
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			await act(() => {
+				root = hydrateRoot(container, DescriptorRetryBoundary, props, { onRecoverableError });
+			});
+			expect(container.querySelector('[data-value="reader"]')).toBe(button);
+			await act(() => button.click());
+			expect(button.textContent).toBe('initial:1');
+			let resolveNext!: (value: string) => void;
+			const next = new Promise<string>((resolve) => {
+				resolveNext = resolve;
+			});
+			await act(() => root!.render(DescriptorRetryBoundary, { ...props, promise: next }));
+			expect(container.querySelector('[data-fallback="reader"]')?.textContent).toBe('loading');
+			expect(container.querySelector('[data-value="reader"]')).toBe(button);
+			expect(button.isConnected).toBe(true);
+			await act(() => resolveNext('next'));
+			expect(container.querySelector('[data-fallback="reader"]')).toBeNull();
+			expect(container.querySelector('[data-value="reader"]')).toBe(button);
+			expect(button.textContent).toBe('next:1');
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		} finally {
+			root?.unmount();
+		}
+	});
+
 	it('seeds the server value so use(promise) returns synchronously (no re-suspend, no rebuild)', async () => {
 		const { html } = await prerender(server.AsyncLeaf, { promise: Promise.resolve('hello') });
 		expect(html).toBe(
