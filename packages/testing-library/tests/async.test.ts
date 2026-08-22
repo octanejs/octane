@@ -57,6 +57,8 @@ describe('suspense', () => {
 		resolve('revealed');
 		const content = await screen.findByTestId('content');
 		expect(content.textContent).toBe('revealed');
-		expect(screen.queryByText('loading')).toBeNull();
+		// Test-id queries also match prepared content that is still hidden behind
+		// Suspense. Wait for the fallback to disappear before observing the reveal.
+		await waitFor(() => expect(screen.queryByText('loading')).toBeNull());
 	});
 });

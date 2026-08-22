@@ -3404,6 +3404,8 @@ function invokeComponentBody(
 			out = replayUpdatedComponentBody(comp, props, scope, frame, hp, snapshot, warmPlanCheckpoint);
 		}
 		return out;
+	} catch (error) {
+		throw normalizeThrownServerThenable(error);
 	} finally {
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		HOOK_PASS = prevHP;
@@ -3485,6 +3487,8 @@ function renderComponentFramed(
 		// An inherit-range site (M3) skips the wrap: the parent's own pair bounds
 		// this output, and the client borrows it instead of adopting.
 		return MARKERS && !inherit ? BLOCK_OPEN + inner + BLOCK_CLOSE : inner;
+	} catch (error) {
+		throw normalizeThrownServerThenable(error);
 	} finally {
 		CURRENT_SCOPE = prevScope;
 		FRAME = prevFrame;
@@ -4090,6 +4094,7 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 						ssrBlock(ssrChildrenHtml(props.children, scope)),
 					);
 				} catch (e) {
+					e = normalizeThrownServerThenable(e);
 					if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
 					const fb =
 						typeof props.fallback === 'function'
@@ -4186,6 +4191,34 @@ export function useContext<T>(ctx: Context<T>): T {
 const SSR_SUSPENSE = Symbol('octane.ssr.suspense');
 export function ssrIsSuspense(err: unknown): boolean {
 	return err === SSR_SUSPENSE;
+}
+
+function normalizeThrownServerThenable(error: unknown): unknown {
+	if (error === null || typeof error !== 'object') return error;
+	try {
+		if (typeof (error as PromiseLike<unknown>).then !== 'function') return error;
+	} catch {
+		// An opaque rejection reason need not permit property access. Preserve it
+		// for the application's catch arm instead of replacing it with a probe error.
+		return error;
+	}
+	// Resource readers own their resolved values. Register only retry work, not
+	// a synthetic use() occurrence or hydration seed. Each throw gets a fresh
+	// registration because the same reader can discover another pending resource.
+	if (SUSPENDED !== null) {
+		SUSPENDED.push({ promise: error as PromiseLike<unknown>, key: '|throw#' + PU_ID++ });
+	}
+	const frame = FRAME;
+	if (DEFERRED !== null && CURRENT_COMP !== null && frame !== null && !frame.deferred) {
+		frame.deferred = true;
+		DEFERRED.push({
+			comp: CURRENT_COMP,
+			props: CURRENT_PROPS,
+			parentScope: CURRENT_PARENT_SCOPE,
+			frame,
+		});
+	}
+	return SSR_SUSPENSE;
 }
 
 type HydrationRejectionPayload =
@@ -5972,6 +6005,7 @@ function runFullFramedPass(
 		const out = invokeComponentBody(component, props, root, FRAME);
 		body = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, root);
 	} catch (err) {
+		err = normalizeThrownServerThenable(err);
 		// A suspension with no enclosing @try unwinds to here; its thenable is
 		// already in `suspended`, so fall through to the await + retry. Any other
 		// throw is a genuine render failure — propagate it (the finally restores).
@@ -7032,6 +7066,9 @@ export function ssrTry(
 			} catch (error) {
 				// A direct suspension has no nested pending arm whose HTML can be kept.
 				// The outer template remains balanced with an empty fallback range.
+				// Inline resource reads can throw before a component normalizes them;
+				// the finally below discards their registration along with use() work.
+				error = normalizeThrownServerThenable(error);
 				if (!ssrIsSuspense(error)) throw error;
 				fallback = '';
 			} finally {
@@ -7118,6 +7155,7 @@ export function ssrTry(
 			}
 			return ssrBlock(inner);
 		} catch (e) {
+			e = normalizeThrownServerThenable(e);
 			if (ssrIsSuspense(e)) {
 				if (propagateSuspense) throw e;
 				if (stream !== null) {

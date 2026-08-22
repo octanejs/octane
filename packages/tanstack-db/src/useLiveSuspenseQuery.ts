@@ -221,14 +221,12 @@ export function useLiveSuspenseQuery(configOrQueryOrCollection: any, ...rest: Ar
 		throw new Error(`Collection "${result.collection.id}" failed to load`);
 	}
 
-	// OCTANE DIVERGENCE: suspend via `use(thenable)`, not `throw promise`, and call
+	// OCTANE ADAPTATION: consume the preload promise through `use(thenable)`, and call
 	// `use()` UNCONDITIONALLY — exactly once on every path that keeps rendering.
 	//
-	// Upstream react-db `throw`s the preload promise, and a React `throw` suspends
-	// the whole component with no positional state. Octane Suspense instead only
-	// recognizes the sentinel `use()` produces (a raw thrown promise reaches the
-	// error path and never renders the fallback), and Octane tracks `use(thenable)`
-	// by dynamic call-order index (the runtime's `__thenableIdx`), like React's
+	// Upstream react-db throws the preload promise; Octane supports that too.
+	// This binding uses the public hook, whose thenable state is tracked by
+	// dynamic call-order index (the runtime's `__thenableIdx`), like React's
 	// positional `thenableState` — NOT by compiler slot. So skipping `use()` on the
 	// ready / stale-after-error paths would shift the thenable index of any sibling
 	// `use()` or second `useLiveSuspenseQuery` in the same component, which could

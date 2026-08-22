@@ -8,7 +8,7 @@ import {
 	HeaderedCommandState,
 	HeaderedGreetingApp,
 } from '../_fixtures/commands.tsrx';
-import { flush, mount } from '../_helpers';
+import { act, flush, mount } from '../_helpers';
 
 type Call = { cmd: string; args: any };
 
@@ -53,7 +53,8 @@ describe('useInvoke', () => {
 		const result = mount(GreetingApp, { name: 'ada' });
 
 		expect(result.find('#fallback').textContent).toBe('loading');
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(result.find('#greeting').textContent).toBe('hello ada');
 		result.unmount();
 	});
@@ -61,8 +62,10 @@ describe('useInvoke', () => {
 	it('invokes once across the suspend and replay of one episode', async () => {
 		const calls = recordIPC(() => 'hello');
 		const result = mount(GreetingApp, { name: 'ada' });
-		await flush();
+		await act(flush);
 
+		expect(result.container.querySelector('#fallback')).toBeNull();
+		expect(result.find('#greeting').textContent).toBe('hello');
 		expect(greetCalls(calls)).toHaveLength(1);
 		result.unmount();
 	});
@@ -70,10 +73,13 @@ describe('useInvoke', () => {
 	it('does not re-invoke when a re-render rebuilds an equal args literal', async () => {
 		const calls = recordIPC((_cmd, args) => `hello ${args.name}`);
 		const result = mount(GreetingApp, { name: 'ada' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
+		expect(result.find('#greeting').textContent).toBe('hello ada');
 
 		result.update(GreetingApp, { name: 'ada' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(greetCalls(calls)).toHaveLength(1);
 		expect(result.find('#greeting').textContent).toBe('hello ada');
 		result.unmount();
@@ -82,8 +88,9 @@ describe('useInvoke', () => {
 	it('runs a command called with neither args nor options', async () => {
 		const calls = recordIPC((cmd) => `ran ${cmd}`);
 		const result = mount(BareGreetingApp);
-		await flush();
+		await act(flush);
 
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(result.find('#greeting').textContent).toBe('ran greet');
 		// @tauri-apps/api defaults an omitted payload to an empty record.
 		expect(greetCalls(calls)[0].args).toEqual({});
@@ -93,13 +100,15 @@ describe('useInvoke', () => {
 	it('refetches on a changed command name even under explicit deps', async () => {
 		recordIPC((cmd) => `ran ${cmd}`);
 		const result = mount(DynamicCommandApp, { cmd: 'first', version: 1 });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(result.find('#dynamic').textContent).toBe('ran first');
 
 		// Explicit deps extend the command name rather than replacing it, so a
 		// caller cannot accidentally pin the result of a command it stopped calling.
 		result.update(DynamicCommandApp, { cmd: 'second', version: 1 });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(result.find('#dynamic').textContent).toBe('ran second');
 		result.unmount();
 	});
@@ -107,10 +116,13 @@ describe('useInvoke', () => {
 	it('re-invokes when an argument value changes', async () => {
 		const calls = recordIPC((_cmd, args) => `hello ${args.name}`);
 		const result = mount(GreetingApp, { name: 'ada' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
+		expect(result.find('#greeting').textContent).toBe('hello ada');
 
 		result.update(GreetingApp, { name: 'grace' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(greetCalls(calls)).toHaveLength(2);
 		expect(result.find('#greeting').textContent).toBe('hello grace');
 		result.unmount();
@@ -119,16 +131,18 @@ describe('useInvoke', () => {
 	it('routes a rejected command to the error boundary', async () => {
 		recordIPC(() => Promise.reject(new Error('command failed')));
 		const result = mount(GreetingApp, { name: 'ada' });
-		await flush();
+		await act(flush);
 
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(result.find('#caught').textContent).toBe('Error');
 		result.unmount();
 	});
 
 	it('reports a missing Tauri host instead of hanging the boundary', async () => {
 		const result = mount(GreetingApp, { name: 'ada' });
-		await flush();
+		await act(flush);
 
+		expect(result.container.querySelector('#fallback')).toBeNull();
 		expect(result.find('#caught').textContent).toBe('TauriUnavailableError');
 		result.unmount();
 	});
@@ -218,13 +232,17 @@ describe('headers', () => {
 	it('refetches the suspending read when a header value rotates', async () => {
 		const seen = recordBridge(() => 'ok');
 		const result = mount(HeaderedGreetingApp, { token: 'first' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
+		expect(result.find('#greeting').textContent).toBe('ok');
 		expect(seen).toEqual([{ Authorization: 'first' }]);
 
 		// Headers reach the host on every request, so a rotated token has to issue
 		// a new command rather than replay the memoized promise.
 		result.update(HeaderedGreetingApp, { token: 'second' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
+		expect(result.find('#greeting').textContent).toBe('ok');
 		expect(seen).toEqual([{ Authorization: 'first' }, { Authorization: 'second' }]);
 		result.unmount();
 	});
@@ -232,12 +250,16 @@ describe('headers', () => {
 	it('does not refetch when a re-render rebuilds an equal headers literal', async () => {
 		const seen = recordBridge(() => 'ok');
 		const result = mount(HeaderedGreetingApp, { token: 'first' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
+		expect(result.find('#greeting').textContent).toBe('ok');
 
 		// The key is by value, matching the argument record, so the inline literal
 		// every render allocates does not count as a change.
 		result.update(HeaderedGreetingApp, { token: 'first' });
-		await flush();
+		await act(flush);
+		expect(result.container.querySelector('#fallback')).toBeNull();
+		expect(result.find('#greeting').textContent).toBe('ok');
 		expect(seen).toHaveLength(1);
 		result.unmount();
 	});

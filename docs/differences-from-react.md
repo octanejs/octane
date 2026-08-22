@@ -677,6 +677,19 @@ setPage(next); // If it suspends, show the pending fallback.
 startTransition(() => setPage(next)); // Keep the previous content while pending.
 ```
 
+Already-visible Suspense content stays visible without a timeout during a
+transition, matching React's
+[shell-retention contract](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberWorkLoop.js#L1356-L1369).
+`isPending` stays true until the transition completes or is superseded. Initial
+boundaries and newly added nested boundaries may show their fallbacks: there is
+no previously visible content for those boundaries to preserve.
+
+`setTransitionFallbackTimeout(ms)` is an Octane extension for applications that
+want a finite deadline. After that deadline, the pending fallback replaces the
+visible primary while `isPending` remains true. `getTransitionFallbackTimeout()`
+returns `Infinity` by default; setting `Infinity` restores the no-timeout policy
+for subsequent holds.
+
 `flushSync` drains both priorities but leaves passive effects asynchronous:
 
 ```tsx
@@ -693,6 +706,26 @@ Other consequences:
   general commit deferral.
 - Fallback-visible boundaries whose retries fully stage reveal together,
   including refs and layout effects.
+- Retry-only Suspense reveals follow React's shared 300ms fallback window.
+  Showing or filling a fallback advances the window, and retries wait if more
+  than 10ms remains. Urgent updates and active `act()` scopes bypass this delay.
+  A committed fallback inside hidden Activity contributes to the window;
+  toggling Activity visibility alone does not.
+  This is separate from the indefinite transition hold above; see
+  [Suspense retry timing](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#5-retry-reveal-throttling--distinct-from-transition-shell-retention).
+- Resource readers can suspend by throwing a thenable during render inside an
+  enclosing Suspense/`@pending` boundary, on the client and during SSR; `use()` is
+  not required. Pending and error fallback renders can also suspend to an outer
+  boundary; promises thrown by effects remain application errors.
+  Client suspension **without** such a boundary remains a known
+  bug: the root unmounts instead of holding and retrying. This is tracked in
+  [issue #821](https://github.com/octanejs/octane/issues/821), not an intentional
+  divergence.
+- Incomplete descriptor retries can still reveal stale content
+  ([issue #825](https://github.com/octanejs/octane/issues/825)), and some ordinary
+  first-mount/parent-driven catches omit `onCaughtError`
+  ([issue #824](https://github.com/octanejs/octane/issues/824)). These are verified
+  pre-existing bugs, not intentional React differences.
 - Same-identity synchronous rendering remains per-swap rather than using a
   global React-style work-in-progress tree. See
   [Suspense divergence #4](../packages/octane/audit/SUSPENSE_DIVERGENCE.md).

@@ -2619,8 +2619,25 @@ interface OffscreenCapture {
 	// lands must not mutate a committed inst (its inst is fresh anyway, per the
 	// fresh-block render, so dropping is both correct and cheap).
 	stores: StoreInst<any>[];
+	/** Suspense visibility changes become recent only when this capture commits. */
+	suspenseCommits?: Set<TrySlot>;
+	/** Speculative renderer transactions are released only after commit or discard. */
+	renderCleanups?: Array<() => void>;
 }
 let WIP_CAPTURE: OffscreenCapture | null = null;
+
+/** @internal Preserve the owning renderer's scheduler without racing a staged commit. */
+export function scheduleRenderCleanup(
+	schedule: (callback: () => void) => void,
+	receiver: unknown,
+	cleanup: () => void,
+): void {
+	if (WIP_CAPTURE === null) {
+		schedule.call(receiver, cleanup);
+	} else {
+		(WIP_CAPTURE.renderCleanups ??= []).push(() => schedule.call(receiver, cleanup));
+	}
+}
 
 function createOffscreenCapture(): OffscreenCapture {
 	return {
@@ -3941,11 +3958,10 @@ function drainRefDetaches(): void {
 			// A throwing ref detach must not abort the commit (the remaining detaches
 			// + attaches still run) — route to the deletion's boundary like React,
 			// reporting through the owning root's callbacks either way.
-			const handler = q[i + 2] as ((e: any) => void) | null;
+			const handler = q[i + 2] as TryHandler | null;
 			const owner = q[i + 3] as Block | null;
 			if (handler !== null) {
-				handler(err);
-				reportCaughtError(owner, err);
+				reportCaughtError(owner, err, handler(err));
 			} else if (!reportUncaughtError(owner, err)) console.error(err);
 		}
 	}
@@ -3981,8 +3997,7 @@ function drainRefAttaches(): void {
 			if (err instanceof MaximumUpdateDepthError) throw err;
 			const handler = findTryHandler(r.block);
 			if (handler) {
-				handler(err);
-				reportCaughtError(r.block, err);
+				reportCaughtError(r.block, err, handler(err));
 			} else if (!reportUncaughtError(r.block, err)) console.error(err);
 		}
 	}
@@ -4334,8 +4349,7 @@ function fireEffectCleanup(e: PendingEffect): void {
 			if (err instanceof MaximumUpdateDepthError) throw err;
 			const handler = findTryHandler(e.scope.block);
 			if (handler) {
-				handler(err);
-				reportCaughtError(e.scope.block, err);
+				reportCaughtError(e.scope.block, err, handler(err));
 			} else if (!reportUncaughtError(e.scope.block, err)) console.error(err);
 		}
 	}
@@ -4365,8 +4379,7 @@ function runEffectBody(e: PendingEffect): void {
 		// Route effect errors to the nearest enclosing tryBlock, if any.
 		const handler = findTryHandler(e.scope.block);
 		if (handler) {
-			handler(err);
-			reportCaughtError(e.scope.block, err);
+			reportCaughtError(e.scope.block, err, handler(err));
 		} else if (!reportUncaughtError(e.scope.block, err)) console.error(err);
 		return;
 	}
@@ -4511,7 +4524,7 @@ function drainEffectEventCommitActions(): void {
 // in deletion-walk order (parent→child, declaration order within a scope);
 // the captured handler routes a late throw to the try boundary that enclosed
 // the deletion — the same routing reportTeardownError gave the sync destroys.
-const pendingPassiveUnmounts: Array<Cleanup | ((err: any) => void) | Block | null> = [];
+const pendingPassiveUnmounts: Array<Cleanup | TryHandler | Block | null> = [];
 
 function drainDeferredPassiveUnmounts(): void {
 	if (pendingPassiveUnmounts.length === 0) return;
@@ -4521,11 +4534,10 @@ function drainDeferredPassiveUnmounts(): void {
 			runEffectCleanupCallback(q[i] as Cleanup);
 		} catch (err) {
 			if (err instanceof MaximumUpdateDepthError) throw err;
-			const handler = q[i + 1] as ((err: any) => void) | null;
+			const handler = q[i + 1] as TryHandler | null;
 			const owner = q[i + 2] as Block | null;
 			if (handler !== null) {
-				handler(err);
-				reportCaughtError(owner, err);
+				reportCaughtError(owner, err, handler(err));
 			} else if (!reportUncaughtError(owner, err)) console.error(err);
 		}
 	}
@@ -4996,6 +5008,19 @@ function renderBlockInner(block: Block): void {
 		(block as any).__thenableDone = true;
 	} catch (error) {
 		profileDidThrow = true;
+		// Resource readers may throw a wakeable directly instead of calling use().
+		// Normalize only render throws: a promise thrown by an effect or cleanup
+		// is still an application error, not a request to suspend that commit.
+		if (error !== null && typeof error === 'object') {
+			try {
+				if (typeof (error as any).then === 'function') {
+					error = new SuspenseException(error as TrackedThenable);
+				}
+			} catch {
+				// Error values are opaque. A throwing accessor must not replace the
+				// original application error merely because it is not a wakeable.
+			}
+		}
 		profileThrown = error;
 		throw error;
 	} finally {
@@ -5381,7 +5406,7 @@ export function componentSlotLite<P>(
 // queueRefDetach captures the live handler per entry, so a commit-time ref
 // detach throw (drainRefDetaches) routes to the same boundary.
 let TEARDOWN_DEPTH = 0;
-let TEARDOWN_HANDLER: ((err: any) => void) | null = null;
+let TEARDOWN_HANDLER: TryHandler | null = null;
 /** The outermost deleted block — root-callback routing for teardown errors. */
 let TEARDOWN_BLOCK: Block | null = null;
 let TEARDOWN_ERRORS: any[] | null = null;
@@ -5400,8 +5425,7 @@ function dispatchTeardownErrors(): void {
 	TEARDOWN_BLOCK = null;
 	if (errs !== null && h !== null) {
 		for (let i = 0; i < errs.length; i++) {
-			h(errs[i]);
-			reportCaughtError(blk, errs[i]);
+			reportCaughtError(blk, errs[i], h(errs[i]));
 		}
 	}
 }
@@ -5852,23 +5876,22 @@ interface LinkedStateSlot<Source, Value> {
 
 type LinkedStateTuple<Value> = [Value, StateSetter<Value>, () => Value];
 
-// A sibling may finish rendering before another sibling suspends their shared
-// boundary. Keep its finished linked-state publication with that boundary: its
-// body may bail when the preserved primary reveals, so relying on a fresh hook
-// call would leave its committed getter behind the already-rendered DOM.
-let LINKED_STATE_REVEAL_ACTIONS: WeakMap<TrySlot, Array<() => void>> | null = null;
+// A sibling may finish before another sibling suspends their shared boundary.
+// Keep linked-state publication and caught-error reports with that boundary:
+// their completed bodies may bail when the preserved primary finally reveals.
+let SUSPENSE_REVEAL_ACTIONS: WeakMap<TrySlot, Array<() => void>> | null = null;
 
-function deferLinkedStateReveal(boundary: TrySlot, action: () => void): void {
-	const deferred = (LINKED_STATE_REVEAL_ACTIONS ??= new WeakMap());
+function deferSuspenseRevealAction(boundary: TrySlot, action: () => void): void {
+	const deferred = (SUSPENSE_REVEAL_ACTIONS ??= new WeakMap());
 	const actions = deferred.get(boundary);
 	if (actions === undefined) deferred.set(boundary, [action]);
 	else actions.push(action);
 }
 
-function publishLinkedStateReveal(boundary: TrySlot): void {
-	const actions = LINKED_STATE_REVEAL_ACTIONS?.get(boundary);
+function publishSuspenseRevealActions(boundary: TrySlot): void {
+	const actions = SUSPENSE_REVEAL_ACTIONS?.get(boundary);
 	if (actions === undefined) return;
-	LINKED_STATE_REVEAL_ACTIONS!.delete(boundary);
+	SUSPENSE_REVEAL_ACTIONS!.delete(boundary);
 	for (let i = 0; i < actions.length; i++) enqueueEffectEventCommitAction(actions[i]);
 }
 
@@ -5922,7 +5945,7 @@ export function useLinkedState<Source, Value>(
 						const publish = state!.renderPublish;
 						if (hiddenBoundary !== null && publish !== undefined) {
 							state!.renderParked = true;
-							deferLinkedStateReveal(hiddenBoundary, publish);
+							deferSuspenseRevealAction(hiddenBoundary, publish);
 							updatingParkedDraft = true;
 						}
 					}
@@ -6029,7 +6052,7 @@ export function useLinkedState<Source, Value>(
 		const hiddenBoundary = findSuspenseHiddenTry(block);
 		if (hiddenBoundary !== null) {
 			current.renderParked = true;
-			deferLinkedStateReveal(hiddenBoundary, publish);
+			deferSuspenseRevealAction(hiddenBoundary, publish);
 			return;
 		}
 		current.source = current.renderSource as Source;
@@ -7628,7 +7651,8 @@ function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
 			return;
 		}
 		state.hydrated = true;
-		useEffect(() => notifyHydrateBoundary(state), [state], HYDRATE_NOTIFY_SLOT);
+		// Runtime-owned effect bodies receive their dependency tuple as arguments.
+		useEffect(notifyHydrateBoundary as EffectFn, [state, scope], HYDRATE_NOTIFY_SLOT);
 	};
 	const pendingBody: ComponentBody = (_props, scope) => {
 		childSlot(scope, 0, scope.block.parentNode, state.props.fallback, scope.block.endMarker);
@@ -8390,8 +8414,32 @@ function cloneHydrationTouchEvent(
 	});
 }
 
-function notifyHydrateBoundary(state: HydrateSlot): void {
-	if (state.didNotify || !state.hydrated) return;
+function notifyHydrateBoundary(state: HydrateSlot, scope: Scope): void {
+	if (state.block.disposed || state.didNotify || !state.hydrated) return;
+	const retryBatch = suspenseRetryBatchForSubtree(state.block);
+	if (retryBatch !== null) {
+		// A client fallback can finish adoption before its already-ready primary
+		// commits. Replaying captured intent now would dispatch into that fallback
+		// and lose the interaction. Wait for this subtree's retry (or supersession),
+		// then replay this same passive effect after the revealed child's effects.
+		// Use the slot's effective key, including any custom-hook namespace.
+		const effect = scope.effectSlots!.find((entry) => entry.connectedFn === notifyHydrateBoundary)!;
+		(retryBatch.afterCommit ??= []).push(() => {
+			if (scope.block.disposed || state.didNotify || !effect.active) return;
+			effectQueues[PASSIVE].push({
+				scope,
+				slot: effect.slot,
+				fn: effect.connectedFn!,
+				order: effect.order,
+				revision: effect.revision,
+				args: effect.connectedArgs,
+				phase: PASSIVE,
+				seq: commitSeq++,
+			});
+			if (!passiveScheduled) schedulePassiveFlush();
+		});
+		return;
+	}
 	state.didNotify = true;
 	// Keep intent capture alive while an asynchronously split child loads. A
 	// pointerdown commonly requests hydration before the browser dispatches the
@@ -17905,6 +17953,19 @@ function spliceOffscreenCapture(capture: OffscreenCapture): void {
 	// live queue so the surrounding commit's drainStoreSyncs reconciles them.
 	const storeTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.stores : storeSyncQueue;
 	for (let i = 0; i < capture.stores.length; i++) storeTarget.push(capture.stores[i]);
+	if (capture.suspenseCommits !== undefined) {
+		for (const state of capture.suspenseCommits) recordSuspenseCommit(state);
+	}
+	const cleanups = capture.renderCleanups;
+	if (cleanups !== undefined) {
+		capture.renderCleanups = undefined;
+		if (WIP_CAPTURE !== null) {
+			const target = (WIP_CAPTURE.renderCleanups ??= []);
+			for (const cleanup of cleanups) target.push(cleanup);
+		} else {
+			for (const cleanup of cleanups) cleanup();
+		}
+	}
 }
 
 function spliceWipCapture(wip: OffscreenWip): void {
@@ -17915,6 +17976,11 @@ function spliceWipCapture(wip: OffscreenWip): void {
 function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	if (capture === null) return;
 	for (let i = 0; i < capture.stores.length; i++) capture.stores[i].queued = false;
+	const cleanups = capture.renderCleanups;
+	if (cleanups !== undefined) {
+		capture.renderCleanups = undefined;
+		for (const cleanup of cleanups) cleanup();
+	}
 }
 
 /** Move a completed WIP range after its ownership/capture has been published. */
@@ -21393,16 +21459,14 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 // ---------------------------------------------------------------------------
 
 /**
- * Transition-suspense fallback timeout — when a transition-priority render
- * suspends on an already-committed try block, we hold the prior DOM but
- * eventually swap to the @pending fallback after this many milliseconds if
- * the promise still hasn't resolved. Matches React's "eventually shows
- * fallback if transition takes too long" contract (default 5s).
+ * An already-visible transition shell stays mounted until its replacement is
+ * ready, matching React. Initial/new boundaries can still show their fallback.
  *
- * Configurable globally via `setTransitionFallbackTimeout(ms)`. Pass
- * Infinity to disable the fallback entirely (keep prior DOM indefinitely).
+ * `setTransitionFallbackTimeout(ms)` is an explicit Octane extension: a finite
+ * non-negative timeout opts into replacing held content with @pending. Infinity
+ * restores the default, with no timeout allocated for a held transition.
  */
-let TRANSITION_FALLBACK_TIMEOUT_MS = 5000;
+let TRANSITION_FALLBACK_TIMEOUT_MS = Infinity;
 
 export function setTransitionFallbackTimeout(ms: number): void {
 	TRANSITION_FALLBACK_TIMEOUT_MS = ms;
@@ -21410,6 +21474,180 @@ export function setTransitionFallbackTimeout(ms: number): void {
 
 export function getTransitionFallbackTimeout(): number {
 	return TRANSITION_FALLBACK_TIMEOUT_MS;
+}
+
+// React's retry-only commit heuristic is global, but its pending commits belong
+// to individual roots. Rendering a retry still happens promptly (including
+// discovering dependent requests); only publishing its completed work waits.
+const SUSPENSE_RETRY_THROTTLE_MS = 300;
+let mostRecentSuspenseCommit = -Infinity;
+interface SuspenseRetryError {
+	error: unknown;
+}
+interface SuspenseRetryBatch {
+	states: Map<TrySlot, OffscreenCapture | SuspenseRetryError | null>;
+	timer: ReturnType<typeof setTimeout> | null;
+	queued: boolean;
+	flushing: boolean;
+	/** Cold observers recheck readiness after a commit or a superseding render. */
+	afterCommit?: Array<() => void>;
+}
+const SUSPENSE_RETRIES = new Map<Block, SuspenseRetryBatch>();
+let flushingSuspenseRetries = false;
+
+function suspenseRetryRoot(block: Block): Block {
+	while (block.parentBlock !== null) block = block.parentBlock;
+	return block;
+}
+
+function suspenseRetryBatchForSubtree(block: Block): SuspenseRetryBatch | null {
+	if (SUSPENSE_RETRIES.size === 0) return null;
+	const batch = SUSPENSE_RETRIES.get(suspenseRetryRoot(block));
+	if (batch !== undefined) {
+		for (const state of batch.states.keys()) {
+			if (state.parentBlock === block || blockIsAncestorOf(block, state.parentBlock)) return batch;
+		}
+	}
+	return null;
+}
+
+function notifySuspenseRetryObservers(batch: SuspenseRetryBatch): void {
+	const observers = batch.afterCommit;
+	if (observers === undefined) return;
+	batch.afterCommit = undefined;
+	// Cancellation can happen mid-render. Observe its outcome only after that
+	// render's commit, and never retain abandoned Hydrate owners in a live batch.
+	queueMicrotask(() => {
+		for (const observer of observers) observer();
+	});
+}
+
+function releaseSuspenseRetryBatch(root: Block, batch: SuspenseRetryBatch): void {
+	if (batch.states.size !== 0 || batch.flushing) return;
+	if (batch.timer !== null) clearTimeout(batch.timer);
+	SUSPENSE_RETRIES.delete(root);
+	// No extra root walk on ordinary scheduled renders once the last pending
+	// retry commits or is canceled. The existing visibility driver owns the hook.
+	if (SUSPENSE_RETRIES.size === 0) SCHEDULED_VISIBILITY_DRIVER!.find = findHiddenRenderOwner;
+}
+
+function cancelSuspenseRetry(state: TrySlot): void {
+	if (SUSPENSE_RETRIES.size === 0) return;
+	const root = suspenseRetryRoot(state.parentBlock);
+	const batch = SUSPENSE_RETRIES.get(root);
+	if (batch === undefined || !batch.states.delete(state)) return;
+	releaseSuspenseRetryBatch(root, batch);
+	notifySuspenseRetryObservers(batch);
+}
+
+function scheduleSuspenseRetryBatch(root: Block, batch: SuspenseRetryBatch): void {
+	if (batch.queued || batch.flushing) return;
+	batch.queued = true;
+	queueMicrotask(() => {
+		batch.queued = false;
+		if (SUSPENSE_RETRIES.get(root) !== batch) return;
+		if (batch.timer !== null) clearTimeout(batch.timer);
+		batch.timer = null;
+		const remaining = mostRecentSuspenseCommit + SUSPENSE_RETRY_THROTTLE_MS - performance.now();
+		if (actScopeDepth !== 0 || remaining <= 10) {
+			flushSuspenseRetryBatch(root, batch);
+		} else {
+			// Do not recalculate at fire time: another root can commit a fallback
+			// meanwhile without postponing this root's already-scheduled reveal.
+			batch.timer = setTimeout(() => flushSuspenseRetryBatch(root, batch), remaining);
+		}
+	});
+}
+
+function queueSuspenseRetry(state: TrySlot, error?: SuspenseRetryError): void {
+	const root = suspenseRetryRoot(state.parentBlock);
+	let batch = SUSPENSE_RETRIES.get(root);
+	if (batch === undefined) {
+		batch = { states: new Map(), timer: null, queued: false, flushing: false };
+		SUSPENSE_RETRIES.set(root, batch);
+		SCHEDULED_VISIBILITY_DRIVER!.find = findHiddenOwnerWithSuspenseRetries;
+	}
+	batch.states.set(state, error ?? state.stagedCapture);
+	scheduleSuspenseRetryBatch(root, batch);
+}
+
+function findHiddenOwnerWithSuspenseRetries(
+	block: Block | null,
+	includeActivity: false,
+): TrySlot | null;
+function findHiddenOwnerWithSuspenseRetries(
+	block: Block | null,
+	includeActivity: true,
+): HiddenRenderOwner | null;
+function findHiddenOwnerWithSuspenseRetries(
+	block: Block | null,
+	includeActivity: boolean,
+): HiddenRenderOwner | null {
+	if (block !== null) {
+		const root = suspenseRetryRoot(block);
+		const batch = SUSPENSE_RETRIES.get(root);
+		// New work in THIS root supersedes its completed retry render, even if
+		// it only updates a sibling. Coalesce after the synchronous render, using
+		// the most recent visibility change; independent roots keep their timer.
+		if (batch !== undefined) scheduleSuspenseRetryBatch(root, batch);
+	}
+	return includeActivity ? findHiddenRenderOwner(block, true) : findHiddenRenderOwner(block, false);
+}
+
+function recordSuspenseCommit(state: TrySlot): void {
+	if (state.parentBlock.disposed) return;
+	if (WIP_CAPTURE !== null) {
+		(WIP_CAPTURE.suspenseCommits ??= new Set()).add(state);
+		return;
+	}
+	// A nested fallback inside an uncommitted Suspense primary is speculative.
+	// Hidden Activity is different: its committed fallbacks still advance React's
+	// retry window, even though Activity owns an additional visibility hide.
+	if (findSuspenseHiddenTry(state.parentBlock) !== null) return;
+	mostRecentSuspenseCommit = performance.now();
+}
+
+function flushSuspenseRetryBatch(root: Block, batch: SuspenseRetryBatch): void {
+	if (SUSPENSE_RETRIES.get(root) !== batch) return;
+	if (batch.timer !== null) clearTimeout(batch.timer);
+	batch.timer = null;
+	const run = (): void => {
+		if (SUSPENSE_RETRIES.get(root) !== batch) return;
+		batch.flushing = true;
+		const entries = [...batch.states].sort(([a], [b]) => compareStagedRevealDomOrder(a, b));
+		const previousDeferral = deferringStagedRevealEffects;
+		const previousFlushing = flushingSuspenseRetries;
+		deferringStagedRevealEffects = true;
+		flushingSuspenseRetries = true;
+		try {
+			for (const [state, capture] of entries) {
+				// Cleanup/ref callbacks can supersede or unmount a later sibling.
+				// Its old completed render must never publish over that newer work.
+				if (!batch.states.has(state) || batch.states.get(state) !== capture) continue;
+				batch.states.delete(state);
+				if (state.parentBlock.disposed || state.branch !== 2 || state.pendingThenable !== null)
+					continue;
+				if (capture !== null && 'error' in capture) {
+					// Preserve the failed attempt's exact reason. Re-rendering here
+					// could lose a one-shot error (e.g. a thenable subscription throw).
+					handleResumeError(state.tryBlock ?? state.parentBlock, capture.error);
+				} else {
+					if (capture !== null) rebaseOffscreenEffectSeq(capture);
+					commitResume(state);
+				}
+			}
+		} finally {
+			deferringStagedRevealEffects = previousDeferral;
+			flushingSuspenseRetries = previousFlushing;
+			batch.flushing = false;
+			releaseSuspenseRetryBatch(root, batch);
+			if (batch.states.size !== 0) scheduleSuspenseRetryBatch(root, batch);
+			if (!previousDeferral) commitEffects();
+			notifySuspenseRetryObservers(batch);
+		}
+	};
+	// The root's complete reveal is one view transition and one lifecycle commit.
+	if (VIEW_TRANSITION_DRIVER?.wrapResume(run) !== true) run();
 }
 
 interface HiddenDisplay {
@@ -21591,6 +21829,8 @@ function releaseHiddenText(text: Text, restore = true): void {
 // Keep Suspense-specific teardown out of the always-live generic slot walk.
 // The visible arm must still unmount before its preserved hidden primary.
 function teardownTrySlot(state: TrySlot, detachDom: boolean): void {
+	cancelSuspenseRetry(state);
+	SUSPENSE_REVEAL_ACTIONS?.delete(state);
 	if (state.block !== null) unmountBlock(state.block, detachDom);
 	discardOffscreenCapture(state.stagedCapture);
 	state.stagedCapture = null;
@@ -21611,11 +21851,9 @@ function teardownTrySlot(state: TrySlot, detachDom: boolean): void {
 		});
 		state.tryBlock = null;
 	}
-	abandonHeldTransition(state);
-	if (state.transitionTimeoutId !== null) {
-		clearTimeout(state.transitionTimeoutId);
-		state.transitionTimeoutId = null;
-	}
+	// Disposal releases the pending cue and held synchronous cells as well as
+	// group membership. Removing only the member strands later transitions.
+	releaseHeldTransition(state);
 	setTryBranch(state, -1);
 	state.block = null;
 }
@@ -21681,9 +21919,8 @@ interface TrySlot {
 	/**
 	 * Pending setTimeout id for the transition-suspense fallback. When a
 	 * transition-priority render suspends on an already-committed try block
-	 * we hold the prior DOM AND schedule a fallback swap so the user isn't
-	 * stuck with stale content forever. Matches React's "eventually shows
-	 * fallback" contract — see TRANSITION_FALLBACK_TIMEOUT_MS.
+	 * we hold the prior DOM. A fallback swap is scheduled only for the explicit
+	 * finite-timeout extension — see TRANSITION_FALLBACK_TIMEOUT_MS.
 	 *
 	 * Cleared (clearTimeout) on retry resolve, on switchToCatch, and on
 	 * scope teardown so we don't leak callbacks past the slot's lifetime.
@@ -22002,7 +22239,10 @@ export function errorBlock(
 		state.env,
 	);
 	body.idState = state.idState;
-	(body as any).$$tryHandler = (error: unknown) => switchErrorToCatch(state!, error);
+	(body as any).$$tryHandler = (error: unknown) => {
+		switchErrorToCatch(state!, error);
+		return state!.block;
+	};
 	state.block = body;
 	try {
 		renderBlock(body);
@@ -22078,6 +22318,7 @@ function switchErrorToCatch(
 			renderBlock(caught);
 		}
 	} catch (nextError) {
+		if (forwardFallbackSuspension(caught, nextError)) return;
 		const rethrowsReason = rejection && Object.is(nextError, caughtError);
 		if (state.block !== null) {
 			unmountBlock(state.block, !(adopting && rethrowsReason));
@@ -22196,7 +22437,7 @@ export function tryBlock(
 		// Parent props can supersede the promise that originally hid this body.
 		// Retry the preserved tree now so already-ready replacement data reveals
 		// immediately and a different suspension refreshes the resume listener.
-		attemptHiddenReveal(s);
+		attemptHiddenReveal(s, undefined, 'parent');
 		// The fresh attempt may still be pending. Keep the already-mounted fallback
 		// block (and its local state/focus), but render it with the latest helper and
 		// captured environment so fallback text and actions cannot lag the request.
@@ -22249,7 +22490,64 @@ export function tryBlock(
 	return s.reset;
 }
 
+function createTryBody(state: TrySlot, start: Node, end: Node): Block {
+	const block = createBlock(
+		'control-flow',
+		state.parentBlock,
+		state.domParent,
+		start,
+		end,
+		state.tryBody,
+		undefined,
+		state.env,
+	);
+	block.idState = state.idState;
+	(block as any).__trySlot = state;
+	(block as any).$$tryHandler = (error: unknown) => {
+		switchToCatch(state, error);
+		return state.block;
+	};
+	if (!state.propagateSuspense) {
+		(block as any).__suspenseHandler = (thenable: TrackedThenable<any>, sourceBlock: Block) => {
+			handleSuspense(state, thenable, sourceBlock);
+		};
+	}
+	state.tryBlock = block;
+	return block;
+}
+
+/** New inputs abandon an initial primary that has never committed, not its fallback. */
+function restartUncommittedTry(state: TrySlot): Block | null {
+	SUSPENSE_REVEAL_ACTIONS?.delete(state);
+	const old = state.tryBlock!;
+	const refs: SuspenseRefEntry[] = [];
+	collectVisibleSubtreeRefs(old, refs);
+	showTryBlock(state);
+	state.tryBlock = null;
+	// Neither these refs nor the primary's captured effects ever committed.
+	// Its hook registrations still need real teardown (e.g. transition listeners).
+	withRefDetachSuppression(refs, () => unmountBlock(old));
+	if (state.parentBlock.disposed || state.tryBlock !== null || state.branch !== 2) return null;
+	return mountHiddenTryBody(state);
+}
+
+/** A new primary can render speculatively without destroying its visible fallback. */
+function mountHiddenTryBody(state: TrySlot): Block {
+	const start = document.createComment('try-b');
+	const end = document.createComment('/try-b');
+	const anchor = state.block?.startMarker ?? state.end;
+	state.domParent.insertBefore(start, anchor);
+	state.domParent.insertBefore(end, anchor);
+	const block = createTryBody(state, start, end);
+	state.detachedRefs = [];
+	hideTryBlock(state);
+	return block;
+}
+
 function mountTry(state: TrySlot): void {
+	cancelSuspenseRetry(state);
+	SUSPENSE_REVEAL_ACTIONS?.delete(state);
+	const wasPending = state.branch === 2;
 	const hydration = activeHydration();
 	discardOffscreenCapture(state.stagedCapture);
 	state.stagedCapture = null;
@@ -22346,26 +22644,7 @@ function mountTry(state: TrySlot): void {
 			hydration.markFresh(bEnd);
 		}
 	}
-	const b = createBlock(
-		'control-flow',
-		state.parentBlock,
-		state.domParent,
-		bStart,
-		bEnd,
-		state.tryBody,
-		undefined,
-		state.env,
-	);
-	b.idState = state.idState;
-	(b as any).__trySlot = state;
-	// Register handlers so descendant effect/render errors can find us.
-	(b as any).$$tryHandler = (err: any) => switchToCatch(state, err);
-	if (!state.propagateSuspense) {
-		(b as any).__suspenseHandler = (thenable: TrackedThenable<any>, sourceBlock: Block) => {
-			handleSuspense(state, thenable, sourceBlock);
-		};
-	}
-	state.tryBlock = b;
+	const b = createTryBody(state, bStart, bEnd);
 	state.block = b;
 	// Install this boundary's streamed seed scope (if any) for the subtree render.
 	const prevSeeds = hydration?.seeds ?? null;
@@ -22377,6 +22656,7 @@ function mountTry(state: TrySlot): void {
 	try {
 		renderBlock(b);
 		state.hasResolved = true;
+		if (wasPending) recordSuspenseCommit(state);
 	} catch (err) {
 		// §6.3 control signal — bypass the local boundary (see the try-body
 		// re-render catch above); the renderer-region owner handles it.
@@ -22562,8 +22842,8 @@ function handleSuspense(
 	// `useSuspenseQuery` throw during setup BEFORE the descendant patches any of
 	// its JSX, so the committed nodes are not mid-mutated. attachResume tracks the
 	// new thenable and re-renders the held tryBlock at transition priority on
-	// resolve; the existing fallback timeout remains the safety valve for a
-	// never-resolving boundary.
+	// resolve. A finite fallback timeout, when explicitly configured, remains
+	// attached to the new suspended episode.
 	const isTransition = sourceBlock.currentRenderMode === 'transition';
 	if (
 		(isTransition || state.transitionHeld) &&
@@ -22588,12 +22868,11 @@ function handleSuspense(
 		// Join the entangled-transition group so its reveal is coordinated with any
 		// sibling boundaries suspended in the same transition (commit-barrier above).
 		enterHeldTransition(state);
-		// Schedule a fallback swap so the user isn't stuck forever staring at
-		// stale content when the transition's promise takes too long. The
+		// An explicitly configured finite timeout opts into a fallback swap. The
 		// counter stays held — `isPending` remains true through the fallback
 		// window because the transition is still in progress, semantically. On
 		// retry resolve, the timeout is cleared and the hidden tryBlock is
-		// revealed. Infinity → fallback never fires (legacy hold-forever).
+		// revealed. The default Infinity keeps the visible shell indefinitely.
 		//
 		// If the held content re-suspends on a DIFFERENT thenable (e.g. the
 		// transition changed the value to 2, holding on d2; then an urgent update
@@ -22668,16 +22947,17 @@ function handleSuspense(
  *     fallbacks — and ultimately the resolved content alongside a stuck fallback
  *     — in the DOM at once. The tryBlock is preserved separately (hiddenDom), so
  *     this never touches it.
- *  6. Mount the fresh @pending body between minted `pend-b` markers; a throw
- *     while rendering it unwinds to @catch via switchToCatch.
+ *  6. Mount the fresh @pending body between minted `pend-b` markers. Application
+ *     errors unwind to @catch; suspension belongs to an enclosing boundary.
  *
- * Returns false when the pending body threw and the boundary switched to @catch
- * — the caller must bail out (no resume wiring for a dead boundary).
+ * Returns false when the pending arm did not finish or its owner was replaced
+ * or disposed. Callers must not publish that fallback or wire a new resume.
  */
 function hideTryContentAndMountPending(
 	state: TrySlot,
 	resumeThenable?: TrackedThenable<any>,
 ): boolean {
+	const wasPending = state.branch === 2;
 	const hydration = activeHydration();
 	if (hydration !== null && !state.hasResolved && state.tryBlock !== null) {
 		// A suspension during the first hydration attempt has no committed client
@@ -22741,6 +23021,7 @@ function hideTryContentAndMountPending(
 	}
 	if (!mountPendingBody(state)) return false;
 	if (state.parentBlock.disposed || state.branch !== 2) return false;
+	if (!wasPending) recordSuspenseCommit(state);
 	// A custom thenable may synchronously invoke its listener. Install ownership
 	// only after the pending arm is coherent, then re-check for reentrant teardown.
 	if (resumeThenable !== undefined) attachResume(state, resumeThenable);
@@ -22770,6 +23051,7 @@ function mountPendingBody(state: TrySlot): boolean {
 		try {
 			renderBlock(b);
 		} catch (err) {
+			if (forwardFallbackSuspension(b, err)) return false;
 			if (state.block) {
 				unmountBlock(state.block);
 				state.block = null;
@@ -22799,6 +23081,7 @@ function refreshPendingBody(state: TrySlot): void {
 	try {
 		renderBlock(pendingBlock);
 	} catch (err) {
+		if (forwardFallbackSuspension(pendingBlock, err)) return;
 		unmountBlock(pendingBlock);
 		state.block = null;
 		switchToCatch(state, err);
@@ -22808,9 +23091,7 @@ function refreshPendingBody(state: TrySlot): void {
 /**
  * Hide the held tryBlock in place (preserving its hook state, DOM identity, and
  * browser-owned state in `hiddenDom`) and mount the @pending body after it. Used by the
- * transition-fallback timeout when a held transition runs over budget — by
- * that point the user has waited long enough that React (and we) commit the
- * fallback to give visual feedback. The retry path reveals hiddenDom on
+ * explicit transition-fallback timeout extension. The retry path reveals hiddenDom on
  * resolve, so this is recoverable. (The resume listener is already attached —
  * the hold began in handleSuspense — so unlike the suspend path there is no
  * attachResume here.)
@@ -22822,8 +23103,8 @@ function swapToPendingFallback(state: TrySlot): void {
 	if (!state.pendingBody || state.branch !== 1 || !state.tryBlock) return;
 	// Once the fallback shows, the held-whole contract is over for this
 	// boundary: write the staged screen forward now so the shell commits the
-	// new values alongside the fallback (what React shows after its own
-	// timeout), and the hidden primary retries against the data in flight.
+	// new values alongside the opted-in fallback, and the hidden primary retries
+	// against the data in flight.
 	if (HELD_SYNC_TRANSITION !== null && HELD_SYNC_TRANSITION.holders.has(state)) {
 		promoteHeldSyncTransition();
 	}
@@ -22844,6 +23125,7 @@ function swapToPendingFallback(state: TrySlot): void {
 function commitResume(state: TrySlot): void {
 	if (
 		!flushingStagedReveals &&
+		!flushingSuspenseRetries &&
 		VIEW_TRANSITION_DRIVER?.wrapResume(() => commitResumeInner(state)) === true
 	)
 		return;
@@ -22852,6 +23134,7 @@ function commitResume(state: TrySlot): void {
 
 function commitResumeInner(state: TrySlot): void {
 	if (state.parentBlock.disposed) return;
+	const wasPending = state.branch === 2;
 	const hiddenActivity = findHiddenActivity(state.parentBlock);
 	const wasHeld = state.transitionHeld;
 	if (wasHeld) state.transitionHeld = false;
@@ -22962,7 +23245,9 @@ function commitResumeInner(state: TrySlot): void {
 						if (isSuspenseException(renderError)) {
 							handleSuspense(state, renderError.thenable, tryBlock, journalCheckpoint);
 						} else {
-							switchToCatch(state, renderError);
+							// A resume runs outside the normal scheduler error drain. Use
+							// the same reporting path when its committed retry reaches catch.
+							handleResumeError(tryBlock, renderError);
 						}
 					} finally {
 						disarmTransitionJournal(journalCheckpoint);
@@ -22971,7 +23256,8 @@ function commitResumeInner(state: TrySlot): void {
 				}
 			}
 			if (state.branch === 1) {
-				publishLinkedStateReveal(state);
+				if (wasPending) recordSuspenseCommit(state);
+				publishSuspenseRevealActions(state);
 				// Reveal: re-attach the host refs detached on hide (same preserved nodes),
 				// before commitEffects fires recreated layout effects. Enumerating now
 				// ensures an aborted A→B hidden retry never resurrects stale ref A.
@@ -23267,26 +23553,39 @@ function queueCurrentHiddenRefs(state: TrySlot): void {
 	}
 }
 
-function attemptHiddenReveal(state: TrySlot, scheduledMode?: 'urgent' | 'transition'): void {
+function attemptHiddenReveal(
+	state: TrySlot,
+	scheduledMode?: 'urgent' | 'transition',
+	reason: 'update' | 'parent' | 'retry' = 'update',
+): void {
 	const hiddenActivity = findHiddenActivity(state.tryBlock);
+	const previousReplay = RESUME_REPLAY;
+	if (reason === 'retry') RESUME_REPLAY = true;
 	try {
-		attemptHiddenRevealInner(state, scheduledMode);
+		attemptHiddenRevealInner(state, scheduledMode, reason);
 	} finally {
+		RESUME_REPLAY = previousReplay;
 		if (hiddenActivity !== null) rehideActivityAfterDescendantRender(hiddenActivity);
 	}
 }
 
-function attemptHiddenRevealInner(state: TrySlot, scheduledMode?: 'urgent' | 'transition'): void {
-	const tryBlock = state.tryBlock;
+function attemptHiddenRevealInner(
+	state: TrySlot,
+	scheduledMode?: 'urgent' | 'transition',
+	reason: 'update' | 'parent' | 'retry' = 'update',
+): void {
+	const retryOnly = reason === 'retry';
+	let tryBlock = state.tryBlock;
 	if (tryBlock === null || tryBlock.disposed || state.hiddenDom === null) return;
 	// A nested boundary cannot reveal independently through an ancestor's hidden
 	// primary. Retry the outer transaction; its render will revisit this boundary
 	// and either reveal both atomically or keep the whole subtree hidden.
 	const hiddenAncestor = findSuspenseHiddenTry(tryBlock.parentBlock);
 	if (hiddenAncestor !== null) {
-		attemptHiddenRevealInner(hiddenAncestor, scheduledMode);
+		attemptHiddenRevealInner(hiddenAncestor, scheduledMode, reason);
 		return;
 	}
+	cancelSuspenseRetry(state);
 	// A fresh retry invalidates any readiness proved by an earlier attempt even
 	// when that attempt had no retained capture (e.g. an ordinary thenable settle
 	// added this boundary to STAGED_REVEALS). It becomes ready again only after the
@@ -23306,6 +23605,28 @@ function attemptHiddenRevealInner(state: TrySlot, scheduledMode?: 'urgent' | 'tr
 		discardOffscreenCapture(supersededCapture);
 		deactivateScope(tryBlock, false);
 	}
+	const effectDeps = snapshotSubtreeEffectDeps(tryBlock);
+	if (reason === 'parent' && !RESUME_REPLAY && !state.hasResolved) {
+		// A completed speculative retry still is not a mount. New props must
+		// initialize state/ref/memo/reducer hooks from the current inputs. Keep
+		// promise replays and updates from inside the primary intact: discarding
+		// a spawned deferred-value task would restart its initial preview forever.
+		let uncommitted = true;
+		for (const effect of effectDeps.keys()) {
+			// Insertion lifetimes can already own an external renderer root while
+			// its DOM primary is pending. Such a lifetime has actually committed
+			// and must survive retries just like other preserved mounted content.
+			if (effect.phase === INSERTION && effect.connectedFn !== null) {
+				uncommitted = false;
+				break;
+			}
+		}
+		if (uncommitted) {
+			tryBlock = restartUncommittedTry(state);
+			if (tryBlock === null) return;
+			effectDeps.clear();
+		}
+	}
 	showTryBlock(state);
 	tryBlock.body = state.tryBody;
 	tryBlock.extra = state.env;
@@ -23320,7 +23641,6 @@ function attemptHiddenRevealInner(state: TrySlot, scheduledMode?: 'urgent' | 'tr
 	// commit work even for urgent retries: a ref/effect can mount before a later
 	// sibling suspends, and must not leak while the fallback remains visible.
 	const hiddenCapture = createOffscreenCapture();
-	const effectDeps = snapshotSubtreeEffectDeps(tryBlock);
 	const previousCapture = WIP_CAPTURE;
 	const refDetachCheckpoint = refDetachQueue.length;
 	WIP_CAPTURE = hiddenCapture;
@@ -23352,8 +23672,16 @@ function attemptHiddenRevealInner(state: TrySlot, scheduledMode?: 'urgent' | 'tr
 			hideTryBlock(state);
 			tryBlock.inactive = true;
 			attachResume(state, thrown.thenable);
+		} else if (retryOnly) {
+			// A rejected wakeable or render error is still a retry-only commit.
+			// Keep its exact reason, error UI and report private until the budget
+			// expires. Newer urgent inputs can supersede the failed attempt.
+			hideTryBlock(state);
+			tryBlock.inactive = true;
+			state.pendingThenable = null;
+			queueSuspenseRetry(state, { error: thrown });
 		} else {
-			switchToCatch(state, thrown);
+			handleResumeError(tryBlock, thrown);
 			// A saved-DOM retry can run directly from a thenable microtask, outside
 			// the scheduler's normal render→commit drain. Its terminal catch arm is a
 			// real commit and must publish refs/effects now. Parent/drain-driven hidden
@@ -23369,20 +23697,35 @@ function attemptHiddenRevealInner(state: TrySlot, scheduledMode?: 'urgent' | 'tr
 	// primary again and stage its commit work in the same barrier used by
 	// thenable resumes. An urgent update remains a true supersession and takes
 	// the immediate reveal path below.
-	if (stagesHeldTransition) {
+	if (stagesHeldTransition || retryOnly) {
 		state.pendingThenable = null;
 		state.stagedCapture = hiddenCapture;
 		state.stagedEffectDeps = effectDeps;
 		hideTryBlock(state);
 		tryBlock.inactive = true;
-		STAGED_REVEALS.add(state);
-		queueMicrotask(flushStagedRevealsIfReady);
+		if (stagesHeldTransition) {
+			STAGED_REVEALS.add(state);
+			queueMicrotask(flushStagedRevealsIfReady);
+		} else {
+			queueSuspenseRetry(state);
+		}
 		return;
 	}
 	try {
 		// Success — reveal without the suspending promise ever resolving.
 		if (state.block !== null && state.block !== tryBlock) {
-			unmountBlock(state.block);
+			const fallback = state.block;
+			state.block = null;
+			unmountBlock(fallback);
+			if (
+				state.parentBlock.disposed ||
+				tryBlock.disposed ||
+				state.tryBlock !== tryBlock ||
+				state.block !== null
+			) {
+				discardOffscreenCapture(hiddenCapture);
+				return;
+			}
 		}
 		state.block = tryBlock;
 		setTryBranch(state, 1);
@@ -23391,7 +23734,8 @@ function attemptHiddenRevealInner(state: TrySlot, scheduledMode?: 'urgent' | 'tr
 		// settles, its retry sees a mismatched pendingThenable and no-ops.
 		state.pendingThenable = null;
 		spliceOffscreenCapture(hiddenCapture);
-		publishLinkedStateReveal(state);
+		recordSuspenseCommit(state);
+		publishSuspenseRevealActions(state);
 		queueCurrentHiddenRefs(state);
 		if (state.transitionTimeoutId !== null) {
 			clearTimeout(state.transitionTimeoutId);
@@ -23552,7 +23896,11 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 		if (persistent !== null && !persistent.disposed) {
 			const hiddenAncestor = findSuspenseHiddenTry(persistent.parentBlock);
 			if (hiddenAncestor !== null) {
-				attemptHiddenReveal(hiddenAncestor, persistent.pendingMode ?? 'urgent');
+				attemptHiddenReveal(
+					hiddenAncestor,
+					HELD_TRANSITIONS.has(hiddenAncestor) ? 'transition' : 'urgent',
+					HELD_TRANSITIONS.has(hiddenAncestor) ? 'update' : 'retry',
+				);
 				return;
 			}
 		}
@@ -23575,7 +23923,17 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 			flushStagedReveals();
 			return;
 		}
-		commitResume(state);
+		if (state.branch === 2 && (state.tryBlock === null || state.tryBlock.disposed)) {
+			// Failed initial adoption discarded its primary. Start client recovery
+			// now, including dependent data discovery, but retain the fallback until
+			// the completed retry can commit under the same root-owned budget.
+			mountHiddenTryBody(state);
+		}
+		if (state.hiddenDom !== null) {
+			attemptHiddenReveal(state, 'urgent', 'retry');
+		} else {
+			commitResume(state);
+		}
 	};
 	thenable.then(retry, retry);
 }
@@ -24168,7 +24526,23 @@ function requestReset(state: TrySlot | ErrorSlot): void {
 	scheduleRender(state.parentBlock);
 }
 
+/** A suspending fallback belongs to the outer boundary, not its own catch arm. */
+function forwardFallbackSuspension(fallbackBlock: Block, error: unknown): boolean {
+	if (!isSuspenseException(error)) return false;
+	// Preserve the fallback's block and hooks so the enclosing Suspense can hide
+	// and retry it. Only an application error tears down a failed fallback.
+	// Unwind active render frames before an outer boundary changes their DOM;
+	// detached retries and finite-timeout fallbacks have no render stack to unwind.
+	if (CURRENT_BLOCK !== null) throw error;
+	// Fallback blocks have no handlers of their own. Start from the block that
+	// actually rendered, so a timeout does not inherit an old transition priority.
+	handleResumeError(fallbackBlock, error);
+	return true;
+}
+
 function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd?: Node): void {
+	cancelSuspenseRetry(state);
+	SUSPENSE_REVEAL_ACTIONS?.delete(state);
 	const hydration = activeHydration();
 	discardOffscreenCapture(state.stagedCapture);
 	state.stagedCapture = null;
@@ -24299,6 +24673,7 @@ function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd
 		if (!adopting && hydration !== null) hydration.suspend(() => renderBlock(b));
 		else renderBlock(b);
 	} catch (e2) {
+		if (forwardFallbackSuspension(b, e2)) return;
 		// Catch body itself threw — bubble to next enclosing tryBlock.
 		const rethrowsHydrationReason = hydrationRejection && Object.is(e2, caughtError);
 		const preserveAdoptedRange = adopting && rethrowsHydrationReason;
@@ -24332,13 +24707,18 @@ function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd
 	}
 }
 
+/** DOM handlers return their own surviving catch block; external bridges return void. */
+type TryHandler = (err: any) => Block | null | void;
+
 /** Walk Block.parentBlock chain looking for a `$$tryHandler` registration. */
-function findTryHandler(block: Block | null): ((err: any) => void) | null {
+function findTryHandler(block: Block | null): TryHandler | null {
 	const origin = block;
 	let b: Block | null = block;
 	while (b) {
 		const h = (b as any).$$tryHandler;
-		if (h) return h;
+		// Suspense-only slots route wakeables, but do not claim application errors.
+		// Skipping them also keeps root error reporting on the uncaught channel.
+		if (h && (b as any).__trySlot?.catchBody !== null) return h;
 		b = b.parentBlock;
 	}
 	return rendererRegionTryHandler(origin);
@@ -24380,9 +24760,21 @@ function handleRenderError(block: Block, err: any): void {
 	}
 	const h = findTryHandler(block);
 	if (h) {
-		h(err);
-		reportCaughtError(block, err);
+		reportCaughtError(block, err, h(err));
 	} else throw err;
+}
+
+/** A detached retry has no scheduler drain to report and dispose a failed root. */
+function handleResumeError(block: Block, error: unknown): void {
+	try {
+		handleRenderError(block, error);
+	} catch (unhandled) {
+		// Parent-driven retries still unwind through their normal render owner.
+		if (CURRENT_BLOCK !== null || inFlush) throw unhandled;
+		const root = suspenseRetryRoot(block);
+		if (!reportUncaughtError(block, unhandled)) console.error(unhandled);
+		if (root.kind === 'root' && !root.disposed) unmountBlock(root);
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -25203,8 +25595,7 @@ function hideActivityRefs(activity: ActivitySlot): void {
 				if (err instanceof MaximumUpdateDepthError) throw err;
 				const handler = findTryHandler(entry.scope.block);
 				if (handler !== null) {
-					handler(err);
-					reportCaughtError(entry.scope.block, err);
+					reportCaughtError(entry.scope.block, err, handler(err));
 				} else if (!reportUncaughtError(entry.scope.block, err)) console.error(err);
 			}
 		}
@@ -28129,9 +28520,30 @@ function invokeRootErrorHandler(handler: (error: unknown) => void, err: unknown)
 }
 
 /** Report a boundary-claimed error to the owning root's onCaughtError, if any. */
-function reportCaughtError(block: Block | null, err: unknown): void {
+function reportCaughtError(block: Block | null, err: unknown, caught?: Block | null | void): void {
 	const h = rootErrorHandlersFor(block)?.onCaughtError;
-	if (h !== undefined) invokeRootErrorHandler(h, err);
+	if (h === undefined || caught === null || caught?.disposed) return;
+	if (caught !== undefined) {
+		const hiddenBoundary = findSuspenseHiddenTry(caught);
+		if (hiddenBoundary !== null) {
+			// An error fallback is still render work and may itself suspend. Its
+			// report belongs to the fallback's eventual commit, not to this attempt.
+			// Reuse the boundary reveal queue so a memoized fallback need not render
+			// again, and an abandoned or unmounted catch never reports its old error.
+			const publish = () => {
+				if (caught.disposed) return;
+				const stillHidden = findSuspenseHiddenTry(caught);
+				if (stillHidden !== null) {
+					deferSuspenseRevealAction(stillHidden, publish);
+					return;
+				}
+				invokeRootErrorHandler(h, err);
+			};
+			deferSuspenseRevealAction(hiddenBoundary, publish);
+			return;
+		}
+	}
+	invokeRootErrorHandler(h, err);
 }
 
 /** True when the owning root's onUncaughtError consumed the report (callers skip their default). */

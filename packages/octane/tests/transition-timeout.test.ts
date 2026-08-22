@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, act } from './_helpers';
-import { setTransitionFallbackTimeout, getTransitionFallbackTimeout } from '../src/index.js';
+import {
+	startTransition,
+	setTransitionFallbackTimeout,
+	getTransitionFallbackTimeout,
+} from '../src/index.js';
 import {
 	TimedEntangledSupersession,
 	TimedHiddenDependentGroup,
@@ -8,8 +12,16 @@ import {
 	TimedHiddenRejection,
 	TimedNestedRefOrder,
 	TimedResumeEffectRollback,
+	TimedSuspendingFallback,
 	TimeoutFallback,
+	TransitionAddsNestedBoundary,
 } from './_fixtures/transition-timeout.tsrx';
+import { BasicSuspense } from './_fixtures/suspense.tsrx';
+import {
+	StandaloneStartTransition,
+	TransitionBasics,
+	UrgentSupersedesTransition,
+} from './_fixtures/transitions.tsrx';
 
 interface Deferred<T> {
 	promise: Promise<T>;
@@ -32,9 +44,65 @@ function fulfilled<T>(value: T): Promise<T> & { status: string; value: T } {
 	return promise;
 }
 
-// Pins the lifecycle a transition goes through when its promise outlives the
-// fallback budget. Uses Vitest's fake-timer rig to advance the clock past
-// the threshold deterministically.
+async function expectStandaloneTransitionHold(kind: 'root.render' | 'useState'): Promise<void> {
+	const first = deferred<string>();
+	const second = deferred<string>();
+	const third = deferred<string>();
+	const valueSelector = kind === 'root.render' ? '.resolved' : '#value';
+	const fallbackSelector = kind === 'root.render' ? '.fallback' : '#fallback';
+	let r!: ReturnType<typeof mount>;
+	startTransition(() => {
+		r =
+			kind === 'root.render'
+				? mount(BasicSuspense, { promise: first.promise })
+				: mount(StandaloneStartTransition, {
+						initialPromise: first.promise,
+						nextPromise: second.promise,
+					});
+	});
+	try {
+		await act(() => vi.advanceTimersByTime(400));
+		expect(r.findAll(fallbackSelector)).toHaveLength(1);
+		await act(() => first.resolve('first'));
+		const content = r.find(valueSelector) as HTMLElement;
+		expect(content.textContent).toBe('first');
+
+		for (const step of [
+			{ resource: second, elapsed: [2_999, 97_001], previous: 'first', next: 'second' },
+			{ resource: third, elapsed: [100_000], previous: 'second', next: 'third' },
+		]) {
+			await act(() => {
+				if (kind === 'root.render') {
+					startTransition(() => r.update(BasicSuspense, { promise: step.resource.promise }));
+				} else {
+					r.update(StandaloneStartTransition, {
+						initialPromise: first.promise,
+						nextPromise: step.resource.promise,
+					});
+					r.click('#swap');
+				}
+			});
+			for (const elapsed of step.elapsed) {
+				await act(() => vi.advanceTimersByTime(elapsed));
+				expect(r.findAll(fallbackSelector)).toHaveLength(0);
+				expect(r.find(valueSelector)).toBe(content);
+				expect(content.isConnected).toBe(true);
+				expect(content.style.display).toBe('');
+				expect(content.textContent).toBe(step.previous);
+			}
+
+			await act(() => step.resource.resolve(step.next));
+			expect(r.findAll(fallbackSelector)).toHaveLength(0);
+			expect(r.find(valueSelector)).toBe(content);
+			expect(content.textContent).toBe(step.next);
+		}
+	} finally {
+		r.unmount();
+	}
+}
+
+// The default transition hold has no time limit. A finite fallback timeout is
+// an opt-in extension, covered with the same visible DOM and pending lifecycle.
 describe('useTransition — transition-timeout fallback', () => {
 	beforeEach(() => {
 		vi.useFakeTimers({ shouldAdvanceTime: false });
@@ -43,10 +111,66 @@ describe('useTransition — transition-timeout fallback', () => {
 		vi.useRealTimers();
 	});
 
+	it('shows outer Suspense immediately when a finite-timeout fallback suspends', async () => {
+		const previousTimeout = getTransitionFallbackTimeout();
+		setTransitionFallbackTimeout(100);
+		const primary = deferred<string>();
+		const fallback = deferred<string>();
+		let fallbackReady = false;
+		const readFallback = () => {
+			if (!fallbackReady) throw fallback.promise;
+			return 'inner loading';
+		};
+		const r = mount(TimedSuspendingFallback, {
+			promise: fulfilled('first'),
+			readFallback,
+		});
+		try {
+			const leaf = r.find('.leaf') as HTMLElement;
+			expect(leaf.textContent).toBe('first');
+			expect(leaf.style.display).toBe('');
+			await act(() => {
+				startTransition(() => {
+					r.update(TimedSuspendingFallback, { promise: primary.promise, readFallback });
+				});
+			});
+			await vi.advanceTimersByTimeAsync(99);
+			expect(r.find('.leaf')).toBe(leaf);
+			expect(leaf.style.display).toBe('');
+			expect(r.findAll('#timed-outer-fallback')).toHaveLength(0);
+
+			// The timeout runs outside a render stack. Once the inner primary is
+			// hidden, its suspending fallback must not start another transition hold
+			// on that now-blank subtree; the outer fallback is urgent at this deadline.
+			await vi.advanceTimersByTimeAsync(1);
+			expect(r.find('#timed-outer-fallback').textContent).toBe('outer loading');
+			expect(leaf.isConnected).toBe(true);
+			expect(leaf.style.display).toBe('none');
+			expect(r.findAll('#timed-inner-fallback')).toHaveLength(0);
+
+			await act(() => {
+				fallbackReady = true;
+				fallback.resolve('inner loading');
+			});
+			expect(r.findAll('#timed-outer-fallback')).toHaveLength(0);
+			expect(r.find('#timed-inner-fallback').textContent).toBe('inner loading');
+			expect(leaf.style.display).toBe('none');
+
+			await act(() => primary.resolve('second'));
+			expect(r.findAll('#timed-outer-fallback')).toHaveLength(0);
+			expect(r.findAll('#timed-inner-fallback')).toHaveLength(0);
+			expect(r.find('.leaf')).toBe(leaf);
+			expect(leaf.style.display).toBe('');
+			expect(leaf.textContent).toBe('second');
+		} finally {
+			r.unmount();
+			setTransitionFallbackTimeout(previousTimeout);
+		}
+	});
+
 	it('eventually swaps to @pending after the configured timeout AND restores try DOM on resolve', async () => {
-		// Mirrors ReactSuspenseWithNoopRenderer-test.js "eventually shows fallback
-		// if transition takes too long". Set the timeout to 100ms so the test
-		// doesn't have to fake-advance 5 real seconds; the contract is identical.
+		// OCTANE DIVERGENCE: applications can opt into a finite fallback timeout;
+		// React's default transition shell retention has no such deadline.
 		const prevTimeout = getTransitionFallbackTimeout();
 		setTransitionFallbackTimeout(100);
 		try {
@@ -187,46 +311,204 @@ describe('useTransition — transition-timeout fallback', () => {
 		}
 	});
 
-	it('setTransitionFallbackTimeout(Infinity) keeps the prior DOM forever (legacy hold)', async () => {
-		// The opt-out path: setting the timeout to Infinity means the runtime
-		// NEVER swaps to fallback. Useful for tests / UIs that prefer staleness
-		// over visual disruption.
-		const prevTimeout = getTransitionFallbackTimeout();
-		setTransitionFallbackTimeout(Infinity);
+	it('keeps already-visible content throughout a slow transition by default', async () => {
+		// Per ReactSuspenseWithNoopRenderer-test.js:2570-2624 at
+		// 6117d7cca4906492c51fe6a03381e35adfd86e7d. Elapsed time alone cannot
+		// replace already-visible UI, including after 100000ms.
+		const next = deferred<string>();
+		const readyRef = { current: null as Element | null };
+		const r = mount(TimeoutFallback, {
+			initialPromise: fulfilled('first'),
+			nextPromise: next.promise,
+			readyRef,
+			readyValue: 'second',
+		});
 		try {
-			const initial = deferred<string>();
-			initial.resolve('first');
-			const next = deferred<string>();
-			const r = mount(TimeoutFallback, {
-				initialPromise: initial.promise,
-				nextPromise: next.promise,
-			});
 			await act(() => {});
+			const leaf = r.find('.leaf') as HTMLElement;
 			await act(() => {
 				r.click('#swap');
 			});
-			expect(r.find('.leaf').textContent).toBe('first');
+			expect(r.find('.leaf')).toBe(leaf);
+			expect(leaf.textContent).toBe('first');
 			expect(r.find('#pending').textContent).toBe('1');
 
-			// Advance time WAY past where any sensible timeout would fire.
-			await act(() => {
-				vi.advanceTimersByTime(60_000);
-			});
-			expect(r.findAll('#fallback')).toHaveLength(0);
-			expect(r.find('.leaf').textContent).toBe('first');
-			expect(r.find('#pending').textContent).toBe('1');
+			for (const elapsed of [5_000, 95_000]) {
+				await act(() => vi.advanceTimersByTime(elapsed));
+				expect(r.findAll('#fallback')).toHaveLength(0);
+				expect(r.find('.leaf')).toBe(leaf);
+				expect(leaf.isConnected).toBe(true);
+				expect(leaf.style.display).toBe('');
+				expect(leaf.textContent).toBe('first');
+				expect(readyRef.current).toBeNull();
+				expect(r.find('#pending').textContent).toBe('1');
+			}
 
 			// Eventually resolve — content swaps in cleanly.
 			await act(() => {
 				next.resolve('second');
 			});
-			expect(r.find('.leaf').textContent).toBe('second');
+			expect(r.findAll('#fallback')).toHaveLength(0);
+			expect(r.find('.leaf')).toBe(leaf);
+			expect(leaf.textContent).toBe('second');
+			expect(readyRef.current).toBe(leaf);
 			expect(r.find('#pending').textContent).toBe('0');
-			r.unmount();
 		} finally {
-			setTransitionFallbackTimeout(prevTimeout);
+			r.unmount();
 		}
 	});
+
+	it('standalone startTransition holds root.render content through 100000ms and resolves', async () => {
+		// ReactSuspenseWithNoopRenderer-test.js:2409, "top level render", at
+		// 6117d7cca4906492c51fe6a03381e35adfd86e7d. The source is legacy-cache-gated;
+		// ReactFiberWorkLoop.js:1356-1369 independently establishes the public hold.
+		await expectStandaloneTransitionHold('root.render');
+	});
+
+	it('standalone startTransition holds useState content through 100000ms and resolves', async () => {
+		// ReactSuspenseWithNoopRenderer-test.js:2453, "hooks", at the same pin.
+		// Exercise the standalone function around a state setter, not useTransition.
+		await expectStandaloneTransitionHold('useState');
+	});
+
+	it('lets an urgent update supersede a long-held transition without a late fallback', async () => {
+		const next = deferred<string>();
+		const r = mount(UrgentSupersedesTransition, {
+			initialPromise: fulfilled('first'),
+			transitionPromise: next.promise,
+			urgentPromise: fulfilled('urgent'),
+		});
+		try {
+			await act(() => r.click('#swap-trans'));
+			await act(() => vi.advanceTimersByTime(100_000));
+			expect(r.find('#value').textContent).toBe('first');
+			expect(r.findAll('#fallback')).toHaveLength(0);
+			expect(r.find('#pending').textContent).toBe('1');
+
+			await act(() => r.click('#swap-urgent'));
+			expect(r.find('#value').textContent).toBe('urgent');
+			expect(r.find('#pending').textContent).toBe('0');
+
+			await act(() => {
+				next.resolve('superseded');
+				vi.advanceTimersByTime(100_000);
+			});
+			expect(r.find('#value').textContent).toBe('urgent');
+			expect(r.findAll('#fallback')).toHaveLength(0);
+			expect(r.find('#pending').textContent).toBe('0');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('reveals long-held sibling boundaries together when every input is ready', async () => {
+		const pendingA = deferred<string>();
+		const pendingB = deferred<string>();
+		const r = mount(TimedEntangledSupersession, {
+			initialA: fulfilled('a1'),
+			initialB: fulfilled('b1'),
+			pendingA: pendingA.promise,
+			pendingB: pendingB.promise,
+		});
+		try {
+			await act(() => r.click('#entangle-both'));
+			await act(() => vi.advanceTimersByTime(100_000));
+			expect(r.findAll('#entangled-a-fallback, #entangled-b-fallback')).toHaveLength(0);
+			expect(r.find('#entangled-a').textContent).toBe('A:a1');
+			expect(r.find('#entangled-b').textContent).toBe('B:b1');
+			expect(r.find('#entangled-pending').textContent).toBe('1');
+
+			await act(() => pendingA.resolve('a2'));
+			expect(r.find('#entangled-a').textContent).toBe('A:a1');
+			expect(r.find('#entangled-b').textContent).toBe('B:b1');
+			expect(r.find('#entangled-pending').textContent).toBe('1');
+
+			await act(() => pendingB.resolve('b2'));
+			expect(r.find('#entangled-a').textContent).toBe('A:a2');
+			expect(r.find('#entangled-b').textContent).toBe('B:b2');
+			expect(r.findAll('#entangled-a-fallback, #entangled-b-fallback')).toHaveLength(0);
+			expect(r.find('#entangled-pending').textContent).toBe('0');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it.each(['initial mount', 'new nested boundary'] as const)(
+		'shows a fallback for %s even during a transition',
+		async (scenario) => {
+			const next = deferred<string>();
+			let r!: ReturnType<typeof mount>;
+			startTransition(() => {
+				r = mount(TransitionAddsNestedBoundary, {
+					promise: next.promise,
+					initiallyVisible: scenario === 'initial mount',
+				});
+			});
+			try {
+				await act(() => {});
+				const shell = r.find('#nested-shell');
+				if (scenario === 'new nested boundary') {
+					expect(r.findAll('#nested-fallback')).toHaveLength(0);
+					await act(() => r.click('#show-boundary'));
+				}
+				expect(r.find('#nested-shell')).toBe(shell);
+				expect(r.find('#nested-fallback').textContent).toBe('loading nested content');
+				expect(r.findAll('#outer-fallback')).toHaveLength(0);
+				expect(r.find('#nested-pending').textContent).toBe('0');
+
+				await act(() => vi.advanceTimersByTime(100_000));
+				expect(r.find('#nested-shell')).toBe(shell);
+				expect(r.find('#nested-fallback').textContent).toBe('loading nested content');
+				expect(r.findAll('#outer-fallback')).toHaveLength(0);
+
+				await act(() => next.resolve('nested content'));
+				expect(r.find('#nested-shell')).toBe(shell);
+				expect(r.findAll('#nested-fallback')).toHaveLength(0);
+				expect(r.find('.leaf').textContent).toBe('nested content');
+				expect(r.find('#nested-pending').textContent).toBe('0');
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it.each([Infinity, 100])(
+		'does not revive an unmounted transition or leave later transitions pending (timeout: %s)',
+		async (timeout) => {
+			const prevTimeout = getTransitionFallbackTimeout();
+			setTransitionFallbackTimeout(timeout);
+			let r: ReturnType<typeof mount> | undefined;
+			try {
+				const next = deferred<string>();
+				const readyRef = { current: null as Element | null };
+				r = mount(TimeoutFallback, {
+					initialPromise: fulfilled('first'),
+					nextPromise: next.promise,
+					readyRef,
+					readyValue: 'second',
+				});
+				await act(() => r!.click('#swap'));
+				expect(r.find('#pending').textContent).toBe('1');
+				const container = r.container;
+				r.unmount();
+				r = undefined;
+				await act(() => vi.advanceTimersByTime(100_000));
+				await act(() => next.resolve('second'));
+				expect(container.innerHTML).toBe('');
+				expect(readyRef.current).toBeNull();
+
+				// Disposal must also release the transition's pending lifetime. A later
+				// transition in another root cannot remain busy for removed content.
+				r = mount(TransitionBasics);
+				await act(() => r!.click('#bump-transition'));
+				expect(r.find('#n').textContent).toBe('10');
+				expect(r.find('#pending').textContent).toBe('idle');
+			} finally {
+				r?.unmount();
+				setTransitionFallbackTimeout(prevTimeout);
+			}
+		},
+	);
 
 	it('keeps overlapping transition queues entangled after their fallbacks appear', async () => {
 		const prevTimeout = getTransitionFallbackTimeout();
@@ -585,8 +867,7 @@ describe('useTransition — transition-timeout fallback', () => {
 		}
 	});
 
-	it('default timeout is 5000ms', () => {
-		// Pin the default constant so a future change is intentional.
-		expect(getTransitionFallbackTimeout()).toBe(5000);
+	it('defaults to holding already-visible content without a fallback timeout', () => {
+		expect(getTransitionFallbackTimeout()).toBe(Infinity);
 	});
 });

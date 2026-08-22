@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { QueryClient, dehydrate } from '@octanejs/tanstack-query';
+import { act } from 'octane';
 import { mount, nextPaint } from '../_helpers';
 import {
 	Infinite,
@@ -108,9 +109,12 @@ describe('useSuspenseQuery', () => {
 		const r = mount(SuspenseQApp, { client, queryFn });
 		expect(r.find('#fallback').textContent).toBe('loading');
 		await flush();
-		resolveFn('ready');
-		await flush();
+		await act(async () => {
+			resolveFn('ready');
+			await flush();
+		});
 		expect(r.find('#data').textContent).toBe('data:ready');
+		expect(r.findAll('#fallback')).toHaveLength(0);
 		r.unmount();
 	});
 
@@ -129,16 +133,20 @@ describe('useSuspenseQuery', () => {
 		const r = mount(SequentialSuspenseQApp, { client, queryFnA, queryFnB });
 		expect(r.find('#sequential-fallback').textContent).toBe('loading');
 
-		resolveA('A');
-		await flush();
+		await act(async () => {
+			resolveA('A');
+			await flush();
+		});
 		// Resolving the first query must not expose the second query's pending
 		// `data`; the boundary stays suspended until that data is also defined.
 		expect(r.findAll('#sequential-fallback')).toHaveLength(1);
 		expect(r.findAll('#sequential-data')).toHaveLength(0);
 		expect(r.findAll('#sequential-error')).toHaveLength(0);
 
-		resolveB('B');
-		await flush();
+		await act(async () => {
+			resolveB('B');
+			await flush();
+		});
 		expect(r.find('#sequential-data').textContent).toBe('A/B');
 		expect(r.findAll('#sequential-fallback')).toHaveLength(0);
 		expect(r.findAll('#sequential-error')).toHaveLength(0);

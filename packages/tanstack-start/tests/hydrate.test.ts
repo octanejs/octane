@@ -3,7 +3,7 @@
 // server-HTML adoption): `useHydrated()` reads `true`, so non-deferred
 // strategies resolve their gate immediately while `visible` waits for its
 // IntersectionObserver and `never` suspends forever.
-import { createElement, createRoot, drainPassiveEffects, flushSync } from 'octane';
+import { act, createElement, createRoot, drainPassiveEffects, flushSync } from 'octane';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Hydrate } from '@octanejs/tanstack-start';
@@ -127,13 +127,16 @@ describe('Hydrate + hydration strategies (client mount)', () => {
 			expect(observers).toHaveLength(1);
 			expect(observers[0]!.observed).toHaveLength(1);
 
-			observers[0]!.callback(
-				[{ isIntersecting: true } as IntersectionObserverEntry],
-				observers[0] as unknown as IntersectionObserver,
-			);
-			await settle();
+			await act(async () => {
+				observers[0]!.callback(
+					[{ isIntersecting: true } as IntersectionObserverEntry],
+					observers[0] as unknown as IntersectionObserver,
+				);
+				await settle();
+			});
 
 			expect(container.querySelector('#visible-child')?.textContent).toBe('revealed');
+			expect(container.querySelector('#placeholder')).toBeNull();
 			expect(observers[0]!.disconnected).toBe(true);
 			expect(onHydrated).toHaveBeenCalledOnce();
 		} finally {

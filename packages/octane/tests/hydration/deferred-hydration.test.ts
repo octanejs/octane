@@ -405,9 +405,10 @@ describe('deferred hydration', () => {
 		);
 		expect(container.querySelector('#split-client-only-content')).toBeNull();
 
-		await vi.waitFor(async () => {
-			await act(() => {});
-			expect(container.querySelector('#split-client-only-content')).not.toBeNull();
+		await act(async () => {
+			await vi.waitFor(() => {
+				expect(container.querySelector('#split-client-only-content')).not.toBeNull();
+			});
 		});
 		const content = container.querySelector('#split-client-only-content') as HTMLButtonElement;
 		expect(container.querySelector('#split-client-only-fallback')).toBeNull();

@@ -310,7 +310,7 @@ describe('style prop — mixed static and dynamic inline objects', () => {
 		{ shape: 'a boolean', initial: 8, value: true },
 		{ shape: 'null after a longhand matching its shorthand', initial: 4, value: null },
 	])(
-		'removes a stale mixed inline style longhand after a suspended mount retries with $shape',
+		'removes a stale mixed inline style longhand after committed content resuspends and retries with $shape',
 		async ({ initial, value }) => {
 			const source = `
 			import { use } from 'octane';
@@ -344,21 +344,37 @@ describe('style prop — mixed static and dynamic inline objects', () => {
 			const promise = new Promise<string>((complete) => {
 				resolve = complete;
 			});
-			const root = mount(client.App, { promise, value: initial });
+			const root = mount(client.App, { promise: Promise.resolve('initial'), value: initial });
 
 			try {
-				expect(root.find('#mixed-inline-style-retry-pending').textContent).toBe('pending');
+				// Identity belongs to a committed primary. An initially suspended
+				// mount can be abandoned on new inputs and is not a prior style write
+				// that the next mount must clear.
+				await act(() => {});
+				expect(root.find('#mixed-inline-style-retry-content').textContent).toBe('initial');
+				expect(root.findAll('#mixed-inline-style-retry-pending')).toHaveLength(0);
 				const preserved = root.find('#mixed-inline-style-retry-panel') as HTMLElement;
 				expect(preserved.style.marginTop).toBe(`${initial}px`);
 				expect(preserved.style.marginRight).toBe('4px');
 
+				// An urgent resuspension hides, but must not replace, the committed
+				// panel. Its dynamic longhand still needs clearing on the same node.
+				root.update(client.App, { promise, value: initial });
+				expect(root.find('#mixed-inline-style-retry-pending').textContent).toBe('pending');
+				expect(root.find('#mixed-inline-style-retry-panel')).toBe(preserved);
+				expect(preserved.isConnected).toBe(true);
+				expect(preserved.style.display).toBe('none');
+
 				root.update(client.App, { promise, value });
 				expect(root.find('#mixed-inline-style-retry-pending').textContent).toBe('pending');
+				expect(root.find('#mixed-inline-style-retry-panel')).toBe(preserved);
 
 				await act(() => resolve('resolved'));
 				const panel = root.find('#mixed-inline-style-retry-panel') as HTMLElement;
 				expect(panel).toBe(preserved);
 				expect(root.find('#mixed-inline-style-retry-content').textContent).toBe('resolved');
+				expect(root.findAll('#mixed-inline-style-retry-pending')).toHaveLength(0);
+				expect(panel.style.display).toBe('');
 				expect(panel.style.marginTop).toBe('');
 				expect(panel.style.marginRight).toBe('4px');
 

@@ -4,6 +4,13 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
+import { hydrateRoot, flushSync } from '../src/index.js';
+import { ThrownResourceBoundary as ClientThrownResourceBoundary } from './_fixtures/ssr-suspense.tsrx';
+import {
+	activateStreamedMarkup,
+	createPipeableCollector,
+	resetStreamRuntimeGlobals,
+} from './_server-stream.js';
 
 // SSR Phase 4 — Suspense + data serialization. render() is async: a
 // use(thenable) that hasn't resolved suspends the pass (the @try shows
@@ -42,6 +49,286 @@ function deferred<T>() {
 	});
 	return { promise, resolve, reject };
 }
+
+function resourceReader<T>(promise: Promise<T>, wakeable: PromiseLike<T> = promise): () => T {
+	let result:
+		| { status: 'pending' }
+		| { status: 'fulfilled'; value: T }
+		| { status: 'rejected'; reason: unknown } = { status: 'pending' };
+	promise.then(
+		(value) => {
+			result = { status: 'fulfilled', value };
+		},
+		(reason: unknown) => {
+			result = { status: 'rejected', reason };
+		},
+	);
+	return () => {
+		if (result.status === 'pending') throw wakeable;
+		if (result.status === 'rejected') throw result.reason;
+		return result.value;
+	};
+}
+
+describe('SSR — resource-thrown thenables', () => {
+	function streamResourceFallback() {
+		const primary = deferred<string>();
+		const fallback = deferred<string>();
+		const collector = createPipeableCollector();
+		const errors: unknown[] = [];
+		let shellReady!: () => void;
+		const shell = new Promise<void>((resolve) => {
+			shellReady = resolve;
+		});
+		const stream = RT.renderToPipeableStream(
+			m.ThrownResourceFallbackBoundary,
+			{
+				primaryRead: resourceReader(primary.promise),
+				fallbackRead: resourceReader(fallback.promise),
+			},
+			{
+				// An obsolete fallback must not keep the response open until its
+				// request deadline. Bound a regression through the public API.
+				timeoutMs: 1000,
+				onShellReady: shellReady,
+				onError: (error) => errors.push(error),
+			},
+		);
+		stream.pipe(collector.destination);
+		return { primary, fallback, collector, errors, stream, shell };
+	}
+
+	it('renders the pending arm in synchronous server output', () => {
+		const pending = deferred<string>();
+		const out = RT.renderToString(m.ThrownResourceBoundary, {
+			read: resourceReader(pending.promise),
+			promise: Promise.resolve('seed'),
+		});
+		expect(out.html).toContain('<span class="resource-loading">loading resource</span>');
+		expect(out.html).not.toContain('resource-error');
+	});
+
+	it.each(['promise', 'thenable'] as const)(
+		'awaits a thrown %s without adding a hydration seed for the resource reader',
+		async (kind) => {
+			const pending = deferred<string>();
+			const wakeable: PromiseLike<string> =
+				kind === 'promise'
+					? pending.promise
+					: { then: (resolve, reject) => pending.promise.then(resolve, reject) };
+			const read = resourceReader(pending.promise, wakeable);
+			const work = prerender(m.ThrownResourceBoundary, { read, promise: Promise.resolve('seed') });
+			pending.resolve('resource');
+			const out = await work;
+			expect(out.html).toContain('<span class="resource-value">resource:seed</span>');
+			expect(out.html).not.toContain('resource-loading');
+
+			// The raw reader never consumed a use() slot. Its value must not shift the
+			// real use() seed or make matching hydration replace the server element.
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = out.html;
+			const before = container.querySelector('.resource-value');
+			const root = hydrateRoot(container, ClientThrownResourceBoundary, {
+				read,
+				promise: new Promise<string>(() => {}),
+			});
+			try {
+				flushSync(() => {});
+				expect(container.querySelector('.resource-value')).toBe(before);
+				expect(before?.textContent).toBe('resource:seed');
+				expect(container.querySelector('.resource-loading')).toBeNull();
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it.each([
+		'child component',
+		'root component',
+		'root iterable',
+		'ErrorBoundary iterable',
+	] as const)('awaits resource readers in a %s', async (mode) => {
+		const pending = deferred<string>();
+		const read = resourceReader(pending.promise);
+		const Child = () => RT.createElement('span', { className: 'resource-child' }, read());
+		const IterableRoot = () =>
+			RT.createElement(
+				'span',
+				{ className: 'resource-child' },
+				{
+					*[Symbol.iterator]() {
+						yield read();
+					},
+				},
+			);
+		const components = {
+			'child component': () => RT.createElement(m.AsyncComponentBoundary, { component: Child }),
+			'root component': Child,
+			'root iterable': IterableRoot,
+			'ErrorBoundary iterable': () =>
+				RT.createElement(
+					RT.Suspense,
+					{ fallback: 'loading' },
+					RT.createElement(RT.ErrorBoundary, { fallback: 'error' }, IterableRoot()),
+				),
+		};
+		const work = prerender(components[mode]);
+		pending.resolve('ready');
+		const container = document.createElement('div');
+		container.innerHTML = (await work).html;
+		expect(container.querySelector('.resource-child')?.textContent).toBe('ready');
+	});
+
+	it('waits for each successive resource thrown from the same render scope', async () => {
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const firstRead = resourceReader(first.promise);
+		const secondRead = resourceReader(second.promise);
+		let completed = false;
+		const work = prerender(m.ThrownResourceBoundary, {
+			read: () => firstRead() + '/' + secondRead(),
+			promise: Promise.resolve('seed'),
+		}).then((out) => {
+			completed = true;
+			return out;
+		});
+		first.resolve('first');
+		for (let turn = 0; turn < 8; turn++) await Promise.resolve();
+		expect(completed).toBe(false);
+		second.resolve('second');
+		expect((await work).html).toContain('<span class="resource-value">first/second:seed</span>');
+	});
+
+	it('renders the original resource rejection through its catch arm', async () => {
+		const pending = deferred<string>();
+		const work = prerender(m.ThrownResourceBoundary, {
+			read: resourceReader(pending.promise),
+			promise: Promise.resolve('seed'),
+		});
+		pending.reject(new Error('resource failed'));
+		const out = await work;
+		expect(out.html).toContain('<span class="resource-error">Error: resource failed</span>');
+		expect(out.html).not.toContain('resource-loading');
+	});
+
+	it('aborts a request waiting on a resource-thrown thenable', async () => {
+		const pending = deferred<string>();
+		const controller = new AbortController();
+		const work = prerender(
+			m.ThrownResourceBoundary,
+			{
+				read: resourceReader(pending.promise),
+				promise: Promise.resolve('seed'),
+			},
+			{ signal: controller.signal },
+		);
+		const reason = new Error('cancelled resource request');
+		controller.abort(reason);
+		await expect(work).rejects.toBe(reason);
+	});
+
+	it('streams a pending resource and reveals its completed content without reporting an error', async () => {
+		const pending = deferred<string>();
+		const collector = createPipeableCollector();
+		const errors: unknown[] = [];
+		let shellReady!: () => void;
+		const shell = new Promise<void>((resolve) => {
+			shellReady = resolve;
+		});
+		const stream = RT.renderToPipeableStream(
+			m.ThrownResourceBoundary,
+			{
+				read: resourceReader(pending.promise),
+				promise: Promise.resolve('seed'),
+			},
+			{
+				onShellReady: shellReady,
+				onError: (error) => {
+					errors.push(error);
+				},
+			},
+		);
+		stream.pipe(collector.destination);
+		await shell;
+		expect(collector.chunks.join('')).toContain('loading resource');
+		pending.resolve('streamed');
+		const html = await collector.ended;
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		try {
+			container.innerHTML = html;
+			activateStreamedMarkup(container);
+			expect(container.querySelector('.resource-value')?.textContent).toBe('streamed:seed');
+			expect(container.querySelector('.resource-loading')).toBeNull();
+			expect(errors).toEqual([]);
+		} finally {
+			stream.abort();
+			container.remove();
+			resetStreamRuntimeGlobals();
+		}
+	});
+
+	it('completes a streamed primary without waiting for its resource-thrown fallback', async () => {
+		const { primary, collector, errors, stream, shell } = streamResourceFallback();
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		try {
+			await shell;
+			expect(collector.chunks.join('')).toContain('loading outer resource');
+			primary.resolve('primary ready');
+			container.innerHTML = await collector.ended;
+			activateStreamedMarkup(container);
+			expect(container.querySelector('.resource-primary')?.textContent).toBe('primary ready');
+			expect(container.querySelector('.resource-outer-loading')).toBeNull();
+			expect(container.querySelector('.resource-fallback')).toBeNull();
+			expect(errors).toEqual([]);
+		} finally {
+			stream.abort();
+			container.remove();
+			resetStreamRuntimeGlobals();
+		}
+	});
+
+	it('routes a streamed resource fallback rejection to the outer catch arm', async () => {
+		const { fallback, collector, errors, stream, shell } = streamResourceFallback();
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		try {
+			await shell;
+			fallback.reject(new Error('fallback failed'));
+			container.innerHTML = await collector.ended;
+			activateStreamedMarkup(container);
+			expect(container.querySelector('.resource-outer-error')?.textContent).toBe(
+				'Error: fallback failed',
+			);
+			expect(container.querySelector('.resource-inner-error')).toBeNull();
+			expect(container.querySelector('.resource-outer-loading')).toBeNull();
+			expect(errors).toEqual([]);
+		} finally {
+			stream.abort();
+			container.remove();
+			resetStreamRuntimeGlobals();
+		}
+	});
+
+	it('aborts a stream while its resource fallback is suspended', async () => {
+		const { collector, errors, stream, shell } = streamResourceFallback();
+		try {
+			await shell;
+			const reason = new Error('cancelled fallback request');
+			stream.abort(reason);
+			const html = await collector.ended;
+			expect(html).toContain('loading outer resource');
+			expect(errors).toContain(reason);
+			expect(errors.every((error) => error === reason)).toBe(true);
+		} finally {
+			stream.abort();
+		}
+	});
+});
 
 describe('SSR Phase 4 — render() awaits use(promise)', () => {
 	it('renders fulfilled plain async components after replay', async () => {

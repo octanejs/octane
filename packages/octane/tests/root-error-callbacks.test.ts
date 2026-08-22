@@ -140,6 +140,29 @@ describe('root error callbacks — onCaughtError / onUncaughtError', () => {
 		root.unmount();
 	});
 
+	it('preserves an ordinary thrown object whose then getter throws', () => {
+		const reason = {
+			message: 'opaque render failure',
+			get then(): never {
+				throw new Error('then accessor is not readable');
+			},
+		};
+		const onUncaughtError = vi.fn();
+		const root = createRoot(container, { onUncaughtError });
+		try {
+			root.render(() => {
+				throw reason;
+			});
+			expect(onUncaughtError).toHaveBeenCalledTimes(1);
+			// Compare identity without asking assertion formatting to inspect the
+			// intentionally opaque value's properties.
+			expect(onUncaughtError.mock.calls[0][0] === reason).toBe(true);
+			expect(container.textContent).toBe('');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('control: a synchronous first-mount error without the option still throws', () => {
 		const root = createRoot(container);
 		expect(() => root.render(MountThrower, {})).toThrow('mount-boom');

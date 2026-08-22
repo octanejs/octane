@@ -2,6 +2,7 @@ import {
 	flushSync,
 	readContextFromScope,
 	renderClientContextProvider,
+	scheduleRenderCleanup,
 	useInsertionEffect as useDomInsertionEffect,
 	useLayoutEffect as useDomLayoutEffect,
 	useRendererThenable as useDomRendererThenable,
@@ -246,7 +247,7 @@ export function createUniversalHostBoundary(renderer: string): ((
 			[],
 			BOUNDARY_LIFETIME_SLOT,
 		);
-		state.root.__scheduleMicrotask(() => {
+		scheduleRenderCleanup(state.root.__scheduleMicrotask, state.root, () => {
 			if (state!.pending !== attempt) return;
 			state!.pending = null;
 			state!.root.__runCommitTasks([

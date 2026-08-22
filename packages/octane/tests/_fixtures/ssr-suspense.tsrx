@@ -1,4 +1,5 @@
 import { Hydrate, Suspense, use, useId, useState } from 'octane';
+import { Suspense as RetrySiblingSuspense, type HydrateProps } from 'octane';
 
 // SSR Phase 4 — Suspense + data serialization. The server render() awaits
 // use(promise) and renders the resolved value (not the @pending fallback); the
@@ -33,6 +34,34 @@ export function DeferredStreamedSuspense(props) @{
 			<DeferredStreamedButton promise={props.promise} onClick={props.onClick} />
 		</Suspense>
 	</Hydrate>
+}
+
+function HydrationRetrySibling(props: { promise: Promise<string> }) @{
+	const [show, setShow] = useState(true);
+	<aside>
+		<button id="remove-stream-sibling" onClick={() => setShow(false)}>{'Remove sibling'}</button>
+		@if (show) {
+			<RetrySiblingSuspense fallback={<span id="stream-sibling-pending">{'Loading sibling'}</span>}>
+				<AsyncLeaf promise={props.promise} />
+			</RetrySiblingSuspense>
+		}
+	</aside>
+}
+
+export function DeferredStreamWithRetrySibling(props: Pick<HydrateProps, 'when' | 'onHydrated'> & {
+	promise: Promise<string>;
+	siblingPromise: Promise<string>;
+	onClick?: (value: string) => void;
+}) @{
+	<main>
+		<DeferredStreamedSuspense
+			promise={props.promise}
+			when={props.when}
+			onClick={props.onClick}
+			onHydrated={props.onHydrated}
+		/>
+		<HydrationRetrySibling promise={props.siblingPromise} />
+	</main>
 }
 
 function NestedDeferredStreamedButton(props) @{
@@ -118,6 +147,41 @@ export function Boundary(props) @{
 			<span class="loading">{'loading'}</span>
 		} @catch (err) {
 			<span class="err">{err.message as string}</span>
+		}
+	</div>
+}
+
+export function ThrownResourceBoundary(props: { read: () => string; promise: Promise<string> }) @{
+	<div>
+		@try {
+			const resource = props.read();
+			const seeded = use(props.promise);
+			<span class="resource-value">{resource + ':' + seeded as string}</span>
+		} @pending {
+			<span class="resource-loading">loading resource</span>
+		} @catch (error: unknown, _reset: () => void) {
+			<span class="resource-error">{String(error)}</span>
+		}
+	</div>
+}
+
+export function ThrownResourceFallbackBoundary(props: {
+	primaryRead: () => string;
+	fallbackRead: () => string;
+}) @{
+	<div>
+		@try {
+			@try {
+				<span class="resource-primary">{props.primaryRead() as string}</span>
+			} @pending {
+				<span class="resource-fallback">{props.fallbackRead() as string}</span>
+			} @catch (error: unknown, _reset: () => void) {
+				<span class="resource-inner-error">{String(error)}</span>
+			}
+		} @pending {
+			<span class="resource-outer-loading">loading outer resource</span>
+		} @catch (error: unknown, _reset: () => void) {
+			<span class="resource-outer-error">{String(error)}</span>
 		}
 	</div>
 }

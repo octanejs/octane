@@ -1,4 +1,5 @@
 import {
+	Suspense,
 	startTransition,
 	use,
 	useInsertionEffect,
@@ -10,16 +11,10 @@ import {
 // ============================================================================
 // Transition-timeout fallback regressions
 // ============================================================================
-// React's `useTransition` contract: when a transition-priority render
-// suspends on an already-committed try block, the prior DOM stays mounted
-// (no fallback flash) — BUT only up to a configurable budget. After the
-// timeout fires React commits the @pending body so the user gets visual
-// feedback instead of staring at stale content indefinitely. isPending
-// stays true through the fallback window because the transition is still
-// in progress; on resolve, the connected hidden try-body DOM is revealed.
-//
-// Mirrors ReactSuspenseWithNoopRenderer-test.js "eventually shows fallback
-// if transition takes too long".
+// A transition keeps already-visible content on screen until it can reveal
+// the next content. Octane optionally allows a finite fallback timeout; when
+// that extension is enabled, isPending stays true while the fallback is
+// visible and the connected hidden primary reveals when its promise resolves.
 
 function SuspendingLeaf(props) @{
 	const v = use(props.promise);
@@ -38,6 +33,50 @@ export function TimeoutFallback(props) @{
 			<SuspendingLeaf promise={promise} readyRef={props.readyRef} readyValue={props.readyValue} />
 		} @pending {
 			<span id="fallback">{'pending-shown'}</span>
+		}
+	</div>
+}
+
+function TimedPendingResource(props: { read: () => string }) @{
+	const value = props.read();
+	<span id="timed-inner-fallback">{value as string}</span>
+}
+
+export function TimedSuspendingFallback(props: {
+	promise: Promise<string>;
+	readFallback: () => string;
+}) @{
+	<Suspense fallback={<span id="timed-outer-fallback">{'outer loading'}</span>}>
+		<Suspense fallback={<TimedPendingResource read={props.readFallback} />}>
+			<SuspendingLeaf promise={props.promise} />
+		</Suspense>
+	</Suspense>
+}
+
+export function TransitionAddsNestedBoundary(props: {
+	promise: Promise<string>;
+	initiallyVisible: boolean;
+}) @{
+	const [visible, setVisible] = useState(props.initiallyVisible);
+	const [isPending, start] = useTransition();
+	<div>
+		<span id="nested-pending">
+			{isPending ? '1' : '0'}
+		</span>
+		<button id="show-boundary" onClick={() => start(() => setVisible(true))}>{'show'}</button>
+		@try {
+			<section id="nested-shell">
+				<span>{'shell'}</span>
+				@if (visible) {
+					@try {
+						<SuspendingLeaf promise={props.promise} />
+					} @pending {
+						<span id="nested-fallback">{'loading nested content'}</span>
+					}
+				}
+			</section>
+		} @pending {
+			<span id="outer-fallback">{'loading shell'}</span>
 		}
 	</div>
 }

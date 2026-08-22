@@ -85,8 +85,8 @@ Every concrete case in either pinned inventory has exactly one ledger dispositio
 
 | Baseline | Cases | Untriaged | Planned | In progress | Covered | Documented | Blocked |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| stable | 5,345 | 0 | 1,806 | 0 | 1,035 | 2,504 | 0 |
-| canary | 5,413 | 0 | 1,844 | 0 | 1,096 | 2,473 | 0 |
+| stable | 5,345 | 0 | 1,799 | 0 | 1,042 | 2,504 | 0 |
+| canary | 5,413 | 0 | 1,837 | 0 | 1,103 | 2,473 | 0 |
 
 Classifications are `portable`, `adaptable`, `divergence`, and `non_goal`. A covered case requires live local test evidence; divergence and non-goal dispositions require a rationale.
 

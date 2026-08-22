@@ -1,9 +1,9 @@
 # Suspense Divergences from React
 
-A registry of intentional behavior differences between octane's Suspense
-implementation and React's. Each entry cites the test that pins the divergence so
-a future runtime change either updates this document OR removes the divergence by
-closing the gap.
+A registry of intentional differences, closed compatibility gaps, and known
+limitations between Octane's Suspense implementation and React's. Each entry
+distinguishes its status and cites the relevant evidence. A documented open bug
+is not an intentional divergence.
 
 Last reviewed against React 19 contracts.
 
@@ -191,30 +191,45 @@ Time-based cross-boundary fallback throttling is the separate Divergence #5.
 
 ---
 
-## 5. Reveal throttling (`FALLBACK_THROTTLE_MS`) — NOT a default-React divergence
+## 5. Retry reveal throttling — distinct from transition shell retention
 
-**Status:** Investigated and dismissed — octane already matches React's DEFAULT behavior;
-the throttle is non-default. (Earlier this was provisionally filed as a divergence using
-the WRONG oracle — the `-test.internal.js` suite, which runs with internal flags.)
+**Correction (2026-08-21):** the previous dismissal was incorrect. An immediate
+reveal inside React's `act()` does not establish production timing: React
+explicitly bypasses its retry delay inside development `act()` scopes
+([stable source](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberWorkLoop.js#L1405-L1428)).
+`alwaysThrottleRetries` is enabled in the pinned
+[stable flags](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/shared/ReactFeatureFlags.js#L128)
+and [canary flags](https://github.com/facebook/react/blob/b740af2510de1e19fcb399abb862af26ff95ac80/packages/shared/ReactFeatureFlags.js#L126),
+not disabled by default.
 
-**The evidence:** the public, default-flags test `ReactUse-test.js:1096` ("load multiple
-nested Suspense boundaries") — outer `(Loading A...)`, resolve A while inner B suspends —
-asserts `toMatchRenderedOutput('A(Loading B...)')`. React reveals A and shows the inner
-fallback IMMEDIATELY; it does NOT hold the outer fallback. octane does exactly the same
-(`conformance`/`suspense.test.ts` "inner Suspense reveals AFTER outer resolves", ported
-from that test, passes). The throttling behavior (`ReactSuspense-test.internal.js:267`
-"throttles fallback committing globally") lives in the internal suite, and the related
-retry-throttle assertions are gated behind `gate('alwaysThrottleRetries')` — a feature
-flag that is OFF by default (`ReactSuspenseWithNoopRenderer-test.js:1778` spells this out:
-"Old behavior, gated until this rolls out at Meta"). `FALLBACK_THROTTLE_MS` only forces a
-delay when `alwaysThrottleRetries || exitStatus === RootSuspended`
-(`ReactFiberWorkLoop.js:1426`), which does not fire for the default nested-reveal path.
+**React behavior:** retry-only commits use a renderer-wide 300ms window from the
+most recent fallback show or fill. A retry waits for the remaining window when
+more than 10ms remains; urgent updates are not retry-only work. This can retain
+an outer fallback while a retry discovers a new nested fallback, or briefly
+retain a fallback whose data has already resolved. It does not impose a
+deadline on already-visible content held by a transition (see #8).
+The stable and canary work loops implement this policy
+([stable](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberWorkLoop.js#L1424-L1487),
+[canary](https://github.com/facebook/react/blob/b740af2510de1e19fcb399abb862af26ff95ac80/packages/react-reconciler/src/ReactFiberWorkLoop.js#L1489-L1552)).
 
-**Conclusion:** implementing the cross-boundary fallback throttle would make octane DIVERGE
-from default React (and break the correctly-ported `ReactUse:1096` test). It is therefore
-intentionally NOT implemented. If React flips `alwaysThrottleRetries` on by default in a
-future release, revisit — it could layer on the existing commit coordinator as a shared
-`FALLBACK_THROTTLE_MS` timer.
+**Octane behavior:** a shared recent-fallback timestamp coordinates retry-only
+work, with one coalesced retry timer per root. Actual fallback show/fill commits
+advance the timestamp; rendering the same fallback again does not. A later
+fallback commit in a different root does not move an already scheduled timer.
+Committed fallbacks under a hidden `<Activity>` also advance the timestamp;
+hiding or revealing Activity by itself does not. The timing tests drain hidden
+prerender work before advancing the clock so its initial fallback commit cannot
+be mistaken for a later Activity visibility change.
+Urgent updates and active `act()` scopes bypass the delay, and stale retries
+are discarded when their inputs are superseded or their boundary unmounts.
+This is a commit-timing policy, not an implementation of React's lanes or
+time-sliced work loop.
+
+**Evidence:**
+[differential/suspense-timing.test.ts](../tests/differential/suspense-timing.test.ts)
+drives the same fixture and clock against React and Octane, outside `act()` for
+timing assertions. Existing `act()`-driven nested-reveal tests remain useful for
+eventual output but are not evidence that production retry commits are immediate.
 
 ---
 
@@ -262,15 +277,125 @@ semantics — insertion effects only unmount on deletion.
 
 ---
 
+## 8. Transition shell retention — no fallback timeout by default
+
+**React behavior:** a transition that suspends on already-visible content keeps
+that content visible indefinitely. This is distinct from retry throttling in #5:
+the transition does not replace the visible shell with a fallback just because
+time has passed. The production work loop explicitly returns without scheduling
+a timeout for this case
+([stable source](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberWorkLoop.js#L1356-L1369)).
+Initial content and newly added nested boundaries can show their own fallbacks
+because they do not replace previously visible content
+([shell distinction](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberWorkLoop.js#L2358-L2375)).
+
+**Octane behavior:** `getTransitionFallbackTimeout()` defaults to `Infinity`.
+Already-visible content remains connected and visible, and `isPending` stays
+true until completion or urgent supersession. Entangled sibling boundaries
+retain their previous content until they can reveal together.
+Unmounting a held boundary releases its pending lifetime as well as canceling
+its late retries and timeout, so later transitions do not remain stuck pending.
+
+**Explicit extension:** `setTransitionFallbackTimeout(ms)` still allows a finite
+deadline. Once that deadline expires, the boundary shows its pending fallback
+while retaining the connected hidden primary; `isPending` stays true until the
+transition resolves. This is an opt-in Octane behavior, not React's default.
+The previous claim that a five-second default matched React was incorrect.
+
+**Evidence:** [transition-timeout.test.ts](../tests/transition-timeout.test.ts)
+checks default retention through 100000ms via `useTransition` and standalone
+`startTransition` around both `root.render` and `useState` updates. It covers
+pending state and DOM identity, eventual reveal, entangled sibling completion,
+urgent supersession, initial and new nested fallbacks, and finite-timeout
+resolve/unmount cleanup.
+
+---
+
+## 9. Resource-thrown thenables — render suspension gap closed
+
+**React behavior:** a resource reader can suspend by throwing a thenable during
+render, without calling `use()`. The surrounding Suspense boundary retries when
+that thenable settles. A real error from the retry goes to the error boundary;
+a thenable thrown by a commit-phase effect is an error, not render suspension.
+
+**Octane behavior:** client and server render catches recognize resource-thrown
+thenables as suspension. The client uses the existing boundary retry path. SSR
+registers the pending boundary without inventing a `use()` slot or hydration
+seed for the resource reader. Native promises and custom thenables are covered;
+this does not fix client suspension without an enclosing boundary (see #10).
+
+Pending and error fallbacks are render work too. A wakeable thrown there suspends
+to an enclosing Suspense boundary, rather than entering the fallback's own catch
+arm or destroying its state. This follows React's
+[fallback-handler context](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberSuspenseContext.js#L102-L107).
+An error report produced by a detached retry stays deferred while its error
+fallback is suspended; replacement or unmount cancels that report. Finite-timeout
+fallbacks use the priority of the fallback render, not the earlier transition.
+On the server, a completed primary does not wait for an obsolete pending fallback
+that throws a raw wakeable.
+
+**Evidence:** [suspense.test.ts](../tests/suspense.test.ts) covers raw resource
+reads, resolution, rejection, and the effect-throw error control;
+[differential/suspense-timing.test.ts](../tests/differential/suspense-timing.test.ts)
+checks retry timing, suspending fallback state, rejection, and deferred error
+reporting against React. [boundary.test.ts](../tests/boundary.test.ts) also covers
+the literal imported JSX ErrorBoundary, and
+[transition-timeout.test.ts](../tests/transition-timeout.test.ts) covers a suspending
+fallback at an explicit finite deadline. Finally,
+[ssr-suspense.test.ts](../tests/ssr-suspense.test.ts) covers buffered and streamed
+rendering, sequential wakeables, rejection, abort, and hydration adoption.
+
+---
+
+## 10. Client suspension without a boundary — open bug
+
+Without an enclosing Suspense/`@pending` boundary, Octane still treats client
+suspension as an uncaught root failure, unmounting the root instead of retaining
+and retrying it. React retains the previous root content, or the empty initial
+root, until the suspended render can complete. This is a known compatibility
+gap, **not** an intentional divergence.
+
+Tracked separately in [issue #821](https://github.com/octanejs/octane/issues/821).
+Closing it requires root-level retry and atomic commit ownership; the
+boundary-local timing and resource-thenable fixes above do not provide that
+contract.
+
+---
+
+## 11. Incomplete descriptor retry bailouts — open bug
+
+A previously committed descriptor subtree can skip an incomplete update on
+retry, removing the fallback but revealing the old value. This also affects
+some memoized ancestors. The same public `createElement`/`use` reproduction fails
+on the unchanged base, without error boundaries or raw resource throws.
+
+Tracked separately in [issue #825](https://github.com/octanejs/octane/issues/825).
+The fix needs correct incomplete-render invalidation while preserving legitimate
+memo and identity bailouts; disabling those bailouts for every retry is not the
+intended solution. This is a known compatibility bug, not a divergence contract.
+
+## 12. Ordinary first-mount error reporting — open bug
+
+First-mount and parent-driven inline catches can render the correct error fallback
+without calling the root's `onCaughtError`. This reproduces on the unchanged base
+without Suspense or promises. The detached-retry reporting fix in #9 does not
+claim to close this separate entry-path gap.
+
+Tracked in [issue #824](https://github.com/octanejs/octane/issues/824).
+
+---
+
 ## What we DO match React on (for the record)
 
-The list above is the complete known set of Suspense-related divergences. Every
-other Suspense / Transitions / Deferred test pins a contract we EXACTLY match
-React on, including:
+The tests below cover established Suspense, transition, and deferred-value
+contracts. They are not an exhaustive claim that every React scheduling or
+Suspense behavior has been implemented:
 
 - Basic suspend → pending → resolve cycle.
 - `use(promise)` thenable cache (same promise reads the cached value
   synchronously).
+- Resource readers throwing thenables during render suspend inside an enclosing
+  boundary on the client and server (see #9; the client root gap is #10).
 - `use(Context)` overload.
 - `use(unsupported)` throws the invariant.
 - Synchronous render throw routes to `@catch` with identical surface as a rejected
@@ -327,12 +452,11 @@ React on, including:
 - Standalone `startTransition` parity with hook form.
 - Nested `useTransition` (independent `isPending` flags).
 - Urgent-supersedes-transition discard.
-- Transition-fallback timeout (`setTransitionFallbackTimeout`, default 5s —
-  matches React).
-- Reveal timing matches React's DEFAULT: content reveals immediately when its promise
-  resolves, including the nested case — revealing an outer boundary shows resolved content
-  AND the inner boundary's fallback in the same commit (`ReactUse-test.js:1096`
-  `'A(Loading B...)'`). React's cross-boundary fallback throttle is `alwaysThrottleRetries`-
-  gated (OFF by default), so octane intentionally does not throttle (see dismissed #5).
+- Transition shell retention has no fallback deadline by default. A finite
+  `setTransitionFallbackTimeout` is an explicit Octane extension (see #8).
+- Retry-only reveals respect the shared 300ms fallback window outside `act()`;
+  urgent updates and active `act()` scopes do not wait (see #5). An outer reveal
+  may include resolved content and a still-pending inner fallback in one commit,
+  but promise resolution alone does not guarantee that commit is immediate.
 
 A divergence not listed here is a bug. File it.

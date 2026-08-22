@@ -56,6 +56,12 @@ function ErrorBoundaryApp(props) @{
 	</>
 }
 
+function ThrownResourceApp(props: { value: PromiseLike<unknown> }) @{
+	<Suspense fallback={<em>pending</em>}>
+		<ThrowingChild value={props.value} />
+	</Suspense>
+}
+
 function useCounter() {
 	return useState(0);
 }
@@ -230,10 +236,11 @@ describe('profile build component events', () => {
 		mounted.unmount();
 	});
 
-	it('does not mistake an arbitrary thrown Promise for use() suspension', () => {
-		const mounted = mount(ErrorBoundaryApp, { value: Promise.resolve('value') });
+	it('reports a resource-thrown thenable as a suspended render attempt', () => {
+		const mounted = mount(ThrownResourceApp, { value: new Promise<string>(() => {}) });
 
-		expect(render('ThrowingChild', 'mount').outcome).toBe('errored');
+		expect(render('ThrowingChild', 'mount').outcome).toBe('suspended');
+		expect(mounted.container.textContent).toBe('pending');
 
 		mounted.unmount();
 	});

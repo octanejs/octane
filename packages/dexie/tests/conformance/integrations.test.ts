@@ -1,4 +1,5 @@
 import Dexie from 'dexie';
+import { act } from 'octane';
 import { afterEach, describe, expect, it } from 'vitest';
 import { flushEffects, mount, nextPaint } from '../_helpers';
 import {
@@ -53,9 +54,12 @@ describe('suspending live queries', () => {
 		await flush();
 		expect(result.find('#suspending-pending').textContent).toBe('loading');
 
-		pending.resolve('loaded');
-		await flush();
+		await act(async () => {
+			pending.resolve('loaded');
+			await flush();
+		});
 		expect(result.find('#suspending-value').textContent).toBe('loaded');
+		expect(result.findAll('#suspending-pending')).toHaveLength(0);
 		result.unmount();
 	});
 
@@ -69,14 +73,19 @@ describe('suspending live queries', () => {
 		await flush();
 		expect(result.find('#sequential-pending').textContent).toBe('loading');
 
-		first.resolve('one');
-		await flush();
+		await act(async () => {
+			first.resolve('one');
+			await flush();
+		});
 		expect(result.find('#sequential-pending').textContent).toBe('loading');
 
-		second.resolve('two');
-		await flush();
+		await act(async () => {
+			second.resolve('two');
+			await flush();
+		});
 		expect(result.find('#suspending-value').textContent).toBe('one');
 		expect(result.findAll('#suspending-value')[1].textContent).toBe('two');
+		expect(result.findAll('#sequential-pending')).toHaveLength(0);
 		result.unmount();
 	});
 
@@ -87,8 +96,10 @@ describe('suspending live queries', () => {
 			cacheKey: ['rejection'],
 		});
 		await flush();
-		pending.reject(new Error('suspending failed'));
-		await flush();
+		await act(async () => {
+			pending.reject(new Error('suspending failed'));
+			await flush();
+		});
 		expect(result.find('#suspending-error').textContent).toBe('suspending failed');
 		result.unmount();
 	});
@@ -101,8 +112,10 @@ describe('suspending live queries', () => {
 			cacheKey: ['stale-error-a'],
 		});
 		await flush();
-		failing.reject(new Error('first key failed'));
-		await flush();
+		await act(async () => {
+			failing.reject(new Error('first key failed'));
+			await flush();
+		});
 		expect(first.find('#suspending-error').textContent).toBe('first key failed');
 		first.unmount();
 		await flush();
@@ -114,9 +127,12 @@ describe('suspending live queries', () => {
 		});
 		await flush();
 		expect(second.find('#suspending-pending').textContent).toBe('loading');
-		recovered.resolve('recovered');
-		await flush();
+		await act(async () => {
+			recovered.resolve('recovered');
+			await flush();
+		});
 		expect(second.find('#suspending-value').textContent).toBe('recovered');
+		expect(second.findAll('#suspending-pending')).toHaveLength(0);
 		second.unmount();
 	});
 
@@ -127,9 +143,12 @@ describe('suspending live queries', () => {
 			cacheKey: ['switch-a'],
 		});
 		await flush();
-		first.resolve('alpha');
-		await flush();
+		await act(async () => {
+			first.resolve('alpha');
+			await flush();
+		});
 		expect(result.find('#suspending-value').textContent).toBe('alpha');
+		expect(result.findAll('#suspending-pending')).toHaveLength(0);
 
 		const second = deferred<string>();
 		result.update(SuspendingBoundary, {
@@ -138,9 +157,12 @@ describe('suspending live queries', () => {
 		});
 		await flush();
 		expect(result.find('#suspending-pending').textContent).toBe('loading');
-		second.resolve('beta');
-		await flush();
+		await act(async () => {
+			second.resolve('beta');
+			await flush();
+		});
 		expect(result.find('#suspending-value').textContent).toBe('beta');
+		expect(result.findAll('#suspending-pending')).toHaveLength(0);
 		result.unmount();
 	});
 
@@ -161,8 +183,10 @@ describe('suspending live queries', () => {
 		});
 		await flush();
 		expect(attempts).toBe(1);
-		pending[0]!.reject(new Error('temporary failure'));
-		await flush();
+		await act(async () => {
+			pending[0]!.reject(new Error('temporary failure'));
+			await flush();
+		});
 		expect(first.find('#suspending-error').textContent).toBe('temporary failure');
 		first.unmount();
 		await flush();
@@ -174,9 +198,12 @@ describe('suspending live queries', () => {
 		await flush();
 		expect(second.find('#suspending-pending').textContent).toBe('loading');
 		expect(attempts).toBe(2);
-		pending[1]!.resolve('retried');
-		await flush();
+		await act(async () => {
+			pending[1]!.resolve('retried');
+			await flush();
+		});
 		expect(second.find('#suspending-value').textContent).toBe('retried');
+		expect(second.findAll('#suspending-pending')).toHaveLength(0);
 		second.unmount();
 	});
 });

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { act } from 'octane';
 import { mount, nextPaint } from '../_helpers';
 import { RouterProvider } from '@octanejs/tanstack-router';
 import { makeConcurrentRouter, createDeferred } from '../_fixtures/concurrent-navigation.tsrx';
@@ -52,8 +53,10 @@ describe('@octanejs/tanstack-router — concurrent navigation (startTransition)'
 		expect(r.findAll('.home').length).toBe(0);
 
 		// Resolve the data; the content replaces the fallback.
-		deferred.resolve('Slow page');
-		await flush();
+		await act(async () => {
+			deferred.resolve('Slow page');
+			await flush();
+		});
 
 		expect(r.findAll('.slow').length).toBe(1);
 		expect(r.find('.slow').textContent).toBe('Slow page');
@@ -84,8 +87,10 @@ describe('@octanejs/tanstack-router — concurrent navigation (startTransition)'
 		expect(r.findAll('.home').length).toBe(1);
 		expect(r.findAll('.slow').length).toBe(0);
 
-		deferred.resolve('Slow page');
-		await flush();
+		await act(async () => {
+			deferred.resolve('Slow page');
+			await flush();
+		});
 
 		expect(r.findAll('.slow').length).toBe(1);
 		expect(r.findAll('.home').length).toBe(0);

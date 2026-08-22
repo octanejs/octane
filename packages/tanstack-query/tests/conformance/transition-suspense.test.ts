@@ -60,8 +60,10 @@ describe('useSuspenseQuery — transition keeps prior content, no fallback flash
 		// First render suspends → fallback while value=1's query is in flight.
 		expect(r.find('#fallback').textContent).toBe('loading');
 
-		d1.resolve('one');
-		await flush();
+		await act(async () => {
+			d1.resolve('one');
+			await flush();
+		});
 		// value=1 content committed.
 		expect(r.find('#data').textContent).toBe('data:one');
 		expect(r.findAll('#fallback')).toHaveLength(0);
@@ -97,8 +99,10 @@ describe('useSuspenseQuery — transition keeps prior content, no fallback flash
 
 		// Resolve value=2 → the held boundary commits the new content all at once
 		// and isPending returns to idle. The fallback never showed at any point.
-		d2.resolve('two');
-		await flush();
+		await act(async () => {
+			d2.resolve('two');
+			await flush();
+		});
 		expect(r.find('#data').textContent).toBe('data:two');
 		expect(r.findAll('#fallback')).toHaveLength(0);
 		expect(r.find('#pending').textContent).toBe('idle');
@@ -143,9 +147,12 @@ describe('useSuspenseQuery — transition keeps prior content, no fallback flash
 			bindSetValueUrgent,
 		});
 		expect(r.find('#fallback').textContent).toBe('loading');
-		d1.resolve('one');
-		await flush();
+		await act(async () => {
+			d1.resolve('one');
+			await flush();
+		});
 		expect(r.find('#data').textContent).toBe('data:one');
+		expect(r.findAll('#fallback')).toHaveLength(0);
 		expect(r.find('#pending').textContent).toBe('idle');
 
 		// Watch the DOM through the whole move so a transient fallback flash (or any
@@ -176,9 +183,11 @@ describe('useSuspenseQuery — transition keeps prior content, no fallback flash
 
 		// Resolve the value=3 fetch → the held boundary commits content-three all at
 		// once and isPending returns to idle.
-		d2.resolve('two');
-		d3.resolve('three');
-		await flush();
+		await act(async () => {
+			d2.resolve('two');
+			d3.resolve('three');
+			await flush();
+		});
 		mo.disconnect();
 
 		expect(fallbackEverSeen).toBe(false); // never flashed at any point
