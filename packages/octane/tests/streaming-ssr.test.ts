@@ -15,6 +15,7 @@ import {
 	Boundary,
 	DeferredAsyncLeaf,
 	DeferredStreamWithLiveSibling,
+	DeferredStreamWithRetrySibling,
 	DeferredStreamedSuspense,
 	IdBoundary,
 	LateStyledBoundary,
@@ -549,10 +550,18 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(onAllReady).toHaveBeenCalledOnce();
 	});
 
-	it.each(['act', 'retry deadline'] as const)(
+	it.each([
+		'act',
+		'retry deadline',
+		'retry deadline after sibling removal',
+		'retry deadline after replacement',
+	] as const)(
 		'releases deferred activation when a pending stream degrades to client rendering (%s)',
 		async (mode) => {
-			const timed = mode === 'retry deadline';
+			const timed = mode !== 'act';
+			const withSibling = mode === 'retry deadline after sibling removal';
+			const withReplacement = mode === 'retry deadline after replacement';
+			const recoveredValue = withReplacement ? 'Updated recovery' : 'Client recovery';
 			if (timed) {
 				vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
 			}
@@ -584,6 +593,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 				const deliveries: Array<{ event: string; time: number; value: string | null }> = [];
 				const serverValue = deferred<string>();
 				const clientValue = deferred<string>();
+				const siblingValue = deferred<string>();
 				const onClick = vi.fn((value: string) => {
 					deliveries.push({ event: 'click', time: performance.now() - started, value });
 				});
@@ -597,9 +607,12 @@ describe('renderToPipeableStream — chunk protocol', () => {
 				const onError = vi.fn();
 				const when = interaction({ events: 'click' });
 				const c = collector();
+				const clientComponent = withSibling
+					? DeferredStreamWithRetrySibling
+					: DeferredStreamedSuspense;
 				const render = ServerRT.renderToPipeableStream(
-					server.DeferredStreamedSuspense,
-					{ promise: serverValue.promise, when },
+					withSibling ? server.DeferredStreamWithRetrySibling : server.DeferredStreamedSuspense,
+					{ promise: serverValue.promise, siblingPromise: serverValue.promise, when },
 					{ onError },
 				);
 				render.pipe(c.dest);
@@ -608,12 +621,14 @@ describe('renderToPipeableStream — chunk protocol', () => {
 				activate(container);
 				const shellChunkCount = c.chunks.length;
 				const fallback = container.querySelector('#deferred-stream-action') as HTMLButtonElement;
-				root = hydrateRoot(container, DeferredStreamedSuspense as any, {
+				const clientProps = {
 					promise: clientValue.promise,
+					siblingPromise: siblingValue.promise,
 					when,
 					onClick,
 					onHydrated,
-				});
+				};
+				root = hydrateRoot(container, clientComponent as any, clientProps);
 				if (timed) {
 					// React 19.2.7 also throttles an aborted stream's client retry after
 					// a recent fallback, even when a click requested hydration. A real
@@ -639,6 +654,7 @@ describe('renderToPipeableStream — chunk protocol', () => {
 					// Resolve before post-abort activation drains, as in the act case.
 					// Ordinary hydration is not required to wait for unknown pending data.
 					clientValue.resolve('Client recovery');
+					siblingValue.resolve('Sibling recovery');
 					await advance();
 					const observeAfter = async (elapsed: number) => {
 						await advance(elapsed);
@@ -651,16 +667,37 @@ describe('renderToPipeableStream — chunk protocol', () => {
 					};
 					// Observe only connected, visible controls: a completed primary may
 					// already exist hidden alongside the fallback while its commit waits.
-					expect([await observeAfter(100), await observeAfter(199), await observeAfter(1)]).toEqual(
-						[
-							{ time: 100, content: ['Loading streamed content'], hydrated: 0, clicks: 0 },
-							{ time: 299, content: ['Loading streamed content'], hydrated: 0, clicks: 0 },
-							{ time: 300, content: ['Client recovery'], hydrated: 1, clicks: 1 },
-						],
-					);
+					const beforeUpdate = await observeAfter(100);
+					if (withSibling) {
+						expect(container.querySelector('#stream-sibling-pending')?.textContent).toBe(
+							'Loading sibling',
+						);
+						flushSync(() => {
+							container.querySelector<HTMLButtonElement>('#remove-stream-sibling')!.click();
+						});
+						await advance();
+						expect(container.querySelector('#stream-sibling-pending')).toBeNull();
+					} else if (withReplacement) {
+						flushSync(() => {
+							root!.render(clientComponent as any, {
+								...clientProps,
+								promise: Promise.resolve('Updated recovery'),
+							});
+						});
+						await advance();
+					}
+					// Superseding one completed retry does not make another staged
+					// primary visible, or authorize replay into its loading control.
+					expect(onHydrated).not.toHaveBeenCalled();
+					expect(onClick).not.toHaveBeenCalled();
+					expect([beforeUpdate, await observeAfter(199), await observeAfter(1)]).toEqual([
+						{ time: 100, content: ['Loading streamed content'], hydrated: 0, clicks: 0 },
+						{ time: 299, content: ['Loading streamed content'], hydrated: 0, clicks: 0 },
+						{ time: 300, content: [recoveredValue], hydrated: 1, clicks: 1 },
+					]);
 					expect(deliveries).toEqual([
-						{ event: 'hydrated', time: 300, value: 'Client recovery' },
-						{ event: 'click', time: 300, value: 'Client recovery' },
+						{ event: 'hydrated', time: 300, value: recoveredValue },
+						{ event: 'click', time: 300, value: recoveredValue },
 					]);
 				} else {
 					await act(() => clientValue.resolve('Client recovery'));
@@ -669,10 +706,10 @@ describe('renderToPipeableStream — chunk protocol', () => {
 						expect(onHydrated).toHaveBeenCalledOnce();
 					});
 				}
-				expect(visibleActions().map((button) => button.textContent)).toEqual(['Client recovery']);
+				expect(visibleActions().map((button) => button.textContent)).toEqual([recoveredValue]);
 				expect(onHydrated).toHaveBeenCalledOnce();
 				expect(onClick).toHaveBeenCalledOnce();
-				expect(onClick).toHaveBeenCalledWith('Client recovery');
+				expect(onClick).toHaveBeenCalledWith(recoveredValue);
 			} finally {
 				root?.unmount();
 				recentFallbackRoot?.unmount();
