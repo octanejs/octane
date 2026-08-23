@@ -37,6 +37,7 @@ import {
 	PACKED_COMMONJS_CONSUMER_PACKAGES,
 	PACKED_JAVASCRIPT_CONSUMER_PACKAGES,
 	PACKED_TSRX_CONSUMER_PROJECTS,
+	PACKED_TSRX_CONSUMER_ESRAP_VERSION,
 	PACKED_TSRX_BROWSER_AMBIENT_FILE,
 	PACKED_TSRX_PROBE_PACKAGES,
 	PACKED_TSRX_STRICT_BROWSER_PACKAGES,
@@ -112,8 +113,8 @@ const packedExampleCanaries = [
 		packages: ['octane', '@octanejs/vite-plugin', '@octanejs/app-core', '@octanejs/seo'],
 	},
 ];
-// Keep known upstream type-graph debt explicit while every new source binding
-// is enrolled automatically. Issue #721 owns removing these exceptions.
+// Keep other upstream type-graph debt explicit while new source bindings are
+// enrolled automatically. The five bindings reported in #721 must stay enrolled.
 const packedTsrxSourceExceptions = new Map([
 	['@octanejs/aria', 'its browser source still reads process.env.NODE_ENV'],
 	['@octanejs/base-ui', 'its browser source still reads process.env.NODE_ENV'],
@@ -1240,11 +1241,18 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 		}
 	}
 
-	for (const toolingSpecifier of ['@tsrx/typescript-plugin', 'octane/compiler/volar']) {
+	for (const toolingSpecifier of ['@tsrx/typescript-plugin', 'octane/compiler/volar', 'esrap']) {
 		const entry = realpathSync(consumerRequire.resolve(toolingSpecifier));
 		if (isWithinDirectory(REPO_ROOT, entry)) {
 			throw new Error(`${toolingSpecifier} resolved back into the workspace: ${entry}`);
 		}
+	}
+
+	const consumerPrinter = JSON.parse(
+		readFileSync(path.join(consumerDirectory, 'node_modules/esrap/package.json'), 'utf8'),
+	);
+	if (consumerPrinter.version !== PACKED_TSRX_CONSUMER_ESRAP_VERSION) {
+		throw new Error(`packed TSRX consumer resolved unexpected esrap ${consumerPrinter.version}`);
 	}
 
 	writeFileSync(
@@ -1302,7 +1310,7 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 		`strict tsrx-tsc validated ${validatedPackages.length - 1} packed TSRX bindings with and without Node ambient types using the installed Octane Volar compiler`,
 	);
 	console.log(
-		`strict ESNext browser source and public contracts passed for ${PACKED_TSRX_STRICT_BROWSER_PACKAGES.join(', ')}`,
+		`strict ESNext browser source and public contracts passed for ${PACKED_TSRX_STRICT_BROWSER_PACKAGES.join(', ')} with consumer esrap ${consumerPrinter.version}`,
 	);
 	for (const [packageName, reason] of packedTsrxSourceExceptions) {
 		console.warn(`deferred strict packed TSRX validation for ${packageName}: ${reason}`);

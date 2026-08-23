@@ -230,43 +230,43 @@ type PolarAngleAxisEvents = {
 	/**
  * The customized event handler of click on the ticks of this axis
  */
-	onClick?: (data: TickItem, index: number, e: NativeMouseEvent<SVGTextElement>) => void;
+	onClick?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mousedown on the ticks of this axis
  */
-	onMouseDown?: (data: TickItem, index: number, e: NativeMouseEvent<SVGTextElement>) => void;
+	onMouseDown?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseup on the ticks of this axis
  */
-	onMouseUp?: (data: TickItem, index: number, e: NativeMouseEvent<SVGTextElement>) => void;
+	onMouseUp?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mousemove on the ticks of this axis
  */
-	onMouseMove?: (data: TickItem, index: number, e: NativeMouseEvent<SVGTextElement>) => void;
+	onMouseMove?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseover on the ticks of this axis
  */
-	onMouseOver?: (data: TickItem, index: number, e: NativeMouseEvent<SVGTextElement>) => void;
+	onMouseOver?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseout on the ticks of this axis
  */
-	onMouseOut?: (data: TickItem, index: number, e: NativeMouseEvent<SVGTextElement>) => void;
+	onMouseOut?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseenter on the ticks of this axis
  */
-	onMouseEnter?: (data: TickItem, index: number, e: NativeMouseEvent<SVGTextElement>) => void;
+	onMouseEnter?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseleave on the ticks of this axis
  */
-	onMouseLeave?: (data: TickItem, index: number, e: NativeMouseEvent<SVGTextElement>) => void;
-	onTouchStart?: (data: TickItem, index: number, e: NativeTouchEvent<SVGTextElement>) => void;
-	onTouchMove?: (data: TickItem, index: number, e: NativeTouchEvent<SVGTextElement>) => void;
-	onTouchEnd?: (data: TickItem, index: number, e: NativeTouchEvent<SVGTextElement>) => void;
+	onMouseLeave?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
+	onTouchStart?: (data: TickItem, index: number, e: NativeTouchEvent<SVGGElement>) => void;
+	onTouchMove?: (data: TickItem, index: number, e: NativeTouchEvent<SVGGElement>) => void;
+	onTouchEnd?: (data: TickItem, index: number, e: NativeTouchEvent<SVGGElement>) => void;
 };
 
 type AxisSvgProps =
 	Omit<
-		PresentationAttributesAdaptChildEvent<TickItem, SVGTextElement>,
+		PresentationAttributesAdaptChildEvent<TickItem, SVGGElement>,
 		'scale' | 'type' | 'dangerouslySetInnerHTML' | 'ref'
 	> & { ref?: never };
 

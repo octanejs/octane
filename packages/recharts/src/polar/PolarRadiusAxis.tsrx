@@ -140,35 +140,35 @@ export interface PolarRadiusAxisProps<DataPointType = any, DataValueType = any> 
 	/**
  * The customized event handler of click on the ticks of this axis
  */
-	onClick?: (data: any, index: number, e: NativeMouseEvent) => void;
+	onClick?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mousedown on the ticks of this axis
  */
-	onMouseDown?: (data: any, index: number, e: NativeMouseEvent) => void;
+	onMouseDown?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseup on the ticks of this axis
  */
-	onMouseUp?: (data: any, index: number, e: NativeMouseEvent) => void;
+	onMouseUp?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mousemove on the ticks of this axis
  */
-	onMouseMove?: (data: any, index: number, e: NativeMouseEvent) => void;
+	onMouseMove?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseover on the ticks of this axis
  */
-	onMouseOver?: (data: any, index: number, e: NativeMouseEvent) => void;
+	onMouseOver?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseout on the ticks of this axis
  */
-	onMouseOut?: (data: any, index: number, e: NativeMouseEvent) => void;
+	onMouseOut?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseenter on the ticks of this axis
  */
-	onMouseEnter?: (data: any, index: number, e: NativeMouseEvent) => void;
+	onMouseEnter?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseleave on the ticks of this axis
  */
-	onMouseLeave?: (data: any, index: number, e: NativeMouseEvent) => void;
+	onMouseLeave?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * Allow the ticks of axis to be decimals or not.
  *
@@ -218,7 +218,7 @@ export interface PolarRadiusAxisProps<DataPointType = any, DataValueType = any> 
 }
 
 type AxisSvgProps =
-	Omit<PresentationAttributesAdaptChildEvent<any, SVGTextElement>, 'scale' | 'type' | 'ref'> & {
+	Omit<PresentationAttributesAdaptChildEvent<any, SVGGElement>, 'scale' | 'type' | 'ref'> & {
 		ref?: never;
 	};
 

@@ -1201,8 +1201,13 @@ type PropsWithResolvedDefaults = RequiresDefaultProps<Props, typeof defaultPiePr
  * @provides LabelListContext
  * @provides CellReader
  */
-function PieFn(outsideProps: Props) {
-	const props: PropsWithResolvedDefaults = resolveDefaultProps(outsideProps, defaultPieProps);
+function PieFn<DataPointType = any, DataValueType = any>(
+	outsideProps: Props<DataPointType, DataValueType>,
+) {
+	const props: PropsWithResolvedDefaults = resolveDefaultProps<Props, typeof defaultPieProps>(
+		outsideProps,
+		defaultPieProps,
+	);
 	const { id: externalId, ...propsWithoutId } = props;
 	const presentationProps: PiePresentationProps | null = svgPropertiesNoEvents(propsWithoutId);
 

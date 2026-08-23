@@ -1075,12 +1075,12 @@
       }
     },
     "conformance": {
-      "status": "passed-before-final-type-only-refinements",
+      "status": "passed",
       "command": "node_modules/.bin/vitest run --project recharts --silent=passed-only",
       "passedTests": 36,
       "passedFiles": 4,
       "scope": "Repository-authored conformance tests; separate recharts-differential project is not included.",
-      "note": "The 36-test run preceded the final erased Boolean/Draft/D3 refinements. The native-event store file was rerun with 5 passing tests afterward. A final full-root runtime rerun, including the separate differential project, remains pending."
+      "note": "The focused run passed all 36 conformance tests. The final normal-root shards subsequently passed all 39 Recharts cases across these four files and the three-case differential file; that coverage is part of the full-root result, not a separate 39-test invocation."
     },
     "formatting": {
       "status": "passed",
@@ -1088,12 +1088,28 @@
       "scope": "Owned ordinary TypeScript, native regression test, comparison script, package manifest, and restoration record."
     },
     "fullRootRuntime": {
-      "status": "pending",
-      "scope": "The initial full-root run exhausted the default heap without an aggregate result; a coordinated sharded rerun owns all fixture generation."
+      "status": "passed",
+      "command": "pnpm exec vitest run --shard=N/4 --maxWorkers=2 --silent=passed-only",
+      "completedShards": [1, 2, 3, 4],
+      "nodeVersion": "24.19.0",
+      "maxOldSpaceSizeMiB": 8192,
+      "passedFiles": 2300,
+      "passedTests": 23986,
+      "scope": "All normal-root Vitest projects, with no project or test exclusions, including Recharts conformance and differential cases. The root test prechecks passed separately. The original unsharded run exhausted the default 4 GiB heap and is not counted as a pass."
     },
     "packedConsumer": {
-      "status": "pending",
-      "scope": "Real packed, installed multi-binding consumer validation and final CI are separate from the passing local strict-source checks. This record does not claim they have completed."
+      "status": "passed",
+      "command": "pnpm packages:pack:check",
+      "validatedTarballs": 101,
+      "preservedTsrxSources": 792,
+      "strictBindings": 37,
+      "focusedIssueBindings": 5,
+      "focusedPublicSpecifiers": 60,
+      "focusedTsrxImplementations": 348,
+      "typescriptVersion": "5.9.3",
+      "tsrxTypeScriptPluginVersion": "0.3.120",
+      "consumerEsrapVersion": "2.3.6",
+      "scope": "Actual tarballs installed outside the workspace. The five issue bindings pass a normal source-only ESNext browser application and canonical full-implementation browser/Node programs with strict checking and skipLibCheck=false. Negative Node ambient, prop, callback, ref, generic, and tuple probes remain active. All 348 shipped TSRX implementations are in the forced program. Runtime/tooling resolutions stay outside the workspace, with one Octane installation and no consumer dependency overrides or patches. The old Recharts facade fails the same public probes. Other existing binding exceptions remain explicit; current-head CI is reported separately on the PR."
     }
   }
 }

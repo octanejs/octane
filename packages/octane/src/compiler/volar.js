@@ -197,10 +197,7 @@ function markNativeTemplateBodies(root) {
  * element types cannot leak into files owned by another renderer.
  *
  * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean }} [options]
- * @returns {import('@tsrx/core/types').VolarMappingsResult & {
- *   diagnostics: readonly unknown[],
- *   generatedAst: import('estree').Program,
- * }}
+ * @returns {import('./index.js').VolarCompileResult}
  */
 export function compileToVolarMappings(source, filename, options) {
 	/** @type {import('@tsrx/core/types').CompileError[]} */
@@ -460,6 +457,12 @@ function collectDirectiveOrigins(ast, source) {
  * @param {string} source
  * @param {string} [filename]
  * @param {{ renderers?: unknown }} [options]
+ * @returns {{
+ *   code: string,
+ *   sourceAst: import('./index.js').CompilerProgram,
+ *   generatedAst: import('./index.js').CompilerProgram,
+ *   segments: (import('./index.js').CompileInspection['segments'][number] & { exact?: true })[],
+ * }}
  */
 export function compileTypesInspection(source, filename, options) {
 	/** @type {import('@tsrx/core/types').CompileError[]} */

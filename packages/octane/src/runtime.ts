@@ -17129,12 +17129,12 @@ function isHostDescriptor(v: any): v is ElementDescriptor & { type: string } {
 // ---------------------------------------------------------------------------
 
 /**
- * True for a createElement/JSX descriptor. Known descriptors retain their prop
- * type; supply P to narrow an element-or-props union to that exact descriptor.
+ * True for a createElement/JSX descriptor. Known descriptors, including unions,
+ * retain their prop types; supply P to narrow an element-or-props union.
  */
-export function isValidElement<P>(
-	v: ElementDescriptor<P> | null | undefined,
-): v is ElementDescriptor<P>;
+export function isValidElement<P = any, E extends ElementDescriptor<P> = ElementDescriptor<P>>(
+	v: E | null | undefined,
+): v is E;
 export function isValidElement<P = any>(v: unknown): v is ElementDescriptor<P>;
 export function isValidElement(v: unknown): v is ElementDescriptor {
 	return isElementDescriptor(v);

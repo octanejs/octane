@@ -49,10 +49,12 @@ compiled presets, correct native-event persistence, and retain the handwritten
 Octane helpers while restoring the missing polar guard. The 25 existing
 authored TypeScript modules retain their runtime bodies except for that guard.
 Strict source checks pass, including both D3 declaration versions encountered
-in combined consumer installs. The record distinguishes completed conformance
-checks from the pending full runtime, packed-consumer, and CI gates. These checks
-do not replace the upstream suite disposition below or establish complete
-upstream parity.
+in combined consumer installs. All normal-root runtime shards and the complete
+tarball validation pass, including a browser-only ESNext consumer of all five
+bindings reported in #721. The record distinguishes focused conformance counts
+from the full-root result; current-head CI is reported separately on the PR.
+These checks do not replace the upstream suite disposition below or establish
+complete upstream parity.
 
 ## Export crosswalk
 

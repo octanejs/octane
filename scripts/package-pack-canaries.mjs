@@ -270,13 +270,17 @@ export function findExternalDependencySpecs(manifests, packageNames) {
 	);
 }
 
+// The consumer printer must not change the packed compiler's private printer.
+// This version exposed duplicated tuple annotations with the unbundled backend.
+export const PACKED_TSRX_CONSUMER_ESRAP_VERSION = '2.3.6';
+
 export function createPackedTsrxConsumerManifest(
 	archiveSpecs,
 	toolingVersions,
 	packageNames,
 	externalDependencies = {},
 ) {
-	const dependencies = { ...externalDependencies };
+	const { esrap: _externalPrinter, ...dependencies } = externalDependencies;
 
 	for (const packageName of packageNames) {
 		const archiveSpec = archiveSpecs[packageName];
@@ -296,6 +300,7 @@ export function createPackedTsrxConsumerManifest(
 		devDependencies: {
 			'@tsrx/typescript-plugin': toolingVersions.tsrxTypeScriptPlugin,
 			'@types/node': toolingVersions.nodeTypes,
+			esrap: PACKED_TSRX_CONSUMER_ESRAP_VERSION,
 			typescript: toolingVersions.typescript,
 		},
 	};
@@ -420,7 +425,9 @@ export type BrowserHasNoNodeNamespace = NodeJS.Process;
 }
 
 export function renderPackedStrictBrowserConsumerTypeProbe() {
-	return `import { atom, useAtom } from '@octanejs/jotai';
+	return `import { sumTypedPair } from './App.tsrx';
+import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
+import { atom, useAtom } from '@octanejs/jotai';
 import { useSelector } from '@octanejs/redux';
 import { Form, Link, NavLink } from '@octanejs/remix-router';
 import { Group } from '@octanejs/visx/group';
@@ -431,6 +438,8 @@ import {
 	Funnel,
 	Line,
 	Pie,
+	PolarAngleAxis,
+	PolarRadiusAxis,
 	Scatter,
 	XAxis,
 	YAxis,
@@ -448,6 +457,33 @@ import { Brush } from '@octanejs/recharts';
 import { Treemap } from '@octanejs/recharts';
 
 type AssertNotAny<T> = 0 extends 1 & T ? never : true;
+export function verifyPackedCompilerTypes() {
+	const mappings = compileToVolarMappings('export const value = 1;', 'Probe.tsrx');
+	const inspection = compileTypesInspection('export const value = 1;', 'Probe.tsrx');
+	const generatedCode: string = mappings.code;
+	const inspectedCode: string = inspection.code;
+	const sourceOffset: number = mappings.mappings[0].sourceOffsets[0];
+	const sourceStart: number = inspection.segments[0].srcStart;
+	// @ts-expect-error Compiler source inputs are strings, not arbitrary objects.
+	compileToVolarMappings({});
+	// @ts-expect-error Inspection source inputs keep the same string contract.
+	compileTypesInspection({});
+	// @ts-expect-error Bundling must not erase the generated code's string type.
+	const invalidGeneratedCode: number = mappings.code;
+	// @ts-expect-error Inspection code remains a string after bundling.
+	const invalidInspectedCode: number = inspection.code;
+	// @ts-expect-error Mapping offsets must not degrade to any.
+	const invalidSourceOffset: string = mappings.mappings[0].sourceOffsets[0];
+	// @ts-expect-error Inspection ranges remain numeric.
+	const invalidSourceStart: string = inspection.segments[0].srcStart;
+	return { generatedCode, inspectedCode, sourceOffset, sourceStart,
+		invalidGeneratedCode, invalidInspectedCode, invalidSourceOffset, invalidSourceStart };
+}
+const tupleTotal: number = sumTypedPair([1, 2]);
+// @ts-expect-error A typed array parameter accepts one tuple, not two arguments.
+sumTypedPair(1, 2);
+// @ts-expect-error Typed tuple members must keep their authored element types.
+sumTypedPair([1, 'two']);
 const barDataKeyIsTyped: AssertNotAny<BarProps['dataKey']> = true;
 const barShapeXIsTyped: AssertNotAny<BarShapeProps['x']> = true;
 const barEventIsTyped: AssertNotAny<Parameters<NonNullable<BarProps['onClick']>>[2]> = true;
@@ -494,6 +530,24 @@ const invalidBar: BarProps = { dataKey: true };
 const invalidBarComponent: Parameters<typeof Bar>[0] = { dataKey: true };
 // @ts-expect-error Chart refs point at SVG roots and do not accept legacy strings.
 const invalidChartRef: Parameters<typeof BarChart>[0] = { ref: 'legacy' };
+const typedPolarAngleAxis: Parameters<typeof PolarAngleAxis>[0] = {
+	onClick(_data, _index, event) {
+		const group: SVGGElement = event.currentTarget;
+		// @ts-expect-error Axis events target the enclosing group, not a text node.
+		event.currentTarget.getComputedTextLength();
+		void group;
+	},
+	tick: { ref: (node: SVGTextElement | null) => { node?.getComputedTextLength(); } },
+};
+const typedPolarRadiusAxis: Parameters<typeof PolarRadiusAxis>[0] = {
+	onScroll(_data, _index, event) {
+		const group: SVGGElement = event.currentTarget;
+		// @ts-expect-error Axis events target the enclosing group, not a text node.
+		event.currentTarget.getComputedTextLength();
+		void group;
+	},
+	tick: { ref: (node: SVGTextElement | null) => { node?.getComputedTextLength(); } },
+};
 
 const typedLink: Parameters<typeof Link>[0] = {
 	to: '/packed',
@@ -548,8 +602,10 @@ const legacyProps: RechartsProps = { width: 320 };
 const legacyBrush: BrushProps = { dataKey: 'value' };
 const legacyTreemap: TreemapProps = { data: [] };
 export const verifiedStrictBrowserTypes = {
+	tupleTotal,
 	barDataKeyIsTyped, barShapeXIsTyped, barEventIsTyped, typedBarShapeX, invalidBarShapeX,
-	typedBar, typedChart, typedArea, typedPie, typedLink, typedForm, typedGroup,
+	typedBar, typedChart, typedArea, typedPie, typedPolarAngleAxis, typedPolarRadiusAxis,
+	typedLink, typedForm, typedGroup,
 	genericBar, numericStackedBar, genericArea, genericFunnel, genericLine, genericPie, genericScatter, genericXAxis, genericYAxis,
 	invalidBar, invalidBarComponent, invalidChartRef, invalidLinkRef, invalidFormRef, invalidNavLinkRef,
 	invalidGroupOffset, invalidGenericDataKey, invalidFunnelDataKey,
@@ -566,6 +622,10 @@ import { Group } from '@octanejs/visx/group';
 import { Bar, BarChart, XAxis, YAxis } from '@octanejs/recharts';
 import { useRef } from 'octane';
 import { createStore } from 'redux';
+
+export function sumTypedPair([first, second]: [number, number]): number {
+	return first + second;
+}
 
 const counter = atom(0);
 const store = createStore((state = { count: 1 }) => state);

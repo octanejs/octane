@@ -222,6 +222,16 @@ if (isValidElement(namedElement)) {
 	use(namedElement.props.missing);
 }
 
+declare const elementUnion:
+	ElementDescriptor<{ label: string }> | ElementDescriptor<{ count: number }> | null | undefined;
+if (isValidElement(elementUnion)) {
+	use<{ label: string } | { count: number }>(elementUnion.props);
+	// @ts-expect-error — recognizing a descriptor union must not erase its props to any.
+	use(elementUnion.props.missing);
+} else {
+	use<null | undefined>(elementUnion);
+}
+
 declare const opaqueElement: ElementDescriptor<unknown>;
 if (isValidElement(opaqueElement)) {
 	// @ts-expect-error — recognizing an element does not validate unknown props.

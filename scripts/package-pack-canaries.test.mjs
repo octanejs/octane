@@ -197,12 +197,14 @@ describe('packed TSRX source consumers', () => {
 			archiveSpecs,
 			toolingVersions,
 			Object.keys(archiveSpecs),
+			{ esrap: '^2.3.2' },
 		);
 
 		assert.deepEqual(manifest.dependencies, archiveSpecs);
 		assert.deepEqual(manifest.devDependencies, {
 			'@tsrx/typescript-plugin': '0.3.116',
 			'@types/node': '24.13.3',
+			esrap: '2.3.6',
 			typescript: '5.9.3',
 		});
 		assert.equal(manifest.private, true);
