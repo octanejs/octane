@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { compile } from 'octane/compiler';
-import * as ClientRT from '../../src/index.js';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 
 // Conformance port of facebook/react's SSR serialization matrix —
 // ReactDOMServerIntegrationElements-test.js, ReactDOMServerIntegrationAttributes-test.js,
@@ -161,20 +160,13 @@ export function FragNested() @{ <>
 export function FragEmpty() @{ <div><></></div> }
 `;
 
-function evalMod(rt: any, opts: any): Record<string, any> {
-	let { code } = compile(SRC, FILE, opts);
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/(?:server|internal\/(?:client|server)))?['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(rt, {});
-}
-
-const server = evalMod(ServerRT, { mode: 'server' });
+const server = loadCompiledFixtureSource(SRC, { id: FILE, mode: 'server' });
 // dev: true so hydration mismatch warnings fire (they are dev-only).
-const client = evalMod(ClientRT, { mode: 'client', dev: true });
+const client = loadCompiledFixtureSource(SRC, {
+	id: FILE,
+	mode: 'client',
+	compileOptions: { dev: true },
+});
 
 const ssr = (name: string, props?: any) => ServerRT.renderToString(server[name], props).html;
 

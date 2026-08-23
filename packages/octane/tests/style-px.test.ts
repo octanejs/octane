@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
-import * as ClientRT from '../src/index.js';
 import * as ServerRT from 'octane/server';
 import { mount } from './_helpers';
+import { loadCompiledFixtureSource } from './_server-fixture';
 import { hydrateRoot, flushSync } from '../src/index.js';
 import { DynStyle, StaticStyle } from './_fixtures/style-px.tsrx';
 
@@ -67,20 +66,12 @@ describe('numeric style px — static (compile-time bake)', () => {
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/style-px.tsrx');
 
-function evalModule(mode: 'server' | 'client', rt: unknown): Record<string, any> {
-	const src = mode === 'server' ? 'octane/server' : 'octane';
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'style-px.tsrx', { mode });
-	code = code.replace(
-		new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*['"]${src}['"];?`, 'g'),
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(rt, {});
+function evalModule(mode: 'server' | 'client'): Record<string, any> {
+	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), { id: 'style-px.tsrx', mode });
 }
 
 describe('numeric style px — SSR', () => {
-	const server = evalModule('server', ServerRT);
+	const server = evalModule('server');
 
 	it('serialises a dynamic object style with px / unitless / 0 / custom-prop rules', async () => {
 		const { html } = await ServerRT.renderToString(server.DynStyle, {
@@ -103,8 +94,8 @@ describe('numeric style px — SSR', () => {
 });
 
 describe('numeric style px — hydration parity', () => {
-	const server = evalModule('server', ServerRT);
-	const client = evalModule('client', ClientRT);
+	const server = evalModule('server');
+	const client = evalModule('client');
 	let container: HTMLElement;
 	let errSpy: ReturnType<typeof vi.spyOn>;
 	beforeEach(() => {

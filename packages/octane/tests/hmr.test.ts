@@ -45,21 +45,22 @@ async function compileHmrComponent(
 	filename = '/src/App.tsrx',
 	modules: Record<string, Record<string, unknown>> = {},
 ): Promise<ComponentBody<any>> {
-	const [{ compile }, runtime] = await Promise.all([
+	const [{ compile }, runtime, internalRuntime] = await Promise.all([
 		import('octane/compiler'),
 		import('../src/index.js'),
+		import('octane/internal/client'),
 	]);
 	const code = compile(source, filename, { hmr: 'webpack' }).code;
 	const transformed =
 		code
 			.replace(
-				/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])octane(?:\/internal\/client)?\2;/gm,
-				(_match: string, imports: string) => {
+				/^import\s*\{([^}]*)\}\s*from\s*(['"])octane(\/internal\/client)?\2;/gm,
+				(_match: string, imports: string, _quote: string, internal: string | undefined) => {
 					const properties = imports
 						.split(',')
 						.map((specifier) => specifier.trim().replace(/\s+as\s+/, ': '))
 						.join(', ');
-					return `const { ${properties} } = runtime;`;
+					return `const { ${properties} } = ${internal ? 'internalRuntime' : 'runtime'};`;
 				},
 			)
 			.replace(
@@ -85,10 +86,11 @@ async function compileHmrComponent(
 	};
 	return Function(
 		'runtime',
+		'internalRuntime',
 		'hot',
 		'modules',
 		transformed,
-	)(runtime, hot, modules) as ComponentBody<any>;
+	)(runtime, internalRuntime, hot, modules) as ComponentBody<any>;
 }
 
 describe('hmr — runtime wrapper', () => {

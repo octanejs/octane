@@ -11,33 +11,22 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
-import * as ClientRT from '../../src/index.js';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture';
 
 const SWAP = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/swap.tsrx');
 
 function serverModule(fixture: string, file: string): Record<string, any> {
-	let { code } = compile(readFileSync(fixture, 'utf8'), file, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
+	return loadServerFixture(fixture, { id: file });
 }
 
 function clientModule(fixture: string, file: string, dev: boolean): Record<string, any> {
-	let { code } = compile(readFileSync(fixture, 'utf8'), file, { mode: 'client', dev });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ClientRT, {});
+	return loadCompiledFixtureSource(readFileSync(fixture, 'utf8'), {
+		id: file,
+		mode: 'client',
+		compileOptions: { dev },
+	});
 }
 
 describe('hydrateRoot — onRecoverableError', () => {

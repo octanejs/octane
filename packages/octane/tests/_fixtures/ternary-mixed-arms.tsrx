@@ -5,7 +5,9 @@
 // setup statement. Every component mounts on the non-JSX arm first — the
 // regression rendered that arm as an empty host.
 
-import { useState } from 'octane';
+import { useState, type OctaneNode } from 'octane';
+
+type ValueArmProps = { on: boolean; label: OctaneNode };
 
 function Chip() @{
 	<em>{'chip'}</em>
@@ -48,6 +50,18 @@ export function StringArm() @{
 			{on ? <b>{'yes'}</b> : 'nope'}
 		</div>
 	</div>
+}
+
+export function PropertyArm(props: ValueArmProps) @{
+	<div class="host">
+		{props.on ? <b>{'yes'}</b> : props.label}
+	</div>
+}
+
+export function ReturnedArm(props: ValueArmProps) {
+	return <div class="host">
+		{props.on ? <b>{'yes'}</b> : props.label}
+	</div>;
 }
 
 // The arm is an element held in a setup variable, not a JSX literal.
@@ -103,6 +117,16 @@ export function UndefinedArm() @{
 
 function Box(props) @{
 	<section>{props.children}</section>
+}
+
+export function WrappedChildrenArm(props: ValueArmProps) @{
+	<div>
+		<Box>
+			<p class="host">
+				{props.on ? <b>{'yes'}</b> : props.label}
+			</p>
+		</Box>
+	</div>
 }
 
 // Component-children position: the client folds this ternary into a descriptor

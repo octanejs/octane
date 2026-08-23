@@ -382,9 +382,8 @@ function attrLoweringToken(node, bind) {
 /**
  * The runtime helper an attribute binding lowers to, or `null` for a binding
  * that is not one attribute's write (children, refs, spreads, the commit-phase
- * source collectors). Single source of truth for the import the binding needs
- * and for the token `registerAttrLoweringOrigin` claims; the mount/update cases
- * call exactly these.
+ * source collectors). Mount writes call this helper directly; guarded scalar
+ * updates use the comparison wrapper selected by attrBindingUpdateHelper.
  */
 function attrBindingHelper(bind) {
 	const controlled = CONTROLLED_KIND_HELPERS[bind.kind];
@@ -410,6 +409,28 @@ function attrBindingHelper(bind) {
 			return bind.ns && bind.ns !== 'html' ? 'setClassAttr' : 'setClassName';
 		default:
 			return null;
+	}
+}
+
+// Shared scalar comparisons retain the ordinary writer's semantics without
+// repeating the guard and previous-value publication in every component.
+// Certified repeated host rows select the ordinary writer and emit an inline
+// guard instead, avoiding a call and cache publication on unchanged rows.
+// Fresh classes deliberately remain unguarded; controlled form properties
+// likewise must reassert the live DOM value on every render.
+function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
+	const helper = attrBindingHelper(bind);
+	if (inlineBindingGuards) return helper;
+	switch (bind.kind) {
+		case 'attr':
+		case 'stringData':
+		case 'booleanAttr':
+		case 'ariaAttr':
+			return `${helper}IfChanged`;
+		case 'class':
+			return bind.fresh ? helper : `${helper}IfChanged`;
+		default:
+			return helper;
 	}
 }
 
@@ -1096,6 +1117,14 @@ const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'replaceRef',
 	'queueOwnRefDetach',
+	'setAttributeIfChanged',
+	'setStringDataIfChanged',
+	'setBooleanAttributeIfChanged',
+	'setAriaAttributeIfChanged',
+	'setClassNameIfChanged',
+	'setClassAttrIfChanged',
+	'textHoleUpdate',
+	'childTextHoleUpdate',
 	...HOOK_MEMO_RUNTIME_HELPERS,
 ]);
 const INTERNAL_SERVER_RUNTIME_HELPERS = new Set(['ssrSpreadContent']);
@@ -13532,6 +13561,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			cssHash,
 			mountCallbackSinks,
 			options?.keyedSelection ?? null,
+			options?.inlineBindingGuards === true,
 		);
 	}
 	ctx.currentInvariantLocals = prevInvariantLocals;
@@ -20546,6 +20576,58 @@ function emitAutoMemoRegion(
 	]);
 }
 
+// Certified repeated host rows keep these guards in their body so stable
+// primitives perform neither a wrapper call nor cache-field publication.
+// Complex children still reconcile at stable identity, and writers run before caches
+// change so held-transition journaling observes the previous binding state.
+function inlineRenderableValueDeclarations(valueExpr) {
+	const V = () => b.id('_v');
+	return [
+		b.const('_v', valueExpr),
+		b.const(
+			'_o',
+			b.logical(
+				'&&',
+				b.binary('!==', V(), b.literal(null)),
+				b.logical(
+					'||',
+					b.binary('===', b.unary('typeof', V()), b.literal('object')),
+					b.binary('===', b.unary('typeof', V()), b.literal('function')),
+				),
+			),
+		),
+	];
+}
+
+function emitInlineRenderableUpdate(previous, cachedNode, slowCall) {
+	const V = () => b.id('_v');
+	return b.if(
+		b.logical('||', b.id('_o'), b.binary('!==', previous(), V())),
+		b.block([
+			b.const('_t', cachedNode()),
+			b.if(
+				andChain([
+					b.binary('!=', b.id('_t'), b.literal(null)),
+					b.unary('!', b.id('_o')),
+					b.binary('!==', V(), b.literal(null)),
+				]),
+				b.stmt(
+					b.call(
+						'_$setText',
+						b.id('_t'),
+						// Bare renderable booleans are empty; explicit text bindings
+						// retain their ordinary coercion through setText.
+						b.conditional(b.binary('===', V(), b.literal(true)), b.literal(''), V()),
+					),
+				),
+				b.stmt(b.assignment('=', cachedNode(), slowCall)),
+			),
+			b.stmt(b.assignment('=', previous(), V())),
+		]),
+		null,
+	);
+}
+
 function planJsx(
 	jsxNodesRaw,
 	ctx,
@@ -20555,6 +20637,7 @@ function planJsx(
 	cssHash = null,
 	mountCallbackSinks = null,
 	keyedSelection = null,
+	inlineBindingGuards = false,
 ) {
 	// DEV ONLY: per-element source-location map for THIS body (path-key → [line, col]),
 	// populated at the top of emitElementHtml and read in the binding mount loop to emit
@@ -21092,12 +21175,21 @@ function planJsx(
 		if (b.kind === 'text' || b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('setText');
 		if (b.kind === 'text') ctx.runtimeNeeded.add('htextSwap');
 		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
-		// One resolution for both consumers: the import this binding needs, and
-		// the token the authored attribute name is claimed against.
+		// Mounts use the unconditional writer; reactive scalar bindings use either
+		// that writer behind an inline guard or its compact comparison helper.
+		// Claim both authored-name tokens when both paths exist, and do not retain
+		// a mount-only import for deferred writes.
 		const attrHelper = attrBindingHelper(b);
 		if (attrHelper !== null) {
-			ctx.runtimeNeeded.add(attrHelper);
-			registerAttrLoweringOrigin(ctx, b.nameOrigin, attrHelper, b.name);
+			if (!b.deferred) {
+				ctx.runtimeNeeded.add(attrHelper);
+				registerAttrLoweringOrigin(ctx, b.nameOrigin, attrHelper, b.name);
+			}
+			if (!b.mountOnly) {
+				const updateHelper = attrBindingUpdateHelper(b, inlineBindingGuards);
+				ctx.runtimeNeeded.add(updateHelper);
+				registerAttrLoweringOrigin(ctx, b.nameOrigin, updateHelper, b.name);
+			}
 		}
 		if (b.kind === 'htmlOnlyChild') ctx.runtimeNeeded.add('setDangerouslySetInnerHTML');
 		if (b.kind === 'dangerCommit') ctx.runtimeNeeded.add('setDangerouslySetInnerHTMLSources');
@@ -21354,7 +21446,7 @@ function planJsx(
 	const updateLines = [];
 	const everyRenderLines = [];
 	for (const b of elementBindings) {
-		const updateEmit = emitBindingUpdate(b, bag);
+		const updateEmit = emitBindingUpdate(b, bag, inlineBindingGuards);
 		if (!updateEmit) continue;
 		if (b.deferred) everyRenderLines.push(updateEmit);
 		else updateLines.push(updateEmit);
@@ -21374,7 +21466,7 @@ function planJsx(
 				keyedSelection.selectedName,
 			]).size === 0
 		) {
-			keyedSelection.update = emitBindingUpdate(classes[0], bag);
+			keyedSelection.update = emitBindingUpdate(classes[0], bag, inlineBindingGuards);
 		}
 	}
 
@@ -21746,17 +21838,10 @@ function planJsx(
 		// component calls; only the emitted runtime call differs.
 		if (cc.isChild) {
 			const V = () => b.id('_v');
-			// setText follows explicit text-binding coercion, which renders `true`.
-			// Renderable children suppress it. Normalize that one differing value
-			// while keeping the journaled text setter and its allocation-free path.
-			const childTextValue = () =>
-				b.conditional(b.binary('===', V(), b.literal(true)), b.literal(''), V());
 			// MARKERLESS only-child renderable: append a primitive as a single Text
-			// node (no `<!>`, no slot state), `setText` it inline on update — exactly
-			// like a `.tsrx` only-child text binding — and fall back to `childTextHole`
-			// (→ childSlot, lazy markers) only for objects / first render / mode switch.
+			// node (no `<!>`, no slot state). Either the shared helper or the inline
+			// row guard compares its cached value/node before the ordinary child path.
 			if (cc.onlyChildText && !noTemplate) {
-				ctx.runtimeNeeded.add('childTextHole');
 				const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
 				const chv = () => bagFieldNode(bag, `_chv$${cc.id}`);
 				// A host that can receive dangerouslySetInnerHTML must validate its
@@ -21764,6 +21849,7 @@ function planJsx(
 				// identity-skip an unchanged child while a raw-HTML writer activates in
 				// the same render, bypassing childTextHole's mutual-exclusion check.
 				if (cc.potentialDangerouslySetInnerHTML) {
+					ctx.runtimeNeeded.add('childTextHole');
 					pushAfterStmt(
 						cc.id,
 						org,
@@ -21788,38 +21874,40 @@ function planJsx(
 					);
 					continue;
 				}
-				ctx.runtimeNeeded.add('setText');
+				ctx.runtimeNeeded.add(inlineBindingGuards ? 'childTextHole' : 'childTextHoleUpdate');
+				if (inlineBindingGuards) ctx.runtimeNeeded.add('setText');
 				const updateHole = () =>
-					b.if(
-						b.logical('||', b.id('_o'), b.binary('!==', chp(), V())),
-						b.block([
-							b.const('_t', chv()),
-							b.if(
-								andChain([
-									b.binary('!=', b.id('_t'), b.literal(null)),
-									b.unary('!', b.id('_o')),
-									b.binary('!==', V(), b.literal(null)),
-								]),
-								b.stmt(b.call('_$setText', b.id('_t'), childTextValue())),
+					inlineBindingGuards
+						? emitInlineRenderableUpdate(
+								chp,
+								chv,
+								b.call(
+									'_$childTextHole',
+									b.id('__s'),
+									b.literal(slotIndex),
+									hostExpr(),
+									V(),
+									b.id('_t'),
+								),
+							)
+						: b.block([
 								b.stmt(
 									b.assignment(
 										'=',
 										chv(),
 										b.call(
-											'_$childTextHole',
+											'_$childTextHoleUpdate',
 											b.id('__s'),
 											b.literal(slotIndex),
 											hostExpr(),
 											V(),
-											b.id('_t'),
+											chv(),
+											chp(),
 										),
 									),
 								),
-							),
-							b.stmt(b.assignment('=', chp(), V())),
-						]),
-						null,
-					);
+								b.stmt(b.assignment('=', chp(), V())),
+							]);
 				const ordinary = updateHole();
 				let update = ordinary;
 				if (cc.autoMemoValue === true) {
@@ -21846,19 +21934,9 @@ function planJsx(
 					cc.id,
 					org,
 					b.block([
-						b.const('_v', cc.valueExpr),
-						b.const(
-							'_o',
-							b.logical(
-								'&&',
-								b.binary('!==', V(), b.literal(null)),
-								b.logical(
-									'||',
-									b.binary('===', b.unary('typeof', V()), b.literal('object')),
-									b.binary('===', b.unary('typeof', V()), b.literal('function')),
-								),
-							),
-						),
+						...(inlineBindingGuards
+							? inlineRenderableValueDeclarations(cc.valueExpr)
+							: [b.const('_v', cc.valueExpr)]),
 						update,
 					]),
 				);
@@ -21880,37 +21958,26 @@ function planJsx(
 				pushAfterStmt(cc.id, org, b.stmt(b.call('_$textSlot', ...args)));
 				continue;
 			}
-			// Template body: INLINE the text-hole hot path. Cache the text node
-			// (`_chv`) + last value (`_chp`) on the bag and, when the value is an
-			// unchanged-skippable primitive already backed by a text node, do a direct
-			// `setText` — exactly like a `.tsrx` `{… as string}` text binding. Objects /
-			// functions (component / element / array), the first render, and mode
-			// switches go through `textHole` → the full `childSlot` — INCLUDING when
-			// the value is identity-UNCHANGED: only childSlot's bail path refreshes
-			// changed-context consumers below (a stable `{children}` passthrough under
-			// a re-rendering Provider), so an inline identity skip would strand them.
-			// Only unchanged primitives/null (no consumers possible) skip the call.
-			ctx.runtimeNeeded.add('textHole');
+			// Keep the same cached text node + raw value and share the primitive
+			// comparison/coercion path. Objects/functions still reach childSlot on
+			// every render so unchanged descriptors propagate changed context.
 			// When the slot has its OWN `<!>` placeholder, tell textHole/childSlot to
 			// reuse it as the end marker (no second comment minted) — `ownEnd`.
 			const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
 			const chv = () => bagFieldNode(bag, `_chv$${cc.id}`);
-			const textHoleCall = (lastArg) => {
-				const args = [
-					b.id('__s'),
-					b.literal(slotIndex),
-					hostExpr(),
-					lastArg,
-					childAnchor ?? b.literal(null),
-				];
+			const textHoleCall = (lastArg, updating = false) => {
+				const args = [b.id('__s'), b.literal(slotIndex), hostExpr(), lastArg];
+				if (updating) args.push(chv(), chp());
+				args.push(childAnchor ?? b.literal(null));
 				if (cc.anchorVar) args.push(b.literal(true));
 				if (cc.coalesceRange) {
 					if (!cc.anchorVar) args.push(undefinedNode());
 					args.push(b.literal(true));
 				}
-				return b.call('_$textHole', ...args);
+				return b.call(updating ? '_$textHoleUpdate' : '_$textHole', ...args);
 			};
 			if (cc.potentialDangerouslySetInnerHTML) {
+				ctx.runtimeNeeded.add('textHole');
 				pushAfterStmt(
 					cc.id,
 					org,
@@ -21922,7 +21989,20 @@ function planJsx(
 				);
 				continue;
 			}
-			ctx.runtimeNeeded.add('setText');
+			if (inlineBindingGuards) {
+				ctx.runtimeNeeded.add('textHole');
+				ctx.runtimeNeeded.add('setText');
+				pushAfterStmt(
+					cc.id,
+					org,
+					b.block([
+						...inlineRenderableValueDeclarations(cc.valueExpr),
+						emitInlineRenderableUpdate(chp, chv, textHoleCall(V())),
+					]),
+				);
+				continue;
+			}
+			ctx.runtimeNeeded.add('textHoleUpdate');
 			// Publish the raw value after the helper: setText must journal the old
 			// binding bag before a held transition can roll the DOM write back.
 			pushAfterStmt(
@@ -21930,35 +22010,8 @@ function planJsx(
 				org,
 				b.block([
 					b.const('_v', cc.valueExpr),
-					b.const(
-						'_o',
-						b.logical(
-							'&&',
-							b.binary('!==', V(), b.literal(null)),
-							b.logical(
-								'||',
-								b.binary('===', b.unary('typeof', V()), b.literal('object')),
-								b.binary('===', b.unary('typeof', V()), b.literal('function')),
-							),
-						),
-					),
-					b.if(
-						b.logical('||', b.id('_o'), b.binary('!==', chp(), V())),
-						b.block([
-							b.const('_t', chv()),
-							b.if(
-								andChain([
-									b.binary('!=', b.id('_t'), b.literal(null)),
-									b.unary('!', b.id('_o')),
-									b.binary('!==', V(), b.literal(null)),
-								]),
-								b.stmt(b.call('_$setText', b.id('_t'), childTextValue())),
-								b.stmt(b.assignment('=', chv(), textHoleCall(V()))),
-							),
-							b.stmt(b.assignment('=', chp(), V())),
-						]),
-						null,
-					),
+					b.stmt(b.assignment('=', chv(), textHoleCall(V(), true))),
+					b.stmt(b.assignment('=', chp(), V())),
 				]),
 			);
 			continue;
@@ -22866,7 +22919,7 @@ function emitBindingMount(bind, elVar, bag) {
 	return null;
 }
 
-function emitBindingUpdate(bind, bag) {
+function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 	if (bind.mountOnly) return null;
 	const org = bindingOrigin(bind);
 	const st = (node) => inheritOriginLoc(node, org);
@@ -22876,7 +22929,8 @@ function emitBindingUpdate(bind, bag) {
 	const F = (prefix) => bagFieldNode(bag, `${prefix}$${bind.id}`);
 	// See emitBindingMount: the helper and the name literal carry the authored
 	// attribute name, so the name resolves to the update write too.
-	const callee = () => attrLoweringToken(b.id(`_$${attrBindingHelper(bind)}`), bind);
+	const callee = () =>
+		attrLoweringToken(b.id(`_$${attrBindingUpdateHelper(bind, inlineBindingGuards)}`), bind);
 	const nameLit = () => attrLoweringToken(b.literal(bind.name), bind);
 	switch (bind.kind) {
 		case 'nativeChangeRuntime': {
@@ -22969,18 +23023,29 @@ function emitBindingUpdate(bind, bag) {
 		case 'stringData':
 		case 'booleanAttr':
 		case 'ariaAttr': {
+			if (inlineBindingGuards) {
+				return st(
+					b.block([
+						b.const('_v', bind.expr),
+						b.if(
+							b.binary('!==', F('_prev'), V()),
+							b.block([
+								b.stmt(b.call(callee(), F('_el'), nameLit(), V())),
+								b.stmt(b.assignment('=', F('_prev'), V())),
+							]),
+							null,
+						),
+					]),
+				);
+			}
 			return st(
-				b.block([
-					b.const('_v', bind.expr),
-					b.if(
-						b.binary('!==', F('_prev'), V()),
-						b.block([
-							b.stmt(b.call(callee(), F('_el'), nameLit(), V())),
-							b.stmt(b.assignment('=', F('_prev'), V())),
-						]),
-						null,
+				b.stmt(
+					b.assignment(
+						'=',
+						F('_prev'),
+						b.call(callee(), bind.expr, F('_prev'), F('_el'), nameLit()),
 					),
-				]),
+				),
 			);
 		}
 		case 'value':
@@ -23000,18 +23065,23 @@ function emitBindingUpdate(bind, bag) {
 			if (bind.fresh) {
 				return st(b.stmt(b.call(callee(), F('_el'), bind.expr)));
 			}
+			if (inlineBindingGuards) {
+				return st(
+					b.block([
+						b.const('_v', bind.expr),
+						b.if(
+							b.binary('!==', F('_prev'), V()),
+							b.block([
+								b.stmt(b.call(callee(), F('_el'), V())),
+								b.stmt(b.assignment('=', F('_prev'), V())),
+							]),
+							null,
+						),
+					]),
+				);
+			}
 			return st(
-				b.block([
-					b.const('_v', bind.expr),
-					b.if(
-						b.binary('!==', F('_prev'), V()),
-						b.block([
-							b.stmt(b.call(callee(), F('_el'), V())),
-							b.stmt(b.assignment('=', F('_prev'), V())),
-						]),
-						null,
-					),
-				]),
+				b.stmt(b.assignment('=', F('_prev'), b.call(callee(), bind.expr, F('_prev'), F('_el')))),
 			);
 		}
 		case 'style': {
@@ -25158,6 +25228,7 @@ function hoistBodyHelper(
 	envNames,
 	idOrigin = null,
 	keyedSelection = null,
+	inlineBindingGuards = false,
 ) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
 	const ownEnvNames = envNames === null ? null : helperCaptures(ctx, stmts, params);
@@ -25202,8 +25273,10 @@ function hoistBodyHelper(
 		},
 		fakeOrigin,
 	);
+	const helperOptions =
+		inlineBindingGuards || keyedSelection !== null ? { keyedSelection, inlineBindingGuards } : null;
 	if (envNames == null) {
-		inlinedSubs.push(compileFunctionBody(fake, ctx, helperName, parentNs, cssHash));
+		inlinedSubs.push(compileFunctionBody(fake, ctx, helperName, parentNs, cssHash, helperOptions));
 		return helperName;
 	}
 	// Module-scope placement. Nested constructs compiled INSIDE this body
@@ -25225,14 +25298,7 @@ function hoistBodyHelper(
 	);
 	let helperFn;
 	try {
-		helperFn = compileFunctionBody(
-			fake,
-			ctx,
-			helperName,
-			parentNs,
-			cssHash,
-			keyedSelection === null ? null : { keyedSelection },
-		);
+		helperFn = compileFunctionBody(fake, ctx, helperName, parentNs, cssHash, helperOptions);
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.currentInvariantLocals = prevInvariantLocals;
@@ -26873,6 +26939,9 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					helper: null,
 				}
 			: null;
+	// The existing direct-host-row proof also scopes inline binding guards to
+	// this repeatedly invoked body. Do not inherit that emission policy into
+	// other helpers, or widen it based on a list's observed size or key shape.
 	const itemHelperName = hoistBodyHelper(
 		ctx,
 		inlinedSubs,
@@ -26884,6 +26953,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		envNames,
 		directiveKeywordOrigin(ctx, node),
 		keyedSelection,
+		hostMountSafe,
 	);
 
 	const mapCall = node.nativeArrayMap || null;

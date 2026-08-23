@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
-import * as ClientRT from '../../src/index.js';
 import { hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
+import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
 
 // Conformance port of facebook/react's hydration mismatch matrix —
 // `ReactDOMHydrationDiff-test.js` and `ReactDOMServerIntegrationReconnecting-test.js` — against
@@ -32,29 +31,12 @@ const FIX = join(
 );
 const FILE = 'hydration-mismatch.tsrx';
 
-function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIX, 'utf8'), FILE, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
-}
-function devClientModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIX, 'utf8'), FILE, { mode: 'client', dev: true });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ClientRT, {});
-}
-
-const server = serverModule();
-const client = devClientModule();
+const server = loadServerFixture(FIX, { id: FILE });
+const client = loadCompiledFixtureSource(readFileSync(FIX, 'utf8'), {
+	id: FILE,
+	mode: 'client',
+	compileOptions: { dev: true },
+});
 
 let container: HTMLElement;
 let errSpy: ReturnType<typeof vi.spyOn>;

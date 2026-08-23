@@ -9,6 +9,7 @@ import {
 	UndefinedArm,
 	AndArm,
 	ChildrenArm,
+	ReturnedArm,
 } from './_fixtures/ternary-mixed-arms.tsrx';
 
 // `{cond ? A : B}` at a child hole renders the taken arm's VALUE whatever its
@@ -22,6 +23,24 @@ function host(r: ReturnType<typeof mount>): HTMLElement {
 }
 
 describe('ternary child holes — non-JSX arm renders its value', () => {
+	it('keeps value arms live in a returned tree', () => {
+		const root = mount(ReturnedArm, { on: false, label: 'first' });
+		try {
+			const element = host(root);
+			expect(element.textContent).toBe('first');
+			root.update(ReturnedArm, { on: false, label: 'second' });
+			expect(host(root)).toBe(element);
+			expect(element.textContent).toBe('second');
+			root.update(ReturnedArm, { on: true, label: 'second' });
+			expect(element.querySelector('b')?.textContent).toBe('yes');
+			root.update(ReturnedArm, { on: false, label: ['back', ' again'] });
+			expect(element.textContent).toBe('back again');
+			expect(element.querySelector('b')).toBeNull();
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('keyed `.map` array arm ⇄ component arm (reported repro)', () => {
 		const r = mount(MapArm as any);
 		// mode 0 → the map arm: two keyed <i> items.

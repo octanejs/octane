@@ -95,8 +95,11 @@ const USER_APP_EVAL_ALLOWED_IMPORTS = new Map([
 	['@tanstack/query-core', null],
 	['i18next', null],
 	['octane', resolve(import.meta.dirname, 'packages/octane/src/index.ts')],
-	// Compiler-injected helper imports receive the already-allowed public runtime only.
-	['octane/internal/client', resolve(import.meta.dirname, 'packages/octane/src/index.ts')],
+	// Compiler helpers use a bounded bridge, not the export-all private runtime.
+	[
+		'octane/internal/client',
+		resolve(import.meta.dirname, 'packages/octane-evals/tests/_client-runtime.ts'),
+	],
 ]);
 const USER_APP_EVAL_TASKS = resolve(
 	import.meta.dirname,
