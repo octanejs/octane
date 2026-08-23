@@ -21628,9 +21628,9 @@ export function memo<P>(
 // ---------------------------------------------------------------------------
 //
 // The compiler emits `MyComp = hmr(MyComp);` after each exported component
-// when its `hmr` option is on, plus an `import.meta.hot.accept(...)` block
-// that calls `MyComp[HMR].update(module.MyComp)` when the source file is
-// edited at dev time. The wrapper:
+// when its `hmr` option is on. A replacement module calls the previous
+// wrapper's `MyComp[HMR].update(newMyComp)` during evaluation, then re-exports
+// that canonical wrapper through its live bindings. The wrapper:
 //
 //   1. Defers to the current `fn` on every call — invocations route through
 //      `wrapper[HMR].fn` so `update()` can replace it.

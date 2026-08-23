@@ -13,8 +13,8 @@ import { mount } from './_helpers';
 /**
  * Runtime tests for the `hmr(...)` wrapper. The focused unit cases use direct
  * component bodies; the structural regressions evaluate real compiler output.
- * In both cases we call `Foo[HMR].update(NewFoo)` manually, which is what the
- * compiler-emitted accept block does after a dev server loads the new module.
+ * Direct wrapper cases call `Foo[HMR].update(NewFoo)` manually; module-lifecycle
+ * cases run the emitted handoff and the bundler's current accept callback.
  *
  * The component bodies here use the same `(props, scope, extra)` signature
  * the octane compiler emits. They follow the standard
@@ -39,18 +39,26 @@ function clearBlockRange(scope: Scope): void {
 	}
 }
 
+interface TestHotContext {
+	data?: Record<string, unknown>;
+	dispose(callback: (data: Record<string, unknown>) => void): void;
+	accept(callback?: (module: Record<string, ComponentBody<any>> | undefined) => void): void;
+	invalidate(): void;
+}
+
 async function compileHmrComponent(
 	source: string,
 	exportName = 'App',
 	filename = '/src/App.tsrx',
 	modules: Record<string, Record<string, unknown>> = {},
+	options: { hmr?: 'vite' | 'webpack'; hot?: TestHotContext } = {},
 ): Promise<ComponentBody<any>> {
 	const [{ compile }, runtime, internalRuntime] = await Promise.all([
 		import('octane/compiler'),
 		import('../src/index.js'),
 		import('octane/internal/client'),
 	]);
-	const code = compile(source, filename, { hmr: 'webpack' }).code;
+	const code = compile(source, filename, { hmr: options.hmr ?? 'webpack' }).code;
 	const transformed =
 		code
 			.replace(
@@ -73,12 +81,13 @@ async function compileHmrComponent(
 					return `const { ${properties} } = modules[${JSON.stringify(request)}];`;
 				},
 			)
-			.replace(/\bexport let /g, 'let ')
+			.replace(/\bexport (let|const) /g, '$1 ')
 			// Verbatim return-JSX functions emit `function X … export { X };`
 			// instead of `export let X = …`; drop the list form the same way.
 			.replace(/^export\s*\{[^}]*\};?\s*$/gm, '')
-			.replaceAll('import.meta.webpackHot', 'hot') + `\nreturn ${exportName};`;
-	const hot = {
+			.replaceAll('import.meta.webpackHot', 'hot')
+			.replaceAll('import.meta.hot', 'hot') + `\nreturn ${exportName};`;
+	const hot = options.hot ?? {
 		data: undefined,
 		dispose() {},
 		accept() {},
@@ -94,6 +103,137 @@ async function compileHmrComponent(
 }
 
 describe('hmr — runtime wrapper', () => {
+	it.each([
+		{ dialect: 'vite', name: 'App' },
+		{ dialect: 'webpack', name: 'App' },
+		{ dialect: 'vite', name: 'module' },
+		{ dialect: 'vite', name: '_$hmrModule' },
+	] as const)(
+		'preserves state and live events for $name across consecutive $dialect replacements',
+		async ({ dialect, name }) => {
+			const data: Record<string, unknown> = {};
+			let dispose: Parameters<TestHotContext['dispose']>[0] | undefined;
+			let accept: Parameters<TestHotContext['accept']>[0];
+			let invalidated = false;
+			const load = async (version: number, incompatible = false) => {
+				// The previous evaluation's callback receives this update. Vite then
+				// keeps only the new evaluation's registration for the next save.
+				const previousAccept = accept;
+				dispose?.(data);
+				dispose = undefined;
+				accept = undefined;
+				const App = await compileHmrComponent(
+					`import { useState } from 'octane';
+					 export function ${name}(props) @{
+					   const [count, setCount] = useState(0);
+					   ${incompatible ? "if (props.empty) return 'empty';" : ''}
+					   <main><p>version ${version}</p><button onClick={() => setCount(count + 1)}>{count as string}</button></main>
+					 }`,
+					name,
+					'/src/App.tsrx',
+					{},
+					{
+						hmr: dialect,
+						hot: {
+							data,
+							dispose(callback) {
+								dispose = callback;
+							},
+							accept(callback) {
+								accept = callback;
+							},
+							invalidate() {
+								invalidated = true;
+							},
+						},
+					},
+				);
+				flushSync(() => previousAccept?.({ [name]: App }));
+				return App;
+			};
+			const r = mount(await load(1));
+			try {
+				r.click('button');
+				r.click('button');
+				for (const version of [2, 3, 4]) {
+					await load(version);
+					expect(r.find('p').textContent).toBe(`version ${version}`);
+					expect(r.find('button').textContent).toBe(String(version));
+					r.click('button');
+					expect(r.find('button').textContent).toBe(String(version + 1));
+				}
+				expect(invalidated).toBe(false);
+				if (dialect === 'vite') {
+					// Vite supplies no namespace when evaluating an edit fails. Keep the
+					// old boundary for recovery, but reload when its export disappears.
+					accept?.(undefined);
+					expect(invalidated).toBe(false);
+					accept?.({});
+					expect(invalidated).toBe(true);
+					invalidated = false;
+				}
+				await load(5, true);
+				expect(invalidated).toBe(true);
+				expect(r.find('p').textContent).toBe('version 4');
+				expect(r.find('button').textContent).toBe('5');
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it.each(['constructor', '__proto__', 'toString'])(
+		'can introduce an exported component named %s during a refresh',
+		async (name) => {
+			const hot: TestHotContext = {
+				data: {},
+				dispose() {},
+				accept() {},
+				invalidate() {
+					throw new Error('Adding a component should not invalidate the existing boundary');
+				},
+			};
+			const options = { hmr: 'vite' as const, hot };
+			const initial = await compileHmrComponent(
+				'export function App() @{ <p>before</p> }',
+				'App',
+				'/src/App.tsrx',
+				{},
+				options,
+			);
+			const r = mount(initial);
+			let added: ReturnType<typeof mount> | undefined;
+			try {
+				const Added = await compileHmrComponent(
+					`export function App() @{ <p>after</p> }
+					 export function ${name}() @{ <p>added component</p> }`,
+					name,
+					'/src/App.tsrx',
+					{},
+					options,
+				);
+				flushSync(() => {});
+				expect(r.find('p').textContent).toBe('after');
+				added = mount(Added);
+				expect(added.find('p').textContent).toBe('added component');
+				await compileHmrComponent(
+					`export function App() @{ <p>next revision</p> }
+					 export function ${name}() @{ <p>updated addition</p> }`,
+					name,
+					'/src/App.tsrx',
+					{},
+					options,
+				);
+				flushSync(() => {});
+				expect(r.find('p').textContent).toBe('next revision');
+				expect(added.find('p').textContent).toBe('updated addition');
+			} finally {
+				added?.unmount();
+				r.unmount();
+			}
+		},
+	);
+
 	it('renders the initial component body', () => {
 		const Foo = hmr(((_props: any, scope: Scope, _extra: any) => {
 			clearBlockRange(scope);
@@ -673,49 +813,32 @@ describe('hmr — runtime wrapper', () => {
 		r.unmount();
 	});
 
-	it('compiler emits Symbol.for(...) for hook slots and an import.meta.hot.accept block', async () => {
-		const { compile } = await import('octane/compiler');
-		const src =
-			"import { useState } from 'octane';\n" +
-			'export function Foo() @{\n' +
-			'  const [n, setN] = useState(0);\n' +
-			'  <button onClick={() => setN(n + 1)}>{n as string}</button>\n' +
-			'}\n';
-		const { code } = compile(src, 'file.tsrx', { hmr: true });
-		// Stable Symbol.for-based hook slot (so re-imports get the same identity).
-		expect(code).toMatch(/Symbol\.for\("octane:file\.tsrx:Foo\.useState#0"\)/);
-		// Inline HMR wrapping on the exported component (shadow-proof `_$` alias).
-		expect(code).toMatch(/export const Foo = _\$hmr\(function Foo/);
-		// Vite-shaped accept block.
-		expect(code).toMatch(/if \(import\.meta\.hot\)/);
-		expect(code).toMatch(
-			/if \(!Foo\[_\$HMR\]\.update\(module\.Foo\)\) import\.meta\.hot\.invalidate\(\)/,
-		);
-	});
-
-	it('distinguishes lowered null guards from renderable value returns during HMR', async () => {
-		const { compile } = await import('octane/compiler');
-		const direct = compile(
+	it('refreshes null-guarded output but declines incompatible returned-value edits', async () => {
+		const direct = await compileHmrComponent(
 			`export function Foo(p) @{ <span>{p.label as string}</span> }`,
-			'file.tsrx',
-			{ hmr: true },
-		).code;
-		const mixed = compile(
+			'Foo',
+		);
+		const mixed = await compileHmrComponent(
 			`export function Foo(p) @{ if (p.empty) return null; <span>{p.label as string}</span> }`,
-			'file.tsrx',
-			{ hmr: true },
-		).code;
-		const returned = compile(
+			'Foo',
+		);
+		const returned = await compileHmrComponent(
 			`export function Foo(p) @{ if (p.empty) return 'empty'; <span>{p.label as string}</span> }`,
-			'file.tsrx',
-			{ hmr: true },
-		).code;
-
-		expect(direct).not.toContain('__octaneReturnedOutput');
-		expect(mixed).not.toContain('__octaneReturnedOutput');
-		expect(mixed).toContain('_$ifBlock');
-		expect(returned).toContain('{ __octaneReturnedOutput: true }');
-		expect(mixed).toContain('if (!Foo[_$HMR].update(module.Foo)) import.meta.hot.invalidate();');
+			'Foo',
+		);
+		const r = mount(direct, { label: 'before', empty: false });
+		try {
+			flushSync(() => expect((direct as any)[HMR].update(mixed)).toBe(true));
+			expect(r.find('span').textContent).toBe('before');
+			r.update(direct, { label: 'hidden', empty: true });
+			expect(r.container.textContent).toBe('');
+			r.update(direct, { label: 'after', empty: false });
+			expect(r.find('span').textContent).toBe('after');
+			flushSync(() => expect((direct as any)[HMR].update(returned)).toBe(false));
+			expect(r.find('span').textContent).toBe('after');
+		} finally {
+			r.unmount();
+		}
 	});
 
 	it('webpack HMR preserves named and default wrapper identity across repeated updates', async () => {
@@ -796,7 +919,6 @@ describe('hmr — runtime wrapper', () => {
 
 		const output = compileVersion(3);
 		expect(output).toContain('const _$webpackHot = import.meta.webpackHot;');
-		expect(output).toContain('_$webpackHot.data?.__octaneComponents?.Named');
 		expect(output).toContain('_$webpackHot.dispose');
 		expect(output).toContain('_$webpackHot.accept();');
 		expect(output).not.toContain('import.meta.webpackHot.data');

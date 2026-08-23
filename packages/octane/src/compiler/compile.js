@@ -8944,7 +8944,7 @@ function compileInternal(
 	// NODES — in exactly the historical statement order — and printed ONCE by
 	// esrap at the end, which also yields the entire module source map.
 	const bodyNodes = emitServerModuleClientStubs(serverModuleInfo, ctx);
-	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrDialect === 'webpack' };
+	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrEnabled };
 	for (let node of ast.body) {
 		if (
 			node === serverModuleInfo?.declaration ||
@@ -8974,7 +8974,7 @@ function compileInternal(
 				...compileReturnJsxFunction(node.declaration, ctx, {
 					export: true,
 					hmrWrap: hmrEnabled,
-					hmrMutable: hmrDialect === 'webpack',
+					hmrMutable: hmrEnabled,
 				}).nodes,
 			);
 			if (hmrEnabled) hmrComponents.push({ name: node.declaration.id.name, exportKind: 'named' });
@@ -8983,7 +8983,7 @@ function compileInternal(
 				...compileReturnJsxFunction(node.declaration, ctx, {
 					default: true,
 					hmrWrap: hmrEnabled,
-					hmrMutable: hmrDialect === 'webpack',
+					hmrMutable: hmrEnabled,
 				}).nodes,
 			);
 			if (hmrEnabled) hmrComponents.push({ name: node.declaration.id.name, exportKind: 'default' });
@@ -9104,12 +9104,10 @@ function compileInternal(
 	flushTailHookSymbols(ctx);
 	const helperNodes = hoistedHelperNodes(ctx);
 
-	// HMR plumbing — sits AFTER the component bodies so the wrappers can
-	// reference the `Comp` const that was just declared. Each exported
-	// component gets rewrapped (`Comp = hmr(Comp);`), default exports get
-	// re-exported afterwards (we already emitted the `export default Comp;`
-	// line earlier — re-exporting again would conflict, so the rewrap mutates
-	// the binding in place). Mirrors `tsrx-ripple`'s emit shape.
+	// Re-evaluated modules hand their fresh bodies to the canonical wrappers
+	// held by importers and mounted components, then re-export those wrappers.
+	// Vite replaces accept callbacks after each evaluation, so an evaluation-local
+	// callback cannot carry the mounted owners across consecutive updates.
 	const hmrNodes = [];
 	if (hmrComponents.length > 0) {
 		// `hmr` is already registered as a needed runtime symbol by the
@@ -9123,128 +9121,139 @@ function compileInternal(
 			property: b.id('meta'),
 			metadata: { path: [] },
 		});
-		if (hmrDialect === 'webpack') {
-			// Rspack/webpack re-evaluates the accepted module and exposes the previous
-			// module's dispose data to that NEW evaluation. Hand the fresh body to the
-			// previous canonical wrapper, then make the new ESM binding point back to
-			// it. Persist that canonical identity again for the next update. This keeps
-			// working across any number of edits; accept callbacks in webpack are error
-			// handlers, not Vite-style callbacks carrying the new module namespace.
-			// Keep every access after the recognized `import.meta.webpackHot` root on a
-			// local. Rspack's React/Rsbuild transform pipeline otherwise treats deeper
-			// expressions such as `import.meta.webpackHot.data` as unsupported even
-			// though it lowers the root itself to `module.hot`.
-			const webpackHotName = allocCompilerName(ctx, '_$webpackHot');
-			const webpackHot = () => b.id(webpackHotName);
+		// Rspack only lowers the recognized import.meta.webpackHot root reliably;
+		// Vite instead requires the literal import.meta.hot.accept call to discover
+		// self-accepting modules. Keep that distinction at the access root.
+		const webpackHotName = hmrDialect === 'webpack' ? allocCompilerName(ctx, '_$webpackHot') : null;
+		const hot = () =>
+			webpackHotName === null ? b.member(importMeta(), 'hot') : b.id(webpackHotName);
+		if (webpackHotName !== null) {
 			hmrNodes.push(
 				inheritOriginLoc(
 					b.const(webpackHotName, b.member(importMeta(), 'webpackHot')),
 					moduleOrigin,
 				),
 			);
-			const previousComponent = (name, optional) =>
-				b.member(
-					b.member(
-						b.member(webpackHot(), b.id('data')),
-						b.id('__octaneComponents'),
-						false,
-						optional,
+		}
+		const componentKey = (component) =>
+			component.exportKind === 'default' ? 'default' : component.name;
+		const componentStore = (optional = false) =>
+			b.member(b.member(hot(), 'data'), b.id('__octaneComponents'), false, optional);
+		const previousComponent = (component) =>
+			b.member(componentStore(), b.id(componentKey(component)));
+		const handoffs = hmrComponents.map((c) =>
+			b.if(
+				// Newly added exports may be named constructor or __proto__; inherited
+				// object members are not retained wrappers. Avoid a shadowable Object global.
+				b.logical(
+					'&&',
+					componentStore(true),
+					b.call(
+						b.member(b.member(b.object([]), 'hasOwnProperty'), 'call'),
+						componentStore(),
+						b.literal(componentKey(c)),
 					),
-					b.id(name),
-					false,
-					optional,
-				);
-			const handoffs = hmrComponents.map((c) =>
-				b.if(
-					previousComponent(c.name, true),
-					b.block([
-						b.if(
-							b.unary(
-								'!',
-								b.call(
-									b.member(
-										b.member(previousComponent(c.name, false), b.id('_$HMR'), true),
-										'update',
-									),
-									b.id(c.name),
-								),
+				),
+				b.block([
+					b.if(
+						b.unary(
+							'!',
+							b.call(
+								b.member(b.member(previousComponent(c), b.id('_$HMR'), true), 'update'),
+								b.id(c.name),
 							),
-							b.block([b.stmt(b.call(b.member(webpackHot(), 'invalidate')))]),
-							b.block([b.stmt(b.assignment('=', b.id(c.name), previousComponent(c.name, false)))]),
 						),
+						b.block([b.stmt(b.call(b.member(hot(), 'invalidate')))]),
+						b.block([b.stmt(b.assignment('=', b.id(c.name), previousComponent(c)))]),
+					),
+				]),
+				null,
+			),
+		);
+		const persist = b.stmt(
+			b.assignment(
+				'=',
+				b.member(
+					webpackHotName === null ? b.member(hot(), 'data') : b.id('data'),
+					'__octaneComponents',
+				),
+				b.object(
+					hmrComponents.map((c) => {
+						const key = componentKey(c);
+						// Expanding __proto__ shorthand downstream must not turn this data
+						// property into an object-literal prototype setter.
+						const computed = key === '__proto__';
+						return b.prop(
+							'init',
+							computed ? b.literal(key) : b.id(key),
+							b.id(c.name),
+							computed,
+							!computed && c.exportKind !== 'default',
+						);
+					}),
+				),
+			),
+		);
+		const hmrModuleName = webpackHotName === null ? allocCompilerName(ctx, '_$hmrModule') : null;
+		const accept = b.stmt(
+			b.call(
+				b.member(hot(), 'accept'),
+				...(webpackHotName === null
+					? [
+							b.arrow(
+								[b.id(hmrModuleName)],
+								b.block([
+									b.if(
+										b.logical(
+											'&&',
+											b.id(hmrModuleName),
+											hmrComponents
+												.map((c) =>
+													b.binary(
+														'!==',
+														b.member(b.id(hmrModuleName), componentKey(c)),
+														b.id(c.name),
+													),
+												)
+												.reduce((left, right) => b.logical('||', left, right)),
+										),
+										b.stmt(b.call(b.member(hot(), 'invalidate'))),
+									),
+								]),
+							),
+						]
+					: []),
+			),
+		);
+		// Vite's data object itself survives evaluations. Persist directly: Vite
+		// keeps only one dispose callback, which renderer/thread cleanup may own.
+		// Webpack creates the next data object through its dispose callback instead.
+		// Vite's callback only validates that the old export boundary survived;
+		// updating there too would remount the already-handed-off component twice.
+		// A host without persistent data can still load the module and invalidate
+		// on replacement, but cannot retain wrapper identity across evaluations.
+		hmrNodes.push(
+			inheritOriginLoc(
+				b.if(
+					hot(),
+					b.block([
+						...handoffs,
+						webpackHotName === null
+							? b.if(b.member(hot(), 'data'), b.block([persist]))
+							: b.stmt(
+									b.call(b.member(hot(), 'dispose'), b.arrow([b.id('data')], b.block([persist]))),
+								),
+						accept,
 					]),
 					null,
 				),
-			);
-			hmrNodes.push(
-				inheritOriginLoc(
-					b.if(
-						webpackHot(),
-						b.block([
-							...handoffs,
-							b.stmt(
-								b.call(
-									b.member(webpackHot(), 'dispose'),
-									b.arrow(
-										[b.id('data')],
-										b.block([
-											b.stmt(
-												b.assignment(
-													'=',
-													b.member(b.id('data'), '__octaneComponents'),
-													b.object(
-														hmrComponents.map((c) =>
-															b.prop('init', b.id(c.name), b.id(c.name), false, true),
-														),
-													),
-												),
-											),
-										]),
-									),
-								),
-							),
-							b.stmt(b.call(b.member(webpackHot(), 'accept'))),
-						]),
-						null,
-					),
-					moduleOrigin,
-				),
-			);
-		} else {
-			const hot = () => b.member(importMeta(), 'hot');
-			const updates = hmrComponents.map((c) => {
-				const accessor =
-					c.exportKind === 'default'
-						? b.member(b.id('module'), 'default')
-						: b.member(b.id('module'), c.name);
-				return b.if(
-					b.unary(
-						'!',
-						b.call(b.member(b.member(b.id(c.name), b.id('_$HMR'), true), 'update'), accessor),
-					),
-					b.stmt(b.call(b.member(hot(), 'invalidate'))),
-					null,
-				);
-			});
-			hmrNodes.push(
-				inheritOriginLoc(
-					b.if(
-						hot(),
-						b.block([
-							b.stmt(
-								b.call(b.member(hot(), 'accept'), b.arrow([b.id('module')], b.block(updates))),
-							),
-						]),
-						null,
-					),
-					moduleOrigin,
-				),
-			);
-		}
+				moduleOrigin,
+			),
+		);
 	}
 
 	// Profiling registrations intentionally run AFTER the HMR handoff block in
-	// the final output. On a webpack/Rspack update the local binding is reassigned
+	// the final output. On a hot update the local binding is reassigned
 	// to the previous canonical wrapper during that handoff; registering earlier
 	// would attach the fresh metadata to a short-lived replacement instead. The
 	// runtime helper records metadata without wrapping or replacing the function.
@@ -13171,12 +13180,9 @@ function compileComponent(node, ctx, options) {
 				)
 			: warmedFn;
 
-	// HMR-wrap exported components inline so the binding stays a `const` (no
-	// reassignment dance needed in Vite). Webpack/Rspack HMR instead uses a `let`
-	// binding so a re-evaluated module can hand its export back to the previous
-	// canonical wrapper stored in hot dispose data. `hmr` returns a wrapper that
-	// delegates to whatever fn is currently committed, and
-	// `module.Foo[HMR].update(...)` swaps it on each accept.
+	// HMR exports use mutable, live bindings so a re-evaluated module can hand
+	// its fresh body to the previous canonical wrapper and re-export that same
+	// identity. Production components retain their tree-shakeable const binding.
 	let valueExpr = hmrWrap && isExported ? inheritOriginLoc(b.call('_$hmr', abiFn), node) : abiFn;
 	if (!hmrWrap && componentInfo?.singleRoot === true) {
 		valueExpr = inheritOriginLoc(singleRootInitializer(ctx, valueExpr), node);

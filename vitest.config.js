@@ -4447,7 +4447,19 @@ export default defineConfig({
 			{
 				test: {
 					name: 'vite-plugin',
-					include: ['packages/vite-plugin-octane/tests/**/*.test.ts'],
+					include: [
+						'packages/vite-plugin-octane/tests/**/*.test.ts',
+						'!packages/vite-plugin-octane/tests/browser/**/*.test.ts',
+					],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'vite-plugin-browser',
+					include: ['packages/vite-plugin-octane/tests/browser/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
 				},
