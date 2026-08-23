@@ -11,10 +11,7 @@
     "integrity": "sha256:205f5c607c68e1e42b8d7a036326bdb3a105ae55e6469ecfcaf998004609d5f7",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "absent"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/markdown/src"],
@@ -138,11 +135,6 @@
           "path": "scripts/react-parity/react-markdown-crosswalk.mjs",
           "role": "support",
           "sha256": "e46c91d548e54b713de6d7664d314b7e6fba1d86fa1fd4b76e788997928e5705"
-        },
-        {
-          "path": "vitest.config.js",
-          "role": "support",
-          "sha256": "af89456752792bccfd8a4d916496992621a35741dabb54c35bd20c5270ccfa97"
         }
       ]
     },

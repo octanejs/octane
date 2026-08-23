@@ -114,7 +114,6 @@ const manifest = {
 				support('packages/markdown/audit/adapted-case-crosswalk.json'),
 				support('scripts/react-parity/react-markdown-runtime-inventory.mjs'),
 				support('scripts/react-parity/react-markdown-crosswalk.mjs'),
-				support('vitest.config.js'),
 			],
 		},
 		{
