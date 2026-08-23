@@ -81,7 +81,7 @@ const OCTANE_PLATFORM = {
 		forOfIterableHelper: 'octane/tsrx-iterable',
 		// Host-element spreads in the virtual TSX lower to
 		// `__normalize_spread_props(...)`; the shared transform imports the
-		// helpers from this module (identity-typed — see octane/tsrx-spread).
+		// helpers from this module (preserving prop types — see octane/tsrx-spread).
 		refProp: 'octane/tsrx-spread',
 	},
 	jsx: {

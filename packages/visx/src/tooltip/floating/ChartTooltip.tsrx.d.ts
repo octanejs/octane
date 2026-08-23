@@ -2,7 +2,7 @@
 import type { OctaneNode } from 'octane';
 import type { ChartTooltipConfig, ChartTooltipContentProps, ChartTooltipItem } from './ChartTooltipContent.tsrx';
 import type { FloatingTooltipOffset, FloatingTooltipPadding, FloatingTooltipPortalProps, FloatingTooltipPositionerProps, FloatingTooltipRootState, TooltipAnchor, TooltipPlacement, UseFloatingTooltipOptions } from './types';
-export { ChartTooltipItem } from './ChartTooltipContent.tsrx';
+export type { ChartTooltipItem } from './ChartTooltipContent.tsrx';
 export type ChartTooltipControlledProps<Datum = unknown> = {
     open: boolean;
     anchor: TooltipAnchor | null;

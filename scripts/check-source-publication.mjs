@@ -57,13 +57,9 @@ export const SOURCE_PUBLICATION_DEBT = {
 	// 2026-08-12 on `pnpm exec tsrx-tsc --noEmit -p <project>`).
 	[RULES.tsgo]: [
 		'packages/dnd-kit/typetests/tsconfig.json', // 4 errors
-		'packages/jotai/tsconfig.json', // 2 errors
-		'packages/recharts/tsconfig.json', // 1268 errors
 		'packages/redux-toolkit/tsconfig.json', // 4 errors
 		'packages/redux-toolkit/typetests/tsconfig.json', // 2 errors
-		'packages/redux/tsconfig.json', // 1 error
 		'packages/tiptap/typetests/tsconfig.json', // 3 errors
-		'packages/visx/tsconfig.json', // 57 errors
 	],
 	// These validation projects still hand shipped source the Node globals a
 	// browser application does not have. Dropping `types: ["node"]` is the fix;
@@ -104,7 +100,6 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/hook-form/tsconfig.json',
 		'packages/i18next/tsconfig.json',
 		'packages/inertia/tsconfig.json',
-		'packages/jotai/tsconfig.json',
 		'packages/lexical/tsconfig.json',
 		'packages/livestore/tsconfig.json',
 		'packages/lucide/tsconfig.json',
@@ -121,10 +116,7 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/rainbowkit/tsconfig.json',
 		'packages/react-error-boundary/tsconfig.json',
 		'packages/react-map-gl/tsconfig.json',
-		'packages/recharts/tsconfig.json',
 		'packages/redux-toolkit/tsconfig.json',
-		'packages/redux/tsconfig.json',
-		'packages/remix-router/tsconfig.json',
 		'packages/rsbuild-plugin-octane/tsconfig.typecheck.json',
 		'packages/rspack-plugin-octane/tsconfig.typecheck.json',
 		'packages/rxjs/tsconfig.json',
@@ -155,15 +147,13 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/transition-group/tsconfig.json',
 		'packages/valtio/tsconfig.json',
 		'packages/vaul/tsconfig.json',
-		'packages/visx/tsconfig.json',
 		'packages/vite-plugin-octane/tsconfig.typecheck.json',
 		'packages/wagmi/tsconfig.json',
 		'packages/window/tsconfig.json',
 		'packages/zag/tsconfig.json',
 		'packages/zustand/tsconfig.json',
 	],
-	// This validation project excludes files that `files` still packs.
-	[RULES.excluded]: ['packages/recharts/tsconfig.json'],
+	[RULES.excluded]: [],
 	// These packages publish `.js` modules with no sibling declaration file, so
 	// the consumer's program types their public API as `any`.
 	[RULES.untypedJavaScript]: [
@@ -177,7 +167,6 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'@octanejs/i18next',
 		'@octanejs/mcp-server',
 		'@octanejs/mdx',
-		'@octanejs/recharts',
 		'@octanejs/rsbuild-plugin',
 		'@octanejs/rspack-plugin',
 		'@octanejs/stylex',

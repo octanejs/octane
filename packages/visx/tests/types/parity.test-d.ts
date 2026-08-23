@@ -101,8 +101,15 @@ type AttributeBagNormalizedPropsExtends<LocalComponent, UpstreamComponent> = Ext
 // sides. They are optional, which is why the member-by-member comparisons
 // above tolerate them without listing them.
 type OctaneOnlyAttributeSurfaceKeys = OctaneOnlyAttributeKeys | 'hidden' | 'tabindex';
-type PropsShapeEqual<LocalComponent, UpstreamComponent> = Equal<
-	Exclude<keyof ComponentProps<LocalComponent>, OctaneOnlyAttributeSurfaceKeys>,
+type PropsShapeEqual<
+	LocalComponent,
+	UpstreamComponent,
+	AdditionalLocalKeys extends PropertyKey = never,
+> = Equal<
+	Exclude<
+		keyof ComponentProps<LocalComponent>,
+		OctaneOnlyAttributeSurfaceKeys | AdditionalLocalKeys
+	>,
 	Exclude<keyof ComponentProps<UpstreamComponent>, OctaneOnlyAttributeSurfaceKeys>
 >;
 
@@ -483,8 +490,10 @@ type _Point = Assert<Equal<Local['Point'], Upstream['Point']>>;
 // ParentSize spreads `Octane.HTMLAttributes` — see the attribute-bag
 // carve-out above (`style` stays `CSSProperties` locally because ParentSize
 // merges style objects; it collapses with the bag members either way).
+// Octane also supports the native xmlns attribute on HTML hosts, whereas
+// React includes it only in SVG props. Normalize that extra key only here.
 type _ResponsiveParentSizeProps = Assert<
-	PropsShapeEqual<Local['Responsive']['ParentSize'], Upstream['Responsive']['ParentSize']>
+	PropsShapeEqual<Local['Responsive']['ParentSize'], Upstream['Responsive']['ParentSize'], 'xmlns'>
 >;
 type _ResponsiveScaleSvg = Assert<
 	Extends<Local['Responsive']['ScaleSVG'], Upstream['Responsive']['ScaleSVG']>

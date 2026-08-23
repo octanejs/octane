@@ -9,11 +9,13 @@
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true,
-    "types": ["node"],
+    "skipLibCheck": false,
+    "types": [],
     "strict": true,
+    "isolatedModules": true,
     "jsxImportSource": "octane"
   },
+  "tsrx": { "compiler": "octane/compiler/volar" },
   "include": ["./src/", "./tests/types/"],
   "exclude": ["node_modules", "dist"]
 }

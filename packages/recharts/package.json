@@ -21,14 +21,15 @@
   },
   "main": "src/index.ts",
   "module": "src/index.ts",
-  "types": "src/index.d.ts",
+  "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.recharts"
   ],
   "exports": {
     ".": {
-      "types": "./src/index.d.ts",
+      "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
   },
@@ -37,12 +38,12 @@
   },
   "dependencies": {
     "@octanejs/redux": "workspace:*",
-    "@reduxjs/toolkit": "catalog:default",
+    "@reduxjs/toolkit": "catalog:recharts-store",
     "clsx": "catalog:default",
     "decimal.js-light": "catalog:default",
     "es-toolkit": "catalog:default",
     "eventemitter3": "catalog:default",
-    "immer": "catalog:default",
+    "immer": "catalog:recharts-store",
     "reselect": "catalog:default",
     "tiny-invariant": "catalog:default",
     "victory-vendor": "catalog:default"

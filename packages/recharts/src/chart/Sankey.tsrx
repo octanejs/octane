@@ -1,19 +1,18 @@
-import * as React from 'octane';
-import {
-	MouseEvent,
-	ReactElement,
-	ReactNode,
+import type {
+	CSSProperties,
+	NativeMouseEvent,
+	OctaneElement,
+	OctaneNode,
 	SVGProps,
-	useCallback,
-	useMemo,
-	useState,
-} from 'octane';
+} from '../util/OctaneTypes.ts';
+import * as React from 'octane';
+import { useCallback, useMemo, useState } from 'octane';
 import maxBy from 'es-toolkit/compat/maxBy';
 import sumBy from 'es-toolkit/compat/sumBy';
 import get from 'es-toolkit/compat/get';
-import { Surface } from '../container/Surface';
-import { Layer } from '../container/Layer';
-import { Props as RectangleProps, Rectangle } from '../shape/Rectangle';
+import { Surface } from '../container/Surface.tsrx';
+import { Layer } from '../container/Layer.tsrx';
+import { Props as RectangleProps, Rectangle } from '../shape/Rectangle.tsrx';
 import { getValueByDataKey } from '../util/ChartUtils';
 import {
 	Coordinate,
@@ -31,8 +30,8 @@ import {
 	useChartWidth,
 } from '../context/chartLayoutContext';
 import { TooltipPortalContext } from '../context/tooltipPortalContext';
-import { RechartsWrapper } from './RechartsWrapper';
-import { RechartsStoreProvider } from '../state/RechartsStoreProvider';
+import { RechartsWrapper } from './RechartsWrapper.tsrx';
+import { RechartsStoreProvider } from '../state/RechartsStoreProvider.tsrx';
 import { useAppDispatch } from '../state/hooks';
 import {
 	mouseLeaveItem,
@@ -54,7 +53,7 @@ import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaul
 import { isPositiveNumber } from '../util/isWellBehavedNumber';
 import { isNotNil, noop } from '../util/DataUtils';
 import { WithIdRequired } from '../util/useUniqueId';
-import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId';
+import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
 import { GraphicalItemId } from '../state/graphicalItemsSlice';
 import { initialEventSettingsState } from '../state/eventSettingsSlice';
 
@@ -412,7 +411,10 @@ const relaxRightToLeft = (
 	}
 };
 
-const updateYOfLinks = (tree: SankeyNode[], links: LinkDataItemDy[]): void => {
+const updateYOfLinks: (tree: SankeyNode[], links: LinkDataItemDy[]) => asserts links is SankeyLink[] = (
+	tree,
+	links,
+) => {
 	for (let i = 0, len = tree.length; i < len; i++) {
 		const node = tree[i];
 		if (node == null) {
@@ -662,7 +664,6 @@ export const computeData = ({
 	resolveNodeLinkCollisions(tree, depthTree, linksWithDy, height, nodePadding);
 	updateYOfLinks(tree, linksWithDy);
 
-	// @ts-expect-error updateYOfLinks modifies the links array to add sy and ty in place
 	const newLinks: ReadonlyArray<SankeyLink> = linksWithDy;
 
 	return { nodes: tree, links: newLinks };
@@ -681,12 +682,24 @@ const getLinkCoordinateOfTooltip = (item: LinkProps): Coordinate | undefined => 
 		: undefined;
 };
 
-type SankeyTooltipPayload = { payload: SankeyNode | SankeyLink; name: unknown; value: unknown };
+// Layout augments the user's data records, retaining arbitrary fields selected
+// by nameKey. Computed link payloads contain node objects, not source indices.
+type SankeyTooltipNode = SankeyNode & Record<string | number, unknown>;
+type SankeyTooltipLink =
+	Omit<LinkProps['payload'], 'source' | 'target'> & {
+		source: SankeyTooltipNode;
+		target: SankeyTooltipNode;
+	} & Record<string | number, unknown>;
+type SankeyTooltipPayload = {
+	payload: SankeyTooltipNode | SankeyTooltipLink;
+	name: unknown;
+	value: unknown;
+};
 
 const getPayloadOfTooltip = (
-	item: { payload: SankeyNode | SankeyLink },
+	item: { payload: SankeyTooltipPayload['payload'] },
 	type: SankeyElementType,
-	nameKey: DataKey<SankeyLink | SankeyNode, string> | undefined,
+	nameKey: Parameters<TooltipPayloadSearcher>[3],
 ): SankeyTooltipPayload | undefined => {
 	const { payload } = item;
 	if (type === 'node') {
@@ -697,10 +710,8 @@ const getPayloadOfTooltip = (
 		};
 	}
 	if ('source' in payload && payload.source && payload.target) {
-		// @ts-expect-error we're sending number indexes as source and target, but getValueByDataKey expects objects
-		const sourceName = getValueByDataKey(payload.source, nameKey, '');
-		// @ts-expect-error we're sending number indexes as source and target, but getValueByDataKey expects objects
-		const targetName = getValueByDataKey(payload.target, nameKey, '');
+		const sourceName = getValueByDataKey(payload.source as SankeyTooltipNode, nameKey, '');
+		const targetName = getValueByDataKey(payload.target as SankeyTooltipNode, nameKey, '');
 
 		return {
 			payload,
@@ -716,7 +727,7 @@ export const sankeyPayloadSearcher: TooltipPayloadSearcher = (
 	_: unknown,
 	activeIndex: TooltipIndex,
 	computedData?: unknown,
-	nameKey,
+	nameKey?: Parameters<TooltipPayloadSearcher>[3],
 ): SankeyTooltipPayload | undefined => {
 	if (activeIndex == null || typeof activeIndex !== 'string') {
 		return undefined;
@@ -728,7 +739,6 @@ export const sankeyPayloadSearcher: TooltipPayloadSearcher = (
 	const [targetType, index] = splitIndex;
 	const item = get(computedData, `${targetType}s[${index}]`);
 	if (item) {
-		// @ts-expect-error nameKey type does not match SankeyElementType
 		const payload = getPayloadOfTooltip(item, targetType as SankeyElementType, nameKey);
 		return payload;
 	}
@@ -782,7 +792,7 @@ interface LinkDataItem {
 	value: number;
 }
 
-export interface NodeProps extends Omit<SVGProps<SVGRectElement>, 'height' | 'width'> {
+export interface NodeProps extends Omit<RectangleProps, 'height' | 'width'> {
 	height: number;
 	width: number;
 	payload: SankeyNode;
@@ -813,12 +823,18 @@ export interface SankeyData {
 
 // TODO: improve types - NodeOptions uses SankeyNode, LinkOptions uses LinkProps. Standardize.
 export type SankeyNodeOptions =
-	ReactElement<SVGProps<SVGRectElement>> | ((props: NodeProps) => ReactNode) | RectangleProps;
+	OctaneElement<RectangleProps> | ((props: NodeProps) => OctaneNode) | RectangleProps;
+
+type SankeyLinkSvgProps =
+	Omit<SVGProps<SVGPathElement>, 'targetX' | 'targetY'> & {
+		targetX?: number;
+		targetY?: number;
+	};
 
 type SankeyLinkOptions =
-	| ReactElement<SVGProps<SVGPathElement>>
-	| ((props: LinkProps) => ReactElement<SVGProps<SVGPathElement>>)
-	| SVGProps<SVGPathElement>;
+	| OctaneElement<SankeyLinkSvgProps>
+	| ((props: LinkProps) => OctaneElement<SVGProps<SVGPathElement>>)
+	| SankeyLinkSvgProps;
 
 interface SankeyProps extends EventThrottlingProps {
 	/**
@@ -914,9 +930,9 @@ interface SankeyProps extends EventThrottlingProps {
  * @example <Sankey link={{ fill: #77c878 }} />
  */
 	link?: SankeyLinkOptions;
-	style?: React.CSSProperties;
+	style?: CSSProperties;
 	className?: string;
-	children?: ReactNode;
+	children?: OctaneNode;
 	/**
  * Empty space around the container.
  *
@@ -926,19 +942,19 @@ interface SankeyProps extends EventThrottlingProps {
 	/**
  * The customized event handler of click on the area in this group
  */
-	onClick?: (item: NodeProps | LinkProps, type: SankeyElementType, e: MouseEvent<
+	onClick?: (item: NodeProps | LinkProps, type: SankeyElementType, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mouseenter on the area in this group
  */
-	onMouseEnter?: (item: NodeProps | LinkProps, type: SankeyElementType, e: MouseEvent<
+	onMouseEnter?: (item: NodeProps | LinkProps, type: SankeyElementType, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mouseleave on the area in this group
  */
-	onMouseLeave?: (item: NodeProps | LinkProps, type: SankeyElementType, e: MouseEvent<
+	onMouseLeave?: (item: NodeProps | LinkProps, type: SankeyElementType, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
@@ -1028,10 +1044,8 @@ const buildLinkProps = ({
 
 	const linkProps: LinkProps = {
 		sourceX,
-		// @ts-expect-error the linkContent from below is contributing unknown props
 		targetX,
 		sourceY,
-		// @ts-expect-error the linkContent from below is contributing unknown props
 		targetY,
 		sourceControlX,
 		targetControlX,
@@ -1060,9 +1074,9 @@ function SankeyLinkElement({
 	props: LinkProps;
 	i: number;
 	linkContent: SankeyLinkOptions | undefined;
-	onMouseEnter: (linkProps: LinkProps, e: MouseEvent<SVGGraphicsElement>) => void;
-	onMouseLeave: (linkProps: LinkProps, e: MouseEvent<SVGGraphicsElement>) => void;
-	onClick: (linkProps: LinkProps, e: MouseEvent<SVGGraphicsElement>) => void;
+	onMouseEnter: (linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
+	onMouseLeave: (linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
+	onClick: (linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
 	dataKey: DataKey<any>;
 }) {
 	const activeCoordinate = getLinkCoordinateOfTooltip(props);
@@ -1071,7 +1085,7 @@ function SankeyLinkElement({
 	const dispatch = useAppDispatch();
 
 	const events = {
-		onMouseEnter: (e: MouseEvent<SVGGraphicsElement>) => {
+		onMouseEnter: (e: NativeMouseEvent<SVGGraphicsElement>) => {
 			dispatch(
 				setActiveMouseOverItemIndex({
 					activeIndex,
@@ -1082,11 +1096,11 @@ function SankeyLinkElement({
 			);
 			onMouseEnter(props, e);
 		},
-		onMouseLeave: (e: MouseEvent<SVGGraphicsElement>) => {
+		onMouseLeave: (e: NativeMouseEvent<SVGGraphicsElement>) => {
 			dispatch(mouseLeaveItem());
 			onMouseLeave(props, e);
 		},
-		onClick: (e: MouseEvent<SVGGraphicsElement>) => {
+		onClick: (e: NativeMouseEvent<SVGGraphicsElement>) => {
 			dispatch(
 				setActiveClickItemIndex({
 					activeIndex,
@@ -1116,9 +1130,9 @@ function AllSankeyLinkElements({
 	modifiedLinks: ReadonlyArray<LinkProps>;
 	links: ReadonlyArray<SankeyLink>;
 	linkContent: SankeyLinkOptions | undefined;
-	onMouseEnter: (linkProps: LinkProps, e: MouseEvent<SVGGraphicsElement>) => void;
-	onMouseLeave: (linkProps: LinkProps, e: MouseEvent<SVGGraphicsElement>) => void;
-	onClick: (linkProps: LinkProps, e: MouseEvent<SVGGraphicsElement>) => void;
+	onMouseEnter: (linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
+	onMouseLeave: (linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
+	onClick: (linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
 	dataKey: DataKey<any>;
 }) {
 	return <Layer className="recharts-sankey-links" key="recharts-sankey-links">{links.map((
@@ -1151,15 +1165,12 @@ function renderNodeItem(option: SankeyNodeOptions | undefined, props: NodeProps)
 		return option(props);
 	}
 
-	return (
-		// @ts-expect-error recharts radius is not compatible with SVG radius
-		<Rectangle
-			className="recharts-sankey-node"
-			fill="#0088fe"
-			fillOpacity="0.8"
-			{...svgPropertiesNoEvents(props)}
-		/>
-	);
+	return <Rectangle
+		className="recharts-sankey-node"
+		fill="#0088fe"
+		fillOpacity="0.8"
+		{...svgPropertiesNoEvents(props)}
+	/>;
 }
 
 const buildNodeProps = ({
@@ -1176,7 +1187,6 @@ const buildNodeProps = ({
 	i: number;
 }) => {
 	const { x, y, dx, dy } = node;
-	// @ts-expect-error nodeContent is passing in unknown props
 	const nodeProps: NodeProps = {
 		...svgPropertiesNoEventsFromUnknown(nodeContent),
 		x: x + left,
@@ -1203,9 +1213,9 @@ function NodeElement({
 	props: NodeProps;
 	nodeContent: SankeyNodeOptions | undefined;
 	i: number;
-	onMouseEnter: (nodeProps: NodeProps, e: MouseEvent<SVGGraphicsElement>) => void;
-	onMouseLeave: (nodeProps: NodeProps, e: MouseEvent<SVGGraphicsElement>) => void;
-	onClick: (nodeProps: NodeProps, e: MouseEvent<SVGGraphicsElement>) => void;
+	onMouseEnter: (nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
+	onMouseLeave: (nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
+	onClick: (nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
 	dataKey: DataKey<any>;
 }) {
 	const dispatch = useAppDispatch();
@@ -1214,7 +1224,7 @@ function NodeElement({
 	const activeIndex = `node-${i}`;
 
 	const events = {
-		onMouseEnter: (e: MouseEvent<SVGGraphicsElement>) => {
+		onMouseEnter: (e: NativeMouseEvent<SVGGraphicsElement>) => {
 			dispatch(
 				setActiveMouseOverItemIndex({
 					activeIndex,
@@ -1225,11 +1235,11 @@ function NodeElement({
 			);
 			onMouseEnter(props, e);
 		},
-		onMouseLeave: (e: MouseEvent<SVGGraphicsElement>) => {
+		onMouseLeave: (e: NativeMouseEvent<SVGGraphicsElement>) => {
 			dispatch(mouseLeaveItem());
 			onMouseLeave(props, e);
 		},
-		onClick: (e: MouseEvent<SVGGraphicsElement>) => {
+		onClick: (e: NativeMouseEvent<SVGGraphicsElement>) => {
 			dispatch(
 				setActiveClickItemIndex({
 					activeIndex,
@@ -1257,9 +1267,9 @@ function AllNodeElements({
 	graphicalItemId: GraphicalItemId;
 	modifiedNodes: ReadonlyArray<NodeProps>;
 	nodeContent: SankeyNodeOptions | undefined;
-	onMouseEnter: (nodeProps: NodeProps, e: MouseEvent<SVGGraphicsElement>) => void;
-	onMouseLeave: (nodeProps: NodeProps, e: MouseEvent<SVGGraphicsElement>) => void;
-	onClick: (nodeProps: NodeProps, e: MouseEvent<SVGGraphicsElement>) => void;
+	onMouseEnter: (nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
+	onMouseLeave: (nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
+	onClick: (nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) => void;
 	dataKey: DataKey<any>;
 }) {
 	return <Layer className="recharts-sankey-nodes" key="recharts-sankey-nodes">{modifiedNodes.map((
@@ -1390,7 +1400,7 @@ function SankeyImpl(props: InternalSankeyProps) {
 	const handleMouseEnter = useCallback((
 		item: NodeProps | LinkProps,
 		type: SankeyElementType,
-		e: MouseEvent<SVGGraphicsElement>,
+		e: NativeMouseEvent<SVGGraphicsElement>,
 	) => {
 		if (onMouseEnter) {
 			onMouseEnter(item, type, e);
@@ -1400,7 +1410,7 @@ function SankeyImpl(props: InternalSankeyProps) {
 	const handleMouseLeave = useCallback((
 		item: NodeProps | LinkProps,
 		type: SankeyElementType,
-		e: MouseEvent<SVGGraphicsElement>,
+		e: NativeMouseEvent<SVGGraphicsElement>,
 	) => {
 		if (onMouseLeave) {
 			onMouseLeave(item, type, e);
@@ -1410,7 +1420,7 @@ function SankeyImpl(props: InternalSankeyProps) {
 	const handleClick = useCallback((
 		item: NodeProps | LinkProps,
 		type: SankeyElementType,
-		e: MouseEvent<SVGGraphicsElement>,
+		e: NativeMouseEvent<SVGGraphicsElement>,
 	) => {
 		if (onClick) {
 			onClick(item, type, e);
@@ -1433,17 +1443,11 @@ function SankeyImpl(props: InternalSankeyProps) {
 				modifiedLinks={modifiedLinks}
 				linkContent={link}
 				dataKey={dataKey}
-				onMouseEnter={(linkProps: LinkProps, e: MouseEvent<SVGGraphicsElement>) => handleMouseEnter(
-					linkProps,
-					'link',
-					e,
-				)}
-				onMouseLeave={(linkProps: LinkProps, e: MouseEvent<SVGGraphicsElement>) => handleMouseLeave(
-					linkProps,
-					'link',
-					e,
-				)}
-				onClick={(linkProps: LinkProps, e: MouseEvent<SVGGraphicsElement>) => handleClick(
+				onMouseEnter={(linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
+					handleMouseEnter(linkProps, 'link', e)}
+				onMouseLeave={(linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
+					handleMouseLeave(linkProps, 'link', e)}
+				onClick={(linkProps: LinkProps, e: NativeMouseEvent<SVGGraphicsElement>) => handleClick(
 					linkProps,
 					'link',
 					e,
@@ -1454,17 +1458,11 @@ function SankeyImpl(props: InternalSankeyProps) {
 				modifiedNodes={modifiedNodes}
 				nodeContent={node}
 				dataKey={dataKey}
-				onMouseEnter={(nodeProps: NodeProps, e: MouseEvent<SVGGraphicsElement>) => handleMouseEnter(
-					nodeProps,
-					'node',
-					e,
-				)}
-				onMouseLeave={(nodeProps: NodeProps, e: MouseEvent<SVGGraphicsElement>) => handleMouseLeave(
-					nodeProps,
-					'node',
-					e,
-				)}
-				onClick={(nodeProps: NodeProps, e: MouseEvent<SVGGraphicsElement>) => handleClick(
+				onMouseEnter={(nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
+					handleMouseEnter(nodeProps, 'node', e)}
+				onMouseLeave={(nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) =>
+					handleMouseLeave(nodeProps, 'node', e)}
+				onClick={(nodeProps: NodeProps, e: NativeMouseEvent<SVGGraphicsElement>) => handleClick(
 					nodeProps,
 					'node',
 					e,

@@ -1,15 +1,16 @@
+import type { OctaneElement, SVGProps } from '../util/OctaneTypes.ts';
 /**
  * @fileOverview Reference Line
  */
 import * as React from 'octane';
-import { ReactElement, SVGProps, useEffect } from 'octane';
+import { useEffect } from 'octane';
 import { clsx } from 'clsx';
-import { Layer } from '../container/Layer';
+import { Layer } from '../container/Layer.tsrx';
 import {
 	CartesianLabelContextProvider,
 	CartesianLabelFromLabelProp,
 	ImplicitLabelType,
-} from '../component/Label';
+} from '../component/Label.tsrx';
 import type { IfOverflow, Overflowable } from '../util/IfOverflow';
 import { isNumOrStr } from '../util/DataUtils';
 import { rectWithCoords } from '../util/CartesianUtils';
@@ -24,10 +25,10 @@ import {
 } from '../state/selectors/axisSelectors';
 import { useIsPanorama } from '../context/PanoramaContext';
 
-import { useClipPathId } from '../container/ClipPathProvider';
+import { useClipPathId } from '../container/ClipPathProvider.tsrx';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents';
 import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { isWellBehavedNumber } from '../util/isWellBehavedNumber';
 import { BandPosition, RechartsScale } from '../util/scale/RechartsScale';
@@ -108,14 +109,14 @@ interface ReferenceLineProps<
  * @defaultValue 0
  */
 	xAxisId?: number | string;
-	shape?: ReactElement<SVGElement> | ((props: any) => ReactElement<SVGElement>);
+	shape?: OctaneElement<SVGElement> | ((props: any) => OctaneElement<SVGElement>);
 	/**
  * Renders a single label.
  *
  * - `false`: no labels are rendered
  * - `string` | `number`: the content of the label
  * - `object`: the props of LabelList component
- * - `ReactElement`: a custom SVG label element, such as `<text>` or `<g>`.
+ * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
  *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
  * - `function`: a render function of custom label
  *
@@ -158,7 +159,6 @@ const renderLine = (option: ReferenceLineProps['shape'], props: SVGProps<SVGLine
 	let line;
 
 	if (React.isValidElement(option)) {
-		// @ts-expect-error element cloning is not typed
 		line = React.cloneElement(option, props);
 	} else if (typeof option === 'function') {
 		line = option(props);

@@ -5,7 +5,7 @@ import {
 	computeRadarPoints,
 	RadarComposedData,
 	RadiusAxisForRadar,
-} from '../../polar/Radar';
+} from '../../polar/Radar.tsrx';
 import { BaseAxisWithScale } from './axisSelectors';
 import { selectPolarAxisScale, selectPolarAxisTicks } from './polarScaleSelectors';
 import { selectAngleAxis, selectPolarViewBox, selectRadiusAxis } from './polarAxisSelectors';

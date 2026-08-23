@@ -21,6 +21,10 @@ import useEventHandlers, {
 	POINTER_EVENTS_NEAREST,
 } from '../hooks/useEventHandlers.tsrx';
 
+// Keep the literal expression below available to bundler define substitution
+// without requiring Node ambient types in browser consumers.
+declare const process: { env: { NODE_ENV?: string } };
+
 const DEFAULT_MARGIN = { top: 50, right: 50, bottom: 50, left: 50 };
 
 export type XYChartProps<XScaleConfig extends ScaleConfig<AxisScaleOutput, any, any>, YScaleConfig extends ScaleConfig<AxisScaleOutput, any, any>, Datum extends object> = {

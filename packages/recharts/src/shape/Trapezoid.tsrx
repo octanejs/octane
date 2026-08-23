@@ -1,3 +1,27 @@
+import type { NativeMouseEvent, SVGProps } from '../util/OctaneTypes.ts';
+import type { AnimationDuration, EasingInput } from '../util/types';
+
+interface TrapezoidProps {
+	className?: SVGProps<SVGPathElement>['className'];
+	x?: number;
+	y?: number;
+	upperWidth?: number;
+	lowerWidth?: number;
+	height?: number;
+	isUpdateAnimationActive?: boolean;
+	animationBegin?: number;
+	animationDuration?: AnimationDuration;
+	animationEasing?: EasingInput;
+	onClick?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseDown?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseUp?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseMove?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseOver?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseOut?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseEnter?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseLeave?: (e: NativeMouseEvent<SVGPathElement>) => void;
+}
+export type Props = SVGProps<SVGPathElement> & TrapezoidProps;
 // Port of shape/Trapezoid.tsx — the funnel-chart segment. Phase 0 ports the
 // STATIC path (isUpdateAnimationActive defaults false); the update animation
 // and the getTotalLength entrance dash arrive with the Phase 5 animation port.
@@ -7,7 +31,13 @@ import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents.ts';
 import { roundTemplateLiteral } from '../util/round';
 
-const getTrapezoidPath = (x, y, upperWidth, lowerWidth, height) => {
+const getTrapezoidPath = (
+	x: number,
+	y: number,
+	upperWidth: number,
+	lowerWidth: number,
+	height: number,
+) => {
 	const widthGap = upperWidth - lowerWidth;
 	let path;
 	path = roundTemplateLiteral`M ${x},${y}`;
@@ -28,9 +58,9 @@ export const defaultTrapezoidProps = {
 	animationBegin: 0,
 	animationDuration: 1500,
 	animationEasing: 'ease',
-};
+} as const satisfies Partial<Props>;
 
-export function Trapezoid(outsideProps) {
+export function Trapezoid(outsideProps: Props) {
 	const trapezoidProps = resolveDefaultProps(outsideProps, defaultTrapezoidProps);
 	const { x, y, upperWidth, lowerWidth, height, className } = trapezoidProps;
 

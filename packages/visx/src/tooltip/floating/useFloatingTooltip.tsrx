@@ -268,7 +268,7 @@ export default function useFloatingTooltip<TData = unknown>(
 
 	const { align, side } = getSideAndAlign(floating.placement);
 	const getFloatingPropsWithId = useCallback(
-		<TProps extends HTMLProps<HTMLElement>>(props?: TProps) => getFloatingProps(
+		<TProps extends HTMLProps<HTMLElement>,>(props?: TProps) => getFloatingProps(
 			getFloatingPropsWithDefaultId(props, id),
 		) as TProps,
 		[getFloatingProps, id],
@@ -295,10 +295,10 @@ export default function useFloatingTooltip<TData = unknown>(
 		update: floating.update,
 		openTooltip,
 		closeTooltip,
-		getReferenceProps: <TProps extends HTMLProps<Element>>(props?: TProps) =>
+		getReferenceProps: <TProps extends HTMLProps<Element>,>(props?: TProps) =>
 			getReferenceProps(props) as TProps,
 		getFloatingProps: getFloatingPropsWithId,
-		getArrowProps: <TProps extends Octane.SVGProps<SVGSVGElement>>(props?: TProps) => {
+		getArrowProps: <TProps extends Octane.SVGProps<SVGSVGElement>,>(props?: TProps) => {
 			const emptyProps = {};
 			return props ?? emptyProps as TProps;
 		},

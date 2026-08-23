@@ -1,3 +1,6 @@
+import type { CartesianChartProps } from '../util/types';
+import type { Ref } from '../util/OctaneTypes.ts';
+
 // Port of chart/CategoricalChart.tsx — the wrapper-div + root-svg pairing
 // (or, in compact/panorama mode, just the bare surface).
 import { RootSurface } from '../container/RootSurface.tsrx';
@@ -6,7 +9,7 @@ import { ClipPathProvider } from '../container/ClipPathProvider.tsrx';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
 import { ReportChartSize } from '../context/chartLayoutContext.ts';
 
-export function CategoricalChart(props) {
+export function CategoricalChart(props: CartesianChartProps & { ref?: Ref<SVGSVGElement> }) {
 	const {
 		width,
 		height,

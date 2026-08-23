@@ -5,6 +5,7 @@ import {
 	LineChart,
 	Bar,
 	Cell,
+	CartesianAxis,
 	CartesianGrid,
 	ComposedChart,
 	DefaultLegendContent,
@@ -34,6 +35,8 @@ import {
 	YAxis,
 	ZAxis,
 } from '@octanejs/recharts';
+import type { CartesianAxisRef } from '../../src/cartesian/CartesianAxis.tsrx';
+import type { Ref } from '../../src/util/OctaneTypes';
 
 void DefaultLegendContent;
 void DefaultTooltipContent;
@@ -56,6 +59,22 @@ export function BarChartApp() @{
 		<YAxis />
 		<Bar dataKey="uv" fill="#8884d8" isAnimationActive={false} />
 		<Bar dataKey="pv" fill="#82ca9d" isAnimationActive={false} />
+	</BarChart>
+}
+
+export function CartesianAxisRefApp({ axisRef }: { axisRef: Ref<CartesianAxisRef> }) @{
+	<BarChart width={500} height={300} data={data}>
+		<CartesianAxis
+			ref={axisRef}
+			x={10}
+			y={250}
+			width={480}
+			height={30}
+			ticks={[
+				{ value: 'A', coordinate: 50 },
+				{ value: 'B', coordinate: 150 },
+			]}
+		/>
 	</BarChart>
 }
 
@@ -285,7 +304,12 @@ export function PolarChartsApp() @{
 	</div>
 }
 
-export function PolarCellsApp() @{
+export function PolarCellsApp(
+	props: {
+		pieRef?: (node: SVGElement | null) => void;
+		label?: boolean;
+	} = {},
+) @{
 	<div>
 		<PieChart width={400} height={300}>
 			<Pie
@@ -296,8 +320,9 @@ export function PolarCellsApp() @{
 				]}
 				fill="#8884d8"
 				isAnimationActive={false}
+				label={props.label}
 			>
-				<Cell fill="#ff0000" />
+				<Cell fill="#ff0000" ref={props.pieRef} />
 				<Cell fill="#0000ff" />
 			</Pie>
 		</PieChart>
@@ -401,6 +426,29 @@ export function HiddenPieTooltipApp() @{
 			isAnimationActive={false}
 		/>
 	</PieChart>
+}
+
+export function MissingRadialGeometryApp({ observe }) @{
+	<RadialBarChart
+		width={400}
+		height={300}
+		layout="centric"
+		data={[
+			{ name: 'missing', value: undefined },
+			{ name: 'present', value: 70 },
+		]}
+	>
+		<PolarAngleAxis dataKey="name" type="category" />
+		<PolarRadiusAxis type="number" domain={[0, 100]} />
+		<RadialBar
+			dataKey="value"
+			isAnimationActive={false}
+			shape={(props) => {
+				observe(props);
+				return <path data-radial-index={props.index} d="M0 0" />;
+			}}
+		/>
+	</RadialBarChart>
 }
 
 export function HierarchyChartsApp() @{

@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { build } from 'esbuild';
 import {
 	cpSync,
@@ -22,7 +22,9 @@ import {
 } from './workspace-packages.mjs';
 import {
 	createPackedJavascriptConsumerManifest,
+	assertPackedTsrxConsumerSucceeded,
 	createPackedTsrxConsumerConfig,
+	resolvePackedTsrxSourceDirectories,
 	createPackedTsrxConsumerManifest,
 	createPackedExampleManifest,
 	isWithinDirectory,
@@ -35,14 +37,19 @@ import {
 	PACKED_COMMONJS_CONSUMER_PACKAGES,
 	PACKED_JAVASCRIPT_CONSUMER_PACKAGES,
 	PACKED_TSRX_CONSUMER_PROJECTS,
+	PACKED_TSRX_BROWSER_AMBIENT_FILE,
 	PACKED_TSRX_PROBE_PACKAGES,
+	PACKED_TSRX_STRICT_BROWSER_PACKAGES,
 	renderPackedExampleWorkspace,
 	renderPackedCommonjsConsumerSource,
 	renderPackedDraggableEsmConsumerSource,
 	renderPackedEsmConsumerSource,
 	renderPackedTsrxConsumerSource,
+	renderPackedTsrxBrowserAmbientProbe,
 	renderPackedTsrxSourceImports,
 	renderPackedTsrxConsumerTypeProbe,
+	renderPackedStrictBrowserConsumerTypeProbe,
+	renderPackedStrictBrowserConsumerSource,
 } from './package-pack-canaries.mjs';
 import { LYNX_TOOLCHAIN_LANES } from '../packages/rspeedy-plugin-octane/src/toolchain-lanes.js';
 import {
@@ -132,18 +139,8 @@ const packedTsrxSourceExceptions = new Map([
 		'@octanejs/rainbowkit',
 		'its Wagmi and TanStack Query peer declarations are not yet mutually compatible under strict checking',
 	],
-	['@octanejs/jotai', 'its browser source still reads process.env.NODE_ENV'],
 	['@octanejs/popper', 'its browser source still reads process.env.NODE_ENV'],
 	['@octanejs/react-map-gl', 'its published source requires Mapbox GeoJSON ambient declarations'],
-	[
-		'@octanejs/recharts',
-		'extensionless relative imports do not yet resolve to sibling TSRX modules in tsrx-tsc',
-	],
-	[
-		'@octanejs/remix-router',
-		'its ref and browser-global source typing debt is tracked by companion PR #734',
-	],
-	['@octanejs/redux', 'its browser source still reads process.env.NODE_ENV'],
 	[
 		'@octanejs/solana-react',
 		'its TanStack Query peer declarations are not yet compatible with the installed strict consumer graph',
@@ -154,7 +151,6 @@ const packedTsrxSourceExceptions = new Map([
 		'its browser source reads process.env.NODE_ENV and its upstream declarations import node:http2',
 	],
 	['@octanejs/tiptap', 'its browser source still reads process.env.NODE_ENV'],
-	['@octanejs/visx', 'React SVG and event prop types are not yet Octane-native'],
 	[
 		'@octanejs/wagmi',
 		'its Wagmi and TanStack Query peer declarations are not yet mutually compatible under strict checking',
@@ -1112,6 +1108,8 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 
 	const sourceDirectory = path.join(consumerDirectory, 'src');
 	mkdirSync(sourceDirectory, { recursive: true });
+	const strictBrowserDirectory = path.join(consumerDirectory, 'strict-browser');
+	mkdirSync(strictBrowserDirectory, { recursive: true });
 	const sourceConsumerPackages = findPackedTsrxSourceConsumerPackages(
 		packages,
 		packedFiles,
@@ -1146,6 +1144,13 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 			sourceConsumerSpecifiers.get(packageName),
 		]),
 	);
+	const strictBrowserSpecifiers = PACKED_TSRX_STRICT_BROWSER_PACKAGES.flatMap((packageName) => {
+		const specifiers = browserSourceConsumerSpecifiers.get(packageName);
+		if (!specifiers) {
+			throw new Error(`${packageName} must remain enrolled in strict packed browser validation`);
+		}
+		return specifiers;
+	});
 	const validatedPackages = [...sourceConsumerSpecifiers.keys(), 'octane'];
 	const installedPackages = findPackedWorkspaceDependencyClosure(packedManifests, [
 		...new Set([...validatedPackages, ...PACKED_TSRX_PROBE_PACKAGES]),
@@ -1171,35 +1176,12 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 		`${JSON.stringify(manifest, null, 2)}\n`,
 	);
 	writeFileSync(
-		path.join(consumerDirectory, 'tsconfig.json'),
-		`${JSON.stringify(
-			createPackedTsrxConsumerConfig({
-				nodeTypes: true,
-				sourcePackageNames: [...sourceConsumerSpecifiers.keys()],
-			}),
-			null,
-			2,
-		)}\n`,
-	);
-	writeFileSync(
-		path.join(consumerDirectory, 'tsconfig.browser.json'),
-		`${JSON.stringify(
-			createPackedTsrxConsumerConfig({
-				consumerSourceFiles: ['src/published-browser-source-imports.ts'],
-				nodeTypes: false,
-				sourcePackageNames: [...browserSourceConsumerSpecifiers.keys()],
-			}),
-			null,
-			2,
-		)}\n`,
-	);
-	writeFileSync(
 		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
 		renderPackedExampleWorkspace(archiveSpecs),
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'PublishedSourceConsumer.tsrx'),
-		renderPackedTsrxConsumerSource({ includeRecharts: false }),
+		renderPackedTsrxConsumerSource(),
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'published-types.ts'),
@@ -1212,6 +1194,22 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 	writeFileSync(
 		path.join(sourceDirectory, 'published-browser-source-imports.ts'),
 		renderPackedTsrxSourceImports([...browserSourceConsumerSpecifiers.values()].flat()),
+	);
+	writeFileSync(
+		path.join(consumerDirectory, PACKED_TSRX_BROWSER_AMBIENT_FILE),
+		renderPackedTsrxBrowserAmbientProbe(),
+	);
+	writeFileSync(
+		path.join(strictBrowserDirectory, 'published-source-imports.ts'),
+		renderPackedTsrxSourceImports(strictBrowserSpecifiers),
+	);
+	writeFileSync(
+		path.join(strictBrowserDirectory, 'published-types.ts'),
+		renderPackedStrictBrowserConsumerTypeProbe(),
+	);
+	writeFileSync(
+		path.join(strictBrowserDirectory, 'App.tsrx'),
+		renderPackedStrictBrowserConsumerSource(),
 	);
 
 	execFileSync(
@@ -1249,18 +1247,62 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 		}
 	}
 
+	writeFileSync(
+		path.join(consumerDirectory, 'tsconfig.json'),
+		`${JSON.stringify(
+			createPackedTsrxConsumerConfig({
+				nodeTypes: true,
+				sourcePackageDirectories: resolvePackedTsrxSourceDirectories(consumerDirectory, [
+					...sourceConsumerSpecifiers.keys(),
+				]),
+			}),
+			null,
+			2,
+		)}\n`,
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'tsconfig.browser.json'),
+		`${JSON.stringify(
+			createPackedTsrxConsumerConfig({
+				consumerSourceFiles: ['src/published-browser-source-imports.ts'],
+				nodeTypes: false,
+				sourcePackageDirectories: resolvePackedTsrxSourceDirectories(consumerDirectory, [
+					...browserSourceConsumerSpecifiers.keys(),
+				]),
+			}),
+			null,
+			2,
+		)}\n`,
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'tsconfig.strict-browser.json'),
+		`${JSON.stringify(
+			createPackedTsrxConsumerConfig({
+				consumerSourceFiles: ['strict-browser/**/*'],
+				ecmaVersion: 'esnext',
+				nodeTypes: false,
+			}),
+			null,
+			2,
+		)}\n`,
+	);
+
 	const tsrxTsc = path.join(consumerDirectory, 'node_modules', '.bin', 'tsrx-tsc');
 	for (const project of PACKED_TSRX_CONSUMER_PROJECTS) {
-		execFileSync(tsrxTsc, ['--noEmit', '-p', project], {
+		const result = spawnSync(tsrxTsc, ['--noEmit', '-p', project], {
 			cwd: consumerDirectory,
 			encoding: 'utf8',
 			stdio: ['ignore', 'pipe', 'pipe'],
 			timeout: 120_000,
 		});
+		assertPackedTsrxConsumerSucceeded(result, project);
 	}
 
 	console.log(
 		`strict tsrx-tsc validated ${validatedPackages.length - 1} packed TSRX bindings with and without Node ambient types using the installed Octane Volar compiler`,
+	);
+	console.log(
+		`strict ESNext browser source and public contracts passed for ${PACKED_TSRX_STRICT_BROWSER_PACKAGES.join(', ')}`,
 	);
 	for (const [packageName, reason] of packedTsrxSourceExceptions) {
 		console.warn(`deferred strict packed TSRX validation for ${packageName}: ${reason}`);
