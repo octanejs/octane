@@ -5088,7 +5088,12 @@ function reportEffectError(block: Block, error: unknown): void {
 	}
 	let root = block;
 	while (root.parentBlock !== null) root = root.parentBlock;
-	if (root.kind === 'root' && !root.disposed) unmountBlock(root);
+	if (root.kind === 'root' && !root.disposed) {
+		unmountBlock(root);
+		// Layout/passive failures can occur after this commit's normal ref drain.
+		// Complete deletion before the error callback observes the failed root.
+		drainRefDetaches();
+	}
 	if (!reportUncaughtError(block, error)) console.error(error);
 }
 

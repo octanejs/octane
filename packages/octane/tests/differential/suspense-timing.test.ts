@@ -1999,7 +1999,22 @@ describe.each<Runtime>(['react', 'octane'])('%s root suspension without a bounda
 
 	it('treats a thenable thrown by a layout effect as an error rather than render suspension', async () => {
 		const error = Promise.resolve('not a render suspension');
-		const onUncaughtError = vi.fn();
+		const observed = callbacks();
+		let container: HTMLElement | null = null;
+		const callbackStates: Array<{
+			html: string | null;
+			readerRef: HTMLSpanElement | null | undefined;
+			shellRef: HTMLElement | null | undefined;
+			layoutCleanups: string[];
+		}> = [];
+		const onUncaughtError = vi.fn((_reported: unknown) => {
+			callbackStates.push({
+				html: container === null ? null : normaliseHtml(container.innerHTML),
+				readerRef: observed.refs.at(-1),
+				shellRef: observed.shellRefs.at(-1),
+				layoutCleanups: observed.lifecycle.filter((event) => event.startsWith('layout cleanup ')),
+			});
+		});
 		// Observe the public error callback outside act's own error-reporting boundary.
 		const root = mount(
 			runtime,
@@ -2007,15 +2022,27 @@ describe.each<Runtime>(['react', 'octane'])('%s root suspension without a bounda
 			{
 				promise: fulfilled('ready'),
 				label: 'ready',
+				...observed.props,
 				onLayout() {
+					// Initial mount can report synchronously, before mount() returns the root.
+					container = observed.refs.at(-1)?.parentElement?.parentElement ?? null;
 					throw error;
 				},
 			},
 			{ onUncaughtError },
 		);
 		await advance();
+		expect(container).toBe(root.container);
 		expect(normaliseHtml(root.container.innerHTML)).toBe('');
 		expect(onUncaughtError.mock.calls.map((call) => call[0])).toEqual([error]);
+		expect(callbackStates).toEqual([
+			{
+				html: '',
+				readerRef: null,
+				shellRef: null,
+				layoutCleanups: ['layout cleanup shell:ready'],
+			},
+		]);
 		await advance(1000);
 		expect(normaliseHtml(root.container.innerHTML)).toBe('');
 		expect(onUncaughtError.mock.calls.map((call) => call[0])).toEqual([error]);
