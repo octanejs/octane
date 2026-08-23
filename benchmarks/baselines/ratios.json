@@ -2937,6 +2937,14 @@
   },
   {
     "suite": "activity",
+    "op": "plain_updates_journalForSlot",
+    "target": "octane-tsrx-work",
+    "reference": "activity-work-model",
+    "maxRatio": 0,
+    "note": "Unchanged keyed membership must not snapshot the chain or key map while updating ordinary row bindings."
+  },
+  {
+    "suite": "activity",
     "op": "plain_updates_hideActivityRange",
     "target": "octane-tsrx-work",
     "reference": "activity-work-model",

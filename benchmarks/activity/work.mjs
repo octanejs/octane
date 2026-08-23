@@ -27,6 +27,7 @@ const METRICS = [
 	'hideActivityRefs',
 	'queueCurrentActivityRefs',
 	'snapshotSubtreeEffectDeps',
+	'journalForSlot',
 	'renderBlock',
 ];
 const targets = [];

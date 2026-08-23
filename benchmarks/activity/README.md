@@ -79,10 +79,11 @@ do not replace, the broader existing bundle-reachability byte budgets.
 
 ## Regression guards
 
-The unified runner has 32 deterministic guards for this suite: coalesced linear
+The unified runner has 33 deterministic guards for this suite: coalesced linear
 hidden-descendant work, retained rows and bounded display writes, cold ref and
 insertion-recovery walks, cached ordinary-ref ownership, and optional Activity
-bundle reachability. They are checked only after the semantic gates pass.
+bundle reachability. Ordinary updates also forbid snapshots of unchanged keyed
+list structure. The guards run only after the semantic gates pass.
 
 The initial audit deliberately adds **no wall-clock timing ceiling**. The hidden
 setter improvement is substantial, but repeated hide/reveal is slower and the

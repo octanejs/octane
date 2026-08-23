@@ -31918,7 +31918,7 @@
     },
     {
       "caseId": "react-case-v1:690bff2d0830ae1e00cd",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "sourceFile": "packages/react-reconciler/src/__tests__/ReactSuspenseWithNoopRenderer-test.js",
       "title": "in concurrent mode, does not error when an update suspends without a Suspense boundary during a sync update",
@@ -31926,7 +31926,39 @@
       "classification": "adaptable",
       "owner": "runtime",
       "workstream": "React reconciler residual audit",
-      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+      "rationale": "Public root renders retain an empty initial root or the committed screen when a raw resource read or use() suspends without a pending boundary, and retry current inputs without reporting suspension as an error. Shared compiled fixtures and public descriptor interactions run against ReactDOM 19.2.7 and both Octane compile modes; matching hydration preserves server DOM until adoption can commit. Actual rejections retain normal error routing.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "keeps an initial suspended root empty until the whole screen can commit",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "holds the whole committed screen during a suspended %s root update",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "retains runtime descriptors, host state, refs and portals until a later reader is ready",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "uses the latest initial props when an uncommitted %s root is superseded",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/differential/suspense-timing.test.ts",
+          "testName": "reports only the actual %s rejection when a root retry fails",
+          "modes": ["client", "production-compile"]
+        },
+        {
+          "file": "packages/octane/tests/hydration/suspense-hydrate.test.ts",
+          "testName": "retains the server screen until hydration can commit, then preserves it through later updates",
+          "modes": ["hydrate-match", "production-compile"]
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:6915fc676121b06ea307",

@@ -643,28 +643,37 @@ export function TransitionKeyedEmptyFill(props) @{
 }
 
 // ---------------------------------------------------------------------------
-// A value-position keyed list whose slot LEAVES array mode during the
-// transition (the value flips to plain text), and then a later sibling
-// suspends. The slot itself is discarded on the flip, so there is nothing for
-// a rollback to restore the rows into — the teardown must run inline with the
-// attempt, exactly as it did before rows learned to wait for a hold. The
-// layout cleanups' position relative to the tail's render pins that.
+// A keyed list changes to plain text before a later sibling suspends. The
+// committed rows, refs, uncontrolled drafts, and effects remain live until
+// the whole replacement can commit.
 // ---------------------------------------------------------------------------
-function FlipRow(props) @{
+type ArrayModeExitProps = {
+	load: (step: number) => PromiseLike<string>;
+	log: (event: string) => void;
+	rowRefs?: Record<string, { current: HTMLLIElement | null }>;
+};
+
+function FlipRow(props: {
+	id: string;
+	log: (event: string) => void;
+	rowRef?: { current: HTMLLIElement | null };
+}) @{
 	useLayoutEffect(() => {
 		props.log('mount:' + props.id);
 		return () => props.log('cleanup:' + props.id);
 	}, []);
-	<li id={'row-' + props.id}>{props.id as string}</li>
+	<li id={'row-' + props.id} ref={props.rowRef}>
+		{props.id as string}
+		<input aria-label={'draft ' + props.id} defaultValue={props.id} />
+	</li>
 }
 
-function FlipTail(props) @{
-	props.log('render:tail:' + props.step);
+function FlipTail(props: { load: ArrayModeExitProps['load']; step: number }) @{
 	const value = use(props.load(props.step));
 	<span id="value">{value as string}</span>
 }
 
-export function TransitionArrayModeExit(props) @{
+export function TransitionArrayModeExit(props: ArrayModeExitProps) @{
 	const [step, setStep] = useState(0);
 	const rows =
 		step === 0 ? ['a', 'b'] : null;
@@ -673,9 +682,13 @@ export function TransitionArrayModeExit(props) @{
 		@try {
 			<>
 				<div id="host">
-					{rows === null ? 'plain' : rows.map((id) => <FlipRow key={id} id={id} log={props.log} />)}
+					{rows === null
+						? 'plain'
+						: rows.map(
+								(id) => <FlipRow key={id} id={id} log={props.log} rowRef={props.rowRefs?.[id]} />,
+							)}
 				</div>
-				<FlipTail load={props.load} step={step} log={props.log} />
+				<FlipTail load={props.load} step={step} />
 			</>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>

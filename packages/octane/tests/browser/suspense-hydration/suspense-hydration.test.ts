@@ -176,6 +176,65 @@ async function expectUrgentPreservation(shape: 'same' | 'swap'): Promise<void> {
 }
 
 describe.sequential('real-browser Suspense and async hydration evidence', () => {
+	it.each(['component', 'branch', 'root', 'keyed', 'empty'] as const)(
+		'keeps native focus undisturbed when %s replacement suspends without a boundary',
+		async (shape) => {
+			for (const implementation of ['react', 'octane']) {
+				await openCase(`case=root-suspension&shape=${shape}&implementation=${implementation}`);
+				await page!.locator('#root-suspension-input').fill('browser-owned draft');
+				const before = await page!.evaluate(() => window.__suspenseHydration.prepareInput!());
+				expect(before).toMatchObject({
+					activeId: 'root-suspension-input',
+					inputValue: 'browser-owned draft',
+					selectionStart: 2,
+					selectionEnd: 9,
+					nativeEvents: [],
+					lifecycle: ['input:mount'],
+				});
+
+				// Invoke the update without a click that would legitimately move focus.
+				// A browser frame also observes native events emitted before DOM rollback.
+				await page!.evaluate(async () => {
+					window.__suspenseHydration.urgent!();
+					await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+				});
+				const held = await snapshot();
+				expect(held.nativeEvents, `${implementation}/${shape}`).toEqual([]);
+				expect(held).toMatchObject({
+					inputSame: true,
+					inputConnected: true,
+					activeId: 'root-suspension-input',
+					inputValue: 'browser-owned draft',
+					selectionStart: 2,
+					selectionEnd: 9,
+					keepSame: true,
+					emptyCount: 0,
+					value: 'A',
+					replacementCount: 0,
+					lifecycle: ['input:mount'],
+					globalFailures: [],
+				});
+
+				await page!.evaluate(() => window.__suspenseHydration.resolve());
+				await page!.waitForFunction(() => window.__suspenseHydration.snapshot().value === 'B');
+				const committed = await snapshot();
+				expect(committed).toMatchObject({
+					inputSame: false,
+					inputConnected: false,
+					keepSame: shape !== 'empty',
+					emptyCount: shape === 'empty' ? 1 : 0,
+					replacementCount: shape === 'keyed' || shape === 'empty' ? 0 : 1,
+					lifecycle: ['input:mount', 'input:cleanup'],
+					globalFailures: [],
+				});
+				await page!.evaluate(() => window.__suspenseHydration.unmount());
+				expect((await snapshot()).lifecycle).toEqual(['input:mount', 'input:cleanup']);
+				await page!.close();
+				page = undefined;
+			}
+		},
+	);
+
 	it('restores focused input and its selected text after a keyed DOM reorder', async () => {
 		await openCase('case=focus-restoration');
 		const before = await snapshot();
@@ -425,6 +484,7 @@ declare global {
 			kind:
 				| 'hydration'
 				| 'suspense'
+				| 'root-suspension'
 				| 'react-baseline'
 				| 'direct-ref-unmount'
 				| 'focus-restoration'

@@ -108,50 +108,30 @@ more than the node: the `default*` mirror and the per-element record of what was
 projected go back with it, or the record would believe the new value had already landed and
 skip re-projecting it on resume.
 
-**Remaining limitation — one project, not two.** Content the same transition patched OUTSIDE
-a suspended boundary still keeps its new value, and so does a structural change above the
-boundary. These were previously filed as separate gaps; they are not. Both need the
-transition render to become a deferred commit unit, for two reasons found while attempting
-the first:
+**Remaining limitation — general transition-wide work in progress.** Outside the supported
+single-origin staged-state path, content patched outside a suspended boundary, or a
+structural change above it, can still commit early. These were originally filed as separate
+gaps. The following investigation motivated the staged-state implementation described below:
 
 1. _Reveal scope._ Reverting content outside the boundary strands it. The reveal path
    re-renders the try block only, so a restored bag outside it is never re-patched and the
    content stays on the old value permanently. The hold would have to record the block the
    transition originated from and re-render that instead.
-2. _Destruction is not undoable_ — ✅ CLOSED for keyed lists (2026-07-29). A keyed removal
-   used to dispose the row outright before the hold was decided, so a held boundary could
-   show a list with a row missing — DOM, hook state and cleanups already gone. Removals now
-   split: the DOM detach happens immediately (the reconciler needs the nodes out of the way)
-   but the nodes are kept and the scope teardown is PARKED. A rollback re-inserts the rows
-   with their state intact and their cleanups never having run; a commit flushes the parked
-   teardowns when the last journal window closes. The list restores as a whole — chain, key
-   map, counts and the `@empty` branch together — so moved survivors return to position
-   alongside dropped rows. `transitions.test.ts` pins the drop, the state survival, the
-   cleanup timing, and both directions of the `@empty` swap.
+2. _Destruction is not undoable_ — ✅ CLOSED for keyed lists (2026-07-29), extended by
+   root transactions (#10). A keyed removal used to dispose the row before the hold was
+   decided. The original boundary journal parked detached nodes and deferred teardown;
+   root transactions now keep outgoing rows connected until commit, so a failed attempt
+   does not blur a focused input. Rollback restores membership, order, state, and `@empty`
+   together; successful deletion runs cleanup while the old DOM is still connected.
+   Structural snapshots are taken only when membership or order changes.
 
-   Parking is gated on the slot's shape being journaled (`forSlotParkable`): a
-   value-position slot LEAVING array mode discards the slot itself, so its rows have
-   nothing to be restored into and tear down inline with the attempt, exactly as before —
-   that kind flip is part of the retained per-swap limitation above, and the flipped-in
-   content stays through a hold. `transitions.test.ts` pins the inline teardown order.
-
-   **This one is NOT blocked by the pending cue, and it is the most visible of the two.** A
-   keyed list between the `@try` and the suspending component sits inside the boundary's own
-   journal window, so it needs no attempt-level widening. Reproduced 2026-07-29: a list of
-   `a, b, c` inside a boundary, a transition moving to `c, a, d` where `d` is what suspends,
-   leaves the held boundary showing `a, c` — row `b` is disposed and gone from a list the
-   boundary is supposed to be holding frozen. Its DOM, its hook state and its cleanups are
-   all already destroyed by the time the hold is decided.
-
-   The shape of the fix: a removal cannot defer its DOM detach, because the reconciler needs
-   the node gone to finish and the hold is only decided afterwards. So the detach is
-   journaled (`node`, `parent`, `nextSibling`) and undoable, while the SCOPE TEARDOWN —
-   `unmountScope`, the `disposed` stamp and the user cleanups — is what defers to commit.
-   `unmountBlock` is the single choke point (three call sites in the reconciler plus
-   `batchClearItems`), but it is on every removal path in the runtime, so the deferral has to
-   be gated tightly on an armed window. The `@for` bookkeeping travels with it: `head`,
-   `tail`, `size`, the key→block map and the intrusive `nextSibling` chain all need
-   snapshotting before the reconcile, the same way a binding bag does.
+   For the supported single-origin transition path, a value-position array-to-text
+   replacement also keeps committed rows live until it can commit. The regression
+   `keeps array content mounted until a suspended text replacement is ready` in
+   `transitions.test.ts` verifies row/input identity, edited uncontrolled values, stable
+   refs, and no cleanup during the hold. Successful replacement clears the refs and runs
+   each row's cleanup once. Real-browser root tests additionally cover native focus events
+   for keyed removal and the rows-to-`@empty` change.
 
 Effects are the third piece: a rolled-back region outside a boundary would otherwise run
 effects against DOM that was reverted underneath them, so that region needs the same
@@ -184,9 +164,12 @@ reverted re-publishes exactly those bindings (everything else no-ops on its bag 
 actual prerequisite is extending the async-Action staging batch to held synchronous
 transitions. Design and phases: [docs/transition-deferred-commit-plan.md](../../docs/transition-deferred-commit-plan.md).
 
-The async Action batching in #6 prevents the shell tear while an Action is in flight, but
-does not close the synchronous case. Fallback-visible retries are capture-safe and never had
-this limitation.
+Single-origin synchronous state staging subsequently shipped with cell rollback and an
+old-input pending-cue render; see
+[P1 landed](../../../docs/transition-deferred-commit-plan.md#p1-landed-2026-07-30-design-a--harvest).
+Root-owned holds in #10 now use that staging contract too. This is not a general
+multi-origin or external-store work-in-progress tree. Fallback-visible retries are
+capture-safe and never had this limitation.
 Time-based cross-boundary fallback throttling is the separate Divergence #5.
 
 ---
@@ -319,14 +302,15 @@ that thenable settles. A real error from the retry goes to the error boundary;
 a thenable thrown by a commit-phase effect is an error, not render suspension.
 
 **Octane behavior:** client and server render catches recognize resource-thrown
-thenables as suspension. The client uses the existing boundary retry path. SSR
-registers the pending boundary without inventing a `use()` slot or hydration
-seed for the resource reader. Native promises and custom thenables are covered;
-this does not fix client suspension without an enclosing boundary (see #10).
+thenables as suspension. The client retries through the nearest pending boundary,
+or through the root when no pending boundary owns the suspension (see #10).
+Catch-only error boundaries do not claim thenables. SSR registers the pending
+boundary without inventing a `use()` slot or hydration seed for the resource
+reader. Native promises and custom thenables are covered.
 
 Pending and error fallbacks are render work too. A wakeable thrown there suspends
-to an enclosing Suspense boundary, rather than entering the fallback's own catch
-arm or destroying its state. This follows React's
+to an enclosing Suspense boundary, or the client root if none exists, rather than
+entering the fallback's own catch arm or destroying its state. This follows React's
 [fallback-handler context](https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-reconciler/src/ReactFiberSuspenseContext.js#L102-L107).
 An error report produced by a detached retry stays deferred while its error
 fallback is suspended; replacement or unmount cancels that report. Finite-timeout
@@ -347,18 +331,54 @@ rendering, sequential wakeables, rejection, abort, and hydration adoption.
 
 ---
 
-## 10. Client suspension without a boundary — open bug
+## 10. Client suspension without a boundary — root hold and retry
 
-Without an enclosing Suspense/`@pending` boundary, Octane still treats client
-suspension as an uncaught root failure, unmounting the root instead of retaining
-and retrying it. React retains the previous root content, or the empty initial
-root, until the suspended render can complete. This is a known compatibility
-gap, **not** an intentional divergence.
+Client roots now retain and retry render suspension from `use()` and
+resource-thrown thenables when no Suspense/`@pending` boundary owns it, fixing
+[issue #821](https://github.com/octanejs/octane/issues/821). A catch-only error
+boundary does not own suspension. An initial client mount stays empty; an urgent
+or transition update retains the previously committed screen while pending.
+The retained screen keeps its node identity, component state, controlled values,
+handlers, refs, and layout/passive effects. Replacement components, branches,
+lists, rendered values, and portals wait for a successful root render before
+replacing committed content.
 
-Tracked separately in [issue #821](https://github.com/octanejs/octane/issues/821).
-Closing it requires root-level retry and atomic commit ownership; the
-boundary-local timing and resource-thenable fixes above do not provide that
-contract.
+Retries use the latest inputs. Superseding requests and unmounts cancel stale
+reveals, and an uncommitted initial root initializes state from its current props
+on retry. A rejected resource reports the actual error through the ordinary
+error boundary or root callback; a thenable thrown by an effect remains an
+application error rather than render suspension.
+
+Initially suspended hydration retains the server DOM without attaching the
+incomplete tree's refs or running its layout/passive effects. A successful retry
+adopts the existing nodes; an unmount or superseding client render cannot revive
+the abandoned hydration.
+
+**Evidence:** the root-suspension group in
+[differential/suspense-timing.test.ts](../tests/differential/suspense-timing.test.ts)
+runs the same compiled fixtures and public descriptor interactions against
+ReactDOM 19.2.7 and both Octane compile modes. It covers raw and `use()` reads,
+initial and committed roots, urgent/transition and descendant updates, structural
+replacement, controlled inputs, event handlers, retained state/context, refs and
+effects, latest-input supersession, rejection, repeated/custom/synchronous
+thenables, independent roots, and unmount. The root-suspension group in
+[hydration/suspense-hydrate.test.ts](../tests/hydration/suspense-hydrate.test.ts)
+checks server-node adoption, subsequent suspended updates, rejection,
+supersession, and unmount in both compile modes.
+
+Pending-cue and commit-time evidence covers single-origin root suspension, including
+successive resources, unrelated props refreshes, cancellation, and rejection. This matrix
+does not establish simultaneous explicit-boundary/root holds, multi-origin staging, or
+external-store-driven transition behavior. That proof limit is separate from the retained
+root-output guarantees above.
+
+These are retained-output and committed-lifecycle guarantees, not a claim that
+every eager native host mutation has React's separate render/commit semantics.
+The broader work-in-progress limitations in #4 remain separate.
+
+The measured ordinary-render overhead, executable bundle growth, affected-path
+work counts, and remaining measurement limits are recorded in the
+[root suspension performance audit](./root-suspension-performance.md).
 
 ---
 
@@ -385,9 +405,9 @@ Activity case is covered by [Activity lifecycle tests](../tests/activity.test.ts
 Costs and limitations are recorded in the
 [performance audit](./incomplete-descriptor-retry-performance.md).
 
-This does not add global structural work-in-progress semantics (#4), root-level
-suspension without a boundary (#10), or general replay of discarded caught-error
-reports.
+Root-owned suspension without a pending boundary is covered separately in #10.
+Descriptor retry validity does not add general React-style work-in-progress
+semantics (#4) or general replay of discarded caught-error reports.
 
 ## 12. Ordinary first-mount error reporting
 
