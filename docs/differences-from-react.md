@@ -713,14 +713,20 @@ Other consequences:
   toggling Activity visibility alone does not.
   This is separate from the indefinite transition hold above; see
   [Suspense retry timing](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#5-retry-reveal-throttling--distinct-from-transition-shell-retention).
-- Resource readers can suspend by throwing a thenable during render inside an
-  enclosing Suspense/`@pending` boundary, on the client and during SSR; `use()` is
-  not required. Pending and error fallback renders can also suspend to an outer
-  boundary; promises thrown by effects remain application errors.
-  Client suspension **without** such a boundary remains a known
-  bug: the root unmounts instead of holding and retrying. This is tracked in
-  [issue #821](https://github.com/octanejs/octane/issues/821), not an intentional
-  divergence.
+- Resource readers can suspend by throwing a thenable during render, on the
+  client and during SSR; `use()` is not required. Pending and error fallback
+  renders can also suspend through an enclosing pending boundary. A catch-only
+  error boundary does not own suspension; promises thrown by effects remain
+  application errors.
+- Without an enclosing Suspense/`@pending` boundary, the client root retains its
+  committed screen, or stays empty on an initial mount, and retries when the
+  thenable settles. Urgent and transition updates retry the latest inputs;
+  superseding requests and unmounts cannot reveal stale work. Initially suspended
+  hydration retains the server DOM until it can adopt it, attach refs, and run
+  layout/passive effects. Actual rejections follow normal
+  error-boundary/root-error routing.
+  See [root suspension coverage](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#10-client-suspension-without-a-boundary--root-hold-and-retry)
+  for the fix to [issue #821](https://github.com/octanejs/octane/issues/821).
 - Incomplete descriptor and memoized subtrees retry before Suspense reveals
   them, preserving mounted state and DOM identity. Completed siblings whose
   speculative commit work was discarded are revisited; unaffected memo and

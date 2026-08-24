@@ -4315,6 +4315,109 @@ describe('mixed DOM and universal ownership', () => {
 		root.unmount();
 	});
 
+	it('releases an abandoned DOM scope before retrying with a delayed foreign cleanup scheduler', async () => {
+		const container = createObjectContainer();
+		const scheduled: Array<() => void> = [];
+		const root = createUniversalRoot(container, createObjectDriver(), {
+			scheduleMicrotask(callback) {
+				scheduled.push(callback);
+			},
+		});
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [
+				['theme', 0],
+				['value', 1],
+			],
+		});
+		let resolve!: (value: string) => void;
+		const pending = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const Child = defineUniversalComponent('object', () =>
+			universalValue(plan, [useUniversalContext(UniversalTheme), use(pending)]),
+		);
+		const props = {
+			root,
+			component: Child,
+			childProps: {},
+			theme: 'dark',
+			log: () => {},
+			failAfterPrepare: false,
+		};
+		const mounted = mount(UniversalBoundaryFixture, props);
+		try {
+			expect(container.children).toEqual([]);
+			// The DOM retry uses native microtasks. The foreign renderer's queued
+			// attempt cleanup deliberately has not run before the new scope mounts.
+			await act(async () => {
+				resolve('ready');
+				await pending;
+			});
+			expect(mounted.container.querySelector('.caught')).toBeNull();
+			expect(container.children).toHaveLength(1);
+			const host = container.children[0];
+			expect(host.props).toMatchObject({ theme: 'dark', value: 'ready' });
+			// Stale abort/bridge-release callbacks must not invalidate the new
+			// owner. A later context update proves its bridge still points live.
+			for (const callback of scheduled.splice(0)) callback();
+			mounted.update(UniversalBoundaryFixture, { ...props, theme: 'light' });
+			expect(container.children).toEqual([host]);
+			expect(host.props).toMatchObject({ theme: 'light', value: 'ready' });
+		} finally {
+			mounted.unmount();
+			root.unmount();
+		}
+		expect(container.children).toEqual([]);
+	});
+
+	it('does not transfer abandoned root suspension ownership to replacement props', async () => {
+		const { container, root } = objectRoot();
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [['value', 0]],
+		});
+		let resolve!: (value: string) => void;
+		const pending = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const Suspends = defineUniversalComponent('object', () => universalValue(plan, [use(pending)]));
+		const Throw = defineUniversalComponent('object', () => {
+			throw new Error('replacement prepare failed');
+		});
+		const Safe = defineUniversalComponent('object', () => universalValue(plan, ['safe']));
+		const props = {
+			root,
+			component: Suspends,
+			childProps: {},
+			theme: 'dark',
+			log: () => {},
+			failAfterPrepare: false,
+		};
+		const mounted = mount(UniversalBoundaryFixture, props);
+		try {
+			mounted.update(UniversalBoundaryFixture, { ...props, component: Throw });
+			expect(mounted.find('.caught').textContent).toBe('caught: replacement prepare failed');
+			expect(container.children).toEqual([]);
+			// This failure belongs to a superseding request, not the abandoned
+			// suspension's retry. It must not consume an uncommitted host root.
+			expect(root.render(Safe, undefined).status).toBe('committed');
+			const host = container.children[0];
+			await act(async () => {
+				resolve('obsolete');
+				await pending;
+			});
+			expect(container.children).toEqual([host]);
+			expect(host.props.value).toBe('safe');
+			expect(mounted.find('.caught').textContent).toBe('caught: replacement prepare failed');
+		} finally {
+			mounted.unmount();
+			root.unmount();
+		}
+	});
+
 	it('retains suspended ownership for retry and tears it down when the retry errors', async () => {
 		const { container, root } = objectRoot();
 		const plan = universalPlan('object', {

@@ -231,7 +231,7 @@
         {
           "path": "packages/vaul/tests/differential/react-oracle.test.ts",
           "role": "test",
-          "sha256": "f40b9bbfdb226f925216f80e3e3d43c7c07396d2ccaf66fc631e78e29cbc91ea",
+          "sha256": "2904cc15a1b01da5d05cb283c7858e5e96423124d0100fda834e7aa987bf31d9",
           "cases": [
             {
               "id": "runtime:a739226076100d42",

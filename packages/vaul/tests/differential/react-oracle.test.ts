@@ -26,6 +26,14 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
 	};
 }
 
+function findButton(container: ParentNode, label: string): HTMLButtonElement {
+	const button = Array.from(container.querySelectorAll('button')).find(function matchLabel(node) {
+		return (node.textContent ?? '').trim() === label;
+	});
+	if (!button) throw new Error(`missing button "${label}"`);
+	return button as HTMLButtonElement;
+}
+
 function semanticSnapshot(content: Element | null) {
 	return {
 		role: content?.getAttribute('role'),
@@ -44,6 +52,7 @@ describe('vaul v1.1.2 React oracle', () => {
 		const reactHost = document.createElement('div');
 		document.body.appendChild(reactHost);
 		const root = createRoot(reactHost);
+		let octane: ReturnType<typeof mount> | undefined;
 		function ReactDrawerFixture() {
 			const [open, setOpen] = React.useState(false);
 			return React.createElement(
@@ -63,27 +72,33 @@ describe('vaul v1.1.2 React oracle', () => {
 				),
 			);
 		}
-		await reactAct(function renderReact() {
-			root.render(React.createElement(ReactDrawerFixture));
-		});
-		const reactTrigger = reactHost.querySelector('button') as HTMLButtonElement;
-		await reactAct(function clickReactTrigger() {
-			reactTrigger.click();
-		});
-		const reactContent = document.body.querySelector('[data-vaul-drawer]');
+		try {
+			await reactAct(function renderReact() {
+				root.render(React.createElement(ReactDrawerFixture));
+			});
+			const reactTrigger = findButton(reactHost, 'Open drawer');
+			await reactAct(function clickReactTrigger() {
+				reactTrigger.click();
+			});
+			const reactContent = document.body.querySelector('[data-vaul-drawer]');
+			expect(reactContent).not.toBeNull();
 
-		const octane = mount(DrawerFixture);
-		await act(function clickOctaneTrigger() {
-			(octane.container.querySelector('button') as HTMLButtonElement).click();
-		});
-		const contents = document.body.querySelectorAll('[data-vaul-drawer]');
-		const octaneContent = contents[contents.length - 1];
-		expect(semanticSnapshot(octaneContent)).toEqual(semanticSnapshot(reactContent));
-
-		octane.unmount();
-		await reactAct(function unmountReact() {
-			root.unmount();
-		});
-		reactHost.remove();
+			octane = mount(DrawerFixture);
+			const octaneTrigger = findButton(octane.container, 'Open drawer');
+			await reactAct(async function clickOctaneTrigger() {
+				await act(() => octaneTrigger.click());
+			});
+			const contents = document.body.querySelectorAll('[data-vaul-drawer]');
+			const octaneContent = contents[contents.length - 1] ?? null;
+			expect(octaneContent).not.toBeNull();
+			expect(octaneContent).not.toBe(reactContent);
+			expect(semanticSnapshot(octaneContent)).toEqual(semanticSnapshot(reactContent));
+		} finally {
+			await reactAct(function unmountRoots() {
+				octane?.unmount();
+				root.unmount();
+			});
+			reactHost.remove();
+		}
 	});
 });

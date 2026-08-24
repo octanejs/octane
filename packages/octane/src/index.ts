@@ -151,6 +151,7 @@ export {
 	evt2u,
 	evtN,
 	evtNu,
+	setEventHandler,
 	devEventListener,
 	devHtmlNesting,
 	htext,

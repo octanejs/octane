@@ -1,5 +1,6 @@
 import {
 	flushSync,
+	getRootRenderRetryKey,
 	readContextFromScope,
 	renderClientContextProvider,
 	scheduleRenderCleanup,
@@ -67,6 +68,10 @@ interface HostBoundaryState {
 }
 
 const boundaryStates = new WeakMap<Scope, HostBoundaryState>();
+// A root-held attempt may discard its initial DOM Scope before any effect
+// commits. Carry only its ownership fact into the authoritative root retry;
+// neither the abandoned Scope nor its context bridge belongs to the new mount.
+const rootRetryOwnership = new WeakMap<object, WeakSet<UniversalRoot>>();
 const BOUNDARY_INVALIDATE_SLOT = Symbol('octane.universal.boundary.invalidate');
 const BOUNDARY_COMMIT_SLOT = Symbol('octane.universal.boundary.commit');
 const BOUNDARY_ATTEMPT_LIFETIME_SLOT = Symbol('octane.universal.boundary.attempt-lifetime');
@@ -125,6 +130,9 @@ export function createUniversalHostBoundary(renderer: string): ((
 			);
 		}
 		let state = boundaryStates.get(scope);
+		const retryKey = getRootRenderRetryKey(scope, true);
+		const retryingRootSuspension =
+			retryKey !== null && rootRetryOwnership.get(retryKey)?.delete(props.root) === true;
 		const [, invalidate] = useDomState(0, BOUNDARY_INVALIDATE_SLOT);
 		if (state === undefined) {
 			let rootInvalidated = false;
@@ -173,6 +181,18 @@ export function createUniversalHostBoundary(renderer: string): ((
 			if (retryingRetainedSuspension) state.retryErrored = true;
 			if (!state.ownerCommitted) {
 				boundaryStates.delete(scope);
+				if (retryingRootSuspension && !state.lifetimeCommitted) {
+					// No insertion effect could install this initial owner's deletion
+					// lifetime. A failed retained retry must still close its root, while
+					// a first prepare failure continues to leave the root reusable.
+					state.root.__runCommitTasks([
+						() => {
+							throw error;
+						},
+						() => state!.root.unmount(),
+						() => state!.root.clearBridge(state!.owner),
+					]);
+				}
 				state.root.clearBridge(state.owner);
 			}
 			throw error;
@@ -247,31 +267,56 @@ export function createUniversalHostBoundary(renderer: string): ((
 			[],
 			BOUNDARY_LIFETIME_SLOT,
 		);
-		scheduleRenderCleanup(state.root.__scheduleMicrotask, state.root, () => {
-			if (state!.pending !== attempt) return;
-			state!.pending = null;
-			state!.root.__runCommitTasks([
-				() => attempt.abort(),
-				() => {
-					// Preserve either a prepared deletion lifetime or a suspended retry
-					// bridge when insertion committed before layout was skipped. Only an
-					// attempt with neither marker was abandoned before owning anything.
-					if (!state!.ownerCommitted && !state!.lifetimeCommitted && !state!.suspensionRetained) {
-						if (boundaryStates.get(scope) === state) boundaryStates.delete(scope);
-						state!.root.clearBridge(state!.owner);
-					}
-				},
-			]);
-		});
+		scheduleRenderCleanup(
+			state.root.__scheduleMicrotask,
+			state.root,
+			() => {
+				if (state!.pending !== attempt) return;
+				state!.pending = null;
+				state!.root.__runCommitTasks([
+					() => attempt.abort(),
+					() => {
+						// Preserve either a prepared deletion lifetime or a suspended retry
+						// bridge when insertion committed before layout was skipped. Only an
+						// attempt with neither marker was abandoned before owning anything.
+						if (!state!.ownerCommitted && !state!.lifetimeCommitted && !state!.suspensionRetained) {
+							if (boundaryStates.get(scope) === state) boundaryStates.delete(scope);
+							state!.root.clearBridge(state!.owner);
+						}
+					},
+				]);
+			},
+			() => {
+				if (
+					scope.block.disposed &&
+					!state!.ownerCommitted &&
+					!state!.lifetimeCommitted &&
+					!state!.suspensionRetained
+				) {
+					// The DOM retry may run before the foreign scheduler's abort. Clear
+					// the dead scope's bridge now; prepare() supersedes its old attempt,
+					// and the delayed clearBridge remains guarded by owner identity.
+					if (boundaryStates.get(scope) === state) boundaryStates.delete(scope);
+					state!.root.clearBridge(state!.owner);
+				}
+			},
+		);
 		// A root-level suspension has no universal @pending arm of its own. Project
 		// it through the DOM owner so the nearest authored DOM @pending boundary can
 		// hide the Canvas shell and render its fallback. The queued abort above
 		// releases the attempt transaction; an insertion-committed owner retains
 		// its bridge so settlement retries through the DOM boundary.
+		if (projectedThenable === null && attempt.status === 'suspended' && !transitionAttempt) {
+			projectedThenable = attempt.thenable;
+		}
 		if (projectedThenable !== null) {
+			const key = getRootRenderRetryKey(scope);
+			if (key !== null) {
+				let roots = rootRetryOwnership.get(key);
+				if (roots === undefined) rootRetryOwnership.set(key, (roots = new WeakSet()));
+				roots.add(state.root);
+			}
 			useDomRendererThenable(projectedThenable);
-		} else if (attempt.status === 'suspended' && !transitionAttempt) {
-			useDomRendererThenable(attempt.thenable);
 		}
 	}) as ((props: HostBoundaryProps, scope: Scope) => void) & {
 		readonly [UNIVERSAL_BOUNDARY]: UniversalBoundaryMetadata;

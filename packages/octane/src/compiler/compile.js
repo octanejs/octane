@@ -21221,7 +21221,10 @@ function planJsx(
 		}
 		if (b.kind === 'nativeChangeRuntime') ctx.runtimeNeeded.add('queueNativeChangeDiagnostic');
 		if (b.kind === 'formDiagnostic') ctx.runtimeNeeded.add('queueFormAuthoringDiagnostic');
-		if (b.kind === 'event' && b.dev) ctx.runtimeNeeded.add('devEventListener');
+		if (b.kind === 'event') {
+			ctx.runtimeNeeded.add('setEventHandler');
+			if (b.dev) ctx.runtimeNeeded.add('devEventListener');
+		}
 		if (b.kind === 'event-bundle') {
 			// 3b: mount builds the descriptor via evtN. Lifetime-stable bundles skip
 			// the update helper but still share the compact mount helper call.
@@ -22826,11 +22829,9 @@ function emitBindingMount(bind, elVar, bag) {
 			const value = bind.dev
 				? b.call('_$devEventListener', b.literal(bind.name), bind.expr)
 				: bind.expr;
-			const slotAssign = b.stmt(
-				b.assignment('=', b.member(el(), slotKeyLiteral(bind), true), value),
-			);
-			if (bind.mountOnly) return st(slotAssign);
-			return [...mountHost().map(st), st(slotAssign)];
+			const install = b.stmt(b.call('_$setEventHandler', el(), slotKeyLiteral(bind), value));
+			if (bind.mountOnly) return st(install);
+			return [...mountHost().map(st), st(install)];
 		}
 		case 'formAction': {
 			// <form action={fn}> / <button formAction={fn}>: wire the submit handler
@@ -23162,7 +23163,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 			const value = bind.dev
 				? b.call('_$devEventListener', b.literal(bind.name), bind.expr)
 				: bind.expr;
-			return st(b.stmt(b.assignment('=', b.member(F('_el'), slotKeyLiteral(bind), true), value)));
+			return st(b.stmt(b.call('_$setEventHandler', F('_el'), slotKeyLiteral(bind), value)));
 		}
 		case 'formAction': {
 			return st(

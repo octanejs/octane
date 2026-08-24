@@ -16,7 +16,11 @@ import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture
 // CLIENT-compiled components (normal .tsrx import path). Importing AsyncCounter
 // (which has an onClick) makes this module register click delegation at load.
 import { AsyncLeaf, AsyncCounter, AsyncUndef } from '../_fixtures/ssr-suspense.tsrx';
-import { DescriptorRetryBoundary } from '../_fixtures/suspense-timing.tsrx';
+import {
+	DescriptorRetryBoundary,
+	RootSuspensionScreen,
+	type RootSuspensionProps,
+} from '../_fixtures/suspense-timing.tsrx';
 
 // SSR Phase 4 — client hydration seeds the server-resolved use(thenable) values
 // from the inline data <script>, so a hydrating use() returns synchronously
@@ -165,6 +169,261 @@ beforeEach(() => {
 	document.body.appendChild(container);
 });
 afterEach(() => container.remove());
+
+describe.each(['raw', 'use'] as const)(
+	'hydrateRoot — root suspension without a boundary (%s resource reads)',
+	(readMode) => {
+		const rootServer = loadServerFixture('packages/octane/tests/_fixtures/suspense-timing.tsrx');
+
+		function pendingResource() {
+			let resolve!: (value: string) => void;
+			let reject!: (reason: Error) => void;
+			let state: 'pending' | 'fulfilled' | 'rejected' = 'pending';
+			let value: string;
+			let error: Error;
+			const promise = Object.assign(
+				new Promise<string>((res, rej) => {
+					resolve = res;
+					reject = rej;
+				}),
+				{ [EXTERNAL_HYDRATION_PROMISE]: true as const },
+			);
+			promise.then(
+				(result) => {
+					state = 'fulfilled';
+					value = result;
+				},
+				(reason) => {
+					state = 'rejected';
+					error = reason;
+				},
+			);
+			return {
+				promise,
+				resolve,
+				reject,
+				read:
+					readMode === 'raw'
+						? () => {
+								if (state === 'pending') throw promise;
+								if (state === 'rejected') throw error;
+								return value;
+							}
+						: undefined,
+			};
+		}
+
+		function readyProps(label = 'server', value = 'server data'): RootSuspensionProps {
+			return {
+				label,
+				items: ['first', 'second'],
+				// An externally owned use() resource must hydrate from its client cache,
+				// rather than the ordinary SSR seed that would bypass suspension.
+				promise: Object.assign(Promise.resolve(value), {
+					[EXTERNAL_HYDRATION_PROMISE]: true as const,
+					status: 'fulfilled' as const,
+					value,
+				}),
+				read: readMode === 'raw' ? () => value : undefined,
+			};
+		}
+
+		function observe() {
+			return {
+				onLifecycle: vi.fn(),
+				onRef: vi.fn(),
+				onShellRef: vi.fn(),
+				onUncaughtError: vi.fn(),
+			};
+		}
+
+		async function serverScreen() {
+			const props = readyProps();
+			const { html } = await prerender(rootServer.RootSuspensionScreen, props);
+			container.innerHTML = html;
+			return props;
+		}
+
+		it('retains the server screen until hydration can commit, then preserves it through later updates', async () => {
+			const props = await serverScreen();
+			const observed = observe();
+			const onRecoverableError = vi.fn();
+			const resource = pendingResource();
+			const main = container.querySelector('main');
+			const header = container.querySelector('header');
+			const input = container.querySelector<HTMLInputElement>('input')!;
+			const button = container.querySelector<HTMLButtonElement>('[data-count]')!;
+			const content = container.querySelector('[data-value]')!;
+			const text = content.firstChild;
+			const survivor = container.querySelector('[data-item="second"]');
+			const tail = container.querySelector('footer');
+			const serverText = container.textContent;
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				await act(() => {
+					root = hydrateRoot(
+						container,
+						RootSuspensionScreen,
+						{ ...props, ...observed, promise: resource.promise, read: resource.read },
+						{ onUncaughtError: observed.onUncaughtError, onRecoverableError },
+					);
+				});
+				expect(container.querySelector('main')).toBe(main);
+				expect(container.querySelector('header')).toBe(header);
+				expect(container.querySelector('input')).toBe(input);
+				expect(container.querySelector('[data-count]')).toBe(button);
+				expect(container.querySelector('[data-value]')).toBe(content);
+				expect(content.firstChild).toBe(text);
+				expect(container.querySelector('footer')).toBe(tail);
+				expect(container.textContent).toBe(serverText);
+				expect(observed.onLifecycle).not.toHaveBeenCalled();
+				expect(observed.onRef).not.toHaveBeenCalled();
+				expect(observed.onShellRef).not.toHaveBeenCalled();
+				expect(observed.onUncaughtError).not.toHaveBeenCalled();
+				expect(onRecoverableError).not.toHaveBeenCalled();
+
+				await act(() => resource.resolve('server data'));
+				expect(container.querySelector('main')).toBe(main);
+				expect(container.querySelector('header')).toBe(header);
+				expect(container.querySelector('input')).toBe(input);
+				expect(container.querySelector('[data-count]')).toBe(button);
+				expect(container.querySelector('[data-value]')).toBe(content);
+				expect(content.firstChild).toBe(text);
+				expect(container.querySelector('footer')).toBe(tail);
+				expect(observed.onRef).toHaveBeenCalledExactlyOnceWith(content);
+				expect(observed.onShellRef).toHaveBeenCalledExactlyOnceWith(header);
+				expect(observed.onLifecycle).toHaveBeenCalledWith('layout reader:server data');
+				expect(observed.onLifecycle).toHaveBeenCalledWith('passive shell:server');
+				await act(() => button.click());
+				expect(button.textContent).toBe('server:1');
+
+				const next = pendingResource();
+				const committedText = container.textContent;
+				const committedLifecycle = [...observed.onLifecycle.mock.calls];
+				await act(() =>
+					root!.render(RootSuspensionScreen, {
+						...props,
+						...observed,
+						promise: next.promise,
+						read: next.read,
+						label: 'next',
+						items: ['added', 'second'],
+					}),
+				);
+				expect(container.textContent).toBe(committedText);
+				expect(input.value).toBe('server');
+				expect(observed.onLifecycle.mock.calls).toEqual(committedLifecycle);
+				await act(() => next.resolve('next data'));
+				expect(container.querySelector('[data-value]')).toBe(content);
+				expect(content.textContent).toBe('next data');
+				expect(container.querySelector('[data-count]')).toBe(button);
+				expect(button.textContent).toBe('next:1');
+				expect(container.querySelector('[data-item="second"]')).toBe(survivor);
+				expect(input.value).toBe('next');
+				expect(observed.onRef).toHaveBeenCalledExactlyOnceWith(content);
+				expect(observed.onUncaughtError).not.toHaveBeenCalled();
+				expect(onRecoverableError).not.toHaveBeenCalled();
+			} finally {
+				root?.unmount();
+			}
+		});
+
+		it('reports the actual rejection after an initially suspended hydration fails', async () => {
+			const props = await serverScreen();
+			const observed = observe();
+			const resource = pendingResource();
+			const serverMain = container.querySelector('main');
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				await act(() => {
+					root = hydrateRoot(
+						container,
+						RootSuspensionScreen,
+						{ ...props, ...observed, promise: resource.promise, read: resource.read },
+						{ onUncaughtError: observed.onUncaughtError },
+					);
+				});
+				expect(container.querySelector('main')).toBe(serverMain);
+				expect(observed.onUncaughtError).not.toHaveBeenCalled();
+				const error = new Error('hydration resource failed');
+				await act(() => resource.reject(error));
+				expect(container.querySelector('*')).toBeNull();
+				expect(container.textContent).toBe('');
+				expect(observed.onUncaughtError.mock.calls.map((call) => call[0])).toEqual([error]);
+				expect(observed.onLifecycle).not.toHaveBeenCalled();
+				expect(observed.onRef).not.toHaveBeenCalled();
+				expect(observed.onShellRef).not.toHaveBeenCalled();
+			} finally {
+				root?.unmount();
+			}
+		});
+
+		it('does not adopt or attach callbacks after a suspended hydration is unmounted', async () => {
+			const props = await serverScreen();
+			const observed = observe();
+			const resource = pendingResource();
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				await act(() => {
+					root = hydrateRoot(
+						container,
+						RootSuspensionScreen,
+						{ ...props, ...observed, promise: resource.promise, read: resource.read },
+						{ onUncaughtError: observed.onUncaughtError },
+					);
+				});
+				expect(observed.onUncaughtError).not.toHaveBeenCalled();
+				await act(() => root!.unmount());
+				await act(() => resource.resolve('server data'));
+				expect(container.querySelector('*')).toBeNull();
+				expect(container.textContent).toBe('');
+				expect(observed.onLifecycle).not.toHaveBeenCalled();
+				expect(observed.onRef).not.toHaveBeenCalled();
+				expect(observed.onShellRef).not.toHaveBeenCalled();
+				expect(observed.onUncaughtError).not.toHaveBeenCalled();
+			} finally {
+				root?.unmount();
+			}
+		});
+
+		it('lets a current root render supersede an incomplete hydration and ignore its stale rejection', async () => {
+			const props = await serverScreen();
+			const observed = observe();
+			const resource = pendingResource();
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				await act(() => {
+					root = hydrateRoot(
+						container,
+						RootSuspensionScreen,
+						{ ...props, ...observed, promise: resource.promise, read: resource.read },
+						{ onUncaughtError: observed.onUncaughtError },
+					);
+				});
+				expect(observed.onUncaughtError).not.toHaveBeenCalled();
+				await act(() =>
+					root!.render(RootSuspensionScreen, {
+						...readyProps('replacement', 'replacement data'),
+						...observed,
+					}),
+				);
+				const replacement = container.querySelector('[data-value]');
+				expect(replacement?.textContent).toBe('replacement data');
+				expect(container.querySelector('footer')?.textContent).toBe('replacement');
+				const committedLifecycle = [...observed.onLifecycle.mock.calls];
+				const committedRefs = [...observed.onRef.mock.calls];
+				await act(() => resource.reject(new Error('abandoned hydration')));
+				expect(container.querySelector('[data-value]')).toBe(replacement);
+				expect(replacement?.textContent).toBe('replacement data');
+				expect(observed.onLifecycle.mock.calls).toEqual(committedLifecycle);
+				expect(observed.onRef.mock.calls).toEqual(committedRefs);
+				expect(observed.onUncaughtError).not.toHaveBeenCalled();
+			} finally {
+				root?.unmount();
+			}
+		});
+	},
+);
 
 describe('hydrateRoot — Suspense data seeding (SSR Phase 4)', () => {
 	it('preserves adopted descriptor DOM and state when an update suspends', async () => {
