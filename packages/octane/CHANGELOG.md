@@ -1,5 +1,63 @@
 # octane
 
+## 0.1.45
+
+### Patch Changes
+
+- 5b1e6a3: Fix missing root `onCaughtError` reports for first-mount and parent-driven error
+  boundary catches in non-suspending renders. Publish inline reports after the
+  fallback's refs and layout effects commit, preserve the original error, and
+  discard abandoned reports without duplicating existing scheduled-error reports.
+- 31abee5: Reduce generated client component code by sharing scalar-binding comparisons and renderable-child text updates through the private compiler runtime. Eligible repeated host rows retain inline comparisons to avoid extra calls and cache writes on unchanged bindings. Hydration avoids repeating attribute mutations when the server already has the final client value, and list-only reconciliation is separate from common text and function children.
+
+  Skip URL regular-expression checks only when the first character proves that the existing unsafe-protocol pattern cannot match. URL policy, controlled form values, authored evaluation order, mismatch recovery, and context propagation through unchanged child descriptors retain their existing behavior.
+
+- fd6ce69: Preserve canonical component wrappers across consecutive Vite hot updates so every save refreshes mounted DOM and universal-renderer components while retaining their own hook state. Keep default exports live and reload when an edit removes or invalidates a refresh boundary.
+- 5f7a457: Retain and retry client roots that suspend without a Suspense boundary. Keep
+  initial roots empty and preserve committed UI, state, refs, and layout/passive
+  effects during suspended updates, including structural replacements and portals.
+  Retry the latest inputs, cancel abandoned work after supersession or unmount,
+  and report actual resource rejections through normal error handling.
+
+  Retain server DOM while initial hydration is suspended, adopting the existing
+  nodes, attaching refs, and running layout/passive effects only when hydration can
+  commit.
+
+  Keep effect-thrown thenables on the error path and tear down roots on unhandled
+  effect errors.
+
+- 5227d7b: Retry incomplete descriptor and memoized subtrees before revealing Suspense
+  content, preserving mounted state and DOM identity. Revisit discarded effect work
+  after interrupted retries, keep descriptor text and props consistent during held
+  transitions, and register deferred Activity effects when a cached hidden child
+  descriptor becomes visible.
+- 6927595: Fix strict browser TypeScript consumption of source-published chart bindings.
+
+  Recharts now publishes authored TypeScript for its chart utilities and state,
+  resolves component imports explicitly, and exports the component implementations'
+  own prop types. Visx supports strict browser source checks without Node globals.
+  Remix Router's published declarations retain native anchor and form ref types.
+  Redux Toolkit's query hooks type their bundler environment without Node globals.
+
+  Fix deferred native chart events, keep imperative and Cell refs off unrelated
+  hosts, and resolve missing radial geometry without dropping data rows.
+
+  Octane accepts optional refs in composed ref arrays and supports nested ref arrays
+  in `useImperativeHandle`, including callback cleanup and primitive handles. Require
+  the published TSRX compiler fix for ref-and-spread expressions rather than relying
+  on a workspace-only patch.
+
+  Publish the Volar compiler with its tested parser/printer dependencies and checked
+  public declarations, preventing newer transitive printers from corrupting typed
+  tuple parameters in installed consumers. Preserve generic Pie props and the
+  native group targets of polar-axis events.
+
+- f1a7802: Match React's Suspense retry timing: share the 300 ms retry-commit budget across boundaries, keep sibling reveals atomic, and retain already-visible transition content indefinitely by default. Explicit finite transition fallback timeouts remain available.
+
+  Support promises thrown by resource readers on the client and server, and fix suspended-render cleanup, initial-state supersession, error reporting, and staged renderer ownership without delaying dependent data requests. Keep deferred hydration notifications and captured clicks behind the actual retry commit.
+
+  Let pending and error fallbacks suspend through an enclosing boundary without losing their state. Defer suspended error-fallback reports until reveal, cancel abandoned reports, and allow a server response to finish without waiting for an obsolete suspending fallback.
+
 ## 0.1.44
 
 ### Patch Changes
