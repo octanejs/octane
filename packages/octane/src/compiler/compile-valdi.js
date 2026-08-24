@@ -762,6 +762,14 @@ function emitIntrinsicContents(node, state, attrs) {
 	return statements;
 }
 
+function isEmptyChild(node) {
+	return (
+		node == null ||
+		(node.type === 'JSXText' && /^[\s;]*$/.test(node.value ?? '')) ||
+		(node.type === 'JSXExpressionContainer' && node.expression?.type === 'JSXEmptyExpression')
+	);
+}
+
 function emitElement(node, state, keys) {
 	const name = elementName(node);
 	const tag = intrinsicTag(node);
@@ -788,9 +796,7 @@ function emitElement(node, state, keys) {
 		return statements;
 	}
 	const component = componentExpression(name, state, node);
-	const children = (node.children ?? []).filter(
-		(child) => child.type !== 'JSXText' || !/^[\s;]*$/.test(child.value ?? ''),
-	);
+	const children = (node.children ?? []).filter((child) => !isEmptyChild(child));
 	if (children.length !== 0) {
 		throw valdiError(state, node, 'component children/render props are not supported yet.');
 	}
@@ -995,9 +1001,9 @@ function rewriteComponentStatement(node, state, keys, allowReturn) {
 function emitNodes(nodes, state, keys, allowReturn) {
 	const output = [];
 	for (const node of nodes) {
-		if (node == null) continue;
+		if (isEmptyChild(node)) continue;
 		if (node.type === 'JSXText') {
-			if (/^[\s;]*$/.test(node.value ?? '') || state.renderer.text === 'ignore') continue;
+			if (state.renderer.text === 'ignore') continue;
 			throw valdiError(
 				state,
 				node,
@@ -1005,7 +1011,6 @@ function emitNodes(nodes, state, keys, allowReturn) {
 			);
 		}
 		if (node.type === 'JSXExpressionContainer') {
-			if (node.expression?.type === 'JSXEmptyExpression') continue;
 			output.push(...emitRenderable(node.expression, state, keys));
 		} else if (isTemplate(node)) {
 			output.push(...emitRenderable(node, state, keys));

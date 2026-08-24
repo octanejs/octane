@@ -33,6 +33,44 @@ function writerFixture(source: string, dev: boolean, options?: CompileOptions) {
 }
 
 describe.each([false, true])('compiled Valdi writer behavior in dev=%s', (dev) => {
+	it.each([
+		[
+			'Comments.tsrx',
+			`function Leaf() @{ <label value="child" /> }
+			 export function Scene() @{ <Leaf>{/* explanation */}{} { /* another comment */ }</Leaf> }`,
+		],
+		[
+			'Comments.tsx',
+			`function Leaf() { return <label value="child" />; }
+			 export function Scene() { return <Leaf>{/* explanation */}{} { /* another comment */ }</Leaf>; }`,
+		],
+	])('treats comments and empty expressions as absent component children in %s', (id, source) => {
+		const recorder = createWriterRecorder();
+		const module = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions: { renderer, hmr: false, dev },
+			runtimeModules: { [renderer.module]: recorder.adapter },
+		});
+		const output = recorder.render(module.Scene, {});
+		expect(
+			output.map((node) => ({ tag: node.tag, props: node.props, children: node.children })),
+		).toEqual([{ tag: 'label', props: { value: 'child' }, children: [] }]);
+	});
+
+	it.each(['text', '<label value="nested" />', '{() => null}'])(
+		'continues to reject nonempty component children: %s',
+		(children) => {
+			expect(() =>
+				writerFixture(
+					`function Leaf() @{ <label value="child" /> }
+					 export function Scene() @{ <Leaf>{/* explanation */}${children}</Leaf> }`,
+					dev,
+				),
+			).toThrow(/component children\/render props are not supported/);
+		},
+	);
+
 	it('writes host and component props through conditionals and keyed loops', () => {
 		const fixture = writerFixture(writerSource, dev);
 		const onTap = vi.fn();
