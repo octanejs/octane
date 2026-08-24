@@ -1,0 +1,20 @@
+{
+  "upstream": {
+    "package": "@formkit/auto-animate",
+    "version": "0.10.0",
+    "source": "https://github.com/formkit/auto-animate/tree/b6a6feebf75c198dd85f280c549bc0303f9e7aa8",
+    "license": "MIT"
+  },
+  "surface": "Vanilla autoAnimate core is reused from @formkit/auto-animate@0.10.0. The React useAutoAnimate hook is ported at ./react. Vue, Preact, Solid, Angular, Nuxt, Marko, and Qwik entry points are explicit gaps.",
+  "inventory": {
+    "supported": ["autoAnimate", "getTransitionSizes", "useAutoAnimate"],
+    "subpaths": ["react"]
+  },
+  "divergences": [
+    "Consumers import from @octanejs/auto-animate and @octanejs/auto-animate/react rather than @formkit/auto-animate and @formkit/auto-animate/react.",
+    "useAutoAnimate treats a compiler-injected symbol in the options position as omitted options.",
+    "Vue, Preact, Solid, Angular, Nuxt, Marko, and Qwik bindings are not ported."
+  ],
+  "ssr": "The vanilla core is DOM-only; the hook attaches in a ref callback and destroys the controller on unmount. No server DOM mutations.",
+  "verified": "2026-08-20"
+}

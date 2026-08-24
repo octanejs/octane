@@ -1,0 +1,59 @@
+{
+  "name": "@octanejs/calendar",
+  "version": "0.0.1",
+  "description": "react-calendar for Octane.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/calendar"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "UPSTREAM.md",
+    "status.json"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./Calendar.css": "./src/Calendar.css",
+    "./dist/Calendar.css": "./src/Calendar.css",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --config vitest.config.js --project calendar",
+    "typecheck": "tsrx-tsc --noEmit"
+  },
+  "dependencies": {
+    "@wojtekmaj/date-utils": "^2.0.2",
+    "clsx": "catalog:default",
+    "get-user-locale": "^3.0.0",
+    "warning": "^4.0.0"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "octane": "workspace:*",
+    "vitest": "catalog:default"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "name": "@octanejs/html-react-parser",
+  "version": "0.0.1",
+  "description": "Octane binding for html-react-parser 6.1.7.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/html-react-parser"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --config vitest.config.js --project html-react-parser",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p tsconfig.tests.json"
+  },
+  "dependencies": {
+    "domhandler": "6.0.1",
+    "html-dom-parser": "8.0.2",
+    "react-property": "2.0.2",
+    "style-to-js": "2.0.2"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "octane": "workspace:*",
+    "vitest": "catalog:default"
+  }
+}

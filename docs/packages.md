@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**99 publishable package(s), including 85 framework binding(s) and 3 framework integration(s).**
+**107 publishable package(s), including 93 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -20,10 +20,13 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/app-core` | [`packages/app-core`](../packages/app-core) | metaframework core | `0.0.41` | 9 |
 | `@octanejs/aria` | [`packages/aria`](../packages/aria) | framework binding | `0.0.39` | 3 |
 | `@octanejs/astro` | [`packages/astro`](../packages/astro) | framework integration | `0.0.24` | 5 |
+| `@octanejs/auto-animate` | [`packages/auto-animate`](../packages/auto-animate) | framework binding | `0.0.1` | 3 |
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.43` | 2 |
+| `@octanejs/calendar` | [`packages/calendar`](../packages/calendar) | framework binding | `0.0.1` | 4 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.0.8` | 2 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.28` | 1 |
 | `@octanejs/colorful` | [`packages/colorful`](../packages/colorful) | framework binding | `0.0.11` | 1 |
+| `@octanejs/content-loader` | [`packages/content-loader`](../packages/content-loader) | framework binding | `0.0.1` | 2 |
 | `@octanejs/day-picker` | [`packages/day-picker`](../packages/day-picker) | framework binding | `0.0.11` | 12 |
 | `@octanejs/devtools` | [`packages/devtools`](../packages/devtools) | framework binding | `0.0.33` | 1 |
 | `@octanejs/dexie` | [`packages/dexie`](../packages/dexie) | framework binding | `0.1.38` | 1 |
@@ -37,7 +40,9 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.44` | 1 |
 | `@octanejs/gsap` | [`packages/gsap`](../packages/gsap) | framework binding | `0.0.14` | 1 |
 | `@octanejs/hook-form` | [`packages/hook-form`](../packages/hook-form) | framework binding | `0.1.42` | 1 |
+| `@octanejs/html-react-parser` | [`packages/html-react-parser`](../packages/html-react-parser) | framework binding | `0.0.1` | 2 |
 | `@octanejs/i18next` | [`packages/i18next`](../packages/i18next) | framework binding | `0.1.40` | 3 |
+| `@octanejs/image-crop` | [`packages/image-crop`](../packages/image-crop) | framework binding | `0.0.1` | 5 |
 | `@octanejs/inertia` | [`packages/inertia`](../packages/inertia) | framework binding | `0.0.14` | 3 |
 | `@octanejs/ink` | [`packages/ink`](../packages/ink) | framework binding | `0.0.8` | 5 |
 | `@octanejs/input-otp` | [`packages/input-otp`](../packages/input-otp) | framework binding | `0.0.11` | 1 |
@@ -74,6 +79,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/solana-react` | [`packages/solana-react`](../packages/solana-react) | framework binding | `0.0.14` | 2 |
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.40` | 2 |
 | `@octanejs/spring` | [`packages/spring`](../packages/spring) | framework binding | `0.0.11` | 2 |
+| `@octanejs/stick-to-bottom` | [`packages/stick-to-bottom`](../packages/stick-to-bottom) | framework binding | `0.0.1` | 2 |
 | `@octanejs/streamdown` | [`packages/streamdown`](../packages/streamdown) | framework binding | `0.1.24` | 6 |
 | `@octanejs/styled-components` | [`packages/styled-components`](../packages/styled-components) | framework binding | `0.1.37` | 1 |
 | `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.44` | 2 |
@@ -97,6 +103,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/textarea-autosize` | [`packages/textarea-autosize`](../packages/textarea-autosize) | framework binding | `0.0.11` | 2 |
 | `@octanejs/three` | [`packages/three`](../packages/three) | framework binding | `0.1.38` | 7 |
 | `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.39` | 2 |
+| `@octanejs/to-print` | [`packages/to-print`](../packages/to-print) | framework binding | `0.0.1` | 2 |
 | `@octanejs/transition-group` | [`packages/transition-group`](../packages/transition-group) | framework binding | `0.0.11` | 7 |
 | `@octanejs/usehooks-ts` | [`packages/usehooks-ts`](../packages/usehooks-ts) | framework binding | `0.0.26` | 1 |
 | `@octanejs/valtio` | [`packages/valtio`](../packages/valtio) | framework binding | `0.1.28` | 5 |
@@ -105,6 +112,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.45` | 3 |
 | `@octanejs/wagmi` | [`packages/wagmi`](../packages/wagmi) | framework binding | `0.0.25` | 3 |
 | `@octanejs/window` | [`packages/window`](../packages/window) | framework binding | `0.0.11` | 1 |
+| `@octanejs/wouter` | [`packages/wouter`](../packages/wouter) | framework binding | `0.0.1` | 5 |
 | `@octanejs/xstate` | [`packages/xstate`](../packages/xstate) | framework binding | `0.0.3` | 2 |
 | `@octanejs/xstate-store` | [`packages/xstate-store`](../packages/xstate-store) | framework binding | `0.0.3` | 2 |
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.11` | 1 |

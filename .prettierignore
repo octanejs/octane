@@ -60,6 +60,12 @@ packages/react-map-gl/src/utils/style-utils.ts
 packages/react-map-gl/src/utils/transform.ts
 # Upstream's own mapbox-gl mock, reused byte-for-byte by the component double.
 packages/react-map-gl/tests/_mocks/mapbox-gl-mock/
+# react-image-crop's framework-neutral helpers and compiled stylesheet stay
+# byte-exact against the pinned upstream/npm artifacts.
+packages/image-crop/src/utils.ts
+packages/image-crop/src/types.ts
+packages/image-crop/src/addons/browserCrop.ts
+packages/image-crop/src/ReactCrop.css
 # Vendored pinned upstream shadcn style sheet (byte-exact below its header)
 playground/octane/src/styles/style-nova.css
 **/dist/

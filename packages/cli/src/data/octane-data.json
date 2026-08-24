@@ -67,6 +67,25 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/auto-animate",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "@formkit/auto-animate",
+        "version": "0.10.0",
+        "source": "https://github.com/formkit/auto-animate/tree/b6a6feebf75c198dd85f280c549bc0303f9e7aa8",
+        "license": "MIT"
+      },
+      "surface": "Vanilla autoAnimate core is reused from @formkit/auto-animate@0.10.0. The React useAutoAnimate hook is ported at ./react. Vue, Preact, Solid, Angular, Nuxt, Marko, and Qwik entry points are explicit gaps.",
+      "divergences": [
+        "Consumers import from @octanejs/auto-animate and @octanejs/auto-animate/react rather than @formkit/auto-animate and @formkit/auto-animate/react.",
+        "useAutoAnimate treats a compiler-injected symbol in the options position as omitted options.",
+        "Vue, Preact, Solid, Angular, Nuxt, Marko, and Qwik bindings are not ported."
+      ],
+      "ssr": "The vanilla core is DOM-only; the hook attaches in a ref callback and destroys the controller on unmount. No server DOM mutations.",
+      "verified": "2026-08-20"
+    },
+    {
       "name": "@octanejs/base-ui",
       "version": "0.1.43",
       "category": "UI and interaction",
@@ -80,6 +99,25 @@
       ],
       "ssr": "Dedicated Node-mode tests cover server snapshots, accessible separators, edge-aligned slider visibility, and closed dialogs; hydration adopts Vite-compiled Octane server markup, transitions to the client snapshot, and preserves interaction. Open overlays and remaining components are not yet covered.",
       "verified": "2026-08-01"
+    },
+    {
+      "name": "@octanejs/calendar",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "react-calendar",
+        "version": "6.0.1",
+        "source": "https://github.com/wojtekmaj/react-calendar/tree/dc73f86f68239cb694650b66e0795a2f7f9323ed/packages/react-calendar",
+        "license": "MIT"
+      },
+      "surface": "Public react-calendar 6.0.1 runtime and type surface: default and named Calendar, CenturyView, DecadeView, MonthView, YearView, Navigation, CalendarProps, and all types exported by the upstream root. The three framework-neutral shared suites run without weakened assertions; representative Calendar and tile cases are adapted to Octane.",
+      "divergences": [
+        "Component refs are ordinary Octane props. Calendar ref exposes the upstream imperative handle; inputRef remains the DOM wrapper ref.",
+        "Callbacks receive native MouseEvent objects, which persist without React's synthetic event.persist() method.",
+        "Renderable public types use OctaneNode instead of React.ReactNode."
+      ],
+      "ssr": "Supported. Pass locale explicitly when server and browser locale defaults may differ.",
+      "verified": "2026-08-20"
     },
     {
       "name": "@octanejs/cmdk",
@@ -123,6 +161,31 @@
       ],
       "ssr": "All pickers and HexColorInput render deterministically without browser globals, hydrate by adopting existing nodes, install styles only on the client, and become interactive after hydration.",
       "verified": "2026-08-03"
+    },
+    {
+      "name": "@octanejs/content-loader",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "react-content-loader",
+        "version": "7.1.2",
+        "source": "https://github.com/danilowoz/react-content-loader/tree/c8a6b6c6669d7e663f9d7e1efecec08e876b0e5d",
+        "license": "MIT"
+      },
+      "surface": "Web runtime at react-content-loader 7.1.2: default ContentLoader, Facebook, Instagram, Code, List, and BulletList presets, and IContentLoaderProps. ./native is an explicit gap.",
+      "divergences": [
+        "Consumers import from @octanejs/content-loader instead of react-content-loader.",
+        "The React Native ./native entry is not published because Octane has no React Native renderer.",
+        "React test-renderer and shallow-renderer observations are asserted through mounted SVG DOM without changing their numeric expectations.",
+        "useId values use Octane's opaque identifier format.",
+        "Octane serializes SVG/CSS url() functions with quotes while React's test renderer reports the unquoted form; uniqueKey/baseUrl relationships are unchanged.",
+        "Octane inserts empty comment holes between children; snapshots compare the public SVG tree after stripping those markers.",
+        "rtl=false uses an empty style object instead of null so the style spread typechecks.",
+        "IContentLoaderProps.style is an object map rather than Octane's string-or-object SVG style union, matching React SVGAttributes.",
+        "Git package.json at the pin SHA advertises 6.2.1; npm published 7.1.2 from that SHA."
+      ],
+      "ssr": "Supported. uniqueKey pins clip and gradient identifiers; otherwise useId remains opaque and request-local.",
+      "verified": "2026-08-20"
     },
     {
       "name": "@octanejs/day-picker",
@@ -290,6 +353,27 @@
       "verified": "2026-08-01"
     },
     {
+      "name": "@octanejs/html-react-parser",
+      "version": "0.0.1",
+      "category": "Forms and content",
+      "upstream": {
+        "package": "html-react-parser",
+        "version": "6.1.7",
+        "source": "https://github.com/remarkablemark/html-react-parser/tree/v6.1.7",
+        "license": "MIT"
+      },
+      "surface": "Public runtime surface at html-react-parser 6.1.7: default parse, attributesToProps, domToReact, htmlToDOM, HTMLReactParserOptions, and re-exported domhandler node classes. library defaults to Octane createElement/cloneElement/isValidElement.",
+      "divergences": [
+        "Consumers import from @octanejs/html-react-parser instead of html-react-parser.",
+        "Default element library is Octane, not React.",
+        "PRESERVE_CUSTOM_ATTRIBUTES is hardcoded true because Octane matches React 16+ DOM attributes while octane.version is 0.x.",
+        "Public types use ElementDescriptor/OctaneNode instead of React JSX.Element/ReactNode.",
+        "Octane serializes style objects through CSSOM, so custom-element style attribute spelling can differ from React snapshots while the parsed style object stays identical."
+      ],
+      "ssr": "Parsing is string-to-element-tree and is SSR-safe. Rendering the tree uses Octane server renderToStaticMarkup.",
+      "verified": "2026-08-20"
+    },
+    {
       "name": "@octanejs/i18next",
       "version": "0.1.40",
       "category": "Forms and content",
@@ -303,6 +387,23 @@
       ],
       "ssr": "Preloaded renderToString output and namespace collection are covered; useSSR, withSSR, getInitialProps, and composeInitialProps are ported. A dedicated hydration differential is still open.",
       "verified": "2026-08-02"
+    },
+    {
+      "name": "@octanejs/image-crop",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "react-image-crop",
+        "version": "11.1.2",
+        "commit": "2cd4d49b36ec9a29a63b27394ec29ade5646dc99"
+      },
+      "surface": "ReactCrop, default and Component aliases, crop types, aspect/centering/conversion/containment/nudge utilities, browser canvas/image helpers, pointer and keyboard crop interactions, selection addons, circular masks, rule-of-thirds overlays, and stylesheet compatibility exports.",
+      "divergences": [
+        "Event callbacks receive native DOM PointerEvent objects because Octane has no synthetic event layer.",
+        "The upstream Sass source compatibility path resolves to the precompiled CSS artifact."
+      ],
+      "ssr": "ReactCrop renders its static wrapper, media child, mask, and selection markup without reading browser globals during render; crop interaction remains client-only.",
+      "verified": "2026-08-20"
     },
     {
       "name": "@octanejs/inertia",
@@ -776,6 +877,25 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/stick-to-bottom",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "use-stick-to-bottom",
+        "version": "1.1.6",
+        "source": "https://github.com/stackblitz/use-stick-to-bottom/tree/8d6a19a0ca6ab632830588073e6a29312a06a088",
+        "license": "MIT"
+      },
+      "surface": "Public runtime surface at use-stick-to-bottom 1.1.6: useStickToBottom, StickToBottom, StickToBottom.Content, useStickToBottomContext, and related types.",
+      "divergences": [
+        "Consumers import from @octanejs/stick-to-bottom instead of use-stick-to-bottom.",
+        "Ref objects are structural { current } / callback refs rather than React.RefObject.",
+        "The plain TypeScript useStickToBottom hook forwards compiler-injected slots; a symbol in the options position is treated as empty options."
+      ],
+      "ssr": "Scroll/resize listeners attach in ref callbacks. Initial isAtBottom follows options.initial. Overflow auto is applied in a layout/effect.",
+      "verified": "2026-08-20"
+    },
+    {
       "name": "@octanejs/streamdown",
       "version": "0.1.24",
       "category": "Forms and content",
@@ -1092,6 +1212,26 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/to-print",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "react-to-print",
+        "version": "3.3.0",
+        "source": "https://github.com/MatthewHerbst/react-to-print/tree/853666f180006b68b533f216e58f974cc791a97f",
+        "license": "MIT"
+      },
+      "surface": "Public runtime surface at react-to-print 3.3.0: useReactToPrint and its option/content/fn types. Print pipeline utilities are ported unchanged aside from Octane ref and event types.",
+      "divergences": [
+        "Consumers import from @octanejs/to-print instead of react-to-print.",
+        "contentRef is a structural { current } ref object rather than React.RefObject.",
+        "The print callback accepts a native Event or a content getter; React.UIEvent is not used.",
+        "The plain TypeScript useReactToPrint hook forwards compiler-injected slots; a symbol in the options position is treated as empty options."
+      ],
+      "ssr": "The hook is client-only: it constructs an iframe and calls window.print (or a custom print function). Calling it during SSR has no DOM target.",
+      "verified": "2026-08-20"
+    },
+    {
       "name": "@octanejs/transition-group",
       "version": "0.0.11",
       "category": "UI and interaction",
@@ -1201,6 +1341,26 @@
       "verified": "2026-08-03"
     },
     {
+      "name": "@octanejs/wouter",
+      "version": "0.0.1",
+      "category": "AI, data, and routing",
+      "upstream": {
+        "package": "wouter",
+        "version": "3.10.0",
+        "source": "https://github.com/molefrog/wouter/tree/708c23639d4174ba7deda06c40c8208118899da7",
+        "license": "Unlicense"
+      },
+      "surface": "Wouter 3.10.0 main router surface plus browser, hash, and memory location subpaths, ported to Octane with manual trailing hook-slot forwarding.",
+      "divergences": [
+        "Link accepts ref as an ordinary Octane prop; forwardRef is not used.",
+        "Switch inspects explicit element descriptors, while nested TSRX children are opaque and must be supplied as descriptor arrays or createElement results.",
+        "Octane useSyncExternalStore replaces the upstream shim and requires forwarded compiler hook slots.",
+        "The React Native use-sync-external-store shim and Wouter's separate Preact package are not exported."
+      ],
+      "ssr": "Router ssrPath, ssrSearch, and redirect context behavior is ported and covered by tests/ssr.test.ts.",
+      "verified": "2026-08-20"
+    },
+    {
       "name": "@octanejs/xstate",
       "version": "0.0.3",
       "category": "Shared state",
@@ -1262,6 +1422,7 @@
     "@base-ui-components/react": "@octanejs/base-ui",
     "@dnd-kit/react": "@octanejs/dnd-kit",
     "@floating-ui/react": "@octanejs/floating-ui",
+    "@formkit/auto-animate": "@octanejs/auto-animate",
     "@gsap/react": "@octanejs/gsap",
     "@inertiajs/react": "@octanejs/inertia",
     "@lexical/react": "@octanejs/lexical",
@@ -1356,6 +1517,7 @@
     "dexie-react-hooks": "@octanejs/dexie",
     "embla-carousel-react": "@octanejs/embla-carousel",
     "framer-motion": "@octanejs/motion",
+    "html-react-parser": "@octanejs/html-react-parser",
     "ink": "@octanejs/ink",
     "input-otp": "@octanejs/input-otp",
     "jotai": "@octanejs/jotai",
@@ -1368,13 +1530,16 @@
     "react-alien-signals": "@octanejs/alien-signals",
     "react-aria": "@octanejs/aria",
     "react-aria-components": "@octanejs/aria",
+    "react-calendar": "@octanejs/calendar",
     "react-colorful": "@octanejs/colorful",
+    "react-content-loader": "@octanejs/content-loader",
     "react-day-picker": "@octanejs/day-picker",
     "react-draggable": "@octanejs/draggable",
     "react-dropzone": "@octanejs/dropzone",
     "react-error-boundary": "@octanejs/react-error-boundary",
     "react-hook-form": "@octanejs/hook-form",
     "react-i18next": "@octanejs/i18next",
+    "react-image-crop": "@octanejs/image-crop",
     "react-intersection-observer": "@octanejs/intersection-observer",
     "react-map-gl": "@octanejs/react-map-gl",
     "react-map-gl/mapbox": "@octanejs/react-map-gl",
@@ -1388,6 +1553,7 @@
     "react-stately": "@octanejs/aria",
     "react-syntax-highlighter": "@octanejs/syntax-highlighter",
     "react-textarea-autosize": "@octanejs/textarea-autosize",
+    "react-to-print": "@octanejs/to-print",
     "react-transition-group": "@octanejs/transition-group",
     "react-window": "@octanejs/window",
     "recharts": "@octanejs/recharts",
@@ -1396,10 +1562,12 @@
     "streamdown": "@octanejs/streamdown",
     "styled-components": "@octanejs/styled-components",
     "swr": "@octanejs/swr",
+    "use-stick-to-bottom": "@octanejs/stick-to-bottom",
     "usehooks-ts": "@octanejs/usehooks-ts",
     "valtio": "@octanejs/valtio",
     "vaul": "@octanejs/vaul",
     "wagmi": "@octanejs/wagmi",
+    "wouter": "@octanejs/wouter",
     "zustand": "@octanejs/zustand"
   },
   "errorCodes": {

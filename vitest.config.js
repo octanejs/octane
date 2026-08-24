@@ -7779,6 +7779,180 @@ export default defineConfig({
 					hookTimeout: 60_000,
 				},
 			},
+			{
+				test: {
+					name: 'image-crop',
+					include: ['packages/image-crop/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/image-crop$/,
+							replacement: resolve(import.meta.dirname, 'packages/image-crop/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'wouter',
+					include: ['packages/wouter/tests/**/*.test.ts'],
+					exclude: ['packages/wouter/tests/ssr.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+					setupFiles: ['packages/wouter/tests/setup.ts'],
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/wouter$/,
+							replacement: resolve(import.meta.dirname, 'packages/wouter/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/wouter\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/wouter/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'wouter-ssr',
+					include: ['packages/wouter/tests/ssr.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/wouter$/,
+							replacement: resolve(import.meta.dirname, 'packages/wouter/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/wouter\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/wouter/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'html-react-parser',
+					include: ['packages/html-react-parser/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/html-react-parser$/,
+							replacement: resolve(import.meta.dirname, 'packages/html-react-parser/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'stick-to-bottom',
+					include: ['packages/stick-to-bottom/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/stick-to-bottom$/,
+							replacement: resolve(import.meta.dirname, 'packages/stick-to-bottom/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'content-loader',
+					include: ['packages/content-loader/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/content-loader$/,
+							replacement: resolve(import.meta.dirname, 'packages/content-loader/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'to-print',
+					include: ['packages/to-print/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/to-print$/,
+							replacement: resolve(import.meta.dirname, 'packages/to-print/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'calendar',
+					include: ['packages/calendar/tests/**/*.test.ts', 'packages/calendar/tests/**/*.spec.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/calendar$/,
+							replacement: resolve(import.meta.dirname, 'packages/calendar/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'auto-animate',
+					include: ['packages/auto-animate/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/auto-animate$/,
+							replacement: resolve(import.meta.dirname, 'packages/auto-animate/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/auto-animate\/react$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/auto-animate/src/react/index.tsrx',
+							),
+						},
+					],
+				},
+			},
 			...['pristine', 'adapted'].map((lane) => ({
 				testExecution: { group: 'react-parity' },
 				test: {

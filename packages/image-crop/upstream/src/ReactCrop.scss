@@ -1,0 +1,310 @@
+@use 'sass:math';
+
+// Query to kick us into "mobile" mode with larger drag handles/bars.
+// See: https://developer.mozilla.org/en-US/docs/Web/CSS/@media/pointer
+$mobile-media-query: '(pointer: coarse)' !default;
+
+// Moved to resolve SASS 1.77.7 deprecation warnings
+$antWidth: 10px;
+$doubleAntWidth: 10px * 2;
+
+@keyframes marching-ants {
+  0% {
+    background-position: 0 0, 0 100%, 0 0, 100% 0;
+  }
+  100% {
+    background-position: $doubleAntWidth 0, (-$doubleAntWidth) 100%, 0 (-$doubleAntWidth), 100% $doubleAntWidth;
+  }
+}
+
+:root {
+  --rc-drag-handle-size: 12px;
+  --rc-drag-handle-mobile-size: 24px;
+  --rc-drag-handle-bg-colour: rgba(0, 0, 0, 0.2);
+  --rc-drag-bar-size: 6px; // The invisible grip size of the crop selection edges
+  --rc-border-color: rgba(255, 255, 255, 0.7);
+  --rc-focus-color: #0088ff;
+}
+
+.ReactCrop {
+  $root: &;
+
+  position: relative;
+  display: inline-block;
+  cursor: crosshair;
+  max-width: 100%;
+
+  & *,
+  & *::before,
+  & *::after {
+    box-sizing: border-box;
+  }
+
+  &--disabled,
+  &--locked {
+    cursor: inherit;
+  }
+
+  &__child-wrapper {
+    overflow: hidden;
+    max-height: inherit;
+
+    & > img,
+    & > video {
+      display: block;
+      max-width: 100%;
+      max-height: inherit;
+    }
+  }
+
+  &:not(#{$root}--disabled) {
+    #{$root}__child-wrapper {
+      & > img,
+      & > video {
+        touch-action: none;
+      }
+    }
+    #{$root}__crop-selection {
+      touch-action: none;
+    }
+  }
+
+  &__crop-mask {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    pointer-events: none;
+    // Workaround an SVG precision issue: #611
+    width: calc(100% + 0.5px);
+    height: calc(100% + 0.5px);
+  }
+
+  &__crop-selection {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: translate3d(0, 0, 0);
+    cursor: move;
+
+    .ReactCrop--disabled & {
+      cursor: inherit;
+    }
+
+    .ReactCrop--circular-crop & {
+      border-radius: 50%;
+
+      &::after {
+        pointer-events: none;
+        content: '';
+        position: absolute;
+        top: -1px;
+        right: -1px;
+        bottom: -1px;
+        left: -1px;
+        border: 1px solid var(--rc-border-color);
+        opacity: 0.3;
+      }
+    }
+
+    .ReactCrop--no-animate & {
+      // border: 1px dashed white;
+      outline: 1px dashed white;
+    }
+    &:not(.ReactCrop--no-animate &) {
+      animation: marching-ants 1s;
+      background-image: linear-gradient(to right, #fff 50%, #444 50%), linear-gradient(to right, #fff 50%, #444 50%),
+        linear-gradient(to bottom, #fff 50%, #444 50%), linear-gradient(to bottom, #fff 50%, #444 50%);
+      background-size: $antWidth 1px, $antWidth 1px, 1px $antWidth, 1px $antWidth;
+      background-position: 0 0, 0 100%, 0 0, 100% 0;
+      background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+      color: #fff;
+      animation-play-state: running;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+
+    &:focus {
+      outline: 2px solid var(--rc-focus-color);
+      outline-offset: -1px;
+    }
+  }
+  &--invisible-crop &__crop-mask,
+  &--invisible-crop &__crop-selection {
+    display: none;
+  }
+
+  &__rule-of-thirds-vt::before,
+  &__rule-of-thirds-vt::after,
+  &__rule-of-thirds-hz::before,
+  &__rule-of-thirds-hz::after {
+    content: '';
+    display: block;
+    position: absolute;
+    background-color: rgba(255, 255, 255, 0.4);
+  }
+
+  &__rule-of-thirds-vt {
+    &::before,
+    &::after {
+      width: 1px;
+      height: 100%;
+    }
+
+    &::before {
+      left: 33.3333%;
+      left: calc(100% / 3);
+    }
+
+    &::after {
+      left: 66.6666%;
+      left: calc(100% / 3 * 2);
+    }
+  }
+
+  &__rule-of-thirds-hz {
+    &::before,
+    &::after {
+      width: 100%;
+      height: 1px;
+    }
+
+    &::before {
+      top: 33.3333%;
+      top: calc(100% / 3);
+    }
+
+    &::after {
+      top: 66.6666%;
+      top: calc(100% / 3 * 2);
+    }
+  }
+
+  &__drag-handle {
+    position: absolute;
+    width: var(--rc-drag-handle-size);
+    height: var(--rc-drag-handle-size);
+    background-color: var(--rc-drag-handle-bg-colour);
+    border: 1px solid var(--rc-border-color);
+
+    &:focus {
+      background: var(--rc-focus-color);
+    }
+  }
+
+  .ord-nw {
+    top: 0;
+    left: 0;
+    transform: translate(-50%, -50%);
+    cursor: nw-resize;
+  }
+  .ord-n {
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    cursor: n-resize;
+  }
+  .ord-ne {
+    top: 0;
+    right: 0;
+    transform: translate(50%, -50%);
+    cursor: ne-resize;
+  }
+  .ord-e {
+    top: 50%;
+    right: 0;
+    transform: translate(50%, -50%);
+    cursor: e-resize;
+  }
+  .ord-se {
+    bottom: 0;
+    right: 0;
+    transform: translate(50%, 50%);
+    cursor: se-resize;
+  }
+  .ord-s {
+    bottom: 0;
+    left: 50%;
+    transform: translate(-50%, 50%);
+    cursor: s-resize;
+  }
+  .ord-sw {
+    bottom: 0;
+    left: 0;
+    transform: translate(-50%, 50%);
+    cursor: sw-resize;
+  }
+  .ord-w {
+    top: 50%;
+    left: 0;
+    transform: translate(-50%, -50%);
+    cursor: w-resize;
+  }
+
+  // Use the same specificity as the ords above but just
+  // come after.
+  &__disabled &__drag-handle {
+    cursor: inherit;
+  }
+
+  &__drag-bar {
+    position: absolute;
+
+    &.ord-n {
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: var(--rc-drag-bar-size);
+      transform: translateY(-50%);
+    }
+    &.ord-e {
+      right: 0;
+      top: 0;
+      width: var(--rc-drag-bar-size);
+      height: 100%;
+      transform: translateX(50%);
+    }
+    &.ord-s {
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: var(--rc-drag-bar-size);
+      transform: translateY(50%);
+    }
+    &.ord-w {
+      top: 0;
+      left: 0;
+      width: var(--rc-drag-bar-size);
+      height: 100%;
+      transform: translateX(-50%);
+    }
+  }
+
+  &--new-crop &__drag-bar,
+  &--new-crop &__drag-handle,
+  &--fixed-aspect &__drag-bar {
+    display: none;
+  }
+
+  &--fixed-aspect &__drag-handle.ord-n,
+  &--fixed-aspect &__drag-handle.ord-e,
+  &--fixed-aspect &__drag-handle.ord-s,
+  &--fixed-aspect &__drag-handle.ord-w {
+    display: none;
+  }
+
+  @media #{$mobile-media-query} {
+    .ord-n,
+    .ord-e,
+    .ord-s,
+    .ord-w {
+      display: none;
+    }
+
+    &__drag-handle {
+      width: var(--rc-drag-handle-mobile-size);
+      height: var(--rc-drag-handle-mobile-size);
+    }
+  }
+}

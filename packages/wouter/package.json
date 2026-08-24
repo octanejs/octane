@@ -1,0 +1,62 @@
+{
+  "name": "@octanejs/wouter",
+  "version": "0.0.1",
+  "license": "Unlicense",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "wouter for Octane, ported from wouter 3.10.0.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/wouter"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./use-browser-location": "./src/use-browser-location.ts",
+    "./use-hash-location": "./src/use-hash-location.ts",
+    "./memory-location": "./src/memory-location.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --config vitest.config.js --project wouter",
+    "typecheck": "tsrx-tsc --noEmit"
+  },
+  "dependencies": {
+    "mitt": "^3.0.1",
+    "regexparam": "^3.0.0"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/jest-dom": "catalog:default",
+    "octane": "workspace:*",
+    "vitest": "catalog:default"
+  }
+}

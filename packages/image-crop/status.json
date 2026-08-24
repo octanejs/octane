@@ -1,0 +1,14 @@
+{
+  "upstream": {
+    "package": "react-image-crop",
+    "version": "11.1.2",
+    "commit": "2cd4d49b36ec9a29a63b27394ec29ade5646dc99"
+  },
+  "surface": "ReactCrop, default and Component aliases, crop types, aspect/centering/conversion/containment/nudge utilities, browser canvas/image helpers, pointer and keyboard crop interactions, selection addons, circular masks, rule-of-thirds overlays, and stylesheet compatibility exports.",
+  "divergences": [
+    "Event callbacks receive native DOM PointerEvent objects because Octane has no synthetic event layer.",
+    "The upstream Sass source compatibility path resolves to the precompiled CSS artifact."
+  ],
+  "ssr": "ReactCrop renders its static wrapper, media child, mask, and selection markup without reading browser globals during render; crop interaction remains client-only.",
+  "verified": "2026-08-20"
+}

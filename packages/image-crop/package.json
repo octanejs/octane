@@ -1,0 +1,54 @@
+{
+  "name": "@octanejs/image-crop",
+  "version": "0.0.1",
+  "description": "react-image-crop for Octane with matching crop interaction behavior.",
+  "license": "ISC",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/image-crop"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "style": "./src/ReactCrop.css",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "./src/ReactCrop.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./dist/ReactCrop.css": "./src/ReactCrop.css",
+    "./ReactCrop.css": "./src/ReactCrop.css",
+    "./src/ReactCrop.scss": "./src/ReactCrop.css",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project image-crop",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p tsconfig.tests.json"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "octane": "workspace:*",
+    "typescript": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

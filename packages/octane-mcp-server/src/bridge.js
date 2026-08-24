@@ -74,6 +74,12 @@ export const KNOWN_BINDINGS = {
 	'react-intersection-observer': '@octanejs/intersection-observer',
 	'react-draggable': '@octanejs/draggable',
 	'react-colorful': '@octanejs/colorful',
+	'use-stick-to-bottom': '@octanejs/stick-to-bottom',
+	'react-image-crop': '@octanejs/image-crop',
+	'react-content-loader': '@octanejs/content-loader',
+	'react-to-print': '@octanejs/to-print',
+	'react-calendar': '@octanejs/calendar',
+	'@formkit/auto-animate': '@octanejs/auto-animate',
 	streamdown: '@octanejs/streamdown',
 	'react-syntax-highlighter': '@octanejs/syntax-highlighter',
 	// The official plugins are consolidated as subpaths of the same package.
@@ -148,11 +154,13 @@ export const KNOWN_BINDINGS = {
 	'@react-rxjs/utils': '@octanejs/rxjs',
 	'@testing-library/react': '@octanejs/testing-library',
 	'react-i18next': '@octanejs/i18next',
+	'html-react-parser': '@octanejs/html-react-parser',
 	'@inertiajs/react': '@octanejs/inertia',
 	ink: '@octanejs/ink',
 	'@mdx-js/react': '@octanejs/mdx',
 	'dexie-react-hooks': '@octanejs/dexie',
 	'@livestore/react': '@octanejs/livestore',
+	wouter: '@octanejs/wouter',
 };
 
 // Octane-specific ecosystem packages that have no React import to rewrite.
@@ -191,6 +199,7 @@ export const KNOWN_VANILLA_CORES = {
 	'@reduxjs/toolkit': 'redux',
 	'react-i18next': 'i18next',
 	'react-hook-form': null,
+	'@formkit/auto-animate': '@formkit/auto-animate',
 	'react-alien-signals': 'alien-signals',
 	zustand: 'zustand/vanilla',
 	valtio: 'valtio/vanilla',
