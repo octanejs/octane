@@ -609,7 +609,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'boneyard-browser',
 					include: ['packages/boneyard/tests/browser/**/*.browser.test.ts'],
@@ -665,7 +665,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'formisch-browser',
 					include: ['packages/formisch/tests/browser/**/*.browser.test.ts'],
@@ -8158,7 +8158,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'thinking-orbs-browser',
 					include: ['packages/thinking-orbs/tests/browser/**/*.browser.test.ts'],
