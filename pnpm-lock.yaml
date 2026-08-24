@@ -7048,7 +7048,7 @@ importers:
         specifier: catalog:default
         version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
-  packages/solana-react:
+  packages/solana-kit:
     dependencies:
       '@octanejs/tanstack-query':
         specifier: workspace:*
@@ -8818,6 +8818,45 @@ importers:
         specifier: catalog:default
         version: 3.7.4(@coinbase/wallet-sdk@4.3.6(@types/react@19.2.17)(bufferutil@4.1.0)(immer@11.1.15)(react@19.2.7)(typescript@6.0.2)(use-sync-external-store@1.6.0(react@19.2.7))(utf-8-validate@5.0.10)(zod@4.4.3))(@safe-global/safe-apps-provider@0.18.6(bufferutil@4.1.0)(typescript@6.0.2)(utf-8-validate@5.0.10)(zod@4.4.3))(@safe-global/safe-apps-sdk@9.1.0(bufferutil@4.1.0)(typescript@6.0.2)(utf-8-validate@5.0.10)(zod@4.4.3))(@tanstack/query-core@5.101.3)(@tanstack/react-query@5.101.3(react@19.2.7))(@types/react@19.2.17)(@walletconnect/ethereum-provider@2.21.1(@types/react@19.2.17)(bufferutil@4.1.0)(db0@0.3.4)(encoding@0.1.13)(react@19.2.7)(typescript@6.0.2)(utf-8-validate@5.0.10)(zod@4.4.3))(immer@11.1.15)(porto@0.2.35)(react@19.2.7)(typescript@5.9.3)(viem@2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3))
 
+  packages/waypoint:
+    devDependencies:
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.58(react@19.2.7)
+      '@types/react':
+        specifier: catalog:default
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: catalog:default
+        version: 19.2.3(@types/react@19.2.17)
+      '@vitejs/plugin-react':
+        specifier: catalog:default
+        version: 6.0.3(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7(supports-color@10.2.2))(@babel/plugin-transform-runtime@7.29.7(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@babel/runtime@7.29.7)(rolldown@1.2.0)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      playwright:
+        specifier: ^1.61.1
+        version: 1.61.1
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      react-waypoint:
+        specifier: 6.0.0
+        version: 6.0.0(prop-types@15.8.1)(react@19.2.7)
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
   packages/window:
     dependencies:
       '@types/react':
@@ -9171,9 +9210,9 @@ importers:
       '@octanejs/shadcn':
         specifier: workspace:*
         version: link:../../packages/shadcn
-      '@octanejs/solana-react':
+      '@octanejs/solana-kit':
         specifier: workspace:*
-        version: link:../../packages/solana-react
+        version: link:../../packages/solana-kit
       '@octanejs/sonner':
         specifier: workspace:*
         version: link:../../packages/sonner
@@ -20848,6 +20887,9 @@ packages:
     resolution: {integrity: sha512-5IKcdX0nnYavi6G7TtOhwkYzyjfJlatbjMjuLSfE2kYT5pMDOilZ4OvMhi637CcDICTmz3wARPoyhqyX1Y+XvA==}
     engines: {node: ^14.18.0 || >=16.10.0}
 
+  consolidated-events@1.1.1:
+    resolution: {integrity: sha512-y1FtzOGAyIrtFyWRqZfrO+gZVnFMYF1X0fIEOOMJBMHzUF8Xl86YvrREn0P0sMWhq6GShS2Bep4RpOoVAQb4YA==}
+
   content-disposition@0.5.2:
     resolution: {integrity: sha512-kRGRZw3bLlFISDBgwTSA1TMBFN6J6GWDeubmDE3AF+3+yXL8hTWv8r5rkLbqYXY4RjPk/EzHnClI3zQf1cFmHA==}
     engines: {node: '>= 0.6'}
@@ -27355,6 +27397,12 @@ packages:
     peerDependenciesMeta:
       react-dom:
         optional: true
+
+  react-waypoint@6.0.0:
+    resolution: {integrity: sha512-Vc3JpyNydJrLUS7Z6tZWn6HWtGmJ6Y1L6U2JkMfI1UAcWxdhksjtuUJE2nn8PhFtIrmeM8tdGPpVZH7o7GWnIg==}
+    peerDependencies:
+      prop-types: ^15.0.0
+      react: ^0.14.0 || ^15.0.0
 
   react-window@1.8.11:
     resolution: {integrity: sha512-+SRbUVT2scadgFSWx+R1P754xHPEqvcfSfVX10QYg6POOz+WNgkN48pS+BtZNIMGiL1HYrSEiCkwsMS15QogEQ==}
@@ -47382,6 +47430,8 @@ snapshots:
 
   consola@3.4.2: {}
 
+  consolidated-events@1.1.1: {}
+
   content-disposition@0.5.2: {}
 
   content-disposition@0.5.4:
@@ -56128,6 +56178,12 @@ snapshots:
       react: 19.2.7
     optionalDependencies:
       react-dom: 19.2.7(react@19.2.7)
+
+  react-waypoint@6.0.0(prop-types@15.8.1)(react@19.2.7):
+    dependencies:
+      consolidated-events: 1.1.1
+      prop-types: 15.8.1
+      react: 19.2.7
 
   react-window@1.8.11(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
     dependencies:

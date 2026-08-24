@@ -122,7 +122,7 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/rxjs/tsconfig.json',
 		'packages/seo/tsconfig.json',
 		'packages/shadcn/tsconfig.json',
-		'packages/solana-react/tsconfig.json',
+		'packages/solana-kit/tsconfig.json',
 		'packages/sonner/tsconfig.json',
 		'packages/spring/tsconfig.json',
 		'packages/styled-components/tsconfig.json',

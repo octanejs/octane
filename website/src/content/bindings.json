@@ -38,7 +38,7 @@
   {
     "title": "Web3",
     "description": "Wallet connection, chain state, contract reads, signing, and transactions.",
-    "packages": ["@octanejs/wagmi", "@octanejs/rainbowkit", "@octanejs/solana-react"]
+    "packages": ["@octanejs/wagmi", "@octanejs/rainbowkit", "@octanejs/solana-kit"]
   },
   {
     "title": "UI and interaction",
@@ -72,6 +72,7 @@
       "@octanejs/phosphor-icons",
       "@octanejs/usehooks-ts",
       "@octanejs/intersection-observer",
+      "@octanejs/waypoint",
       "@octanejs/tanstack-hotkeys",
       "@octanejs/tanstack-pacer",
       "@octanejs/stick-to-bottom",

@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**107 publishable package(s), including 93 framework binding(s) and 3 framework integration(s).**
+**108 publishable package(s), including 94 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -76,7 +76,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/rxjs` | [`packages/rxjs`](../packages/rxjs) | framework binding | `0.1.25` | 2 |
 | `@octanejs/seo` | [`packages/seo`](../packages/seo) | document metadata | `0.0.31` | 1 |
 | `@octanejs/shadcn` | [`packages/shadcn`](../packages/shadcn) | framework binding | `0.0.31` | 121 |
-| `@octanejs/solana-react` | [`packages/solana-react`](../packages/solana-react) | framework binding | `0.0.15` | 2 |
+| `@octanejs/solana-kit` | [`packages/solana-kit`](../packages/solana-kit) | framework binding | `0.0.15` | 2 |
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.41` | 2 |
 | `@octanejs/spring` | [`packages/spring`](../packages/spring) | framework binding | `0.0.12` | 2 |
 | `@octanejs/stick-to-bottom` | [`packages/stick-to-bottom`](../packages/stick-to-bottom) | framework binding | `0.0.2` | 2 |
@@ -111,6 +111,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.40` | 49 |
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.46` | 3 |
 | `@octanejs/wagmi` | [`packages/wagmi`](../packages/wagmi) | framework binding | `0.0.26` | 3 |
+| `@octanejs/waypoint` | [`packages/waypoint`](../packages/waypoint) | framework binding | `0.0.1` | 1 |
 | `@octanejs/window` | [`packages/window`](../packages/window) | framework binding | `0.0.12` | 1 |
 | `@octanejs/wouter` | [`packages/wouter`](../packages/wouter) | framework binding | `0.0.2` | 5 |
 | `@octanejs/xstate` | [`packages/xstate`](../packages/xstate) | framework binding | `0.0.4` | 2 |

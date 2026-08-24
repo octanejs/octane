@@ -1,0 +1,73 @@
+{
+  "name": "@octanejs/solana-kit",
+  "version": "0.0.15",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "Octane-native reactive client, Wallet Standard, query, and transaction seams for Solana Kit 7.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/solana-kit"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "LICENSE.upstream",
+    "README.md",
+    "status.json",
+    "UPSTREAM.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./query": "./src/query.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project solana-kit --project solana-kit-adapted --project solana-kit-pristine",
+    "test:upstream": "node ../../scripts/react-parity/run-pristine.mjs solana-kit",
+    "test:type-parity": "node ../../scripts/react-parity/solana-kit-types.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json && tsc --noEmit -p audit/upstream-typetests/tsconfig.json",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
+  },
+  "dependencies": {
+    "@solana/kit": "7.0.0",
+    "@octanejs/tanstack-query": "workspace:*",
+    "@tanstack/query-core": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@solana/react": "7.0.0",
+    "@tanstack/react-query": "catalog:default",
+    "@testing-library/react": "catalog:livestore-react-oracle",
+    "@types/react": "catalog:livestore-react-oracle",
+    "@types/react-dom": "catalog:livestore-react-oracle",
+    "@wallet-standard/base": "1.1.1",
+    "@wallet-standard/errors": "0.1.2",
+    "@wallet-standard/react": "1.0.3",
+    "@wallet-standard/ui": "1.0.3",
+    "@wallet-standard/ui-registry": "1.1.1",
+    "@solana/wallet-standard-features": "1.4.0",
+    "octane": "workspace:*",
+    "react": "catalog:livestore-react-oracle",
+    "react-dom": "catalog:livestore-react-oracle",
+    "react-error-boundary": "catalog:default",
+    "typescript": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

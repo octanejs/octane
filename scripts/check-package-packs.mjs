@@ -143,7 +143,7 @@ const packedTsrxSourceExceptions = new Map([
 	['@octanejs/popper', 'its browser source still reads process.env.NODE_ENV'],
 	['@octanejs/react-map-gl', 'its published source requires Mapbox GeoJSON ambient declarations'],
 	[
-		'@octanejs/solana-react',
+		'@octanejs/solana-kit',
 		'its TanStack Query peer declarations are not yet compatible with the installed strict consumer graph',
 	],
 	['@octanejs/tanstack-query', 'its browser source still reads process.env.NODE_ENV'],

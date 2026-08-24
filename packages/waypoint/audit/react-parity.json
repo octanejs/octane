@@ -1,0 +1,227 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/brigade/react-waypoint.git",
+    "version": "6.0.0",
+    "commit": "b23770d57fa66b4e20eeb3e8d80fa60d85135f36",
+    "sourceRoot": "src",
+    "testRoot": "spec",
+    "license": "MIT",
+    "integrity": "sha256:2843a0bbecbb4dfd34eb4f5d97b0fdc48c8c4e5b1b0722999e8f13796371a50d",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/waypoint/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/waypoint/tests"],
+      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "exclude": ["/(?:browser|differential|ssr|types)/"]
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 16,
+    "uniqueIdentities": 16,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "3c19b217aaf26835a444155a0bd2420f2cc42a9838033414bcfd47757aeab231"
+    }
+  },
+  "lanes": [
+    {
+      "id": "waypoint-adapted",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "waypoint",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Complete Octane geometry, lifecycle, ref, callback, and hydration suite.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/waypoint/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/waypoint/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "a840b36e3bea3e060feb3a09b1849f9518655021347201670726c9aa176eef0b"
+        }
+      ]
+    },
+    {
+      "id": "waypoint-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "waypoint-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "The same public fixture renders through Octane and react-waypoint 6.0.0.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/waypoint/audit/differential-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/waypoint/audit/differential-runtime.json",
+          "role": "support",
+          "sha256": "718d1aeb8fd4e89262913f282e0371fdbcf62577ee091aa8dac190288952aa55"
+        }
+      ]
+    },
+    {
+      "id": "waypoint-ssr",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "waypoint-ssr",
+      "evidenceOrigin": "repo-authored",
+      "notes": "React and Octane server renderers produce the same semantic marker markup.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/waypoint/audit/ssr-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/waypoint/audit/ssr-runtime.json",
+          "role": "support",
+          "sha256": "e2da753814fdd65d9ba0c51cd7c74ab74ce486f83d0eee6ff24b5d8cf2dcffbb"
+        }
+      ]
+    },
+    {
+      "id": "waypoint-browser",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "waypoint-browser",
+      "notes": "Real Chromium callback-sequence and scroll-measurement budget parity.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/waypoint/audit/browser-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/waypoint/audit/browser-runtime.json",
+          "role": "support",
+          "sha256": "9dfd5fe5efa7c93190a912cbce35d7f317a31c408d149d94a839adf867397c32"
+        }
+      ]
+    },
+    {
+      "id": "waypoint-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "waypoint-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Strict probes against the pinned published React declarations.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/waypoint/tests/types/upstream/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/waypoint/tests/types/upstream/pristine.ts",
+          "role": "test",
+          "sha256": "416378f2f30366b05658470ce7fed670c1970f554c2a6891c28e60389bc4f47b",
+          "cases": [
+            {
+              "id": "types:waypoint-pristine",
+              "testName": "pinned published declaration probes",
+              "fullName": "pinned published declaration probes"
+            }
+          ]
+        },
+        {
+          "path": "packages/waypoint/tests/types/upstream/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "ec05dfdf19e3e2a0e50c154af2a5e7ef98f73fd2301bbb759cdacb6243571597"
+        }
+      ]
+    },
+    {
+      "id": "waypoint-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "waypoint-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Strict upstream-shaped probes against the adapted Octane surface.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/waypoint/tests/types/upstream/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/waypoint/tests/types/upstream/adapted.ts",
+          "role": "test",
+          "sha256": "51a886023b7627710f404220054a2d2f46ec2b142e4c1cf990b189ae92f42882",
+          "cases": [
+            {
+              "id": "types:waypoint-adapted",
+              "testName": "adapted declaration probes",
+              "fullName": "adapted declaration probes"
+            }
+          ]
+        },
+        {
+          "path": "packages/waypoint/tests/types/upstream/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "dd1b0b3c31d73b1d5d15931bebb06949019072f6060d9beb004879a214ab0561"
+        }
+      ]
+    },
+    {
+      "id": "waypoint-public-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "waypoint-public-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Strict consumer-facing public declaration probes.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/waypoint/tests/types/public/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/waypoint/tests/types/public/public.ts",
+          "role": "test",
+          "sha256": "cdbea47d8e68020fc7003f5d2bdacbc141b9b19ccb9a24cd1a2af2307e760d2b",
+          "cases": [
+            {
+              "id": "types:waypoint-public",
+              "testName": "public declaration probes",
+              "fullName": "public declaration probes"
+            }
+          ]
+        },
+        {
+          "path": "packages/waypoint/tests/types/public/tsconfig.json",
+          "role": "support",
+          "sha256": "585acc19b2a2e8efcf84e583da4b797912f21d8c5137a6f27538ebdd87cdafe3"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

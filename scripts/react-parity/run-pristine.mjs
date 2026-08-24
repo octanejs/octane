@@ -15,7 +15,7 @@ export const runners = new Map([
 		'monaco-editor',
 		{ module: './monaco-editor-pristine-runtime.mjs', label: '@monaco-editor/react' },
 	],
-	['solana-react', { module: './solana-react-pristine-runtime.mjs', label: '@solana/react' }],
+	['solana-kit', { module: './solana-kit-pristine-runtime.mjs', label: '@solana/react' }],
 	['tanstack-store', { module: './tanstack-store-pristine-runtime.mjs', label: 'TanStack Store' }],
 	['zag', { module: './zag-pristine-runtime.mjs', label: 'Zag' }],
 ]);
