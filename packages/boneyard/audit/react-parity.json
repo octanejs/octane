@@ -1,0 +1,146 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/0xGF/boneyard.git",
+    "version": "boneyard-js@1.9.0",
+    "commit": "64aa5c08741a020afe782571e2c65f396677709e",
+    "sourceRoot": "src",
+    "testRoot": "not-published",
+    "license": "MIT (repository; published artifact omitted the license)",
+    "integrity": "sha256:a3c955b2b53a77ec17098f449af934bf625e1de879b57f34a96096adb3a5c2ac",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/boneyard/src"],
+      "include": ["\\.(?:ts|tsx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/boneyard/tests"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "exclude": ["/types/"]
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "d52830e0ca13df144bde3e151819da021f6e54c35064db2e4dc121c1d05090bd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "boneyard-clean-room-contract",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "boneyard",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Independently authored contract observations for skeleton geometry, keyed identity, hydration, and a catastrophic performance guard.",
+      "files": [
+        {
+          "path": "packages/boneyard/tests/conformance/component.test.tsx",
+          "role": "test",
+          "sha256": "c61c0f42d1d7f5759c0e2a7122034543625ef906eba2a41308bc210ca27eb95e",
+          "cases": [
+            {
+              "id": "differential:boneyard-skeleton",
+              "testName": "renders documented skeleton geometry and accessibility state",
+              "fullName": "@octanejs/boneyard Skeleton renders documented skeleton geometry and accessibility state"
+            },
+            {
+              "id": "differential:boneyard-keyed-identity",
+              "testName": "preserves keyed bone identity when geometry updates",
+              "fullName": "@octanejs/boneyard Skeleton preserves keyed bone identity when geometry updates"
+            }
+          ]
+        },
+        {
+          "path": "packages/boneyard/tests/conformance/core.test.ts",
+          "role": "test",
+          "sha256": "1d32610306a463e294772a53f83b81582d5c0b3fecfe86e7a1402b80f2e726f0",
+          "cases": [
+            {
+              "id": "differential:boneyard-performance",
+              "testName": "normalizes generated geometry within a catastrophic-regression budget",
+              "fullName": "@octanejs/boneyard core normalizes generated geometry within a catastrophic-regression budget"
+            }
+          ]
+        },
+        {
+          "path": "packages/boneyard/tests/hydration/boneyard.test.ts",
+          "role": "test",
+          "sha256": "b8b39a5b2de678d3d6289d59a3c70347726e817913b80567061e02c4ad771332",
+          "cases": [
+            {
+              "id": "differential:boneyard-hydration",
+              "testName": "adopts static server skeleton markup without mismatch warnings",
+              "fullName": "@octanejs/boneyard hydration adopts static server skeleton markup without mismatch warnings"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "boneyard-server-contract",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "boneyard-ssr",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Independently authored deterministic server-rendering observation.",
+      "files": [
+        {
+          "path": "packages/boneyard/tests/ssr/boneyard.server.test.tsx",
+          "role": "test",
+          "sha256": "b407ab0765e070850041c254ee1ef7c4301fae50ff9e93fce51607847afe485b",
+          "cases": [
+            {
+              "id": "differential:boneyard-ssr",
+              "testName": "emits deterministic first-frame skeleton markup from static bones",
+              "fullName": "@octanejs/boneyard SSR emits deterministic first-frame skeleton markup from static bones"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "boneyard-browser-contract",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "boneyard-browser",
+      "notes": "Runs responsive breakpoint selection and ancestor dark-mode observation in real Chromium.",
+      "files": [
+        {
+          "path": "packages/boneyard/tests/browser/boneyard.browser.test.ts",
+          "role": "test",
+          "sha256": "b38c4032705ba63f2bcb9553846aa9815bf4a923b013935c1c47092ea4d47733",
+          "cases": [
+            {
+              "id": "browser:boneyard-responsive-theme",
+              "testName": "chromium: responds to container size and ancestor dark mode",
+              "fullName": "@octanejs/boneyard real-browser behavior chromium: responds to container size and ancestor dark mode"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**0 active pin(s) across 94 binding package(s).**
+**0 active pin(s) across 97 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -21,6 +21,7 @@ surface and evidence.
 | `@octanejs/aria` | 0 |
 | `@octanejs/auto-animate` | 0 |
 | `@octanejs/base-ui` | 0 |
+| `@octanejs/boneyard` | 0 |
 | `@octanejs/calendar` | 0 |
 | `@octanejs/cmdk` | 0 |
 | `@octanejs/colorful` | 0 |
@@ -35,6 +36,7 @@ surface and evidence.
 | `@octanejs/electron` | 0 |
 | `@octanejs/embla-carousel` | 0 |
 | `@octanejs/floating-ui` | 0 |
+| `@octanejs/formisch` | 0 |
 | `@octanejs/gsap` | 0 |
 | `@octanejs/hook-form` | 0 |
 | `@octanejs/html-react-parser` | 0 |
@@ -93,6 +95,7 @@ surface and evidence.
 | `@octanejs/tauri` | 0 |
 | `@octanejs/testing-library` | 0 |
 | `@octanejs/textarea-autosize` | 0 |
+| `@octanejs/thinking-orbs` | 0 |
 | `@octanejs/three` | 0 |
 | `@octanejs/tiptap` | 0 |
 | `@octanejs/to-print` | 0 |

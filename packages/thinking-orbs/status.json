@@ -1,0 +1,26 @@
+{
+  "upstream": {
+    "package": "thinking-orbs",
+    "version": "0.3.1",
+    "source": "https://github.com/Jakubantalik/thinking-orbs/tree/bd204b73c9b6660fad7210b1ad48d9dc2adbb89d",
+    "license": "MIT"
+  },
+  "surface": "Complete thinking-orbs 0.3.1 web component, preset, and framework-neutral engine surface.",
+  "inventory": {
+    "supported": [
+      "ThinkingOrb",
+      "resolvePreset",
+      "STATE_TO_MODE",
+      "MODE_DRAWS",
+      "MODE_FRAMES",
+      "engine primitives"
+    ],
+    "subpaths": ["./engine", "./package.json"]
+  },
+  "divergences": [
+    "Consumers import from @octanejs/thinking-orbs instead of thinking-orbs.",
+    "The component is authored in TSRX and uses Octane's native ref and effect lifecycle; its canvas, accessibility, animation, theme, and reduced-motion behavior match the React package."
+  ],
+  "ssr": "Supported. SSR emits the accessible canvas shell; drawing and browser observers begin after client commit.",
+  "verified": "2026-08-24"
+}

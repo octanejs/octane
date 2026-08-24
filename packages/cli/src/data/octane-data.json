@@ -102,6 +102,25 @@
       "verified": "2026-08-01"
     },
     {
+      "name": "@octanejs/boneyard",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "boneyard-js",
+        "version": "1.9.0",
+        "source": "https://github.com/0xGF/boneyard/tree/64aa5c08741a020afe782571e2c65f396677709e",
+        "license": "not present in the published artifact"
+      },
+      "surface": "Clean-room Octane Skeleton and BoneSuspense components plus the documented registry, configuration, responsive selection, snapshot, and HTML rendering APIs.",
+      "divergences": [
+        "Consumers import from @octanejs/boneyard instead of boneyard-js/react.",
+        "The Playwright capture CLI, Vite plugin, descriptor layout engine, React Native adapter, and non-Octane framework adapters are not included.",
+        "The package was implemented clean-room because the boneyard-js 1.9.0 npm artifact does not carry a recognizable license file."
+      ],
+      "ssr": "Supported when initialBones or a registry entry is available; the static skeleton markup is emitted without DOM measurement.",
+      "verified": "2026-08-24"
+    },
+    {
       "name": "@octanejs/calendar",
       "version": "0.0.2",
       "category": "UI and interaction",
@@ -320,6 +339,25 @@
       "divergences": ["`forwardRef` becomes octane's ref-as-prop."],
       "ssr": "No dedicated SSR/hydration tests.",
       "verified": "2026-07-05"
+    },
+    {
+      "name": "@octanejs/formisch",
+      "version": "0.0.1",
+      "category": "Forms and content",
+      "upstream": {
+        "package": "@formisch/react",
+        "version": "1.0.0",
+        "source": "https://github.com/fabian-hiller/formisch/tree/5be934ac067a68b0421d18fc0fa51d77abd4d9a1",
+        "license": "not present in the published artifact"
+      },
+      "surface": "Clean-room Octane implementation of Formisch's public React form-store, hook, component, validation, dirty-state, and field-array APIs.",
+      "divergences": [
+        "Consumers import from @octanejs/formisch instead of @formisch/react.",
+        "Field props use Octane's native onInput event for per-keystroke updates while retaining native onChange for blur/selection changes.",
+        "The implementation is clean-room because the @formisch/react 1.0.0 npm artifact does not carry a recognizable license file."
+      ],
+      "ssr": "Supported. Store construction and headless rendering do not require browser globals.",
+      "verified": "2026-08-24"
     },
     {
       "name": "@octanejs/gsap",
@@ -1173,6 +1211,24 @@
       ],
       "ssr": "Server rendering emits one plain textarea without accessing browser measurement globals; Octane hydration adopts the existing host and preserves pre-hydration uncontrolled edits.",
       "verified": "2026-08-03"
+    },
+    {
+      "name": "@octanejs/thinking-orbs",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "thinking-orbs",
+        "version": "0.3.1",
+        "source": "https://github.com/Jakubantalik/thinking-orbs/tree/bd204b73c9b6660fad7210b1ad48d9dc2adbb89d",
+        "license": "MIT"
+      },
+      "surface": "Complete thinking-orbs 0.3.1 web component, preset, and framework-neutral engine surface.",
+      "divergences": [
+        "Consumers import from @octanejs/thinking-orbs instead of thinking-orbs.",
+        "The component is authored in TSRX and uses Octane's native ref and effect lifecycle; its canvas, accessibility, animation, theme, and reduced-motion behavior match the React package."
+      ],
+      "ssr": "Supported. SSR emits the accessible canvas shell; drawing and browser observers begin after client commit.",
+      "verified": "2026-08-24"
     },
     {
       "name": "@octanejs/three",

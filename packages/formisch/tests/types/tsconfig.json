@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false,
+    "baseUrl": "../..",
+    "paths": {
+      "@octanejs/formisch": ["./src/index.ts"]
+    }
+  },
+  "reactPortEvidence": {
+    "gate": "public-types"
+  },
+  "include": [
+    "../../src/**/*.ts",
+    "../../src/**/*.tsrx",
+    "../../src/**/*.tsx",
+    "./public-api.test.ts"
+  ],
+  "exclude": []
+}

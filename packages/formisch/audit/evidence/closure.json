@@ -1,0 +1,50 @@
+{
+  "runtimeDependencies": ["octane", "valibot"],
+  "adaptedSources": [],
+  "sourceLedger": [
+    {
+      "path": "src/components.tsx",
+      "origin": "authored",
+      "sha256": "8fe9795ef1d398f3477f18ef24420a4b2f59adf61eff35fb43d9888c18be6598"
+    },
+    {
+      "path": "src/hooks.ts",
+      "origin": "authored",
+      "sha256": "5df1b776edceaa0a02c516f43260ca6e7f982f4ced26c5c6f50db0142359a761"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "authored",
+      "sha256": "16f15bf076e9f6445057b22a1ad8c18c72eb2eb30b3be6bba09f9c8136a8ce21"
+    },
+    {
+      "path": "src/methods.ts",
+      "origin": "authored",
+      "sha256": "8948003076671557f4f92ee942920cd37d7778d2b813f0c2b5c77c7e5c592610"
+    },
+    {
+      "path": "src/store.ts",
+      "origin": "authored",
+      "sha256": "ac9c6f2005271687efacc8d97ec3cdd2013d2710a7de4e6725fe6dff99ec7c75"
+    }
+  ],
+  "reimplementedDependencies": [
+    {
+      "packageName": "@formisch/react",
+      "publicBehaviors": [
+        "schema-derived form state and native field event bindings",
+        "validation, submission, focus, reset, and dirty-state helpers",
+        "stable field-array identity across insert, remove, replace, move, and swap",
+        "headless Form, Field, and FieldArray render-prop components",
+        "deterministic SSR and hydration-safe subscriptions"
+      ],
+      "localEvidence": [
+        "tests/conformance/form.test.tsx",
+        "tests/browser/formisch.browser.test.ts",
+        "tests/hydration/formisch.test.ts",
+        "tests/ssr/formisch.server.test.tsx",
+        "tests/types/public-api.test.ts"
+      ]
+    }
+  ]
+}

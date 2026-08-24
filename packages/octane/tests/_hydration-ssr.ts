@@ -9,12 +9,15 @@ type HydrationBinding =
 	| 'apollo-client'
 	| 'aria'
 	| 'base-ui'
+	| 'boneyard'
 	| 'docusaurus'
+	| 'formisch'
 	| 'monaco-editor'
 	| 'pdf'
 	| 'rainbowkit'
 	| 'react-map-gl'
 	| 'solana-kit'
+	| 'thinking-orbs'
 	| 'testing-library';
 
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
@@ -63,6 +66,24 @@ function bindingAliases(binding: HydrationBinding) {
 		return [
 			{
 				find: /^@octanejs\/solana-kit$/,
+				replacement: resolve(source, 'index.ts'),
+			},
+		];
+	}
+
+	if (binding === 'thinking-orbs') {
+		return [
+			{
+				find: /^@octanejs\/thinking-orbs$/,
+				replacement: resolve(source, 'index.ts'),
+			},
+		];
+	}
+
+	if (binding === 'boneyard' || binding === 'formisch') {
+		return [
+			{
+				find: new RegExp(`^@octanejs/${binding}$`),
 				replacement: resolve(source, 'index.ts'),
 			},
 		];

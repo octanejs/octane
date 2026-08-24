@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "thinking-orbs",
+    "version": "0.3.1",
+    "repository": {
+      "owner": "Jakubantalik",
+      "repo": "thinking-orbs",
+      "subdirectory": null
+    },
+    "commit": "bd204b73c9b6660fad7210b1ad48d9dc2adbb89d",
+    "integrity": "sha512-3BG1aeB1RUTxItCml/BBuIz5JRM4kZqGuyx+vouv0fXTtcR9ZNoKjWGneHPx94y74GxgArwJZ1qbJR5dt54kSw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "915a283980628a0ca9e7b423ebafc6f3a0fa1e630ff17d34e59034808d92011c"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["LICENSE", "README.md", "package.json", "spec", "src"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "0e9405a2ee75ce720c665c04568fedda3c07906a",
+      "size": 1070
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "0d0e35ab79f2299212d6704d22ef73d7cb6e30e2",
+      "size": 2086
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "8fcf526fb19a1d0d7168f20b81f1824d5e2acf62",
+      "size": 3429
+    },
+    {
+      "path": "spec/orbs-golden.json",
+      "gitBlob": "838dbf60daa1fb230482a867142131114076c88b",
+      "size": 625283
+    },
+    {
+      "path": "spec/orbs-spec.json",
+      "gitBlob": "896523813559c107dc17a6632f176d83b74e1ddc",
+      "size": 7150
+    },
+    {
+      "path": "src/engine/braid.ts",
+      "gitBlob": "dd670a694bb40105016024e53d0d980134c3acf0",
+      "size": 1952
+    },
+    {
+      "path": "src/engine/core.ts",
+      "gitBlob": "6e0b1eb6f3ef9f088e991f0f68db6ddcfa77ebc8",
+      "size": 5554
+    },
+    {
+      "path": "src/engine/index.ts",
+      "gitBlob": "6f8139586cca86a229d1c9bbd29b0e781e43613a",
+      "size": 1476
+    },
+    {
+      "path": "src/engine/lattice.ts",
+      "gitBlob": "f4f9126cb6205b6097835d5ba1107597f5d8a11c",
+      "size": 7347
+    },
+    {
+      "path": "src/engine/morph.ts",
+      "gitBlob": "cebec9768926b9d6c99c41d3c124201b11ebc369",
+      "size": 4275
+    },
+    {
+      "path": "src/engine/orbits.ts",
+      "gitBlob": "78861970ca4596d24af35f509d51745bf991336c",
+      "size": 2556
+    },
+    {
+      "path": "src/engine/profiles.ts",
+      "gitBlob": "386986ea70c144aa5da7a6214c000180f8601de4",
+      "size": 3896
+    },
+    {
+      "path": "src/engine/registry.ts",
+      "gitBlob": "d62524b35720cbc4830a92ac7aa8126ac0ee0857",
+      "size": 1397
+    },
+    {
+      "path": "src/engine/ribbon.ts",
+      "gitBlob": "0b0734cab7dc43e37501ce4cabea19e4cb492c4c",
+      "size": 4070
+    },
+    {
+      "path": "src/engine/types.ts",
+      "gitBlob": "e7b5dc53510f0e14ac3b0276ff45082fece737e3",
+      "size": 850
+    },
+    {
+      "path": "src/engine/web.ts",
+      "gitBlob": "7ffa137ac923ae504202567f2b3391da5ba66859",
+      "size": 3428
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "65913f10a484ae2f5296784d84bca7acf0601527",
+      "size": 383
+    },
+    {
+      "path": "src/presets.ts",
+      "gitBlob": "b2b44ae8a781341e68d1185c4639a4577ac723d6",
+      "size": 3317
+    },
+    {
+      "path": "src/theme.ts",
+      "gitBlob": "6f1c744a68a56cf4726a97b180d3e5db9c25362f",
+      "size": 2665
+    },
+    {
+      "path": "src/ThinkingOrb.tsx",
+      "gitBlob": "6065218b3bf79d7724cf471a720236355d51eba6",
+      "size": 3465
+    },
+    {
+      "path": "src/types.ts",
+      "gitBlob": "4f60d7ad6ed842496e1326aa9081d65963ba8cbc",
+      "size": 2532
+    }
+  ],
+  "fingerprint": "cb038587a567f68e3a94f0465cbe0fb497dc0e62098b504c1c14daf9012b3774"
+}

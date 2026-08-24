@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": ["react"]
+  },
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "upstreamRegistrations": []
+  },
+  "include": ["./public-api.test.ts"]
+}

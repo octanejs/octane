@@ -1,0 +1,139 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/open-circle/formisch.git",
+    "version": "@formisch/react@1.0.0",
+    "commit": "5be934ac067a68b0421d18fc0fa51d77abd4d9a1",
+    "sourceRoot": "frameworks/react",
+    "testRoot": "not-published",
+    "license": "MIT (repository; published artifact omitted the license)",
+    "integrity": "sha256:87c596abe2aceb5a818c2387a8867a66f67522f9fd76f550937189d5dff6debf",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/formisch/src"],
+      "include": ["\\.(?:ts|tsx|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/formisch/tests"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "exclude": ["/types/"]
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "d52830e0ca13df144bde3e151819da021f6e54c35064db2e4dc121c1d05090bd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "formisch-clean-room-contract",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "formisch",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Independently authored contract observations for native events, validation focus, field-array identity, hydration, and a catastrophic performance guard.",
+      "files": [
+        {
+          "path": "packages/formisch/tests/conformance/form.test.tsx",
+          "role": "test",
+          "sha256": "edd95da9faacd212fc48b11264f5fc0bc57bde63a4c73dafb3fc4e7a32453f0f",
+          "cases": [
+            {
+              "id": "differential:formisch-native-submit",
+              "testName": "validates on submit, reports field errors, and only calls success with output",
+              "fullName": "@octanejs/formisch validates on submit, reports field errors, and only calls success with output"
+            },
+            {
+              "id": "differential:formisch-field-array-identity",
+              "testName": "keeps field-array identities stable across mutations",
+              "fullName": "@octanejs/formisch keeps field-array identities stable across mutations"
+            },
+            {
+              "id": "differential:formisch-performance",
+              "testName": "keeps programmatic store updates within a catastrophic-regression budget",
+              "fullName": "@octanejs/formisch keeps programmatic store updates within a catastrophic-regression budget"
+            }
+          ]
+        },
+        {
+          "path": "packages/formisch/tests/hydration/formisch.test.ts",
+          "role": "test",
+          "sha256": "38f8dc48059657f35e066431a499328a5ffef32885055d079689b0d6dd300db3",
+          "cases": [
+            {
+              "id": "differential:formisch-hydration",
+              "testName": "adopts form controls and continues responding to native input",
+              "fullName": "@octanejs/formisch hydration adopts form controls and continues responding to native input"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "formisch-server-contract",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "formisch-ssr",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Independently authored deterministic server-rendering observation.",
+      "files": [
+        {
+          "path": "packages/formisch/tests/ssr/formisch.server.test.tsx",
+          "role": "test",
+          "sha256": "cf1c740fe4815fba4b83c120f38c96af54641ec2c995b934a6269da2a7f49e59",
+          "cases": [
+            {
+              "id": "differential:formisch-ssr",
+              "testName": "renders a deterministic native form without browser access",
+              "fullName": "@octanejs/formisch SSR renders a deterministic native form without browser access"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "formisch-browser-contract",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "formisch-browser",
+      "notes": "Runs the native input, validation, and submission lifecycle in real Chromium.",
+      "files": [
+        {
+          "path": "packages/formisch/tests/browser/formisch.browser.test.ts",
+          "role": "test",
+          "sha256": "13281cef7f4abd5d6d0fcb820db0741f58a069ea0c33084c3cafb128cafa3964",
+          "cases": [
+            {
+              "id": "browser:formisch-native-lifecycle",
+              "testName": "chromium: handles native input, validation, and submission",
+              "fullName": "@octanejs/formisch real-browser behavior chromium: handles native input, validation, and submission"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

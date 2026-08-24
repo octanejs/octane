@@ -1,0 +1,55 @@
+{
+  "name": "@octanejs/formisch",
+  "version": "0.0.1",
+  "description": "Clean-room Formisch binding for Octane and Valibot.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/formisch"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "status.json",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project formisch --project formisch-ssr --project formisch-browser",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*",
+    "valibot": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@formisch/react": "1.0.0",
+    "@octanejs/testing-library": "workspace:*",
+    "@types/react": "catalog:default",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "catalog:default",
+    "valibot": "1.4.2",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

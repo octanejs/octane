@@ -78,6 +78,8 @@
       "@octanejs/stick-to-bottom",
       "@octanejs/image-crop",
       "@octanejs/content-loader",
+      "@octanejs/boneyard",
+      "@octanejs/thinking-orbs",
       "@octanejs/to-print",
       "@octanejs/calendar",
       "@octanejs/auto-animate"
@@ -88,6 +90,7 @@
     "description": "Forms, file acquisition, rich-text editing, streaming Markdown, MDX, and translations.",
     "packages": [
       "@octanejs/hook-form",
+      "@octanejs/formisch",
       "@octanejs/input-otp",
       "@octanejs/dropzone",
       "@octanejs/tanstack-form",

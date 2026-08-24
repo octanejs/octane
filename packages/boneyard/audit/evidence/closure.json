@@ -1,0 +1,41 @@
+{
+  "runtimeDependencies": ["octane"],
+  "adaptedSources": [],
+  "sourceLedger": [
+    {
+      "path": "src/Skeleton.tsx",
+      "origin": "authored",
+      "sha256": "e87fc1ebf7941eaee3f887460b430637deb09f4ec4326553eaec5b7488bd2b22"
+    },
+    {
+      "path": "src/core.ts",
+      "origin": "authored",
+      "sha256": "13865c482839e35615868cb55ef108746d064e51b681fbd88d53e646627d01af"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "authored",
+      "sha256": "789151ebc794bd53c9bd02a18c1a861841bbe2c4afd69b4640d37df071528c9c"
+    }
+  ],
+  "reimplementedDependencies": [
+    {
+      "packageName": "boneyard-js",
+      "publicBehaviors": [
+        "skeleton registry and compact bone normalization",
+        "responsive largest-fitting breakpoint selection",
+        "accessible animated Skeleton and Suspense fallback components",
+        "container resize and ancestor dark-mode observation",
+        "deterministic SSR and hydration adoption"
+      ],
+      "localEvidence": [
+        "tests/conformance/core.test.ts",
+        "tests/conformance/component.test.tsx",
+        "tests/browser/boneyard.browser.test.ts",
+        "tests/hydration/boneyard.test.ts",
+        "tests/ssr/boneyard.server.test.tsx",
+        "tests/types/public-api.test.ts"
+      ]
+    }
+  ]
+}

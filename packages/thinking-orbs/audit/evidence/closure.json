@@ -1,0 +1,100 @@
+{
+  "runtimeDependencies": ["octane"],
+  "adaptedSources": [
+    {
+      "packageName": "thinking-orbs",
+      "paths": [
+        "src/engine/braid.ts",
+        "src/engine/core.ts",
+        "src/engine/index.ts",
+        "src/engine/lattice.ts",
+        "src/engine/morph.ts",
+        "src/engine/orbits.ts",
+        "src/engine/profiles.ts",
+        "src/engine/registry.ts",
+        "src/engine/ribbon.ts",
+        "src/engine/web.ts",
+        "src/presets.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/ThinkingOrb.tsrx",
+      "origin": "authored",
+      "sha256": "e5f3d28b3dd5f0ed1e233aea8d54d1e4756fe1c843c96d4fee5f8c6519b2d189"
+    },
+    {
+      "path": "src/engine/braid.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "a11c6afa594140201fad7cd2ecbc4eeb3c1a0e5f8ac2f7905ddf3d1397e419d9"
+    },
+    {
+      "path": "src/engine/core.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "51b5183488dcb2c32c44b1ca5a45596fd221add19f72e293bfd3e9706fe6bbca"
+    },
+    {
+      "path": "src/engine/index.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "8d3004c6cb6bb8a7923a6c6c600294e697269bbecda688b565d51afc3e6a4275"
+    },
+    {
+      "path": "src/engine/lattice.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "21d674f14839b203d5c26e8812297f21fc90cea61f28417f324718add714f0a6"
+    },
+    {
+      "path": "src/engine/morph.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "8134b35248207309527d94512e576b28c20a6a0158f3b972328a6a81be96cbbc"
+    },
+    {
+      "path": "src/engine/orbits.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "2fa36e0f446c65744d3c6a9844ee95d64503153d31f94c048c6ad63ae1c18a86"
+    },
+    {
+      "path": "src/engine/profiles.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "a9981aa35e278b2b178f5b6f05041002b59f0088fa6eaf191cfe1263408343e7"
+    },
+    {
+      "path": "src/engine/registry.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "c25331682f5738cafbc6392eb53142a833ee498ac8a2978ba0199ddf14e21df1"
+    },
+    {
+      "path": "src/engine/ribbon.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "e8f5874bd16e8f04155171bc5f80f46769f43622a58bcebb305a4cacbf8babcf"
+    },
+    {
+      "path": "src/engine/web.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "69d8405c5f5998951a803ff67599d1308badfa507ed57641ae1011524e0ad8c7"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "authored",
+      "sha256": "dbb89e80c8b7bd5c6910328e2f08e14c6d0fa0978ee8ef07c5cea1057b1bf46c"
+    },
+    {
+      "path": "src/presets.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "fe42ffaed4308c47cbd85e200da74e5f8ba9ee55fe4f931a48c889672b601c61"
+    }
+  ],
+  "reimplementedDependencies": []
+}

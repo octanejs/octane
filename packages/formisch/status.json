@@ -1,0 +1,52 @@
+{
+  "upstream": {
+    "package": "@formisch/react",
+    "version": "1.0.0",
+    "source": "https://github.com/fabian-hiller/formisch/tree/5be934ac067a68b0421d18fc0fa51d77abd4d9a1",
+    "license": "not present in the published artifact"
+  },
+  "surface": "Clean-room Octane implementation of Formisch's public React form-store, hook, component, validation, dirty-state, and field-array APIs.",
+  "inventory": {
+    "supported": [
+      "useForm",
+      "useField",
+      "useFieldArray",
+      "Form",
+      "Field",
+      "FieldArray",
+      "focus",
+      "getDeepError",
+      "getDeepErrorEntries",
+      "getDeepErrorEntry",
+      "getDeepErrors",
+      "getDirtyInput",
+      "getDirtyPaths",
+      "getErrors",
+      "getInput",
+      "handleSubmit",
+      "insert",
+      "isDirty",
+      "isEdited",
+      "isTouched",
+      "isValid",
+      "move",
+      "pickDirty",
+      "remove",
+      "replace",
+      "reset",
+      "setErrors",
+      "setInput",
+      "submit",
+      "swap",
+      "validate"
+    ],
+    "subpaths": ["./package.json"]
+  },
+  "divergences": [
+    "Consumers import from @octanejs/formisch instead of @formisch/react.",
+    "Field props use Octane's native onInput event for per-keystroke updates while retaining native onChange for blur/selection changes.",
+    "The implementation is clean-room because the @formisch/react 1.0.0 npm artifact does not carry a recognizable license file."
+  ],
+  "ssr": "Supported. Store construction and headless rendering do not require browser globals.",
+  "verified": "2026-08-24"
+}

@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false,
+    "baseUrl": "../..",
+    "paths": {
+      "@octanejs/boneyard": ["./src/index.ts"]
+    }
+  },
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamRegistrations": []
+  },
+  "include": ["../../src/**/*.ts", "../../src/**/*.tsx", "./public-api.test.ts"]
+}

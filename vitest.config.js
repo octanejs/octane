@@ -565,6 +565,118 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'boneyard',
+					include: [
+						'packages/boneyard/tests/conformance/**/*.test.ts',
+						'packages/boneyard/tests/conformance/**/*.test.tsx',
+						'packages/boneyard/tests/hydration/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/boneyard$/,
+							replacement: resolve(import.meta.dirname, 'packages/boneyard/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'boneyard-ssr',
+					include: ['packages/boneyard/tests/ssr/**/*.server.test.tsx'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/boneyard$/,
+							replacement: resolve(import.meta.dirname, 'packages/boneyard/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'boneyard-browser',
+					include: ['packages/boneyard/tests/browser/**/*.browser.test.ts'],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'formisch',
+					include: [
+						'packages/formisch/tests/conformance/**/*.test.ts',
+						'packages/formisch/tests/conformance/**/*.test.tsx',
+						'packages/formisch/tests/hydration/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/formisch$/,
+							replacement: resolve(import.meta.dirname, 'packages/formisch/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'formisch-ssr',
+					include: ['packages/formisch/tests/ssr/**/*.server.test.tsx'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/formisch$/,
+							replacement: resolve(import.meta.dirname, 'packages/formisch/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'formisch-browser',
+					include: ['packages/formisch/tests/browser/**/*.browser.test.ts'],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
 				test: {
 					name: 'rxjs',
 					include: ['packages/rxjs/tests/**/*.test.ts'],
@@ -7975,6 +8087,86 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/content-loader/src/index.ts'),
 						},
 					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'thinking-orbs',
+					include: [
+						'packages/thinking-orbs/tests/conformance/**/*.test.ts',
+						'packages/thinking-orbs/tests/hydration/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/thinking-orbs$/,
+							replacement: resolve(import.meta.dirname, 'packages/thinking-orbs/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/thinking-orbs\/engine$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/thinking-orbs/src/engine/index.ts',
+							),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'thinking-orbs-differential',
+					include: ['packages/thinking-orbs/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/thinking-orbs$/,
+							replacement: resolve(import.meta.dirname, 'packages/thinking-orbs/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'thinking-orbs-ssr',
+					include: ['packages/thinking-orbs/tests/ssr/**/*.server.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/thinking-orbs$/,
+							replacement: resolve(import.meta.dirname, 'packages/thinking-orbs/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'thinking-orbs-browser',
+					include: ['packages/thinking-orbs/tests/browser/**/*.browser.test.ts'],
+					environment: 'node',
+					globals: false,
+					fileParallelism: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
 				},
 			},
 			{

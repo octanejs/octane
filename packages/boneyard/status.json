@@ -1,0 +1,31 @@
+{
+  "upstream": {
+    "package": "boneyard-js",
+    "version": "1.9.0",
+    "source": "https://github.com/0xGF/boneyard/tree/64aa5c08741a020afe782571e2c65f396677709e",
+    "license": "not present in the published artifact"
+  },
+  "surface": "Clean-room Octane Skeleton and BoneSuspense components plus the documented registry, configuration, responsive selection, snapshot, and HTML rendering APIs.",
+  "inventory": {
+    "supported": [
+      "Skeleton",
+      "BoneSuspense",
+      "configureBoneyard",
+      "registerBones",
+      "registerSkeleton",
+      "registerSkeletons",
+      "getRegisteredSkeleton",
+      "selectBreakpoint",
+      "snapshotBones",
+      "renderBones"
+    ],
+    "subpaths": ["./package.json"]
+  },
+  "divergences": [
+    "Consumers import from @octanejs/boneyard instead of boneyard-js/react.",
+    "The Playwright capture CLI, Vite plugin, descriptor layout engine, React Native adapter, and non-Octane framework adapters are not included.",
+    "The package was implemented clean-room because the boneyard-js 1.9.0 npm artifact does not carry a recognizable license file."
+  ],
+  "ssr": "Supported when initialBones or a registry entry is available; the static skeleton markup is emitted without DOM measurement.",
+  "verified": "2026-08-24"
+}

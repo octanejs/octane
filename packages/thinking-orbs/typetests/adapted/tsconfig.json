@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false,
+    "baseUrl": "../..",
+    "paths": {
+      "@octanejs/thinking-orbs": ["./src/index.ts"],
+      "@octanejs/thinking-orbs/engine": ["./src/engine/index.ts"]
+    }
+  },
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamRegistrations": []
+  },
+  "include": ["../../src/**/*.ts", "../../src/**/*.tsrx", "./public-api.test.ts"]
+}

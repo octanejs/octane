@@ -1,0 +1,169 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/Jakubantalik/thinking-orbs.git",
+    "version": "thinking-orbs@0.3.1",
+    "commit": "bd204b73c9b6660fad7210b1ad48d9dc2adbb89d",
+    "sourceRoot": "src",
+    "testRoot": "not-published",
+    "license": "MIT",
+    "integrity": "sha256:cb038587a567f68e3a94f0465cbe0fb497dc0e62098b504c1c14daf9012b3774",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/thinking-orbs/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/thinking-orbs/tests"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "exclude": ["/types/"]
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "d52830e0ca13df144bde3e151819da021f6e54c35064db2e4dc121c1d05090bd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "thinking-orbs-upstream-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "thinking-orbs-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compares the Octane component against the pinned React package with a frozen clock and captured canvas operations.",
+      "files": [
+        {
+          "path": "packages/thinking-orbs/tests/differential/thinking-orbs.test.ts",
+          "role": "test",
+          "sha256": "06b4ed70b7016aca90bb7ea74115eeb8427874e206d14fc36f0afb5a6a6234e5",
+          "cases": [
+            {
+              "id": "differential:thinking-orbs-react",
+              "testName": "matches canvas attributes and draw operations for a frozen public state",
+              "fullName": "differential: @octanejs/thinking-orbs vs thinking-orbs@0.3.1 matches canvas attributes and draw operations for a frozen public state"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "thinking-orbs-octane-contract",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "thinking-orbs",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Checks pinned engine vectors, accessible canvas behavior, node identity, and hydration adoption.",
+      "files": [
+        {
+          "path": "packages/thinking-orbs/tests/conformance/thinking-orbs.test.ts",
+          "role": "test",
+          "sha256": "9121ddaa2823b33b3080a05efcaf1ab4f24aa5289b4dbf2e5f83aa751d6039b7",
+          "cases": [
+            {
+              "id": "differential:thinking-orbs-canvas",
+              "testName": "renders the accessible default canvas and a deterministic initial frame",
+              "fullName": "@octanejs/thinking-orbs component renders the accessible default canvas and a deterministic initial frame"
+            },
+            {
+              "id": "differential:thinking-orbs-identity",
+              "testName": "preserves the canvas node while changing animation state",
+              "fullName": "@octanejs/thinking-orbs component preserves the canvas node while changing animation state"
+            }
+          ]
+        },
+        {
+          "path": "packages/thinking-orbs/tests/conformance/engine-golden.test.ts",
+          "role": "test",
+          "sha256": "5a45f44a5798da7e9f125d68450206bf5295f39607432724ccc3900486ae4c0d",
+          "cases": [
+            {
+              "id": "differential:thinking-orbs-golden",
+              "testName": "matches all 72 pinned geometry vectors",
+              "fullName": "@octanejs/thinking-orbs engine matches all 72 pinned geometry vectors"
+            }
+          ]
+        },
+        {
+          "path": "packages/thinking-orbs/tests/hydration/thinking-orbs.test.ts",
+          "role": "test",
+          "sha256": "4b6ffe15fa8a4cf5de3a3f9a8bb992d4b0e726c3634a858c8195263aa23830ce",
+          "cases": [
+            {
+              "id": "differential:thinking-orbs-hydration",
+              "testName": "adopts the server canvas and starts drawing after commit",
+              "fullName": "@octanejs/thinking-orbs hydration adopts the server canvas and starts drawing after commit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "thinking-orbs-server-contract",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "thinking-orbs-ssr",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Checks deterministic server rendering without browser globals.",
+      "files": [
+        {
+          "path": "packages/thinking-orbs/tests/ssr/thinking-orbs.server.test.ts",
+          "role": "test",
+          "sha256": "dbf624379b576ff7ac54665d2fa3e55a3e90224b279b531451b7a7991eb223ef",
+          "cases": [
+            {
+              "id": "differential:thinking-orbs-ssr",
+              "testName": "renders a deterministic accessible canvas shell without browser globals",
+              "fullName": "@octanejs/thinking-orbs SSR renders a deterministic accessible canvas shell without browser globals"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "thinking-orbs-browser-contract",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "thinking-orbs-browser",
+      "notes": "Runs animation, pause, and live ancestor-theme behavior in real Chromium.",
+      "files": [
+        {
+          "path": "packages/thinking-orbs/tests/browser/thinking-orbs.browser.test.ts",
+          "role": "test",
+          "sha256": "f9be2a59fe9c76f32c9ba78a4eb9d21dc328ab6cd499764fcef10303d64b7741",
+          "cases": [
+            {
+              "id": "browser:thinking-orbs-animation-theme",
+              "testName": "chromium: animates, pauses, and follows live ancestor theme changes",
+              "fullName": "@octanejs/thinking-orbs real-browser behavior chromium: animates, pauses, and follows live ancestor theme changes"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

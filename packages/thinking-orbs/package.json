@@ -1,0 +1,59 @@
+{
+  "name": "@octanejs/thinking-orbs",
+  "version": "0.0.1",
+  "description": "Octane binding for thinking-orbs 0.3.1, including the canvas component and framework-neutral engine.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/thinking-orbs"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE",
+    "LICENSE.upstream"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./engine": "./src/engine/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project thinking-orbs --project thinking-orbs-ssr --project thinking-orbs-differential --project thinking-orbs-browser",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/react": "16.3.2",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "thinking-orbs": "0.3.1",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**108 publishable package(s), including 94 framework binding(s) and 3 framework integration(s).**
+**111 publishable package(s), including 97 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -22,6 +22,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/astro` | [`packages/astro`](../packages/astro) | framework integration | `0.0.25` | 5 |
 | `@octanejs/auto-animate` | [`packages/auto-animate`](../packages/auto-animate) | framework binding | `0.0.2` | 3 |
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.44` | 2 |
+| `@octanejs/boneyard` | [`packages/boneyard`](../packages/boneyard) | framework binding | `0.0.1` | 2 |
 | `@octanejs/calendar` | [`packages/calendar`](../packages/calendar) | framework binding | `0.0.2` | 4 |
 | `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.0.8` | 2 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.29` | 1 |
@@ -38,6 +39,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/electron` | [`packages/electron`](../packages/electron) | framework binding | `0.0.24` | 6 |
 | `@octanejs/embla-carousel` | [`packages/embla-carousel`](../packages/embla-carousel) | framework binding | `0.0.12` | 2 |
 | `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.45` | 1 |
+| `@octanejs/formisch` | [`packages/formisch`](../packages/formisch) | framework binding | `0.0.1` | 2 |
 | `@octanejs/gsap` | [`packages/gsap`](../packages/gsap) | framework binding | `0.0.15` | 1 |
 | `@octanejs/hook-form` | [`packages/hook-form`](../packages/hook-form) | framework binding | `0.1.43` | 1 |
 | `@octanejs/html-react-parser` | [`packages/html-react-parser`](../packages/html-react-parser) | framework binding | `0.0.2` | 2 |
@@ -101,6 +103,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/tauri` | [`packages/tauri`](../packages/tauri) | framework binding | `0.0.29` | 1 |
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.43` | 2 |
 | `@octanejs/textarea-autosize` | [`packages/textarea-autosize`](../packages/textarea-autosize) | framework binding | `0.0.12` | 2 |
+| `@octanejs/thinking-orbs` | [`packages/thinking-orbs`](../packages/thinking-orbs) | framework binding | `0.0.1` | 3 |
 | `@octanejs/three` | [`packages/three`](../packages/three) | framework binding | `0.1.39` | 7 |
 | `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.40` | 2 |
 | `@octanejs/to-print` | [`packages/to-print`](../packages/to-print) | framework binding | `0.0.2` | 2 |
