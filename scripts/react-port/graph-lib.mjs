@@ -152,8 +152,8 @@ function assignBinding(node, bindingName) {
 	node.bindingDirectory = `packages/${node.binding.slice('@octanejs/'.length)}`;
 }
 
-function assignProposedBinding(node) {
-	assignBinding(node, proposedBindingName(node.packageName));
+function assignProposedBinding(node, bindingNames = {}) {
+	assignBinding(node, bindingNames[node.packageName] ?? proposedBindingName(node.packageName));
 }
 
 function blockBindingName(node, reason) {
@@ -174,6 +174,23 @@ function applyCleanRoomReimplementation(node) {
 		requirement:
 			'Re-author only the public behavior used by each dependent and prove it with independently authored differential parity evidence.',
 	};
+	delete node.feasibility;
+	node.blockers = [];
+	node.repair = null;
+}
+
+function applyCleanRoomTarget(node) {
+	node.state = 'classified';
+	node.action = 'audit-dependency';
+	node.copyPermission = 'denied-or-unproven';
+	node.reimplementation = {
+		target: true,
+		copySource: false,
+		copyTests: false,
+		requirement:
+			'Re-author the documented public contract without inspecting or adapting upstream source or tests, then prove it with independently authored black-box and differential evidence.',
+	};
+	node.upstreamTestInventory = [];
 	delete node.feasibility;
 	node.blockers = [];
 	node.repair = null;
@@ -380,6 +397,8 @@ export function planPortGraph({
 	inventory,
 	dependencyClassifications = {},
 	adoptedBindings = [],
+	cleanRoomTargets = [],
+	bindingNames = {},
 }) {
 	const nodes = {};
 	const targetByPackage = new Map();
@@ -392,6 +411,7 @@ export function planPortGraph({
 			.filter((target) => target.status === 'licensed')
 			.map((target) => packageNameFromBlockedTarget(target)),
 	);
+	const cleanRoomTargetNames = new Set(cleanRoomTargets);
 
 	function ensureNode(packageName) {
 		const id = `pkg:${packageName}`;
@@ -416,6 +436,7 @@ export function planPortGraph({
 		const packageName = packageNameFromBlockedTarget(target);
 		const node = ensureNode(packageName);
 		node.requested ||= target.requested !== false;
+		const cleanRoomTarget = target.requested !== false && cleanRoomTargetNames.has(packageName);
 		const hasLicensedEvidence = licensedPackageNames.has(packageName);
 		if (target.status === 'blocked' && target.requested === false && hasLicensedEvidence) {
 			continue;
@@ -431,7 +452,7 @@ export function planPortGraph({
 			node.upstreamTestInventory = target.upstreamTestInventory ?? [];
 			targetByPackage.set(packageName, target);
 		}
-		if (providesPrimaryEvidence && target.sourceAnalysis) {
+		if (providesPrimaryEvidence && target.sourceAnalysis && !cleanRoomTarget) {
 			node.feasibility = {
 				verdict: target.sourceAnalysis.verdict,
 				requiresAdaptation: target.sourceAnalysis.verdict === 'bridgeable-with-rewrites',
@@ -444,7 +465,18 @@ export function planPortGraph({
 				plan: target.sourceAnalysis.plan ?? [],
 			};
 		}
-		if (target.status === 'blocked') {
+		if (
+			cleanRoomTarget &&
+			target.identity?.packageName === packageName &&
+			target.identity?.version &&
+			target.identity?.commit &&
+			(target.status === 'licensed' ||
+				(target.status === 'blocked' &&
+					(target.blockers ?? []).length > 0 &&
+					(target.blockers ?? []).every(isLicensePolicyBlocker)))
+		) {
+			applyCleanRoomTarget(node);
+		} else if (target.status === 'blocked') {
 			node.state = 'blocked';
 			node.action = 'repair-preflight';
 			node.blockers.push(...(target.blockers ?? ['Target did not pass preflight.']));
@@ -453,8 +485,10 @@ export function planPortGraph({
 	}
 
 	for (const target of targets) {
-		if (target.status !== 'licensed') continue;
-		const targetNode = ensureNode(target.identity.packageName);
+		const packageName = packageNameFromBlockedTarget(target);
+		const targetNode = ensureNode(packageName);
+		if (targetNode.reimplementation?.target === true || target.status !== 'licensed') continue;
+		if (!target.identity?.packageName) continue;
 		for (const [dependencyName, range] of Object.entries(target.runtimeDependencies ?? {}).sort()) {
 			if (OCTANE_RUNTIME_PACKAGES.has(dependencyName)) continue;
 			const dependencyNode = ensureNode(dependencyName);
@@ -568,12 +602,13 @@ export function planPortGraph({
 				'Route the missing primitive to its owning Octane package or remove the target.';
 			continue;
 		}
-		if (target?.status === 'licensed') {
-			assignProposedBinding(node);
+		if (target?.status === 'licensed' || node.reimplementation?.target === true) {
+			assignProposedBinding(node, bindingNames);
 			const occupiedBinding = inventory.bindings[node.binding];
 			const occupiedPackageName = workspacePackageNames.has(node.binding);
 			const occupiedDirectory = workspaceDirectories.has(node.bindingDirectory);
-			const adoptionMatches = matchingAdoptionEvidence(node, occupiedBinding);
+			const adoptionMatches =
+				node.reimplementation?.target !== true && matchingAdoptionEvidence(node, occupiedBinding);
 			if (adoptionMatches && adoptedBindings.includes(node.packageName)) {
 				node.state = 'ready';
 				node.action = 'adopt-binding';

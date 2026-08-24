@@ -22,6 +22,36 @@ function licensedTarget(packageName, version, runtimeDependencies = {}) {
 	};
 }
 
+function licenseBlockedTarget(packageName, version, runtimeDependencies = {}) {
+	return {
+		input: `${packageName}@${version}`,
+		status: 'blocked',
+		identity: {
+			packageName,
+			version,
+			commit: 'b'.repeat(40),
+			integrity: 'sha512-clean-room-fixture',
+		},
+		evidenceFingerprint: `${packageName}-${version}-blocked-license`,
+		runtimeDependencies,
+		license: {
+			policy: 'approved-license-v2',
+			published: { status: 'blocked', spdx: null, evidence: [] },
+			source: { status: 'passed', spdx: 'MIT', evidence: [] },
+		},
+		blockers: ['Published artifact: No license file was found in the applicable package scope.'],
+		sourceAnalysis: {
+			verdict: 'bridgeable-with-rewrites',
+			filesScanned: 12,
+			truncated: false,
+			hazards: [],
+			apis: [],
+			imports: ['react', 'widget-core'],
+			plan: ['Copy source that is unavailable to the clean-room implementer.'],
+		},
+	};
+}
+
 function fixtureInventory() {
 	return buildCapabilityInventory({
 		knownBindings: { 'react-covered': '@octanejs/covered', 'react-partial': '@octanejs/partial' },
@@ -102,6 +132,43 @@ describe('repository capability inventory', () => {
 });
 
 describe('union prerequisite graph', () => {
+	test('plans an explicitly named requested target for no-copy clean-room implementation', () => {
+		const graph = planPortGraph({
+			targets: [licenseBlockedTarget('widget-js', '1.0.0', { 'widget-core': '^1.0.0' })],
+			inventory: fixtureInventory(),
+			dependencyClassifications: { 'widget-core': 'framework-neutral' },
+			cleanRoomTargets: ['widget-js'],
+			bindingNames: { 'widget-js': '@octanejs/widget' },
+		});
+
+		const node = graph.nodes['pkg:widget-js'];
+		assert.equal(node.state, 'ready');
+		assert.equal(node.disposition, 'actionable');
+		assert.equal(node.action, 'create-binding');
+		assert.equal(node.binding, '@octanejs/widget');
+		assert.equal(node.bindingDirectory, 'packages/widget');
+		assert.equal(node.copyPermission, 'denied-or-unproven');
+		assert.equal(node.reimplementation.target, true);
+		assert.equal(node.reimplementation.copySource, false);
+		assert.equal(node.reimplementation.copyTests, false);
+		assert.deepEqual(node.upstreamTestInventory, []);
+		assert.equal(node.feasibility, undefined);
+		assert.equal(graph.nodes['pkg:widget-core'], undefined);
+	});
+
+	test('does not let clean-room mode bypass non-license preflight blockers', () => {
+		const target = licenseBlockedTarget('widget-js', '1.0.0');
+		target.blockers = ['Immutable source manifest repository contradicts the requested repository'];
+		const graph = planPortGraph({
+			targets: [target],
+			inventory: fixtureInventory(),
+			cleanRoomTargets: ['widget-js'],
+		});
+
+		assert.equal(graph.nodes['pkg:widget-js'].state, 'blocked');
+		assert.equal(graph.nodes['pkg:widget-js'].action, 'repair-preflight');
+	});
+
 	test('reuses adequate live bindings and framework-neutral cores', () => {
 		const graph = planPortGraph({
 			targets: [

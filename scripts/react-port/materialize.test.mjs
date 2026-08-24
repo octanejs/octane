@@ -502,4 +502,21 @@ describe('materialize CLI lifecycle', () => {
 		assert.equal(locked.exitCode, 2);
 		assert.match(locked.stderr, /no approved source license/);
 	});
+
+	test('lock refuses source materialization for a clean-room node', async () => {
+		const context = scenario();
+		const manifestPath = path.join(context.workRoot, 'fixture-batch', 'manifest.json');
+		const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+		manifest.nodes[NODE_ID].copyPermission = 'denied-or-unproven';
+		manifest.nodes[NODE_ID].reimplementation = {
+			target: true,
+			copySource: false,
+			copyTests: false,
+		};
+		writeFileSync(manifestPath, JSON.stringify(manifest));
+
+		const locked = await runCli(LOCK_ARGUMENTS(context));
+		assert.equal(locked.exitCode, 2);
+		assert.match(locked.stderr, /clean-room reimplementation.*materialization is forbidden/i);
+	});
 });

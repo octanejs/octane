@@ -154,6 +154,7 @@ function canonicalPath(filePath) {
 }
 
 function attributionHashes(node) {
+	if (node.reimplementation?.target === true) return { licenses: [], notices: [] };
 	const verdicts = [node.license?.published, node.license?.source];
 	return {
 		licenses: [
@@ -635,8 +636,8 @@ function referencedProvenance(node, checker, provenanceBySymbol) {
 	return keys;
 }
 
-function typeContainsUnsafe(type, checker, seen = new Set()) {
-	if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return true;
+function typeContainsUnsafe(type, checker, seen = new Set(), ownedFiles = null) {
+	if (type.flags & ts.TypeFlags.Any) return true;
 	if (seen.has(type)) return false;
 	seen.add(type);
 	if (type.flags & ts.TypeFlags.TypeParameter) {
@@ -644,25 +645,32 @@ function typeContainsUnsafe(type, checker, seen = new Set()) {
 			checker.getBaseConstraintOfType(type),
 			checker.getDefaultFromTypeParameter(type),
 		]) {
-			if (parameterType && typeContainsUnsafe(parameterType, checker, seen)) return true;
+			if (parameterType && typeContainsUnsafe(parameterType, checker, seen, ownedFiles))
+				return true;
 		}
 	}
 	if (type.isUnionOrIntersection?.()) {
-		return type.types.some((nested) => typeContainsUnsafe(nested, checker, seen));
+		return type.types.some((nested) => typeContainsUnsafe(nested, checker, seen, ownedFiles));
 	}
 	for (const signature of [
 		...checker.getSignaturesOfType(type, ts.SignatureKind.Call),
 		...checker.getSignaturesOfType(type, ts.SignatureKind.Construct),
 	]) {
 		for (const typeParameter of signature.getTypeParameters() ?? []) {
-			if (typeContainsUnsafe(typeParameter, checker, seen)) return true;
+			if (typeContainsUnsafe(typeParameter, checker, seen, ownedFiles)) return true;
 		}
-		if (typeContainsUnsafe(checker.getReturnTypeOfSignature(signature), checker, seen)) return true;
+		if (typeContainsUnsafe(checker.getReturnTypeOfSignature(signature), checker, seen, ownedFiles))
+			return true;
 		for (const parameter of signature.parameters) {
 			const declaration = parameter.valueDeclaration ?? parameter.declarations?.[0];
 			if (
 				declaration &&
-				typeContainsUnsafe(checker.getTypeOfSymbolAtLocation(parameter, declaration), checker, seen)
+				typeContainsUnsafe(
+					checker.getTypeOfSymbolAtLocation(parameter, declaration),
+					checker,
+					seen,
+					ownedFiles,
+				)
 			) {
 				return true;
 			}
@@ -671,40 +679,51 @@ function typeContainsUnsafe(type, checker, seen = new Set()) {
 	if (type.flags & ts.TypeFlags.Object) {
 		if (type.objectFlags & (ts.ObjectFlags.Class | ts.ObjectFlags.Interface)) {
 			for (const baseType of checker.getBaseTypes(type)) {
-				if (typeContainsUnsafe(baseType, checker, seen)) return true;
+				if (typeContainsUnsafe(baseType, checker, seen, ownedFiles)) return true;
 			}
 		}
 		if (type.objectFlags & ts.ObjectFlags.Reference) {
 			for (const argument of checker.getTypeArguments(type)) {
-				if (typeContainsUnsafe(argument, checker, seen)) return true;
+				if (typeContainsUnsafe(argument, checker, seen, ownedFiles)) return true;
 			}
 		}
 		for (const property of checker.getPropertiesOfType(type)) {
 			const declarations = property.declarations ?? [];
-			const authoredDeclaration = declarations.find(
-				(declaration) => !declaration.getSourceFile().hasNoDefaultLib,
-			);
+			const authoredDeclaration = declarations.find((declaration) => {
+				const sourceFile = declaration.getSourceFile();
+				return ownedFiles
+					? ownedFiles.has(canonicalPath(sourceFile.fileName))
+					: !sourceFile.hasNoDefaultLib;
+			});
 			if (!authoredDeclaration && declarations.length > 0) continue;
 			const declaration = authoredDeclaration ?? property.valueDeclaration;
 			if (
 				declaration &&
-				typeContainsUnsafe(checker.getTypeOfSymbolAtLocation(property, declaration), checker, seen)
+				typeContainsUnsafe(
+					checker.getTypeOfSymbolAtLocation(property, declaration),
+					checker,
+					seen,
+					ownedFiles,
+				)
 			) {
 				return true;
 			}
 		}
 		for (const indexInfo of checker.getIndexInfosOfType(type)) {
-			if (typeContainsUnsafe(indexInfo.type, checker, seen)) return true;
+			if (typeContainsUnsafe(indexInfo.type, checker, seen, ownedFiles)) return true;
 		}
 	}
 	return false;
 }
 
-function declarationsContainUnsafeTypeParameters(symbol, checker) {
+function declarationsContainUnsafeTypeParameters(symbol, checker, ownedFiles = null) {
 	for (const declaration of symbol.declarations ?? []) {
 		for (const typeParameter of declaration.typeParameters ?? []) {
 			for (const typeNode of [typeParameter.constraint, typeParameter.default]) {
-				if (typeNode && typeContainsUnsafe(checker.getTypeFromTypeNode(typeNode), checker)) {
+				if (
+					typeNode &&
+					typeContainsUnsafe(checker.getTypeFromTypeNode(typeNode), checker, new Set(), ownedFiles)
+				) {
 					return true;
 				}
 			}
@@ -733,6 +752,15 @@ function directBindingExpressionProvenance(expression, checker, provenanceBySymb
 			return true;
 		}
 		if (ts.isPropertyAccessExpression(node)) {
+			if (
+				ts.isIdentifier(node.expression) &&
+				identifierIsNamespaceImportBinding(node.expression, checker)
+			) {
+				for (const key of referencedProvenance(node.name, checker, provenanceBySymbol)) {
+					provenance.add(key);
+				}
+				return provenance.size > 0;
+			}
 			if (!visit(node.expression)) return false;
 			for (const key of referencedProvenance(node.name, checker, provenanceBySymbol)) {
 				provenance.add(key);
@@ -762,6 +790,14 @@ function identifierIsImportBinding(identifier, checker) {
 					ts.isImportSpecifier(declaration) ||
 					ts.isNamespaceImport(declaration),
 			),
+	);
+}
+
+function identifierIsNamespaceImportBinding(identifier, checker) {
+	return Boolean(
+		checker
+			.getSymbolAtLocation(identifier)
+			?.declarations?.some((declaration) => ts.isNamespaceImport(declaration)),
 	);
 }
 
@@ -1044,10 +1080,22 @@ function analyzeTypeEvidence(
 	parsed,
 	expectedSpecifiers,
 	trustedTypeAssertionModulePath,
+	{ allowUnsafePublicTypes = false, ownedDirectory = null } = {},
 ) {
 	const checkerFiles = programFiles.filter((filePath) => !filePath.endsWith('.tsrx'));
 	const program = ts.createProgram({ rootNames: checkerFiles, options: parsed.options });
 	const checker = program.getTypeChecker();
+	const resolvedOwnedDirectory = ownedDirectory ? canonicalPath(ownedDirectory) : null;
+	const ownedFiles = new Set(
+		program
+			.getSourceFiles()
+			.map(({ fileName }) => canonicalPath(fileName))
+			.filter((fileName) => {
+				if (!resolvedOwnedDirectory) return checkerFiles.map(canonicalPath).includes(fileName);
+				const relative = path.relative(resolvedOwnedDirectory, fileName);
+				return !relative.startsWith('..') && !path.isAbsolute(relative);
+			}),
+	);
 	const expected = new Set(expectedSpecifiers);
 	const importedEntries = new Set();
 	const importedBindings = [];
@@ -1120,6 +1168,7 @@ function analyzeTypeEvidence(
 			const record = projectImportsBySpecifier.get(specifier) ?? {
 				moduleSpecifier: statement.moduleSpecifier,
 				namespace: false,
+				namespaceBindings: [],
 				coveredExports: new Set(),
 			};
 			const clause = statement.importClause;
@@ -1132,6 +1181,7 @@ function analyzeTypeEvidence(
 			if (clause?.namedBindings && ts.isNamespaceImport(clause.namedBindings)) {
 				bindingSymbols(clause.namedBindings.name, checker, taintedSymbols);
 				record.namespace = true;
+				record.namespaceBindings.push(clause.namedBindings.name);
 				importedBindings.push(clause.namedBindings.name);
 			}
 			if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings)) {
@@ -1168,33 +1218,52 @@ function analyzeTypeEvidence(
 		}
 		for (const symbol of exports) {
 			const exportKey = `${specifier}:${symbol.name}`;
+			const contractSymbol =
+				symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
 			publicExports.set(exportKey, { name: symbol.name, specifier });
 			addProvenance(symbol, exportKey);
+			for (const namespaceBinding of record.namespaceBindings) {
+				addProvenance(checker.getSymbolAtLocation(namespaceBinding), exportKey);
+			}
 			const declaration =
-				symbol.valueDeclaration ?? symbol.declarations?.[0] ?? record.moduleSpecifier;
+				contractSymbol.valueDeclaration ??
+				contractSymbol.declarations?.[0] ??
+				record.moduleSpecifier;
 			let type;
 			try {
 				type =
-					symbol.flags & (ts.SymbolFlags.TypeAlias | ts.SymbolFlags.Interface)
-						? checker.getDeclaredTypeOfSymbol(symbol)
-						: checker.getTypeOfSymbolAtLocation(symbol, declaration);
+					contractSymbol.flags & (ts.SymbolFlags.TypeAlias | ts.SymbolFlags.Interface)
+						? checker.getDeclaredTypeOfSymbol(contractSymbol)
+						: checker.getTypeOfSymbolAtLocation(contractSymbol, declaration);
 			} catch (error) {
 				throw new Error(
 					`Type project cannot inspect public export ${specifier}.${symbol.name}: ${error instanceof Error ? error.message : String(error)}`,
 				);
 			}
 			if (
-				typeContainsUnsafe(type, checker) ||
-				declarationsContainUnsafeTypeParameters(symbol, checker)
+				!allowUnsafePublicTypes &&
+				(typeContainsUnsafe(type, checker, new Set(), ownedFiles) ||
+					declarationsContainUnsafeTypeParameters(contractSymbol, checker, ownedFiles))
 			) {
-				throw new Error(
-					`Imported public type ${specifier}.${symbol.name} resolves to any or unknown`,
-				);
+				throw new Error(`Imported public type ${specifier}.${symbol.name} contains any`);
 			}
 		}
 	}
 	for (const imported of importedBindings) {
-		if (checker.getTypeAtLocation(imported).flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+		const importedSymbol = checker.getSymbolAtLocation(imported);
+		const contractSymbol =
+			importedSymbol?.flags & ts.SymbolFlags.Alias
+				? checker.getAliasedSymbol(importedSymbol)
+				: importedSymbol;
+		const declaration =
+			contractSymbol?.valueDeclaration ?? contractSymbol?.declarations?.[0] ?? imported;
+		const importedType =
+			contractSymbol?.flags & (ts.SymbolFlags.TypeAlias | ts.SymbolFlags.Interface)
+				? checker.getDeclaredTypeOfSymbol(contractSymbol)
+				: contractSymbol
+					? checker.getTypeOfSymbolAtLocation(contractSymbol, declaration)
+					: checker.getTypeAtLocation(imported);
+		if (!allowUnsafePublicTypes && importedType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
 			throw new Error(`Imported public type ${imported.text} resolves to any or unknown`);
 		}
 	}
@@ -1378,6 +1447,7 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 				parsed,
 				concretePublicSpecifiers(packageDirectory, node.binding),
 				trustedTypeAssertionModulePath,
+				{ ownedDirectory: packageDirectory },
 			);
 			if (!semantics.hasPositiveAssertion) {
 				throw new Error('Public type project must contain a positive type assertion');
@@ -1420,6 +1490,10 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 			parsed,
 			[expectedImport],
 			canonicalPath(path.join(workspaceRoot, 'scripts/react-port/type-assertions.d.ts')),
+			{
+				allowUnsafePublicTypes: gateId === 'upstream-types-pristine',
+				ownedDirectory: packageDirectory,
+			},
 		);
 		if (!analysis.hasPositiveAssertion || !analysis.hasNegativeControl) {
 			throw new Error(
@@ -1766,6 +1840,7 @@ async function operate(
 		identity: node.identity,
 		expectedLicenseHashes: attribution.licenses,
 		expectedNoticeHashes: attribution.notices,
+		cleanRoom: node.reimplementation?.target === true,
 	});
 	const closureReport = auditShippedClosure({
 		nodeId: options.node,

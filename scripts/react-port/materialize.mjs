@@ -422,6 +422,11 @@ async function commandLockFromBatch(options) {
 	const manifest = validateBatchManifest(JSON.parse(readFileSync(manifestPath, 'utf8')));
 	const node = manifest.nodes[options.node];
 	if (!node) throw new Error(`Batch manifest has no node ${options.node}`);
+	if (node.copyPermission === 'denied-or-unproven' || node.reimplementation?.copySource === false) {
+		throw new Error(
+			`Node ${options.node} is planned for clean-room reimplementation; source materialization is forbidden`,
+		);
+	}
 	if (!node.identity?.commit) {
 		throw new Error(`Node ${options.node} has no preflighted immutable identity`);
 	}

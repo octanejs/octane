@@ -229,11 +229,11 @@ export function evaluateApprovedLicense({ manifestLicense, licenseFiles = [], no
 	};
 }
 
-function sameRepository(left, right) {
+export function sameRepository(left, right) {
 	return (
 		left?.owner?.toLowerCase() === right?.owner?.toLowerCase() &&
 		left?.repo?.toLowerCase() === right?.repo?.toLowerCase() &&
-		(left?.subdirectory ?? null) === (right?.subdirectory ?? null)
+		(!left?.subdirectory || !right?.subdirectory || left.subdirectory === right.subdirectory)
 	);
 }
 
@@ -793,10 +793,50 @@ function normalizeConfigurationPattern(value) {
 	return candidate.includes('/') || TEST_SOURCE_PATTERN.test(candidate) ? candidate : null;
 }
 
-function commandPathPatterns(testScripts) {
+export function commandPathPatterns(testScripts) {
 	return Object.values(testScripts).flatMap((command) =>
-		String(command).split(/\s+/).map(normalizeConfigurationPattern).filter(Boolean),
+		String(command)
+			.split(/&&|\|\||;/)
+			.filter(isTestRunnerCommand)
+			.flatMap((segment) =>
+				segment.split(/\s+/).map(normalizeConfigurationPattern).filter(Boolean),
+			),
 	);
+}
+
+function isTestRunnerCommand(command) {
+	const tokens = command
+		.trim()
+		.split(/\s+/)
+		.map((token) => token.replace(/^['"]|['"]$/g, ''))
+		.filter(Boolean);
+	let index = 0;
+	while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[index] ?? '')) index++;
+	if (tokens[index] === 'cross-env') {
+		index++;
+		while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[index] ?? '')) index++;
+	}
+	const wrapper = path.posix.basename(tokens[index] ?? '');
+	if (['pnpm', 'npm', 'yarn'].includes(wrapper)) {
+		index++;
+		if (['exec', 'dlx'].includes(tokens[index])) index++;
+		if (tokens[index] === '--') index++;
+	} else if (['npx', 'bunx'].includes(wrapper)) {
+		index++;
+		while ((tokens[index] ?? '').startsWith('-')) index++;
+	}
+	const runner = path.posix.basename(tokens[index] ?? '');
+	if (
+		['vitest', 'jest', 'mocha', 'ava', 'karma', 'tap', 'tape', 'jasmine', 'uvu'].includes(runner)
+	) {
+		return true;
+	}
+	if (runner === 'node') {
+		return tokens
+			.slice(index + 1)
+			.some((token) => token === '--test' || token.startsWith('--test='));
+	}
+	return ['bun', 'deno'].includes(runner) && tokens[index + 1] === 'test';
 }
 
 function propertyName(name) {
@@ -943,14 +983,15 @@ async function immutableTestInventory(tree, subdirectory, manifest, options) {
 		if (!TEST_SOURCE_PATTERN.test(relativePath) || /(?:^|\/)node_modules\//i.test(relativePath)) {
 			return [];
 		}
-		const directTest =
-			conventionalTestPath(relativePath) ||
-			referencedByTestConfiguration(relativePath, configuredTestPatterns);
+		const configuredTest = referencedByTestConfiguration(relativePath, configuredTestPatterns);
+		const directTest = conventionalTestPath(relativePath) || configuredTest;
 		const inlineSource = referencedByTestConfiguration(
 			relativePath,
 			configuredInlineSourcePatterns,
 		);
-		return directTest || inlineSource ? [{ directTest, entry, inlineSource, relativePath }] : [];
+		return directTest || inlineSource
+			? [{ configuredTest, directTest, entry, inlineSource, relativePath }]
+			: [];
 	});
 	if (candidateEntries.length > MAX_UPSTREAM_TEST_FILES) {
 		throw new Error('Immutable upstream test inventory exceeds the file limit');
@@ -972,7 +1013,7 @@ async function immutableTestInventory(tree, subdirectory, manifest, options) {
 		candidates.push(candidate);
 	}
 	const inventory = [];
-	for (const { entry, relativePath } of candidates.sort((left, right) =>
+	for (const { configuredTest, entry, relativePath } of candidates.sort((left, right) =>
 		left.entry.path.localeCompare(right.entry.path),
 	)) {
 		const source =
@@ -987,6 +1028,7 @@ async function immutableTestInventory(tree, subdirectory, manifest, options) {
 		}
 		const testCases = extractTestCases(source, { file: entry.path });
 		if (testCases.length === 0) {
+			if (!configuredTest) continue;
 			throw new Error(`Immutable upstream test ${entry.path} has no countable registrations`);
 		}
 		const registrations = testCases.flatMap((testCase) => {

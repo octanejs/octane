@@ -281,6 +281,97 @@ describe('evidence matrix', () => {
 });
 
 describe('package and closure completion', () => {
+	test('accepts project-license-only provenance for an explicit clean-room target', async () => {
+		const root = await mkdtemp(path.join(tmpdir(), 'react-port-clean-room-package-'));
+		const packageDirectory = path.join(root, 'packages/widget');
+		await mkdir(path.join(packageDirectory, 'src'), { recursive: true });
+		await mkdir(path.join(packageDirectory, 'tests'));
+		await writeFile(
+			path.join(packageDirectory, 'package.json'),
+			JSON.stringify({
+				name: '@octanejs/widget',
+				version: '0.1.0',
+				license: 'MIT',
+				engines: { node: '>=22.22.2' },
+				publishConfig: { access: 'public' },
+				repository: { directory: 'packages/widget' },
+				files: ['src', 'README.md', 'UPSTREAM.md', 'LICENSE'],
+				exports: { '.': './src/index.ts' },
+				scripts: { test: 'vitest run' },
+				peerDependencies: { octane: 'workspace:*' },
+				devDependencies: { octane: 'workspace:*' },
+			}),
+		);
+		await writeFile(path.join(packageDirectory, 'src/index.ts'), 'export const widget = true;\n');
+		await writeFile(path.join(packageDirectory, 'tests/widget.test.ts'), 'export {};\n');
+		await writeFile(path.join(packageDirectory, 'README.md'), '# Widget\n');
+		await writeFile(path.join(packageDirectory, 'LICENSE'), MIT_TEXT);
+		await writeFile(
+			path.join(packageDirectory, 'UPSTREAM.md'),
+			'# Upstream\n\nwidget@1.0.0\n\ncommit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\n## Source boundary\n\nClean-room implementation from public behavior only.\n',
+		);
+		await writeFile(
+			path.join(packageDirectory, 'status.json'),
+			JSON.stringify({
+				upstream: { package: 'widget', version: '1.0.0' },
+				surface: 'Independently implemented public surface.',
+				verified: '2026-08-24',
+			}),
+		);
+
+		const result = inspectBindingPackage(packageDirectory, {
+			expectedPackageName: '@octanejs/widget',
+			expectedDirectory: 'packages/widget',
+			identity: { packageName: 'widget', version: '1.0.0', commit: 'a'.repeat(40) },
+			cleanRoom: true,
+		});
+		assert.equal(result.status, 'passed', result.issues.join('\n'));
+	});
+
+	test('requires independently authored proof for a clean-room target', async () => {
+		const evidenceRoot = await mkdtemp(path.join(tmpdir(), 'react-port-clean-room-target-proof-'));
+		await mkdir(path.join(evidenceRoot, 'tests'));
+		await writeFile(
+			path.join(evidenceRoot, 'tests/public-contract.test.ts'),
+			'export const independentlyAuthored = true;\n',
+		);
+		const graphNodes = {
+			'pkg:widget': {
+				packageName: 'widget',
+				dependsOn: [],
+				copyPermission: 'denied-or-unproven',
+				reimplementation: { target: true, copySource: false, copyTests: false },
+			},
+		};
+
+		const missing = auditShippedClosure({
+			nodeId: 'pkg:widget',
+			graphNodes,
+			evidenceRoot,
+			runtimeDependencies: [],
+			adaptedSources: [],
+			reimplementedDependencies: [],
+		});
+		assert.equal(missing.status, 'blocked');
+		assert.match(missing.issues.join('\n'), /widget.*clean-room.*proof/i);
+
+		const valid = auditShippedClosure({
+			nodeId: 'pkg:widget',
+			graphNodes,
+			evidenceRoot,
+			runtimeDependencies: [],
+			adaptedSources: [],
+			reimplementedDependencies: [
+				{
+					packageName: 'widget',
+					publicBehaviors: ['Implements the documented public contract'],
+					localEvidence: ['tests/public-contract.test.ts'],
+				},
+			],
+		});
+		assert.equal(valid.status, 'passed', valid.issues.join('\n'));
+	});
+
 	test('validates durable package shape, provenance, MIT text, and Octane singleton edges', async () => {
 		const root = await mkdtemp(path.join(tmpdir(), 'react-port-package-'));
 		const packageDirectory = path.join(root, 'packages/widget');
@@ -463,6 +554,36 @@ describe('package and closure completion', () => {
 
 		assert.equal(result.status, 'blocked');
 		assert.match(result.issues.join('\n'), /surprise-runtime.*approved graph/i);
+	});
+
+	test('follows authored TypeScript behind .js specifiers and ignores non-source exports', async () => {
+		const packageDirectory = await mkdtemp(path.join(tmpdir(), 'react-port-js-specifier-'));
+		await mkdir(path.join(packageDirectory, 'src'));
+		const manifest = JSON.stringify({
+			name: '@octanejs/widget',
+			exports: { '.': './src/index.ts', './package.json': './package.json' },
+		});
+		const indexSource = "export { helper } from './helper.js';\n";
+		const helperSource = 'export const helper = true;\n';
+		await writeFile(path.join(packageDirectory, 'package.json'), manifest);
+		await writeFile(path.join(packageDirectory, 'src/index.ts'), indexSource);
+		await writeFile(path.join(packageDirectory, 'src/helper.ts'), helperSource);
+
+		const result = auditShippedClosure({
+			nodeId: 'pkg:widget',
+			graphNodes: {
+				'pkg:widget': { packageName: 'widget', dependsOn: [] },
+			},
+			packageDirectory,
+			runtimeDependencies: [],
+			adaptedSources: [],
+			sourceLedger: [
+				{ path: 'src/index.ts', origin: 'authored', sha256: sha256(indexSource) },
+				{ path: 'src/helper.ts', origin: 'authored', sha256: sha256(helperSource) },
+			],
+		});
+
+		assert.equal(result.status, 'passed', result.issues.join('\n'));
 	});
 
 	test('does not classify TypeScript type-only imports as shipped runtime dependencies', async () => {

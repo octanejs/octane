@@ -25,6 +25,9 @@ Options:
   --prerequisite <input>     Add a discovered prerequisite without marking it requested
   --classify <package=kind>  Classify a dependency as framework-neutral,
                              react-coupled, reimplemented, or unsupported (repeatable)
+  --clean-room-target <pkg>  Reimplement a requested target from its public contract without
+                             copying source or tests (repeatable; license-only blockers)
+  --binding-name <pkg=name>  Override a target's planned @octanejs/* package name
   --adopt-binding <package>  Adopt matching partial binding work after provenance review
   --batch <id>               Use a stable batch identifier (derived by default)
   --work-root <directory>    Store state below this directory (default: .react-port-work)
@@ -44,6 +47,8 @@ function parseArguments(arguments_) {
 	let recoverStaleLock = false;
 	const dependencyClassifications = {};
 	const adoptedBindings = [];
+	const cleanRoomTargets = [];
+	const bindingNames = {};
 	for (let index = 0; index < arguments_.length; index += 1) {
 		const argument = arguments_[index];
 		if (argument === '-h' || argument === '--help') {
@@ -56,6 +61,9 @@ function parseArguments(arguments_) {
 				noState,
 				recoverStaleLock,
 				dependencyClassifications,
+				adoptedBindings,
+				cleanRoomTargets,
+				bindingNames,
 			};
 		}
 		if (argument === '--prerequisite') {
@@ -79,6 +87,25 @@ function parseArguments(arguments_) {
 				);
 			}
 			dependencyClassifications[packageName] = kind;
+			index += 1;
+			continue;
+		}
+		if (argument === '--clean-room-target') {
+			const packageName = arguments_[index + 1];
+			if (!packageName) throw new Error('--clean-room-target requires a package name');
+			cleanRoomTargets.push(packageName);
+			index += 1;
+			continue;
+		}
+		if (argument === '--binding-name') {
+			const assignment = arguments_[index + 1];
+			const separator = assignment?.lastIndexOf('=') ?? -1;
+			const packageName = separator > 0 ? assignment.slice(0, separator) : '';
+			const bindingName = separator > 0 ? assignment.slice(separator + 1) : '';
+			if (!packageName || !/^@octanejs\/[a-z0-9][a-z0-9._-]*$/i.test(bindingName)) {
+				throw new Error('--binding-name requires package=@octanejs/name');
+			}
+			bindingNames[packageName] = bindingName;
 			index += 1;
 			continue;
 		}
@@ -124,6 +151,8 @@ function parseArguments(arguments_) {
 		recoverStaleLock,
 		dependencyClassifications,
 		adoptedBindings,
+		cleanRoomTargets,
+		bindingNames,
 	};
 }
 
@@ -166,6 +195,8 @@ export async function main({
 		inventory,
 		dependencyClassifications: parsedArguments.dependencyClassifications,
 		adoptedBindings: parsedArguments.adoptedBindings,
+		cleanRoomTargets: parsedArguments.cleanRoomTargets,
+		bindingNames: parsedArguments.bindingNames,
 	});
 	report.capabilityInventory = {
 		fingerprint: inventory.fingerprint,

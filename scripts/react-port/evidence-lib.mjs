@@ -467,6 +467,7 @@ export function inspectBindingPackage(
 		identity,
 		expectedLicenseHashes = [],
 		expectedNoticeHashes = [],
+		cleanRoom = false,
 	},
 ) {
 	const issues = [];
@@ -479,8 +480,16 @@ export function inspectBindingPackage(
 	const status = readJson(path.join(packageDirectory, 'status.json'), issues, 'status.json');
 	const licenseArtifacts = attributionArtifacts(packageDirectory, LICENSE_ARTIFACT_PATTERN);
 	const noticeArtifacts = attributionArtifacts(packageDirectory, NOTICE_ARTIFACT_PATTERN);
-	if (expectedLicenseHashes.length === 0) {
+	if (expectedLicenseHashes.length === 0 && !cleanRoom) {
 		issues.push('Preflight license evidence has no content hashes');
+	}
+	if (cleanRoom) {
+		for (const artifact of licenseArtifacts.filter(({ name }) => name !== 'LICENSE')) {
+			issues.push(`Clean-room target must not package upstream license bytes: ${artifact.name}`);
+		}
+		for (const artifact of noticeArtifacts) {
+			issues.push(`Clean-room target must not package upstream notice bytes: ${artifact.name}`);
+		}
 	}
 	for (const expectedHash of new Set(expectedLicenseHashes)) {
 		if (!licenseArtifacts.some((artifact) => artifact.sha256 === expectedHash)) {
@@ -602,6 +611,7 @@ export function inspectBindingPackage(
 			identity,
 			expectedPackageName,
 			expectedDirectory,
+			cleanRoom,
 			artifacts,
 			issues,
 		}),
@@ -703,10 +713,13 @@ function staticModuleSpecifiers(filePath) {
 
 function resolveRelativeSource(fromFile, specifier) {
 	const base = path.resolve(path.dirname(fromFile), specifier);
+	const authoredBase = /\.(?:c|m)?jsx?$/.test(base) ? base.replace(/\.(?:c|m)?jsx?$/, '') : base;
 	const candidates = [
 		base,
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => `${base}${extension}`),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => path.join(base, `index${extension}`)),
+		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => `${authoredBase}${extension}`),
+		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => path.join(authoredBase, `index${extension}`)),
 	];
 	return (
 		candidates.find((candidate) => existsSync(candidate) && statSync(candidate).isFile()) ?? null
@@ -725,7 +738,12 @@ function deriveShippedClosure(packageDirectory, sourceLedger) {
 		...Object.keys(manifest.peerDependencies ?? {}),
 	]);
 	const queue = collectExportTargets(manifest.exports ?? manifest.main ?? manifest.module ?? [])
-		.filter((target) => typeof target === 'string' && !/\.d\.[cm]?ts$/.test(target))
+		.filter(
+			(target) =>
+				typeof target === 'string' &&
+				SHIPPED_SOURCE_EXTENSIONS.includes(path.extname(target)) &&
+				!/\.d\.[cm]?ts$/.test(target),
+		)
 		.map((target) => path.resolve(resolvedPackageDirectory, target));
 	const reachableFiles = new Set();
 	while (queue.length > 0) {
@@ -866,14 +884,15 @@ export function auditShippedClosure({
 			}
 		}),
 	);
-	const plannedCleanRoomDependencies = new Set(
-		(node.dependsOn ?? []).flatMap((dependencyId) => {
+	const plannedCleanRoomDependencies = new Set([
+		...(node.reimplementation?.target === true && node.packageName ? [node.packageName] : []),
+		...(node.dependsOn ?? []).flatMap((dependencyId) => {
 			const dependency = graphNodes[dependencyId];
 			return dependency?.action === 'reimplement-in-parent' && dependency.packageName
 				? [dependency.packageName]
 				: [];
 		}),
-	);
+	]);
 	let derivedClosure = null;
 	if (packageDirectory) {
 		try {
@@ -986,7 +1005,7 @@ export function auditShippedClosure({
 		proofsByPackage.set(proof.packageName, packageProofs);
 		if (!plannedCleanRoomDependencies.has(proof.packageName)) {
 			issues.push(
-				`Reimplementation proof for ${label} was not planned as a direct clean-room dependency.`,
+				`Reimplementation proof for ${label} was not planned for clean-room reimplementation.`,
 			);
 		}
 		if (
@@ -1048,7 +1067,7 @@ export function auditShippedClosure({
 	for (const packageName of [...plannedCleanRoomDependencies].sort()) {
 		const proofCount = proofsByPackage.get(packageName)?.length ?? 0;
 		if (proofCount === 0) {
-			issues.push(`${packageName} clean-room dependency has no reimplementation proof.`);
+			issues.push(`${packageName} clean-room package has no reimplementation proof.`);
 		} else if (proofCount !== 1) {
 			issues.push(
 				`${packageName} clean-room dependency requires exactly one reimplementation proof; found ${proofCount}.`,

@@ -848,13 +848,11 @@ describe('evidence CLI', () => {
 		);
 	});
 
-	test('rejects nested any and unknown in imported public contracts', () => {
+	test('rejects nested any in imported public contracts', () => {
 		for (const [label, source] of [
 			['return', 'export declare function unsafe(): any;\n'],
 			['generic-default-any', 'export declare function unsafe<T = any>(): T;\n'],
-			['generic-default-unknown', 'export declare function unsafe<T = unknown>(): T;\n'],
 			['property', 'export declare const unsafe: { value: any };\n'],
-			['nested-unknown', 'export declare const unsafe: { value: unknown };\n'],
 			['promise-argument', 'export declare function unsafe(): Promise<any>;\n'],
 			[
 				'promise-base',
@@ -895,10 +893,91 @@ describe('evidence CLI', () => {
 						},
 						{ workspaceRoot },
 					),
-				/imported public type.*any or unknown/i,
+				/imported public type.*any/i,
 				label,
 			);
 		}
+	});
+
+	test('accepts unknown in a nested public contract because callers must narrow it', () => {
+		const { workspaceRoot } = createReadyBatch();
+		const packageDirectory = createCompletePackage(workspaceRoot);
+		writeFileSync(
+			path.join(packageDirectory, 'src/index.ts'),
+			'export declare const safe: { value: unknown };\n',
+		);
+		writeFileSync(
+			path.join(packageDirectory, 'tests/types/public/public.ts'),
+			"import { safe } from '@octanejs/widget';\nsafe satisfies { value: unknown };\n// @ts-expect-error unknown is not assignable to string without narrowing\nconst invalid: string = safe.value;\n",
+		);
+
+		assert.doesNotThrow(() =>
+			assertApprovedGateCommand(
+				['public-types'],
+				[
+					'pnpm',
+					'exec',
+					'tsrx-tsc',
+					'--noEmit',
+					'-p',
+					'packages/widget/tests/types/public/tsconfig.json',
+				],
+				{
+					binding: '@octanejs/widget',
+					bindingDirectory: 'packages/widget',
+					upstreamTestInventory: [],
+				},
+				{ workspaceRoot },
+			),
+		);
+	});
+
+	test('allows upstream any only in the pristine type probe', () => {
+		const { workspaceRoot } = createReadyBatch();
+		const packageDirectory = createCompletePackage(workspaceRoot);
+		writeFileSync(
+			path.join(packageDirectory, 'src/index.ts'),
+			'export const widget: any = true;\n',
+		);
+		const node = {
+			binding: '@octanejs/widget',
+			bindingDirectory: 'packages/widget',
+			packageName: 'widget',
+			upstreamTestInventory: [],
+		};
+
+		assert.doesNotThrow(() =>
+			assertApprovedGateCommand(
+				['upstream-types-pristine'],
+				[
+					'pnpm',
+					'exec',
+					'tsc',
+					'--noEmit',
+					'-p',
+					'packages/widget/tests/types/upstream/tsconfig.pristine.json',
+				],
+				node,
+				{ workspaceRoot },
+			),
+		);
+		assert.throws(
+			() =>
+				assertApprovedGateCommand(
+					['public-types'],
+					[
+						'pnpm',
+						'exec',
+						'tsrx-tsc',
+						'--noEmit',
+						'-p',
+						'packages/widget/tests/types/public/tsconfig.json',
+					],
+					node,
+					{ workspaceRoot },
+				),
+			/imported public type.*any/i,
+		);
 	});
 
 	test('accepts recursively safe callable and object public contracts', () => {
@@ -934,8 +1013,42 @@ describe('evidence CLI', () => {
 		);
 	});
 
-	test('rejects unsafe defaults on public generic type aliases', () => {
-		for (const defaultType of ['any', 'unknown']) {
+	test('resolves safe type aliases re-exported from another authored module', () => {
+		const { workspaceRoot } = createReadyBatch();
+		const packageDirectory = createCompletePackage(workspaceRoot);
+		writeFileSync(path.join(packageDirectory, 'src/types.ts'), "export type Mode = 'a' | 'b';\n");
+		writeFileSync(
+			path.join(packageDirectory, 'src/index.ts'),
+			"export type { Mode } from './types.js';\n",
+		);
+		writeFileSync(
+			path.join(packageDirectory, 'tests/types/public/public.ts'),
+			"import * as Widget from '@octanejs/widget';\nimport type { Mode } from '@octanejs/widget';\nWidget satisfies object;\nconst valid: Mode = 'a';\n// @ts-expect-error Mode rejects unknown literals\nconst invalid: Mode = 'c';\nvoid valid; void invalid;\n",
+		);
+
+		assert.doesNotThrow(() =>
+			assertApprovedGateCommand(
+				['public-types'],
+				[
+					'pnpm',
+					'exec',
+					'tsrx-tsc',
+					'--noEmit',
+					'-p',
+					'packages/widget/tests/types/public/tsconfig.json',
+				],
+				{
+					binding: '@octanejs/widget',
+					bindingDirectory: 'packages/widget',
+					upstreamTestInventory: [],
+				},
+				{ workspaceRoot },
+			),
+		);
+	});
+
+	test('rejects unsafe any defaults on public generic type aliases', () => {
+		for (const defaultType of ['any']) {
 			const { workspaceRoot } = createReadyBatch();
 			const packageDirectory = createCompletePackage(workspaceRoot);
 			writeFileSync(
@@ -966,7 +1079,7 @@ describe('evidence CLI', () => {
 						},
 						{ workspaceRoot },
 					),
-				/imported public type.*any or unknown/i,
+				/imported public type.*any/i,
 				defaultType,
 			);
 		}

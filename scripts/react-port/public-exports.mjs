@@ -460,7 +460,11 @@ export function concretePublicSpecifiers(packageDirectory, packageName) {
 	return [
 		...new Set(
 			inspectPublicExports(packageDirectory)
-				.targets.map(({ concreteSubpath, subpath }) => concreteSubpath ?? subpath)
+				.targets.filter(
+					({ concreteTarget, target }) =>
+						path.extname(concreteTarget ?? target).toLowerCase() !== '.json',
+				)
+				.map(({ concreteSubpath, subpath }) => concreteSubpath ?? subpath)
 				.filter((subpath) => subpath && !subpath.includes('*'))
 				.map((subpath) => (subpath === '.' ? packageName : `${packageName}/${subpath.slice(2)}`)),
 		),

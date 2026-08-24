@@ -10,11 +10,13 @@ import { gzipSync } from 'node:zlib';
 import {
 	assessResolvedEvidence,
 	collectArchiveEvidence,
+	commandPathPatterns,
 	evaluateApprovedLicense,
 	parseTarArchive,
 	parseInput,
 	resolveRemoteInput,
 	runPreflight,
+	sameRepository,
 	sanitizeForReport,
 	validateArchiveEntries,
 	verifyIntegrity,
@@ -306,6 +308,38 @@ function makeTar(files) {
 }
 
 describe('resolved evidence', () => {
+	test('does not treat source paths in non-test spec tooling as test files', () => {
+		assert.deepEqual(
+			commandPathPatterns({
+				spec: 'tsx scripts/extract-spec.ts && tsx scripts/extract-golden.ts',
+			}),
+			[],
+		);
+		assert.deepEqual(
+			commandPathPatterns({
+				test: 'node --test quality/node.behavior.ts && vitest run quality/widget.behavior.ts',
+			}),
+			['quality/node.behavior.ts', 'quality/widget.behavior.ts'],
+		);
+	});
+
+	test('accepts an explicit package directory when repository metadata names the monorepo root', () => {
+		assert.equal(
+			sameRepository(
+				{ owner: 'example', repo: 'widgets', subdirectory: 'packages/react-widget' },
+				{ owner: 'example', repo: 'widgets', subdirectory: null },
+			),
+			true,
+		);
+		assert.equal(
+			sameRepository(
+				{ owner: 'example', repo: 'widgets', subdirectory: 'packages/react-widget' },
+				{ owner: 'example', repo: 'widgets', subdirectory: 'packages/other-widget' },
+			),
+			false,
+		);
+	});
+
 	test('cross-checks the published artifact against one immutable source revision', () => {
 		const result = assessResolvedEvidence({
 			input: 'react-widget@1.2.3',
@@ -557,7 +591,10 @@ describe('resolved evidence', () => {
 			},
 			gitHead: commit,
 			dependencies: { 'react-helper': '^1.0.0' },
-			scripts: { test: 'vitest --config configs/quality.mjs' },
+			scripts: {
+				test: 'vitest --config configs/quality.mjs',
+				spec: 'tsx scripts/extract-spec.ts',
+			},
 		};
 		const tarball = gzipSync(
 			makeTar({
@@ -597,6 +634,7 @@ describe('resolved evidence', () => {
 			"export default { resolve: { alias: { source: 'src/' } }, test: { include: ['quality/**/*.ts'], includeSource: ['src/**/*.ts'], exclude: ['src/**/*.ts'], setupFiles: ['index.ts'] } };\n",
 		);
 		const sourceTestBytes = Buffer.from("test('renders', () => {});\n");
+		const sourceExtractorBytes = Buffer.from('export const extractedSpec = true;\n');
 		const ordinarySourceBytes = Buffer.from('export const widgetSource = true;\n');
 		const inlineTestSourceBytes = Buffer.from(
 			"export const inline = true; if (import.meta.vitest) { test('works inline', () => {}); }\n",
@@ -633,6 +671,14 @@ describe('resolved evidence', () => {
 				size: sourceTestBytes.length,
 				sha: gitBlobSha(sourceTestBytes),
 				url: 'https://api.github.com/repos/example/widgets/git/blobs/test',
+			},
+			{
+				path: 'packages/react-widget/scripts/extract-spec.ts',
+				mode: '100644',
+				type: 'blob',
+				size: sourceExtractorBytes.length,
+				sha: gitBlobSha(sourceExtractorBytes),
+				url: 'https://api.github.com/repos/example/widgets/git/blobs/spec-extractor',
 			},
 			{
 				path: 'packages/react-widget/src/index.ts',
@@ -719,6 +765,14 @@ describe('resolved evidence', () => {
 					encoding: 'base64',
 					content: sourceTestBytes.toString('base64'),
 					size: sourceTestBytes.length,
+				}),
+			],
+			[
+				'https://api.github.com/repos/example/widgets/git/blobs/spec-extractor',
+				Response.json({
+					encoding: 'base64',
+					content: sourceExtractorBytes.toString('base64'),
+					size: sourceExtractorBytes.length,
 				}),
 			],
 			[
@@ -986,6 +1040,45 @@ describe('resolved evidence', () => {
 });
 
 describe('preflight CLI', () => {
+	test('requires an explicit clean-room target and preserves a custom binding name', () => {
+		const workRoot = mkdtempSync(path.join(tmpdir(), 'react-port-clean-room-target-'));
+		const fixture = JSON.parse(
+			readFileSync(path.join(SCRIPT_DIRECTORY, '__fixtures__/resolved/mit-widget.json'), 'utf8'),
+		);
+		fixture.targets['fixture-widget@1.0.0'].registry.licenseFiles = [];
+		const fixturePath = path.join(workRoot, 'evidence.json');
+		writeFileSync(fixturePath, JSON.stringify(fixture));
+
+		const result = spawnSync(
+			process.execPath,
+			[
+				FIXTURE_PREFLIGHT_CLI,
+				'--no-state',
+				'--fixture-evidence',
+				fixturePath,
+				'--classify',
+				'fixture-core=framework-neutral',
+				'--clean-room-target',
+				'fixture-widget',
+				'--binding-name',
+				'fixture-widget=@octanejs/clean-widget',
+				'fixture-widget@1.0.0',
+			],
+			{ encoding: 'utf8' },
+		);
+
+		assert.equal(result.status, 0, result.stderr);
+		const report = JSON.parse(result.stdout);
+		const node = report.graph.nodes['pkg:fixture-widget'];
+		assert.equal(report.preflightStatus, 'blocked');
+		assert.equal(report.status, 'passed');
+		assert.equal(node.state, 'ready');
+		assert.equal(node.binding, '@octanejs/clean-widget');
+		assert.equal(node.reimplementation.target, true);
+		assert.equal(node.copyPermission, 'denied-or-unproven');
+		assert.deepEqual(node.upstreamTestInventory, []);
+	});
+
 	test('runs deterministically against local evidence with network resolution disabled', () => {
 		const result = spawnSync(
 			process.execPath,

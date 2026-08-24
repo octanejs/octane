@@ -83,7 +83,11 @@ test('rejects an empty local re-export chain', () => {
 test('expands wildcard exports into concrete public specifiers', () => {
 	const packageDirectory = createPackage(
 		'@octanejs/wildcard-fixture',
-		{ '.': './src/index.ts', './features/*': './src/features/*.ts' },
+		{
+			'.': './src/index.ts',
+			'./features/*': './src/features/*.ts',
+			'./package.json': './package.json',
+		},
 		{
 			'src/index.ts': 'export const root = true;\n',
 			'src/features/alpha.ts': 'export const alpha = true;\n',
