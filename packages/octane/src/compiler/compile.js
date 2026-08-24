@@ -62,6 +62,9 @@ import {
 	UNIVERSAL_COMPILER_RUNTIME_IMPORTS,
 	UNIVERSAL_THREAD_RUNTIME_IMPORTS,
 } from './compile-universal.js';
+import { compileValdi, VALDI_COMPILER_RUNTIME_IMPORTS } from './compile-valdi.js';
+import { HOOK_NAMES } from './hook-names.js';
+export { HOOK_NAMES } from './hook-names.js';
 import {
 	expandDomRendererRegionsAst,
 	prepareRendererBoundaryRegions,
@@ -1913,28 +1916,6 @@ function classifyViewTransitionOwnership(astBody, production, ownComponents) {
 	}
 	return { global, owners };
 }
-
-export const HOOK_NAMES = new Set([
-	'useState',
-	'useLinkedState',
-	'useReducer',
-	'useEffect',
-	'useLayoutEffect',
-	'useInsertionEffect',
-	'useMemo',
-	'useCallback',
-	'useRef',
-	'useId',
-	'useEffectEvent',
-	'useImperativeHandle',
-	'useDeferredValue',
-	'useTransition',
-	'useSyncExternalStore',
-	// React 19 Actions bundle.
-	'useActionState',
-	'useFormStatus',
-	'useOptimistic',
-]);
 
 function hookRuntimeModulesForCompile(options, universalUnits = []) {
 	const modules = new Set(options?.__hookRuntimeModules || []);
@@ -7828,7 +7809,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, strong?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, dataCallbackHooks?: readonly string[], textTypeFacts?: { version: 1, filename: string, sourceVersion: string, projectVersion: string, stringChildRanges: readonly (readonly [number, number])[] }, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, strong?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, dataCallbackHooks?: readonly string[], valdiWriterFacts?: import('./compile-valdi.js').ValdiWriterFacts, textTypeFacts?: { version: 1, filename: string, sourceVersion: string, projectVersion: string, stringChildRanges: readonly (readonly [number, number])[] }, renderer?: { id: string, module: string, target: 'dom' | 'universal' | 'valdi', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal' | 'valdi', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -7839,13 +7820,17 @@ function instrumentProfileComponents(ast, ctx) {
  *   `import.meta.webpackHot` wiring with dispose-data wrapper handoff. Dev
  *   tooling should select its dialect in serve mode and leave HMR off for
  *   production builds.
- *   `mode` selects the codegen target: `'client'` (default) emits the
- *   template-clone DOM runtime; `'server'` emits HTML-string SSR output (static
+ *   `mode` selects client or server execution. The default client renderer
+ *   emits the template-clone DOM runtime; `renderer.target: 'valdi'` opts into
+ *   the experimental external writer adapter. `'server'` emits HTML-string SSR output (static
  *   chunks interleaved with `ssr*` helpers) carrying the hydration markers the
  *   client `hydrateRoot` adopts.
  *   `rendererBoundaries` and `rendererRegistry` are the normalized static
  *   boundary table and renderer registry. Pass them together when a client
  *   module may contain an explicitly renderer-owned component prop.
+ *   `valdiWriterFacts` supplies exact authored attribute-expression type proofs
+ *   for the Valdi target. That target uses ordinary keyed hook calls and does
+ *   not use the DOM-specific `autoMemo` or `inlineHookMemo` optimizations.
  * @returns {{ code: string, map: any, diagnostics: readonly unknown[] }}
  */
 function cleanCompileFilename(filename) {
@@ -7924,6 +7909,50 @@ function compileInternal(
 	const universalRuntime = normalizeUniversalRuntime(options?.universalRuntime);
 	if (!options?.__rendererBoundariesLowered) {
 		assertUniversalRuntimeTarget(universalRuntime, mode, options?.renderer);
+	}
+	if (options?.renderer?.target === 'valdi') {
+		const renderer = options.renderer;
+		if (mode !== 'client') {
+			throw new Error(
+				`Renderer ${JSON.stringify(renderer.id)} does not provide the serialization/hydration capability required by server compilation.`,
+			);
+		}
+		return compileValdi(
+			source,
+			filename,
+			renderer,
+			(loweredAst, abiGuard) =>
+				compileInternal(
+					source,
+					filename,
+					{
+						...options,
+						renderer: undefined,
+						universalRuntime: undefined,
+						rendererBoundaries: undefined,
+						rendererRegistry: undefined,
+						// The external writer ABI exposes ordinary keyed hook calls,
+						// not DOM-owned memo cells or component scopes.
+						inlineHookMemo: false,
+						autoMemo: false,
+						__hydratePrepared: true,
+						__rendererBoundariesLowered: true,
+						__valdiAbiGuard: abiGuard,
+						__hookRuntimeModules: [...(options.__hookRuntimeModules ?? []), renderer.module],
+						__runtimeImportRoutes: [
+							...(options.__runtimeImportRoutes ?? []),
+							{ module: renderer.module, imported: VALDI_COMPILER_RUNTIME_IMPORTS },
+						],
+						__nativeChangeDiagnostics: [],
+					},
+					loweredAst,
+					mode,
+					null,
+					hasStringChildProofs,
+				),
+			options,
+			analyzedAst,
+		);
 	}
 	if (!options?.__hydratePrepared) {
 		const cleanFilename = cleanCompileFilename(filename);
@@ -9335,6 +9364,17 @@ function compileInternal(
 		...hmrNodes,
 		...profileNodes,
 	];
+	if (options?.__valdiAbiGuard !== undefined) {
+		// Fail before even compiler-hoisted hook-slot allocation can call an
+		// incompatible external adapter. Keep imports first for downstream
+		// CommonJS transforms that lower imports at their statement positions.
+		const imports = [];
+		const statements = [];
+		for (const node of moduleBody) {
+			(node.type === 'ImportDeclaration' ? imports : statements).push(node);
+		}
+		moduleBody = [...imports, options.__valdiAbiGuard, ...statements];
+	}
 	if (ctx.inlineHookMemo && ctx.hasSlotMemoCandidates) {
 		moduleBody = lowerSlotMemoFunctions(moduleBody, {
 			allocateName: (preferred) => allocCompilerName(ctx, preferred),

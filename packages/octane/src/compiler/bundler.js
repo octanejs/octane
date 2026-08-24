@@ -1082,7 +1082,7 @@ class OctaneBundlerCompiler {
 		if (!hostOwned) this._assertClientOnlySourceSupported(file, filename, renderer, collected);
 		if (
 			plainHelperSource &&
-			renderer.target === 'universal' &&
+			(renderer.target === 'universal' || renderer.target === 'valdi') &&
 			renderer.validation !== undefined &&
 			this._isProjectOwnedSource(file) &&
 			!this.exclude.some((path) => file.includes(path)) &&

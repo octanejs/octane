@@ -1622,6 +1622,12 @@ function importSourceRanges(sources) {
 export function validateRendererModuleSource(source, filename, renderer) {
 	if (renderer?.validation === undefined) return;
 	const ast = parseModule(source, filename);
+	validateRendererAst(ast, filename, renderer);
+}
+
+/** Reuse renderer restrictions without reparsing an already adopted AST. */
+export function validateRendererAst(ast, filename, renderer) {
+	if (renderer?.validation === undefined) return;
 	validateRendererSource(ast, { filename, renderer });
 }
 

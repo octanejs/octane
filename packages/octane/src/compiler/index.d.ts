@@ -6,7 +6,7 @@ export type { TextTypeFacts } from './typescript.js';
 export interface CompileRenderer {
 	id: string;
 	module: string;
-	target: 'dom' | 'universal';
+	target: 'dom' | 'universal' | 'valdi';
 	server?: string;
 	/** Additional normalized renderer capabilities. */
 	[option: string]: unknown;
@@ -30,6 +30,27 @@ export interface OctaneCssModuleConstants {
 	default?: Readonly<Record<string, string>>;
 }
 
+/** The version checked by compiler-emitted external Valdi adapter calls. */
+export const VALDI_COMPILER_ABI_VERSION: 1;
+
+export type ValdiWriterEffectiveType = 'boolean' | 'number' | 'string' | 'function' | 'style';
+
+/** An exact authored-expression fact supplied by an integration's type checker. */
+export interface ValdiWriterExpressionFact {
+	/** UTF-16 source offset, inclusive. */
+	start: number;
+	/** UTF-16 source offset, exclusive. */
+	end: number;
+	effectiveType: ValdiWriterEffectiveType;
+	/** Typed adapter setters must also accept and clear nullish values. */
+	isNullable: boolean;
+}
+
+export interface ValdiWriterFacts {
+	version: 1;
+	expressions: readonly ValdiWriterExpressionFact[];
+}
+
 export interface CompileOptions {
 	mode?: 'client' | 'server';
 	hmr?: boolean | 'vite' | 'webpack';
@@ -45,6 +66,8 @@ export interface CompileOptions {
 	dataCallbackHooks?: readonly string[];
 	/** Exact authored-source facts from octane/compiler/typescript. */
 	textTypeFacts?: TextTypeFacts;
+	/** Optional exact attribute-expression proofs; used only by the Valdi target. */
+	valdiWriterFacts?: ValdiWriterFacts;
 	/**
 	 * Trusted bundler/provider proof of an already initialized, immutable CSS
 	 * class string. `property` is null for a named string import, or the static
@@ -65,7 +88,7 @@ export interface CompileOptions {
 	renderer?: CompileRenderer;
 	rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, CompileRendererBoundary>>>>;
 	rendererRegistry?: Readonly<
-		Record<string, { module: string; target: 'dom' | 'universal'; server?: string }>
+		Record<string, { module: string; target: 'dom' | 'universal' | 'valdi'; server?: string }>
 	>;
 	universalRuntime?: { runtime: string; thread: 'background' | 'main-thread' };
 	clientOnlyImports?: readonly unknown[];
