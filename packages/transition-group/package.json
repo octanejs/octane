@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/transition-group",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "license": "BSD-3-Clause",
   "type": "module",
   "sideEffects": false,

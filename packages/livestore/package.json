@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/livestore",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,

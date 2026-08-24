@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/draggable",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "Octane port of react-draggable 4.7.1",
   "license": "MIT",
   "type": "module",
