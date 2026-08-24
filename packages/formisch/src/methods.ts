@@ -340,10 +340,10 @@ export function move<TSchema extends FormSchema>(
 	config: MoveConfig,
 ): void {
 	const array = arrayAt(form, config.path);
+	if (config.from >= array.length) return;
 	const state = internal(form);
 	const ids = arrayIds(form, config.path, array.length);
 	const [item] = array.splice(config.from, 1);
-	if (item === undefined && config.from >= array.length + 1) return;
 	const [id] = ids.splice(config.from, 1);
 	array.splice(config.to, 0, item);
 	if (id) ids.splice(config.to, 0, id);

@@ -100,6 +100,15 @@ describe('@octanejs/formisch', () => {
 		expect(screen.getByText(/formisch-/).textContent!.split(',')).toHaveLength(2);
 	});
 
+	// @parity-case differential:formisch-move-out-of-bounds
+	it('leaves a field array unchanged when move starts at its length', async () => {
+		render(<TestForm submit={() => undefined} />);
+		const identities = screen.getByText(/formisch-/).textContent;
+		await act(async () => move(captured, { path: ['tags'], from: 2, to: 0 }));
+		expect(getInput(captured, { path: ['tags'] })).toEqual(['a', 'b']);
+		expect(screen.getByText(/formisch-/).textContent).toBe(identities);
+	});
+
 	it('supports programmatic field updates', async () => {
 		render(<TestForm submit={() => undefined} />);
 		await act(async () =>

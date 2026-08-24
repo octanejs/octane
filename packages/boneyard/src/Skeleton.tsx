@@ -70,7 +70,7 @@ export function Skeleton(props: SkeletonProps): OctaneNode {
 			resize?.disconnect();
 			mutation?.disconnect();
 		};
-	}, []);
+	}, [props.loading]);
 
 	useEffect(() => {
 		if (typeof matchMedia !== 'function') return;

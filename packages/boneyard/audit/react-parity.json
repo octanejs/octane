@@ -56,12 +56,17 @@
         {
           "path": "packages/boneyard/tests/conformance/component.test.tsx",
           "role": "test",
-          "sha256": "c61c0f42d1d7f5759c0e2a7122034543625ef906eba2a41308bc210ca27eb95e",
+          "sha256": "0b171a024bb16c4b091d900e3d4d8df6db98cf72f9d262944ab78fa85410259b",
           "cases": [
             {
               "id": "differential:boneyard-skeleton",
               "testName": "renders documented skeleton geometry and accessibility state",
               "fullName": "@octanejs/boneyard Skeleton renders documented skeleton geometry and accessibility state"
+            },
+            {
+              "id": "differential:boneyard-loading-toggle-observers",
+              "testName": "observes ancestor dark mode when loading begins after mount",
+              "fullName": "@octanejs/boneyard Skeleton observes ancestor dark mode when loading begins after mount"
             },
             {
               "id": "differential:boneyard-keyed-identity",

@@ -56,7 +56,7 @@
         {
           "path": "packages/formisch/tests/conformance/form.test.tsx",
           "role": "test",
-          "sha256": "edd95da9faacd212fc48b11264f5fc0bc57bde63a4c73dafb3fc4e7a32453f0f",
+          "sha256": "8da33b36c73d8957dd86c187b8db136b1e58ff5d26cc488f63f329b03fc1dacc",
           "cases": [
             {
               "id": "differential:formisch-native-submit",
@@ -67,6 +67,11 @@
               "id": "differential:formisch-field-array-identity",
               "testName": "keeps field-array identities stable across mutations",
               "fullName": "@octanejs/formisch keeps field-array identities stable across mutations"
+            },
+            {
+              "id": "differential:formisch-move-out-of-bounds",
+              "testName": "leaves a field array unchanged when move starts at its length",
+              "fullName": "@octanejs/formisch leaves a field array unchanged when move starts at its length"
             },
             {
               "id": "differential:formisch-performance",

@@ -35,6 +35,40 @@ describe('@octanejs/boneyard Skeleton', () => {
 		expect((rectangles[1] as HTMLElement).style.animation).toBe('none');
 	});
 
+	// @parity-case differential:boneyard-loading-toggle-observers
+	it('observes ancestor dark mode when loading begins after mount', () => {
+		const rendered = render(
+			<div class="dark">
+				<Skeleton
+					loading={false}
+					initialBones={bones}
+					animate={false}
+					color="#f0f0f0"
+					darkColor="#111111"
+				>
+					<p>Ready</p>
+				</Skeleton>
+			</div>,
+		);
+		expect(rendered.container.textContent).toBe('Ready');
+		rendered.rerender(
+			<div class="dark">
+				<Skeleton
+					loading={true}
+					initialBones={bones}
+					animate={false}
+					color="#f0f0f0"
+					darkColor="#111111"
+				>
+					<p>Ready</p>
+				</Skeleton>
+			</div>,
+		);
+		expect(
+			(rendered.container.querySelector('[data-boneyard-bone]') as HTMLElement).style.background,
+		).toBe('rgb(17, 17, 17)');
+	});
+
 	it('shows fallback without bones and children after loading', () => {
 		const fallback = render(
 			<Skeleton loading={true} fallback={<p>Waiting</p>}>
