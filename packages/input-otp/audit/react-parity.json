@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "fcd517ecbc7d8786f0f5686e60b04f2a0c89e05520a067687fbb5178035fb1c9"
+      "lockfileSha256": "1e9a5cd3c71b17e0ccb3d15188a0997da27a31279379332032dd31e7499f3b59"
     }
   },
   "lanes": [
@@ -59,7 +59,7 @@
         {
           "path": "packages/input-otp/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "a6e8062db42f8fc2e4473859849072af9114f80d25f454f39364e04fe98ae1cf"
+          "sha256": "d6bd52249741567e5eb647d2f71b74afb43666ae7d4b9f05a5c8b5559afec244"
         },
         {
           "path": "packages/input-otp/audit/pristine-runtime-browser.json",
