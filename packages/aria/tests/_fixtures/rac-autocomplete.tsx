@@ -18,6 +18,7 @@ import { Item } from '../../src/stately/collections/Item';
 import { useListState } from '../../src/stately/list/useListState';
 import { useListBox } from '../../src/listbox/useListBox';
 import { useOption } from '../../src/listbox/useOption';
+import { useDragAndDrop } from '../../src/components/useDragAndDrop';
 
 // ---------------------------------------------------------------------------
 // RAC Autocomplete: the real <Autocomplete> + <TextField>/<Input> (wired through
@@ -169,4 +170,20 @@ export function RenderDropIndicatorScenario(props: { hooks: any }) {
 export function DndPersistedKeysScenario(props: { focusedKey: any }) {
 	const keys = useDndPersistedKeys({ focusedKey: props.focusedKey } as any, undefined, undefined);
 	return <div data-testid="persisted" data-keys={[...keys].join(',')} />;
+}
+
+export function DragAndDropHooksScenario() {
+	const { dragAndDropHooks } = useDragAndDrop({
+		getItems: (keys) => [...keys].map((key) => ({ 'text/plain': String(key) })),
+		onReorder: () => {},
+	});
+	return (
+		<output
+			data-testid="dnd-hooks"
+			data-draggable={String(!!dragAndDropHooks.useDraggableCollectionState)}
+			data-droppable={String(!!dragAndDropHooks.useDroppableCollectionState)}
+			data-preview={String(!!dragAndDropHooks.DragPreview)}
+			data-drop-indicator={String(!!dragAndDropHooks.useDropIndicator)}
+		/>
+	);
 }

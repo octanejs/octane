@@ -3,10 +3,10 @@ import { act, mount } from '../../octane/tests/_helpers';
 import {
 	AutocompleteScenario,
 	DndPersistedKeysScenario,
+	DragAndDropHooksScenario,
 	DropIndicatorScenario,
 	RenderDropIndicatorScenario,
 } from './_fixtures/rac-autocomplete.tsx';
-import { useDragAndDrop } from '../src/components/useDragAndDrop';
 
 // RAC Autocomplete (Phase 5): the real <Autocomplete> provides
 // AutocompleteStateContext + FieldInputContext (consumed by <TextField>/<Input>)
@@ -241,9 +241,13 @@ describe('@octanejs/aria/components — DragAndDrop context layer', () => {
 		none.unmount();
 	});
 
-	it('useDragAndDrop throws its not-ported message', () => {
-		expect(() => useDragAndDrop({} as any)).toThrowError(
-			'@octanejs/aria: useDragAndDrop is not ported yet (drag and drop arrives in a later phase)',
-		);
+	it('useDragAndDrop composes draggable and droppable collection hooks', () => {
+		const r = mount(DragAndDropHooksScenario);
+		const hooks = r.container.querySelector('[data-testid="dnd-hooks"]') as HTMLElement;
+		expect(hooks.getAttribute('data-draggable')).toBe('true');
+		expect(hooks.getAttribute('data-droppable')).toBe('true');
+		expect(hooks.getAttribute('data-preview')).toBe('true');
+		expect(hooks.getAttribute('data-drop-indicator')).toBe('true');
+		r.unmount();
 	});
 });

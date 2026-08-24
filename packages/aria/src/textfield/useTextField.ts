@@ -179,6 +179,9 @@ export function useTextField(...args: any[]): TextFieldAria {
 		subSlot(slot, 'field'),
 	);
 	let domProps = filterDOMProps(props, { labelable: true });
+	// `onChange` above is the public value callback consumed by useControlledState,
+	// not a native DOM commit handler. Octane wires per-edit updates through onInput.
+	delete domProps.onChange;
 
 	const inputOnlyProps = {
 		type,

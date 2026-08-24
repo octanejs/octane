@@ -1,7 +1,7 @@
 {
   "name": "@octanejs/aria",
   "version": "0.0.40",
-  "license": "MIT",
+  "license": "MIT AND Apache-2.0",
   "type": "module",
   "sideEffects": [
     "./src/index.ts",
@@ -36,7 +36,9 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE-APACHE-2.0"
   ],
   "exports": {
     ".": "./src/index.ts",
@@ -44,6 +46,7 @@
     "./components": "./src/components/index.ts"
   },
   "scripts": {
+    "exports:check": "node scripts/check-react-aria-components-exports.mjs",
     "test": "vitest run"
   },
   "dependencies": {
@@ -65,6 +68,7 @@
     "react-aria-components": "catalog:default",
     "react-dom": "catalog:default",
     "react-stately": "catalog:default",
+    "typescript": "catalog:default",
     "vitest": "catalog:default"
   }
 }

@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { act, mount, nextPaint } from '../../octane/tests/_helpers';
 import {
 	BlockChildrenButton,
+	BlockChildrenToastRegion,
 	ComposedBlockChildren,
 	RenderPropButton,
 	ValueChildrenButton,
 } from './_fixtures/rac-block-children.tsrx';
+import { UNSTABLE_ToastQueue } from '../src/components';
 import {
 	ButtonScenario,
 	FieldErrorScenario,
@@ -338,6 +340,16 @@ describe('@octanejs/aria — RAC children authored as a .tsrx block', () => {
 		// function child is still invoked, and still sees selection state.
 		const r = mount(RenderPropButton);
 		expect((r.find('#render-prop') as HTMLElement).textContent).toBe('on');
+		r.unmount();
+	});
+
+	it('keeps ToastRegion block children out of its per-toast render-prop path', () => {
+		const queue = new UNSTABLE_ToastQueue<string>();
+		queue.add('notice');
+		const r = mount(BlockChildrenToastRegion, { queue });
+		expect(document.body.querySelector('#block-toast-child')?.textContent).toBe(
+			'Queued notifications',
+		);
 		r.unmount();
 	});
 });

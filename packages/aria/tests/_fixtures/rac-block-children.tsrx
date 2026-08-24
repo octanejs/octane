@@ -1,4 +1,10 @@
-import { Button, composeRenderProps, ToggleButton } from '@octanejs/aria/components';
+import {
+	Button,
+	composeRenderProps,
+	ToggleButton,
+	UNSTABLE_ToastQueue,
+	UNSTABLE_ToastRegion,
+} from '@octanejs/aria/components';
 
 // `@{ … }` is the idiomatic .tsrx body form, and it compiles component children
 // to a tagged BLOCK FUNCTION rather than a plain value. RAC's render-props
@@ -37,4 +43,13 @@ function ComposedButton(props: { children?: unknown }) @{
 
 export function ComposedBlockChildren() @{
 	<ComposedButton>Accept terms</ComposedButton>
+}
+
+// ToastRegion has its own children dispatch because a plain function child is
+// shorthand for rendering each queued toast. A .tsrx block child must bypass
+// that render-prop path just like the shared RAC render-props plumbing does.
+export function BlockChildrenToastRegion(props: { queue: UNSTABLE_ToastQueue<string> }) @{
+	<UNSTABLE_ToastRegion queue={props.queue}>
+		<span id="block-toast-child">Queued notifications</span>
+	</UNSTABLE_ToastRegion>
 }

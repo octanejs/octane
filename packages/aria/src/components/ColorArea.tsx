@@ -1,0 +1,120 @@
+/** @jsxImportSource octane */
+// Ported from adobe/react-spectrum@1c84a49a1faf50b571c84e00bcf9c60b22ddd03e (packages/react-aria-components/src/ColorArea.tsx).
+import { AriaColorAreaProps, useColorArea } from '../upstream-exports/react-aria/useColorArea';
+import {
+	ClassNameOrFunction,
+	ContextValue,
+	dom,
+	Provider,
+	RenderProps,
+	SlotProps,
+	useContextProps,
+	useRenderProps,
+} from './utils';
+import {
+	ColorAreaState,
+	useColorAreaState,
+} from '../upstream-exports/react-stately/useColorAreaState';
+import { filterDOMProps } from '../upstream-exports/react-aria/filterDOMProps';
+import { GlobalDOMAttributes } from '@react-types/shared';
+import { InternalColorThumbContext } from './ColorThumb';
+import { mergeProps } from '../upstream-exports/react-aria/mergeProps';
+import React, { createContext, ForwardedRef, forwardRef, useRef } from '../compat/react';
+
+export interface ColorAreaRenderProps {
+	/**
+	 * Whether the color area is disabled.
+	 *
+	 * @selector [data-disabled]
+	 */
+	isDisabled: boolean;
+	/**
+	 * State of the color area.
+	 */
+	state: ColorAreaState;
+}
+
+export interface ColorAreaProps
+	extends
+		AriaColorAreaProps,
+		RenderProps<ColorAreaRenderProps>,
+		SlotProps,
+		GlobalDOMAttributes<HTMLDivElement> {
+	/**
+	 * The CSS [className](https://developer.mozilla.org/en-US/docs/Web/API/Element/className) for the
+	 * element. A function may be provided to compute the class based on component state.
+	 *
+	 * @default 'react-aria-ColorArea'
+	 */
+	className?: ClassNameOrFunction<ColorAreaRenderProps>;
+}
+
+export const ColorAreaContext =
+	createContext<ContextValue<Partial<ColorAreaProps>, HTMLDivElement>>(null);
+export const ColorAreaStateContext = createContext<ColorAreaState | null>(null);
+
+/**
+ * A color area allows users to adjust two channels of an RGB, HSL or HSB color value against a
+ * two-dimensional gradient background.
+ */
+export const ColorArea = forwardRef(function ColorArea(
+	props: ColorAreaProps,
+	ref: ForwardedRef<HTMLDivElement>,
+) {
+	[props, ref] = useContextProps(props, ref, ColorAreaContext);
+	let inputXRef = useRef(null);
+	let inputYRef = useRef(null);
+
+	let state = useColorAreaState(props);
+	let { colorAreaProps, xInputProps, yInputProps, thumbProps } = useColorArea(
+		{
+			...props,
+			inputXRef,
+			inputYRef,
+			containerRef: ref,
+		},
+		state,
+	);
+
+	let renderProps = useRenderProps({
+		...props,
+		defaultClassName: 'react-aria-ColorArea',
+		defaultStyle: colorAreaProps.style,
+		values: {
+			state,
+			isDisabled: props.isDisabled || false,
+		},
+	});
+
+	let DOMProps = filterDOMProps(props, { global: true });
+	delete DOMProps.id;
+
+	return (
+		<dom.div
+			ref={ref}
+			{...mergeProps(DOMProps, colorAreaProps, renderProps)}
+			slot={props.slot || undefined}
+			data-disabled={props.isDisabled || undefined}
+		>
+			<Provider
+				values={[
+					[ColorAreaStateContext, state],
+					[
+						InternalColorThumbContext,
+						{
+							state,
+							thumbProps,
+							inputXRef,
+							xInputProps,
+							inputYRef,
+							yInputProps,
+							isDisabled: props.isDisabled,
+						},
+					],
+				]}
+			>
+				{renderProps.children}
+			</Provider>
+		</dom.div>
+	);
+});
