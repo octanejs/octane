@@ -7,7 +7,8 @@
   "scripts": {
     "bench": "node run.mjs",
     "bench:long": "node run.mjs 16",
-    "bench:work": "node work.mjs"
+    "bench:work": "node work.mjs",
+    "bench:descriptors": "node descriptor-stream.mjs"
   },
   "dependencies": {
     "playwright": "catalog:default"

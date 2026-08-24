@@ -47,10 +47,12 @@ describe('renderable children in a held transition', () => {
 		try {
 			await act(() => {});
 			const onlyChild = root.find('#only-child');
+			const descriptorChild = root.find('#descriptor-child');
 			const anchoredChild = root.find('#anchored-child');
 			const input = root.find('#retained-input') as HTMLInputElement;
 			input.value = 'typed by the user';
 			expect(onlyChild.textContent).toBe('first');
+			expect(descriptorChild.textContent).toBe('first');
 			expect(anchoredChild.textContent).toBe('before:first:after');
 
 			// The store keeps its new snapshot while the later sibling suspends.
@@ -58,6 +60,7 @@ describe('renderable children in a held transition', () => {
 			// update for content that already reached the screen.
 			await act(() => startTransition(() => store.set({ value, request: second.promise })));
 			expect(onlyChild.textContent).toBe('first');
+			expect(descriptorChild.textContent).toBe('first');
 			expect(anchoredChild.textContent).toBe('before:first:after');
 			expect(root.find('#ready').textContent).toBe('ready:first');
 			expect(root.find('#pending').textContent).toBe('pending');
@@ -65,8 +68,10 @@ describe('renderable children in a held transition', () => {
 
 			await act(() => second.resolve('ready:second'));
 			expect(root.find('#only-child')).toBe(onlyChild);
+			expect(root.find('#descriptor-child')).toBe(descriptorChild);
 			expect(root.find('#anchored-child')).toBe(anchoredChild);
 			expect(onlyChild.textContent).toBe(expected);
+			expect(descriptorChild.textContent).toBe(expected);
 			expect(anchoredChild.textContent).toBe(`before:${expected}:after`);
 			expect(root.find('#ready').textContent).toBe('ready:second');
 			expect(root.find('#pending').textContent).toBe('idle');

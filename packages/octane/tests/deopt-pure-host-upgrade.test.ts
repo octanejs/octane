@@ -26,7 +26,7 @@ function Comp() {
 		'form',
 		null,
 		createElement('p', { 'data-testid': 'p' }, String(on)),
-		createElement('button', { 'data-testid': 'btn', onClick: () => setOn(true) }, 'flip'),
+		createElement('button', { 'data-testid': 'btn', onClick: () => setOn(!on) }, 'flip'),
 		on && createElement(Inner, null),
 	);
 }
@@ -103,11 +103,33 @@ describe('de-opt pure-host → component upgrade', () => {
 		r.unmount();
 	});
 
-	it('tears the upgraded tree down cleanly (flip off again)', () => {
+	it('preserves the host and siblings when the last component disappears and returns', () => {
 		const r = mount(Comp);
-		r.click('[data-testid="btn"]');
-		expect(r.find('[data-testid="inner"]')).toBeTruthy();
-		r.unmount();
+		try {
+			const form = r.find('form');
+			const paragraph = r.find('[data-testid="p"]');
+			const button = r.find('[data-testid="btn"]');
+			r.click('[data-testid="btn"]');
+			const input = r.find('[data-testid="inner"]') as HTMLInputElement;
+			input.value = 'temporary detail';
+
+			r.click('[data-testid="btn"]');
+			expect(r.findAll('[data-testid="inner"]')).toEqual([]);
+			expect(input.isConnected).toBe(false);
+			expect(r.find('form')).toBe(form);
+			expect(r.find('[data-testid="p"]')).toBe(paragraph);
+			expect(paragraph.textContent).toBe('false');
+			expect(r.find('[data-testid="btn"]')).toBe(button);
+
+			r.click('[data-testid="btn"]');
+			expect(r.find('form')).toBe(form);
+			expect(r.find('[data-testid="p"]')).toBe(paragraph);
+			expect(paragraph.textContent).toBe('true');
+			expect(r.find('[data-testid="inner"]')).not.toBe(input);
+			expect((r.find('[data-testid="inner"]') as HTMLInputElement).value).toBe('');
+		} finally {
+			r.unmount();
+		}
 		expect(document.querySelector('[data-testid="inner"]')).toBeNull();
 	});
 });

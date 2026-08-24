@@ -1,6 +1,6 @@
 import { renderToPipeableStream } from 'octane/server';
 import { App } from './App.tsrx';
-import { makeCards, type Scenario } from './data';
+import { cardData, makeCards, type CardData, type CardSlot, type Scenario } from './data';
 
 // Streaming SSR entry — octane target. The harness (../run.mjs) imports the
 // BUILT bundle of this module and times renderStream(): data promises start at
@@ -28,6 +28,38 @@ export function renderStream(scenario: Scenario, onChunk: (chunk: string) => voi
 		);
 		pipe({
 			write: onChunk,
+			end: resolve,
+		});
+	});
+}
+
+// CPU/scaling control for the same compiled page, without the data timers of
+// the cross-framework schedule. The producer releases a group only after the
+// previous response chunk is accepted, so the shell remains genuinely streamed
+// and the runtime's own wave/coalescing work stays inside the measurement.
+export function renderControlledStream(
+	cardCount: number,
+	waveSize: number,
+	onChunk: (chunk: string) => void,
+): Promise<void> {
+	const resolveCards: Array<() => void> = [];
+	const cards: CardSlot[] = Array.from({ length: cardCount }, (_, id) => ({
+		id,
+		promise: new Promise<CardData>((resolve) => resolveCards.push(() => resolve(cardData(id)))),
+	}));
+	let remaining = cardCount;
+	return new Promise((resolve, reject) => {
+		const stream = renderToPipeableStream(
+			App,
+			{ cards },
+			{ onShellError: reject, onError: reject },
+		);
+		stream.pipe({
+			write(chunk) {
+				onChunk(chunk);
+				for (let i = Math.min(waveSize, remaining); i > 0; i--) resolveCards[--remaining]();
+				return true;
+			},
 			end: resolve,
 		});
 	});

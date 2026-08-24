@@ -297,11 +297,163 @@ const mod = evalServer(
 				<strong class="late-catch">{error.message as string}</strong>
 			}
 		}
+
+		type ReplayedPendingProps = {
+			discarded: Promise<string>;
+			final: Promise<string>;
+			fallback: Promise<string>;
+		};
+		function ReplayedPendingParent(props: ReplayedPendingProps) @{
+			const [settled, setSettled] = useState(false);
+			if (!settled) setSettled(true);
+			@try {
+				@if (settled) {
+					const value = use(props.final);
+					<strong class="replayed-final">{'final:' + value as string}</strong>
+				} @else {
+					const value = use(props.discarded);
+					<strong class="replayed-discarded">{value as string}</strong>
+				}
+			} @pending {
+				<SharedBoundary label="fallback" promise={props.fallback} />
+			}
+		}
+
+		export function ReplayPrunedFallback(props: ReplayedPendingProps & {
+			trigger: Promise<string>;
+			trailing?: Promise<string>;
+		}) @{
+			<main>
+				<ReplayedPendingParent
+					discarded={props.discarded}
+					final={props.final}
+					fallback={props.fallback}
+				/>
+				<SharedBoundary label="trigger" promise={props.trigger} />
+				@if (props.trailing) {
+					<SharedBoundary label="trailing" promise={props.trailing} />
+				}
+			</main>
+		}
   `,
 	'ssr-stream-state-regressions.tsrx',
 );
 
 describe('SSR stream state regressions', () => {
+	it('keeps a fallback child reachable when a discarded render completed its parent', async () => {
+		const discarded = deferred<string>();
+		const final = deferred<string>();
+		const fallback = deferred<string>();
+		const trigger = deferred<string>();
+		const output = collector();
+		const onError = vi.fn();
+		const stream = ServerRuntime.renderToPipeableStream(
+			mod.ReplayPrunedFallback,
+			{
+				discarded: discarded.promise,
+				final: final.promise,
+				fallback: fallback.promise,
+				trigger: trigger.promise,
+			},
+			{ onError, timeoutMs: 1000 },
+		);
+		stream.pipe(output.destination);
+		try {
+			discarded.resolve('discarded');
+			trigger.resolve('ready');
+			await vi.waitFor(() => {
+				expect(output.chunks.some((chunk) => chunk.includes('trigger:ready'))).toBe(true);
+			});
+
+			fallback.resolve('revealed');
+			await vi.waitFor(() => {
+				expect(output.chunks.some((chunk) => chunk.includes('fallback:revealed'))).toBe(true);
+			});
+			const intermediate = activateChunks(output.chunks);
+			try {
+				expect(intermediate.querySelector('[data-label="fallback"]')?.textContent).toBe(
+					'fallback:revealed',
+				);
+				expect(intermediate.querySelector('[data-label="trigger"]')?.textContent).toBe(
+					'trigger:ready',
+				);
+				expect(intermediate.querySelector('.replayed-discarded')).toBeNull();
+			} finally {
+				intermediate.remove();
+				resetStreamRuntimeGlobals();
+			}
+
+			final.resolve('kept');
+			await output.ended;
+			const completed = activateChunks(output.chunks);
+			try {
+				expect(completed.querySelector('.replayed-final')?.textContent).toBe('final:kept');
+				expect(completed.querySelector('[data-label="fallback"]')).toBeNull();
+				expect(completed.querySelector('.replayed-discarded')).toBeNull();
+				expect(onError).not.toHaveBeenCalled();
+			} finally {
+				completed.remove();
+			}
+		} finally {
+			stream.abort();
+			await output.ended;
+			resetStreamRuntimeGlobals();
+		}
+	});
+
+	it('reports same-wave fallback and sibling failures in discovery order after a render retry', async () => {
+		const discarded = deferred<string>();
+		const final = deferred<string>();
+		const fallback = deferred<string>();
+		const trigger = deferred<string>();
+		const trailing = deferred<string>();
+		const output = collector();
+		const errors: unknown[] = [];
+		const props = {
+			discarded: discarded.promise,
+			final: final.promise,
+			fallback: fallback.promise,
+			trigger: trigger.promise,
+			trailing: trailing.promise,
+		};
+		const stream = ServerRuntime.renderToPipeableStream(mod.ReplayPrunedFallback, props, {
+			onError: (error) => errors.push(error),
+			timeoutMs: 1000,
+		});
+		stream.pipe(output.destination);
+		try {
+			discarded.resolve('discarded');
+			trigger.resolve('ready');
+			await vi.waitFor(() => {
+				expect(output.chunks.some((chunk) => chunk.includes('trigger:ready'))).toBe(true);
+			});
+			// Keep the parent pending on later passes, so both retained fallbacks
+			// remain visible when their data rejects together.
+			props.discarded = new Promise<string>(() => {});
+			const fallbackError = new Error('fallback failed');
+			const trailingError = new Error('trailing failed');
+			fallback.reject(fallbackError);
+			trailing.reject(trailingError);
+			await vi.waitFor(() => expect(errors).toHaveLength(2));
+			expect([...errors]).toEqual([fallbackError, trailingError]);
+			const visible = activateChunks(output.chunks);
+			try {
+				expect(visible.querySelector('[data-waiting="fallback"]')?.textContent).toBe(
+					'fallback:waiting',
+				);
+				expect(visible.querySelector('[data-waiting="trailing"]')?.textContent).toBe(
+					'trailing:waiting',
+				);
+			} finally {
+				visible.remove();
+			}
+		} finally {
+			stream.abort();
+			await output.ended;
+			resetStreamRuntimeGlobals();
+		}
+	});
+
 	it('does not retain a boundary registered by a discarded render-phase pass', async () => {
 		const data = deferred<string>();
 		const output = collector();

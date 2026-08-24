@@ -10,6 +10,7 @@ import * as HydrationRT from 'octane/hydration';
 import { prerender } from 'octane/static';
 import { initializeHydrationEventCapture, interaction } from 'octane/hydration';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
+import { collectPipeableStream, collectReadableStream } from './_server-stream.js';
 // CLIENT-compiled fixture (registers click delegation at import).
 import {
 	Boundary,
@@ -22,6 +23,7 @@ import {
 	NestedDeferredStreamedHydrates,
 	NestedStreamSeedScopes,
 	ReasonBoundary,
+	ReplayedStreamBoundary,
 	Siblings,
 	StyledBoundary,
 } from './_fixtures/ssr-suspense.tsrx';
@@ -128,6 +130,46 @@ afterEach(() => {
 });
 
 describe('renderToPipeableStream — chunk protocol', () => {
+	it.each([
+		['pipeable', collectPipeableStream],
+		['readable', collectReadableStream],
+	] as const)(
+		'hydrates the accepted render-phase content of a %s stream',
+		async (_name, collect) => {
+			const value = deferred<string>();
+			const rendered = collect(server.ReplayedStreamBoundary, { promise: value.promise });
+			value.resolve('ready');
+			const result = await rendered;
+			expect(result.errors).toEqual([]);
+			container.innerHTML = result.html;
+			activate(container);
+			const button = container.querySelector<HTMLButtonElement>('[data-replayed-stream]')!;
+			const shell = container.querySelector('p')!;
+			expect(button.textContent).toBe('Accepted: ready');
+			expect(button.id).not.toBe(shell.id);
+			const contentId = button.id;
+			const onClick = vi.fn();
+			const onRecoverableError = vi.fn();
+			const root = hydrateRoot(
+				container,
+				ReplayedStreamBoundary as any,
+				{ promise: new Promise<string>(() => {}), onClick },
+				{ onRecoverableError },
+			);
+			try {
+				flushSync(() => {});
+				expect(container.querySelector('[data-replayed-stream]')).toBe(button);
+				expect(container.querySelector('p')).toBe(shell);
+				expect(button.id).toBe(contentId);
+				button.click();
+				expect(onClick).toHaveBeenCalledWith('ready');
+				expect(onRecoverableError).not.toHaveBeenCalled();
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
 	it('streams a deferred Hydrate child and later adopts its revealed DOM and seed', async () => {
 		const serverValue = deferred<string>();
 		const c = collector();

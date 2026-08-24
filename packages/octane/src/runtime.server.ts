@@ -3239,27 +3239,9 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		streamNextId: stream?.nextId ?? 0,
 		streamActiveTryKeys: stream?.activeTryKeys.slice() ?? [],
 		streamActiveOwnerKeys: stream?.activeOwnerKeys.slice() ?? [],
-		streamPassBoundaryKeys:
-			stream?.activePassBoundaryKeys === null || stream?.activePassBoundaryKeys === undefined
-				? null
-				: new Set(stream.activePassBoundaryKeys),
+		streamPassBoundaryCount: stream?.activePassBoundaryKeys?.size ?? 0,
 		asyncScope: ASYNC_SCOPE,
-		streamBoundaries:
-			stream === null
-				? null
-				: Array.from(stream.boundaries, ([key, entry]) => ({
-						key,
-						entry,
-						id: entry.id,
-						order: entry.order,
-						state: entry.state,
-						html: entry.html,
-						seeds: entry.seeds.slice(),
-						pendingIdOffset: entry.pendingIdOffset,
-						ancestors: entry.ancestors.slice(),
-						owners: entry.owners.slice(),
-						namespace: entry.namespace,
-					})),
+		streamReplayCheckpoint: stream?.replay?.length ?? 0,
 		frameDeferred: frame?.deferred ?? false,
 		frameNextChild: frame?.nextChild ?? 0,
 		frameScopedChildren:
@@ -3319,30 +3301,21 @@ function rewindComponentReplayState(
 		VT_SSR_STACK.push(entry.candidate);
 	}
 	const stream = snapshot.stream;
-	if (stream !== null && snapshot.streamBoundaries !== null) {
+	if (stream !== null) {
 		stream.nextId = snapshot.streamNextId;
-		if (stream.activePassBoundaryKeys !== null && snapshot.streamPassBoundaryKeys !== null) {
-			stream.activePassBoundaryKeys.clear();
-			for (const key of snapshot.streamPassBoundaryKeys) stream.activePassBoundaryKeys.add(key);
+		if (stream.activePassBoundaryKeys !== null) {
+			// Discovery only appends during a pass. Trim the discarded suffix on
+			// the rare retry instead of copying the growing set for every component.
+			let index = 0;
+			for (const key of stream.activePassBoundaryKeys) {
+				if (index++ >= snapshot.streamPassBoundaryCount) stream.activePassBoundaryKeys.delete(key);
+			}
 		}
 		stream.activeTryKeys.length = 0;
 		stream.activeTryKeys.push(...snapshot.streamActiveTryKeys);
 		stream.activeOwnerKeys.length = 0;
 		stream.activeOwnerKeys.push(...snapshot.streamActiveOwnerKeys);
-		stream.boundaries.clear();
-		for (const saved of snapshot.streamBoundaries) {
-			const entry = saved.entry;
-			entry.id = saved.id;
-			entry.order = saved.order;
-			entry.state = saved.state;
-			entry.html = saved.html;
-			entry.seeds = saved.seeds.slice();
-			entry.pendingIdOffset = saved.pendingIdOffset;
-			entry.ancestors = saved.ancestors.slice();
-			entry.owners = saved.owners.slice();
-			entry.namespace = saved.namespace;
-			stream.boundaries.set(saved.key, entry);
-		}
+		rewindStreamBoundaryReplay(stream, snapshot.streamReplayCheckpoint);
 	}
 	scope.$$ctxValues = snapshot.context;
 	if (frame !== null) {
@@ -6817,6 +6790,58 @@ interface StreamState {
 	activeTryKeys: string[];
 	/** All arm owners (content/catch/fallback) while walking nested `ssrTry` calls. */
 	activeOwnerKeys: string[];
+	/** Undo log scoped to one synchronous full pass; null between passes. */
+	replay: StreamBoundaryReplayEntry[] | null;
+}
+
+interface StreamBoundaryReplayEntry {
+	key: string;
+	boundary: StreamBoundary | undefined;
+	value: StreamBoundary | undefined;
+}
+
+// Render-phase retries need the stream registry as it stood on entry to the
+// component. Copying every boundary at EVERY component multiplies a full wave's
+// work by the already-discovered boundary count. Checkpoint this pass-local log
+// instead, recording only actual registry mutations. Boundary arrays are replaced,
+// never mutated, so their previous references are sufficient for rollback.
+function recordStreamBoundaryMutation(stream: StreamState, key: string): void {
+	if (stream.replay === null) return;
+	const boundary = stream.boundaries.get(key);
+	stream.replay.push({
+		key,
+		boundary,
+		value: boundary === undefined ? undefined : { ...boundary },
+	});
+}
+
+function rewindStreamBoundaryReplay(stream: StreamState, checkpoint: number): void {
+	const replay = stream.replay;
+	if (replay === null) return;
+	let restoredDeletion = false;
+	while (replay.length > checkpoint) {
+		const saved = replay.pop()!;
+		if (saved.boundary === undefined) {
+			stream.boundaries.delete(saved.key);
+		} else {
+			const boundary = saved.boundary;
+			const value = saved.value!;
+			Object.assign(boundary, value);
+			// These optional fields can be introduced by the discarded pass.
+			boundary.error = value.error;
+			boundary.errorReported = value.errorReported;
+			boundary.errorFlushed = value.errorFlushed;
+			if (!stream.boundaries.has(saved.key)) restoredDeletion = true;
+			stream.boundaries.set(saved.key, boundary);
+		}
+	}
+	if (restoredDeletion) {
+		// Restoring a pruned boundary appends it to Map. Re-establish discovery
+		// order only on this rare path, including recoverable-error report order.
+		const ordered = [...stream.boundaries].sort((a, b) => a[1].order - b[1].order);
+		stream.boundaries.clear();
+		for (const [key, boundary] of ordered) stream.boundaries.set(key, boundary);
+	}
 }
 
 // Every boundary id includes a render-unique token. The counter proves
@@ -6874,6 +6899,7 @@ function pruneUnrepresentedStreamDescendants(
 			}
 			if (nearestOwner !== ownerKey) continue;
 			if (ownerHtml.includes(STREAM_BOUNDARY_ATTR + '="' + child.id + '"')) continue;
+			recordStreamBoundaryMutation(stream, childKey);
 			stream.boundaries.delete(childKey);
 			removed = true;
 		}
@@ -6950,7 +6976,10 @@ export function ssrTry(
 		ancestorKeys = stream.activeTryKeys.slice();
 		ownerKeys = stream.activeOwnerKeys.slice();
 		entry = stream.boundaries.get(key);
-		if (entry !== undefined) entry.namespace = namespace;
+		if (entry !== undefined) {
+			recordStreamBoundaryMutation(stream, key);
+			entry.namespace = namespace;
+		}
 		if (entry !== undefined && entry.state === 'pending') {
 			entry.ancestors = ancestorKeys;
 			entry.owners = ownerKeys;
@@ -7178,6 +7207,7 @@ export function ssrTry(
 							ancestors: ancestorKeys,
 							owners: ownerKeys,
 						};
+						recordStreamBoundaryMutation(stream, key);
 						stream.boundaries.set(key, entry);
 						enterBoundaryIds(pendingIdOffset);
 					} else {
@@ -7241,6 +7271,7 @@ export function ssrTry(
 						ancestors: ancestorKeys,
 						owners: ownerKeys,
 					};
+					recordStreamBoundaryMutation(stream, key);
 					stream.boundaries.set(key, entry);
 					enterBoundaryIds(pendingIdOffset);
 				} else if (entry.state === 'pending') {
@@ -7587,6 +7618,7 @@ async function runStream(
 		activePassBoundaryKeys: null,
 		activeTryKeys: [],
 		activeOwnerKeys: [],
+		replay: null,
 	};
 	const renderFullPass = (): {
 		pass: FullPassResult;
@@ -7594,7 +7626,9 @@ async function runStream(
 	} => {
 		const boundaryKeys = new Set<string>();
 		const previousBoundaryKeys = stream.activePassBoundaryKeys;
+		const previousReplay = stream.replay;
 		stream.activePassBoundaryKeys = boundaryKeys;
+		stream.replay = [];
 		try {
 			return {
 				pass: withStream(stream, () =>
@@ -7604,6 +7638,7 @@ async function runStream(
 			};
 		} finally {
 			stream.activePassBoundaryKeys = previousBoundaryKeys;
+			stream.replay = previousReplay;
 		}
 	};
 	// ── External injection (cold path: every hook below no-ops when absent) ──

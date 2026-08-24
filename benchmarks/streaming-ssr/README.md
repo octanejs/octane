@@ -41,10 +41,19 @@ deterministic `setTimeout` schedule:
   streaming-shape scenario: every framework's `totalTime` is floored at ~50ms
   by the schedule itself, so the numbers that matter are `shellTTFB` and the
   chunk framing.
-- **all-fast** — every card resolves at ~1ms. Data latency vanishes, so
-  per-chunk engine overhead dominates; this is the throughput scenario
+- **all-fast** — every card resolves at ~1ms. Data latency shrinks, so
+  per-chunk engine overhead is more visible; this is the throughput scenario
   (**renders/sec**, sequential, from mean `totalTime` — the ~1ms timer floor
   is included and identical for all targets).
+
+Three additional **Octane-only CPU controls** reuse the exact compiled page:
+`cpu-10` and `cpu-100` release 10 or 100 cards immediately after the consumer
+accepts the shell; `cpu-waves-50` releases 50 cards in reverse-discovery groups
+of five, advancing the producer when each response chunk is accepted. No data
+timers are added. The runtime's normal coalescing, full passes, serialization,
+and consumer acceptance remain in the measurement. These cases isolate
+per-component/per-boundary cost from a network or timer floor; they do not
+represent application token-streaming latency or a cross-framework comparison.
 
 ## Metrics (medians over the iteration count, after 5 warmup renders)
 
@@ -64,31 +73,28 @@ deterministic `setTimeout` schedule:
   `runFullFramedPass` + shell flush). This should stay near the top: it's one
   sync pass with no scheduler.
 - **octane `totalTime` / `chunkCount`** — the streaming engine's **pass-based
-  round model** (`runStream`): each round `settleSuspended`s **all** currently
-  suspended thenables (`Promise.all`), then re-runs a **full page pass**. With
-  10 independent boundaries that means the staggered schedule produces exactly
-  **2 chunks** (shell, then one segment batch after the *slowest* promise) —
-  octane does not flush card 0 at 5ms the way React/Preact/Solid/Ripple do. The
-  metrics here can't see per-boundary latency directly, but `chunkCount` = 2
-  is its fingerprint, and any regression that adds rounds (or passes per
-  round) shows up in `total_staggered` tail and `total_allfast`.
+  wave model** (`runStream`): `settleFirstOfWave` waits for the first unresolved
+  thenable, coalesces settlements from the same event-loop turn, then re-runs
+  a **full page pass**. A staggered boundary can flush before a slower sibling;
+  simultaneous settlements share a pass. Chunk counts describe the observed
+  coalescing, not a fixed shell-plus-one-batch contract.
 - **octane all-fast `renders/sec`** — the cost of (passes × full-tree
-  serialization): the all-fast render is shell pass + 1 settle + 1 full
-  re-pass + segment flush. If N boundaries with distinct resolve ticks ever
-  stop coalescing into one round, this crashes first. Don't tune the runtime
-  from this suite alone — profile `runStream`'s re-pass loop.
-- **React / Preact / Solid / Ripple** — reference engines measured on the same clock;
-  their per-boundary flushing is the granularity octane's round model trades
-  away.
+  serialization): the all-fast render normally coalesces into a shell pass
+  plus one full re-pass and segment flush. Separately resolving boundaries
+  legitimately require more waves. The controlled CPU cases make the cost of
+  those waves and boundary-count scaling measurable without the 1ms data floor.
+- **React / Preact / Solid / Ripple** — reference engines measured on the same
+  clock; their scheduling and flush policies can differ. Compare the output
+  gates and observed chunk counts alongside timing.
 
 ## Fairness notes / genuine semantic differences
 
 - Same DOM shape, same data schedule, promises created at render start for
   every target; the suspending read lives in a child component of the
   boundary in all five fixtures.
-- **octane**: per-round full re-passes (documented divergence from React Fizz
-  in `runtime.server.ts`) — batches all boundaries that resolve in the same
-  round into one chunk, and re-renders the whole page each round. Resolved
+- **octane**: per-wave full re-passes (documented divergence from React Fizz
+  in `runtime.server.ts`) — batches boundaries that resolve in the same
+  event-loop wave into one chunk, and re-renders the whole page each wave. Resolved
   boundary markup travels in parser-safe JSON data scripts so trusted raw HTML
   cannot close a protocol carrier early; the correctness gate decodes those
   carriers before inspecting the semantic page shape.
@@ -109,12 +115,15 @@ deterministic `setTimeout` schedule:
   Treat its numbers as a slightly-lighter-duty reference, not a strict
   apples-to-apples engine comparison.
 
-The harness correctness gate asserts semantics only (shell exactly once, all
-10 card payloads present, and — for staggered — the first chunk flushed before
-the slowest data could resolve and the stream outlived the 50ms schedule).
+The harness correctness gate asserts the shell appears exactly once and all
+requested card payloads are present (10 cards in the shared scenarios). For
+staggered, the first chunk must flush before the slowest data could resolve and
+the stream must outlive the 50ms schedule.
 Protocol payload decoding is confined to this verification pass; measured
-bytes, chunks, and timings always use the original wire output. Chunk framing
-is deliberately NOT gated; it's part of the result.
+bytes, chunks, and timings always use the original wire output. The shared
+timer-based scenarios do not fix chunk framing; it is part of the result. The
+controlled CPU cases additionally require the same chunk count in every timed
+sample, because consumer acceptance drives their producer schedule.
 
 ## Run
 
@@ -128,3 +137,9 @@ TARGETS=octane,react node benchmarks/streaming-ssr/run.mjs 10 --no-build
 `BENCH_JSON` ops per target: `shell_staggered`, `total_staggered`,
 `shell_allfast`, `total_allfast` (the latter carries `opsPerSec`); chunk
 counts, bytes, skeleton counts and all-fast renders/sec land in `meta`.
+Octane additionally reports `shell_cpu_10`, `total_cpu_10`, `shell_cpu_100`,
+`total_cpu_100`, `shell_cpu_waves_50`, and `total_cpu_waves_50`, with the actual
+card/group sizes, chunks, and bytes in `meta.controlledCpu`. Every CPU case
+passes the same complete-card-output gate and checks that the shell precedes
+the controlled data. Increase the iteration count for sub-millisecond cases;
+quick smoke runs establish correctness, not a performance claim.
