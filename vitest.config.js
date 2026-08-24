@@ -1382,7 +1382,10 @@ export default defineConfig({
 			{
 				testExecution: {
 					group: 'react-parity',
-					include: ['packages/waypoint/tests/waypoint.test.ts'],
+					include: [
+						'packages/waypoint/tests/hydration/hydration.test.ts',
+						'packages/waypoint/tests/waypoint.test.ts',
+					],
 				},
 				test: {
 					name: 'waypoint',
