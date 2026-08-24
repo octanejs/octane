@@ -1,5 +1,19 @@
 # @octanejs/tanstack-query
 
+## 0.1.44
+
+### Patch Changes
+
+- fd6ce69: Keep strict source consumers compatible with Query core 5.102, which removed experimental render-time prefetching and query-result promises, while preserving the legacy behavior with Query core 5.101.
+- Updated dependencies [5b1e6a3]
+- Updated dependencies [31abee5]
+- Updated dependencies [fd6ce69]
+- Updated dependencies [5f7a457]
+- Updated dependencies [5227d7b]
+- Updated dependencies [6927595]
+- Updated dependencies [f1a7802]
+  - octane@0.1.45
+
 ## 0.1.43
 
 ### Patch Changes
