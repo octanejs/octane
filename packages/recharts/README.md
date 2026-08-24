@@ -13,6 +13,18 @@ byte-identical to upstream in the differential rig. The phased plan lives in
 import { BarChart, Bar, XAxis, YAxis } from '@octanejs/recharts';
 ```
 
+## TypeScript
+
+The package exports authored TypeScript and `.tsrx` source, including its component
+prop types. Check applications with `tsrx-tsc --noEmit` and the
+`octane/compiler/volar` compiler configured by the Octane CLI. Plain `tsc` does not
+check `.tsrx` implementations.
+
+The package is checked with `strict: true`, `skipLibCheck: false`, and no Node
+ambient types. `BarProps`, `PieProps`, and the other component prop exports come
+from the implementations, not a separate declaration facade. Events use native
+DOM types, and refs use Octane's ref-as-prop contract.
+
 ## Status
 
 Current scope, known divergences, and verification status are tracked in the

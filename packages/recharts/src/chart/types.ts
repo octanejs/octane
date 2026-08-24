@@ -1,4 +1,3 @@
-// @ts-nocheck -- compatibility-only upstream type surface is not part of the initial runtime port.
 import type { MouseHandlerDataParam } from '../synchronisation/types';
 
 export type TooltipTrigger = 'hover' | 'click';

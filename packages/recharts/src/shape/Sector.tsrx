@@ -1,3 +1,38 @@
+import type { NativeMouseEvent, SVGProps } from '../util/OctaneTypes.ts';
+import type { GeometrySector, GeometrySectorWithCornerRadius } from '../util/types';
+
+interface TangentCircleDef {
+	cx: number;
+	cy: number;
+	radius: number;
+	angle: number;
+	sign: number;
+	isExternal?: boolean;
+	cornerRadius: number;
+	cornerIsExternal?: boolean;
+}
+interface SectorProps {
+	className?: SVGProps<SVGPathElement>['className'];
+	cx?: number;
+	cy?: number;
+	innerRadius?: number;
+	outerRadius?: number;
+	startAngle?: number;
+	endAngle?: number;
+	cornerRadius?: number;
+	forceCornerRadius?: boolean;
+	cornerIsExternal?: boolean;
+	onClick?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseDown?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseUp?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseMove?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseOver?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseOut?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseEnter?: (e: NativeMouseEvent<SVGPathElement>) => void;
+	onMouseLeave?: (e: NativeMouseEvent<SVGPathElement>) => void;
+}
+export type Props =
+	Omit<SVGProps<SVGPathElement>, 'cx' | 'cy' | 'dangerouslySetInnerHTML'> & Partial<SectorProps>;
 // Port of shape/Sector.tsx — the pie/radial-bar wedge (arc path with optional
 // per-corner rounding). Path strings must be BYTE-IDENTICAL to upstream:
 // recharts builds them with roundTemplateLiteral (every interpolated number
@@ -11,7 +46,7 @@ import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { svgPropertiesAndEvents } from '../util/svgPropertiesAndEvents.ts';
 import { roundTemplateLiteral } from '../util/round';
 
-const getDeltaAngle = (startAngle, endAngle) => {
+const getDeltaAngle = (startAngle: number, endAngle: number) => {
 	const sign = mathSign(endAngle - startAngle);
 	const deltaAngle = Math.min(Math.abs(endAngle - startAngle), 359.999);
 	return sign * deltaAngle;
@@ -26,7 +61,7 @@ const getTangentCircle = ({
 	isExternal,
 	cornerRadius,
 	cornerIsExternal,
-}) => {
+}: TangentCircleDef) => {
 	const centerRadius = cornerRadius * (isExternal ? 1 : -1) + radius;
 	const theta = Math.asin(cornerRadius / centerRadius) / RADIAN;
 	const centerAngle = cornerIsExternal ? angle : angle + sign * theta;
@@ -44,7 +79,14 @@ const getTangentCircle = ({
 	return { center, circleTangency, lineTangency, theta };
 };
 
-const getSectorPath = ({ cx, cy, innerRadius, outerRadius, startAngle, endAngle }) => {
+const getSectorPath = ({
+	cx,
+	cy,
+	innerRadius,
+	outerRadius,
+	startAngle,
+	endAngle,
+}: GeometrySector) => {
 	const angle = getDeltaAngle(startAngle, endAngle);
 
 	// When the angle of sector equals to 360, start point and end point coincide
@@ -85,7 +127,7 @@ const getSectorWithCorner = ({
 	cornerIsExternal,
 	startAngle,
 	endAngle,
-}) => {
+}: GeometrySectorWithCornerRadius) => {
 	const sign = mathSign(endAngle - startAngle);
 	const { circleTangency: soct, lineTangency: solt, theta: sot } = getTangentCircle({
 		cx,
@@ -177,9 +219,9 @@ export const defaultSectorProps = {
 	cornerRadius: 0,
 	forceCornerRadius: false,
 	cornerIsExternal: false,
-};
+} as const satisfies Partial<Props>;
 
-export function Sector(sectorProps) {
+export function Sector(sectorProps: Props) {
 	const props = resolveDefaultProps(sectorProps, defaultSectorProps);
 	const {
 		cx,

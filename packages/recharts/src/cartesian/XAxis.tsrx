@@ -1,3 +1,58 @@
+import type { OctaneElement } from '../util/OctaneTypes.ts';
+import type {
+	AxisInterval,
+	AxisTick,
+	RenderableAxisProps,
+	PresentationAttributesAdaptChildEvent,
+	AxisDomain,
+	ScaleType,
+	AxisDomainTypeInput,
+	EvaluatedAxisDomainType,
+	TickProp,
+	XAxisTickContentProps,
+	TickItem,
+} from '../util/types';
+import type {
+	XAxisOrientation,
+	XAxisPadding,
+	XAxisSettings,
+	NiceTicksAlgorithm,
+} from '../state/cartesianAxisSlice';
+import type { RequiresDefaultProps } from '../util/resolveDefaultProps';
+import type { CustomScaleDefinition } from '../util/scale/CustomScaleDefinition';
+
+interface XAxisProps<DataPointType = any, DataValueType = any> extends Omit<
+	RenderableAxisProps<DataPointType, DataValueType>,
+	'domain' | 'scale' | 'tick'
+> {
+	type?: AxisDomainTypeInput;
+	xAxisId?: string | number;
+	height?: number;
+	mirror?: boolean;
+	orientation?: XAxisOrientation;
+	domain?: AxisDomain;
+	scale?: | ScaleType
+	| CustomScaleDefinition
+	| CustomScaleDefinition<string>
+	| CustomScaleDefinition<number>
+	| CustomScaleDefinition<Date>;
+	tick?: TickProp<XAxisTickContentProps>;
+	ticks?: ReadonlyArray<AxisTick>;
+	padding?: XAxisPadding;
+	minTickGap?: number;
+	interval?: AxisInterval;
+	tickMargin?: number;
+	fontSize?: number | string;
+	letterSpacing?: number | string;
+	niceTicks?: NiceTicksAlgorithm;
+}
+export type Props<DataPointType = any, DataValueType = any> =
+	Omit<
+		PresentationAttributesAdaptChildEvent<TickItem, SVGTextElement>,
+		'scale' | 'ref'
+	> & XAxisProps<DataPointType, DataValueType>;
+type PropsWithDefaults<DataPointType = any, DataValueType = any> =
+	RequiresDefaultProps<Props<DataPointType, DataValueType>, typeof xAxisDefaultProps>;
 // Port of cartesian/XAxis.tsx — registers x-axis settings in the store and
 // renders through CartesianAxis with store-synchronized settings.
 import { useLayoutEffect, useMemo, useRef, memo } from 'octane';
@@ -19,13 +74,19 @@ import { axisPropsAreEqual } from '../util/axisPropsAreEqual';
 import { useCartesianChartLayout } from '../context/chartLayoutContext.ts';
 import { getAxisTypeBasedOnLayout } from '../util/getAxisTypeBasedOnLayout';
 
-function SetXAxisSettings(props) {
+function SetXAxisSettings(props: Omit<XAxisSettings, 'type'> & {
+	type: AxisDomainTypeInput;
+}) {
 	const dispatch = useAppDispatch();
-	const prevSettingsRef = useRef(null);
+	const prevSettingsRef = useRef<XAxisSettings | null>(null);
 	const layout = useCartesianChartLayout();
 	const { type: typeFromProps, ...restProps } = props;
-	const evaluatedType = getAxisTypeBasedOnLayout(layout, 'xAxis', typeFromProps);
-	const settings = useMemo(() => {
+	const evaluatedType: EvaluatedAxisDomainType | undefined = getAxisTypeBasedOnLayout(
+		layout,
+		'xAxis',
+		typeFromProps,
+	);
+	const settings: XAxisSettings | undefined = useMemo(() => {
 		if (evaluatedType == null) {
 			return undefined;
 		}
@@ -53,7 +114,7 @@ function SetXAxisSettings(props) {
 	return null;
 }
 
-function XAxisImpl(props) {
+function XAxisImpl(props: PropsWithDefaults) {
 	const { xAxisId, className } = props;
 	const viewBox = useAppSelector(selectAxisViewBox);
 	const isPanorama = useIsPanorama();
@@ -112,10 +173,15 @@ export const xAxisDefaultProps = {
 	type: implicitXAxis.type,
 	niceTicks: implicitXAxis.niceTicks,
 	xAxisId: 0,
-};
+} as const satisfies Partial<Props>;
 
-function XAxisSettingsDispatcher(outsideProps) @{
-	const props = resolveDefaultProps(outsideProps, xAxisDefaultProps);
+function XAxisSettingsDispatcher<DataPointType = any, DataValueType = any>(
+	outsideProps: Props<DataPointType, DataValueType>,
+) @{
+	const props: PropsWithDefaults<DataPointType, DataValueType> = resolveDefaultProps(
+		outsideProps,
+		xAxisDefaultProps,
+	);
 	<>
 		<SetXAxisSettings
 			allowDataOverflow={props.allowDataOverflow}
@@ -152,5 +218,8 @@ function XAxisSettingsDispatcher(outsideProps) @{
  * @consumes CartesianViewBoxContext
  * @provides CartesianLabelContext
  */
-export const XAxis = memo(XAxisSettingsDispatcher, axisPropsAreEqual);
+export const XAxis = memo(
+	XAxisSettingsDispatcher,
+	axisPropsAreEqual,
+) as typeof XAxisSettingsDispatcher & { displayName?: string };
 XAxis.displayName = 'XAxis';

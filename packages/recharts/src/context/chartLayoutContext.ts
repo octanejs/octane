@@ -12,11 +12,22 @@ import {
 import { selectChartHeight, selectChartWidth } from '../state/selectors/containerSelectors';
 import { useIsPanorama } from './PanoramaContext';
 import { selectBrushDimensions, selectBrushSettings } from '../state/selectors/brushSelectors';
-import { useResponsiveContainerContext } from '../component/ResponsiveContainer';
+import { useResponsiveContainerContext } from '../component/ResponsiveContainer.tsrx';
 import { isPositiveNumber } from '../util/isWellBehavedNumber';
 import { splitSlot, subSlot } from '../internal';
+import type { RechartsRootState } from '../state/store';
+import type { CartesianViewBoxRequired, Margin, TrapezoidViewBox } from '../util/types';
 
-export function cartesianViewBoxToTrapezoid(box: any) {
+export function cartesianViewBoxToTrapezoid(box: undefined): undefined;
+export function cartesianViewBoxToTrapezoid(
+	box: CartesianViewBoxRequired | TrapezoidViewBox,
+): TrapezoidViewBox;
+export function cartesianViewBoxToTrapezoid(
+	box: CartesianViewBoxRequired | TrapezoidViewBox | undefined,
+): TrapezoidViewBox | undefined;
+export function cartesianViewBoxToTrapezoid(
+	box: CartesianViewBoxRequired | TrapezoidViewBox | undefined,
+): TrapezoidViewBox | undefined {
 	if (!box) {
 		return undefined;
 	}
@@ -81,7 +92,7 @@ export const useChartHeight = (...rest: any[]) => {
 	return useAppSelector(selectChartHeight, subSlot(slot, 'clc:height'));
 };
 
-const selectMargin = (state: any) => state.layout.margin;
+const selectMargin = (state: RechartsRootState) => state.layout.margin;
 
 /** The chart's margin (empty space around the plot), or `undefined` outside a chart. */
 export const useMargin = (...rest: any[]) => {
@@ -89,7 +100,7 @@ export const useMargin = (...rest: any[]) => {
 	return useAppSelector(selectMargin, subSlot(slot, 'clc:margin'));
 };
 
-export const selectChartLayout = (state: any) => state.layout.layoutType;
+export const selectChartLayout = (state: RechartsRootState) => state.layout.layoutType;
 
 /**
  * The chart layout as configured by the chart (`horizontal`/`vertical` for
@@ -111,7 +122,7 @@ export const useCartesianChartLayout = (...rest: any[]) => {
 	return undefined;
 };
 
-export const selectPolarChartLayout = (state: any) => {
+export const selectPolarChartLayout = (state: RechartsRootState) => {
 	const layout = state.layout.layoutType;
 	if (layout === 'centric' || layout === 'radial') {
 		return layout;
@@ -132,7 +143,10 @@ export const useIsInChartContext = (...rest: any[]) => {
 	return layout !== undefined;
 };
 
-export const ReportChartSize = (props: { width: number; height: number }): null => {
+export const ReportChartSize = (props: {
+	width: number | string | undefined;
+	height: number | string | undefined;
+}): null => {
 	const dispatch = useAppDispatch();
 	// Skip dispatching in a panorama chart: the ROOT chart decides these, and
 	// Brush reads them from the store (stability avoids a re-render cycle).
@@ -161,7 +175,7 @@ export const ReportChartSize = (props: { width: number; height: number }): null 
 	return null;
 };
 
-export const ReportChartMargin = (props: { margin: unknown }): null => {
+export const ReportChartMargin = (props: { margin: Partial<Margin> }): null => {
 	const { margin } = props;
 	const dispatch = useAppDispatch();
 	useEffect(() => {

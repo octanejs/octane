@@ -1,12 +1,19 @@
+import type {
+	FunctionComponent,
+	NativeMouseEvent,
+	OctaneElement,
+	OctaneNode,
+	SVGProps,
+} from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { FunctionComponent, ReactElement, ReactNode, SVGProps, useEffect, useMemo } from 'octane';
+import { useEffect, useMemo } from 'octane';
 import maxBy from 'es-toolkit/compat/maxBy';
 import minBy from 'es-toolkit/compat/minBy';
 
 import { clsx } from 'clsx';
-import { Text } from '../component/Text';
-import { PolarLabelContextProvider, PolarLabelFromLabelProp } from '../component/Label';
-import { Layer } from '../container/Layer';
+import { Text } from '../component/Text.tsrx';
+import { PolarLabelContextProvider, PolarLabelFromLabelProp } from '../component/Label.tsrx';
+import { Layer } from '../container/Layer.tsrx';
 import { polarToCartesian } from '../util/PolarUtils';
 import {
 	adaptEventsOfChild,
@@ -20,7 +27,7 @@ import {
 	AxisDomainTypeInput,
 	EvaluatedAxisDomainType,
 	TickProp,
-	BaseTickContentProps,
+	PolarTickContentProps,
 	AxisTick,
 } from '../util/types';
 import { addRadiusAxis, RadiusAxisSettings, removeRadiusAxis } from '../state/polarAxisSlice';
@@ -34,7 +41,7 @@ import {
 	svgPropertiesNoEventsFromUnknown,
 } from '../util/svgPropertiesNoEvents';
 import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { RechartsScale } from '../util/scale/RechartsScale';
 import type { CustomScaleDefinition } from '../util/scale/CustomScaleDefinition';
 import { usePolarChartLayout } from '../context/chartLayoutContext';
@@ -133,35 +140,35 @@ export interface PolarRadiusAxisProps<DataPointType = any, DataValueType = any> 
 	/**
  * The customized event handler of click on the ticks of this axis
  */
-	onClick?: (data: any, index: number, e: React.MouseEvent) => void;
+	onClick?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mousedown on the ticks of this axis
  */
-	onMouseDown?: (data: any, index: number, e: React.MouseEvent) => void;
+	onMouseDown?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseup on the ticks of this axis
  */
-	onMouseUp?: (data: any, index: number, e: React.MouseEvent) => void;
+	onMouseUp?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mousemove on the ticks of this axis
  */
-	onMouseMove?: (data: any, index: number, e: React.MouseEvent) => void;
+	onMouseMove?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseover on the ticks of this axis
  */
-	onMouseOver?: (data: any, index: number, e: React.MouseEvent) => void;
+	onMouseOver?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseout on the ticks of this axis
  */
-	onMouseOut?: (data: any, index: number, e: React.MouseEvent) => void;
+	onMouseOut?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseenter on the ticks of this axis
  */
-	onMouseEnter?: (data: any, index: number, e: React.MouseEvent) => void;
+	onMouseEnter?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseleave on the ticks of this axis
  */
-	onMouseLeave?: (data: any, index: number, e: React.MouseEvent) => void;
+	onMouseLeave?: (data: any, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * Allow the ticks of axis to be decimals or not.
  *
@@ -190,12 +197,12 @@ export interface PolarRadiusAxisProps<DataPointType = any, DataValueType = any> 
  * - `false`: Do not render any tick labels.
  * - `true`: Render tick labels with default settings.
  * - `object`: An object of props to be merged into the internally calculated tick props.
- * - `ReactElement`: A custom React element to be used as the tick label.
+ * - `OctaneElement`: A custom React element to be used as the tick label.
  * - `function`: A function that returns a React element for custom rendering of tick labels.
  *
  * @defaultValue true
  */
-	tick?: TickProp<BaseTickContentProps>;
+	tick?: TickProp<PolarTickContentProps>;
 	ticks?: ReadonlyArray<AxisTick>;
 	/**
  * Z-Index of this component and its children. The higher the value,
@@ -211,7 +218,9 @@ export interface PolarRadiusAxisProps<DataPointType = any, DataValueType = any> 
 }
 
 type AxisSvgProps =
-	Omit<PresentationAttributesAdaptChildEvent<any, SVGTextElement>, 'scale' | 'type'>;
+	Omit<PresentationAttributesAdaptChildEvent<any, SVGGElement>, 'scale' | 'type' | 'ref'> & {
+		ref?: never;
+	};
 
 export type Props<DataPointType = any, DataValueType = any> =
 	AxisSvgProps & PolarRadiusAxisProps<DataPointType, DataValueType>;
@@ -310,7 +319,7 @@ const getViewBox = (
 	};
 };
 
-const renderAxisLine = (props: InsideProps, ticks: ReadonlyArray<TickItem>): ReactElement => {
+const renderAxisLine = (props: InsideProps, ticks: ReadonlyArray<TickItem>): OctaneElement => {
 	const { cx, cy, angle, axisLine, ...others } = props;
 	const extent: [number, number] = ticks.reduce(
 		(result: [number, number], entry: TickItem): [number, number] => [
@@ -332,7 +341,6 @@ const renderAxisLine = (props: InsideProps, ticks: ReadonlyArray<TickItem>): Rea
 		y2: point1.y,
 	};
 
-	// @ts-expect-error wrong SVG element type
 	return <line className="recharts-polar-radius-axis-line" {...axisLineProps} />;
 };
 
@@ -340,7 +348,7 @@ const renderTickItem = (
 	option: Props['tick'],
 	tickProps: any,
 	value: string | number,
-): ReactNode => {
+): OctaneNode => {
 	let tickItem;
 
 	if (React.isValidElement(option)) {
@@ -357,7 +365,7 @@ const renderTickItem = (
 	return tickItem;
 };
 
-const renderTicks = (props: InsideProps, ticks: ReadonlyArray<TickItem>): ReactElement => {
+const renderTicks = (props: InsideProps, ticks: ReadonlyArray<TickItem>): OctaneElement => {
 	const { angle, tickFormatter, stroke, tick, ...others } = props;
 	const textAnchor = getTickTextAnchor(props.orientation);
 	const axisProps = svgPropertiesNoEvents(others);

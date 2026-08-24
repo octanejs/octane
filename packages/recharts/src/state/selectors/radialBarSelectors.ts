@@ -1,7 +1,8 @@
+import type { RegisteredCell } from '../../context/CellsContext';
 import { createSelector } from 'reselect';
-import { ReactElement } from 'octane';
+
 import { Series } from 'victory-vendor/d3-shape';
-import { computeRadialBarDataItems, RadialBarDataItem } from '../../polar/RadialBar';
+import { computeRadialBarDataItems, RadialBarDataItem } from '../../polar/RadialBar.tsrx';
 import { selectChartDataAndAlwaysIgnoreIndexes, selectChartDataWithIndexes } from './dataSelectors';
 import { RechartsRootState } from '../store';
 import { ChartDataState } from '../chartDataSlice';
@@ -37,7 +38,7 @@ import {
 	selectUnfilteredPolarItems,
 } from './polarSelectors';
 import { AngleAxisSettings, RadiusAxisSettings } from '../polarAxisSlice';
-import { LegendPayload } from '../../component/DefaultLegendContent';
+import { LegendPayload } from '../../component/DefaultLegendContent.tsrx';
 import { isNullish } from '../../util/DataUtils';
 
 import type {
@@ -198,7 +199,7 @@ const pickCells = (
 	_radiusAxisId: AxisId,
 	_angleAxisId: AxisId,
 	_radialBarSettings: RadialBarSettings,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 ) => cells;
 
 const pickAngleAxisId = (
@@ -206,7 +207,7 @@ const pickAngleAxisId = (
 	_radiusAxisId: AxisId,
 	angleAxisId: AxisId,
 	_radialBarSettings: RadialBarSettings,
-	_cells: ReadonlyArray<ReactElement> | undefined,
+	_cells: ReadonlyArray<RegisteredCell> | undefined,
 ): AxisId => angleAxisId;
 
 const pickRadiusAxisId = (
@@ -214,7 +215,7 @@ const pickRadiusAxisId = (
 	radiusAxisId: AxisId,
 	_angleAxisId: AxisId,
 	_radialBarSettings: RadialBarSettings,
-	_cells: ReadonlyArray<ReactElement> | undefined,
+	_cells: ReadonlyArray<RegisteredCell> | undefined,
 ): AxisId => radiusAxisId;
 
 export const pickMaxBarSize = (
@@ -222,7 +223,7 @@ export const pickMaxBarSize = (
 	_radiusAxisId: AxisId,
 	_angleAxisId: AxisId,
 	radialBarSettings: RadialBarSettings,
-	_cells: ReadonlyArray<ReactElement> | undefined,
+	_cells: ReadonlyArray<RegisteredCell> | undefined,
 ): number | undefined => radialBarSettings.maxBarSize;
 
 const isRadialBar = (item: PolarGraphicalItemSettings): item is RadialBarSettings =>
@@ -233,7 +234,7 @@ const selectAllVisibleRadialBars: (
 	radiusAxisId: AxisId,
 	angleAxisId: AxisId,
 	radialBarSettings: RadialBarSettings,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 ) => ReadonlyArray<RadialBarSettings> = createSelector(
 	[selectChartLayout, selectUnfilteredPolarItems, pickAngleAxisId, pickRadiusAxisId],
 	(
@@ -266,7 +267,7 @@ export const selectPolarBarSizeList: (
 	radiusAxisId: AxisId,
 	angleAxisId: AxisId,
 	radialBarSettings: RadialBarSettings,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 ) => SizeList = createSelector(
 	[selectAllVisibleRadialBars, selectRootBarSize, selectPolarBarAxisSize],
 	combineBarSizeList,
@@ -277,7 +278,7 @@ export const selectPolarBarBandSize: (
 	radiusAxisId: AxisId,
 	angleAxisId: AxisId,
 	radialBarSettings: RadialBarSettings,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 ) => number = createSelector(
 	[
 		selectChartLayout,
@@ -312,7 +313,7 @@ export const selectAllPolarBarPositions: (
 	radiusAxisId: AxisId,
 	angleAxisId: AxisId,
 	radialBarSettings: RadialBarSettings,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 ) => ReadonlyArray<BarWithPosition> | undefined = createSelector(
 	[
 		selectPolarBarSizeList,
@@ -331,7 +332,7 @@ export const selectPolarBarPosition: (
 	radiusAxisId: AxisId,
 	angleAxisId: AxisId,
 	radialBarSettings: RadialBarSettings,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 ) => BarPositionPosition | undefined = createSelector(
 	[selectAllPolarBarPositions, selectSynchronisedRadialBarSettings],
 	combineBarPosition,
@@ -377,7 +378,7 @@ const selectRadialBarStackGroups: (
 	radiusAxisId: AxisId,
 	angleAxisId: AxisId,
 	radialBarSettings: RadialBarSettings,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 ) => AllStackGroups | undefined = (state, radiusAxisId, angleAxisId) => {
 	const layout = selectChartLayout(state);
 	if (layout === 'centric') {
@@ -391,7 +392,7 @@ const selectPolarStackedData: (
 	radiusAxisId: AxisId,
 	angleAxisId: AxisId,
 	radialBarSettings: RadialBarSettings,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 ) => StackSeries | undefined = createSelector(
 	[selectRadialBarStackGroups, selectSynchronisedRadialBarSettings],
 	combineStackedData,
@@ -402,7 +403,7 @@ export const selectRadialBarSectors: (
 	radiusAxisId: AxisId,
 	angleAxisId: AxisId,
 	radialBarSettings: RadialBarSettings,
-	cells: ReadonlyArray<ReactElement> | undefined,
+	cells: ReadonlyArray<RegisteredCell> | undefined,
 ) => ReadonlyArray<RadialBarDataItem> = createSelector(
 	[
 		selectAngleAxisWithScale,
@@ -430,7 +431,7 @@ export const selectRadialBarSectors: (
 		layout: LayoutType,
 		baseValue: number | unknown,
 		polarViewBox: PolarViewBoxRequired | undefined,
-		cells: ReadonlyArray<ReactElement> | undefined,
+		cells: ReadonlyArray<RegisteredCell> | undefined,
 		pos: BarPositionPosition | undefined,
 		stackedData: Series<StackDataPoint, StackSeriesIdentifier> | undefined,
 	): ReadonlyArray<RadialBarDataItem> => {

@@ -1,5 +1,16 @@
+import type { CellPropsFor } from '../component/Cell';
+import type { RegisteredCell } from '../context/CellsContext.ts';
+
+import type {
+	ComponentProps,
+	MutableRefObject,
+	NativeMouseEvent,
+	NativeTouchEvent,
+	OctaneElement,
+	OctaneNode,
+} from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { MutableRefObject, ReactElement, ReactNode, useRef } from 'octane';
+import { useRef } from 'octane';
 import { clsx } from 'clsx';
 
 import { Series } from 'victory-vendor/d3-shape';
@@ -8,15 +19,15 @@ import {
 	parseCornerRadius,
 	RadialBarSector,
 	RadialBarSectorProps,
-} from '../util/RadialBarUtils';
-import { Props as SectorProps } from '../shape/Sector';
-import { Layer } from '../container/Layer';
+} from '../util/RadialBarUtils.tsrx';
+import { defaultSectorProps, type Props as SectorProps } from '../shape/Sector.tsrx';
+import { Layer } from '../container/Layer.tsrx';
 import {
 	ImplicitLabelListType,
 	LabelListFromLabelProp,
 	PolarLabelListContextProvider,
 	PolarLabelListEntry,
-} from '../component/LabelList';
+} from '../component/LabelList.tsrx';
 import { interpolate, mathSign, noop } from '../util/DataUtils';
 import {
 	BarPositionPosition,
@@ -33,9 +44,9 @@ import {
 	EasingInput,
 	DataConsumer,
 	DataKey,
+	GeometrySector,
 	LayoutType,
 	LegendType,
-	PolarViewBoxRequired,
 	PresentationAttributesAdaptChildEvent,
 	ShapeAnimationProps,
 	TickItem,
@@ -50,7 +61,7 @@ import {
 } from '../context/tooltipContext';
 import { TooltipPayloadConfiguration } from '../state/tooltipSlice';
 import { SetTooltipEntrySettings } from '../state/SetTooltipEntrySettings';
-import { Formatter } from '../component/DefaultTooltipContent';
+import { Formatter } from '../component/DefaultTooltipContent.tsrx';
 import { BaseAxisWithScale } from '../state/selectors/axisSelectors';
 import { ChartData } from '../state/chartDataSlice';
 import {
@@ -64,10 +75,10 @@ import {
 	AnimatedItems,
 	AnimationInterpolateFn,
 	useAnimationCallbacks,
-} from '../animation/AnimatedItems';
+} from '../animation/AnimatedItems.tsrx';
 import { AnimationMatchByProp, matchAppend } from '../animation/matchBy';
 import { AxisId } from '../state/cartesianAxisSlice';
-import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId';
+import { RegisterGraphicalItemId } from '../context/RegisterGraphicalItemId.tsrx';
 import type { RadialBarSettings } from '../state/types/RadialBarSettings';
 import { SetPolarGraphicalItem } from '../state/SetGraphicalItem';
 import {
@@ -76,7 +87,7 @@ import {
 } from '../util/svgPropertiesNoEvents';
 import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 import { WithIdRequired } from '../util/useUniqueId';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { getZIndexFromUnknown } from '../zIndex/getZIndexFromUnknown';
 import { usePolarChartLayout } from '../context/chartLayoutContext';
@@ -85,7 +96,7 @@ import { CellsContext, useCellRegistry } from '../context/CellsContext';
 const STABLE_EMPTY_ARRAY: readonly RadialBarDataItem[] = [];
 
 export type RadialBarDataItem =
-	SectorProps & PolarViewBoxRequired & TooltipTriggerInfo & {
+	SectorProps & GeometrySector & TooltipTriggerInfo & {
 		value?: any;
 		payload?: any;
 		background?: SectorProps;
@@ -107,7 +118,7 @@ function RadialBarLabelListProvider({
 }: {
 	showLabels: boolean;
 	sectors: ReadonlyArray<RadialBarDataItem>;
-	children: ReactNode;
+	children: OctaneNode;
 }) {
 	const labelListEntries: ReadonlyArray<PolarLabelListEntry> = sectors.map(
 		(sector: RadialBarDataItem): PolarLabelListEntry => ({
@@ -175,7 +186,7 @@ function RadialBarSectors({
 			const onMouseLeave = onMouseLeaveFromContext(entry, i);
 			const onClick = onClickFromContext(entry, i);
 
-			const radialBarSectorProps: React.ComponentProps<typeof RadialBarSector> = {
+			const radialBarSectorProps: ComponentProps<typeof RadialBarSector> = {
 				...baseProps,
 				cornerRadius: parseCornerRadius(cornerRadius),
 				...entry,
@@ -371,7 +382,7 @@ interface InternalRadialBarProps<DataPointType = any, DataValueType = any> exten
  *  - `false`: no background;
  *  - `true`: renders default background;
  *  - `object`: the props of background rectangle;
- *  - `ReactElement`: a custom background element;
+ *  - `OctaneElement`: a custom background element;
  *  - `function`: a render function of custom background.
  *
  * @defaultValue false
@@ -413,7 +424,7 @@ interface InternalRadialBarProps<DataPointType = any, DataValueType = any> exten
  * - `true`: renders default labels;
  * - `false`: no labels are rendered;
  * - `object`: the props of LabelList component;
- * - `ReactElement`: a custom SVG label element, such as `<text>` or `<g>`.
+ * - `OctaneElement`: a custom SVG label element, such as `<text>` or `<g>`.
  *   HTML elements such as `<div>` are not valid inside the chart SVG and may trigger React DOM warnings.
  * - `function`: a render function of custom label.
  *
@@ -441,58 +452,58 @@ interface InternalRadialBarProps<DataPointType = any, DataValueType = any> exten
 	/**
  * The customized event handler of click in this chart.
  */
-	onClick?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+	onClick?: (data: RadialBarDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mousedown in this chart.
  */
-	onMouseDown?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+	onMouseDown?: (data: RadialBarDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mouseup in this chart.
  */
-	onMouseUp?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+	onMouseUp?: (data: RadialBarDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mousemove in this chart.
  */
-	onMouseMove?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+	onMouseMove?: (data: RadialBarDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mouseover in this chart.
  */
-	onMouseOver?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+	onMouseOver?: (data: RadialBarDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mouseout in this chart.
  */
-	onMouseOut?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+	onMouseOut?: (data: RadialBarDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mouseenter in this chart.
  */
-	onMouseEnter?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+	onMouseEnter?: (data: RadialBarDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
  * The customized event handler of mouseleave in this chart.
  */
-	onMouseLeave?: (data: RadialBarDataItem, index: number, e: React.MouseEvent<
+	onMouseLeave?: (data: RadialBarDataItem, index: number, e: NativeMouseEvent<
 		SVGGraphicsElement
 	>) => void;
-	onTouchStart?: (data: RadialBarDataItem, index: number, e: React.TouchEvent<
+	onTouchStart?: (data: RadialBarDataItem, index: number, e: NativeTouchEvent<
 		SVGGraphicsElement
 	>) => void;
-	onTouchMove?: (data: RadialBarDataItem, index: number, e: React.TouchEvent<
+	onTouchMove?: (data: RadialBarDataItem, index: number, e: NativeTouchEvent<
 		SVGGraphicsElement
 	>) => void;
-	onTouchEnd?: (data: RadialBarDataItem, index: number, e: React.TouchEvent<
+	onTouchEnd?: (data: RadialBarDataItem, index: number, e: NativeTouchEvent<
 		SVGGraphicsElement
 	>) => void;
 	/**
@@ -500,7 +511,7 @@ interface InternalRadialBarProps<DataPointType = any, DataValueType = any> exten
  */
 	radiusAxisId?: AxisId;
 	/**
- * If set a ReactElement, the shape of radial bar sectors can be customized.
+ * If set a OctaneElement, the shape of radial bar sectors can be customized.
  * If set a function, the function will be called to render customized shape.
  * During animations, the function shape also receives `animationElapsedTime`, `isAnimating`, and `isEntrance`.
  * By default, renders a sector.
@@ -594,10 +605,9 @@ function renderBackground(props: InternalProps, sectors?: ReadonlyArray<RadialBa
 			return null;
 		}
 
-		const sectorProps: React.ComponentProps<typeof RadialBarSector> = {
+		const sectorProps: ComponentProps<typeof RadialBarSector> = {
 			cornerRadius: parseCornerRadius(cornerRadius),
 			...rest,
-			// @ts-expect-error backgroundProps is contributing unknown props
 			fill: '#eee',
 			...background,
 			...backgroundProps,
@@ -755,7 +765,7 @@ export function computeRadialBarDataItems({
 	cx: number;
 	cy: number;
 	angleAxisTicks: ReadonlyArray<TickItem> | undefined;
-	cells: ReadonlyArray<ReactElement> | undefined;
+	cells: ReadonlyArray<RegisteredCell> | undefined;
 	startAngle: number;
 	endAngle: number;
 }): ReadonlyArray<RadialBarDataItem> {
@@ -764,12 +774,18 @@ export function computeRadialBarDataItems({
 	}
 
 	return (displayedData ?? []).map((entry: unknown, index: number) => {
-		let value, innerRadius: number | null | undefined, outerRadius: | number
-		| undefined, startAngle: number | null, endAngle: number, backgroundSector;
+		let value;
+		let innerRadius: number | null | undefined;
+		let outerRadius: number | undefined;
+		let startAngle: number | null;
+		let endAngle: number | undefined;
+		let backgroundSector;
 
 		if (stackedData) {
-			// @ts-expect-error truncateByDomain expects only numerical domain, but it can received categorical domain too
-			value = truncateByDomain(stackedData[dataStartIndex + index], stackedDomain);
+			value = truncateByDomain(
+				stackedData[dataStartIndex + index],
+				stackedDomain as readonly number[],
+			);
 		} else {
 			value = getValueByDataKey(entry, dataKey);
 			if (!Array.isArray(value)) {
@@ -833,20 +849,21 @@ export function computeRadialBarDataItems({
 			}
 		}
 
+		// Unresolved scale values use the same zero geometry as the default
+		// Sector. Keep the row so custom shapes, Cell overrides, and tooltip
+		// indices still refer to the original datum.
 		return {
-			// @ts-expect-error can't spread unknown
-			...entry,
+			...entry as Record<string, unknown>,
 			...backgroundSector,
 			payload: entry,
 			value: stackedData ? value : value[1],
 			cx,
 			cy,
-			innerRadius,
-			outerRadius,
-			startAngle,
-			// @ts-expect-error endAngle is used before assigned (?)
-			endAngle,
-			...cells && cells[index] && cells[index].props,
+			innerRadius: innerRadius ?? defaultSectorProps.innerRadius,
+			outerRadius: outerRadius ?? defaultSectorProps.outerRadius,
+			startAngle: startAngle ?? defaultSectorProps.startAngle,
+			endAngle: endAngle ?? defaultSectorProps.endAngle,
+			...cells && cells[index] && cells[index].props as CellPropsFor<SVGPathElement>,
 		} satisfies RadialBarDataItem;
 	});
 }

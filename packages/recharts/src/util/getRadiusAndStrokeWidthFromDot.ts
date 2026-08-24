@@ -1,0 +1,31 @@
+// Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
+import { ActiveDotType, DotType } from './types';
+import { svgPropertiesNoEventsFromUnknown } from './svgPropertiesNoEvents';
+
+export function getRadiusAndStrokeWidthFromDot(dot: ActiveDotType | DotType): {
+	r: number;
+	strokeWidth: number;
+} {
+	const props = svgPropertiesNoEventsFromUnknown(dot);
+	const defaultR = 3;
+	const defaultStrokeWidth = 2;
+	if (props != null) {
+		const { r, strokeWidth } = props;
+		let realR = Number(r);
+		let realStrokeWidth = Number(strokeWidth);
+		if (Number.isNaN(realR) || realR < 0) {
+			realR = defaultR;
+		}
+		if (Number.isNaN(realStrokeWidth) || realStrokeWidth < 0) {
+			realStrokeWidth = defaultStrokeWidth;
+		}
+		return {
+			r: realR,
+			strokeWidth: realStrokeWidth,
+		};
+	}
+	return {
+		r: defaultR,
+		strokeWidth: defaultStrokeWidth,
+	};
+}

@@ -51,6 +51,9 @@ import type { Store } from 'redux';
 import { useStableQueryArgs } from './useSerializedStableValue';
 import { useShallowStableValue } from './useShallowStableValue';
 
+// Module-local type for the bundler's process.env.NODE_ENV replacement.
+declare const process: { env: { NODE_ENV?: string } };
+
 type DependencyList = any[];
 type InfiniteQueryDirection = 'forward' | 'backward';
 type RefObject<T> = { current: T };

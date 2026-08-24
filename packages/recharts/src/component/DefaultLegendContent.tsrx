@@ -1,9 +1,14 @@
+import type {
+	CSSProperties,
+	NativeMouseEvent,
+	OctaneElement,
+	OctaneNode,
+} from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { ReactNode, MouseEvent, ReactElement, CSSProperties } from 'octane';
 
 import { clsx } from 'clsx';
-import { Surface } from '../container/Surface';
-import { Symbols } from '../shape/Symbols';
+import { Surface } from '../container/Surface.tsrx';
+import { Symbols } from '../shape/Symbols.tsrx';
 import {
 	DataKey,
 	LegendType,
@@ -14,11 +19,11 @@ import {
 import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
 
 const SIZE = 32;
-export type ContentType = ReactElement | ((props: Props) => ReactNode);
+export type ContentType = OctaneElement | ((props: Props) => OctaneNode);
 
 export type HorizontalAlignmentType = 'center' | 'left' | 'right';
 export type VerticalAlignmentType = 'top' | 'bottom' | 'middle';
-export type Formatter = (value: any, entry: LegendPayload, index: number) => ReactNode;
+export type Formatter = (value: any, entry: LegendPayload, index: number) => OctaneNode;
 
 export interface LegendPayload {
 	/**
@@ -35,7 +40,7 @@ export interface LegendPayload {
 	payload?: object;
 	formatter?: Formatter;
 	inactive?: boolean;
-	legendIcon?: ReactElement<SVGElement>;
+	legendIcon?: OctaneElement<SVGElement>;
 	dataKey?: DataKey<any>;
 }
 
@@ -95,16 +100,16 @@ interface DefaultLegendContentProps {
  * The customized event handler of mouseenter on the items in this group
  * @example https://recharts.github.io/examples/LegendEffectOpacity
  */
-	onMouseEnter?: (data: LegendPayload, index: number, event: MouseEvent<HTMLElement>) => void;
+	onMouseEnter?: (data: LegendPayload, index: number, event: NativeMouseEvent<HTMLElement>) => void;
 	/**
  * The customized event handler of mouseleave on the items in this group
  * @example https://recharts.github.io/examples/LegendEffectOpacity
  */
-	onMouseLeave?: (data: LegendPayload, index: number, event: MouseEvent<HTMLElement>) => void;
+	onMouseLeave?: (data: LegendPayload, index: number, event: NativeMouseEvent<HTMLElement>) => void;
 	/**
  * The customized event handler of click on the items in this group
  */
-	onClick?: (data: LegendPayload, index: number, event: MouseEvent<HTMLElement>) => void;
+	onClick?: (data: LegendPayload, index: number, event: NativeMouseEvent<HTMLElement>) => void;
 	/**
  * DefaultLegendContent.payload is omitted from Legend props.
  * A custom payload can be passed here if desired, or it can be passed from the Legend "content" callback.
@@ -119,7 +124,7 @@ interface DefaultLegendContentProps {
 
 export type Props =
 	DefaultLegendContentProps & Omit<
-		PresentationAttributesAdaptChildEvent<any, ReactElement>,
+		PresentationAttributesAdaptChildEvent<any, OctaneElement>,
 		keyof DefaultLegendContentProps
 	>;
 

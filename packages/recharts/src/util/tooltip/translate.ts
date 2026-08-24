@@ -1,5 +1,6 @@
+import type { CSSProperties } from '../OctaneTypes';
 import { clsx } from 'clsx';
-import { CSSProperties } from 'octane';
+
 import { isNumber } from '../DataUtils';
 import { Coordinate, CartesianViewBox, AllowInDimension } from '../types';
 

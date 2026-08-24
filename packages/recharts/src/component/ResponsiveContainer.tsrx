@@ -1,4 +1,5 @@
-import type { OctaneNode } from 'octane';
+import type { CSSProperties, HTMLAttributes, OctaneNode, Ref } from '../util/OctaneTypes.ts';
+
 import {
 	createContext,
 	useCallback,
@@ -25,7 +26,10 @@ export interface ResponsiveContainerDimensions {
 	height: number;
 }
 
-export interface Props {
+export interface Props extends Omit<
+	HTMLAttributes<HTMLDivElement>,
+	'id' | 'className' | 'style' | 'onResize'
+> {
 	aspect?: number;
 	width?: `${number}%` | number;
 	height?: `${number}%` | number;
@@ -37,10 +41,9 @@ export interface Props {
 	debounce?: number;
 	id?: string | number;
 	className?: string | number;
-	style?: React.CSSProperties;
+	style?: CSSProperties;
 	onResize?: (width: number, height: number) => void;
-	ref?: React.Ref<HTMLDivElement>;
-	[key: string]: any;
+	ref?: Ref<HTMLDivElement>;
 }
 
 const initialDimension = defaultResponsiveContainerProps.initialDimension;
@@ -87,9 +90,9 @@ function SizeDetectorContainer(props: Props) @{
 		...others
 	} = props;
 	const containerRef = useRef<HTMLDivElement | null>(null);
-	const onResizeRef = useRef(onResize);
+	const onResizeRef = useRef<Props['onResize']>(onResize);
 	onResizeRef.current = onResize;
-	useImperativeHandle(ref, () => containerRef.current, []);
+	useImperativeHandle<HTMLDivElement | null>(ref, () => containerRef.current, []);
 	const [sizes, setSizes] = useState({
 		containerWidth: initial.width,
 		containerHeight: initial.height,
@@ -114,7 +117,7 @@ function SizeDetectorContainer(props: Props) @{
 			setContainerSize(entry.contentRect.width, entry.contentRect.height);
 			onResizeRef.current?.(entry.contentRect.width, entry.contentRect.height);
 		};
-		const callback =
+		const callback: typeof handleResize & { cancel?: () => void } =
 			debounce > 0
 				? throttle(handleResize, debounce, { trailing: true, leading: false })
 				: handleResize;
@@ -123,7 +126,7 @@ function SizeDetectorContainer(props: Props) @{
 		setContainerSize(rect.width, rect.height);
 		observer.observe(containerRef.current);
 		return () => {
-			if ('cancel' in callback) callback.cancel();
+			callback.cancel?.();
 			observer.disconnect();
 		};
 	}, [setContainerSize, debounce]);
@@ -133,7 +136,7 @@ function SizeDetectorContainer(props: Props) @{
 		aspect,
 		maxHeight,
 	});
-	const outerProps: any = Object.assign({}, others, {
+	const outerProps = Object.assign({}, others, {
 		id: id ? `${id}` : undefined,
 		className: clsx('recharts-responsive-container', className),
 		style: { ...style, width, height, minWidth, minHeight, maxHeight },

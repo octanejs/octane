@@ -1,5 +1,6 @@
+import type { ComponentType, OctaneElement, SVGProps } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { cloneElement, createElement, isValidElement, ReactElement, SVGProps } from 'octane';
+import { cloneElement, createElement, isValidElement } from 'octane';
 import { clsx } from 'clsx';
 import {
 	ChartOffsetInternal,
@@ -9,19 +10,19 @@ import {
 	PolarCoordinate,
 	TooltipEventType,
 } from '../util/types';
-import { Curve } from '../shape/Curve';
-import { Cross } from '../shape/Cross';
+import { Curve } from '../shape/Curve.tsrx';
+import { Cross } from '../shape/Cross.tsrx';
 import { getCursorRectangle } from '../util/cursor/getCursorRectangle';
-import { Rectangle } from '../shape/Rectangle';
+import { Rectangle } from '../shape/Rectangle.tsrx';
 import { getRadialCursorPoints } from '../util/cursor/getRadialCursorPoints';
-import { Sector } from '../shape/Sector';
+import { Sector } from '../shape/Sector.tsrx';
 import { getCursorPoints } from '../util/cursor/getCursorPoints';
 import { useChartLayout, useOffsetInternal } from '../context/chartLayoutContext';
 import { useTooltipAxisBandSize } from '../context/useTooltipAxis';
 import { useChartName } from '../state/selectors/selectors';
 import { TooltipIndex, TooltipPayload } from '../state/tooltipSlice';
 import { svgPropertiesNoEventsFromUnknown } from '../util/svgPropertiesNoEvents';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 
 /**
@@ -29,7 +30,7 @@ import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
  * If set an object, the option is the configuration of cursor.
  * If set a React element, the option is the custom react element of drawing cursor
  */
-export type CursorDefinition = boolean | ReactElement | SVGProps<SVGElement>;
+export type CursorDefinition = boolean | OctaneElement | SVGProps<SVGElement>;
 
 export interface CursorProps extends ZIndexable {
 	cursor: CursorDefinition;
@@ -53,7 +54,7 @@ function RenderCursor({
 	cursorProps,
 }: {
 	cursor: CursorDefinition;
-	cursorComp: React.ComponentType<any>;
+	cursorComp: ComponentType<any>;
 	cursorProps: any;
 }) {
 	if (isValidElement(cursor)) {
@@ -82,7 +83,7 @@ export function CursorInternal(props: CursorConnectedProps) {
 	if (!cursor || !activeCoordinate || chartName !== 'ScatterChart' && tooltipEventType !== 'axis') {
 		return null;
 	}
-	let restProps, cursorComp: React.ComponentType<any>, preferredZIndex: number;
+	let restProps, cursorComp: ComponentType<any>, preferredZIndex: number;
 
 	if (chartName === 'ScatterChart') {
 		restProps = activeCoordinate;
@@ -110,7 +111,7 @@ export function CursorInternal(props: CursorConnectedProps) {
 		preferredZIndex = DefaultZIndexes.cursorLine;
 	}
 
-	const extraClassName: string | undefined =
+	const extraClassName =
 		typeof cursor === 'object' && 'className' in cursor ? cursor.className : undefined;
 
 	const cursorProps = {

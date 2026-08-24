@@ -1,8 +1,8 @@
 import * as React from 'octane';
-import { Props as FunnelProps, FunnelTrapezoidItem } from '../cartesian/Funnel';
-import { Trapezoid } from '../shape/Trapezoid';
+import { Props as FunnelProps, FunnelTrapezoidItem } from '../cartesian/Funnel.tsrx';
+import { Trapezoid } from '../shape/Trapezoid.tsrx';
 import { ShapeAnimationProps } from './types';
-import { Shape } from './ActiveShapeUtils';
+import { Shape } from './ActiveShapeUtils.tsrx';
 
 export const defaultFunnelShape = Trapezoid;
 

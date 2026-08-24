@@ -23,6 +23,9 @@ import type { InfiniteQueryHooks, MutationHooks, QueryHooks } from './buildHooks
 import { buildHooks } from './buildHooks';
 import type { HooksWithUniqueNames } from './namedHooks';
 
+// Module-local type for the bundler's process.env.NODE_ENV replacement.
+declare const process: { env: { NODE_ENV?: string } };
+
 const isQueryDefinition = (definition: { type?: string }) => definition.type === 'query';
 const isMutationDefinition = (definition: { type?: string }) => definition.type === 'mutation';
 const isInfiniteQueryDefinition = (definition: { type?: string }) =>

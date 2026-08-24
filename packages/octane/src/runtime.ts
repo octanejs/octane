@@ -6780,20 +6780,86 @@ export function useRef<T>(initial: T, slot?: HookSlot): { current: T } {
 export function useDebugValue(_value?: unknown, _format?: unknown, _slot?: symbol): void;
 export function useDebugValue(_value?: unknown, _format?: unknown, _slot?: HookSlot): void {}
 
+type ImperativeRef<T> =
+	| { current: T | null }
+	| ((value: T | null) => void)
+	| readonly ImperativeRef<T>[]
+	| null
+	| undefined;
+
+// Array refs are optional work: the ordinary scalar hook below keeps its
+// existing attach/cleanup path. Snapshot the attached leaves as cleanups so
+// later mutations to the caller's array cannot detach different owners.
+function attachImperativeRefArray<T>(refs: readonly ImperativeRef<T>[], factory: () => T): Cleanup {
+	const cleanups: Cleanup[] = [];
+	let value: T;
+	let initialized = false;
+	function attach(ref: ImperativeRef<T>): void {
+		if (ref == null) return;
+		if (Array.isArray(ref)) {
+			for (let i = 0; i < ref.length; i++) attach(ref[i]);
+			return;
+		}
+		if (!initialized) {
+			value = factory();
+			initialized = true;
+		}
+		if (typeof ref === 'function') {
+			const cleanup: unknown = ref(value);
+			cleanups.push(typeof cleanup === 'function' ? (cleanup as Cleanup) : () => ref(null));
+		} else {
+			const objectRef = ref as { current: T | null };
+			objectRef.current = value;
+			cleanups.push(() => {
+				objectRef.current = null;
+			});
+		}
+	}
+	function detach(): void {
+		let error: unknown;
+		let failed = false;
+		for (const cleanup of cleanups) {
+			try {
+				cleanup();
+			} catch (caught) {
+				if (!failed) {
+					error = caught;
+					failed = true;
+				}
+			}
+		}
+		cleanups.length = 0;
+		if (failed) throw error;
+	}
+	try {
+		attach(refs);
+	} catch (error) {
+		// A failed attachment never installs an effect cleanup. Release the
+		// successful earlier leaves here, preserving the original failure.
+		try {
+			detach();
+		} finally {
+			throw error;
+		}
+	}
+	return detach;
+}
+
 /**
  * React's `useImperativeHandle(ref, factory, deps)` — exposes an imperative
  * API to a parent via the ref. Scheduled as a layout-phase effect so the
  * `ref.current` is populated before paint and before any layout effects in
- * ancestors that depend on the API. Cleared to null on unmount.
+ * ancestors that depend on the API. Cleared to null on unmount. Octane's
+ * nested array refs share one factory result across all non-null owners.
  */
 export function useImperativeHandle<T>(
-	ref: { current: T | null } | ((value: T | null) => void) | null | undefined,
+	ref: ImperativeRef<T>,
 	factory: () => T,
 	deps?: any[] | null,
 	slot?: symbol,
 ): void;
 export function useImperativeHandle<T>(
-	ref: { current: T | null } | ((value: T | null) => void) | null | undefined,
+	ref: ImperativeRef<T>,
 	factory: () => T,
 	deps?: any[] | null,
 	slot?: HookSlot,
@@ -6811,6 +6877,7 @@ export function useImperativeHandle<T>(
 	enqueueEffect(
 		slot,
 		() => {
+			if (Array.isArray(ref)) return attachImperativeRefArray(ref, factory);
 			// React-19 callback-ref cleanup (refs-test.js:528): a callback ref may
 			// RETURN a cleanup; detach then runs the cleanup INSTEAD of ref(null).
 			// Handled locally (not via attachRef) because the handle value can be a
@@ -17061,8 +17128,15 @@ function isHostDescriptor(v: any): v is ElementDescriptor & { type: string } {
 // `traverseAllChildren`); `toArray`/`map` drop the empties from their results.
 // ---------------------------------------------------------------------------
 
-/** True if `v` is an element from `createElement` / JSX-at-value (React's `isValidElement`). */
-export function isValidElement(v: any): v is ElementDescriptor {
+/**
+ * True for a createElement/JSX descriptor. Known descriptors, including unions,
+ * retain their prop types; supply P to narrow an element-or-props union.
+ */
+export function isValidElement<P = any, E extends ElementDescriptor<P> = ElementDescriptor<P>>(
+	v: E | null | undefined,
+): v is E;
+export function isValidElement<P = any>(v: unknown): v is ElementDescriptor<P>;
+export function isValidElement(v: unknown): v is ElementDescriptor {
 	return isElementDescriptor(v);
 }
 

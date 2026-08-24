@@ -17,6 +17,6 @@ export declare const Form: (props: {
 	defaultShouldRevalidate?: boolean;
 	discover?: 'render' | 'none';
 	onSubmit?: (event: SubmitEvent) => void;
-	ref?: unknown;
+	ref?: { current: HTMLFormElement | null } | ((node: HTMLFormElement | null) => void) | null;
 	[key: string]: unknown;
 }) => unknown;

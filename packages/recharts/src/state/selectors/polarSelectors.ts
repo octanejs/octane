@@ -95,7 +95,7 @@ export const selectAllPolarAppliedNumericalValues: (
 		if (items.length > 0) {
 			return data
 				.flatMap((entry) => {
-					return items.flatMap((item): AppliedChartDataWithErrorDomain | undefined => {
+					return items.flatMap((item): AppliedChartDataWithErrorDomain => {
 						const valueByDataKey: unknown = getValueByDataKey(
 							entry,
 							axisSettings.dataKey ?? item.dataKey,

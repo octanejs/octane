@@ -1,3 +1,92 @@
+import type { Ref, RefObject, SVGProps } from '../util/OctaneTypes.ts';
+import type { Props as TextProps, TextAnchor, TextVerticalAnchor } from '../component/Text.tsrx';
+import type { ImplicitLabelType } from '../component/Label.tsrx';
+import type {
+	CartesianViewBoxRequired,
+	PresentationAttributesAdaptChildEvent,
+	CartesianTickItem,
+	AxisInterval,
+	TickProp,
+	BaseTickContentProps,
+	TickItem as TickItemType,
+} from '../util/types';
+import type {
+	AxisId,
+	XAxisOrientation,
+	XAxisPadding,
+	YAxisOrientation,
+	YAxisPadding,
+} from '../state/cartesianAxisSlice';
+import type { RequiresDefaultProps } from '../util/resolveDefaultProps';
+import type { ZIndexable } from '../zIndex/ZIndexLayer.tsrx';
+
+export type Orientation = XAxisOrientation | YAxisOrientation;
+export type Unit = string | number;
+export type TickFormatter = (value: any, index: number) => string;
+export interface CartesianAxisProps extends ZIndexable {
+	className?: SVGProps<SVGElement>['className'];
+	axisType?: 'xAxis' | 'yAxis';
+	axisId?: AxisId;
+	x?: number;
+	y?: number;
+	width?: number;
+	height?: number;
+	unit?: Unit;
+	orientation?: Orientation;
+	viewBox?: CartesianViewBoxRequired;
+	tick?: TickProp<unknown>;
+	tickTextProps?: TextProps;
+	axisLine?: boolean | SVGProps<SVGLineElement>;
+	tickLine?: boolean | SVGProps<SVGLineElement>;
+	mirror?: boolean;
+	tickMargin?: number;
+	hide?: boolean;
+	label?: ImplicitLabelType;
+	padding?: XAxisPadding | YAxisPadding;
+	minTickGap?: number;
+	ticks?: ReadonlyArray<CartesianTickItem>;
+	tickSize?: number;
+	tickFormatter?: TickFormatter;
+	interval?: AxisInterval;
+	angle?: number;
+	scale?: unknown;
+	labelRef?: RefObject<SVGTextElement | null> | null;
+	ref?: Ref<CartesianAxisRef>;
+}
+export interface CartesianAxisRef {
+	getCalculatedWidth(): number;
+}
+export type Props =
+	Omit<
+		PresentationAttributesAdaptChildEvent<any, SVGElement>,
+		'viewBox' | 'scale' | 'ref'
+	> & CartesianAxisProps;
+type InternalProps = RequiresDefaultProps<Props, typeof defaultCartesianAxisProps>;
+type TicksProps = {
+	ref?: Ref<SVGGElement>;
+	axisType: 'xAxis' | 'yAxis' | undefined;
+	events: Omit<PresentationAttributesAdaptChildEvent<any, SVGElement>, 'scale' | 'viewBox'>;
+	fontSize: string;
+	getTicksConfig: Omit<InternalProps, 'ticks' | 'ref'>;
+	height: number;
+	letterSpacing: string;
+	mirror: boolean;
+	orientation: Orientation;
+	padding?: Props['padding'];
+	stroke?: Props['stroke'];
+	tick?: Props['tick'];
+	tickFormatter?: Props['tickFormatter'];
+	tickLine?: Props['tickLine'];
+	tickMargin: number;
+	tickSize: number;
+	tickTextProps?: Props['tickTextProps'];
+	ticks?: ReadonlyArray<CartesianTickItem>;
+	unit?: Props['unit'];
+	width: number;
+	x: number;
+	y: number;
+	axisId: AxisId | undefined;
+};
 // Port of cartesian/CartesianAxis.tsx — the axis renderer: axis line, tick
 // lines, tick labels (measured for font metrics via a callback ref), the
 // rendered-ticks store reporter, and the imperative getCalculatedWidth handle
@@ -55,9 +144,18 @@ export const defaultCartesianAxisProps = {
 	tickMargin: 2,
 	interval: 'preserveEnd',
 	zIndex: DefaultZIndexes.axis,
-};
+} as const satisfies Partial<Props>;
 
-function AxisLine(axisLineProps) {
+function AxisLine(axisLineProps: {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	orientation: Orientation;
+	mirror: boolean;
+	axisLine: boolean | SVGProps<SVGLineElement>;
+	otherSvgProps: SVGProps<SVGLineElement> | null;
+}) {
 	const { x, y, width, height, orientation, mirror, axisLine, otherSvgProps } = axisLineProps;
 	if (!axisLine) {
 		return null;
@@ -92,7 +190,17 @@ function AxisLine(axisLineProps) {
  * Calculate the coordinates of endpoints in ticks: `line` for the tick line,
  * `tick` for the tick text.
  */
-function getTickLineCoord(data, x, y, width, height, orientation, tickSize, mirror, tickMargin) {
+function getTickLineCoord(
+	data: CartesianTickItem,
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+	orientation: Orientation,
+	tickSize: number,
+	mirror: boolean,
+	tickMargin: number,
+) {
 	let x1, x2, y1, y2, tx, ty;
 	const sign = mirror ? -1 : 1;
 	const finalTickSize = data.tickSize || tickSize;
@@ -133,7 +241,7 @@ function getTickLineCoord(data, x, y, width, height, orientation, tickSize, mirr
 	};
 }
 
-function getTickTextAnchor(orientation, mirror) {
+function getTickTextAnchor(orientation: Orientation, mirror: boolean) {
 	switch (orientation) {
 		case 'left':
 			return mirror ? 'start' : 'end';
@@ -144,7 +252,7 @@ function getTickTextAnchor(orientation, mirror) {
 	}
 }
 
-function getTickVerticalAnchor(orientation, mirror) {
+function getTickVerticalAnchor(orientation: Orientation, mirror: boolean) {
 	switch (orientation) {
 		case 'left':
 		case 'right':
@@ -156,7 +264,11 @@ function getTickVerticalAnchor(orientation, mirror) {
 	}
 }
 
-function TickItem(props) {
+function TickItem(props: {
+	option: Props['tick'];
+	tickProps: TextProps;
+	value: string;
+}) {
 	const { option, tickProps, value } = props;
 	let tickItem;
 	const combinedClassName = clsx(tickProps.className, 'recharts-cartesian-axis-tick-value');
@@ -174,7 +286,11 @@ function TickItem(props) {
 	return tickItem;
 }
 
-function RenderedTicksReporter(props) {
+function RenderedTicksReporter(props: {
+	ticks: ReadonlyArray<TickItemType>;
+	axisType: 'xAxis' | 'yAxis' | undefined;
+	axisId: AxisId | undefined;
+}) {
 	const { ticks, axisType, axisId } = props;
 	const dispatch = useAppDispatch();
 	useEffect(() => {
@@ -198,7 +314,7 @@ function RenderedTicksReporter(props) {
 	return null;
 }
 
-function Ticks(props) {
+function Ticks(props: TicksProps) {
 	const {
 		ticks = [],
 		tick,
@@ -228,18 +344,22 @@ function Ticks(props) {
 	const axisProps = svgPropertiesNoEvents(getTicksConfig);
 	const customTickProps = svgPropertiesNoEventsFromUnknown(tick);
 	// Use user-provided textAnchor if available, otherwise calculate from orientation/mirror
-	const textAnchor =
+	const textAnchor: TextAnchor =
 		isValidTextAnchor(axisProps.textAnchor)
 			? axisProps.textAnchor
 			: getTickTextAnchor(orientation, mirror);
-	const verticalAnchor = getTickVerticalAnchor(orientation, mirror);
-	let tickLinePropsObject = {};
+	const verticalAnchor: TextVerticalAnchor = getTickVerticalAnchor(orientation, mirror);
+	let tickLinePropsObject: SVGProps<SVGLineElement> = {};
 	if (typeof tickLine === 'object') {
 		tickLinePropsObject = tickLine;
 	}
-	const tickLineProps = { ...axisProps, fill: 'none', ...tickLinePropsObject };
+	const tickLineProps: SVGProps<SVGLineElement> = {
+		...axisProps,
+		fill: 'none',
+		...tickLinePropsObject,
+	};
 	const tickLineCoords = finalTicks.map(
-		(entry) => ({
+		(entry: CartesianTickItem) => ({
 			entry,
 			...getTickLineCoord(entry, x, y, width, height, orientation, tickSize, mirror, tickMargin),
 		}),
@@ -273,7 +393,7 @@ function Ticks(props) {
 			...tickTextProps,
 			angle: tickTextProps?.angle ?? axisProps.angle ?? 0,
 		};
-		const finalTickProps = { ...tickProps, ...customTickProps };
+		const finalTickProps: BaseTickContentProps = { ...tickProps, ...customTickProps };
 		return <Layer
 			className="recharts-cartesian-axis-tick-label"
 			key={'tick-label-' + entry.value + '-' + entry.coordinate + '-' + entry.tickCoord}
@@ -306,11 +426,23 @@ function Ticks(props) {
 	</g>;
 }
 
-function CartesianAxisComponent(props) {
-	const { axisLine, width, height, className, hide, ticks, axisType, axisId, ref, ...rest } = props;
+function CartesianAxisComponent(props: InternalProps) {
+	// This ref receives the imperative axis handle, never an SVG line or tick.
+	const { ref, ...propsWithoutRef } = props;
+	const {
+		axisLine,
+		width,
+		height,
+		className,
+		hide,
+		ticks,
+		axisType,
+		axisId,
+		...rest
+	} = propsWithoutRef;
 	const [fontSize, setFontSize] = useState('');
 	const [letterSpacing, setLetterSpacing] = useState('');
-	const tickRefs = useRef(null);
+	const tickRefs = useRef<HTMLCollectionOf<Element> | null>(null);
 	useImperativeHandle(
 		ref,
 		() => ({
@@ -325,11 +457,11 @@ function CartesianAxisComponent(props) {
 			},
 		}),
 	);
-	const layerRef = useCallback((el) => {
+	const layerRef = useCallback((el: SVGElement | null) => {
 		if (el) {
 			const tickNodes = el.getElementsByClassName('recharts-cartesian-axis-tick-value');
 			tickRefs.current = tickNodes;
-			const tick = tickNodes[0];
+			const tick: Element | undefined = tickNodes[0];
 			if (tick) {
 				const computedStyle = window.getComputedStyle(tick);
 				const calculatedFontSize = computedStyle.fontSize;
@@ -359,14 +491,14 @@ function CartesianAxisComponent(props) {
 				orientation={props.orientation}
 				mirror={props.mirror}
 				axisLine={axisLine}
-				otherSvgProps={svgPropertiesNoEvents(props)}
+				otherSvgProps={svgPropertiesNoEvents(propsWithoutRef)}
 			/>
 			<Ticks
 				ref={layerRef}
 				axisType={axisType}
 				events={rest}
 				fontSize={fontSize}
-				getTicksConfig={props}
+				getTicksConfig={propsWithoutRef}
 				height={props.height}
 				letterSpacing={letterSpacing}
 				mirror={props.mirror}
@@ -404,7 +536,7 @@ function CartesianAxisComponent(props) {
 /**
  * @deprecated not meant to be used directly in app code — use XAxis or YAxis.
  */
-export function CartesianAxis(outsideProps) {
+export function CartesianAxis(outsideProps: Props) {
 	const { ref, ...rest } = outsideProps;
 	const props = resolveDefaultProps(rest, defaultCartesianAxisProps);
 	return <CartesianAxisComponent {...props} ref={ref} />;

@@ -1,7 +1,9 @@
+import type { Ref } from '../util/OctaneTypes.ts';
+
 import { arrayTooltipSearcher } from '../state/optionsSlice';
 import { PolarChartProps, PolarLayout, TooltipEventType } from '../util/types';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
-import { defaultPolarChartProps, PolarChart } from './PolarChart';
+import { defaultPolarChartProps, PolarChart } from './PolarChart.tsrx';
 
 const allowedTooltipTypes: ReadonlyArray<TooltipEventType> = ['axis'];
 
@@ -39,7 +41,9 @@ type RadarChartProps<DataPointType> =
  * @provides PolarViewBoxContext
  * @provides PolarChartContext
  */
-export function RadarChart(props: RadarChartProps<unknown>) {
+export function RadarChart<DataPointType = unknown>(props: RadarChartProps<DataPointType> & {
+	ref?: Ref<SVGSVGElement>;
+}) {
 	const { ref, ...rest } = props;
 	const propsWithDefaults = resolveDefaultProps(rest, defaultRadarChartProps);
 	return <PolarChart

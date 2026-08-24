@@ -1,3 +1,5 @@
+import type { Ref } from '../util/OctaneTypes.ts';
+
 import { arrayTooltipSearcher } from '../state/optionsSlice';
 import { CartesianChart } from './CartesianChart.tsrx';
 import { CartesianChartProps, TooltipEventType } from '../util/types';
@@ -9,7 +11,9 @@ const allowedTooltipTypes: ReadonlyArray<TooltipEventType> = ['axis'];
  * @provides CartesianViewBoxContext
  * @provides CartesianChartContext
  */
-export function ComposedChart(props: CartesianChartProps<unknown>) {
+export function ComposedChart<DataPointType = unknown>(props: CartesianChartProps<DataPointType> & {
+	ref?: Ref<SVGSVGElement>;
+}) {
 	const { ref, ...rest } = props;
 	return <CartesianChart
 		chartName="ComposedChart"

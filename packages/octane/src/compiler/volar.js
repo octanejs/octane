@@ -81,7 +81,7 @@ const OCTANE_PLATFORM = {
 		forOfIterableHelper: 'octane/tsrx-iterable',
 		// Host-element spreads in the virtual TSX lower to
 		// `__normalize_spread_props(...)`; the shared transform imports the
-		// helpers from this module (identity-typed — see octane/tsrx-spread).
+		// helpers from this module (preserving prop types — see octane/tsrx-spread).
 		refProp: 'octane/tsrx-spread',
 	},
 	jsx: {
@@ -197,10 +197,7 @@ function markNativeTemplateBodies(root) {
  * element types cannot leak into files owned by another renderer.
  *
  * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean }} [options]
- * @returns {import('@tsrx/core/types').VolarMappingsResult & {
- *   diagnostics: readonly unknown[],
- *   generatedAst: import('estree').Program,
- * }}
+ * @returns {import('./index.js').VolarCompileResult}
  */
 export function compileToVolarMappings(source, filename, options) {
 	/** @type {import('@tsrx/core/types').CompileError[]} */
@@ -460,6 +457,12 @@ function collectDirectiveOrigins(ast, source) {
  * @param {string} source
  * @param {string} [filename]
  * @param {{ renderers?: unknown }} [options]
+ * @returns {{
+ *   code: string,
+ *   sourceAst: import('./index.js').CompilerProgram,
+ *   generatedAst: import('./index.js').CompilerProgram,
+ *   segments: (import('./index.js').CompileInspection['segments'][number] & { exact?: true })[],
+ * }}
  */
 export function compileTypesInspection(source, filename, options) {
 	/** @type {import('@tsrx/core/types').CompileError[]} */

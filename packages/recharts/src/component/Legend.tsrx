@@ -1,5 +1,6 @@
+import type { CSSProperties } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
-import { CSSProperties, useLayoutEffect } from 'octane';
+import { useLayoutEffect } from 'octane';
 import { createPortal } from 'octane';
 import { useLegendPortal } from '../context/legendPortalContext';
 import {
@@ -8,11 +9,11 @@ import {
 	LegendPayload,
 	Props as DefaultLegendContentProps,
 	VerticalAlignmentType,
-} from './DefaultLegendContent';
+} from './DefaultLegendContent.tsrx';
 
 import { LayoutType, Margin, Size } from '../util/types';
 import { getUniqPayload, UniqueOption } from '../util/payload/getUniqPayload';
-import { useLegendPayload } from '../context/legendPayloadContext';
+import { useLegendPayload } from '../context/legendPayloadContext.tsrx';
 import { ElementOffset, useElementOffset } from '../util/useElementOffset';
 import { useChartHeight, useChartWidth, useMargin } from '../context/chartLayoutContext';
 import { LegendSettings, setLegendSettings, setLegendSize } from '../state/legendSlice';
@@ -44,7 +45,7 @@ function LegendContent(props: ContentProps) {
 		return React.cloneElement(props.content, contentProps);
 	}
 	if (typeof props.content === 'function') {
-		return React.createElement(props.content as any, contentProps);
+		return React.createElement(props.content, contentProps);
 	}
 
 	return <DefaultLegendContent {...contentProps} />;
@@ -297,6 +298,9 @@ function LegendImpl(outsideProps: Props) {
 	return createPortal(legendElement, legendPortal);
 }
 
-export const Legend = React.memo(LegendImpl, propsAreEqual);
+export const Legend = React.memo(LegendImpl, propsAreEqual) as
+	typeof LegendImpl & {
+		displayName?: string;
+	};
 
 Legend.displayName = 'Legend';

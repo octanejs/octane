@@ -1,3 +1,19 @@
+import type { OctaneNode } from '../util/OctaneTypes.ts';
+import type { EasingInput } from './easing';
+import type { AnimationController } from './AnimationController';
+
+type JavascriptAnimateProps = {
+	animationId: string;
+	animationController?: AnimationController;
+	duration?: number;
+	begin?: number;
+	easing?: EasingInput;
+	isActive?: boolean | 'auto';
+	canBegin?: boolean;
+	onAnimationStart?: () => void;
+	onAnimationEnd?: () => void;
+	children: (animationElapsedTime: number) => OctaneNode;
+};
 // Port of animation/JavascriptAnimate.tsx — the render-prop animation driver:
 // `children(t)` with t progressing 0→1 through the (vendored) animation core.
 // `isActive={false}` renders a single synchronous `children(1)` — the static
@@ -21,12 +37,12 @@ const defaultJavascriptAnimateProps = {
 	canBegin: true,
 	onAnimationEnd: () => {},
 	onAnimationStart: () => {},
-};
+} as const satisfies Partial<JavascriptAnimateProps>;
 
 const from = 0;
 const to = 1;
 
-export function JavascriptAnimate(outsideProps) {
+export function JavascriptAnimate(outsideProps: JavascriptAnimateProps) {
 	const props = resolveDefaultProps(outsideProps, defaultJavascriptAnimateProps);
 	const {
 		animationId,

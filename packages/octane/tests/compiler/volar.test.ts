@@ -1,9 +1,14 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+// @vitest-environment node
+
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
 import { compileToVolarMappings } from 'octane/compiler/volar';
+import { bundleVolarCompiler } from '../../scripts/bundle-volar.mjs';
 
 const OBJECT_RENDERERS = {
 	registry: {
@@ -80,6 +85,143 @@ describe('compileToVolarMappings', () => {
 		expect(result.code).toContain('setCount');
 		expect(result.code).toContain('props.label');
 		expect(result.errors).toEqual([]);
+	});
+
+	it.each([false, true])(
+		'preserves typed tuple parameters and their mappings (loose: %s)',
+		(loose) => {
+			// esrap 2.3.6 began printing ArrayPattern annotations itself. Combined
+			// with @tsrx/core 0.1.60's wrapper, a valid one-argument function was
+			// printed with two annotations and TypeScript inferred two parameters.
+			const source =
+				'export function ratio([width, height]: [number, number]): number {\n' +
+				'  return width / height;\n' +
+				'}\n';
+			const root = mkdtempSync(join(tmpdir(), 'octane-volar-tuple-'));
+			try {
+				const result = compileToVolarMappings(source, 'tuple.tsrx', { loose });
+				expect(result.errors).toEqual([]);
+				for (const name of ['width', 'height']) {
+					const offset = source.indexOf(name);
+					const mapping = result.mappings.find(
+						(candidate) =>
+							candidate.sourceOffsets[0] === offset && candidate.lengths[0] === name.length,
+					);
+					expect(mapping).toBeDefined();
+					const generated = mapping!.generatedOffsets[0];
+					expect(result.code.slice(generated, generated + name.length)).toBe(name);
+				}
+				const valid = join(root, 'tuple.tsx');
+				const invalid = join(root, 'invalid.tsx');
+				writeFileSync(valid, result.code + '\nexport const value: number = ratio([20, 10]);\n');
+				writeFileSync(
+					invalid,
+					"import { ratio } from './tuple';\nratio([20, 'wrong']);\nratio(20, 10);\n",
+				);
+				const program = ts.createProgram({
+					rootNames: [valid, invalid],
+					options: {
+						jsx: ts.JsxEmit.Preserve,
+						module: ts.ModuleKind.ESNext,
+						moduleResolution: ts.ModuleResolutionKind.Bundler,
+						noEmit: true,
+						skipLibCheck: false,
+						strict: true,
+						target: ts.ScriptTarget.ESNext,
+						types: [],
+					},
+				});
+				expect(
+					ts
+						.getPreEmitDiagnostics(program)
+						.map(({ file, code }) => ({ file: file?.fileName, code })),
+				).toEqual([
+					{ file: invalid, code: 2322 },
+					{ file: invalid, code: 2554 },
+				]);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
+
+	it('publishes the tested Volar dependency graph without duplicating Octane modules', async () => {
+		const packageDir = fileURLToPath(new URL('../../', import.meta.url));
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-bundle-'));
+		try {
+			const { metafile, dependencies } = await bundleVolarCompiler({ packageDir, outdir: root });
+			const output = Object.values(metafile.outputs).find((file) => file.entryPoint)!;
+			writeFileSync(join(root, 'package.json'), JSON.stringify({ type: 'module' }));
+			for (const dependency of output.imports) {
+				// The real helper modules retain their normal package resolution;
+				// the bundle owns only the third-party parser/transform/printer.
+				symlinkSync(join(packageDir, 'src/compiler', dependency.path), join(root, dependency.path));
+			}
+			const source =
+				'export function ratio([width, height]: [number, number]) { return width / height; }\n' +
+				'export function App() @{ <div>{ratio([20, 10]) as string}</div> }';
+			const filename = 'published.tsrx';
+			// Native Node imports the actual build product, without Vitest's
+			// source aliases or a loader replacing the compiler under test.
+			const actual = JSON.parse(
+				execFileSync(
+					process.execPath,
+					[
+						'--input-type=module',
+						'-e',
+						`import * as compiler from ${JSON.stringify(pathToFileURL(join(root, 'volar.js')).href)};
+const source = ${JSON.stringify(source)};
+const result = compiler.compileToVolarMappings(source, ${JSON.stringify(filename)}, { loose: true });
+const inspection = compiler.compileTypesInspection(source, ${JSON.stringify(filename)});
+process.stdout.write(JSON.stringify({
+	exports: Object.keys(compiler),
+	code: result.code,
+	mappings: result.mappings,
+	errors: result.errors,
+	inspectionCode: inspection.code,
+	nativeBody: result.sourceAst.body[1].declaration.metadata.native_tsrx_body,
+}));`,
+					],
+					{ encoding: 'utf8' },
+				),
+			);
+			const expected = compileToVolarMappings(source, filename, { loose: true });
+			expect(actual.exports).toEqual(['compileToVolarMappings', 'compileTypesInspection']);
+			expect(actual.code).toBe(expected.code);
+			expect(actual.mappings).toEqual(expected.mappings);
+			expect(actual.errors).toEqual([]);
+			expect(actual.inspectionCode).toBe(expected.code);
+			expect(actual.nativeBody).toBe(true);
+			const notices = readFileSync(join(root, 'volar.LICENSES.txt'), 'utf8');
+			expect(dependencies.some((id) => id.startsWith('@tsrx/core@'))).toBe(true);
+			expect(dependencies.some((id) => id.startsWith('esrap@'))).toBe(true);
+			for (const id of dependencies) expect(notices).toContain(`${id}\n\n`);
+			expect(notices).toContain('Copyright (c) 2025 Dominic Gannaway');
+			expect(notices).toContain('Permission is hereby granted, free of charge');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('rejects a public declaration that no longer matches the source JSDoc', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-stale-declaration-'));
+		try {
+			const compiler = join(root, 'src/compiler');
+			mkdirSync(compiler, { recursive: true });
+			writeFileSync(
+				join(compiler, 'volar.js'),
+				'/** @param {string} source */\nexport function compileToVolarMappings(source) { return source; }',
+			);
+			writeFileSync(
+				join(compiler, 'volar.d.ts'),
+				'export function compileToVolarMappings(source: number): string;',
+			);
+			await expect(
+				bundleVolarCompiler({ packageDir: root, outdir: join(root, 'dist/compiler') }),
+			).rejects.toThrow('volar.d.ts is stale');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	it('produces mappings entries pointing source → generated positions', () => {
@@ -515,6 +657,157 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 				.filter((element) => ts.isArrayLiteralExpression(element))
 				.map((element) => element.getText(generated));
 			expect(nested, name).toEqual([]);
+		}
+	});
+
+	it('type-checks absent and optional host spread refs without weakening authored prop types', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-spread-types-'));
+		try {
+			mkdirSync(join(root, 'node_modules'));
+			symlinkSync(
+				fileURLToPath(new URL('../..', import.meta.url)),
+				join(root, 'node_modules/octane'),
+				'dir',
+			);
+			const sources: ReadonlyArray<readonly [name: string, source: string]> = [
+				...refSpreadModules(),
+				[
+					'optional refs in a typed SVG spread',
+					`import type { Octane } from 'octane/jsx-runtime';
+export function Chart({ innerRef, ...rest }: Octane.SVGProps<SVGTextElement> & {
+	innerRef?: Octane.Ref<SVGTextElement>;
+}) {
+	return <svg><text ref={innerRef} {...rest} /></svg>;
+}`,
+				],
+				[
+					'destructured ref with a ref-less HTML spread',
+					`import type { Octane } from 'octane/jsx-runtime';
+export const Tooltip = ({ ref, ...rest }: Octane.HTMLAttributes<HTMLDivElement> & {
+	ref?: Octane.Ref<HTMLDivElement>;
+}) => <div ref={ref} {...rest} />;`,
+				],
+				[
+					'union spread with and without a ref',
+					`import type { Octane } from 'octane/jsx-runtime';
+export function Chart(props: {
+	ref?: Octane.Ref<SVGTextElement>;
+	rest: { x: number } | { ref?: Octane.Ref<SVGTextElement> };
+}) {
+	return <text ref={props.ref} {...props.rest} />;
+}`,
+				],
+				[
+					'conditional empty spread',
+					`export function Tooltip(props: { rest: { id?: string } | false | null | undefined }) {
+	return <div ref={null} {...props.rest} />;
+}`,
+				],
+				[
+					'generic ref-less spread',
+					`export function Tooltip<T extends { id?: string }>(props: T) {
+	return <div ref={null} {...props} />;
+}`,
+				],
+				[
+					'generic SVG props',
+					`import type { Octane } from 'octane/jsx-runtime';
+export function Chart<T extends Octane.SVGProps<SVGTextElement>>(props: T) {
+	return <text ref={null} {...props} />;
+}`,
+				],
+			];
+			const files = sources.map(([name, source], index) => {
+				const compiled = compileToVolarMappings(source, `/src/Spread${index}.tsrx`);
+				expect(compiled.errors, name).toEqual([]);
+				const file = join(root, `Spread${index}.tsx`);
+				writeFileSync(file, compiled.code);
+				return { name, file };
+			});
+			const invalidSources: ReadonlyArray<readonly [source: string, errorCode: number]> = [
+				[
+					`export function Invalid(props: { ref: (node: SVGSVGElement | null) => void; rest: { id: string } }) {
+	return <input ref={props.ref} {...props.rest} />;
+}`,
+					2322,
+				],
+				[
+					`export function Invalid(props: { ref: (node: HTMLInputElement | null) => void; rest: { ref: (node: SVGSVGElement | null) => void } }) {
+	return <input ref={props.ref} {...props.rest} />;
+}`,
+					2322,
+				],
+				[
+					`export function Invalid(props: { ref: (node: HTMLInputElement | null) => void; rest: { value: { invalid: true } } }) {
+	return <input ref={props.ref} {...props.rest} />;
+}`,
+					2322,
+				],
+				[
+					`export function Invalid(props: { rest: { id: string } | { ref: (node: SVGSVGElement | null) => void } }) {
+	return <input ref={null} {...props.rest} />;
+}`,
+					2322,
+				],
+				[
+					`export function Invalid(props: { rest: unknown }) {
+	return <input ref={null} {...props.rest} />;
+}`,
+					2698,
+				],
+				[
+					`export function Invalid(props: { rest: number }) {
+	return <input ref={null} {...props.rest} />;
+}`,
+					2698,
+				],
+				[
+					`export function Invalid(props: { rest: Record<string, unknown> }) {
+	return <input ref={null} {...props.rest} />;
+}`,
+					2322,
+				],
+			];
+			const invalidFiles = invalidSources.map(([source], index) => {
+				const compiled = compileToVolarMappings(source, `/src/Invalid${index}.tsrx`);
+				expect(compiled.errors).toEqual([]);
+				const file = join(root, `Invalid${index}.tsx`);
+				writeFileSync(file, compiled.code);
+				return file;
+			});
+			const program = ts.createProgram({
+				rootNames: [...files.map(({ file }) => file), ...invalidFiles],
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					skipLibCheck: false,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+					types: [],
+				},
+			});
+			const diagnostics = ts.getPreEmitDiagnostics(program);
+			const validDiagnostics = diagnostics
+				.filter((diagnostic) => !invalidFiles.includes(diagnostic.file?.fileName ?? ''))
+				.map((diagnostic) => {
+					const position = files.find(({ file }) => file === diagnostic.file?.fileName);
+					return `${position?.name ?? diagnostic.file?.fileName}: ${ts.flattenDiagnosticMessageText(
+						diagnostic.messageText,
+						' ',
+					)}`;
+				});
+			expect(validDiagnostics).toEqual([]);
+			for (const [index, file] of invalidFiles.entries()) {
+				const errors = diagnostics.filter((diagnostic) => diagnostic.file?.fileName === file);
+				expect(
+					errors.map(({ code }) => code),
+					file,
+				).toContain(invalidSources[index][1]);
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
 	});
 

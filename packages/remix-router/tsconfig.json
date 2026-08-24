@@ -11,11 +11,14 @@
     "allowSyntheticDefaultImports": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
-    "types": ["node"],
+    "types": [],
+    "skipLibCheck": false,
     "strict": true,
+    "isolatedModules": true,
     "jsx": "react-jsx",
     "jsxImportSource": "octane"
   },
+  "tsrx": { "compiler": "octane/compiler/volar" },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"]
 }

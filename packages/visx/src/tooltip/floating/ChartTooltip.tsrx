@@ -17,7 +17,7 @@ import type {
 	UseFloatingTooltipOptions,
 } from './types';
 
-export { ChartTooltipItem } from './ChartTooltipContent.tsrx';
+export type { ChartTooltipItem } from './ChartTooltipContent.tsrx';
 
 export type ChartTooltipControlledProps<Datum = unknown> = {
 	open: boolean;

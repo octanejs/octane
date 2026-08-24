@@ -1,25 +1,26 @@
+import type { SVGProps } from '../util/OctaneTypes.ts';
 /**
  * @fileOverview Render a group of error bar
  */
 import * as React from 'octane';
-import { SVGProps } from 'octane';
-import { Layer } from '../container/Layer';
+
+import { Layer } from '../container/Layer.tsrx';
 import { EasingInput, DataKey, RectangleCoordinate } from '../util/types';
 import { BarRectangleItem } from './Bar';
 import { LinePointItem } from './Line';
-import { ScatterPointItem } from './Scatter';
-import { ReportErrorBarSettings, useErrorBarContext } from '../context/ErrorBarContext';
+import { ScatterPointItem } from './Scatter.tsrx';
+import { ReportErrorBarSettings, useErrorBarContext } from '../context/ErrorBarContext.tsrx';
 import { useXAxis, useYAxis } from '../hooks';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { svgPropertiesNoEvents } from '../util/svgPropertiesNoEvents';
 import { useChartLayout } from '../context/chartLayoutContext';
-import { CSSTransitionAnimate, extractCssEasing } from '../animation/CSSTransitionAnimate';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { CSSTransitionAnimate, extractCssEasing } from '../animation/CSSTransitionAnimate.tsrx';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 
 export interface ErrorBarDataItem {
-	x: number | undefined;
-	y: number | undefined;
+	x: number | null | undefined;
+	y: number | null | undefined;
 	value: number;
 	errorVal?: number[] | number;
 }

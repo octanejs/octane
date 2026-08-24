@@ -1,0 +1,291 @@
+// Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
+import { createSlice, PayloadAction, prepareAutoBatched } from '@reduxjs/toolkit';
+import { castDraft, type Draft } from 'immer';
+import {
+	AxisDomain,
+	AxisInterval,
+	AxisTick,
+	DataKey,
+	EvaluatedAxisDomainType,
+	ScaleType,
+	TickProp,
+} from '../util/types';
+import { TickFormatter } from '../cartesian/CartesianAxis.tsrx';
+import type { AxisRange } from './selectors/axisSelectors';
+import { CustomScaleDefinition } from '../util/scale/CustomScaleDefinition';
+
+/**
+ * @inline
+ */
+export type AxisId = string | number;
+export const defaultAxisId: AxisId = 0;
+export type XAxisPadding = { left?: number; right?: number } | 'gap' | 'no-gap';
+export type YAxisPadding = { top?: number; bottom?: number } | 'gap' | 'no-gap';
+
+export type XAxisOrientation = 'top' | 'bottom';
+export type YAxisOrientation = 'left' | 'right';
+
+/**
+ * Properties shared in X, Y, and Z axes.
+ * User defined axis settings, coming from props.
+ */
+export type BaseCartesianAxis = {
+	id: AxisId;
+	scale:
+		| ScaleType
+		| CustomScaleDefinition
+		| CustomScaleDefinition<string>
+		| CustomScaleDefinition<number>
+		| CustomScaleDefinition<Date>;
+	/**
+	 * Before creating this object, evaluate the domain type based on the chart layout so that we have the 'auto' resolved.
+	 */
+	type: EvaluatedAxisDomainType;
+	/**
+	 * The axis functionality is severely restricted without a dataKey
+	 * - but there is still something left, and the prop is optional
+	 * so this can also be undefined even in real charts.
+	 * There are no defaults.
+	 */
+	dataKey: DataKey<any> | undefined;
+	unit: string | undefined;
+	name: string | undefined;
+	allowDuplicatedCategory: boolean;
+	allowDataOverflow: boolean;
+	reversed: boolean;
+	includeHidden: boolean;
+	domain: AxisDomain | undefined;
+};
+
+/**
+ * Controls how Recharts calculates "nice" tick values for numerical axes.
+ *
+ * - `'none'`: Recharts does not apply any tick-rounding algorithm; tick positions are
+ *   determined entirely by d3, evenly spaced but not rounded to human-friendly numbers.
+ *   There is no domain-extension logic applied in this mode.
+ *
+ * - `'auto'` *(default)*: Recharts automatically decides whether and how to apply tick
+ *   niceties based on the domain definition. When the domain contains an `'auto'` keyword,
+ *   Recharts uses the `'adaptive'` algorithm and may extend the domain slightly to
+ *   produce clean tick labels. Otherwise, it applies the same algorithm while keeping
+ *   ticks within the fixed domain. This mirrors the default behavior from Recharts v2.
+ *
+ * - `'adaptive'`: Always applies the space-efficient algorithm (`getAdaptiveStep`),
+ *   which fills the available range as densely as possible while still rounding steps
+ *   to reasonable numbers (e.g. 10, 20, 25). May produce less "round-looking" labels
+ *   than `'snap125'`, but wastes less space. The domain-extension logic still applies
+ *   when the domain contains an `'auto'` keyword.
+ *
+ * - `'snap125'`: Always applies the round-numbers algorithm (`getSnap125Step`), which
+ *   snaps step sizes to values from the set {1, 2, 2.5, 5} × 10ⁿ. Produces very
+ *   human-friendly labels (e.g. 0, 5, 10, 15, 20) but may leave blank space at the
+ *   edges of the chart. The domain-extension logic still applies when the domain
+ *   contains an `'auto'` keyword.
+ *
+ * @see {@link https://recharts.github.io/guide/axisTicks/}
+ * @inline
+ */
+export type NiceTicksAlgorithm = 'none' | 'auto' | 'adaptive' | 'snap125';
+
+export type TicksSettings = {
+	allowDecimals: boolean;
+	/**
+	 * We pass the suggested number of ticks to d3 https://d3js.org/d3-scale/linear#linear_ticks
+	 * This number is a suggestion. d3 tries to accommodate it, but it might return more or less ticks than requested:
+	 * > The specified count is only a hint; the scale may return more or fewer values depending on the domain.
+	 *
+	 * If undefined, then d3 decides the number of ticks on its own. The default in d3 is 10,
+	 * but it can vary based on the domain size and other factors.
+	 */
+	tickCount: number | undefined;
+	/**
+	 * Ticks can be any type when the axis is the type of category
+	 * Ticks must be numbers when the axis is the type of number
+	 */
+	ticks: ReadonlyArray<AxisTick> | undefined;
+	tick: TickProp<any>;
+	/**
+	 * Controls how Recharts calculates "nice" tick values for this axis.
+	 * See {@link NiceTicksAlgorithm} for a full description of each option.
+	 *
+	 * @defaultValue 'auto'
+	 */
+	niceTicks: NiceTicksAlgorithm;
+};
+
+/**
+ * These are the external props, visible for users as they set them using our public API.
+ * There is all sorts of internal computed things based on these, but they will come through selectors.
+ *
+ * Properties shared between X and Y axes
+ */
+export type CartesianAxisSettings = BaseCartesianAxis &
+	TicksSettings & {
+		interval: AxisInterval;
+		mirror: boolean;
+		minTickGap: number;
+		angle: number;
+		hide: boolean;
+		tickFormatter: TickFormatter | undefined;
+	};
+
+export type XAxisSettings = CartesianAxisSettings & {
+	padding: XAxisPadding;
+	height: number;
+	orientation: XAxisOrientation;
+};
+
+export type YAxisWidth = number | 'auto';
+
+export type YAxisSettings = CartesianAxisSettings & {
+	padding: YAxisPadding;
+	width: YAxisWidth;
+	orientation: YAxisOrientation;
+	widthHistory?: number[];
+};
+
+/**
+ * Z axis is special because it's never displayed. It controls the size of Scatter dots,
+ * but it never displays ticks anywhere.
+ */
+export type ZAxisSettings = BaseCartesianAxis & {
+	range: AxisRange;
+};
+
+type AxisMapState = {
+	xAxis: Record<AxisId, XAxisSettings>;
+	yAxis: Record<AxisId, YAxisSettings>;
+	zAxis: Record<AxisId, ZAxisSettings>;
+};
+
+const initialState: AxisMapState = {
+	xAxis: {},
+	yAxis: {},
+	zAxis: {},
+};
+
+/**
+ * This is the slice where each individual Axis element pushes its own configuration.
+ * Prefer to use this one instead of axisSlice.
+ */
+// Registered props may contain native DOM refs. The private callback boundary
+// avoids RTK's prepared-action validator recursively comparing raw DOM-backed
+// settings with Draft<Settings>. Every access still uses the exact known draft;
+// the exported reducer state and action payloads remain fully typed.
+const cartesianAxisSlice = createSlice({
+	name: 'cartesianAxis',
+	initialState,
+	reducers: {
+		addXAxis: {
+			reducer(state: unknown, action: PayloadAction<XAxisSettings>) {
+				(state as Draft<AxisMapState>).xAxis[action.payload.id] = castDraft(action.payload);
+			},
+			prepare: prepareAutoBatched<XAxisSettings>(),
+		},
+		replaceXAxis: {
+			reducer(state: unknown, action: PayloadAction<{ prev: XAxisSettings; next: XAxisSettings }>) {
+				const { prev, next } = action.payload;
+				if ((state as Draft<AxisMapState>).xAxis[prev.id] !== undefined) {
+					if (prev.id !== next.id) {
+						delete (state as Draft<AxisMapState>).xAxis[prev.id];
+					}
+					(state as Draft<AxisMapState>).xAxis[next.id] = castDraft(next);
+				}
+			},
+			prepare: prepareAutoBatched<{ prev: XAxisSettings; next: XAxisSettings }>(),
+		},
+		removeXAxis: {
+			reducer(state: unknown, action: PayloadAction<XAxisSettings>) {
+				delete (state as Draft<AxisMapState>).xAxis[action.payload.id];
+			},
+			prepare: prepareAutoBatched<XAxisSettings>(),
+		},
+		addYAxis: {
+			reducer(state: unknown, action: PayloadAction<YAxisSettings>) {
+				(state as Draft<AxisMapState>).yAxis[action.payload.id] = castDraft(action.payload);
+			},
+			prepare: prepareAutoBatched<YAxisSettings>(),
+		},
+		replaceYAxis: {
+			reducer(state: unknown, action: PayloadAction<{ prev: YAxisSettings; next: YAxisSettings }>) {
+				const { prev, next } = action.payload;
+				if ((state as Draft<AxisMapState>).yAxis[prev.id] !== undefined) {
+					if (prev.id !== next.id) {
+						delete (state as Draft<AxisMapState>).yAxis[prev.id];
+					}
+					(state as Draft<AxisMapState>).yAxis[next.id] = castDraft(next);
+				}
+			},
+			prepare: prepareAutoBatched<{ prev: YAxisSettings; next: YAxisSettings }>(),
+		},
+		removeYAxis: {
+			reducer(state: unknown, action: PayloadAction<YAxisSettings>) {
+				delete (state as Draft<AxisMapState>).yAxis[action.payload.id];
+			},
+			prepare: prepareAutoBatched<YAxisSettings>(),
+		},
+		addZAxis: {
+			reducer(state: unknown, action: PayloadAction<ZAxisSettings>) {
+				(state as Draft<AxisMapState>).zAxis[action.payload.id] = castDraft(action.payload);
+			},
+			prepare: prepareAutoBatched<ZAxisSettings>(),
+		},
+		replaceZAxis: {
+			reducer(state: unknown, action: PayloadAction<{ prev: ZAxisSettings; next: ZAxisSettings }>) {
+				const { prev, next } = action.payload;
+				if ((state as Draft<AxisMapState>).zAxis[prev.id] !== undefined) {
+					if (prev.id !== next.id) {
+						delete (state as Draft<AxisMapState>).zAxis[prev.id];
+					}
+					(state as Draft<AxisMapState>).zAxis[next.id] = castDraft(next);
+				}
+			},
+			prepare: prepareAutoBatched<{ prev: ZAxisSettings; next: ZAxisSettings }>(),
+		},
+		removeZAxis: {
+			reducer(state: unknown, action: PayloadAction<ZAxisSettings>) {
+				delete (state as Draft<AxisMapState>).zAxis[action.payload.id];
+			},
+			prepare: prepareAutoBatched<ZAxisSettings>(),
+		},
+		updateYAxisWidth(state: unknown, action: PayloadAction<{ id: AxisId; width: number }>) {
+			const { id, width } = action.payload;
+			const axis = (state as Draft<AxisMapState>).yAxis[id];
+			if (axis) {
+				const history = axis.widthHistory || [];
+				// An oscillation is detected when the new width is the same as the width before the last one.
+				// This is a simple A -> B -> A pattern. If the next width is B, and the difference is less than 1 pixel, we ignore it.
+				if (
+					history.length === 3 &&
+					history[0] === history[2] &&
+					width === history[1] &&
+					width !== axis.width &&
+					Math.abs(width - (history[0] ?? 0)) <= 1
+				) {
+					return;
+				}
+				const newHistory = [...history, width].slice(-3);
+				(state as Draft<AxisMapState>).yAxis[id] = {
+					...axis,
+					width,
+					widthHistory: newHistory,
+				};
+			}
+		},
+	},
+});
+
+export const {
+	addXAxis,
+	replaceXAxis,
+	removeXAxis,
+	addYAxis,
+	replaceYAxis,
+	removeYAxis,
+	addZAxis,
+	replaceZAxis,
+	removeZAxis,
+	updateYAxisWidth,
+} = cartesianAxisSlice.actions;
+
+export const cartesianAxisReducer = cartesianAxisSlice.reducer;

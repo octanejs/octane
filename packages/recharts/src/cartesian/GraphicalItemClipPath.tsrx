@@ -1,3 +1,10 @@
+import type { AxisId } from '../state/cartesianAxisSlice';
+
+type GraphicalItemClipPathProps = {
+	xAxisId: AxisId;
+	yAxisId: AxisId;
+	clipPathId: string;
+};
 // Port of cartesian/GraphicalItemClipPath.tsx — the per-item clipPath used
 // when either axis has allowDataOverflow.
 import { useAppSelector } from '../state/hooks';
@@ -11,16 +18,16 @@ import {
 } from '../state/selectors/axisSelectors';
 import { usePlotArea } from '../hooks';
 
-export function useNeedsClip(xAxisId, yAxisId) {
+export function useNeedsClip(xAxisId: AxisId, yAxisId: AxisId) {
 	const xAxis = useAppSelector((state) => selectXAxisSettings(state, xAxisId));
 	const yAxis = useAppSelector((state) => selectYAxisSettings(state, yAxisId));
-	const needClipX = xAxis?.allowDataOverflow ?? implicitXAxis.allowDataOverflow;
-	const needClipY = yAxis?.allowDataOverflow ?? implicitYAxis.allowDataOverflow;
+	const needClipX: boolean = xAxis?.allowDataOverflow ?? implicitXAxis.allowDataOverflow;
+	const needClipY: boolean = yAxis?.allowDataOverflow ?? implicitYAxis.allowDataOverflow;
 	const needClip = needClipX || needClipY;
 	return { needClip, needClipX, needClipY };
 }
 
-export function GraphicalItemClipPath(props) @{
+export function GraphicalItemClipPath(props: GraphicalItemClipPathProps) @{
 	const { xAxisId, yAxisId, clipPathId } = props;
 	const plotArea = usePlotArea();
 	const { needClipX, needClipY, needClip } = useNeedsClip(xAxisId, yAxisId);

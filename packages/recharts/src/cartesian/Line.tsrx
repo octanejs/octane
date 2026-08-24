@@ -1,3 +1,118 @@
+import type {
+	MutableRefObject,
+	OctaneElement,
+	OctaneNode,
+	RefObject,
+} from '../util/OctaneTypes.ts';
+import type { CurveType, Props as CurveProps } from '../shape/Curve.tsrx';
+import type { LineDrawShapeProps } from './LineDrawShape.tsrx';
+import type { CartesianLabelListEntry, ImplicitLabelListType } from '../component/LabelList.tsrx';
+import type { ErrorBarDataPointFormatter } from './ErrorBar.tsrx';
+import type {
+	ActiveDotType,
+	ActiveShape,
+	AnimationDuration,
+	CartesianLayout,
+	DataConsumer,
+	DataKey,
+	DataProvider,
+	DotType,
+	EasingInput,
+	LegendType,
+	TickItem,
+	TooltipType,
+	TrapezoidViewBox,
+} from '../util/types';
+import type { Formatter } from '../component/DefaultTooltipContent.tsrx';
+import type { TooltipPayloadConfiguration } from '../state/tooltipSlice';
+import type { BaseAxisWithScale } from '../state/selectors/axisSelectors';
+import type { AxisId } from '../state/cartesianAxisSlice';
+import type { AnimationInterpolateFn } from '../animation/AnimatedItems.tsrx';
+import type { AnimationItem, AnimationMatchByProp } from '../animation/matchBy';
+import type { WithIdRequired } from '../util/useUniqueId';
+import type { ZIndexable } from '../zIndex/ZIndexLayer.tsrx';
+import type { GraphicalItemId } from '../state/graphicalItemsSlice';
+import type { ChartData } from '../state/chartDataSlice';
+
+export interface LinePointItem {
+	readonly value: number;
+	readonly payload?: any;
+	x: number | null;
+	y: number | null;
+}
+interface InternalLineProps extends ZIndexable {
+	activeDot: ActiveDotType;
+	animateNewValues: boolean;
+	animationBegin: number;
+	animationDuration: AnimationDuration;
+	animationEasing: EasingInput;
+	animationInterpolateFn: AnimationInterpolateFn<LinePointItem, CartesianLayout>;
+	animationMatchBy: AnimationMatchByProp<LinePointItem>;
+	className?: string;
+	connectNulls: boolean;
+	data?: any;
+	dataKey?: DataKey<any>;
+	dot: DotType;
+	height: number;
+	hide: boolean;
+	id: GraphicalItemId;
+	isAnimationActive: boolean | 'auto';
+	label: ImplicitLabelListType;
+	layout: 'horizontal' | 'vertical';
+	left: number;
+	legendType: LegendType;
+	shape: ActiveShape<LineDrawShapeProps, SVGPathElement>;
+	name?: string | number;
+	needClip?: boolean;
+	onAnimationEnd?: () => void;
+	onAnimationStart?: () => void;
+	points: ReadonlyArray<LinePointItem>;
+	formatter?: Formatter;
+	tooltipType?: TooltipType;
+	top: number;
+	type?: CurveType;
+	unit?: string | number | null;
+	width: number;
+	xAxisId: AxisId;
+	yAxisId: AxisId;
+}
+interface LineProps<DataPointType = any, DataValueType = any> extends DataProvider<
+	DataPointType
+>, DataConsumer<DataPointType, DataValueType>, ZIndexable {
+	activeDot?: ActiveDotType;
+	animateNewValues?: boolean;
+	animationBegin?: number;
+	animationDuration?: AnimationDuration;
+	animationEasing?: EasingInput;
+	animationInterpolateFn?: AnimationInterpolateFn<LinePointItem, CartesianLayout>;
+	animationMatchBy?: AnimationMatchByProp<LinePointItem>;
+	className?: string;
+	connectNulls?: boolean;
+	dot?: DotType;
+	hide?: boolean;
+	id?: string;
+	isAnimationActive?: boolean | 'auto';
+	label?: ImplicitLabelListType;
+	legendType?: LegendType;
+	shape?: ActiveShape<LineDrawShapeProps, SVGPathElement>;
+	name?: string | number;
+	onAnimationEnd?: () => void;
+	onAnimationStart?: () => void;
+	tooltipType?: TooltipType;
+	type?: CurveType;
+	unit?: string | number | null;
+	formatter?: Formatter;
+	xAxisId?: AxisId;
+	yAxisId?: AxisId;
+	zIndex?: number;
+	stroke?: string;
+	strokeWidth?: string | number;
+	strokeDasharray?: string | number;
+}
+type LineSvgProps = Omit<CurveProps, 'points' | 'pathRef' | 'ref' | 'layout' | 'baseLine'>;
+type InternalProps = LineSvgProps & InternalLineProps;
+export type Props<DataPointType = any, ValueAxisType = any> =
+	LineSvgProps & LineProps<DataPointType, ValueAxisType>;
 // Port of cartesian/Line.tsx — the line graphical item: redux registration,
 // store-computed points, the draw-in curve, dots, labels, active points.
 // `computeLinePoints` stays here (vendored lineSelectors imports it through
@@ -38,7 +153,7 @@ import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { propsAreEqual } from '../util/propsAreEqual';
 import { Dots } from '../component/Dots.tsrx';
 
-function getTotalLength(mainCurve) {
+function getTotalLength(mainCurve: SVGPathElement | null) {
 	try {
 		return mainCurve && mainCurve.getTotalLength && mainCurve.getTotalLength() || 0;
 	} catch {
@@ -50,7 +165,7 @@ function getTotalLength(mainCurve) {
  * Average x-shift between matched pairs — the overall direction/magnitude of
  * data movement, used to extrapolate enter/exit positions.
  */
-function averageShift(items) {
+function averageShift(items: ReadonlyArray<AnimationItem<LinePointItem>>) {
 	let total = 0;
 	let count = 0;
 	for (const item of items) {
@@ -62,7 +177,10 @@ function averageShift(items) {
 	return count > 0 ? total / count : 0;
 }
 
-const defaultLineAnimateItems = (items, animationElapsedTime) => {
+const defaultLineAnimateItems: AnimationInterpolateFn<LinePointItem, CartesianLayout> = (
+	items,
+	animationElapsedTime,
+) => {
 	if (items == null) {
 		// First render: return empty, stroke-dasharray handles the reveal
 		return [];
@@ -72,7 +190,7 @@ const defaultLineAnimateItems = (items, animationElapsedTime) => {
 		return items.flatMap((item) => (item.status === 'removed' ? [] : [item.next]));
 	}
 	const shift = averageShift(items);
-	const result = [];
+	const result: LinePointItem[] = [];
 	for (const item of items) {
 		if (item.status === 'matched') {
 			result.push({
@@ -129,9 +247,9 @@ export const defaultLineProps = {
 	yAxisId: 0,
 	zIndex: DefaultZIndexes.line,
 	type: 'linear',
-};
+} as const satisfies Partial<Props>;
 
-const computeLegendPayloadFromAreaData = (props) => {
+const computeLegendPayloadFromAreaData = (props: Props) => {
 	const { dataKey, name, stroke, legendType, hide } = props;
 	return [
 		{
@@ -145,7 +263,22 @@ const computeLegendPayloadFromAreaData = (props) => {
 	];
 };
 
-const SetLineTooltipEntrySettings = memo((props) => {
+const SetLineTooltipEntrySettings = memo((
+	props: Pick<
+		InternalProps,
+		| 'dataKey'
+		| 'data'
+		| 'stroke'
+		| 'strokeWidth'
+		| 'fill'
+		| 'name'
+		| 'hide'
+		| 'unit'
+		| 'formatter'
+		| 'tooltipType'
+		| 'id'
+	>,
+) => {
 	const {
 		dataKey,
 		data,
@@ -159,7 +292,7 @@ const SetLineTooltipEntrySettings = memo((props) => {
 		tooltipType,
 		id,
 	} = props;
-	const tooltipEntrySettings = {
+	const tooltipEntrySettings: TooltipPayloadConfiguration = {
 		dataDefinedOnItem: data,
 		getPosition: noop,
 		settings: {
@@ -180,7 +313,11 @@ const SetLineTooltipEntrySettings = memo((props) => {
 	return <SetTooltipEntrySettings tooltipEntrySettings={tooltipEntrySettings} />;
 });
 
-function LineDotsWrapper(props) {
+function LineDotsWrapper(props: {
+	points: ReadonlyArray<LinePointItem>;
+	clipPathId: string;
+	props: InternalProps;
+}) {
 	const { clipPathId, points } = props;
 	const { dot, dataKey, needClip } = props.props;
 	// Exclude ID so it isn't duplicated across every dot.
@@ -198,11 +335,15 @@ function LineDotsWrapper(props) {
 	/>;
 }
 
-function LineLabelListProvider(props) @{
+function LineLabelListProvider(props: {
+	showLabels: boolean;
+	children: OctaneNode;
+	points: ReadonlyArray<LinePointItem>;
+}) @{
 	const { showLabels, children, points } = props;
-	const labelListEntries = useMemo(() => {
+	const labelListEntries: ReadonlyArray<CartesianLabelListEntry> = useMemo(() => {
 		return points?.map((point) => {
-			const viewBox = {
+			const viewBox: TrapezoidViewBox = {
 				x: point.x ?? 0,
 				y: point.y ?? 0,
 				width: 0,
@@ -225,7 +366,16 @@ function LineLabelListProvider(props) @{
 	>{children}</CartesianLabelListContextProvider>
 }
 
-function StaticCurve(staticCurveProps) {
+function StaticCurve(staticCurveProps: {
+	clipPathId: string;
+	pathRef: RefObject<SVGPathElement | null>;
+	points: ReadonlyArray<LinePointItem>;
+	props: InternalProps;
+	animationElapsedTime?: number;
+	isAnimating?: boolean;
+	isEntrance?: boolean;
+	visibleLength?: number | null;
+}) {
 	const {
 		clipPathId,
 		pathRef,
@@ -237,7 +387,7 @@ function StaticCurve(staticCurveProps) {
 		visibleLength,
 	} = staticCurveProps;
 	const { type, layout, connectNulls, needClip, shape, strokeDasharray, ...others } = props;
-	const curveProps = {
+	const curveProps: LineDrawShapeProps = {
 		...svgPropertiesAndEvents(others),
 		fill: 'none',
 		className: 'recharts-line-curve',
@@ -260,7 +410,12 @@ function StaticCurve(staticCurveProps) {
 	</>;
 }
 
-function CurveWithAnimation(curveWithAnimationProps) {
+function CurveWithAnimation(curveWithAnimationProps: {
+	clipPathId: string;
+	props: InternalProps;
+	pathRef: RefObject<SVGPathElement | null>;
+	previousPointsRef: MutableRefObject<ReadonlyArray<LinePointItem> | null>;
+}) {
 	const { clipPathId, props, pathRef, previousPointsRef } = curveWithAnimationProps;
 	const {
 		points,
@@ -281,7 +436,7 @@ function CurveWithAnimation(curveWithAnimationProps) {
 	const getVisibleLength = useAnimatedLineLength(points);
 	// Don't update previousPointsRef before the SVG path is measured.
 	const shouldUpdatePreviousRef = useCallback(
-		(animationElapsedTime) => animationElapsedTime > 0 && totalLength > 0,
+		(animationElapsedTime: number) => animationElapsedTime > 0 && totalLength > 0,
 		[totalLength],
 	);
 	return <LineLabelListProvider points={points} showLabels={showLabels}>
@@ -322,10 +477,13 @@ function CurveWithAnimation(curveWithAnimationProps) {
 	</LineLabelListProvider>;
 }
 
-function RenderCurve(props) {
+function RenderCurve(props: {
+	clipPathId: string;
+	props: InternalProps;
+}) {
 	const { clipPathId } = props;
-	const previousPointsRef = useRef(null);
-	const pathRef = useRef(null);
+	const previousPointsRef = useRef<ReadonlyArray<LinePointItem> | null>(null);
+	const pathRef = useRef<SVGPathElement | null>(null);
 	return <CurveWithAnimation
 		props={props.props}
 		clipPathId={clipPathId}
@@ -334,7 +492,10 @@ function RenderCurve(props) {
 	/>;
 }
 
-const errorBarDataPointFormatter = (dataPoint, dataKey) => {
+const errorBarDataPointFormatter: ErrorBarDataPointFormatter<LinePointItem> = (
+	dataPoint: LinePointItem,
+	dataKey,
+) => {
 	return {
 		x: dataPoint.x ?? undefined,
 		y: dataPoint.y ?? undefined,
@@ -344,7 +505,7 @@ const errorBarDataPointFormatter = (dataPoint, dataKey) => {
 	};
 };
 
-function LineWithState(props) @{
+function LineWithState(props: InternalProps) @{
 	const {
 		hide,
 		dot,
@@ -410,7 +571,7 @@ function LineWithState(props) @{
 	</>
 }
 
-function LineImpl(props) {
+function LineImpl(props: WithIdRequired<Props>) {
 	const {
 		activeDot,
 		animateNewValues,
@@ -432,7 +593,7 @@ function LineImpl(props) {
 	const plotArea = usePlotArea();
 	const layout = useChartLayout();
 	const isPanorama = useIsPanorama();
-	const points = useAppSelector(
+	const points: ReadonlyArray<LinePointItem> | undefined = useAppSelector(
 		(state) => selectLinePoints(state, xAxisId, yAxisId, isPanorama, id),
 	);
 	if (layout !== 'horizontal' && layout !== 'vertical' || points == null || plotArea == null) {
@@ -475,10 +636,19 @@ export function computeLinePoints({
 	dataKey,
 	bandSize,
 	displayedData,
+}: {
+	layout: CartesianLayout;
+	xAxis: BaseAxisWithScale;
+	yAxis: BaseAxisWithScale;
+	xAxisTicks: TickItem[];
+	yAxisTicks: TickItem[];
+	dataKey: Props['dataKey'];
+	bandSize: number;
+	displayedData: ChartData;
 }) {
-	return displayedData.map((entry, index) => {
+	const points = displayedData.map((entry, index) => {
 		// getValueByDataKey does not validate the output type
-		const value = getValueByDataKey(entry, dataKey);
+		const value: number = getValueByDataKey(entry, dataKey);
 		if (layout === 'horizontal') {
 			const x = getCateCoordinateOfLine({ axis: xAxis, ticks: xAxisTicks, bandSize, entry, index });
 			const y =
@@ -497,10 +667,18 @@ export function computeLinePoints({
 			return null;
 		}
 		return { x, y, value, payload: entry };
-	}).filter(Boolean);
+	});
+	// This map returns only objects or null, so Boolean removes exactly the nulls.
+	return points.filter(
+		Boolean as BooleanConstructor & ((point: (typeof points)[number]) => point is NonNullable<
+			typeof point
+		>),
+	);
 }
 
-function LineFn(outsideProps) {
+function LineFn<DataPointType = any, ValueAxisType = any>(
+	outsideProps: Props<DataPointType, ValueAxisType>,
+) {
 	const props = resolveDefaultProps(outsideProps, defaultLineProps);
 	const isPanorama = useIsPanorama();
 	return <RegisterGraphicalItemId id={props.id} type="line">
@@ -540,5 +718,5 @@ function LineFn(outsideProps) {
  * @provides ErrorBarContext
  * @consumes CartesianChartContext
  */
-export const Line = memo(LineFn, propsAreEqual);
+export const Line = memo(LineFn, propsAreEqual) as typeof LineFn & { displayName?: string };
 Line.displayName = 'Line';

@@ -133,6 +133,7 @@ type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | '
 		class?: ClassValue;
 		className?: ClassValue;
 		for?: string;
+		xmlns?: string;
 		style?: string | React.CSSProperties;
 		children?: unknown;
 	};
@@ -140,8 +141,8 @@ type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | '
 declare namespace Octane {
 	type Key = string | number | bigint;
 
-	/** Octane ref forms: callback (optional cleanup), object, or (nested) arrays. */
-	type Ref<T> = React.Ref<T> | readonly Ref<T>[];
+	/** Ref forms: callback (optional cleanup), object, or nested arrays with optional entries. */
+	type Ref<T> = React.Ref<T> | readonly (Ref<T> | undefined)[];
 
 	interface Attributes {
 		key?: Key | null | undefined;

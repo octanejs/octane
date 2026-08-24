@@ -1,9 +1,10 @@
+import type { CSSProperties, HTMLAttributes, OctaneNode, SVGProps } from '../util/OctaneTypes.ts';
 /**
  * @fileOverview Default Tooltip Content
  */
 
 import * as React from 'octane';
-import { CSSProperties, HTMLAttributes, ReactNode, SVGProps, type OctaneNode } from 'octane';
+
 import sortBy from 'es-toolkit/compat/sortBy';
 import { clsx } from 'clsx';
 import { isNullish, isNumOrStr } from '../util/DataUtils';
@@ -35,7 +36,7 @@ export interface Payload<
 	formatter?: Formatter<TValue, TName>;
 	name?: TName;
 	value?: TValue;
-	unit?: ReactNode;
+	unit?: OctaneNode;
 	fill?: string;
 	dataKey?: DataKey<any>;
 	nameKey?: DataKey<any>;
@@ -69,8 +70,10 @@ export interface Props<TValue extends ValueType = ValueType, TName extends NameT
 	contentStyle?: CSSProperties;
 	itemStyle?: CSSProperties;
 	labelStyle?: CSSProperties;
-	labelFormatter?: (label: ReactNode, payload: ReadonlyArray<Payload<TValue, TName>>) => ReactNode;
-	label?: ReactNode;
+	labelFormatter?: (label: OctaneNode, payload: ReadonlyArray<
+		Payload<TValue, TName>
+	>) => OctaneNode;
+	label?: OctaneNode;
 	payload?: ReadonlyArray<Payload<TValue, TName>>;
 	itemSorter?: TooltipItemSorter<TValue, TName>;
 	accessibilityLayer?: boolean;
@@ -95,15 +98,14 @@ export const defaultDefaultTooltipContentProps = {
 	accessibilityLayer: false,
 } as const satisfies Partial<Props<any, any>>;
 
-function lodashLikeSortBy<T>(
+function lodashLikeSortBy<T extends Payload>(
 	array: ReadonlyArray<T>,
 	itemSorter: TooltipItemSorter | undefined,
 ): ReadonlyArray<T> {
 	if (itemSorter == null) {
 		return array;
 	}
-	// @ts-expect-error sortBy types somehow are returning a number type.
-	return sortBy(array, itemSorter);
+	return sortBy<T>(array, itemSorter);
 }
 
 /**
@@ -181,7 +183,7 @@ export const DefaultTooltipContent = (props: Props) => {
 		return null;
 	};
 
-	const finalStyle: React.CSSProperties = {
+	const finalStyle: CSSProperties = {
 		...defaultDefaultTooltipContentProps.contentStyle,
 		...contentStyle,
 	};
@@ -190,7 +192,7 @@ export const DefaultTooltipContent = (props: Props) => {
 		...labelStyle,
 	};
 	const hasLabel = !isNullish(label);
-	let finalLabel: ReactNode = hasLabel ? label : '';
+	let finalLabel: OctaneNode = hasLabel ? label : '';
 	const wrapperCN = clsx('recharts-default-tooltip', wrapperClassName);
 	const labelCN = clsx('recharts-tooltip-label', labelClassName);
 

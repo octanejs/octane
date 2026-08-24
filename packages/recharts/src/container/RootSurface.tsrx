@@ -1,3 +1,12 @@
+import type { OctaneNode, Ref } from '../util/OctaneTypes.ts';
+
+type RootSurfaceProps = {
+	children: OctaneNode;
+	title: string | undefined;
+	desc: string | undefined;
+	otherAttributes: Record<string, unknown> | null;
+	ref?: Ref<SVGSVGElement>;
+};
 // Port of container/RootSurface.tsx — the chart's outer <svg> (via Surface),
 // sized from the store, with the zIndex portal <g>s wrapped around children.
 // A panorama (Brush preview) renders a nested, brush-sized Surface instead.
@@ -18,7 +27,7 @@ const FULL_WIDTH_AND_HEIGHT = {
 	display: 'block',
 };
 
-function MainChartSurface(props) {
+function MainChartSurface(props: RootSurfaceProps) {
 	const width = useChartWidth();
 	const height = useChartHeight();
 	const hasAccessibilityLayer = useAccessibilityLayer();
@@ -26,7 +35,7 @@ function MainChartSurface(props) {
 		return null;
 	}
 	const { children, otherAttributes, title, desc, ref } = props;
-	let tabIndex, role;
+	let tabIndex: number | undefined, role: string | undefined;
 	if (otherAttributes != null) {
 		if (typeof otherAttributes.tabIndex === 'number') {
 			tabIndex = otherAttributes.tabIndex;
@@ -52,7 +61,9 @@ function MainChartSurface(props) {
 	>{children}</Surface>;
 }
 
-function BrushPanoramaSurface(props) {
+function BrushPanoramaSurface(props: {
+	children: OctaneNode;
+}) {
 	const { children } = props;
 	const brushDimensions = useAppSelector(selectBrushDimensions);
 	if (!brushDimensions) {
@@ -62,7 +73,7 @@ function BrushPanoramaSurface(props) {
 	return <Surface width={width} height={height} x={x} y={y}>{children}</Surface>;
 }
 
-export function RootSurface(props) {
+export function RootSurface(props: RootSurfaceProps) {
 	const { children, ref, ...rest } = props;
 	const isPanorama = useIsPanorama();
 	if (isPanorama) {
