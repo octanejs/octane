@@ -11,8 +11,7 @@
     "noErrorTruncation": true,
     "verbatimModuleSyntax": true,
     "strict": true,
-    "skipLibCheck": true,
-    "types": ["node", "vitest/globals"]
+    "skipLibCheck": true
   },
-  "include": ["src", "tests"]
+  "include": ["src"]
 }

@@ -40,7 +40,6 @@ Octane behavioral coverage is `tests/stick-to-bottom.test.ts`. It is Octane-only
 ## Intentional divergences
 
 - React ref types are structural.
-- TSRX nested children are opaque; use the `children` prop for render functions.
 - The plain TypeScript hook accepts and forwards a compiler-injected trailing
   slot; when called without options, a symbol in the options position is
   treated as empty options.

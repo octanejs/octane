@@ -35,7 +35,6 @@ export default function Flex({
 			offset && index === 0 ? toPercent((100 * offset) / count) : null;
 
 		return cloneElement(child, {
-			...child.props,
 			style: {
 				flexBasis: toPercent(100 / count),
 				flexShrink: 0,

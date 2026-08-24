@@ -18,7 +18,6 @@
   "divergences": [
     "Consumers import from @octanejs/stick-to-bottom instead of use-stick-to-bottom.",
     "Ref objects are structural { current } / callback refs rather than React.RefObject.",
-    "In TSRX, StickToBottom / StickToBottom.Content render functions must be supplied through the children prop; nested children compile to an opaque render block.",
     "The plain TypeScript useStickToBottom hook forwards compiler-injected slots; a symbol in the options position is treated as empty options."
   ],
   "ssr": "Scroll/resize listeners attach in ref callbacks. Initial isAtBottom follows options.initial. Overflow auto is applied in a layout/effect.",

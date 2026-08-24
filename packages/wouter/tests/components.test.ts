@@ -18,6 +18,7 @@ import {
 	type StringRouteParams,
 } from '@octanejs/wouter';
 import { memoryLocation } from '@octanejs/wouter/memory-location';
+import { NestedElementRoute, RenderPropRoute } from './_fixtures/route-children.tsrx';
 
 function routerWrapper(options: Omit<RouterProps, 'children'>) {
 	function Wrapper({ children }: { children: OctaneNode }) {
@@ -262,6 +263,13 @@ describe('Route', () => {
 		expect(container.textContent).toBe('users');
 	});
 
+	it('renders nested TSRX element children instead of calling them as render-props', () => {
+		const { container } = render(NestedElementRoute, {
+			props: { hook: memoryLocation({ path: '/about', static: true }).hook },
+		});
+		expect(container.textContent).toBe('about');
+	});
+
 	it('works with render props', () => {
 		const { container } = renderInMemory(
 			h(Route, {
@@ -270,6 +278,13 @@ describe('Route', () => {
 			}),
 			{ path: '/users/42' },
 		);
+		expect(container.textContent).toBe('42');
+	});
+
+	it('invokes TSRX render-prop children with route params', () => {
+		const { container } = render(RenderPropRoute, {
+			props: { hook: memoryLocation({ path: '/users/42', static: true }).hook },
+		});
 		expect(container.textContent).toBe('42');
 	});
 

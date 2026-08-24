@@ -34,7 +34,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --config vitest.config.js --project html-react-parser",
-    "typecheck": "tsrx-tsc --noEmit"
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p tsconfig.tests.json"
   },
   "dependencies": {
     "domhandler": "6.0.1",

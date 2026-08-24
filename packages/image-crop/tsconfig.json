@@ -10,9 +10,8 @@
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "allowImportingTsExtensions": true,
-    "strict": true,
-    "types": ["node"]
+    "strict": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsrx", "tests/**/*.ts", "tests/**/*.tsrx"],
+  "include": ["src/**/*.ts", "src/**/*.tsrx"],
   "exclude": ["node_modules", "dist", "upstream"]
 }

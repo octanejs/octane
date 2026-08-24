@@ -137,7 +137,7 @@ describe('@octanejs/image-crop', () => {
 		expect(manifest.exports['./src/ReactCrop.scss']).toBe('./src/ReactCrop.css');
 		const publishedCss = readFileSync(resolve(packageRoot, 'src/ReactCrop.css'), 'utf8').trim();
 		const upstreamCss = readFileSync(
-			resolve(packageRoot, 'upstream/npm/dist/ReactCrop.css'),
+			resolve(packageRoot, 'upstream-artifact/ReactCrop.css'),
 			'utf8',
 		)
 			.replace('/*$vite$:1*/', '')

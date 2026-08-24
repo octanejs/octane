@@ -30,7 +30,12 @@ import type {
 	RouterOptions,
 	SsrContext,
 } from './router';
-import type { ComponentBody, ElementDescriptor, OctaneNode } from 'octane';
+import {
+	isChildrenBlock,
+	type ComponentBody,
+	type ElementDescriptor,
+	type OctaneNode,
+} from 'octane';
 import type { JSX, Octane } from 'octane/jsx-runtime';
 import type { RouteParams } from 'regexparam';
 
@@ -285,7 +290,7 @@ function renderRoute(
 	if (component) {
 		return h(component as ComponentBody<{ params: DefaultParams }>, { params });
 	}
-	return typeof children === 'function' ? children(params) : children;
+	return typeof children === 'function' && !isChildrenBlock(children) ? children(params) : children;
 }
 
 function useCachedParams(value: DefaultParams, slot: symbol | undefined): DefaultParams {

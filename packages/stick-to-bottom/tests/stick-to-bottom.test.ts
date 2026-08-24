@@ -5,7 +5,12 @@ import {
 	useStickToBottom,
 	useStickToBottomContext,
 } from '@octanejs/stick-to-bottom';
-import { HookProbe, StickProbe } from './_fixtures/probes.ts';
+import {
+	ContentRenderPropStickProbe,
+	HookProbe,
+	RenderPropStickProbe,
+	StickProbe,
+} from './_fixtures/probes.tsrx';
 
 const originalResizeObserver = globalThis.ResizeObserver;
 
@@ -101,5 +106,15 @@ describe('StickToBottom', function componentSuite() {
 		expect(scroll?.style.overflow).toBe('auto');
 		expect(container.querySelector('[data-content]')).not.toBeNull();
 		expect(container.textContent).toContain('hello');
+	});
+
+	it('invokes function children with the stick-to-bottom context', function renderProp() {
+		const { container } = render(RenderPropStickProbe);
+		expect(container.textContent).toContain('bottom');
+	});
+
+	it('invokes content function children with the stick-to-bottom context', function contentRenderProp() {
+		const { container } = render(ContentRenderPropStickProbe);
+		expect(container.textContent).toContain('content-bottom');
 	});
 });

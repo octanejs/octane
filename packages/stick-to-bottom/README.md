@@ -16,6 +16,6 @@ export function Transcript(props: { messages: string[] }) @{
 }
 ```
 
-For render-prop children in `.tsrx`, pass `children={(ctx) => ...}`. Nested TSRX children compile to an opaque render block.
+Nested TSRX children render normally. Function children remain render props and receive the stick-to-bottom context.
 
 See [UPSTREAM.md](./UPSTREAM.md).

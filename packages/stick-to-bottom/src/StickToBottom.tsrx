@@ -6,6 +6,7 @@
 import {
 	type OctaneNode,
 	createContext,
+	isChildrenBlock,
 	useCallback,
 	useContext,
 	useEffect,
@@ -128,7 +129,7 @@ export function StickToBottom({
 
 	return <StickToBottomContext.Provider value={context}>
 		<div {...props}>
-			{typeof children === 'function' ? children(context) : children}
+			{typeof children === 'function' && !isChildrenBlock(children) ? children(context) : children}
 		</div>
 	</StickToBottomContext.Provider>;
 }
@@ -155,7 +156,7 @@ export function StickToBottomContent({
 		className={scrollClassName}
 	>
 		<div {...props} ref={context.contentRef}>
-			{typeof children === 'function' ? children(context) : children}
+			{typeof children === 'function' && !isChildrenBlock(children) ? children(context) : children}
 		</div>
 	</div>;
 }

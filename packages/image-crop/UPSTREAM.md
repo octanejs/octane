@@ -9,7 +9,7 @@
 
 ## Source boundary
 
-`upstream/src/` is the byte-exact canonical repository source at the pinned commit. `upstream/npm/` records the published npm artifact, including its generated bundles and compiled stylesheet. The Octane port:
+`upstream/src/` is the byte-exact canonical repository source at the pinned commit. `upstream/npm/` records the published npm source payload, while `upstream-artifact/ReactCrop.css` records the generated stylesheet from the pinned npm tarball with only a repository-final newline added. The Octane port:
 
 - converts `src/ReactCrop.tsx` from a React `PureComponent` to the hook-backed `src/ReactCrop.tsrx` function component;
 - reuses the framework-neutral `types.ts`, `utils.ts`, and `addons/browserCrop.ts` source unchanged;

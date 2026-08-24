@@ -41,7 +41,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --project image-crop",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p tsconfig.tests.json"
   },
   "peerDependencies": {
     "octane": "workspace:*"
