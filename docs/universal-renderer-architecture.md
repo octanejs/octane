@@ -9,6 +9,10 @@ existing DOM compiler and runtime remain the production renderer; the
 universal path is a separate compiler target and runtime module until non-DOM
 evidence justifies sharing more machinery.
 
+The separate [Valdi writer target](./valdi-compiler.md) emits calls to an
+application-provided writer adapter instead of universal host plans. It does
+not change the universal renderer's runtime or ownership model described here.
+
 The central decision is:
 
 > Renderer selection happens while lowering a template. DOM templates keep

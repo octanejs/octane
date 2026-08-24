@@ -205,8 +205,8 @@ function normalizeRegistryEntry(id, value, path) {
 		assertKnownKeys(value, REGISTRY_ENTRY_KEYS, path);
 		moduleId = validateModuleId(value.module, `${path}.module`);
 		target = value.target ?? 'universal';
-		if (target !== 'dom' && target !== 'universal') {
-			throw configError(`${path}.target must be "dom" or "universal".`);
+		if (target !== 'dom' && target !== 'universal' && target !== 'valdi') {
+			throw configError(`${path}.target must be "dom", "universal", or "valdi".`);
 		}
 
 		server = value.server ?? (target === 'dom' ? 'render' : 'unsupported');
@@ -221,6 +221,11 @@ function normalizeRegistryEntry(id, value, path) {
 		if (target === 'universal' && server === 'render') {
 			throw configError(
 				`${path}.server cannot be "render" until the universal renderer provides a validated server serializer.`,
+			);
+		}
+		if (target === 'valdi' && server === 'render') {
+			throw configError(
+				`${path}.server cannot be "render" for the client-only Valdi writer target.`,
 			);
 		}
 

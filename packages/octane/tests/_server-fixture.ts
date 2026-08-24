@@ -32,6 +32,8 @@ export interface CompiledFixtureSourceOptions {
 	mode: 'client' | 'server';
 	/** Additional public compiler options; `mode` is always enforced. */
 	compileOptions?: Record<string, unknown>;
+	/** Self-contained external modules used by custom-renderer fixtures. */
+	runtimeModules?: Readonly<Record<string, CompiledFixtureModule>>;
 }
 
 export interface PlainHookFixtureSourceOptions {
@@ -49,7 +51,7 @@ export function loadCompiledFixtureSource<T extends CompiledFixtureModule = Comp
 		...options.compileOptions,
 		mode,
 	});
-	return evaluateCompiledFixtureCode<T>(code, id, mode);
+	return evaluateCompiledFixtureCode<T>(code, id, mode, options.runtimeModules);
 }
 
 /** Execute the public plain-module transform through the shared module loader. */
@@ -76,13 +78,14 @@ export function loadPlainHookFixtureSource<T extends CompiledFixtureModule = Com
 			verbatimModuleSyntax: true,
 		},
 	});
-	return evaluateCompiledFixtureCode<T>(outputText, options.id, 'client');
+	return evaluateCompiledFixtureCode<T>(outputText, options.id, 'client', undefined);
 }
 
 function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 	code: string,
 	id: string,
 	mode: 'client' | 'server',
+	runtimeModules: Readonly<Record<string, CompiledFixtureModule>> | undefined,
 ): T {
 	const runtime = mode === 'server' ? ServerRuntime : ClientRuntime;
 	const internalRuntime = mode === 'server' ? InternalServerRuntime : InternalClientRuntime;
@@ -107,6 +110,18 @@ function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/hydration['"];?/g,
 		(_match: string, names: string) =>
 			`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`,
+	);
+	code = code.replace(
+		/import\s+(\*\s+as\s+[\w$]+|\{[^}]*\}|[\w$]+)\s+from\s*['"]([^'"]+)['"];?/g,
+		(match: string, binding: string, request: string) => {
+			if (runtimeModules === undefined || !Object.hasOwn(runtimeModules, request)) return match;
+			const module = `__runtimeModules[${JSON.stringify(request)}]`;
+			if (binding.startsWith('*'))
+				return `const ${binding.replace(/^\*\s+as\s+/, '')} = ${module};`;
+			if (binding.startsWith('{'))
+				return `const ${binding.replace(/\s+as\s+/g, ': ')} = ${module};`;
+			return `const ${binding} = ${module}.default;`;
+		},
 	);
 
 	// `export function X` must stay a real function *declaration*: compiled
@@ -144,10 +159,11 @@ function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 		'__runtime',
 		'__internalRuntime',
 		'__hydrationRuntime',
+		'__runtimeModules',
 		'__exports',
 		`'use strict';\n${code}\n//# sourceURL=${id}?${mode}-fixture\nreturn __exports;`,
 	);
-	return evaluate(runtime, internalRuntime, HydrationRuntime, {}) as T;
+	return evaluate(runtime, internalRuntime, HydrationRuntime, runtimeModules, {}) as T;
 }
 
 export function loadServerFixture<T extends CompiledFixtureModule = CompiledFixtureModule>(

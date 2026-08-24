@@ -30,7 +30,7 @@ export type OctaneRendererRegistryEntry =
 	| string
 	| {
 			module: string;
-			target?: 'dom' | 'universal';
+			target?: 'dom' | 'universal' | 'valdi';
 			server?: 'render' | 'client-only' | 'unsupported';
 			intrinsics?: string;
 			text?: 'reject' | 'ignore' | 'host';

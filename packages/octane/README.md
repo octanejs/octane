@@ -25,6 +25,11 @@ Vite builds can fold proven immutable CSS-module class strings into templates.
 See the [CSS-module constants guide](https://github.com/octanejs/octane/blob/main/docs/compiler-css-module-constants.md)
 for the provider contract and stylesheet-loading guarantees.
 
+Custom native integrations can opt into the experimental
+[Valdi writer compiler](https://github.com/octanejs/octane/blob/main/docs/valdi-compiler.md).
+It requires an application-provided adapter; Octane does not bundle a Valdi
+runtime or native build integration.
+
 Direct Node or Bun server scripts can preload `octane/compiler/register` to
 compile imported Octane components without going through Vite. See the
 [SSR guide](https://github.com/octanejs/octane/blob/main/docs/ssr.md#run-an-ssg-script-directly).
