@@ -36,7 +36,7 @@
     "@octanejs/radix": "workspace:*",
     "@octanejs/spring": "workspace:*",
     "@octanejs/rainbowkit": "workspace:*",
-    "@octanejs/solana-react": "workspace:*",
+    "@octanejs/solana-kit": "workspace:*",
     "@octanejs/react-error-boundary": "workspace:*",
     "@octanejs/resizable-panels": "workspace:*",
     "@octanejs/dropzone": "workspace:*",

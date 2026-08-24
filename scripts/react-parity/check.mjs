@@ -61,7 +61,7 @@ import { verifyReactTextareaAutosizeTypes } from './react-textarea-autosize-type
 import { verifyReactTransitionGroupTestClassifications } from './react-transition-group-classifications-lib.mjs';
 import { verifyReactTransitionGroupTypes } from './react-transition-group-types-lib.mjs';
 import { verifyReactTransitionGroupUpstream } from './react-transition-group-upstream-lib.mjs';
-import { verifySolanaReactTypes } from './solana-react-types-lib.mjs';
+import { verifySolanaReactTypes } from './solana-kit-types-lib.mjs';
 import { verifyTanstackDevtoolsTestClassifications } from './tanstack-devtools-classifications-lib.mjs';
 import { verifyTanstackHotkeysTestClassifications } from './tanstack-hotkeys-classifications-lib.mjs';
 import { verifyTanstackPacerTypes } from './tanstack-pacer-types-lib.mjs';
@@ -210,7 +210,7 @@ await capture('react-markdown type evidence', () => verifyReactMarkdownTypes(REP
 await capture('react-markdown test classifications', () =>
 	verifyReactMarkdownTestClassifications(REPO),
 );
-await capture('@octanejs/solana-react type evidence', () => verifySolanaReactTypes(REPO));
+await capture('@octanejs/solana-kit type evidence', () => verifySolanaReactTypes(REPO));
 await capture('react-spring upstream evidence', () => verifyReactSpringUpstream(REPO));
 await capture('@octanejs/tanstack-table type evidence', () => verifyTanstackTableTypes(REPO));
 await capture('tanstack-table test classifications', () =>

@@ -32,8 +32,8 @@ packages/tanstack-devtools/src/index.ts
 packages/*/upstream-types/
 # One-for-one adapted type-suite mirrors must stay structurally identical to
 # the vendored upstream typetests after permitted import rewrites only.
-packages/solana-react/typetests/__typetests__/
-packages/solana-react/typetests/query/__typetests__/
+packages/solana-kit/typetests/__typetests__/
+packages/solana-kit/typetests/query/__typetests__/
 # popper adapted typings mirrors stay printer-identical to upstream.
 packages/popper/typetests/main-test.tsx
 packages/popper/typetests/svg-test.tsx

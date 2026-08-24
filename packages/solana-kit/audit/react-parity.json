@@ -1,0 +1,292 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/anza-xyz/kit.git",
+    "version": "7.0.0",
+    "commit": "58df993f4bea388121a872b33038c6af0ca3dd90",
+    "sourceRoot": "packages/react/src",
+    "testRoot": "packages/react/src",
+    "license": "MIT",
+    "integrity": "sha256:f73adefa489c91d1f6ae7c61476a1ac15e26d5c58c48346b7c88dd100bc7729c",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/solana-kit/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/solana-kit/tests/upstream"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 32,
+    "uniqueIdentities": 32,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "3c19b217aaf26835a444155a0bd2420f2cc42a9838033414bcfd47757aeab231"
+    }
+  },
+  "lanes": [
+    {
+      "id": "solana-kit-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "solana-kit-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the byte-exact @solana/react 7.0.0 ClientProvider, useClientCapability, and useRequestQuery suites against the vendored React binding and checks every passed identity against the committed inventory.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/solana-kit/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/solana-kit/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "6bb0697c08669da9e349a615b4c52c4e18970b2a8d53b7572e0b2fd92e219aa2"
+        },
+        {
+          "path": "packages/solana-kit/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "71e9320307dd59ae9c8c47c33d0e664a001162bb2e55ebc51cd6746f881f5943"
+        },
+        {
+          "path": "packages/solana-kit/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "f7024b92f72055221c12b3d5e79da44f491cc99ec81b0ded506a9c121cfcf1c3"
+        },
+        {
+          "path": "scripts/react-parity/solana-kit-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "de3808463cff002570e55e395fe96298ccbfd244bb29ea5ec2c1181f0981e132"
+        },
+        {
+          "path": "scripts/react-parity/run-pristine.mjs",
+          "role": "support",
+          "sha256": "87904edd7a2209e81c7aba9a6912c0ab7ebd68a2d6890e1371fb9f2498fe9595"
+        },
+        {
+          "path": "packages/solana-kit/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "3b2979726d68db37a173d8bcc3652b21f1ac23c9946a06b3ca9125475459b50f"
+        },
+        {
+          "path": "packages/solana-kit/tests/_harness/pristine-setup.ts",
+          "role": "support",
+          "sha256": "ecd5d3d7ba54a6a82117ad21b4bb5394f5c77a07513171fa77b081663a1bcb43"
+        },
+        {
+          "path": "packages/solana-kit/audit/provenance.json",
+          "role": "support",
+          "sha256": "41580ce8d75a3df42d00505c95f685ce788951b67623557c8121ec3c63ab0996"
+        },
+        {
+          "path": "packages/solana-kit/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "63cc306d45c923df7d97e7e82f10bc94a417a9e17c0dd8221af165df178c7bef"
+        },
+        {
+          "path": "scripts/react-parity/solana-kit-parity-controls.test.mjs",
+          "role": "support",
+          "sha256": "beaf9ea75c3cabed352a928df78771094bbe310bfecd58829807cf8e4b11b76b"
+        }
+      ]
+    },
+    {
+      "id": "solana-kit-adapted-full-suite",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "solana-kit-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the adapted ClientProvider, useClientCapability, and useRequestQuery cases with one-for-one identities for every selected pristine assertion (including divergence pins).",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/solana-kit/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/solana-kit/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "d6f80c5addf1d8ba04c911964de8a6d260d7601a1ab2908834b3f533507a5eab"
+        }
+      ]
+    },
+    {
+      "id": "solana-kit-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "solana-kit-pristine-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Byte-exact upstream __typetests__ for every adapted and pristine-only disposition (client/capability/query/wallet/transaction/request/subscription/tracked) with original tsc + pinned React/TanStack/wallet-standard type dependencies.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/solana-kit/audit/upstream-typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/solana-kit/audit/pristine-types.json",
+          "role": "test",
+          "sha256": "8b892b03887bb454d3da56454e0620fa0ca5d47941072f8ca2e45a392dec21a7",
+          "cases": [
+            {
+              "id": "types:solana-kit-pristine",
+              "testName": "pinned upstream typetests",
+              "fullName": "pinned upstream typetests"
+            }
+          ]
+        },
+        {
+          "path": "packages/solana-kit/audit/upstream-typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "d133978f21fb1dee23aef8245c5ddcb9cce5e0468a2aeda4df1ce985e3f9a005"
+        },
+        {
+          "path": "packages/solana-kit/audit/upstream-typetests/shims.d.ts",
+          "role": "support",
+          "sha256": "10a09feed9e85ae69e632e862c44ae9f3c8459e29f62062753510cc55497ce2a"
+        },
+        {
+          "path": "packages/solana-kit/audit/type-parity.json",
+          "role": "support",
+          "sha256": "e7abe323fe33f5e4262988be918f8ec595518d96a8f18dc26566a71757f84417"
+        },
+        {
+          "path": "scripts/react-parity/solana-kit-types-lib.mjs",
+          "role": "support",
+          "sha256": "b9d50e79df58aedfdcc9c00d2bc1de2b6ca66b35b17ef4e8c4da01ad8ea3c64f"
+        }
+      ]
+    },
+    {
+      "id": "solana-kit-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "solana-kit-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "One-for-one adapted Octane typetests for every adapted disposition, plus wallet/transaction adaptedEvidence, with file/assertion-group inventory, permitted-transformation ledger, and omission/negative controls.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/solana-kit/typetests/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/solana-kit/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "f1dda18d852e2ccabd7a701cb96b6e75f88c3e85a9a8e2452b983752d70e0731",
+          "cases": [
+            {
+              "id": "types:solana-kit-adapted",
+              "testName": "adapted Octane typetests",
+              "fullName": "adapted Octane typetests"
+            }
+          ]
+        },
+        {
+          "path": "packages/solana-kit/typetests/tsconfig.json",
+          "role": "support",
+          "sha256": "05f41a0abdb043526c67a187c89d9164c53eab18fb2431feae91fae8b0607f06"
+        },
+        {
+          "path": "packages/solana-kit/audit/type-parity.json",
+          "role": "support",
+          "sha256": "e7abe323fe33f5e4262988be918f8ec595518d96a8f18dc26566a71757f84417"
+        },
+        {
+          "path": "scripts/react-parity/solana-kit-types-lib.mjs",
+          "role": "support",
+          "sha256": "b9d50e79df58aedfdcc9c00d2bc1de2b6ca66b35b17ef4e8c4da01ad8ea3c64f"
+        },
+        {
+          "path": "scripts/react-parity/solana-kit-types-lib.test.mjs",
+          "role": "support",
+          "sha256": "61693fab9e9f20b7a5bd98bbb1729f81bd9e567c245cd5b978d949ae149db403"
+        },
+        {
+          "path": "scripts/react-parity/solana-kit-types.mjs",
+          "role": "support",
+          "sha256": "96279ba452ea19bcb3759827bbd84b6c2acf0e46018eca2939095e6e4b571356"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "solana-kit-missing-provider-error",
+      "caseIds": ["runtime:32e73d9952587b2f", "runtime:d775c531b3e8370b"],
+      "upstreamResult": "useClient throws SolanaError MISSING_PROVIDER with hookName context.",
+      "octaneResult": "useClient throws a plain Error with message 'useClient must be used inside ClientProvider'.",
+      "rationale": "The Octane binding keeps the public failure surface free of @solana/kit React error codes while preserving the must-be-under-provider contract.",
+      "classification": "error-model",
+      "consumerImpact": "Catch sites that match SolanaError codes must match the Error message instead.",
+      "migrationGuidance": "Prefer try/catch on the message or a shared helper rather than SOLANA_ERROR__REACT__MISSING_PROVIDER.",
+      "owner": "@octanejs/solana-kit",
+      "reviewCondition": "Review if Octane adopts SolanaError for binding-boundary failures."
+    },
+    {
+      "id": "solana-kit-capability-error",
+      "caseIds": [
+        "runtime:f55bf79ffdd7ffe2",
+        "runtime:697b90de86fb3bd4",
+        "runtime:5f370d960e375ce4"
+      ],
+      "upstreamResult": "useClientCapability throws SolanaError MISSING_CAPABILITY listing every missing capability.",
+      "octaneResult": "useClientCapability throws a plain Error naming the first missing capability in the configured list.",
+      "rationale": "Octane validates capabilities sequentially and surfaces a single actionable message without importing SolanaError into the public binding.",
+      "classification": "error-model",
+      "consumerImpact": "Callers that inspected SolanaError.context.capabilities see a message string instead.",
+      "migrationGuidance": "Parse the Error message or check capabilities before calling the hook.",
+      "owner": "@octanejs/solana-kit",
+      "reviewCondition": "Review if the binding starts returning SolanaError for capability failures."
+    },
+    {
+      "id": "solana-kit-sync-client-only",
+      "caseIds": [
+        "runtime:8dce5b0ab8f4ae0a",
+        "runtime:14c8d6af4a82769f",
+        "runtime:fb3f27ba06fcb68d"
+      ],
+      "upstreamResult": "ClientProvider accepts Promise<Client>, suspends while pending, and propagates rejection to the nearest error boundary.",
+      "octaneResult": "ClientProvider accepts only a resolved client and throws if a thenable is passed.",
+      "rationale": "Octane bindings keep async plugin setup outside the provider so Suspense is not required for client construction.",
+      "classification": "api-surface",
+      "consumerImpact": "Callers must await client construction before mounting ClientProvider.",
+      "migrationGuidance": "Resolve the client Promise, then pass the settled client to ClientProvider.",
+      "owner": "@octanejs/solana-kit",
+      "reviewCondition": "Review if Octane gains a first-class async ClientProvider path."
+    },
+    {
+      "id": "solana-kit-query-ssr",
+      "caseIds": ["runtime:04e39c17fcc6fcd5"],
+      "upstreamResult": "renderToString of useRequestQuery renders idle markup without firing queryFn.",
+      "octaneResult": "QueryClientProvider SSR host plumbing may throw in this pin; the adapted identity still asserts queryFn is not invoked while effects are absent.",
+      "rationale": "Preserve the no-fetch-during-SSR oracle without weakening it to a skipped case.",
+      "classification": "environment",
+      "consumerImpact": "Server render of request queries should not start network work before hydration effects.",
+      "migrationGuidance": "Treat idle SSR/pre-effect as the contract; do not rely on React-specific QueryClientProvider SSR markup.",
+      "owner": "@octanejs/solana-kit",
+      "reviewCondition": "Review when @octanejs/tanstack-query SSR provider host parity lands."
+    }
+  ]
+}

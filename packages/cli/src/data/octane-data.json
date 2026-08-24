@@ -829,7 +829,7 @@
       "verified": "2026-08-02"
     },
     {
-      "name": "@octanejs/solana-react",
+      "name": "@octanejs/solana-kit",
       "version": "0.0.15",
       "category": "Web3",
       "upstream": {
@@ -1328,6 +1328,25 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/waypoint",
+      "version": "0.0.1",
+      "category": "UI and interaction",
+      "upstream": {
+        "package": "react-waypoint",
+        "version": "6.0.0",
+        "source": "https://github.com/brigade/react-waypoint/tree/v6.0.0",
+        "license": "MIT"
+      },
+      "surface": "Waypoint component and position constants at react-waypoint 6.0.0, with vertical/horizontal geometry, offsets, ancestor selection, rapid-crossing callbacks, refs, SSR, and hydration behavior.",
+      "divergences": [
+        "Public node and prop types use Octane structural types and do not import React.",
+        "The upstream class lifecycle is expressed with Octane hooks and refs-as-props.",
+        "A custom child must be supplied through the children prop so it remains an inspectable descriptor; nested TSRX children compile to an opaque render block."
+      ],
+      "ssr": "Supported. The marker renders on the server and measurement/listeners begin after client mount.",
+      "verified": "2026-08-24"
+    },
+    {
       "name": "@octanejs/window",
       "version": "0.0.12",
       "category": "Data-heavy screens",
@@ -1439,7 +1458,7 @@
     "@react-three/drei": "@octanejs/drei",
     "@react-three/fiber": "@octanejs/three",
     "@reduxjs/toolkit": "@octanejs/redux-toolkit",
-    "@solana/react": "@octanejs/solana-react",
+    "@solana/react": "@octanejs/solana-kit",
     "@streamdown/cjk": "@octanejs/streamdown",
     "@streamdown/code": "@octanejs/streamdown",
     "@streamdown/math": "@octanejs/streamdown",
@@ -1555,6 +1574,7 @@
     "react-textarea-autosize": "@octanejs/textarea-autosize",
     "react-to-print": "@octanejs/to-print",
     "react-transition-group": "@octanejs/transition-group",
+    "react-waypoint": "@octanejs/waypoint",
     "react-window": "@octanejs/window",
     "recharts": "@octanejs/recharts",
     "shadcn": "@octanejs/shadcn",

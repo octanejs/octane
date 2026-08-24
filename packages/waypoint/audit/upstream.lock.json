@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-waypoint",
+    "version": "6.0.0",
+    "repository": {
+      "owner": "brigade",
+      "repo": "react-waypoint",
+      "subdirectory": null
+    },
+    "commit": "b23770d57fa66b4e20eeb3e8d80fa60d85135f36",
+    "integrity": "sha512-Vc3JpyNydJrLUS7Z6tZWn6HWtGmJ6Y1L6U2JkMfI1UAcWxdhksjtuUJE2nn8PhFtIrmeM8tdGPpVZH7o7GWnIg=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "967ed7247c69ab319d03f67768c743b4d0a9e9959ee33f0232540473522b8d6b"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": ".babelrc",
+      "gitBlob": "31a5b4395a76e461e40e80791bfcdf78860cc9d4",
+      "size": 100
+    },
+    {
+      "path": ".eslintignore",
+      "gitBlob": "378eac25d311703f3f2cd456d8036da525cd0366",
+      "size": 6
+    },
+    {
+      "path": ".eslintrc.js",
+      "gitBlob": "3451522c97efd3f8c9f678c12165cb25593aaeac",
+      "size": 141
+    },
+    {
+      "path": ".gitignore",
+      "gitBlob": "dfd8ee9ba6423d78e0a5e092ad6a078a7ca862c1",
+      "size": 40
+    },
+    {
+      "path": ".npmignore",
+      "gitBlob": "e7fc0d997711fa8f21f9e1472c21f61d536613fe",
+      "size": 136
+    },
+    {
+      "path": ".npmrc",
+      "gitBlob": "32fd3a789fc382509830e27b417bba6957b4e788",
+      "size": 22
+    },
+    {
+      "path": ".overcommit.yml",
+      "gitBlob": "d3372cd0ec7b44c6c153f159be503b682eaa24ea",
+      "size": 451
+    },
+    {
+      "path": ".projections.json",
+      "gitBlob": "234b68bf52cf194ea16b5f156dddab6b10bac7a4",
+      "size": 157
+    },
+    {
+      "path": ".travis.yml",
+      "gitBlob": "f368c15d7d4d2dcbce7441587ed0653f6da0f36d",
+      "size": 353
+    },
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "17bbc005598e807254def93452a816a717e664a5",
+      "size": 4619
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "gitBlob": "5188b206b63f31d9e6753823182a7cc2477b9c73",
+      "size": 1150
+    },
+    {
+      "path": "index.d.ts",
+      "gitBlob": "0008fad2640347660705fdc01c1198f7ae450282",
+      "size": 3631
+    },
+    {
+      "path": "INTHEWILD.md",
+      "gitBlob": "0356f685857f002569225e7a8f39b6256e25c9b9",
+      "size": 454
+    },
+    {
+      "path": "karma.conf.js",
+      "gitBlob": "bed278582922be5d22dfaf1177f55c03143c5591",
+      "size": 1902
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "41ec79d0c45e29493faa730c03fc1104d202fefc",
+      "size": 1074
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "27a8287e7b750e6ba92de71448c7ae19346c84c7",
+      "size": 2612
+    },
+    {
+      "path": "react-waypoint-demo.gif",
+      "gitBlob": "1b9e9e6ae6ca2594e2bf8d2695906ce451227ee9",
+      "size": 97101
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "414324583364518844db470b0a23108d8fa719c2",
+      "size": 14221
+    },
+    {
+      "path": "spec/.eslintrc.js",
+      "gitBlob": "7cc5d2b89f0627eb0df1a29e995aaebbd2376635",
+      "size": 274
+    },
+    {
+      "path": "spec/resolveScrollableAncestorProp_spec.js",
+      "gitBlob": "27990e266b47907a47a127f341b9fe0196cd0d32",
+      "size": 392
+    },
+    {
+      "path": "spec/waypoint_spec.js",
+      "gitBlob": "79dd12d8927baeaf1d46d9ed99bd5e14cc57685e",
+      "size": 52453
+    },
+    {
+      "path": "src/computeOffsetPixels.js",
+      "gitBlob": "beb43fb4178b94f5b75300e8a19c1f14f1916810",
+      "size": 610
+    },
+    {
+      "path": "src/constants.js",
+      "gitBlob": "768b99051b22e5e01cc918e865fb3f29871eb773",
+      "size": 102
+    },
+    {
+      "path": "src/debugLog.js",
+      "gitBlob": "807547f043ed397c0867041a33e5ea804e2e5af8",
+      "size": 152
+    },
+    {
+      "path": "src/ensureChildrenIsSingleDOMElement.js",
+      "gitBlob": "69ebe485a70e65c1697749ac6dabb45892290670",
+      "size": 505
+    },
+    {
+      "path": "src/getCurrentPosition.js",
+      "gitBlob": "aa2efc0f459cc9ed818d21880e3b50a594ab8fe2",
+      "size": 1237
+    },
+    {
+      "path": "src/isDOMElement.js",
+      "gitBlob": "97da63018c2bda250586f545bd2679796b37a200",
+      "size": 396
+    },
+    {
+      "path": "src/parseOffsetAsPercentage.js",
+      "gitBlob": "981f7de4baa5e41d389ccc55dc0fe24deb80fe59",
+      "size": 704
+    },
+    {
+      "path": "src/parseOffsetAsPixels.js",
+      "gitBlob": "28c5551ea8be0ac6f019350e1bdb107d1165e722",
+      "size": 672
+    },
+    {
+      "path": "src/resolveScrollableAncestorProp.js",
+      "gitBlob": "fa343abad7c855dca658274b4402e994a6f14674",
+      "size": 382
+    },
+    {
+      "path": "src/waypoint.jsx",
+      "gitBlob": "60029c9d0c0d86fdc4ed2d52a2c4c7ee54793b65",
+      "size": 9815
+    },
+    {
+      "path": "tests.webpack.js",
+      "gitBlob": "fa69c4703bf621df38ac4b9eb4527c3e79663a3a",
+      "size": 96
+    }
+  ],
+  "fingerprint": "b24c3dfb67ae4581ad63ef900221d29cd6293b96ea50ca5443f39da13cfbee03"
+}

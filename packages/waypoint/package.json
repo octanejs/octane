@@ -1,0 +1,62 @@
+{
+  "name": "@octanejs/waypoint",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "react-waypoint for Octane.",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/waypoint"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "status.json",
+    "LICENSE",
+    "LICENSE.upstream"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "pnpm upstream:verify && vitest run --root ../.. --config vitest.config.js --project waypoint --project waypoint-ssr --project waypoint-differential --project waypoint-browser",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "@vitejs/plugin-react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-waypoint": "6.0.0",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

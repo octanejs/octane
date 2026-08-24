@@ -1324,12 +1324,12 @@ export default defineConfig({
 			},
 			{
 				test: {
-					name: 'solana-react',
-					include: ['packages/solana-react/tests/**/*.test.ts'],
+					name: 'solana-kit',
+					include: ['packages/solana-kit/tests/**/*.test.ts'],
 					exclude: [
 						...configDefaults.exclude,
-						'packages/solana-react/tests/upstream/**/*.test.ts',
-						'packages/solana-react/tests/upstream-original.test.ts',
+						'packages/solana-kit/tests/upstream/**/*.test.ts',
+						'packages/solana-kit/tests/upstream-original.test.ts',
 					],
 					environment: 'jsdom',
 					globals: false,
@@ -1338,12 +1338,12 @@ export default defineConfig({
 				resolve: {
 					alias: [
 						{
-							find: /^@octanejs\/solana-react$/,
-							replacement: resolve(import.meta.dirname, 'packages/solana-react/src/index.ts'),
+							find: /^@octanejs\/solana-kit$/,
+							replacement: resolve(import.meta.dirname, 'packages/solana-kit/src/index.ts'),
 						},
 						{
-							find: /^@octanejs\/solana-react\/query$/,
-							replacement: resolve(import.meta.dirname, 'packages/solana-react/src/query.ts'),
+							find: /^@octanejs\/solana-kit\/query$/,
+							replacement: resolve(import.meta.dirname, 'packages/solana-kit/src/query.ts'),
 						},
 					],
 				},
@@ -1351,8 +1351,8 @@ export default defineConfig({
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
-					name: 'solana-react-adapted',
-					include: ['packages/solana-react/tests/upstream/**/*.test.ts'],
+					name: 'solana-kit-adapted',
+					include: ['packages/solana-kit/tests/upstream/**/*.test.ts'],
 					environment: 'jsdom',
 					globals: false,
 				},
@@ -1360,12 +1360,12 @@ export default defineConfig({
 				resolve: {
 					alias: [
 						{
-							find: /^@octanejs\/solana-react$/,
-							replacement: resolve(import.meta.dirname, 'packages/solana-react/src/index.ts'),
+							find: /^@octanejs\/solana-kit$/,
+							replacement: resolve(import.meta.dirname, 'packages/solana-kit/src/index.ts'),
 						},
 						{
-							find: /^@octanejs\/solana-react\/query$/,
-							replacement: resolve(import.meta.dirname, 'packages/solana-react/src/query.ts'),
+							find: /^@octanejs\/solana-kit\/query$/,
+							replacement: resolve(import.meta.dirname, 'packages/solana-kit/src/query.ts'),
 						},
 					],
 				},
@@ -1373,10 +1373,92 @@ export default defineConfig({
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
-					name: 'solana-react-pristine',
-					include: ['packages/solana-react/tests/upstream-original.test.ts'],
+					name: 'solana-kit-pristine',
+					include: ['packages/solana-kit/tests/upstream-original.test.ts'],
 					environment: 'node',
 					globals: false,
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/waypoint/tests/hydration/hydration.test.ts',
+						'packages/waypoint/tests/waypoint.test.ts',
+					],
+				},
+				test: {
+					name: 'waypoint',
+					include: ['packages/waypoint/tests/**/*.test.ts'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/waypoint/tests/browser/**/*.test.ts',
+						'packages/waypoint/tests/differential/**/*.test.ts',
+						'packages/waypoint/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/waypoint$/,
+							replacement: resolve(import.meta.dirname, 'packages/waypoint/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'waypoint-differential',
+					include: ['packages/waypoint/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/waypoint/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/waypoint$/,
+							replacement: resolve(import.meta.dirname, 'packages/waypoint/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'waypoint-ssr',
+					include: ['packages/waypoint/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/waypoint$/,
+							replacement: resolve(import.meta.dirname, 'packages/waypoint/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'waypoint-browser',
+					include: ['packages/waypoint/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 				},
 			},
 			{
