@@ -1,5 +1,13 @@
 # @octanejs/astro
 
+## 0.0.25
+
+### Patch Changes
+
+- Updated dependencies [7e96f71]
+- Updated dependencies [d7226ff]
+  - octane@0.1.46
+
 ## 0.0.24
 
 ### Patch Changes

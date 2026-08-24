@@ -1,5 +1,13 @@
 # @octanejs/nuqs
 
+## 0.1.35
+
+### Patch Changes
+
+- Updated dependencies [7e96f71]
+- Updated dependencies [d7226ff]
+  - octane@0.1.46
+
 ## 0.1.34
 
 ### Patch Changes

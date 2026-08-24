@@ -1,5 +1,18 @@
 # octane
 
+## 0.1.46
+
+### Patch Changes
+
+- 7e96f71: Reduce streaming server-render work by checkpointing changed Suspense boundaries instead of copying the entire boundary registry for every component. Preserve render-phase retry state, discovery order, hydration seeds, and error handling.
+
+  Avoid general keyed-child bookkeeping for a single owned text node, and avoid reclassifying host subtrees that already require component reconciliation. Keep text identity, foreign DOM ownership, and interrupted-update rollback unchanged.
+
+- d7226ff: Add an experimental client-only Valdi writer compiler target with an explicit
+  application-provided adapter contract, public compiler option types, and
+  self-contained regression tests. Existing DOM and universal targets remain
+  unchanged; no native runtime or application build integration is bundled.
+
 ## 0.1.45
 
 ### Patch Changes

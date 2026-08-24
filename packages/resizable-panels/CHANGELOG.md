@@ -1,5 +1,13 @@
 # @octanejs/resizable-panels
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [7e96f71]
+- Updated dependencies [d7226ff]
+  - octane@0.1.46
+
 ## 0.0.3
 
 ### Patch Changes
