@@ -14,6 +14,41 @@ export function AsyncLeaf(props) @{
 	<div id="leaf">{value as string}</div>
 }
 
+type ReplayedStreamProps = {
+	promise: Promise<string>;
+	onClick?: (value: string) => void;
+};
+
+function ReplayedStreamContent(props: ReplayedStreamProps & { parentSettled: boolean }) @{
+	const [settled, setSettled] = useState(false);
+	if (!settled) setSettled(true);
+	@try {
+		const value = use(props.promise);
+		const contentId = useId();
+		<button
+			id={contentId}
+			data-replayed-stream=""
+			onClick={() => props.onClick?.(value)}
+		>{(props.parentSettled && settled ? 'Accepted: ' : 'Discarded: ') + value as string}</button>
+	} @pending {
+		<p>{'Waiting for replayed content'}</p>
+	}
+}
+
+export function ReplayedStreamBoundary(props: ReplayedStreamProps) @{
+	const [settled, setSettled] = useState(false);
+	const shellId = useId();
+	if (!settled) setSettled(true);
+	<main aria-describedby={shellId}>
+		<p id={shellId}>{'Replay shell'}</p>
+		<ReplayedStreamContent
+			parentSettled={settled}
+			promise={props.promise}
+			onClick={props.onClick}
+		/>
+	</main>
+}
+
 export function DeferredAsyncLeaf(props) @{
 	<Hydrate when={props.when} split={false}>
 		<AsyncLeaf promise={props.promise} />

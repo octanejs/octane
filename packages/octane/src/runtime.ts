@@ -20311,6 +20311,23 @@ function reconcileDeoptNode(
 // not reused are removed; survivors are reordered to match the descriptor. No markers
 // are introduced — the element fully owns its children, so this is raw-DOM reuse.
 function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): void {
+	// A scalar leaf keeps its sole owned Text node at the implicit first slot.
+	// Other shapes still need keyed matching: a lone text node may belong to a
+	// different array position, a nested wrapper, or independently inserted DOM.
+	const type = typeof children;
+	if ((type === 'string' && children !== '') || type === 'number' || type === 'bigint') {
+		const first = getFirstChild(el);
+		if (
+			first !== null &&
+			first.nodeType === 3 &&
+			getNextSibling(first) === null &&
+			(first as any).$$deoptKey === 0 &&
+			(first as any).$$portalEnd == null
+		) {
+			updateTextValue(first as Text, String(children));
+			return;
+		}
+	}
 	// The element that owns these children is authoritative. This matters when a
 	// component or dynamic tag made the lexical namespace unknowable, and when an
 	// SVG foreignObject resets its descendants to HTML.
@@ -20494,10 +20511,10 @@ function deoptItemBody(item: any, scope: Scope): void {
 	// construction (hydrated items always adopt the server's pair).
 	const existingChild = scope.slots[0] as ChildSlot | undefined;
 	const needsBlocks =
-		descNeedsBlocks(item) ||
 		(isHostDescriptor(item) &&
 			existingChild?.__kind === 'childSlot' &&
-			existingChild.currentComp === (hostElementBody as unknown as ComponentBody));
+			existingChild.currentComp === (hostElementBody as unknown as ComponentBody)) ||
+		descNeedsBlocks(item);
 	const sm = block.startMarker;
 	if (
 		sm !== null &&
@@ -21839,8 +21856,8 @@ export function childSlot(
 	const pureHost =
 		preparedList === null &&
 		isHostDescriptor(value) &&
-		!descNeedsBlocks(value) &&
-		state?.currentComp !== (hostElementBody as unknown as ComponentBody);
+		state?.currentComp !== (hostElementBody as unknown as ComponentBody) &&
+		!descNeedsBlocks(value);
 	let rootShapeChanged = false;
 	if (state !== undefined && ROOT_RENDER_TRANSACTION !== null) {
 		const component =

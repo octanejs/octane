@@ -1,4 +1,4 @@
-import { use, useSyncExternalStore, useTransition, type OctaneNode } from 'octane';
+import { createElement, use, useSyncExternalStore, useTransition, type OctaneNode } from 'octane';
 
 export interface GenericChildSnapshot {
 	value: OctaneNode;
@@ -21,6 +21,10 @@ function OnlyChild(props: { value: OctaneNode }) @{
 	<main id="only-child">{props.value}</main>
 }
 
+function DescriptorChild(props: { value: OctaneNode }) {
+	return createElement('p', { id: 'descriptor-child' }, props.value);
+}
+
 function AnchoredChild(props: { value: OctaneNode }) @{
 	<section id="anchored-child">
 		<span>{'before:'}</span>
@@ -38,6 +42,7 @@ function ReadyValue(props: { request: Promise<string> }) @{
 function Contents(props: { snapshot: GenericChildSnapshot }) @{
 	<div>
 		<OnlyChild value={props.snapshot.value} />
+		<DescriptorChild value={props.snapshot.value} />
 		<AnchoredChild value={props.snapshot.value} />
 		<ReadyValue request={props.snapshot.request} />
 	</div>
