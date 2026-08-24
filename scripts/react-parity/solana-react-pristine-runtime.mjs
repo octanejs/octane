@@ -7,7 +7,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
-import { verifySolanaReactUpstream } from '../../packages/solana-react/scripts/verify-upstream.mjs';
+import { verifyProvenanceManifest } from './provenance-manifest-lib.mjs';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../packages/solana-react');
 const upstreamRoot = join(packageRoot, 'upstream');
@@ -39,7 +39,7 @@ export function runPristineUpstreamSuite({
 	repoRoot = resolve(packageRoot, '../..'),
 	reportPath = join(tmpdir(), `octane-solana-react-pristine-${process.pid}.json`),
 } = {}) {
-	verifySolanaReactUpstream(packageRoot);
+	verifyProvenanceManifest(packageRoot);
 	const runRoot = mkdtempSync(join(packageRoot, '.pristine-upstream-'));
 	try {
 		cpSync(join(upstreamRoot, 'src'), join(runRoot, 'src'), { recursive: true });

@@ -3,9 +3,9 @@
 // visible frame" ref is only writable after the new cycle's t=0 handshake.
 import { useCallback, useRef } from 'octane';
 
-export function useAnimationStartSnapshot(
+export function useAnimationStartSnapshot<T>(
 	animationInput: unknown,
-	previousValueRef: { current: any },
+	previousValueRef: { current: T },
 ) {
 	// Identity of the animation cycle currently being served.
 	const previousAnimationInputRef = useRef(animationInput);
@@ -20,7 +20,7 @@ export function useAnimationStartSnapshot(
 		isReadyToCommitRef.current = false;
 	}
 	const syncStepValue = useCallback(
-		(stepValue: any, animationElapsedTime: number, canCommit = true) => {
+		(stepValue: T, animationElapsedTime: number, canCommit = true) => {
 			if (animationElapsedTime === 0) {
 				// t=0 handshake: the new animation has rendered its starting frame.
 				isReadyToCommitRef.current = true;

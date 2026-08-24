@@ -8,6 +8,7 @@ export function StaticUnsafeLinks() @{
 	<div>
 		<a id="static-first" href="javascript:notfine">p0wned</a>
 		<a id="static-last" href="javascript:notfineagain">p0wned again</a>
+		<a id="static-uppercase" href="JaVaScRiPt:notfine">uppercase</a>
 	</div>
 }
 

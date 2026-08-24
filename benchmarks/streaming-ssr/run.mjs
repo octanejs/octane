@@ -65,6 +65,11 @@ const TARGETS = [
 	{ name: 'ripple', dir: 'ripple' },
 ];
 const SCENARIOS = ['staggered', 'all-fast'];
+const CPU_SCENARIOS = [
+	{ name: 'cpu-10', cards: 10, waveSize: 10 },
+	{ name: 'cpu-100', cards: 100, waveSize: 100 },
+	{ name: 'cpu-waves-50', cards: 50, waveSize: 5 },
+];
 const CARD_COUNT = 10;
 
 const TARGET_FILTER = process.env.TARGETS
@@ -126,7 +131,7 @@ async function renderOnce(mod, scenario, collect = false) {
 	const chunks = [];
 	let html = '';
 	const t0 = performance.now();
-	await mod.renderStream(scenario, (chunk) => {
+	await renderScenario(mod, scenario, (chunk) => {
 		if (chunk.length === 0) return;
 		chunks.push({ t: performance.now() - t0, bytes: Buffer.byteLength(chunk) });
 		if (collect) html += chunk;
@@ -139,6 +144,13 @@ async function renderOnce(mod, scenario, collect = false) {
 		bytes: chunks.reduce((a, c) => a + c.bytes, 0),
 		html,
 	};
+}
+
+function renderScenario(mod, scenario, onChunk) {
+	const controlled = CPU_SCENARIOS.find((candidate) => candidate.name === scenario);
+	return controlled
+		? mod.renderControlledStream(controlled.cards, controlled.waveSize, onChunk)
+		: mod.renderStream(scenario, onChunk);
 }
 
 // Correctness gate shared with the ssr-http suite (same fixtures, same
@@ -156,8 +168,16 @@ for (const t of selected) {
 		continue;
 	}
 	const mod = await import(pathToFileURL(entry).href);
+	if (t.name === 'octane-tsrx' && typeof mod.renderControlledStream !== 'function') {
+		failures.push(`${t.name}: CPU entry missing from bundle (rebuild without --no-build)`);
+		continue;
+	}
 	const target = { name: t.name, scenarios: {} };
-	for (const scenario of SCENARIOS) {
+	const scenarios = [
+		...SCENARIOS,
+		...(typeof mod.renderControlledStream === 'function' ? CPU_SCENARIOS.map((s) => s.name) : []),
+	];
+	for (const scenario of scenarios) {
 		console.error(`running ${t.name}/${scenario} (${WARMUP} warmup + ${ITER} timed renders)…`);
 		try {
 			// Warm up FIRST (template compilation, JIT), then verify against a warm
@@ -169,7 +189,7 @@ for (const t of selected) {
 			let html = '';
 			const vt0 = performance.now();
 			let vChunks = 0;
-			await mod.renderStream(scenario, (chunk) => {
+			await renderScenario(mod, scenario, (chunk) => {
 				if (chunk.length === 0) return;
 				if (vChunks === 0) firstChunk = chunk;
 				vChunks++;
@@ -179,8 +199,11 @@ for (const t of selected) {
 				t.name,
 				scenario,
 				{ html, firstChunk, total: performance.now() - vt0 },
-				CARD_COUNT,
+				CPU_SCENARIOS.find((candidate) => candidate.name === scenario)?.cards ?? CARD_COUNT,
 			);
+			if (scenario.startsWith('cpu-') && firstChunk.includes('<article')) {
+				throw new Error(`${t.name}/${scenario}: controlled data appeared before shell acceptance`);
+			}
 			const shell = [];
 			const total = [];
 			const chunkCounts = [];
@@ -191,6 +214,9 @@ for (const t of selected) {
 				total.push(r.total);
 				chunkCounts.push(r.chunkCount);
 				bytes = r.bytes;
+			}
+			if (scenario.startsWith('cpu-') && chunkCounts.some((count) => count !== vChunks)) {
+				throw new Error(`${t.name}/${scenario}: producer pacing changed across timed samples`);
 			}
 			target.scenarios[scenario] = {
 				shell: summarize(shell),
@@ -214,7 +240,7 @@ const kb = (n) => (n / 1024).toFixed(1).padStart(7);
 console.log(
 	`\nstreaming-ssr — shell TTFB + stream-end totals (${ITER} renders/scenario, production builds)`,
 );
-for (const scenario of SCENARIOS) {
+for (const scenario of [...SCENARIOS, ...CPU_SCENARIOS.map((s) => s.name)]) {
 	console.log(`\n[${scenario}]`);
 	console.log(
 		'target       | shell score |  (min)   | total score |  (min)   | chunks | bytes KB | renders/s',
@@ -269,10 +295,25 @@ if (process.env.BENCH_JSON) {
 				ops.shell_allfast = timingStatForJson(af.shell);
 				ops.total_allfast = timingStatForJson(af.total);
 			}
+			const controlledCpu = {};
+			for (const scenario of CPU_SCENARIOS) {
+				const result = r.scenarios[scenario.name];
+				if (!result) continue;
+				const name = scenario.name.replaceAll('-', '_');
+				ops[`shell_${name}`] = timingStatForJson(result.shell);
+				ops[`total_${name}`] = timingStatForJson(result.total);
+				controlledCpu[scenario.name] = {
+					cards: scenario.cards,
+					waveSize: scenario.waveSize,
+					chunks: result.chunkCount,
+					bytes: result.bytes,
+				};
+			}
 			return {
 				name: r.name,
 				ops,
 				meta: {
+					...(Object.keys(controlledCpu).length > 0 ? { controlledCpu } : {}),
 					chunksStaggered: st ? st.chunkCount : null,
 					bytesStaggered: st ? st.bytes : null,
 					skeletonsStaggered: st ? st.skeletonsInStream : null,

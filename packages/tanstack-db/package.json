@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-db",
-  "version": "0.0.4",
+  "version": "0.0.8",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -36,7 +36,8 @@
   "files": [
     "src",
     "skills",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts"

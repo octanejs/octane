@@ -1,11 +1,11 @@
-import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = resolve(packageRoot, '../..');
 const upstreamRoot = resolve(packageRoot, 'upstream');
-const repositoryRoot = resolve(upstreamRoot, 'repository');
 const crosswalkPath = resolve(packageRoot, 'audit/export-crosswalk.json');
 
 function walk(directory) {
@@ -29,35 +29,25 @@ function exportedNames(source) {
 	return names;
 }
 
-const checksums = new Map(
-	readFileSync(resolve(upstreamRoot, 'SHA256SUMS'), 'utf8')
-		.trim()
-		.split('\n')
-		.map(function (line) {
-			const match = /^([a-f0-9]{64})  (.+)$/.exec(line);
-			if (!match) throw new Error(`invalid checksum line: ${line}`);
-			return [match[2], match[1]];
-		}),
+// The committed upstream/ tree verifies offline against the upstream git blob
+// shas in audit/upstream.lock.json.
+execFileSync(
+	process.execPath,
+	[
+		resolve(repoRoot, 'scripts/react-port/materialize.mjs'),
+		'run',
+		'--check',
+		'--package-dir',
+		packageRoot,
+	],
+	{ cwd: repoRoot, stdio: 'pipe' },
 );
-const files = walk(repositoryRoot)
+const files = walk(upstreamRoot)
 	.map(function (path) {
 		return relative(upstreamRoot, path).split(sep).join('/');
 	})
 	.sort();
-if (
-	files.length !== 452 ||
-	checksums.size !== files.length ||
-	files.some(function (path) {
-		return !checksums.has(path);
-	})
-)
-	throw new Error('vendored Radix file inventory drifted');
-for (const path of files) {
-	const digest = createHash('sha256')
-		.update(readFileSync(resolve(upstreamRoot, path)))
-		.digest('hex');
-	if (digest !== checksums.get(path)) throw new Error(`vendored Radix bytes drifted: ${path}`);
-}
+if (files.length !== 452) throw new Error('vendored Radix file inventory drifted');
 
 const packageFiles = files.filter(function (path) {
 	return path.endsWith('/package.json');
@@ -85,7 +75,7 @@ if (sourceFiles.length !== 207 || testFiles.length !== 38)
 	throw new Error('vendored Radix source or canonical test inventory drifted');
 
 const upstreamIndex = readFileSync(
-	resolve(upstreamRoot, 'repository/packages/react/radix-ui/src/index.ts'),
+	resolve(upstreamRoot, 'packages/react/radix-ui/src/index.ts'),
 	'utf8',
 );
 const octaneIndex = readFileSync(resolve(packageRoot, 'src/index.ts'), 'utf8');

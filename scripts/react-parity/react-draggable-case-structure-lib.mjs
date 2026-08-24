@@ -221,6 +221,48 @@ export function extractAdaptedCaseLedger(source, fileName) {
 }
 
 /**
+ * Extract it/test callback ledgers whose identity comes from a leading
+ * `@parity-case adapted-browser:<identity>` marker comment. The browser lane
+ * registers plain `it` cases under those markers rather than adaptedCase calls.
+ */
+export function extractMarkedCaseLedger(source, fileName) {
+	const sourceFile = ts.createSourceFile(
+		fileName,
+		source,
+		ts.ScriptTarget.Latest,
+		true,
+		scriptKindFor(fileName),
+	);
+	const printer = ts.createPrinter({ removeComments: true });
+	const cases = [];
+	function visit(node) {
+		if (ts.isCallExpression(node) && isTestCall(node.expression)) {
+			const leading = source.slice(node.getFullStart(), node.getStart(sourceFile));
+			const marker = /@parity-case\s+adapted-browser:([^\n]+?)\s*$/m.exec(leading);
+			const body = callbackBody(node);
+			if (marker && body) {
+				const identity = marker[1];
+				const assertions = extractAssertionsFrom(body, printer, sourceFile);
+				const scenarioSteps = extractScenarioSteps(body, printer, sourceFile);
+				cases.push({
+					identity,
+					citation: identity,
+					assertions,
+					scenarioSteps,
+					fixtures: fixtureRefs(scenarioSteps),
+					structureSha256: sha256(
+						JSON.stringify({ assertions, scenarioSteps, fixtures: fixtureRefs(scenarioSteps) }),
+					),
+				});
+			}
+		}
+		ts.forEachChild(node, visit);
+	}
+	visit(sourceFile);
+	return cases;
+}
+
+/**
  * Extract upstream it/test callback ledgers keyed by `file::title`.
  */
 export function extractUpstreamCaseLedger(source, relativeFile) {
@@ -268,7 +310,7 @@ export function buildAdaptedStructureInventory(packageRoot) {
 			return { ...entry, path: publicPath };
 		},
 	);
-	const browserCases = extractAdaptedCaseLedger(browserSource, browserPath).map(
+	const browserCases = extractMarkedCaseLedger(browserSource, browserPath).map(
 		function withPath(entry) {
 			return { ...entry, path: browserPath };
 		},
@@ -286,7 +328,10 @@ export function buildUpstreamStructureInventory(packageRoot, unitCases, browserC
 	}
 	const ledgers = [];
 	for (const [file, cases] of byFile) {
-		const source = readFileSync(resolve(packageRoot, 'upstream', file), 'utf8');
+		// Inventory identities keep the historical tag/ prefix; the tag tree
+		// itself now lives directly at upstream/.
+		const treePath = file.startsWith('tag/') ? file.slice('tag/'.length) : file;
+		const source = readFileSync(resolve(packageRoot, 'upstream', treePath), 'utf8');
 		const extracted = extractUpstreamCaseLedger(source, file);
 		const byTitle = new Map(
 			extracted.map(function pair(entry) {

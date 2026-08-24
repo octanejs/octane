@@ -1,9 +1,10 @@
-import type { CSSProperties, HTMLAttributes, SVGAttributes } from 'react';
+import type { CSSProperties } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type { TextProps } from '@octanejs/visx/text';
 
-export type HTMLTextStyles = HTMLAttributes<HTMLDivElement>['style'];
+export type HTMLTextStyles = CSSProperties;
 
-export type LineStyles = Omit<SVGAttributes<SVGLineElement>, 'Key'>;
+export type LineStyles = Omit<Octane.SVGProps<SVGLineElement>, 'key' | 'ref'>;
 
 export type GridStyles = CSSProperties;
 

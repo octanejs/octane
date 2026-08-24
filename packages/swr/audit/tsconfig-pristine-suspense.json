@@ -9,6 +9,7 @@
       "swr/mutation": ["tests/pristine/package/dist/mutation/index.d.mts"],
       "swr/_internal": ["tests/pristine/package/dist/_internal/index.d.mts"],
       "swr/subscription": ["tests/pristine/package/dist/subscription/index.d.mts"]
-    }
+    },
+    "incremental": false
   }
 }

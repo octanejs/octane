@@ -1,0 +1,16 @@
+diff --git a/tests/upstream/hooks/useStableCallback.test.tsx b/tests/upstream/hooks/useStableCallback.test.tsx
+--- a/tests/upstream/hooks/useStableCallback.test.tsx
++++ b/tests/upstream/hooks/useStableCallback.test.tsx
+@@ -1,6 +1,9 @@
+-import { fireEvent, render, renderHook, screen } from "@octanejs/testing-library";
+-import { describe, expect, test, vi } from "vitest";
+-import { useStableCallback } from "./useStableCallback";
++// Fidelity: exact pinned upstream test identities and assertions; imports and runtime harness are Octane-adapted.
++import { cleanup, fireEvent, render, renderHook, screen } from "@octanejs/testing-library";
++import { afterEach, describe, expect, test, vi } from "vitest";
++import { useStableCallback } from "../../../src/hooks/useStableCallback";
++
++afterEach(cleanup);
+ 
+ describe("useStableCallback", () => {
+   test("should not execute the callback", () => {

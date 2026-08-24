@@ -1,3 +1,58 @@
+import type { OctaneElement, OctaneNode, RefObject, SVGProps } from '../util/OctaneTypes.ts';
+import type { RenderableText, TextAnchor, TextVerticalAnchor } from './Text.tsrx';
+import type {
+	CartesianViewBoxRequired,
+	DataKey,
+	PolarViewBoxRequired,
+	TrapezoidViewBox,
+	ViewBox,
+} from '../util/types';
+import type { ZIndexable } from '../zIndex/ZIndexLayer.tsrx';
+import type { CartesianLabelPosition } from '../cartesian/getCartesianPosition';
+
+export type LabelContentType = OctaneElement | ((props: Props) => RenderableText | OctaneElement);
+type PolarLabelPosition = 'insideStart' | 'insideEnd' | 'end';
+export type LabelPosition = CartesianLabelPosition | PolarLabelPosition;
+export type LabelFormatter = (label: RenderableText) => RenderableText;
+interface LabelProps extends ZIndexable {
+	viewBox?: ViewBox;
+	parentViewBox?: ViewBox;
+	formatter?: LabelFormatter;
+	value?: RenderableText;
+	offset?: number;
+	position?: LabelPosition;
+	children?: RenderableText;
+	className?: SVGProps<SVGTextElement>['className'];
+	content?: LabelContentType;
+	textBreakAll?: boolean;
+	angle?: number;
+	index?: number;
+	labelRef?: RefObject<SVGTextElement | null> | null;
+	zIndex?: number;
+	id?: string;
+}
+export type Props = Omit<SVGProps<SVGTextElement>, 'viewBox'> & LabelProps;
+type PropsWithDefaults =
+	Props & {
+		offset: number;
+	};
+export type ImplicitLabelType =
+	| boolean
+	| string
+	| number
+	| OctaneElement<SVGElement>
+	| ((props: any) => RenderableText | OctaneElement)
+	| (Props & {
+			dataKey?: DataKey<any>;
+	  });
+export type LabelPositionAttributes = {
+	x: number;
+	y: number;
+	textAnchor: TextAnchor;
+	verticalAnchor: TextVerticalAnchor;
+	width?: number;
+	height?: number;
+};
 // Port of component/Label.tsx — chart labels with cartesian + polar
 // positioning, radial (textPath) rendering, and the label-as-prop parser
 // (boolean | value | element | function | object). Element-as-prop resolves
@@ -23,9 +78,11 @@ import { ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { DefaultZIndexes } from '../zIndex/DefaultZIndexes';
 import { getCartesianPosition } from '../cartesian/getCartesianPosition';
 
-const CartesianLabelContext = createContext(null);
+const CartesianLabelContext = createContext<TrapezoidViewBox | null>(null);
 
-export function CartesianLabelContextProvider(props) @{
+export function CartesianLabelContextProvider(props: TrapezoidViewBox & {
+	children: OctaneNode;
+}) @{
 	const { x, y, upperWidth, lowerWidth, width, height, children } = props;
 	const viewBox = useMemo(() => ({ x, y, upperWidth, lowerWidth, width, height }), [
 		x,
@@ -45,9 +102,11 @@ function useCartesianLabelContext() {
 		(chartContext ? cartesianViewBoxToTrapezoid(chartContext) : undefined);
 }
 
-const PolarLabelContext = createContext(null);
+const PolarLabelContext = createContext<PolarViewBoxRequired | null>(null);
 
-export function PolarLabelContextProvider(props) @{
+export function PolarLabelContextProvider(props: PolarViewBoxRequired & {
+	children: OctaneNode;
+}) @{
 	const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, clockWise, children } = props;
 	const viewBox = useMemo(
 		() => ({ cx, cy, innerRadius, outerRadius, startAngle, endAngle, clockWise }),
@@ -62,7 +121,7 @@ export function usePolarLabelContext() {
 	return labelChildContext || chartContext;
 }
 
-const getLabel = (props) => {
+const getLabel = (props: Props) => {
 	const { value, formatter } = props;
 	const label = isNullish(props.children) ? value : props.children;
 	if (typeof formatter === 'function') {
@@ -71,17 +130,23 @@ const getLabel = (props) => {
 	return label;
 };
 
-export function isLabelContentAFunction(content) {
+export function isLabelContentAFunction(content: unknown) {
 	return content != null && typeof content === 'function';
 }
 
-const getDeltaAngle = (startAngle, endAngle) => {
+const getDeltaAngle = (startAngle: number, endAngle: number) => {
 	const sign = mathSign(endAngle - startAngle);
 	const deltaAngle = Math.min(Math.abs(endAngle - startAngle), 360);
 	return sign * deltaAngle;
 };
 
-function renderRadialLabel(labelProps, position, label, attrs, viewBox) {
+function renderRadialLabel(
+	labelProps: PropsWithDefaults,
+	position: PolarLabelPosition,
+	label: OctaneNode,
+	attrs: SVGProps<SVGTextElement>,
+	viewBox: PolarViewBoxRequired,
+) {
 	const { offset, className } = labelProps;
 	const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, clockWise } = viewBox;
 	const radius = (innerRadius + outerRadius) / 2;
@@ -129,7 +194,11 @@ function renderRadialLabel(labelProps, position, label, attrs, viewBox) {
 	</text>;
 }
 
-const getAttrsOfPolarLabel = (viewBox, offset, position) => {
+const getAttrsOfPolarLabel = (
+	viewBox: PolarViewBoxRequired,
+	offset: number,
+	position: LabelPosition | undefined,
+): LabelPositionAttributes => {
 	const { cx, cy, innerRadius, outerRadius, startAngle, endAngle } = viewBox;
 	const midAngle = (startAngle + endAngle) / 2;
 	if (position === 'outside') {
@@ -155,7 +224,9 @@ const getAttrsOfPolarLabel = (viewBox, offset, position) => {
 	return { x, y, textAnchor: 'middle', verticalAnchor: 'middle' };
 };
 
-const isPolar = (viewBox) => viewBox != null && 'cx' in viewBox && isNumber(viewBox.cx);
+const isPolar = (
+	viewBox: CartesianViewBoxRequired | TrapezoidViewBox | PolarViewBoxRequired | undefined,
+): viewBox is PolarViewBoxRequired => viewBox != null && 'cx' in viewBox && isNumber(viewBox.cx);
 
 export const defaultLabelProps = {
 	angle: 0,
@@ -163,9 +234,9 @@ export const defaultLabelProps = {
 	zIndex: DefaultZIndexes.label,
 	position: 'middle',
 	textBreakAll: false,
-};
+} as const satisfies Partial<Props>;
 
-function polarViewBoxToTrapezoid(viewBox) {
+function polarViewBoxToTrapezoid(viewBox: PolarViewBoxRequired | TrapezoidViewBox | undefined) {
 	if (!isPolar(viewBox)) {
 		return viewBox;
 	}
@@ -181,8 +252,8 @@ function polarViewBoxToTrapezoid(viewBox) {
 	};
 }
 
-export function Label(outerProps) {
-	const props = resolveDefaultProps(outerProps, defaultLabelProps);
+export function Label(outerProps: Props) {
+	const props: PropsWithDefaults = resolveDefaultProps(outerProps, defaultLabelProps);
 	const {
 		viewBox: viewBoxFromProps,
 		parentViewBox,
@@ -200,7 +271,7 @@ export function Label(outerProps) {
 	// position 'center' prefers the cartesian box (recharts#6030 quick fix).
 	const resolvedViewBox =
 		position === 'center' ? cartesianViewBox : polarViewBox ?? cartesianViewBox;
-	let viewBox, label, positionAttrs;
+	let viewBox, label, positionAttrs: LabelPositionAttributes;
 	if (viewBoxFromProps == null) {
 		viewBox = resolvedViewBox;
 	} else if (isPolar(viewBoxFromProps)) {
@@ -270,7 +341,11 @@ export function Label(outerProps) {
 
 Label.displayName = 'Label';
 
-const parseLabel = (label, viewBox, labelRef) => {
+const parseLabel = (
+	label: ImplicitLabelType | undefined,
+	viewBox: ViewBox | undefined,
+	labelRef?: RefObject<SVGTextElement | null> | null,
+) => {
 	if (!label) {
 		return null;
 	}
@@ -281,7 +356,7 @@ const parseLabel = (label, viewBox, labelRef) => {
 	if (isNumOrStr(label)) {
 		return <Label key="label-implicit" value={label} {...commonProps} />;
 	}
-	if (isValidElement(label)) {
+	if (isValidElement<SVGElement>(label)) {
 		if (label.type === Label) {
 			return cloneElement(label, { key: 'label-implicit', ...commonProps });
 		}
@@ -296,13 +371,18 @@ const parseLabel = (label, viewBox, labelRef) => {
 	return null;
 };
 
-export function CartesianLabelFromLabelProp(props) {
+export function CartesianLabelFromLabelProp(props: {
+	label: ImplicitLabelType | undefined;
+	labelRef?: RefObject<SVGTextElement | null> | null;
+}) {
 	const { label, labelRef } = props;
 	const viewBox = useCartesianLabelContext();
 	return parseLabel(label, viewBox, labelRef) || null;
 }
 
-export function PolarLabelFromLabelProp(props) {
+export function PolarLabelFromLabelProp(props: {
+	label: ImplicitLabelType | undefined;
+}) {
 	const { label } = props;
 	const viewBox = usePolarLabelContext();
 	return parseLabel(label, viewBox) || null;

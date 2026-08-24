@@ -16,9 +16,11 @@
 
 The tagged repository contains the upstream runtime and compile-time suites. The
 published npm artifact contains source and declarations but omits those tests, so
-the repository pin is vendored under `packages/tanstack-store/upstream/` with
-`packages/react-store/src` and `packages/react-store/tests` locked file-by-file
-by `upstream/SHA256SUMS`.
+the repository pin is vendored under `packages/tanstack-store/upstream/` and pinned by
+`audit/upstream.lock.json`: each committed file verifies offline against its upstream git blob
+sha at the pinned commit (`pnpm react-port:materialize run --check --package-dir
+packages/tanstack-store`). The upstream MIT license is retained byte-exact as
+`LICENSE.upstream`, hash-matched to the lock.
 
 Run `pnpm --dir packages/tanstack-store upstream:verify` to verify every vendored
 byte. The pristine React-parity lanes run that same verifier before copying or

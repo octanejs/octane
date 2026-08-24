@@ -20,8 +20,9 @@ repository release commit whose package versions and unified manifest are `1.6.4
 
 The unified package has 55 direct workspace dependencies. Following those dependencies through the
 pinned monorepo produces 61 packages, 207 source files, and 38 canonical runtime test files. The
-byte-exact package directories and root MIT license are vendored under `upstream/repository`;
-`upstream/SHA256SUMS` authenticates all 452 files. The executable checker rejects file, byte,
+byte-exact package directories and root MIT license are vendored under `upstream/`; all 452 files
+verify offline against the upstream git blob shas recorded in `audit/upstream.lock.json`, and the
+pinned license is republished at the package root as `LICENSE.upstream`. The executable checker rejects file,
 package-graph, source, test inventory, or root-export crosswalk drift.
 
 The 38 canonical tests are preserved as provenance. Pristine React execution and a case-by-case

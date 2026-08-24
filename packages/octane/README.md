@@ -21,6 +21,10 @@ Custom Node build pipelines can opt into project-aware string-child inference
 through `octane/compiler/typescript`. See the
 [type-aware text compilation guide](https://github.com/octanejs/octane/blob/main/docs/compiler-text-inference.md).
 
+Vite builds can fold proven immutable CSS-module class strings into templates.
+See the [CSS-module constants guide](https://github.com/octanejs/octane/blob/main/docs/compiler-css-module-constants.md)
+for the provider contract and stylesheet-loading guarantees.
+
 Direct Node or Bun server scripts can preload `octane/compiler/register` to
 compile imported Octane components without going through Vite. See the
 [SSR guide](https://github.com/octanejs/octane/blob/main/docs/ssr.md#run-an-ssg-script-directly).

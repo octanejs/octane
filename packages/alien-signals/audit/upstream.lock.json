@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-alien-signals",
+    "version": "0.3.0",
+    "repository": {
+      "owner": "Rajaniraiyn",
+      "repo": "react-alien-signals",
+      "subdirectory": null
+    },
+    "commit": "6d883959ddf25a3f486451ff8abff60eb989671c",
+    "integrity": "sha512-UJdsSl9bLUL0wb/TmJ0YR++CCx0q+8PJYw/c3WUVdl1C61HNudUMRX6Qe5fJHsyRWuD0vb9yUjFtgnnB0Im5ag=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "file-only",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "2782e3bdc0ea2a7333995da1008cb34934d4cabb2195c4713251601040b02bbd"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "package.json",
+    "src/index.test.ts",
+    "src/index.ts",
+    "tsconfig.json",
+    "tsconfig.tsbuildinfo"
+  ],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "package.json",
+      "gitBlob": "0ae528d4378027c4635671a32240814cf0ba7e54",
+      "size": 1166
+    },
+    {
+      "path": "src/index.test.ts",
+      "gitBlob": "1ff8387b52b572b5ec2d2b0240fcf92649aedf56",
+      "size": 13483
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "e0977e033f0dfa6ffab2e773bf8d84dfe43ffe28",
+      "size": 8084
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "67212c2c50c7de69d978a4f09e2ea27d01c4f349",
+      "size": 689
+    }
+  ],
+  "fingerprint": "37292208bd61b096f854e6018b22bb4fe238e8522f9d719babcee9c8a1f1001e"
+}

@@ -62,7 +62,7 @@ async function fixture() {
 	const upstreamRoot = join(root, 'upstream');
 	const adaptedRoot = join(root, 'adapted');
 	const auditRoot = join(root, 'audit');
-	await cp(join(REPO, 'packages/tanstack-pacer/upstream/package/src'), upstreamRoot, {
+	await cp(join(REPO, 'packages/tanstack-pacer/upstream/src'), upstreamRoot, {
 		recursive: true,
 	});
 	await cp(join(REPO, 'packages/tanstack-pacer/src'), adaptedRoot, {

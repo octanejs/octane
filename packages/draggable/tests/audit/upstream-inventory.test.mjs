@@ -23,7 +23,11 @@ async function inventory(root, edit) {
 }
 
 async function mutateArtifact(root, path, edit) {
-	const file = join(root, 'upstream', path);
+	// Inventory identities keep the historical tag/ and npm/ prefixes; the
+	// trees live at upstream/ and upstream-artifact/ respectively.
+	const file = path.startsWith('npm/')
+		? join(root, 'upstream-artifact', path.slice('npm/'.length))
+		: join(root, 'upstream', path.slice('tag/'.length));
 	await writeFile(file, edit(await readFile(file, 'utf8')));
 	const bytes = await readFile(file);
 	await inventory(root, (value) => {
@@ -55,8 +59,8 @@ await rejectsMutation(
 	'a missing source file fails closed',
 	async (root) => {
 		await rename(
-			join(root, 'upstream/tag/lib/utils/log.ts'),
-			join(root, 'upstream/tag/lib/utils/log-renamed.ts'),
+			join(root, 'upstream/lib/utils/log.ts'),
+			join(root, 'upstream/lib/utils/log-renamed.ts'),
 		);
 	},
 	/artifact: missing identity tag\/lib\/utils\/log\.ts/,
@@ -201,7 +205,7 @@ await rejectsMutation(
 await rejectsMutation(
 	'a stale fixture hash fails closed',
 	async (root) => {
-		const path = join(root, 'upstream/tag/test/browser/test.html');
+		const path = join(root, 'upstream/test/browser/test.html');
 		await writeFile(path, `${await readFile(path, 'utf8')}\n`);
 	},
 	/artifact: stale hash tag\/test\/browser\/test\.html/,

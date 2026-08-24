@@ -189,11 +189,12 @@ describe('registry and store lifecycle', () => {
 		const result = mount(SuspenseStoreReader, { registry, options });
 
 		expect(result.find('#fallback').textContent).toBe('loading');
-		resolve(store);
-		(registry.getOrLoadPromise as ReturnType<typeof vi.fn>).mockReturnValue(store);
-		await nextPaint();
-		await Promise.resolve();
-		await nextPaint();
+		expect(registry.retain).not.toHaveBeenCalled();
+		await act(() => {
+			resolve(store);
+			(registry.getOrLoadPromise as ReturnType<typeof vi.fn>).mockReturnValue(store);
+		});
+		expect(result.findAll('#fallback')).toHaveLength(0);
 		expect(result.find('#store').textContent).toBe('ready');
 
 		flushEffects();

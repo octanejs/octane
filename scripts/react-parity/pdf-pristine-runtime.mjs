@@ -9,8 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../packages/pdf');
-const upstreamTag = join(packageRoot, 'upstream/tag');
-const upstreamSupport = join(packageRoot, 'upstream/support');
+const upstreamTag = join(packageRoot, 'upstream/packages/react-pdf');
+const upstreamSupport = join(packageRoot, 'upstream');
 
 export function pristineTestIdentities(report, repoRoot = resolve(packageRoot, '../..')) {
 	const identities = [];
@@ -20,7 +20,7 @@ export function pristineTestIdentities(report, repoRoot = resolve(packageRoot, '
 		const portable = relativeFile.includes('/.pristine-upstream-')
 			? relativeFile.replace(
 					/^packages\/pdf\/\.pristine-upstream-[^/]+\/packages\/pdf\//u,
-					'packages/pdf/upstream/tag/',
+					'packages/pdf/upstream/packages/react-pdf/',
 				)
 			: relativeFile;
 		for (const test of suite.assertionResults ?? []) {
@@ -43,12 +43,20 @@ function materializePristineRoot(runRoot) {
 	cpSync(join(upstreamTag, 'package.json'), join(packageDir, 'package.json'));
 	cpSync(join(upstreamTag, 'tsconfig.json'), join(packageDir, 'tsconfig.json'));
 	cpSync(upstreamSupport + '/__mocks__', join(runRoot, '__mocks__'), { recursive: true });
-	// Specs import test-utils.js; emit a thin re-export from the TypeScript authority.
+	// Specs import test-utils.js and __mocks__/*.js; upstream's Vite maps those
+	// specifiers to the TypeScript authorities, so emit thin re-exports here
+	// rather than vendoring repo-authored shims inside the pristine tree.
 	writeFileSync(
 		join(runRoot, 'test-utils.ts'),
 		readFileSync(join(upstreamSupport, 'test-utils.ts'), 'utf8'),
 	);
 	writeFileSync(join(runRoot, 'test-utils.js'), "export * from './test-utils.ts';\n");
+	for (const mock of ['_failing_page', '_failing_pdf', '_silently_failing_pdf']) {
+		writeFileSync(
+			join(runRoot, '__mocks__', `${mock}.js`),
+			`export { default } from './${mock}.ts';\n`,
+		);
+	}
 }
 
 export function runPristineUpstreamSuite({
@@ -120,7 +128,7 @@ export function inventoryFromIdentities(identities) {
 	return {
 		schemaVersion: 1,
 		project: 'pdf-pristine',
-		roots: ['packages/pdf/upstream/tag'],
+		roots: ['packages/pdf/upstream/packages/react-pdf'],
 		files: [
 			...new Set(
 				tests.map(function fileOf(test) {

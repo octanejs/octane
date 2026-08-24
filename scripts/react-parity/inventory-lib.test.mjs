@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
@@ -103,6 +103,116 @@ describe('extractTestCases', () => {
 		assert.equal(cases.length, 1);
 		assert.equal(cases[0].estimatedRegistrations, 2);
 		assert.deepEqual(cases[0].parameterization?.outerRowCounts, [2]);
+	});
+
+	test('extracts Vitest namespace wrappers and their static suite matrices', () => {
+		const cases = extractTestCases(`
+			Vitest.describe.each(['memory', 'web'])('%s', backend => {
+				Vitest.scopedLive('persists a value', () => backend);
+			});
+		`);
+
+		assert.equal(cases.length, 1);
+		assert.equal(cases[0].kind, 'scopedLive');
+		assert.equal(cases[0].title, 'persists a value');
+		assert.equal(cases[0].estimatedRegistrations, 2);
+		assert.deepEqual(cases[0].parameterization?.outerRowCounts, [2]);
+	});
+
+	test('extracts nested Node test-context subtests without matching arbitrary properties', () => {
+		const cases = extractTestCases(`
+			test('outer', async t => {
+				await t.test('inner', async nested => {
+					await nested.test('deep', () => {});
+				});
+			});
+			pattern.test('not a registered test');
+		`);
+
+		assert.deepEqual(
+			cases.map(({ title }) => title),
+			['outer', 'inner', 'deep'],
+		);
+	});
+
+	test('extracts the registered title from curried Vitest conditionals', () => {
+		const cases = extractTestCases(`
+			it.skipIf(!isJSDOM)('uses the real title', () => {});
+			test.runIf(browserEnabled)('runs in a browser', () => {});
+		`);
+
+		assert.deepEqual(
+			cases.map(({ title, modifiers, gate }) => ({ title, modifiers, gate })),
+			[
+				{
+					title: 'uses the real title',
+					modifiers: ['skipIf'],
+					gate: { kind: 'runtime', expression: 'skipIf(!isJSDOM)' },
+				},
+				{
+					title: 'runs in a browser',
+					modifiers: ['runIf'],
+					gate: { kind: 'runtime', expression: 'runIf(browserEnabled)' },
+				},
+			],
+		);
+	});
+
+	test('covers the complete vendored markdown and Base UI registrar shapes', () => {
+		const markdownPath = new URL('../../packages/markdown/upstream/test.jsx', import.meta.url);
+		const markdownCases = extractTestCases(readFileSync(markdownPath, 'utf8'), {
+			file: 'packages/markdown/upstream/test.jsx',
+		});
+		assert.equal(markdownCases.length, 91);
+
+		const baseUiPath = new URL(
+			'../../packages/base-ui/upstream/packages/react/src/select/item/SelectItem.test.tsx',
+			import.meta.url,
+		);
+		const baseUiCases = extractTestCases(readFileSync(baseUiPath, 'utf8'), {
+			file: 'packages/base-ui/upstream/packages/react/src/select/item/SelectItem.test.tsx',
+		});
+		const keyboardCase = baseUiCases.find(
+			(testCase) => testCase.title === 'navigating with keyboard should focus item',
+		);
+		assert.deepEqual(keyboardCase?.gate, {
+			kind: 'runtime',
+			expression: 'skipIf(!isJSDOM)',
+		});
+	});
+
+	test('counts describe.for static suite matrices', () => {
+		const cases = extractTestCases(`
+			describe.for([{ mode: 'a' }, { mode: 'b' }])('$mode', context => {
+				test('handles the mode', () => context.mode);
+			});
+		`);
+
+		assert.equal(cases.length, 1);
+		assert.equal(cases[0].estimatedRegistrations, 2);
+		assert.equal(cases[0].parameterization?.kind, 'describe.for');
+		assert.deepEqual(cases[0].parameterization?.outerRowCounts, [2]);
+	});
+
+	test('counts each static test row once inside a static suite matrix', () => {
+		const cases = extractTestCases(`
+			describe.each(['button', 'input'])('%s', tag => {
+				test.each([['mouse'], ['keyboard'], ['touch']])(
+					'handles %s input',
+					input => ({ tag, input }),
+				);
+			});
+		`);
+
+		assert.equal(cases.length, 3);
+		assert.deepEqual(
+			cases.map(({ estimatedRegistrations }) => estimatedRegistrations),
+			[2, 2, 2],
+		);
+		assert.equal(
+			cases.reduce((total, testCase) => total + testCase.estimatedRegistrations, 0),
+			6,
+		);
 	});
 
 	test('annotates React DOM server integration helper expansion modes', () => {

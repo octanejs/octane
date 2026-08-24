@@ -1,0 +1,340 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-intersection-observer",
+    "version": "10.1.0",
+    "repository": {
+      "owner": "thebuilder",
+      "repo": "react-intersection-observer",
+      "subdirectory": null
+    },
+    "commit": "5f82a7328fb63a2e54729f2205278209c14e30e8",
+    "integrity": "sha512-V8HDu3+Llg6OEhOxx8LnUSS0t4VS+1Xk9ZatkI8Jct/H0CwKnqFTCu8NT3q7ghJTghTdIrEMPSWr2dkKPG+gdQ=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "ee419222e62ec9c36ec40745db5d79ef88e8dc086597d88b808673d52faeab2e"
+      }
+    ],
+    "notices": []
+  },
+  "adaptedMappings": [
+    {
+      "fromRoot": "src/__tests__",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "'react-intersection-observer/test-utils'",
+      "replace": "'@octanejs/intersection-observer/test-utils'"
+    },
+    {
+      "find": "\"@testing-library/react/pure\"",
+      "replace": "\"@octanejs/testing-library/pure\""
+    },
+    {
+      "find": "\"@testing-library/react\"",
+      "replace": "\"@octanejs/testing-library\""
+    },
+    {
+      "find": "import React, { useCallback } from \"react\";",
+      "replace": "import { useCallback, useEffect, useState } from \"octane\";"
+    },
+    {
+      "find": "from \"react\";",
+      "replace": "from \"octane\";"
+    },
+    {
+      "find": "React.useState",
+      "replace": "useState"
+    },
+    {
+      "find": "React.useEffect",
+      "replace": "useEffect"
+    },
+    {
+      "find": "from \"../InView\";",
+      "replace": "from \"../../src/InView.tsrx\";"
+    },
+    {
+      "find": "from \"../useInView\";",
+      "replace": "from \"../../src/useInView.tsrx\";"
+    },
+    {
+      "find": "from \"../useOnInView\";",
+      "replace": "from \"../../src/useOnInView.tsrx\";"
+    },
+    {
+      "find": "from \"../observe\";",
+      "replace": "from \"../../src/observe\";"
+    },
+    {
+      "find": "from \"../test-utils\";",
+      "replace": "from \"../../src/test-utils\";"
+    },
+    {
+      "find": "from \"../index\";",
+      "replace": "from \"../../src/index\";"
+    },
+    {
+      "find": "from \"../\";",
+      "replace": "from \"../../src/index\";"
+    },
+    {
+      "find": "from \"..\";",
+      "replace": "from \"../../src/index\";"
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitattributes",
+      "gitBlob": "c8016164ef428b4d0c9c1024c0776d3907b6c49b",
+      "size": 1431
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.md",
+      "gitBlob": "38839855462468863f5ab6aff572cb13a231e26e",
+      "size": 1120
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/feature_request.md",
+      "gitBlob": "2866f790faca2bf179881c4aa8c66ad268f4ba95",
+      "size": 594
+    },
+    {
+      "path": ".github/workflows/pkg-pr.yml",
+      "gitBlob": "cfc7f04c3e341876ef3c9de78d8604319a33cf94",
+      "size": 511
+    },
+    {
+      "path": ".github/workflows/test.yml",
+      "gitBlob": "730756bfe31d29f6d12d67e69aca1999fb627eb3",
+      "size": 1652
+    },
+    {
+      "path": ".gitignore",
+      "gitBlob": "f0ccb801c66e64f6f8d7989b6613a9d75bc8cfe3",
+      "size": 225
+    },
+    {
+      "path": ".npmignore",
+      "gitBlob": "b96de39eaa806b408bc9d9aa3dbf8fe44521bc76",
+      "size": 323
+    },
+    {
+      "path": ".npmrc",
+      "gitBlob": "e2a389c3236d83e3f0fdf460b8200c97b9089112",
+      "size": 32
+    },
+    {
+      "path": "biome.json",
+      "gitBlob": "ba713abc7ab0df4cf65e766172585d4a5eb16073",
+      "size": 749
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "gitBlob": "166ae69fa608b353c8535c4afcad4c87b5519178",
+      "size": 2775
+    },
+    {
+      "path": "docs/Recipes.md",
+      "gitBlob": "9f1bffd562ff88995427f858ecc5e76107b77892",
+      "size": 4403
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "2afe4ed68cd6306d933836b286803e152c73ebc1",
+      "size": 1102
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "e284a5b40dfdf2fbfa0db71dfe29129f2ea38e9d",
+      "size": 4210
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "gitBlob": "f277a9932debead4ac075190143eb9c0be29bbc1",
+      "size": 322927
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "gitBlob": "4ba9d6c43e113a8690ce235d39e01c55e66a5e50",
+      "size": 115
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "426254aae70d47f20ac473c2442ca1bbdc83dc63",
+      "size": 28628
+    },
+    {
+      "path": "SECURITY.md",
+      "gitBlob": "68903767066b88175a6eec7d7fda49493d99026d",
+      "size": 379
+    },
+    {
+      "path": "src/__tests__/browser.test.tsx",
+      "gitBlob": "8199cd18af78cad229442c5281756c1f7738a1e0",
+      "size": 1379
+    },
+    {
+      "path": "src/__tests__/InView.test.tsx",
+      "gitBlob": "213a51cf2626e903df15765739ee5cad68da9dfb",
+      "size": 6504
+    },
+    {
+      "path": "src/__tests__/observe.test.ts",
+      "gitBlob": "40841e01f682621514a3380330cf6383118e02d7",
+      "size": 1529
+    },
+    {
+      "path": "src/__tests__/setup.test.ts",
+      "gitBlob": "ed38f9016556bd60d6312ec21080f35015ca7669",
+      "size": 1220
+    },
+    {
+      "path": "src/__tests__/useInView.test.tsx",
+      "gitBlob": "cc664e86967120dc631beba7bbcdcd4e0dc11118",
+      "size": 12862
+    },
+    {
+      "path": "src/__tests__/useOnInView.test.tsx",
+      "gitBlob": "ed9ccab039eb086be8383cb0184b42d2e9971da9",
+      "size": 13478
+    },
+    {
+      "path": "src/index.tsx",
+      "gitBlob": "91f175549c90007ccb8d5464b9bf3809713b46b5",
+      "size": 4322
+    },
+    {
+      "path": "src/InView.tsx",
+      "gitBlob": "d130060a6b48242ddfc48dc694b79dd955b2c63c",
+      "size": 5740
+    },
+    {
+      "path": "src/observe.ts",
+      "gitBlob": "0e84176b1010084daf0b6889a3b72b6b5c19ae9f",
+      "size": 5638
+    },
+    {
+      "path": "src/test-utils.ts",
+      "gitBlob": "3e3f557275cb6f5e8f608132d61f93358a95a8c4",
+      "size": 8296
+    },
+    {
+      "path": "src/useInView.tsx",
+      "gitBlob": "791c5014297e4d7db37973ef8f42f63fe1ad970c",
+      "size": 4540
+    },
+    {
+      "path": "src/useOnInView.tsx",
+      "gitBlob": "5e9069c0c451b51e72343c4fac2cf6037aff5d10",
+      "size": 4626
+    },
+    {
+      "path": "storybook/.storybook/main.ts",
+      "gitBlob": "57c841a0915ecf477185ef927e943629b098e7f8",
+      "size": 821
+    },
+    {
+      "path": "storybook/.storybook/manager.ts",
+      "gitBlob": "51a5066951b408fa22808f026b92e332adfcc318",
+      "size": 273
+    },
+    {
+      "path": "storybook/.storybook/preview-head.html",
+      "gitBlob": "f3a5644ab07034c34474e985c3fb3d5ad3097f52",
+      "size": 660
+    },
+    {
+      "path": "storybook/.storybook/preview.ts",
+      "gitBlob": "18645f2567611d3513b69ad58d35681b53c38825",
+      "size": 214
+    },
+    {
+      "path": "storybook/package.json",
+      "gitBlob": "0d173bbafa7ee54efb41e3f3f77af839d4ed4ead",
+      "size": 1095
+    },
+    {
+      "path": "storybook/postcss.config.js",
+      "gitBlob": "483f378543c055b9299d8bd02620999429cbeb83",
+      "size": 72
+    },
+    {
+      "path": "storybook/readme.md",
+      "gitBlob": "70f354ec6fbec9af951db00a8b78fc4d11c9b558",
+      "size": 9842
+    },
+    {
+      "path": "storybook/stories/elements.tsx",
+      "gitBlob": "d9ce568ebac892cec6cfce9761917e44ed968085",
+      "size": 7820
+    },
+    {
+      "path": "storybook/stories/Intro.mdx",
+      "gitBlob": "14a3905a4e1559c0658cb59f3ff61da432f17fc7",
+      "size": 127
+    },
+    {
+      "path": "storybook/stories/InView.story.tsx",
+      "gitBlob": "1cd0bb7342b5d8884f5ced70914d05efa80429a3",
+      "size": 3989
+    },
+    {
+      "path": "storybook/stories/Recipes.mdx",
+      "gitBlob": "9a0ef97b88c7bb11fc0c6927220f41930c2a6a47",
+      "size": 138
+    },
+    {
+      "path": "storybook/stories/story-utils.ts",
+      "gitBlob": "e7ae126347db1538df32e25323388f6f2374b967",
+      "size": 3085
+    },
+    {
+      "path": "storybook/stories/useInView.story.tsx",
+      "gitBlob": "3a54b32aad1f21dd7f5d1be86b33e6c42a9f7d43",
+      "size": 4728
+    },
+    {
+      "path": "storybook/stories/useOnInView.story.tsx",
+      "gitBlob": "e1d5876640a51325f747d56f50e78d4a29435c71",
+      "size": 3972
+    },
+    {
+      "path": "storybook/styles.css",
+      "gitBlob": "f1d8c73cdcf9eaacb01fec99963ad78d591305ae",
+      "size": 23
+    },
+    {
+      "path": "storybook/tailwind.config.js",
+      "gitBlob": "273b968a16e600dcf8b59a2ae6aa75326e1cb077",
+      "size": 131
+    },
+    {
+      "path": "storybook/tsconfig.json",
+      "gitBlob": "08dbc85d79b7207cfb10ee1d4061c80053b810c4",
+      "size": 568
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "32f6584b23b8f46c63014ed8ed5410971b8e1a39",
+      "size": 579
+    },
+    {
+      "path": "tsup.config.ts",
+      "gitBlob": "f88713e7838f5d1d4b7978e56bcac826b03e8869",
+      "size": 441
+    },
+    {
+      "path": "vitest.config.ts",
+      "gitBlob": "0dc2ad108389fa109090d056978eb5458541ac39",
+      "size": 630
+    }
+  ],
+  "fingerprint": "91422b9a382f1e8b967caa7cace8c94e0f381b590ef4acee6b6d6f786c10ef0c"
+}

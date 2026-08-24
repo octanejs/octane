@@ -31,6 +31,7 @@ import { PhosphorIconsDemo } from './demos/PhosphorIcons.tsrx';
 import { RxJSDemo } from './demos/RxJS.tsrx';
 import { RainbowKitDemo } from './demos/RainbowKit.tsrx';
 import { ReactDropzoneDemo } from './demos/ReactDropzone.tsrx';
+import { ReactResizablePanelsDemo } from './demos/ReactResizablePanels.tsrx';
 import { ReactMarkdownDemo } from './demos/ReactMarkdown.tsrx';
 import { ReactWindowDemo } from './demos/ReactWindow.tsrx';
 import { ShadcnBasesDemo } from './demos/ShadcnBases.tsrx';
@@ -71,6 +72,7 @@ import phosphorIconsSource from './demos/PhosphorIcons.tsrx?raw';
 import rxjsSource from './demos/RxJS.tsrx?raw';
 import rainbowKitSource from './demos/RainbowKit.tsrx?raw';
 import reactDropzoneSource from './demos/ReactDropzone.tsrx?raw';
+import reactResizablePanelsSource from './demos/ReactResizablePanels.tsrx?raw';
 import reactMarkdownSource from './demos/ReactMarkdown.tsrx?raw';
 import reactWindowSource from './demos/ReactWindow.tsrx?raw';
 import shadcnSource from './demos/ShadcnBases.tsrx?raw';
@@ -222,6 +224,12 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'Intersection Observer',
 				Component: IntersectionObserverDemo,
 				source: intersectionObserverSource,
+			},
+			{
+				id: 'react-resizable-panels',
+				title: 'Resizable panels',
+				Component: ReactResizablePanelsDemo,
+				source: reactResizablePanelsSource,
 			},
 			{
 				id: 'cmdk',

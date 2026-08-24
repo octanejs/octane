@@ -93,7 +93,7 @@ flowchart LR
 
 **Files:** `packages/embla-carousel/package.json`, `tsconfig.json`, `status.json`, `README.md`, `UPSTREAM.md`, `upstream/`, `audit/react-parity.json`, package tests, root parity configuration.
 
-**Approach:** Follow the current `react-library-port` skill. Vendor MIT-permitted source/tests, record npm and Git pins, classify every export and upstream artifact, and register applicable runtime/type/differential/SSR/browser lanes.
+**Approach:** Follow the current `octane-react-library-port` skill. Vendor MIT-permitted source/tests, record npm and Git pins, classify every export and upstream artifact, and register applicable runtime/type/differential/SSR/browser lanes.
 
 **Test scenarios:** Missing source/test dispositions fail the audit; deleting a required lane or adapted assertion fails parity validation; the package exports only the planned root surface.
 

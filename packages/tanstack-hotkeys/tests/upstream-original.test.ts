@@ -45,7 +45,7 @@ it('runs all 41 pinned @tanstack/react-hotkeys tests unchanged', function () {
 			'--reporter=verbose',
 		],
 		{
-			cwd: resolve(packageRoot, 'upstream/package'),
+			cwd: resolve(packageRoot, 'upstream'),
 			encoding: 'utf8',
 			env: {
 				...process.env,
@@ -56,8 +56,20 @@ it('runs all 41 pinned @tanstack/react-hotkeys tests unchanged', function () {
 	);
 	const output = `${result.stdout}\n${result.stderr}`;
 	expect(result.status, output).toBe(0);
-	const checksums = readFileSync(resolve(packageRoot, 'upstream/SHA256SUMS'), 'utf8');
-	expect(checksums.split('\n').filter(Boolean).length).toBe(26);
+	// The committed upstream tree verifies offline against
+	// audit/upstream.lock.json (upstream git blob shas at the pinned commit).
+	const lockCheck = spawnSync(
+		process.execPath,
+		[
+			resolve(repoRoot, 'scripts/react-port/materialize.mjs'),
+			'run',
+			'--check',
+			'--package-dir',
+			resolve(repoRoot, 'packages/tanstack-hotkeys'),
+		],
+		{ cwd: repoRoot, encoding: 'utf8' },
+	);
+	expect(lockCheck.status, `${lockCheck.stdout}\n${lockCheck.stderr}`).toBe(0);
 	const expected = (
 		JSON.parse(readFileSync(resolve(packageRoot, 'audit/pristine-runtime.json'), 'utf8'))
 			.tests as Identity[]

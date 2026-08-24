@@ -7,6 +7,13 @@
  * do not provide DOM globals.
  */
 export * from './universal-core.js';
+export {
+	createSubSlot,
+	subSlot,
+	type SubSlot,
+	type SlotlessSubSlot,
+	type SubSlotOptions,
+} from './sub-slot.js';
 
 import {
 	universalContext,

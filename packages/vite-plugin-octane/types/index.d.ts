@@ -1,4 +1,5 @@
 import type { Plugin, ViteDevServer } from 'vite';
+import type { OctaneVitePluginOptions } from 'octane/compiler/vite';
 import type {
 	ConfigModuleRunner,
 	ExperimentalRendererConfigOptions,
@@ -42,6 +43,8 @@ export interface OctanePluginOptions {
 	 * reads `compiler.renderers` from `octane.config.ts` before transforming modules.
 	 */
 	renderers?: ExperimentalRendererConfigOptions;
+	/** @experimental Authenticate immutable CSS-module exports in production builds. */
+	cssModuleConstants?: OctaneVitePluginOptions['cssModuleConstants'];
 }
 
 /** The Octane compiler plugin plus Vite app/metaframework integration. */

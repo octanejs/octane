@@ -10,6 +10,13 @@ packages/shadcn/registry/
 # Vendored pinned upstream sources a port is written against (byte-exact
 # provenance; do not reformat)
 packages/*/upstream/
+# Pinned npm-artifact evidence retained beside a lock-pinned source tree
+# (tarballs, artifact manifests, artifact declarations); byte-exact by hash.
+packages/*/upstream-artifact/
+# Adapted upstream suites mirror pinned upstream bytes plus committed patches
+# (react-port:materialize regenerates them for lock-based ports); reformatting
+# would drift the mirror away from its patch or hash evidence.
+packages/*/tests/upstream/
 # Attribution-compatible application input frozen byte-exact by its adoption test.
 packages/markdown/tests/adoption/public-app/MarkdownBlock.react.tsx
 # Adapted Markdown assertions carry independently pinned row/declaration hashes.
@@ -30,6 +37,11 @@ packages/solana-react/typetests/query/__typetests__/
 # popper adapted typings mirrors stay printer-identical to upstream.
 packages/popper/typetests/main-test.tsx
 packages/popper/typetests/svg-test.tsx
+# xstate adapted type suites stay byte-identical to the vendored upstream
+# typetests below their header, so the permitted-transformation ledger in each
+# package's audit/type-parity.json is verifiable by diff.
+packages/xstate/typetests/types.test-d.tsx
+packages/xstate-store/typetests/types.test-d.tsx
 packages/shadcn/tests/differential/upstream/
 # The framework-neutral half of @vis.gl/react-mapbox is reused byte-for-byte, so
 # an upstream bump stays a clean diff against packages/react-map-gl/upstream/.
@@ -135,6 +147,9 @@ playground/octane/debug/
 # Markdown is hand-authored — Prettier should not reformat docs (prose wrap, tables)
 **/*.md
 
+# Byte-exact upstream evidence for the react-resizable-panels binding.
+packages/resizable-panels/upstream/
+
 # RuleSync generated files (source lives in .rulesync/; run `pnpm rules:generate`).
 # The .md outputs are already covered above; .cursor/ holds a .mdc with no Prettier parser.
 .cursor/
@@ -163,3 +178,5 @@ packages/swr/src/infinite/infinite.tsrx
 packages/swr/src/mutation/mutation.tsrx
 dist-redact
 .content-collections
+# Pristine Vitest caches
+packages/*/.vite-pristine/

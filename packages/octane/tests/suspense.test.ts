@@ -20,6 +20,9 @@ import {
 	PendingPropSwap,
 	PreSuspendSiblingEffects,
 	CommittedThenNewSibling,
+	ThrownResourceSuspense,
+	ThrownResourceJsxSuspense,
+	PromiseThrownFromLayout,
 } from './_fixtures/suspense.tsrx';
 
 interface Deferred<T> {
@@ -34,6 +37,26 @@ function deferred<T>(): Deferred<T> {
 		reject = rej;
 	});
 	return { promise, resolve, reject };
+}
+
+function resourceReader<T>(promise: Promise<T>, wakeable: PromiseLike<T> = promise): () => T {
+	let result:
+		| { status: 'pending' }
+		| { status: 'fulfilled'; value: T }
+		| { status: 'rejected'; reason: unknown } = { status: 'pending' };
+	promise.then(
+		(value) => {
+			result = { status: 'fulfilled', value };
+		},
+		(reason: unknown) => {
+			result = { status: 'rejected', reason };
+		},
+	);
+	return () => {
+		if (result.status === 'pending') throw wakeable;
+		if (result.status === 'rejected') throw result.reason;
+		return result.value;
+	};
 }
 
 describe('Suspense — basic', () => {
@@ -85,6 +108,81 @@ describe('Suspense — basic', () => {
 		expect(r.find('.resolved').textContent).toBe('current');
 		r.unmount();
 	});
+});
+
+describe.each([
+	['template', ThrownResourceSuspense],
+	['JSX', ThrownResourceJsxSuspense],
+] as const)('Suspense — thrown resources through %s boundaries', (_name, App) => {
+	it.each(['promise', 'thenable'] as const)(
+		'suspends on a resource-thrown %s and commits its lifecycle on reveal',
+		async (kind) => {
+			// React resource readers may throw a wakeable directly instead of calling
+			// use(): ReactFiberThrow.js routes these to the nearest Suspense boundary.
+			const pending = deferred<string>();
+			const wakeable: PromiseLike<string> =
+				kind === 'promise'
+					? pending.promise
+					: { then: (resolve, reject) => pending.promise.then(resolve, reject) };
+			const log: string[] = [];
+			const r = mount(App, { read: resourceReader(pending.promise, wakeable), log });
+			expect(r.find('.fallback').textContent).toBe('loading');
+			expect(r.findAll('.error')).toHaveLength(0);
+			expect(log).toEqual([]);
+			await act(() => pending.resolve('ready'));
+			expect(r.find('.resolved').textContent).toBe('ready');
+			expect(r.findAll('.fallback')).toHaveLength(0);
+			expect(log).toEqual(['mounted:ready']);
+			r.unmount();
+			expect(log).toEqual(['mounted:ready', 'cleanup:ready']);
+		},
+	);
+
+	it('routes a rejected resource to catch after its pending promise settles', async () => {
+		const pending = deferred<string>();
+		const log: string[] = [];
+		const r = mount(App, { read: resourceReader(pending.promise), log });
+		expect(r.find('.fallback').textContent).toBe('loading');
+		await act(() => pending.reject(new Error('resource failed')));
+		expect(r.find('.error').textContent).toBe('Error: resource failed');
+		expect(r.findAll('.fallback')).toHaveLength(0);
+		expect(log).toEqual([]);
+		r.unmount();
+	});
+
+	it('ignores a superseded resource wakeable when older data arrives first', async () => {
+		const older = deferred<string>();
+		const newer = deferred<string>();
+		const log: string[] = [];
+		const r = mount(App, { read: resourceReader(older.promise), log });
+		r.update(App, { read: resourceReader(newer.promise), log });
+		await act(() => older.resolve('stale'));
+		expect(r.find('.fallback').textContent).toBe('loading');
+		expect(log).toEqual([]);
+		await act(() => newer.resolve('current'));
+		expect(r.find('.resolved').textContent).toBe('current');
+		expect(log).toEqual(['mounted:current']);
+		r.unmount();
+	});
+
+	it('does not mount a resource reader after its pending boundary unmounts', async () => {
+		const pending = deferred<string>();
+		const log: string[] = [];
+		const r = mount(App, { read: resourceReader(pending.promise), log });
+		expect(r.find('.fallback').textContent).toBe('loading');
+		r.unmount();
+		await act(() => pending.resolve('too late'));
+		expect(r.container.innerHTML).toBe('');
+		expect(log).toEqual([]);
+	});
+});
+
+it('treats a promise thrown by a layout effect as an error, not a render suspension', () => {
+	const pending = deferred<string>();
+	const r = mount(PromiseThrownFromLayout, { promise: pending.promise });
+	expect(r.find('.error').textContent).toBe('[object Promise]');
+	expect(r.findAll('.fallback')).toHaveLength(0);
+	r.unmount();
 });
 
 describe('Suspense — catch on rejection', () => {

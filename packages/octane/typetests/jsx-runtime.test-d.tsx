@@ -4,7 +4,7 @@
  * with octane's exceptions. Compile-only (tsgo --noEmit); never executed and
  * never imported by runtime code.
  */
-import { Fragment, type FragmentInstance } from 'octane';
+import { Fragment, isValidElement, type ElementDescriptor, type FragmentInstance } from 'octane';
 import { Fragment as AutomaticRuntimeFragment, type JSX as OctaneJSX } from 'octane/jsx-runtime';
 import type * as React from 'react';
 
@@ -63,6 +63,10 @@ export function TypeSurface() {
 			<div ref={obj} />
 			<div ref={[cb, obj]} />
 			<div ref={[[cb], obj]} />
+			<div ref={[cb, undefined]} />
+			<div ref={[[undefined, cb], obj, null]} />
+			{/* @ts-expect-error — optional array entries do not erase a ref's element type */}
+			<div ref={[undefined, (el: SVGSVGElement | null) => {}]} />
 
 			{/* ── native `for` and React's htmlFor both work ── */}
 			<label for="field" />
@@ -148,6 +152,13 @@ export function TypeSurface() {
 			<div dangerouslySetInnerHTML={{ __html: '<b>x</b>' }} suppressHydrationWarning />
 			<input defaultValue="a" defaultChecked />
 			<div data-testid="anything" aria-hidden="true" />
+			<svg>
+				<foreignObject>
+					<div xmlns="http://www.w3.org/1999/xhtml" />
+				</foreignObject>
+			</svg>
+			{/* @ts-expect-error — namespace declarations are string attributes */}
+			<div xmlns={42} />
 
 			{/* ── children are renderables (unknown) ── */}
 			<div>{123}</div>
@@ -194,3 +205,35 @@ export async function elementAwaitRejected() {
 }
 // @ts-expect-error — .then with a callback fails overload resolution
 export const elementThenRejected = someElement.then(() => null);
+
+// Element inspection preserves known prop types and can identify the element
+// alternative in a generic element-or-props union without widening either arm.
+export function propsFromElementOrObject<P extends object>(
+	option: ElementDescriptor<Partial<P>> | Partial<P>,
+): Partial<P> {
+	if (isValidElement<Partial<P>>(option)) return option.props;
+	return option;
+}
+
+declare const namedElement: ElementDescriptor<{ label: string }> | null;
+if (isValidElement(namedElement)) {
+	use<string>(namedElement.props.label);
+	// @ts-expect-error — the guard must not erase known props to any.
+	use(namedElement.props.missing);
+}
+
+declare const elementUnion:
+	ElementDescriptor<{ label: string }> | ElementDescriptor<{ count: number }> | null | undefined;
+if (isValidElement(elementUnion)) {
+	use<{ label: string } | { count: number }>(elementUnion.props);
+	// @ts-expect-error — recognizing a descriptor union must not erase its props to any.
+	use(elementUnion.props.missing);
+} else {
+	use<null | undefined>(elementUnion);
+}
+
+declare const opaqueElement: ElementDescriptor<unknown>;
+if (isValidElement(opaqueElement)) {
+	// @ts-expect-error — recognizing an element does not validate unknown props.
+	use(opaqueElement.props.label);
+}

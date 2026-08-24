@@ -131,6 +131,12 @@ packageExtensions:
       '@rspack/core': 2.1.3
 
 catalogs:
+  # Immer 11's published Iterator global conflicts with TypeScript's ESNext
+  # libraries (immerjs/immer#1273), including 11.1.17. Keep Recharts' private
+  # store on compatible RTK/Immer majors so packed consumers need no patches.
+  recharts-store:
+    '@reduxjs/toolkit': ~2.10.1
+    immer: ^10.2.0
   livestore-react-oracle:
     '@livestore/utils-dev': 0.4.0
     '@opentelemetry/sdk-trace-base': 2.2.0
@@ -264,11 +270,12 @@ catalogs:
     electron: 43.2.0
     '@testing-library/dom': ^10.4.1
     '@testing-library/jest-dom': ^6.9.1
+    '@testing-library/react': ^16.3.2
     '@vitest/coverage-istanbul': 4.1.10
     '@vitest/coverage-v8': 4.1.10
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
-    '@tsrx/core': ^0.1.58
+    '@tsrx/core': ^0.1.60
     '@tsrx/prettier-plugin': ^0.3.120
     '@tsrx/typescript-plugin': ^0.3.120
     '@tsrx/ripple': ^0.1.59
@@ -294,6 +301,7 @@ catalogs:
     '@types/d3-time-format': 2.1.0
     '@types/d3-voronoi': ^1.1.12
     '@types/geojson': ^7946.0.16
+    '@types/jsdom': 30.0.0
     '@types/node': ^24.13.3
     '@types/react': ^19.2.17
     '@types/react-dom': ^19.2.3
@@ -424,6 +432,7 @@ catalogs:
     react-dom: ^19.2.7
     react-i18next: 17.0.9
     react-error-boundary: 6.1.2
+    react-resizable-panels: 4.12.2
     ripple: ^0.3.118
     rxjs: ^7.8.2
     rulesync: ^8.32.0
@@ -528,12 +537,30 @@ catalogs:
     "@types/react-dom": 19.2.3
     react: 19.2.3
     react-dom: 19.2.3
+  xstate-react-oracle:
+    "@testing-library/react": 16.3.1
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    "@xstate/react": 6.1.0
+    react: 19.2.3
+    react-dom: 19.2.3
+    use-isomorphic-layout-effect: 1.2.1
+    use-sync-external-store: 1.6.0
+    xstate: 5.32.5
+  xstate-store-react-oracle:
+    "@testing-library/react": 16.3.1
+    "@types/react": 19.2.17
+    "@types/react-dom": 19.2.3
+    "@xstate/store": 4.2.3
+    "@xstate/store-react": 2.0.0
+    react: 19.2.3
+    react-dom: 19.2.3
 
 # patchedDependencies: the @tsrx/core@0.1.37/0.1.40 JSX parse patches are
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37 || 0.1.39
+  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37 || 0.1.39 || 0.1.42 || 0.1.43 || 0.1.45
   - react-dropzone@20.0.0
   - '@tanstack/db@0.7.0'
   - '@oxc-tsrx/native-darwin-arm64@0.5.0'
@@ -549,32 +576,7 @@ minimumReleaseAgeExclude:
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.
 #
-# @tsrx/core 0.1.56/0.1.58: the shared JSX transform hard-throws "TSRX fragments can
-# only have one style tag", which in type-only mode makes tsrx-tsc/editors
-# fall back to the raw source as the virtual TSX — every CSS brace then
-# surfaces as a TSX parse error (TS1381/TS1005). Octane components may split
-# scoped CSS across several <style> blocks under one canonical hash (see
-# packages/octane/src/compiler/compile.js applyCssScoping), so the patch makes
-# the TYPE-ONLY path accept multiple sheets and rebase them onto the first
-# sheet's hash; runtime transforms keep the throw. Remove once @tsrx/core
-# ships the equivalent fix upstream.
-#
-# @tsrx/core 0.1.56/0.1.58: a host element carrying `ref` plus a spread lowers to a
-# generated `let X = __normalize_spread_props_for_ref_attr(…)` that rides on the
-# element's metadata for a later pass to hoist. Only the render-block statement
-# builder and the native-directive path hoist it, so the same element in
-# plain-JS expression position (a ternary arm, a concise arrow body, a
-# declarator init, a callback body, an attribute value, an array element) lost
-# the declaration while the rewritten attributes still referenced the name —
-# TS2304 in the virtual TSX for source that compiles and runs correctly
-# (octanejs/octane#737). Such an element also reached BOTH lowering sites, and
-# the lowering is not idempotent, so it emitted a second binding and a nested
-# ref array. The patch wraps residual declarations in the IIFE the
-# native-directive path already uses and marks an element whose host ref/spread
-# is lowered; both are scoped to the TYPE-ONLY path, so runtime emit for the
-# other platforms sharing this transform is unchanged. Remove once @tsrx/core
-# ships the equivalent fix upstream.
+# The JSX type-only fixes formerly patched into @tsrx/core 0.1.56/0.1.58
+# are published in the required @tsrx/core >= 0.1.60.
 patchedDependencies:
   '@changesets/cli@2.31.1': patches/@changesets__cli@2.31.1.patch
-  '@tsrx/core@0.1.56': patches/@tsrx__core@0.1.56-0.1.58.patch
-  '@tsrx/core@0.1.58': patches/@tsrx__core@0.1.56-0.1.58.patch

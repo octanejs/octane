@@ -1,0 +1,14 @@
+diff --git a/tests/upstream/utils/live.test.ts b/tests/upstream/utils/live.test.ts
+--- a/tests/upstream/utils/live.test.ts
++++ b/tests/upstream/utils/live.test.ts
+@@ -4,9 +4,7 @@ import live from '../../../src/utils/live';
+ 
+ vi.mock('../../../src/utils/isHTMLElement');
+ 
+-const mockIsHTMLElement = isHTMLElement as vi.MockedFunction<
+-  typeof isHTMLElement
+->;
++const mockIsHTMLElement = isHTMLElement as MockedFunction<typeof isHTMLElement>;
+ 
+ describe('live', () => {
+   afterEach(() => {

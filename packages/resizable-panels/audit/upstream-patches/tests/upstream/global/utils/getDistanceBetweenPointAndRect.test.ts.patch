@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/global/utils/getDistanceBetweenPointAndRect.test.ts b/tests/upstream/global/utils/getDistanceBetweenPointAndRect.test.ts
+--- a/tests/upstream/global/utils/getDistanceBetweenPointAndRect.test.ts
++++ b/tests/upstream/global/utils/getDistanceBetweenPointAndRect.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, test } from "vitest";
+-import { getDistanceBetweenPointAndRect } from "./getDistanceBetweenPointAndRect";
++import { getDistanceBetweenPointAndRect } from "../../../../src/global/utils/getDistanceBetweenPointAndRect";
+ 
+ describe("getDistanceBetweenPointAndRect", () => {
+   const rect = new DOMRect(25, 25, 100, 50);

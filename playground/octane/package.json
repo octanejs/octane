@@ -38,6 +38,7 @@
     "@octanejs/rainbowkit": "workspace:*",
     "@octanejs/solana-react": "workspace:*",
     "@octanejs/react-error-boundary": "workspace:*",
+    "@octanejs/resizable-panels": "workspace:*",
     "@octanejs/dropzone": "workspace:*",
     "@octanejs/markdown": "workspace:*",
     "@octanejs/textarea-autosize": "workspace:*",

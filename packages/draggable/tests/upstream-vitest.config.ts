@@ -4,11 +4,13 @@ import { defineConfig } from 'vitest/config';
 
 const upstreamRoot = process.env.REACT_DRAGGABLE_PRISTINE_ROOT
 	? resolve(process.env.REACT_DRAGGABLE_PRISTINE_ROOT)
-	: resolve(import.meta.dirname, '../upstream/tag');
+	: resolve(import.meta.dirname, '../upstream');
 
 export default defineConfig({
 	plugins: [react()],
-	cacheDir: resolve(upstreamRoot, '.vite-cache'),
+	// Never cache inside the lock-verified pristine tree: extra files there
+	// read as drift to materialize run --check and the inventory walker.
+	cacheDir: resolve(import.meta.dirname, '../.vite-pristine'),
 	test: {
 		name: 'draggable-pristine',
 		root: upstreamRoot,

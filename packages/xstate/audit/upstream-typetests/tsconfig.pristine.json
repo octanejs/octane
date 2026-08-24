@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "esModuleInterop": true,
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "skipLibCheck": true,
+    "noEmit": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "types": ["node", "vitest/globals"]
+  },
+  "files": [
+    "../../upstream/src/index.ts",
+    "../../upstream/src/createActorContext.ts",
+    "../../upstream/src/shallowEqual.ts",
+    "../../upstream/src/stopRootWithRehydration.ts",
+    "../../upstream/src/useActor.ts",
+    "../../upstream/src/useActorRef.ts",
+    "../../upstream/src/useMachine.ts",
+    "../../upstream/src/useSelector.ts",
+    "../../upstream/test/types.test.tsx"
+  ]
+}

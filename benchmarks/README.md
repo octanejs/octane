@@ -212,6 +212,7 @@ internally, get their own baseline and guard namespace.
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
 | `effectful-list` | effectful-list | Octane + reference frameworks | effect/ref cleanup churn |
+| `activity` | activity | none (builds) | same-source Octane/React Activity lifecycle, hidden/nested work, retained state/effects/DOM, cold-vs-used ordinary-ref controls, and optional-runtime bundle reachability |
 | `list-clear` | list-clear | Octane-only | keyed-list bulk clear by parent shape — the only coverage of the shared-parent path |
 | `memo-wall` | memo-wall | Octane + reference frameworks | memo bail + context walk |
 | `portal-swarm` | portal-swarm | Octane + reference frameworks | portal render/dispatch |
@@ -248,6 +249,11 @@ per-commit signal (its corpus is FIXED — editing the corpus list invalidates t
 baseline, re-record when you change it), `bundle-size` is the cross-framework
 comparison (all targets built with one normalized minify so solid's
 `minify:false` dev config and octane's terser passes don't skew the compare).
+The separate `codegen-size` CSS targets also build the real Rspack/CssExtract
+adapter with named exports and authenticated immutable default maps. They compare
+identical source with the option off/on, keep framework imports external for byte
+measurement, and verify equal emitted CSS and full-runtime SSR output. Their
+same-run ratios catch an adapter that silently stops supplying compiler proofs.
 `lynx-bundle-size` instead uses the pinned Rspeedy native encoder unchanged and
 bounds the incremental decoded/encoded cost of IFR against the equivalent
 background-rendered preview graph; its semantic checks remain source/build

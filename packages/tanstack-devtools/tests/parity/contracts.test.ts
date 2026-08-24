@@ -8,16 +8,24 @@ const crosswalk = JSON.parse(
 	readFileSync(resolve(root, 'packages/tanstack-devtools/audit/upstream-crosswalk.json'), 'utf8'),
 );
 const upstreamIndex = readFileSync(
-	resolve(root, 'packages/tanstack-devtools/upstream/package/src/index.ts'),
+	resolve(root, 'packages/tanstack-devtools/upstream/src/index.ts'),
 	'utf8',
 );
 
 describe('@octanejs/tanstack-devtools parity audit contracts', () => {
 	it('authenticates the complete adapter and absent runtime suite', () => {
+		// The committed upstream tree verifies offline against
+		// audit/upstream.lock.json (upstream git blob shas at the pinned commit).
 		expect(() =>
 			execFileSync(
 				process.execPath,
-				['packages/tanstack-devtools/scripts/check-upstream-ledger.mjs'],
+				[
+					'scripts/react-port/materialize.mjs',
+					'run',
+					'--check',
+					'--package-dir',
+					'packages/tanstack-devtools',
+				],
 				{ cwd: root, stdio: 'pipe' },
 			),
 		).not.toThrow();

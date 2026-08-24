@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/global/styles/parseSizeAndUnit.test.ts b/tests/upstream/global/styles/parseSizeAndUnit.test.ts
+--- a/tests/upstream/global/styles/parseSizeAndUnit.test.ts
++++ b/tests/upstream/global/styles/parseSizeAndUnit.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, test } from "vitest";
+-import { parseSizeAndUnit } from "./parseSizeAndUnit";
++import { parseSizeAndUnit } from "../../../../src/global/styles/parseSizeAndUnit";
+ 
+ describe("parseSizeAndUnit", () => {
+   describe("implicit units", () => {

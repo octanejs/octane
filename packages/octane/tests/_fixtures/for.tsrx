@@ -684,3 +684,69 @@ export function NestedKeyedReorderTransition(props: {
 		}
 	</div>
 }
+
+interface HostBindingRow {
+	id: number;
+	className: string | string[];
+	title: string;
+	data: string;
+	aria: string;
+	hidden: boolean;
+	only: OctaneNode;
+	mixed: OctaneNode;
+}
+
+interface HostBindingListProps {
+	items: HostBindingRow[];
+	version: number;
+	context: string;
+}
+
+export function HostBindingList(props: HostBindingListProps) @{
+	const version = props.version;
+	<FastRowContext.Provider value={props.context}>
+		<ul>
+			@for (const row of props.items; key row.id) {
+				<li
+					class={row.className}
+					title={row.title}
+					data-value={row.data as string}
+					aria-label={row.aria}
+					hidden={row.hidden}
+					data-version={version}
+				>
+					<span data-kind="only">{row.only}</span>
+					<span data-kind="mixed">
+						<i>before</i>
+						{row.mixed}
+						<i>after</i>
+					</span>
+				</li>
+			}
+		</ul>
+	</FastRowContext.Provider>
+}
+
+export function HostMappedBindingList(props: HostBindingListProps) @{
+	const version = props.version;
+	<FastRowContext.Provider value={props.context}>
+		<ul>{props.items.map(
+			(row) => <li
+				key={row.id}
+				class={row.className}
+				title={row.title}
+				data-value={row.data as string}
+				aria-label={row.aria}
+				hidden={row.hidden}
+				data-version={version}
+			>
+				<span data-kind="only">{row.only}</span>
+				<span data-kind="mixed">
+					<i>before</i>
+					{row.mixed}
+					<i>after</i>
+				</span>
+			</li>,
+		)}</ul>
+	</FastRowContext.Provider>
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "project": "resizable-panels-differential",
+  "roots": ["packages/resizable-panels/tests/differential"],
+  "files": ["packages/resizable-panels/tests/differential/useDefaultLayout.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:react-resizable-panels-differential:0001",
+      "file": "packages/resizable-panels/tests/differential/useDefaultLayout.test.ts",
+      "fullName": "react-resizable-panels useDefaultLayout differential identical deprecated debounce checkpoints and cancellation"
+    },
+    {
+      "id": "runtime:react-resizable-panels-differential:0002",
+      "file": "packages/resizable-panels/tests/differential/useDefaultLayout.test.ts",
+      "fullName": "react-resizable-panels useDefaultLayout differential identical restore and committed-layout checkpoints"
+    }
+  ]
+}

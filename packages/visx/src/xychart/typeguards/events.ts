@@ -1,5 +1,3 @@
-import type { FocusEvent, PointerEvent } from 'react';
-
 type EventType = PointerEvent | FocusEvent;
 
 // functional definition of a PointerEvent (mouse, touch)

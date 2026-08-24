@@ -11,9 +11,14 @@ This port targets the immutable `embla-carousel-react@8.6.0` release.
 - React types: `@types/react@19.2.17` (exact; declaration consumer matrix)
 - Advertised compatibility: exactly the 8.6.0 React adapter surface
 
-The MIT-licensed tag supplied the byte-exact files in `upstream/`. The npm
-artifact supplied the declaration and bundle check; it contains no source or
-tests. Vendored evidence is excluded from the published `files` list.
+The MIT-licensed tag supplied the byte-exact files in `upstream/`, pinned by
+`audit/upstream.lock.json`: each committed file verifies offline against its
+upstream git blob sha at the tag commit
+(`pnpm react-port:materialize run --check --package-dir packages/embla-carousel`).
+The npm artifact supplied the declaration and bundle check; it contains no
+source or tests. Vendored evidence is excluded from the published `files`
+list; the upstream MIT license is retained byte-exact as `LICENSE.upstream`,
+hash-matched to the lock.
 
 ## Export crosswalk
 

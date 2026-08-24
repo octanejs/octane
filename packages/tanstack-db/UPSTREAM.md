@@ -13,13 +13,16 @@ adapter over the same core, so the two adapters read side by side under
 
 - Package: `@tanstack/react-db@0.1.96` (adapter) over `@tanstack/db@0.7.0` (core)
 - Repository: `https://github.com/TanStack/db.git`
-- Release tag: `@tanstack/react-db@0.1.96` (the npm artifact does not embed a
-  `gitHead`; the pin is by version + integrity below)
+- Release tag: `@tanstack/react-db@0.1.96`
+- Immutable commit: `2c35b5883907b4e9f155f849f92d6ebe0602e0f3` (the release
+  tag's target; the npm artifact embeds no `gitHead`, and the pinned commit's
+  own `packages/react-db/package.json` declares exactly this package and
+  version)
 - Source root: `src` (adapter); core is consumed from the published
   `@tanstack/db` package, not vendored
 - Test root: `packages/react-db/tests` in the repository (NOT published in the
   npm artifact — see the suite disposition)
-- License: MIT (vendored at `upstream/react-db/LICENSE`)
+- License: MIT (retained byte-exact as `LICENSE.upstream`, hash-matched to the lock)
 - npm archive SHA-256 (`@tanstack/react-db@0.1.96`):
   `2c9f6022aab930ada80d82fdadef6c7ec23bcd42b2e776c44f1806e70b7a228c`
 - npm integrity (`@tanstack/react-db@0.1.96`):

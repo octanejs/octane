@@ -3,32 +3,12 @@
 // custom-hook call. Binding hooks split that argument from their public
 // options and derive one stable sub-slot for each base hook they compose.
 
-const subSlotCache = new Map<symbol, Map<string, symbol>>();
-const bareSlotCache = new Map<string, symbol>();
+import { createSubSlot } from 'octane';
 
-export function subSlot(slot: symbol | undefined, tag: string): symbol {
-	if (slot === undefined) {
-		let bare = bareSlotCache.get(tag);
-		if (bare === undefined) {
-			bare = Symbol.for(`@octanejs/tiptap:${tag}`);
-			bareSlotCache.set(tag, bare);
-		}
-		return bare;
-	}
-
-	let byTag = subSlotCache.get(slot);
-	if (byTag === undefined) {
-		byTag = new Map();
-		subSlotCache.set(slot, byTag);
-	}
-
-	let result = byTag.get(tag);
-	if (result === undefined) {
-		result = Symbol.for(`${slot.description ?? ''}:@octanejs/tiptap:${tag}`);
-		byTag.set(tag, result);
-	}
-	return result;
-}
+export const subSlot = createSubSlot({
+	tagPrefix: ':@octanejs/tiptap:',
+	slotlessPrefix: '@octanejs/tiptap:',
+});
 
 /** Split a compiler-owned trailing slot from a custom hook's user arguments. */
 export function splitSlot(args: readonly unknown[]): [readonly unknown[], symbol | undefined] {

@@ -763,6 +763,8 @@ describe('manifest-declared manual hook slots', () => {
 			'wagmi',
 			'window',
 			'wouter',
+			'xstate',
+			'xstate-store',
 			'zag',
 			'zustand',
 		]);

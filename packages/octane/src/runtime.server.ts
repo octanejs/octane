@@ -552,18 +552,23 @@ const PORTAL_TAG = Symbol.for('octane.portal');
 export const Fragment: unique symbol = Symbol.for('octane.Fragment');
 
 /**
- * React-19 `<Activity>` sentinel. Server-compiled template sites lower directly
- * to `ssrActivity`; this export keeps `import { Activity } from 'octane'`
- * resolvable after the server compiler retargets it to `octane/server`.
+ * React-19 `<Activity>` sentinel. Direct template sites lower to `ssrActivity`;
+ * generic component and descriptor sites dispatch by this same symbol identity.
+ * Its public type is component-shaped so aliases and JSX values type-check.
  */
-export const Activity: unique symbol = Symbol.for('octane.Activity');
+export const Activity = Symbol.for('octane.Activity') as unknown as (props: {
+	mode?: 'visible' | 'hidden';
+	children?: unknown;
+	name?: string;
+	key?: string | number | bigint | null | undefined;
+}) => unknown;
 
 interface ElementDescriptor {
 	$$kind: typeof ELEMENT_TAG;
 	// A server ComponentBody (component-value form, e.g. `{<Comp/>}`) OR a host tag
 	// string (`'li'`), produced when host JSX appears at a VALUE position (a
 	// `.map(...)` callback, a render-prop arrow body, an array literal).
-	type: ServerComponent | string | typeof Fragment;
+	type: ServerComponent | string | typeof Fragment | typeof Activity;
 	props: any;
 	// React-style `key`, lifted out of props (consulted by the client's de-opt list
 	// path on hydration; the server only renders it into markup).
@@ -654,7 +659,7 @@ export function createScopedValue(readElement: () => ElementDescriptor): Element
 
 /** Server twin of the compiler-only scope-preserving JSX descriptor factory. */
 export function createScopedElement(
-	type: ServerComponent | string | typeof Fragment,
+	type: ServerComponent | string | typeof Fragment | typeof Activity,
 	props: any,
 	readChildren: () => unknown,
 ): ElementDescriptor {
@@ -697,7 +702,7 @@ export function createScopedElement(
 // literal) to this call in BOTH modes, so the same lowered call resolves to the
 // client-or-server `createElement` per build, and `ssrChild` renders the result.
 export function createElement(
-	type: ServerComponent | string | typeof Fragment,
+	type: ServerComponent | string | typeof Fragment | typeof Activity,
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
@@ -1601,9 +1606,9 @@ function serverDescNeedsBlocks(v: unknown): boolean {
 	if (!isElementDescriptor(v) && childrenIterator(v) !== null) return true;
 	const d = v as ElementDescriptor;
 	if (d.$$kind === ELEMENT_TAG) {
-		// A Fragment below a host descriptor is reconciled by childSlot's
-		// fragment-aware list path, including when all of its leaves are pure hosts.
-		if (d.type === Fragment) return true;
+		// Fragment and Activity descriptors own reconcilable boundaries even when
+		// all of their descendants are pure hosts/text.
+		if (d.type === Fragment || d.type === Activity) return true;
 		return typeof d.type === 'function' || serverDescNeedsBlocks(d.children);
 	}
 	return false;
@@ -1713,6 +1718,16 @@ export function ssrFragmentMarker(open: boolean, _ref?: unknown): string {
  */
 export function ssrActivity(mode: string, render: () => string): string {
 	return ssrBlock(mode === 'hidden' ? '' : render());
+}
+
+/** Cold twin of the client's generic Activity body and its ordinary child slot. */
+function renderActivityDescriptor(
+	props: { mode?: 'visible' | 'hidden'; children?: unknown },
+	scope: SSRScope,
+): string {
+	// Keep the accessor inside the visibility branch: scoped JSX children may
+	// start data work or throw, and hidden server Activities must evaluate neither.
+	return ssrActivity(props.mode ?? 'visible', () => ssrChild(props.children, scope));
 }
 
 /**
@@ -3224,27 +3239,9 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		streamNextId: stream?.nextId ?? 0,
 		streamActiveTryKeys: stream?.activeTryKeys.slice() ?? [],
 		streamActiveOwnerKeys: stream?.activeOwnerKeys.slice() ?? [],
-		streamPassBoundaryKeys:
-			stream?.activePassBoundaryKeys === null || stream?.activePassBoundaryKeys === undefined
-				? null
-				: new Set(stream.activePassBoundaryKeys),
+		streamPassBoundaryCount: stream?.activePassBoundaryKeys?.size ?? 0,
 		asyncScope: ASYNC_SCOPE,
-		streamBoundaries:
-			stream === null
-				? null
-				: Array.from(stream.boundaries, ([key, entry]) => ({
-						key,
-						entry,
-						id: entry.id,
-						order: entry.order,
-						state: entry.state,
-						html: entry.html,
-						seeds: entry.seeds.slice(),
-						pendingIdOffset: entry.pendingIdOffset,
-						ancestors: entry.ancestors.slice(),
-						owners: entry.owners.slice(),
-						namespace: entry.namespace,
-					})),
+		streamReplayCheckpoint: stream?.replay?.length ?? 0,
 		frameDeferred: frame?.deferred ?? false,
 		frameNextChild: frame?.nextChild ?? 0,
 		frameScopedChildren:
@@ -3304,30 +3301,21 @@ function rewindComponentReplayState(
 		VT_SSR_STACK.push(entry.candidate);
 	}
 	const stream = snapshot.stream;
-	if (stream !== null && snapshot.streamBoundaries !== null) {
+	if (stream !== null) {
 		stream.nextId = snapshot.streamNextId;
-		if (stream.activePassBoundaryKeys !== null && snapshot.streamPassBoundaryKeys !== null) {
-			stream.activePassBoundaryKeys.clear();
-			for (const key of snapshot.streamPassBoundaryKeys) stream.activePassBoundaryKeys.add(key);
+		if (stream.activePassBoundaryKeys !== null) {
+			// Discovery only appends during a pass. Trim the discarded suffix on
+			// the rare retry instead of copying the growing set for every component.
+			let index = 0;
+			for (const key of stream.activePassBoundaryKeys) {
+				if (index++ >= snapshot.streamPassBoundaryCount) stream.activePassBoundaryKeys.delete(key);
+			}
 		}
 		stream.activeTryKeys.length = 0;
 		stream.activeTryKeys.push(...snapshot.streamActiveTryKeys);
 		stream.activeOwnerKeys.length = 0;
 		stream.activeOwnerKeys.push(...snapshot.streamActiveOwnerKeys);
-		stream.boundaries.clear();
-		for (const saved of snapshot.streamBoundaries) {
-			const entry = saved.entry;
-			entry.id = saved.id;
-			entry.order = saved.order;
-			entry.state = saved.state;
-			entry.html = saved.html;
-			entry.seeds = saved.seeds.slice();
-			entry.pendingIdOffset = saved.pendingIdOffset;
-			entry.ancestors = saved.ancestors.slice();
-			entry.owners = saved.owners.slice();
-			entry.namespace = saved.namespace;
-			stream.boundaries.set(saved.key, entry);
-		}
+		rewindStreamBoundaryReplay(stream, snapshot.streamReplayCheckpoint);
 	}
 	scope.$$ctxValues = snapshot.context;
 	if (frame !== null) {
@@ -3389,6 +3377,8 @@ function invokeComponentBody(
 			out = replayUpdatedComponentBody(comp, props, scope, frame, hp, snapshot, warmPlanCheckpoint);
 		}
 		return out;
+	} catch (error) {
+		throw normalizeThrownServerThenable(error);
 	} finally {
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		HOOK_PASS = prevHP;
@@ -3470,6 +3460,8 @@ function renderComponentFramed(
 		// An inherit-range site (M3) skips the wrap: the parent's own pair bounds
 		// this output, and the client borrows it instead of adopting.
 		return MARKERS && !inherit ? BLOCK_OPEN + inner + BLOCK_CLOSE : inner;
+	} catch (error) {
+		throw normalizeThrownServerThenable(error);
 	} finally {
 		CURRENT_SCOPE = prevScope;
 		FRAME = prevFrame;
@@ -3489,12 +3481,21 @@ function renderComponentFramed(
  */
 export function ssrComponent(
 	parent: SSRScope,
-	comp: ServerComponent | string,
+	comp: ServerComponent | string | typeof Activity,
 	props: any,
 	inherit?: boolean,
 	key?: unknown,
 	identityScoped?: boolean,
 ): string {
+	// A runtime-resolved Activity is a symbol, not a callable component. Keep its
+	// original identity for async keys, then use the stable cold body below. A
+	// spread-only key has not been split into the compiler's explicit key argument.
+	// Unlike the client cold registration, SSR must also accept a public
+	// `octane` Activity descriptor when this server export was tree-shaken away.
+	// The shared Symbol.for identity keeps that mixed-entry path working; retaining
+	// this small string-rendering wrapper does not retain the client Activity engine.
+	const activity = comp === Activity;
+	if (activity && key === undefined) key = props?.key;
 	// Component recursion is one of SSR's hottest and deepest paths. Install the
 	// same async-identity membrane inline instead of recursing back through
 	// ssrComponent from two wrapper callbacks. Besides avoiding callback overhead,
@@ -3508,6 +3509,12 @@ export function ssrComponent(
 	try {
 		const explicitNamespace = NEXT_COMPONENT_NAMESPACE;
 		NEXT_COMPONENT_NAMESPACE = null;
+		if (activity) {
+			comp = renderActivityDescriptor;
+			// The generic component and inner Activity both own hydratable ranges.
+			// This mirrors the client even for a sole-root dynamic Activity tag.
+			inherit = false;
+		}
 		// Boundary builtins decline inherit through their component capability bit —
 		// mirrors componentSlot's
 		// client-side decline exactly (member/aliased/dynamic tags resolving to
@@ -3526,9 +3533,10 @@ export function ssrComponent(
 		// value-position call site (ssrHostElement's content path handles those), or
 		// a render FUNCTION from a template one.
 		if (typeof comp === 'string') {
+			const tag = comp;
 			const inheritedNamespace = explicitNamespace ?? FRAME?.namespace ?? 'html';
 			const childNamespace = parserNamespacesForTag(
-				comp.toLowerCase(),
+				tag.toLowerCase(),
 				inheritedNamespace,
 			).childrenNamespace;
 			return ssrInNamespace(childNamespace, () => {
@@ -3546,10 +3554,10 @@ export function ssrComponent(
 					// like renderComponentFramed normalizes a de-opt body's return.
 					const out = (kids as any)(undefined, parent);
 					const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, parent);
-					const html = ssrHostElement(comp, props, null, parent, inner);
+					const html = ssrHostElement(tag, props, null, parent, inner);
 					return inherit ? html : ssrBlock(html);
 				}
-				const html = ssrHostElement(comp, props, kids, parent);
+				const html = ssrHostElement(tag, props, kids, parent);
 				return inherit ? html : ssrBlock(html);
 			});
 		}
@@ -3585,7 +3593,7 @@ export function ssrComponent(
 		// transition (`<svg>`, `<math>`, or `<foreignObject>`) overrides it for the
 		// next component frame through ssrComponentNS.
 		frame.namespace = explicitNamespace ?? pf?.namespace;
-		return renderComponentFramed(comp, props, parent, frame, inherit);
+		return renderComponentFramed(comp as ServerComponent, props, parent, frame, inherit);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
 	}
@@ -3596,7 +3604,7 @@ let NEXT_COMPONENT_NAMESPACE: 'html' | 'svg' | 'mathml' | null = null;
 /** Compiler ABI for a component call whose output is parsed in foreign content. */
 export function ssrComponentNS(
 	parent: SSRScope,
-	comp: ServerComponent | string,
+	comp: ServerComponent | string | typeof Activity,
 	props: any,
 	namespace: 'html' | 'svg' | 'mathml',
 	inherit?: boolean,
@@ -4059,6 +4067,7 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 						ssrBlock(ssrChildrenHtml(props.children, scope)),
 					);
 				} catch (e) {
+					e = normalizeThrownServerThenable(e);
 					if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
 					const fb =
 						typeof props.fallback === 'function'
@@ -4155,6 +4164,34 @@ export function useContext<T>(ctx: Context<T>): T {
 const SSR_SUSPENSE = Symbol('octane.ssr.suspense');
 export function ssrIsSuspense(err: unknown): boolean {
 	return err === SSR_SUSPENSE;
+}
+
+function normalizeThrownServerThenable(error: unknown): unknown {
+	if (error === null || typeof error !== 'object') return error;
+	try {
+		if (typeof (error as PromiseLike<unknown>).then !== 'function') return error;
+	} catch {
+		// An opaque rejection reason need not permit property access. Preserve it
+		// for the application's catch arm instead of replacing it with a probe error.
+		return error;
+	}
+	// Resource readers own their resolved values. Register only retry work, not
+	// a synthetic use() occurrence or hydration seed. Each throw gets a fresh
+	// registration because the same reader can discover another pending resource.
+	if (SUSPENDED !== null) {
+		SUSPENDED.push({ promise: error as PromiseLike<unknown>, key: '|throw#' + PU_ID++ });
+	}
+	const frame = FRAME;
+	if (DEFERRED !== null && CURRENT_COMP !== null && frame !== null && !frame.deferred) {
+		frame.deferred = true;
+		DEFERRED.push({
+			comp: CURRENT_COMP,
+			props: CURRENT_PROPS,
+			parentScope: CURRENT_PARENT_SCOPE,
+			frame,
+		});
+	}
+	return SSR_SUSPENSE;
 }
 
 type HydrationRejectionPayload =
@@ -5941,6 +5978,7 @@ function runFullFramedPass(
 		const out = invokeComponentBody(component, props, root, FRAME);
 		body = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, root);
 	} catch (err) {
+		err = normalizeThrownServerThenable(err);
 		// A suspension with no enclosing @try unwinds to here; its thenable is
 		// already in `suspended`, so fall through to the await + retry. Any other
 		// throw is a genuine render failure — propagate it (the finally restores).
@@ -6752,6 +6790,58 @@ interface StreamState {
 	activeTryKeys: string[];
 	/** All arm owners (content/catch/fallback) while walking nested `ssrTry` calls. */
 	activeOwnerKeys: string[];
+	/** Undo log scoped to one synchronous full pass; null between passes. */
+	replay: StreamBoundaryReplayEntry[] | null;
+}
+
+interface StreamBoundaryReplayEntry {
+	key: string;
+	boundary: StreamBoundary | undefined;
+	value: StreamBoundary | undefined;
+}
+
+// Render-phase retries need the stream registry as it stood on entry to the
+// component. Copying every boundary at EVERY component multiplies a full wave's
+// work by the already-discovered boundary count. Checkpoint this pass-local log
+// instead, recording only actual registry mutations. Boundary arrays are replaced,
+// never mutated, so their previous references are sufficient for rollback.
+function recordStreamBoundaryMutation(stream: StreamState, key: string): void {
+	if (stream.replay === null) return;
+	const boundary = stream.boundaries.get(key);
+	stream.replay.push({
+		key,
+		boundary,
+		value: boundary === undefined ? undefined : { ...boundary },
+	});
+}
+
+function rewindStreamBoundaryReplay(stream: StreamState, checkpoint: number): void {
+	const replay = stream.replay;
+	if (replay === null) return;
+	let restoredDeletion = false;
+	while (replay.length > checkpoint) {
+		const saved = replay.pop()!;
+		if (saved.boundary === undefined) {
+			stream.boundaries.delete(saved.key);
+		} else {
+			const boundary = saved.boundary;
+			const value = saved.value!;
+			Object.assign(boundary, value);
+			// These optional fields can be introduced by the discarded pass.
+			boundary.error = value.error;
+			boundary.errorReported = value.errorReported;
+			boundary.errorFlushed = value.errorFlushed;
+			if (!stream.boundaries.has(saved.key)) restoredDeletion = true;
+			stream.boundaries.set(saved.key, boundary);
+		}
+	}
+	if (restoredDeletion) {
+		// Restoring a pruned boundary appends it to Map. Re-establish discovery
+		// order only on this rare path, including recoverable-error report order.
+		const ordered = [...stream.boundaries].sort((a, b) => a[1].order - b[1].order);
+		stream.boundaries.clear();
+		for (const [key, boundary] of ordered) stream.boundaries.set(key, boundary);
+	}
 }
 
 // Every boundary id includes a render-unique token. The counter proves
@@ -6809,6 +6899,7 @@ function pruneUnrepresentedStreamDescendants(
 			}
 			if (nearestOwner !== ownerKey) continue;
 			if (ownerHtml.includes(STREAM_BOUNDARY_ATTR + '="' + child.id + '"')) continue;
+			recordStreamBoundaryMutation(stream, childKey);
 			stream.boundaries.delete(childKey);
 			removed = true;
 		}
@@ -6885,7 +6976,10 @@ export function ssrTry(
 		ancestorKeys = stream.activeTryKeys.slice();
 		ownerKeys = stream.activeOwnerKeys.slice();
 		entry = stream.boundaries.get(key);
-		if (entry !== undefined) entry.namespace = namespace;
+		if (entry !== undefined) {
+			recordStreamBoundaryMutation(stream, key);
+			entry.namespace = namespace;
+		}
 		if (entry !== undefined && entry.state === 'pending') {
 			entry.ancestors = ancestorKeys;
 			entry.owners = ownerKeys;
@@ -7001,6 +7095,9 @@ export function ssrTry(
 			} catch (error) {
 				// A direct suspension has no nested pending arm whose HTML can be kept.
 				// The outer template remains balanced with an empty fallback range.
+				// Inline resource reads can throw before a component normalizes them;
+				// the finally below discards their registration along with use() work.
+				error = normalizeThrownServerThenable(error);
 				if (!ssrIsSuspense(error)) throw error;
 				fallback = '';
 			} finally {
@@ -7087,6 +7184,7 @@ export function ssrTry(
 			}
 			return ssrBlock(inner);
 		} catch (e) {
+			e = normalizeThrownServerThenable(e);
 			if (ssrIsSuspense(e)) {
 				if (propagateSuspense) throw e;
 				if (stream !== null) {
@@ -7109,6 +7207,7 @@ export function ssrTry(
 							ancestors: ancestorKeys,
 							owners: ownerKeys,
 						};
+						recordStreamBoundaryMutation(stream, key);
 						stream.boundaries.set(key, entry);
 						enterBoundaryIds(pendingIdOffset);
 					} else {
@@ -7172,6 +7271,7 @@ export function ssrTry(
 						ancestors: ancestorKeys,
 						owners: ownerKeys,
 					};
+					recordStreamBoundaryMutation(stream, key);
 					stream.boundaries.set(key, entry);
 					enterBoundaryIds(pendingIdOffset);
 				} else if (entry.state === 'pending') {
@@ -7518,6 +7618,7 @@ async function runStream(
 		activePassBoundaryKeys: null,
 		activeTryKeys: [],
 		activeOwnerKeys: [],
+		replay: null,
 	};
 	const renderFullPass = (): {
 		pass: FullPassResult;
@@ -7525,7 +7626,9 @@ async function runStream(
 	} => {
 		const boundaryKeys = new Set<string>();
 		const previousBoundaryKeys = stream.activePassBoundaryKeys;
+		const previousReplay = stream.replay;
 		stream.activePassBoundaryKeys = boundaryKeys;
+		stream.replay = [];
 		try {
 			return {
 				pass: withStream(stream, () =>
@@ -7535,6 +7638,7 @@ async function runStream(
 			};
 		} finally {
 			stream.activePassBoundaryKeys = previousBoundaryKeys;
+			stream.replay = previousReplay;
 		}
 	};
 	// ── External injection (cold path: every hook below no-ops when absent) ──
