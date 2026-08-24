@@ -1,5 +1,129 @@
 # octane
 
+## 0.1.46
+
+### Patch Changes
+
+- 7e96f71: Reduce streaming server-render work by checkpointing changed Suspense boundaries instead of copying the entire boundary registry for every component. Preserve render-phase retry state, discovery order, hydration seeds, and error handling.
+
+  Avoid general keyed-child bookkeeping for a single owned text node, and avoid reclassifying host subtrees that already require component reconciliation. Keep text identity, foreign DOM ownership, and interrupted-update rollback unchanged.
+
+- d7226ff: Add an experimental client-only Valdi writer compiler target with an explicit
+  application-provided adapter contract, public compiler option types, and
+  self-contained regression tests. Existing DOM and universal targets remain
+  unchanged; no native runtime or application build integration is bundled.
+
+## 0.1.45
+
+### Patch Changes
+
+- 5b1e6a3: Fix missing root `onCaughtError` reports for first-mount and parent-driven error
+  boundary catches in non-suspending renders. Publish inline reports after the
+  fallback's refs and layout effects commit, preserve the original error, and
+  discard abandoned reports without duplicating existing scheduled-error reports.
+- 31abee5: Reduce generated client component code by sharing scalar-binding comparisons and renderable-child text updates through the private compiler runtime. Eligible repeated host rows retain inline comparisons to avoid extra calls and cache writes on unchanged bindings. Hydration avoids repeating attribute mutations when the server already has the final client value, and list-only reconciliation is separate from common text and function children.
+
+  Skip URL regular-expression checks only when the first character proves that the existing unsafe-protocol pattern cannot match. URL policy, controlled form values, authored evaluation order, mismatch recovery, and context propagation through unchanged child descriptors retain their existing behavior.
+
+- fd6ce69: Preserve canonical component wrappers across consecutive Vite hot updates so every save refreshes mounted DOM and universal-renderer components while retaining their own hook state. Keep default exports live and reload when an edit removes or invalidates a refresh boundary.
+- 5f7a457: Retain and retry client roots that suspend without a Suspense boundary. Keep
+  initial roots empty and preserve committed UI, state, refs, and layout/passive
+  effects during suspended updates, including structural replacements and portals.
+  Retry the latest inputs, cancel abandoned work after supersession or unmount,
+  and report actual resource rejections through normal error handling.
+
+  Retain server DOM while initial hydration is suspended, adopting the existing
+  nodes, attaching refs, and running layout/passive effects only when hydration can
+  commit.
+
+  Keep effect-thrown thenables on the error path and tear down roots on unhandled
+  effect errors.
+
+- 5227d7b: Retry incomplete descriptor and memoized subtrees before revealing Suspense
+  content, preserving mounted state and DOM identity. Revisit discarded effect work
+  after interrupted retries, keep descriptor text and props consistent during held
+  transitions, and register deferred Activity effects when a cached hidden child
+  descriptor becomes visible.
+- 6927595: Fix strict browser TypeScript consumption of source-published chart bindings.
+
+  Recharts now publishes authored TypeScript for its chart utilities and state,
+  resolves component imports explicitly, and exports the component implementations'
+  own prop types. Visx supports strict browser source checks without Node globals.
+  Remix Router's published declarations retain native anchor and form ref types.
+  Redux Toolkit's query hooks type their bundler environment without Node globals.
+
+  Fix deferred native chart events, keep imperative and Cell refs off unrelated
+  hosts, and resolve missing radial geometry without dropping data rows.
+
+  Octane accepts optional refs in composed ref arrays and supports nested ref arrays
+  in `useImperativeHandle`, including callback cleanup and primitive handles. Require
+  the published TSRX compiler fix for ref-and-spread expressions rather than relying
+  on a workspace-only patch.
+
+  Publish the Volar compiler with its tested parser/printer dependencies and checked
+  public declarations, preventing newer transitive printers from corrupting typed
+  tuple parameters in installed consumers. Preserve generic Pie props and the
+  native group targets of polar-axis events.
+
+- f1a7802: Match React's Suspense retry timing: share the 300 ms retry-commit budget across boundaries, keep sibling reveals atomic, and retain already-visible transition content indefinitely by default. Explicit finite transition fallback timeouts remain available.
+
+  Support promises thrown by resource readers on the client and server, and fix suspended-render cleanup, initial-state supersession, error reporting, and staged renderer ownership without delaying dependent data requests. Keep deferred hydration notifications and captured clicks behind the actual retry commit.
+
+  Let pending and error fallbacks suspend through an enclosing boundary without losing their state. Defer suspended error-fallback reports until reveal, cancel abandoned reports, and allow a server response to finish without waiting for an obsolete suspending fallback.
+
+## 0.1.44
+
+### Patch Changes
+
+- 9b06e47: Fix duplicated text when hydrating a sole primitive child that the server framed,
+  including spread-bearing hosts and conditional children. Reuse the server Text
+  node while preserving hydration mismatch suppression, native events, and later
+  child updates.
+- 7535acd: Deduplicate binding hook sub-slot derivation behind Octane's shared helper while preserving each binding's slotless and symbol-identity behavior.
+
+## 0.1.43
+
+### Patch Changes
+
+- 4b590bd: Improve Activity parity across compiled JSX, element descriptors, server rendering,
+  hydration, and universal renderers. Hidden boundaries now disconnect public refs,
+  preserve the latest authored styles and text, hide logically owned portals, and
+  contain suspended work without activating an enclosing visible fallback. Retained
+  insertion effects replay safely after suspended hidden renders, including memoized
+  children and nested boundaries.
+
+  Support Activity aliases, namespaces, spreads, children props, and ordered keys
+  without changing the direct mode-only compiler fast path. Integrate Activity
+  visibility changes with ViewTransition enter/exit animations and expose native
+  pseudo-element animations through the transition instance.
+
+  Coalesce hidden descendant visibility scans once per render wave and keep optional
+  Activity implementation and ref tracking off unrelated application paths. Add
+  production browser benchmarks and deterministic work, ref, and bundle controls.
+  Octane's synchronous hidden-work scheduling and existing structural-transaction
+  limitations remain unchanged.
+
+- c0ff085: Keep boolean renderable children empty when updated from text, and correctly
+  reapply anchored child text after a held transition resumes. Explicit string
+  conversion and typed text bindings retain their existing coercion semantics.
+- 6a68a7d: Fold provider-proven immutable CSS-module class strings before template planning. Production Vite builds retain a live class reference in each static subtree so unused and lazy component styles keep their existing delivery boundaries. Mutable default maps remain dynamic unless their CSS provider supplies an explicit immutable-export contract.
+- 6b97f85: Add opt-in CSS-module constant folding to one-shot Rspack and Rsbuild production builds. Authenticate immutable JavaScript CSS exports from the actual module graph, preserve stylesheet ownership, and keep proof callbacks on the main thread when compiler workers are enabled. Native CSS modules and mutable default maps retain their existing behavior.
+
+## 0.1.42
+
+### Patch Changes
+
+- 1581e1b: Skip already-drained scheduled flushes after synchronous native-event commits. Preserve commit-only effects, refs, Fragment bindings, transition finalization, profiling notifications, and microtask ordering.
+- afa3722: Preserve server-rendered descriptor components when a suspended Hydrate boundary
+  resumes. Claim fallback cleanup ranges only after adoption completes, avoiding
+  false hydration mismatch reports while preserving template-owned checks and
+  removing genuinely unmatched content added during suspension.
+- 231e248: Reduce keyed-row selection work for compiler-proven class-only updates. Preserve full row reconciliation for live renderable children and use the correct class setter for statically known HTML, SVG, and MathML templates. Also avoid unnecessary state-update allocations and focus traversal when a document has no focused control.
+- 2f9b301: Keep keyed row selection updates bounded when a row declares a constant alias for its key before rendering. Preserve the full affected-row bodies, event captures, strict-equality behavior, and transition replay.
+- 939c64d: Keep `useMemo` and `useCallback` on a universal renderer's hook runtime in production builds.
+
+  The closure-free DOM memo optimization could incorrectly lower hooks inside an owning universal renderer component and import `octane/internal/client`. Universal renderers do not have a DOM component scope, so those helpers either failed to resolve in custom build pipelines or crashed at runtime. Universal components now retain their renderer-specific memo hooks, while DOM components keep the optimized path.
+
 ## 0.1.41
 
 ### Patch Changes

@@ -1,5 +1,62 @@
 # @octanejs/vite-plugin
 
+## 0.1.46
+
+### Patch Changes
+
+- Updated dependencies [7e96f71]
+- Updated dependencies [d7226ff]
+  - octane@0.1.46
+  - @octanejs/app-core@0.0.42
+
+## 0.1.45
+
+### Patch Changes
+
+- Updated dependencies [5b1e6a3]
+- Updated dependencies [31abee5]
+- Updated dependencies [fd6ce69]
+- Updated dependencies [5f7a457]
+- Updated dependencies [5227d7b]
+- Updated dependencies [6927595]
+- Updated dependencies [f1a7802]
+  - octane@0.1.45
+  - @octanejs/app-core@0.0.41
+
+## 0.1.44
+
+### Patch Changes
+
+- Updated dependencies [9b06e47]
+- Updated dependencies [7535acd]
+  - octane@0.1.44
+  - @octanejs/app-core@0.0.40
+
+## 0.1.43
+
+### Patch Changes
+
+- 6a68a7d: Fold provider-proven immutable CSS-module class strings before template planning. Production Vite builds retain a live class reference in each static subtree so unused and lazy component styles keep their existing delivery boundaries. Mutable default maps remain dynamic unless their CSS provider supplies an explicit immutable-export contract.
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+  - octane@0.1.43
+  - @octanejs/app-core@0.0.39
+
+## 0.1.42
+
+### Patch Changes
+
+- Updated dependencies [1581e1b]
+- Updated dependencies [afa3722]
+- Updated dependencies [afa3722]
+- Updated dependencies [231e248]
+- Updated dependencies [2f9b301]
+- Updated dependencies [939c64d]
+  - octane@0.1.42
+  - @octanejs/app-core@0.0.38
+
 ## 0.1.41
 
 ### Patch Changes

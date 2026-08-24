@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/input-otp",
-  "version": "0.0.8",
+  "version": "0.0.12",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -24,6 +24,7 @@
   "types": "src/index.ts",
   "files": [
     "src",
+    "LICENSE.upstream",
     "README.md",
     "UPSTREAM.md"
   ],

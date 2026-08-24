@@ -27,8 +27,8 @@
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 11,
-    "uniqueIdentities": 11,
+    "inventoryEntries": 12,
+    "uniqueIdentities": 12,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "379fe670d0857881696519b4162249dc4278f117dffa978aa3891cc06ba16eac"
+      "lockfileSha256": "fcd517ecbc7d8786f0f5686e60b04f2a0c89e05520a067687fbb5178035fb1c9"
     }
   },
   "lanes": [
@@ -57,6 +57,11 @@
       },
       "files": [
         {
+          "path": "packages/input-otp/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "a6e8062db42f8fc2e4473859849072af9114f80d25f454f39364e04fe98ae1cf"
+        },
+        {
           "path": "packages/input-otp/audit/pristine-runtime-browser.json",
           "role": "support",
           "sha256": "94bba26296d62da407ff2a792b1bec5941a9caec32dbb6634df5638be1f66e3d"
@@ -64,7 +69,7 @@
         {
           "path": "packages/input-otp/audit/pristine-runtime-crosswalk.json",
           "role": "support",
-          "sha256": "1d88930fa68ebfb79189ae4b26bbcb3a56eabe7efe21af3fd2fc7417df9a4813"
+          "sha256": "79e436f2f9415119037b98b63d7a6ffb308d623b055e89f427e69816588e43a3"
         },
         {
           "path": "packages/input-otp/audit/pristine-adaptation-ledger.json",
@@ -77,47 +82,47 @@
           "sha256": "f9257765451998e0b6103c0b014f39680dce85ec9637411126ba3bf17a671f3a"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/playground/src/tests/base.delete-word.spec.ts",
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/base.delete-word.spec.ts",
           "role": "support",
           "sha256": "ae78b0365739b9a7f2d1a349a841b0d69dd9371d5cb7078af743772c34f19eb7"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/playground/src/tests/base.props.spec.ts",
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/base.props.spec.ts",
           "role": "support",
           "sha256": "9a6ed238323b02cb34efef3224982597ac5130d5ec117903d32de955feebc666"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/playground/src/tests/base.render.spec.ts",
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/base.render.spec.ts",
           "role": "support",
           "sha256": "b7924a0b71da35dbd0ca95bc6882a5980c082878c92b050bcdd9b85b7d868c99"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/playground/src/tests/base.selections.spec.ts",
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/base.selections.spec.ts",
           "role": "support",
           "sha256": "fa47b6afed3b0db73814306777345175ce3d9921bbe0b4a163e6d3d6fced5a76"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/playground/src/tests/base.slot.spec.ts",
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/base.slot.spec.ts",
           "role": "support",
           "sha256": "370090e7e678b2099aa4f00126d98b3d0ff479a7fc336d3b25c31b19845e68ec"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/playground/src/tests/base.typing.spec.ts",
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/base.typing.spec.ts",
           "role": "support",
           "sha256": "802df2eb14aab655e291f2d08386c588b5f8ab37ba111de9f7add86f16ca2f3b"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/playground/src/tests/pwm-space.spec.ts",
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/pwm-space.spec.ts",
           "role": "support",
           "sha256": "edef8c0fa30fd4784f5a0814baad8a1d59534ed5b0ef3011412f3153ef8df83a"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/playground/src/tests/with-autofocus.spec.ts",
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/with-autofocus.spec.ts",
           "role": "support",
           "sha256": "df34526e673189c1561d61d82089736344bb670f528ab649193f60954570c939"
         },
         {
-          "path": "packages/input-otp/upstream/source/apps/playground/src/tests/with-on-complete.spec.ts",
+          "path": "packages/input-otp/upstream/apps/playground/src/tests/with-on-complete.spec.ts",
           "role": "support",
           "sha256": "3b380592c0f0374ff423b9d346377e9e1cd285455c6f1985b03af68778233452"
         }
@@ -139,7 +144,7 @@
         {
           "path": "packages/input-otp/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "181e888cc08685d689ed038e40f73f9e5cf403849eed197bbe5296a15ec50448"
+          "sha256": "39d3002869fb4eccec87dbecc50fd5c88b49b764bbab612c7b3350d4319d379a"
         }
       ]
     },
@@ -220,7 +225,7 @@
         {
           "path": "packages/input-otp/audit/type-probes/pristine.ts",
           "role": "test",
-          "sha256": "9204fefb0b7056cf246dd8ee48a69f4f47cd6efa4da46a7540eb8717273b5ab7",
+          "sha256": "383d0d644d9afc44f2c7d8d5a1fba0efb1456c4e47cfc408c430cc9593686de0",
           "cases": [
             {
               "id": "types:input-otp-pristine",

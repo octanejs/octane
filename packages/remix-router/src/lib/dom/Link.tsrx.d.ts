@@ -17,6 +17,6 @@ export declare const Link: (props: {
 	preventScrollReset?: boolean;
 	viewTransition?: boolean;
 	defaultShouldRevalidate?: boolean;
-	ref?: unknown;
+	ref?: { current: HTMLAnchorElement | null } | ((node: HTMLAnchorElement | null) => void) | null;
 	[key: string]: unknown;
 }) => unknown;

@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "379fe670d0857881696519b4162249dc4278f117dffa978aa3891cc06ba16eac"
+      "lockfileSha256": "fcd517ecbc7d8786f0f5686e60b04f2a0c89e05520a067687fbb5178035fb1c9"
     }
   },
   "lanes": [
@@ -139,6 +139,11 @@
         "inventory": "packages/base-ui/audit/adapted-runtime.json"
       },
       "files": [
+        {
+          "path": "packages/base-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "82937a5512e6a5520261f1604eb30f8830a0385fb65a021e28157b16dd4d758f"
+        },
         {
           "path": "packages/base-ui/audit/adapted-runtime.json",
           "role": "support",

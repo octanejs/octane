@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "root": "upstream/source/apps/playground/src/tests",
+  "root": "upstream/apps/playground/src/tests",
   "artifactCount": 9,
   "caseCount": 19,
   "requiredPortAuthoredClassifications": [
@@ -55,10 +55,7 @@
       "adaptedSkipDisposition": "removed; all cases must execute in CI",
       "cases": [
         { "identity": "should replace selected char if another is pressed", "adaptedActive": true },
-        {
-          "identity": "should replace last char if another one is pressed",
-          "adaptedActive": true
-        },
+        { "identity": "should replace last char if another one is pressed", "adaptedActive": true },
         {
           "identity": "should move slot selection with arrow keys when input is full",
           "adaptedActive": true

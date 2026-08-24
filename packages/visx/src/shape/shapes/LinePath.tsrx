@@ -1,5 +1,6 @@
 import type { Ref } from 'react';
 import type { OctaneNode } from 'octane';
+import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 import type { Line as LineType } from 'd3-shape';
 import type { AddSVGProps, LinePathConfig } from '../types';
@@ -15,7 +16,7 @@ export type LinePathProps<Datum> = {
 		/** Fill color of the path element. */
 		fill?: string;
 		/** className applied to path element. */
-		className?: string;
+		className?: Octane.SVGProps<SVGPathElement>['className'];
 	} & LinePathConfig<Datum>;
 
 export default function LinePath<Datum>({

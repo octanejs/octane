@@ -1,0 +1,27 @@
+// Adapted from recharts@3.9.2, commit b3451050c027a23957ffa50a2665c9119df21e47.
+import { AllStackGroups, StackGroup, StackSeries } from '../../../util/stacks/stackTypes';
+import { MaybeStackedGraphicalItem } from '../../types/StackedGraphicalItem';
+import { getStackSeriesIdentifier } from '../../../util/stacks/getStackSeriesIdentifier';
+
+export const combineStackedData = (
+	stackGroups: AllStackGroups | undefined,
+	barSettings: MaybeStackedGraphicalItem | undefined,
+): StackSeries | undefined => {
+	const stackSeriesIdentifier = getStackSeriesIdentifier(barSettings);
+	if (!stackGroups || stackSeriesIdentifier == null || barSettings == null) {
+		return undefined;
+	}
+	const { stackId } = barSettings;
+	if (stackId == null) {
+		return undefined;
+	}
+	const stackGroup: StackGroup | undefined = stackGroups[stackId];
+	if (!stackGroup) {
+		return undefined;
+	}
+	const { stackedData }: StackGroup = stackGroup;
+	if (!stackedData) {
+		return undefined;
+	}
+	return stackedData.find((sd) => sd.key === stackSeriesIdentifier);
+};

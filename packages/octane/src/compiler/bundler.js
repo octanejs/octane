@@ -34,6 +34,7 @@ import { formatCompileDiagnostic } from './native-change-diagnostics.js';
 import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
 import { rewriteServerRuntimeRequests } from './runtime-requests.js';
 import { assertStrongMode } from './strong-mode.js';
+import { findCssModuleImportRequests } from './css-module-imports.js';
 import {
 	assertNoLiveClientOnlyImports,
 	createClientOnlyServerStub,
@@ -42,6 +43,11 @@ import {
 } from './client-only-server.js';
 
 export { findVoidComponentImports, findVoidRootImports };
+export {
+	isPlainCssModuleId,
+	readCssModuleExports,
+	validateCssModuleConstants,
+} from './css-module-imports.js';
 export { HYDRATE_QUERY_PARAM } from './hydrate-boundaries.js';
 export {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
@@ -915,6 +921,32 @@ class OctaneBundlerCompiler {
 		return findStaticRuntimeImportRequests(code, this._canonicalModuleId(id));
 	}
 
+	/** CSS proof discovery uses the same ownership gate as the eventual compile. */
+	findCssModuleImportRequests(code, id, environment = 'client') {
+		if (typeof code !== 'string' || !code.includes('.module.')) return [];
+		// The live-read witness currently follows DOM host ownership only. Even
+		// a DOM-owned module can delegate a JSX-valued prop to another renderer.
+		if (Object.keys(this.renderers.boundaries).length > 0) return [];
+		const file = cleanModuleId(id);
+		const collected = { dependencies: new Set(), missingDependencies: new Set() };
+		if (!this._isFullCompileSource(file, collected)) return [];
+		const filename = this._canonicalModuleId(file);
+		const pragmaOwned =
+			this.requireDirective &&
+			file.endsWith('.tsx') &&
+			this._isProjectOwnedSource(file) &&
+			this._pragmaClaimsOwnership(code);
+		if (!this._passesOwnershipGate(file, filename, pragmaOwned)) return [];
+		const renderer = resolveRendererForFile(this.renderers, filename);
+		if (
+			renderer.target !== 'dom' ||
+			(environment === 'server' && renderer.server === 'client-only')
+		) {
+			return [];
+		}
+		return findCssModuleImportRequests(code, filename);
+	}
+
 	/**
 	 * requireDirective ownership for code-less classification: a project
 	 * `.tsrx` is Octane's by extension; any other project module needs its
@@ -1050,7 +1082,7 @@ class OctaneBundlerCompiler {
 		if (!hostOwned) this._assertClientOnlySourceSupported(file, filename, renderer, collected);
 		if (
 			plainHelperSource &&
-			renderer.target === 'universal' &&
+			(renderer.target === 'universal' || renderer.target === 'valdi') &&
 			renderer.validation !== undefined &&
 			this._isProjectOwnedSource(file) &&
 			!this.exclude.some((path) => file.includes(path)) &&
@@ -1079,6 +1111,10 @@ class OctaneBundlerCompiler {
 				};
 			}
 			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
+			const collectCssModuleConstants =
+				renderer.target === 'dom' &&
+				!hasRendererBoundaries &&
+				typeof options.resolveCssModuleConstant === 'function';
 			const compileFilename =
 				hydrateBoundaryPath === null
 					? filename
@@ -1109,15 +1145,27 @@ class OctaneBundlerCompiler {
 				...(typeof options.isDescriptorChildrenImport === 'function'
 					? { isDescriptorChildrenImport: options.isDescriptorChildrenImport }
 					: null),
+				...(collectCssModuleConstants
+					? {
+							resolveCssModuleConstant: options.resolveCssModuleConstant,
+							...(options.preserveCssModuleReferences === undefined
+								? null
+								: { preserveCssModuleReferences: options.preserveCssModuleReferences }),
+						}
+					: null),
 			};
 			const collectVoidComponentExports =
 				environment === 'client' && options.collectVoidComponentExports === true;
 			let out;
 			let voidComponentAst = null;
-			if (collectVoidComponentExports) {
+			let cssModuleConstantImports;
+			if (collectVoidComponentExports || collectCssModuleConstants) {
 				const compilation = compileForBundler(code, compileFilename, compileOptions);
 				out = compilation.result;
-				voidComponentAst = compilation.hydrateAst;
+				if (collectVoidComponentExports) voidComponentAst = compilation.hydrateAst;
+				if (collectCssModuleConstants) {
+					cssModuleConstantImports = compilation.cssModuleConstantImports;
+				}
 			} else {
 				out = compile(code, compileFilename, compileOptions);
 			}
@@ -1135,6 +1183,7 @@ class OctaneBundlerCompiler {
 					: {
 							voidComponentExports: findVoidComponentExports(voidComponentAst, filename),
 						}),
+				...(cssModuleConstantImports === undefined ? null : { cssModuleConstantImports }),
 				descriptorChildrenExports: findDescriptorChildrenExports(code, filename),
 				...finishMetadata(collected),
 			};

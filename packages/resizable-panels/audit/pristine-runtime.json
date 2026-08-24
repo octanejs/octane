@@ -1,0 +1,2169 @@
+{
+  "schemaVersion": 1,
+  "project": "react-resizable-panels-pristine",
+  "roots": ["packages/resizable-panels/upstream/lib"],
+  "files": [
+    "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+    "packages/resizable-panels/upstream/lib/components/group/sortByElementOffset.test.ts",
+    "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+    "packages/resizable-panels/upstream/lib/components/panel/Panel.test.tsx",
+    "packages/resizable-panels/upstream/lib/components/separator/Separator.test.tsx",
+    "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+    "packages/resizable-panels/upstream/lib/global/dom/calculateAvailableGroupSize.test.ts",
+    "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+    "packages/resizable-panels/upstream/lib/global/styles/parseSizeAndUnit.test.ts",
+    "packages/resizable-panels/upstream/lib/global/styles/sizeStyleToPixels.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/calculateDefaultLayout.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/calculateSeparatorAriaValues.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/compareLayoutNumbers.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/findMatchingHitRegions.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/getDistanceBetweenPointAndRect.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/getImperativeGroupMethods.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/layoutNumbersEqual.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/layoutsEqual.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/objectsEqual.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/validatePanelGroupLayout.test.ts",
+    "packages/resizable-panels/upstream/lib/hooks/useId.test.ts",
+    "packages/resizable-panels/upstream/lib/hooks/useMergedRefs.test.tsx",
+    "packages/resizable-panels/upstream/lib/hooks/useStableCallback.test.tsx",
+    "packages/resizable-panels/upstream/lib/utils/isArrayEqual.test.ts",
+    "packages/resizable-panels/upstream/lib/utils/parseNumericStyleValue.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:1264fd78cf16b836",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group HTML attributes problematic styles should be suppressed"
+    },
+    {
+      "id": "runtime:590222b2610fbdac",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group HTML attributes should expose explicit id and testid"
+    },
+    {
+      "id": "runtime:96858512c282ea11",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group HTML attributes should pass through ...rest attributes"
+    },
+    {
+      "id": "runtime:d199b8ea84630e2d",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group changes to defaultProps or disableCursor should not cause Group to remount"
+    },
+    {
+      "id": "runtime:856244c014ae6b23",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group defaultLayout should be ignored if it does not match Panel ids"
+    },
+    {
+      "id": "runtime:1bf9c0bd4c276c88",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group defaultLayout should be ignored if it does not match Panel ids (mounted within hidden subtree)"
+    },
+    {
+      "id": "runtime:736def134d1a995a",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group defaultLayout should not break the layout if layout Panel ids are in an unexpected order three panel vertical group"
+    },
+    {
+      "id": "runtime:a313393a64655536",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group defaultLayout should not break the layout if layout Panel ids are in an unexpected order two panel horizontal group"
+    },
+    {
+      "id": "runtime:5dda362aca54eee4",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group defaultLayout should not require multiple render passes"
+    },
+    {
+      "id": "runtime:c2dde8ebc312f141",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group groupRef should allow layout to be read or written on mount"
+    },
+    {
+      "id": "runtime:1ad8b6c57885dbc2",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group groupRef should work with an empty Group"
+    },
+    {
+      "id": "runtime:91573a40a1bd99ca",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group groupRef should work within a hidden subtree"
+    },
+    {
+      "id": "runtime:01b677f9a0004442",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group groupResizeBehavior preserve-pixel-size preserves pixel size Group size changes"
+    },
+    {
+      "id": "runtime:51247fdf35bd7954",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group groupResizeBehavior preserve-relative-size preserves relative (percentage based) size Group size changes"
+    },
+    {
+      "id": "runtime:20c737b39795e06d",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group in-memory layout cache should not break if right click occurs while left click is active"
+    },
+    {
+      "id": "runtime:e884e7392dc8238c",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group in-memory layout cache should update when resized via Group imperative API"
+    },
+    {
+      "id": "runtime:ffbb467dadc499e4",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group in-memory layout cache should update when resized via Panel imperative API"
+    },
+    {
+      "id": "runtime:cd9a7b602c3af8ee",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group in-memory layout cache should update when resized via keyboard"
+    },
+    {
+      "id": "runtime:6a5029204bced860",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group in-memory layout cache should update when resized via pointer"
+    },
+    {
+      "id": "runtime:954808fac4eb2ef6",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group invariants duplicate panel ids"
+    },
+    {
+      "id": "runtime:fd96751609d03713",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group invariants duplicate separator ids"
+    },
+    {
+      "id": "runtime:288dfb6890ab6d0c",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group onLayoutChange and onLayoutChanged should be called in response to imperative API"
+    },
+    {
+      "id": "runtime:05cd4af8fe5c7777",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group onLayoutChange and onLayoutChanged should be called once per layout change"
+    },
+    {
+      "id": "runtime:0b92df744b382190",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group onLayoutChange and onLayoutChanged should be called when panels change"
+    },
+    {
+      "id": "runtime:ea7a71dfc680b4a3",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group onLayoutChange and onLayoutChanged should be called with default layout"
+    },
+    {
+      "id": "runtime:3ad5fc772d8f772e",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group onLayoutChange and onLayoutChanged should not be called before layout has been initialized"
+    },
+    {
+      "id": "runtime:6de3d4e495b6583d",
+      "file": "packages/resizable-panels/upstream/lib/components/group/Group.test.tsx",
+      "fullName": "Group should support updates to either Group or Panel ids"
+    },
+    {
+      "id": "runtime:d7b6d2594c91fcb4",
+      "file": "packages/resizable-panels/upstream/lib/components/group/sortByElementOffset.test.ts",
+      "fullName": "sortByElementOffset orientation: horizontal should handle empty elements array"
+    },
+    {
+      "id": "runtime:bcf8a6ba70cbb63d",
+      "file": "packages/resizable-panels/upstream/lib/components/group/sortByElementOffset.test.ts",
+      "fullName": "sortByElementOffset orientation: horizontal should prioritize smaller elements if offsets are the same"
+    },
+    {
+      "id": "runtime:ad96b2f8c0157e33",
+      "file": "packages/resizable-panels/upstream/lib/components/group/sortByElementOffset.test.ts",
+      "fullName": "sortByElementOffset orientation: horizontal should sort horizontal elements"
+    },
+    {
+      "id": "runtime:aa31b904e2a96b47",
+      "file": "packages/resizable-panels/upstream/lib/components/group/sortByElementOffset.test.ts",
+      "fullName": "sortByElementOffset orientation: vertical should prioritize smaller elements if offsets are the same"
+    },
+    {
+      "id": "runtime:82fd6dea63e0a52e",
+      "file": "packages/resizable-panels/upstream/lib/components/group/sortByElementOffset.test.ts",
+      "fullName": "sortByElementOffset orientation: vertical should sort vertical elements"
+    },
+    {
+      "id": "runtime:ab214b7e129aa6df",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback updates persisted modern layout"
+    },
+    {
+      "id": "runtime:f593d91579f162c5",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback with panel ids prop prefers matching modern layouts if both are present"
+    },
+    {
+      "id": "runtime:c59dc865e13f7e27",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback with panel ids prop returns matching legacy layout"
+    },
+    {
+      "id": "runtime:dbfe9b3f219e3787",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback with panel ids prop skips mismatched legacy layout"
+    },
+    {
+      "id": "runtime:70c102020d94a378",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback without panel ids prop prefers matching modern layouts if both are present"
+    },
+    {
+      "id": "runtime:a79a912d80b7d32f",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback without panel ids prop returns matching legacy layout"
+    },
+    {
+      "id": "runtime:485407a8267661f8",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy layout fallback without panel ids prop skips mismatched legacy layout"
+    },
+    {
+      "id": "runtime:4b28cd23f79b8625",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should cancel pending debounced write on unmount"
+    },
+    {
+      "id": "runtime:7868a4de7dbf9a38",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should ignore invalid layouts (panel ids mismatch)"
+    },
+    {
+      "id": "runtime:2775f80258b4b8ef",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should ignore temporarily invalid layouts after update (num panels mismatch)"
+    },
+    {
+      "id": "runtime:31f46f3d9b838ee7",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should ignore temporarily invalid layouts on mount (ids mismatch)"
+    },
+    {
+      "id": "runtime:53003d89d3a463d1",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should ignore temporarily invalid layouts on mount (num panels mismatch)"
+    },
+    {
+      "id": "runtime:777982d1d8ab4935",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should override pending debounce with newer value"
+    },
+    {
+      "id": "runtime:f7a12240c36ab119",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should read/write from the provided Storage API"
+    },
+    {
+      "id": "runtime:818122d9e23164b9",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should save separate layouts per panel group when panelIds param is present"
+    },
+    {
+      "id": "runtime:34496af5335fcf94",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout legacy onLayoutChange prop should support debounced write"
+    },
+    {
+      "id": "runtime:40db0ad3e17b41fe",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should ignore debounce param when using onLayoutChanged"
+    },
+    {
+      "id": "runtime:9da0746ca2e369d4",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should ignore invalid layouts (panel ids mismatch)"
+    },
+    {
+      "id": "runtime:00e4b2a6264502f9",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should ignore non-user interactions"
+    },
+    {
+      "id": "runtime:c652e1728263df43",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should ignore temporarily invalid layouts after update (num panels mismatch)"
+    },
+    {
+      "id": "runtime:54223331ea15c652",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should ignore temporarily invalid layouts on mount (ids mismatch)"
+    },
+    {
+      "id": "runtime:04844578f122368d",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should ignore temporarily invalid layouts on mount (num panels mismatch)"
+    },
+    {
+      "id": "runtime:0fab3cd31a07b10f",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should read/write from the provided Storage API"
+    },
+    {
+      "id": "runtime:56831422e8dc0287",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should save separate layouts per panel group when panelIds param is present"
+    },
+    {
+      "id": "runtime:f9bb76772b56739b",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout modern onLayoutChanged prop should support out-of-order panel ids"
+    },
+    {
+      "id": "runtime:27ee1fe5a3b3d489",
+      "file": "packages/resizable-panels/upstream/lib/components/group/useDefaultLayout.test.tsx",
+      "fullName": "useDefaultLayout should only write once if both onLayoutChange and onLayoutChanged props are used"
+    },
+    {
+      "id": "runtime:d35e7a72cbd6574e",
+      "file": "packages/resizable-panels/upstream/lib/components/panel/Panel.test.tsx",
+      "fullName": "Panel HTML attributes ARIA attributes should assign an id prop to support the ARIA separator"
+    },
+    {
+      "id": "runtime:9abb9b8305671701",
+      "file": "packages/resizable-panels/upstream/lib/components/panel/Panel.test.tsx",
+      "fullName": "Panel HTML attributes ARIA attributes should pass through explicit id prop"
+    },
+    {
+      "id": "runtime:d70ff711dd5e7ef9",
+      "file": "packages/resizable-panels/upstream/lib/components/panel/Panel.test.tsx",
+      "fullName": "Panel HTML attributes problematic styles should be suppressed"
+    },
+    {
+      "id": "runtime:baff9f38db544f87",
+      "file": "packages/resizable-panels/upstream/lib/components/panel/Panel.test.tsx",
+      "fullName": "Panel HTML attributes should expose id as testid"
+    },
+    {
+      "id": "runtime:81c4dbce69df13b0",
+      "file": "packages/resizable-panels/upstream/lib/components/panel/Panel.test.tsx",
+      "fullName": "Panel HTML attributes should pass through ...rest attributes"
+    },
+    {
+      "id": "runtime:56785b83e738eb30",
+      "file": "packages/resizable-panels/upstream/lib/components/panel/Panel.test.tsx",
+      "fullName": "Panel disabled prop changes to disabled prop should not cause the Panel to remount"
+    },
+    {
+      "id": "runtime:7f6db2ac9c15d38d",
+      "file": "packages/resizable-panels/upstream/lib/components/panel/Panel.test.tsx",
+      "fullName": "Panel disabled prop changes to this prop should update Panel behavior"
+    },
+    {
+      "id": "runtime:b7931da1dee18067",
+      "file": "packages/resizable-panels/upstream/lib/components/panel/Panel.test.tsx",
+      "fullName": "Panel memoization Panels contents should not re-render on Group layout change"
+    },
+    {
+      "id": "runtime:f4801b1cfd58da7d",
+      "file": "packages/resizable-panels/upstream/lib/components/panel/Panel.test.tsx",
+      "fullName": "Panel should throw if rendered outside of a Group"
+    },
+    {
+      "id": "runtime:c0bcace489ff389a",
+      "file": "packages/resizable-panels/upstream/lib/components/separator/Separator.test.tsx",
+      "fullName": "Separator HTML attributes ARIA attributes should identify its primary panel if and only if it has an explicit id"
+    },
+    {
+      "id": "runtime:eeb9988261fbb343",
+      "file": "packages/resizable-panels/upstream/lib/components/separator/Separator.test.tsx",
+      "fullName": "Separator HTML attributes should expose id and data-testid"
+    },
+    {
+      "id": "runtime:9cfd7f6192c9deb5",
+      "file": "packages/resizable-panels/upstream/lib/components/separator/Separator.test.tsx",
+      "fullName": "Separator HTML attributes should pass through ...rest attributes"
+    },
+    {
+      "id": "runtime:bfc43cdc00173d0c",
+      "file": "packages/resizable-panels/upstream/lib/components/separator/Separator.test.tsx",
+      "fullName": "Separator disabled prop changes to disabled prop should not cause the Separator to remount"
+    },
+    {
+      "id": "runtime:47060df1fd38e26f",
+      "file": "packages/resizable-panels/upstream/lib/components/separator/Separator.test.tsx",
+      "fullName": "Separator disabled prop changes to this prop should update Separator behavior"
+    },
+    {
+      "id": "runtime:a3078895eef1b1c0",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 1 -> e-resize"
+    },
+    {
+      "id": "runtime:b6809eb8843ef5da",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 10 -> nw-resize"
+    },
+    {
+      "id": "runtime:2fdac952f91843a2",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 2 -> w-resize"
+    },
+    {
+      "id": "runtime:07ab36729a08e796",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 4 -> s-resize"
+    },
+    {
+      "id": "runtime:90c8c76650af4ed5",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 5 -> se-resize"
+    },
+    {
+      "id": "runtime:e31631327c7560d5",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 6 -> sw-resize"
+    },
+    {
+      "id": "runtime:d9e5be92b3256d2d",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 8 -> n-resize"
+    },
+    {
+      "id": "runtime:0e490605536c69a4",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active cursor flags: 9 -> ne-resize"
+    },
+    {
+      "id": "runtime:79c4003d3d7cc44f",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active disabled groups"
+    },
+    {
+      "id": "runtime:4d640fce35d813c2",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active horizontal"
+    },
+    {
+      "id": "runtime:98e48b1ddcd73a14",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active horizontal and vertical"
+    },
+    {
+      "id": "runtime:e06c34626c28c395",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: active vertical"
+    },
+    {
+      "id": "runtime:73b0457d6eca5787",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: hover cursor flags should be ignored"
+    },
+    {
+      "id": "runtime:1bd266e4a228f551",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: hover disabled groups"
+    },
+    {
+      "id": "runtime:1f733ed3d0c0d3f4",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: hover horizontal"
+    },
+    {
+      "id": "runtime:a047981001b7de84",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: hover horizontal and vertical"
+    },
+    {
+      "id": "runtime:2a319989b01e319f",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: hover vertical"
+    },
+    {
+      "id": "runtime:6d21faaa212172cd",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle advanced cursor style support state: inactive should return null"
+    },
+    {
+      "id": "runtime:e99b91f5467e0e4c",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 1 -> grab"
+    },
+    {
+      "id": "runtime:62ac8d17837e986b",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 10 -> grab"
+    },
+    {
+      "id": "runtime:16a04b6e2e181a9f",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 2 -> grab"
+    },
+    {
+      "id": "runtime:e22b68fb255c1606",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 4 -> grab"
+    },
+    {
+      "id": "runtime:a5d81a1f1e6ae43a",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 5 -> grab"
+    },
+    {
+      "id": "runtime:00afe9fe35386cb2",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 6 -> grab"
+    },
+    {
+      "id": "runtime:949bb48b201cb156",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 8 -> grab"
+    },
+    {
+      "id": "runtime:931ac64c4b1a8908",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active cursor flags: 9 -> grab"
+    },
+    {
+      "id": "runtime:c68c63c7525cb426",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active disabled groups"
+    },
+    {
+      "id": "runtime:a386bb8fe4d768a4",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active horizontal"
+    },
+    {
+      "id": "runtime:1fe378279656794c",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active horizontal and vertical"
+    },
+    {
+      "id": "runtime:e0d166f6e2e292db",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: active vertical"
+    },
+    {
+      "id": "runtime:ce16a777559f25ad",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: hover cursor flags should be ignored"
+    },
+    {
+      "id": "runtime:a4fb9675049c2eaf",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: hover disabled groups"
+    },
+    {
+      "id": "runtime:8fb95afab51ab796",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: hover horizontal"
+    },
+    {
+      "id": "runtime:6064b40c9d340ca0",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: hover horizontal and vertical"
+    },
+    {
+      "id": "runtime:1b98065b9c197dcb",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: hover vertical"
+    },
+    {
+      "id": "runtime:1b42234d52b64436",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+      "fullName": "getCursorStyle basic cursor style support state: inactive should return null"
+    },
+    {
+      "id": "runtime:383525e68f388544",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateAvailableGroupSize.test.ts",
+      "fullName": "calculateAvailableGroupSize panel widths"
+    },
+    {
+      "id": "runtime:dcc66a2784d91b59",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateAvailableGroupSize.test.ts",
+      "fullName": "calculateAvailableGroupSize panel widths, excluding flex padding, gap, or margins"
+    },
+    {
+      "id": "runtime:c4934ab60f85fa32",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateAvailableGroupSize.test.ts",
+      "fullName": "calculateAvailableGroupSize panel widths, excluding other DOM elements"
+    },
+    {
+      "id": "runtime:377e9b15dbba8694",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateAvailableGroupSize.test.ts",
+      "fullName": "calculateAvailableGroupSize panel widths, excluding separators"
+    },
+    {
+      "id": "runtime:b6f77f7df1dd572d",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions CSS styles (e.g. padding and flex gap)"
+    },
+    {
+      "id": "runtime:f5269fa9c332fc84",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions empty panels"
+    },
+    {
+      "id": "runtime:6edee08804811d22",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions mixed panels and non-panel children"
+    },
+    {
+      "id": "runtime:6ca0aeb05fd5e498",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions one panel"
+    },
+    {
+      "id": "runtime:19ee0cf8d37afbb1",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions out of order children (e.g. dynamic rendering)"
+    },
+    {
+      "id": "runtime:e68ae337677b67fa",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions panels and explicit separators"
+    },
+    {
+      "id": "runtime:5207e592b7e366f9",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions panels and some explicit separators"
+    },
+    {
+      "id": "runtime:fb8a54ce297f22a3",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions should disable a hit region if the separator is disabled"
+    },
+    {
+      "id": "runtime:304aee83bdde720f",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions should disable all hit regions if there is one or fewer enabled panels"
+    },
+    {
+      "id": "runtime:695a1f78898a4a91",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions should disable panel boundaries if there are no resizable panels after the current boundary"
+    },
+    {
+      "id": "runtime:83a14c822a97adaa",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions should disable panel boundaries if there are no resizable panels before the current boundary"
+    },
+    {
+      "id": "runtime:1bf8924d0f9c4aa9",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions should not disable a hit region if one or both panels are disabled but there is an enabled separator"
+    },
+    {
+      "id": "runtime:808872881ad394bb",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions should sort elements and separators by offset"
+    },
+    {
+      "id": "runtime:de96ffdb5413830b",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions three panels"
+    },
+    {
+      "id": "runtime:e65008fa2a54c356",
+      "file": "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
+      "fullName": "calculateHitRegions two panels"
+    },
+    {
+      "id": "runtime:152d0796db50156b",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit explicit units % units"
+    },
+    {
+      "id": "runtime:e01694cdcee8bb1b",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit explicit units em units"
+    },
+    {
+      "id": "runtime:5fcb75e8cdc9f03c",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit explicit units px units"
+    },
+    {
+      "id": "runtime:65c54ec3254589b9",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit explicit units rem units"
+    },
+    {
+      "id": "runtime:27359c626da8f269",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit explicit units vh units"
+    },
+    {
+      "id": "runtime:1a72d42f47be6e4b",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit explicit units vw units"
+    },
+    {
+      "id": "runtime:7fea25cb58bb51af",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit implicit units % units"
+    },
+    {
+      "id": "runtime:a53d66e1ff899964",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/parseSizeAndUnit.test.ts",
+      "fullName": "parseSizeAndUnit implicit units px units"
+    },
+    {
+      "id": "runtime:85917f25d73ab2b5",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels explicit units % units"
+    },
+    {
+      "id": "runtime:c197eb708cc87061",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels explicit units em units"
+    },
+    {
+      "id": "runtime:5172a45b970cb6a3",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels explicit units px units"
+    },
+    {
+      "id": "runtime:aee18a7009aa4935",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels explicit units rem units"
+    },
+    {
+      "id": "runtime:7a66f25cf76b3edc",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels explicit units vh units"
+    },
+    {
+      "id": "runtime:3685b463da37e97e",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels explicit units vw units"
+    },
+    {
+      "id": "runtime:35fa6bd2b184e899",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels implicit units % units"
+    },
+    {
+      "id": "runtime:abf0087f4082a90e",
+      "file": "packages/resizable-panels/upstream/lib/global/styles/sizeStyleToPixels.test.ts",
+      "fullName": "sizeStyleToPixels implicit units px units"
+    },
+    {
+      "id": "runtime:c4166e826a68c6d4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:c4166e826a68c6d4:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:c4166e826a68c6d4:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:c4166e826a68c6d4:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:c4166e826a68c6d4:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:c4166e826a68c6d4:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:c4166e826a68c6d4:7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:c4166e826a68c6d4:8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:c4166e826a68c6d4:9",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3,4]"
+    },
+    {
+      "id": "runtime:4d0f399e6f95d79e",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:4d0f399e6f95d79e:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:4d0f399e6f95d79e:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:4d0f399e6f95d79e:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:4d0f399e6f95d79e:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:4d0f399e6f95d79e:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:4d0f399e6f95d79e:7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:4d0f399e6f95d79e:8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:4d0f399e6f95d79e:9",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2,3]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:9",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:10",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:11",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:12",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:13",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:14",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:759e70d480e8253e:15",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1++,2]"
+    },
+    {
+      "id": "runtime:6fad5c6453110c9e",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:6fad5c6453110c9e:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:6fad5c6453110c9e:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:6fad5c6453110c9e:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:6fad5c6453110c9e:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:6fad5c6453110c9e:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:6fad5c6453110c9e:7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:6fad5c6453110c9e:8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3,4]"
+    },
+    {
+      "id": "runtime:dd378c88e46ddff0",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:dd378c88e46ddff0:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:dd378c88e46ddff0:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:dd378c88e46ddff0:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:dd378c88e46ddff0:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:dd378c88e46ddff0:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:dd378c88e46ddff0:7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:dd378c88e46ddff0:8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2++,3]"
+    },
+    {
+      "id": "runtime:4f3428a7983f9b55",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3++,4]"
+    },
+    {
+      "id": "runtime:4f3428a7983f9b55:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3++,4]"
+    },
+    {
+      "id": "runtime:4f3428a7983f9b55:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3++,4]"
+    },
+    {
+      "id": "runtime:4f3428a7983f9b55:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3++,4]"
+    },
+    {
+      "id": "runtime:4f3428a7983f9b55:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3++,4]"
+    },
+    {
+      "id": "runtime:4f3428a7983f9b55:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3++,4]"
+    },
+    {
+      "id": "runtime:a24728e5e1a8bba2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:a24728e5e1a8bba2:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:a24728e5e1a8bba2:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:a24728e5e1a8bba2:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:a24728e5e1a8bba2:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:a24728e5e1a8bba2:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:a24728e5e1a8bba2:7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:a24728e5e1a8bba2:8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2,3--,4]"
+    },
+    {
+      "id": "runtime:443a20f226113079",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:443a20f226113079:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:443a20f226113079:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:443a20f226113079:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:443a20f226113079:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:443a20f226113079:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:443a20f226113079:7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:443a20f226113079:8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3,4]"
+    },
+    {
+      "id": "runtime:f8846e4c2eea9894",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:f8846e4c2eea9894:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:f8846e4c2eea9894:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:f8846e4c2eea9894:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:f8846e4c2eea9894:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:f8846e4c2eea9894:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:f8846e4c2eea9894:7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1,2--,3]"
+    },
+    {
+      "id": "runtime:52b9b5e3f629e16d",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:52b9b5e3f629e16d:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:52b9b5e3f629e16d:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:52b9b5e3f629e16d:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:52b9b5e3f629e16d:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:52b9b5e3f629e16d:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:52b9b5e3f629e16d:7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:52b9b5e3f629e16d:8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:52b9b5e3f629e16d:9",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3,4]"
+    },
+    {
+      "id": "runtime:1c0867a9f3b34745",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:1c0867a9f3b34745:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:1c0867a9f3b34745:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:1c0867a9f3b34745:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:1c0867a9f3b34745:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:1c0867a9f3b34745:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:1c0867a9f3b34745:7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:1c0867a9f3b34745:8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:1c0867a9f3b34745:9",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2,3]"
+    },
+    {
+      "id": "runtime:ec8c8977773bb7d5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:ec8c8977773bb7d5:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:ec8c8977773bb7d5:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:ec8c8977773bb7d5:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:ec8c8977773bb7d5:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:ec8c8977773bb7d5:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:ec8c8977773bb7d5:7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:ec8c8977773bb7d5:8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta [1--,2]"
+    },
+    {
+      "id": "runtime:15dec0747a939588",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds 3-panel layouts edge case discussions/643"
+    },
+    {
+      "id": "runtime:decb6be1e557ca4b",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds 3-panel layouts edge case issues/639"
+    },
+    {
+      "id": "runtime:10ed900eaddbe67a",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds 3-panel layouts edge case issues/650"
+    },
+    {
+      "id": "runtime:14ceacd9b2ab4ea9",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds 3-panel layouts expand left when there are multiple panels"
+    },
+    {
+      "id": "runtime:f18d9e85ca4bd1a8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds 3-panel layouts expand right when there are multiple panels"
+    },
+    {
+      "id": "runtime:b980ddce20509d63",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 close if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:bfc67ee67fa30092",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 close if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:319f50ec89f15135",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 open if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:07c2a510550adb3b",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 re-open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:3775c20f3ba120ee",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 remain closed if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:39c96256ed0566a3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 remain closed if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:fefc1b03be1690ce",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 remain open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:6896752e9777704c",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:0 remain open if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:b352e7d33dde68ad",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 close if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:0b8ac37bd0f98aa4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 close if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:ef8e4dbcc73b8333",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 open if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:7498d488caf24697",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 re-open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:e21fe862d81385dd",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 remain closed if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:adba9d04f6e67ce5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 remain closed if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:14508f971d3a6c4b",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 remain open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:74e9dfcf8f294095",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds left panel with collapsedSize:5 remain open if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:9c6051de541e73bf",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 close if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:5ec8d0774ef405fa",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 close if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:5829b4c09e3acc15",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 open if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:81f0c9c44e04f77a",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 re-open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:648ce0018be9d637",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 remain closed if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:7d01cc0f3612528f",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 remain closed if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:3755645621c15c2a",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 remain open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:40a4f61975f79142",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:0 remain open if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:22fa5152e2cc3a1b",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 close if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:a08bfffc3ee70575",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 close if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:9aab4521943196ea",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 open if delta is greater than minimum threshold"
+    },
+    {
+      "id": "runtime:226c9fc894d6dda5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 re-open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:dd30f0d7dc43eb77",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 remain closed if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:c29131c678882edf",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 remain closed if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:ce31d1aa14810560",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 remain open if delta is less than minimum threshold"
+    },
+    {
+      "id": "runtime:b38f0eb130592575",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta collapsible panel thresholds right panel with collapsedSize:5 remain open if delta is more than minimum threshold"
+    },
+    {
+      "id": "runtime:39c3c0ab7bf8569e",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta disabled panels should be resizable via the imperative API"
+    },
+    {
+      "id": "runtime:3b40a29f6e972747",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta disabled panels should not be resizable if 1 of 3 panels are disabled"
+    },
+    {
+      "id": "runtime:866a1aa35cc32ece",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta disabled panels should not be resizable if 2 of 3 panels are disabled"
+    },
+    {
+      "id": "runtime:525776f6d9d26d1e",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta disabled panels should not be resizable in a 2 panel group"
+    },
+    {
+      "id": "runtime:3f3eef1c3fcfe74e",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta invalid layouts should ignore changes that violate max or min size constraints"
+    },
+    {
+      "id": "runtime:a60cd9866e874da4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta should (re)collapse an already-collapsed panel that's been expanded and (re)collapsed as part of a single drag"
+    },
+    {
+      "id": "runtime:2d25365b07f26d91",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/adjustLayoutByDelta.test.ts",
+      "fullName": "adjustLayoutByDelta should fallback to the previous layout if an intermediate layout is invalid"
+    },
+    {
+      "id": "runtime:3d114d9d18a66ae0",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/calculateDefaultLayout.test.ts",
+      "fullName": "calculateDefaultLayout explicit"
+    },
+    {
+      "id": "runtime:93f9e2aa3e21b243",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/calculateDefaultLayout.test.ts",
+      "fullName": "calculateDefaultLayout inferred"
+    },
+    {
+      "id": "runtime:069557232a75f4f9",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/calculateDefaultLayout.test.ts",
+      "fullName": "calculateDefaultLayout mix of explicit and inferred"
+    },
+    {
+      "id": "runtime:e8a84063802b6547",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/calculateSeparatorAriaValues.test.ts",
+      "fullName": "calculateSeparatorAriaValues should assign aria-controls if an explicit id was passed as a prop"
+    },
+    {
+      "id": "runtime:9205b2923f709de6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/calculateSeparatorAriaValues.test.ts",
+      "fullName": "calculateSeparatorAriaValues should calculate the correct min/max/now values for collapsible panels"
+    },
+    {
+      "id": "runtime:cdea53098efce653",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/calculateSeparatorAriaValues.test.ts",
+      "fullName": "calculateSeparatorAriaValues should consider other panel constraints when computing min/max values"
+    },
+    {
+      "id": "runtime:f907c5e74709ae9e",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: -50, -100 -> 1"
+    },
+    {
+      "id": "runtime:2f10e161b35d2fb4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: 0, -1 -> 1"
+    },
+    {
+      "id": "runtime:cb2e3f44aea2e21b",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: 0, 0 -> 0"
+    },
+    {
+      "id": "runtime:ffb95cd05f57b927",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: 0, 1 -> -1"
+    },
+    {
+      "id": "runtime:8278340c3a0748a0",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: 0, 25 -> -1"
+    },
+    {
+      "id": "runtime:7db4c1874e7d6de1",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: 50, 100 -> -1"
+    },
+    {
+      "id": "runtime:13c2ef5ce557ac41",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/compareLayoutNumbers.test.ts",
+      "fullName": "compareLayoutNumbers compare: 50, 25 -> 1"
+    },
+    {
+      "id": "runtime:955646372dae22c3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should handle empty rects"
+    },
+    {
+      "id": "runtime:36f7b204aa7f9fb4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support all negative coordinates"
+    },
+    {
+      "id": "runtime:db6d16ea8a7eceaf",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support fully overlapping rects"
+    },
+    {
+      "id": "runtime:75eeb804b4fa2038",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: -100 }"
+    },
+    {
+      "id": "runtime:a754da0abc77c791",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: -100, y: -100 }"
+    },
+    {
+      "id": "runtime:e0a182db797d6c43",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: -25 }"
+    },
+    {
+      "id": "runtime:0469fbac93b0d79b",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: -25, y: -25 }"
+    },
+    {
+      "id": "runtime:37002a6612c9a0f9",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: 100 }"
+    },
+    {
+      "id": "runtime:a7ee88733e55afa0",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: 100, y: 100 }"
+    },
+    {
+      "id": "runtime:747aa40af6a1409b",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: 75 }"
+    },
+    {
+      "id": "runtime:05daef8ce53a87c3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { x: 75, y: 75 }"
+    },
+    {
+      "id": "runtime:269909f61daa4ef5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { y: -100 }"
+    },
+    {
+      "id": "runtime:fa10067489f5f44e",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { y: -25 }"
+    },
+    {
+      "id": "runtime:70e01e6d0bb0415e",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { y: 100 }"
+    },
+    {
+      "id": "runtime:42a639c3ecf36bd9",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support non-overlapping rects: { y: 75 }"
+    },
+    {
+      "id": "runtime:4db0fa686d711671",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support partially overlapping rects: { x: +0 }"
+    },
+    {
+      "id": "runtime:0c795ecdc9d1faf4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/doRectsIntersect.test.ts",
+      "fullName": "doRectsIntersect should support partially overlapping rects: { y: +0 }"
+    },
+    {
+      "id": "runtime:b93061ecc9753eca",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/findMatchingHitRegions.test.ts",
+      "fullName": "findMatchingHitRegions empty groups"
+    },
+    {
+      "id": "runtime:3447ecb06dfb2d80",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/findMatchingHitRegions.test.ts",
+      "fullName": "findMatchingHitRegions group with no separator"
+    },
+    {
+      "id": "runtime:17570eba02f0f5b6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/findMatchingHitRegions.test.ts",
+      "fullName": "findMatchingHitRegions group with separator"
+    },
+    {
+      "id": "runtime:f4cbe3d75cbc542b",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/findMatchingHitRegions.test.ts",
+      "fullName": "findMatchingHitRegions nested groups"
+    },
+    {
+      "id": "runtime:0f5e7ad5838972f1",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/findMatchingHitRegions.test.ts",
+      "fullName": "findMatchingHitRegions should skip disabled groups"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:3",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:9",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:10",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:11",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:12",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:13",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:ebfb0a0f17c93341:14",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/formatLayoutNumber.test.ts",
+      "fullName": "formatLayoutNumber format: 0 -> 0"
+    },
+    {
+      "id": "runtime:72f3be7e8e945c6c",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getDistanceBetweenPointAndRect.test.ts",
+      "fullName": "getDistanceBetweenPointAndRect should report the distance between the nearest border and an external point"
+    },
+    {
+      "id": "runtime:d98623aa92b36fb9",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getDistanceBetweenPointAndRect.test.ts",
+      "fullName": "getDistanceBetweenPointAndRect should report the distance between the nearest border and an external point alt"
+    },
+    {
+      "id": "runtime:4bf5bdb839b0009b",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getDistanceBetweenPointAndRect.test.ts",
+      "fullName": "getDistanceBetweenPointAndRect should report the distance between the nearest border and an internal point"
+    },
+    {
+      "id": "runtime:8862d48622a8a6d8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods getLayout returns the current group layout"
+    },
+    {
+      "id": "runtime:835f1668ee6b9c96",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods getLayout throws if group not mounted"
+    },
+    {
+      "id": "runtime:e7cb101ab9d56c63",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods setLayout allows disabled panels to be resized"
+    },
+    {
+      "id": "runtime:a0086cbb7442eeb6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods setLayout ignores a no-op layout update"
+    },
+    {
+      "id": "runtime:5705043637dfa8cf",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods setLayout ignores an invalid layout update"
+    },
+    {
+      "id": "runtime:94be7ee56e369fef",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods setLayout throws if group not mounted"
+    },
+    {
+      "id": "runtime:5f4ce5bd3cd472f8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativeGroupMethods.test.ts",
+      "fullName": "getImperativeGroupMethods setLayout validates and updates the group layout"
+    },
+    {
+      "id": "runtime:b695e9afd0fa65b7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods method 'collapse': throws if group or panel not mounted"
+    },
+    {
+      "id": "runtime:d6b8f522d00336e7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods method 'expand': throws if group or panel not mounted"
+    },
+    {
+      "id": "runtime:83ae0061106f8630",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods method 'getSize': throws if group or panel not mounted"
+    },
+    {
+      "id": "runtime:535c92b63ff3f8e1",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods method 'isCollapsed': throws if group or panel not mounted"
+    },
+    {
+      "id": "runtime:e6013839da469ee7",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods method 'resize': throws if group or panel not mounted"
+    },
+    {
+      "id": "runtime:0838cec490964cb0",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted collapse allows disabled panel to be collapsed"
+    },
+    {
+      "id": "runtime:e9e7e21d8bf0c900",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted collapse does nothing if panel is already collapsed"
+    },
+    {
+      "id": "runtime:c6965411ba3dfa52",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted collapse does nothing if panel is not collapsible"
+    },
+    {
+      "id": "runtime:5022da156576ae6b",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted collapse resizes panel to collapsed size"
+    },
+    {
+      "id": "runtime:76d3dedf0f7d280b",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted expand allows disabled panel to be expanded"
+    },
+    {
+      "id": "runtime:64e4d74088e0b09f",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted expand does nothing if panel is not collapsed"
+    },
+    {
+      "id": "runtime:c45d343135ca9808",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted expand does nothing if panel is not collapsible"
+    },
+    {
+      "id": "runtime:d4ebeaecc4a59116",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted expand edge case: expands panel to a non-zero size if minSize is 0"
+    },
+    {
+      "id": "runtime:8e885ceebc70aef9",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted expand expands panel to the minimum size as a fallback"
+    },
+    {
+      "id": "runtime:362d01ac582d4813",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted expand expands the panel to the previous pre-collapse size"
+    },
+    {
+      "id": "runtime:8784cefbb27c7a29",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted getSize returns the current panel size"
+    },
+    {
+      "id": "runtime:1693eefa28ee78c1",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted isCollapsed returns false if collapsible and expanded"
+    },
+    {
+      "id": "runtime:2a15c5679950bf07",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted isCollapsed returns false if not collapsible"
+    },
+    {
+      "id": "runtime:19f83b207c0fbe01",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted isCollapsed returns true if collapsible and collapsed"
+    },
+    {
+      "id": "runtime:15b06272506bfdab",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize allows disabled panel to be resized"
+    },
+    {
+      "id": "runtime:0a36c7ab7ac1a790",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize edge cases does not throw when resizing the only panel in the group"
+    },
+    {
+      "id": "runtime:6b3fafea634c6e93",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize edge cases last panel can still be resized normally when preceding panels are not all collapsed"
+    },
+    {
+      "id": "runtime:fe33368f8b2c9ec0",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize edge cases last panel keeps the remainder when all preceding panels are collapsed and it is resized smaller"
+    },
+    {
+      "id": "runtime:68fe28bba52a82b0",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize ignores a no-op size update"
+    },
+    {
+      "id": "runtime:603ca992cd31bd89",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize ignores an invalid size update"
+    },
+    {
+      "id": "runtime:78067fb7e1efd08a",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize units accepts percentage units"
+    },
+    {
+      "id": "runtime:04a63849f0866910",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize units accepts pixel units"
+    },
+    {
+      "id": "runtime:49c56cc197e5332f",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize units accepts rem units"
+    },
+    {
+      "id": "runtime:75717566064d8d68",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize units accepts viewport units"
+    },
+    {
+      "id": "runtime:a2432551eab166c6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/getImperativePanelMethods.test.ts",
+      "fullName": "getImperativePanelMethods mounted resize validates and updates the panel size"
+    },
+    {
+      "id": "runtime:6cf29857e81f7e70",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: -1, -1 -> true"
+    },
+    {
+      "id": "runtime:220eca7541975f0d",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: -1, 1 -> false"
+    },
+    {
+      "id": "runtime:f174dce38810b582",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: 0, -1 -> false"
+    },
+    {
+      "id": "runtime:3a42a89559919ccd",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: 0, 0 -> true"
+    },
+    {
+      "id": "runtime:bb50725c8f020862",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: 0, 1 -> false"
+    },
+    {
+      "id": "runtime:8359a152318a8230",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: 1, -1 -> false"
+    },
+    {
+      "id": "runtime:2812dd47faaba20b",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutNumbersEqual.test.ts",
+      "fullName": "layoutNumbersEqual compare: 1, 1 -> true"
+    },
+    {
+      "id": "runtime:361b4ab739eb5cdd",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { a: 25, b: 75 }, { a: 25, b: 75 } -> true"
+    },
+    {
+      "id": "runtime:ed3cd6ad71492522",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { a: 25, b: 75 }, { a: 75, b: 25 } -> false"
+    },
+    {
+      "id": "runtime:883a05632e615ada",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { a: 25, b: 75 }, { d: 25, e: 75 } -> false"
+    },
+    {
+      "id": "runtime:d58deb8c6830186a",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { a: 25, b: 75 }, {} -> false"
+    },
+    {
+      "id": "runtime:ed14944820ce95c4",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { a: 75, b: 25 }, { a: 25, b: 75 } -> false"
+    },
+    {
+      "id": "runtime:39d4b87e431a8217",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { a: 75, b: 25 }, { a: 75, b: 25 } -> true"
+    },
+    {
+      "id": "runtime:46bd678120ba48cc",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: { d: 25, e: 75 }, { a: 25, b: 75 } -> false"
+    },
+    {
+      "id": "runtime:df74d3ad0a9c2779",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: {}, { a: 25, b: 75 } -> false"
+    },
+    {
+      "id": "runtime:55a8d8951f322137",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/layoutsEqual.test.ts",
+      "fullName": "layoutsEqual layoutsEqual: {}, {} -> true"
+    },
+    {
+      "id": "runtime:236474af25aa3f41",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 25, b: 75 }, { a: 25, b: 75 } -> true"
+    },
+    {
+      "id": "runtime:e913d39f7f52b7c6",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 25, b: 75 }, { a: 75 } -> false"
+    },
+    {
+      "id": "runtime:1b324e0c85aa11f1",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 25, b: 75 }, { a: 75, b: 25 } -> false"
+    },
+    {
+      "id": "runtime:f30e6241f0ac8ce1",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 25, b: 75 }, {} -> false"
+    },
+    {
+      "id": "runtime:cd787258fd7f42d5",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 75 }, { a: 25, b: 75 } -> false"
+    },
+    {
+      "id": "runtime:e65da27628f87053",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 75, b: 25 }, { a: 25, b: 75 } -> false"
+    },
+    {
+      "id": "runtime:a42220a4b3c4006e",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: { a: 75, b: 25 }, { a: 75, b: 25 } -> true"
+    },
+    {
+      "id": "runtime:cdf79b3d9cad5383",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: {}, { a: 25, b: 75 } -> false"
+    },
+    {
+      "id": "runtime:c0714ccb9060fac8",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/objectsEqual.test.ts",
+      "fullName": "objectsEqual objectsEqual: {}, {} -> true"
+    },
+    {
+      "id": "runtime:df43e773867f4a4a",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout collapsible panels should collapse a panel once it drops below the halfway point between collapsed and minimum percentage sizes"
+    },
+    {
+      "id": "runtime:3f5db501a0d45540",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout collapsible panels should not collapse a panel that's at or above the minimum size"
+    },
+    {
+      "id": "runtime:f8ba51bbae79c385",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout maximum size constraints should account for multiple panels with maximum size constraints"
+    },
+    {
+      "id": "runtime:ff59c77aef836110",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout maximum size constraints should adjust the layout to account for maximum percentage sizes"
+    },
+    {
+      "id": "runtime:cb17bed4bbba81ed",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout minimum size constraints should account for multiple panels with minimum size constraints"
+    },
+    {
+      "id": "runtime:a18c8d36115d6a1d",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout minimum size constraints should adjust the layout to account for minimum percentage sizes"
+    },
+    {
+      "id": "runtime:e15545e510664c7a",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout should accept requested layout if there are no constraints provided"
+    },
+    {
+      "id": "runtime:c96b98eb2347d2b2",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout should normalize layouts that do not total 100%"
+    },
+    {
+      "id": "runtime:d8b90d3c86e450b0",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/validatePanelGroupLayout.test.ts",
+      "fullName": "validatePanelGroupLayout should reject layouts that do not match the number of panels"
+    },
+    {
+      "id": "runtime:c00f7022c03bde3b",
+      "file": "packages/resizable-panels/upstream/lib/hooks/useId.test.ts",
+      "fullName": "useId should fallback ot React useId"
+    },
+    {
+      "id": "runtime:fb41f2eb4f117b56",
+      "file": "packages/resizable-panels/upstream/lib/hooks/useId.test.ts",
+      "fullName": "useId should prefer explicit id"
+    },
+    {
+      "id": "runtime:a8891d6f6bf786ab",
+      "file": "packages/resizable-panels/upstream/lib/hooks/useMergedRefs.test.tsx",
+      "fullName": "useMergedRefs should gracefully ignore undefined refs"
+    },
+    {
+      "id": "runtime:f7ba14d70a4681dc",
+      "file": "packages/resizable-panels/upstream/lib/hooks/useMergedRefs.test.tsx",
+      "fullName": "useMergedRefs should support ref objects and callback refs"
+    },
+    {
+      "id": "runtime:d09a08b2f21ed51b",
+      "file": "packages/resizable-panels/upstream/lib/hooks/useStableCallback.test.tsx",
+      "fullName": "useStableCallback should call the callback when the event is triggered"
+    },
+    {
+      "id": "runtime:4ae95adf7d9e641e",
+      "file": "packages/resizable-panels/upstream/lib/hooks/useStableCallback.test.tsx",
+      "fullName": "useStableCallback should not execute the callback"
+    },
+    {
+      "id": "runtime:c223c35228eef933",
+      "file": "packages/resizable-panels/upstream/lib/utils/isArrayEqual.test.ts",
+      "fullName": "isArrayEqual should work"
+    },
+    {
+      "id": "runtime:75ec4e643a5bf2ad",
+      "file": "packages/resizable-panels/upstream/lib/utils/parseNumericStyleValue.test.ts",
+      "fullName": "parseNumericStyleValue should handle undefined styles"
+    },
+    {
+      "id": "runtime:f7b66bb8c05471f2",
+      "file": "packages/resizable-panels/upstream/lib/utils/parseNumericStyleValue.test.ts",
+      "fullName": "parseNumericStyleValue should ignore string percentage styles"
+    },
+    {
+      "id": "runtime:ad0dedb350fbbd79",
+      "file": "packages/resizable-panels/upstream/lib/utils/parseNumericStyleValue.test.ts",
+      "fullName": "parseNumericStyleValue should ignore string relative styles"
+    },
+    {
+      "id": "runtime:921fb345f0d582c7",
+      "file": "packages/resizable-panels/upstream/lib/utils/parseNumericStyleValue.test.ts",
+      "fullName": "parseNumericStyleValue should parse string pixels styles"
+    },
+    {
+      "id": "runtime:bc2fe6a601279ff6",
+      "file": "packages/resizable-panels/upstream/lib/utils/parseNumericStyleValue.test.ts",
+      "fullName": "parseNumericStyleValue should return numeric styles"
+    }
+  ],
+  "snapshots": 0
+}

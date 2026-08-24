@@ -1,5 +1,77 @@
 # @octanejs/remix-router
 
+## 0.1.42
+
+### Patch Changes
+
+- Updated dependencies [7e96f71]
+- Updated dependencies [d7226ff]
+  - octane@0.1.46
+
+## 0.1.41
+
+### Patch Changes
+
+- 6927595: Fix strict browser TypeScript consumption of source-published chart bindings.
+
+  Recharts now publishes authored TypeScript for its chart utilities and state,
+  resolves component imports explicitly, and exports the component implementations'
+  own prop types. Visx supports strict browser source checks without Node globals.
+  Remix Router's published declarations retain native anchor and form ref types.
+  Redux Toolkit's query hooks type their bundler environment without Node globals.
+
+  Fix deferred native chart events, keep imperative and Cell refs off unrelated
+  hosts, and resolve missing radial geometry without dropping data rows.
+
+  Octane accepts optional refs in composed ref arrays and supports nested ref arrays
+  in `useImperativeHandle`, including callback cleanup and primitive handles. Require
+  the published TSRX compiler fix for ref-and-spread expressions rather than relying
+  on a workspace-only patch.
+
+  Publish the Volar compiler with its tested parser/printer dependencies and checked
+  public declarations, preventing newer transitive printers from corrupting typed
+  tuple parameters in installed consumers. Preserve generic Pie props and the
+  native group targets of polar-axis events.
+
+- Updated dependencies [5b1e6a3]
+- Updated dependencies [31abee5]
+- Updated dependencies [fd6ce69]
+- Updated dependencies [5f7a457]
+- Updated dependencies [5227d7b]
+- Updated dependencies [6927595]
+- Updated dependencies [f1a7802]
+  - octane@0.1.45
+
+## 0.1.40
+
+### Patch Changes
+
+- 7535acd: Deduplicate binding hook sub-slot derivation behind Octane's shared helper while preserving each binding's slotless and symbol-identity behavior.
+- Updated dependencies [9b06e47]
+- Updated dependencies [7535acd]
+  - octane@0.1.44
+
+## 0.1.39
+
+### Patch Changes
+
+- Updated dependencies [4b590bd]
+- Updated dependencies [c0ff085]
+- Updated dependencies [6a68a7d]
+- Updated dependencies [6b97f85]
+  - octane@0.1.43
+
+## 0.1.38
+
+### Patch Changes
+
+- Updated dependencies [1581e1b]
+- Updated dependencies [afa3722]
+- Updated dependencies [231e248]
+- Updated dependencies [2f9b301]
+- Updated dependencies [939c64d]
+  - octane@0.1.42
+
 ## 0.1.37
 
 ### Patch Changes

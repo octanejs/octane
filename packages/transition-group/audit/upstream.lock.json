@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-transition-group",
+    "version": "4.4.5",
+    "repository": {
+      "owner": "reactjs",
+      "repo": "react-transition-group",
+      "subdirectory": null
+    },
+    "commit": "4cb51a9be0ebf508cb8f6506452097f7ebb874fe",
+    "integrity": "sha512-pZcd1MCJoiKiBR2NRxeCRg13uCXbydPnmB4EOeRrY7480qNWO8IIgQG6zlDkm6uRMsURXPuKq0GWtiM59a5Q6g=="
+  },
+  "license": {
+    "spdx": "BSD-3-Clause",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "b9adc17ad75a847d8743be2843935f0842a0ea4f45e7b0c7e17ed0be98614b9b"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["src", "test"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "src/config.js",
+      "gitBlob": "fb43f3d89bc62aa0e0c87b3ae584df9797ee01c6",
+      "size": 39
+    },
+    {
+      "path": "src/CSSTransition.js",
+      "gitBlob": "5764b372e77a19693bf9ba1e0ce1f5560ce22ece",
+      "size": 11646
+    },
+    {
+      "path": "src/index.js",
+      "gitBlob": "4e7160c71b111c2d88cc540c9069541782bd40aa",
+      "size": 358
+    },
+    {
+      "path": "src/ReplaceTransition.js",
+      "gitBlob": "7c0b90929fd6e06ebbecfb88f5e0c2d12172c90e",
+      "size": 2466
+    },
+    {
+      "path": "src/SwitchTransition.js",
+      "gitBlob": "cb3a45b379b3d547e5bb3552f3069969444cab46",
+      "size": 5585
+    },
+    {
+      "path": "src/Transition.js",
+      "gitBlob": "f1fc78011d92b134870ffa960adf28b3a1da4e1d",
+      "size": 17648
+    },
+    {
+      "path": "src/TransitionGroup.js",
+      "gitBlob": "14783c0f02c59ebbbe13d5e0e87d6f18bfa7d694",
+      "size": 5428
+    },
+    {
+      "path": "src/TransitionGroupContext.js",
+      "gitBlob": "51b82c7da70d087dd4fad2ebedfa9e0fd20eac3b",
+      "size": 70
+    },
+    {
+      "path": "src/utils/ChildMapping.js",
+      "gitBlob": "cdd33a3e6e55e04e50bcb8a6e438efa7bb084931",
+      "size": 4666
+    },
+    {
+      "path": "src/utils/PropTypes.js",
+      "gitBlob": "5284b53a89c9707ebc4191279f43c939f6389fad",
+      "size": 890
+    },
+    {
+      "path": "src/utils/reflow.js",
+      "gitBlob": "f02dd2ab183c8f53d64d4169784bd98c8a3b1184",
+      "size": 53
+    },
+    {
+      "path": "src/utils/SimpleSet.js",
+      "gitBlob": "1617ecba1570908ececc5e9713884fa45397086a",
+      "size": 360
+    },
+    {
+      "path": "test/.eslintrc.yml",
+      "gitBlob": "3c0a3a9e1eeff39d1cb94879d125ea823602612d",
+      "size": 387
+    },
+    {
+      "path": "test/ChildMapping-test.js",
+      "gitBlob": "7afb2574f419731af4bcc089646babc64e2eea92",
+      "size": 2646
+    },
+    {
+      "path": "test/CSSTransition-test.js",
+      "gitBlob": "9ec4672ac4ca7083a316b9015b90670371f88975",
+      "size": 12370
+    },
+    {
+      "path": "test/CSSTransitionGroup-test.js",
+      "gitBlob": "3f37106ce5b8685bfb4ca4d6313f38f5ea270d86",
+      "size": 7917
+    },
+    {
+      "path": "test/setup.js",
+      "gitBlob": "85c00e4d841566b7715952c535d9a656cf2e5ca0",
+      "size": 83
+    },
+    {
+      "path": "test/setupAfterEnv.js",
+      "gitBlob": "aa245bf1aaf3b71fb1d2e5d654936c2f61d4cf74",
+      "size": 91
+    },
+    {
+      "path": "test/SSR-test.js",
+      "gitBlob": "629acacd2fbab14f4fd356759b0fd90daf14cb1e",
+      "size": 253
+    },
+    {
+      "path": "test/SwitchTransition-test.js",
+      "gitBlob": "9250a58624335db4edfa6d7b63555f2953ef5b6f",
+      "size": 4128
+    },
+    {
+      "path": "test/Transition-test.js",
+      "gitBlob": "e9124e14957b6db14fe880f55b77ad28842c4574",
+      "size": 14673
+    },
+    {
+      "path": "test/TransitionGroup-test.js",
+      "gitBlob": "da07db44dc1fd1bf7f7b1f6ca837a00259be2559",
+      "size": 3264
+    },
+    {
+      "path": "test/utils.js",
+      "gitBlob": "e42aae602c32e682329485a91ea45b0262c335d4",
+      "size": 348
+    }
+  ],
+  "fingerprint": "18f7c4dc0d13f5714e9c7bf0ac616de1efb4a8b4676092b65f00dcabd0592787"
+}

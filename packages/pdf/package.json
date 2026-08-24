@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/pdf",
-  "version": "0.0.7",
+  "version": "0.0.12",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -28,6 +28,7 @@
     "README.md",
     "UPSTREAM.md",
     "LICENSE",
+    "LICENSE.upstream",
     "THIRD_PARTY_NOTICES.md",
     "upstream-public-surface.json"
   ],

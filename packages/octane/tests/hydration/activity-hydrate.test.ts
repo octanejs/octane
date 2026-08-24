@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from 'octane/compiler';
-import { flushSync, hydrateRoot } from '../../src/index.js';
+import { act, flushSync, hydrateRoot } from '../../src/index.js';
 import { flushEffects } from '../_helpers.js';
 import * as ServerRT from 'octane/server';
 import {
@@ -176,9 +176,7 @@ describe('hydrateRoot — <Activity>', () => {
 		const pending = container.querySelector('#activity-resume-pending') as HTMLElement;
 		expect(container.querySelector('#activity-resumed-content')).toBeNull();
 		expect(pending.style.display).toBe('none');
-		resolve('client');
-		await Promise.resolve();
-		flushSync(() => {});
+		await act(() => resolve('client'));
 
 		const resumed = container.querySelector('#activity-resumed-content') as HTMLElement;
 		expect(resumed).not.toBe(serverContent);

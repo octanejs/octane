@@ -411,8 +411,9 @@ let inputStyleUsers = 0;
 
 function acquireInputStyles(nonce?: string): () => void {
 	if (ownedInputStyle && !ownedInputStyle.isConnected) {
+		// Forget the removed node so it can be reinstalled, but retain the count:
+		// mounted inputs still own their release callbacks.
 		ownedInputStyle = null;
-		inputStyleUsers = 0;
 	}
 	const existing = document.getElementById('input-otp-style');
 	if (existing && existing !== ownedInputStyle) return () => {};

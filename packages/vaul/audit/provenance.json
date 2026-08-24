@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "requiredFiles": [
+    "upstream/playwright.config.ts",
+    "upstream/test/package.json",
+    "upstream/test/next.config.js",
+    "upstream/test/tests/base.spec.ts",
+    "upstream/test/src/app/page.tsx",
+    "upstream/src/index.tsx",
+    "upstream/LICENSE.md"
+  ],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream/LICENSE.md"
+    }
+  ],
+  "filesInclude": [
+    {
+      "path": "upstream/LICENSE.md",
+      "includes": ["MIT License", "Copyright (c) 2023 Emil Kowalski"]
+    }
+  ]
+}

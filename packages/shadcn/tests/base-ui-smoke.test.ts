@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement, flushSync } from 'octane';
 import { flushEffects, mount } from '../../octane/tests/_helpers';
 import * as F from './_fixtures/base-ui-smoke.tsrx';
@@ -23,6 +23,23 @@ async function settle(): Promise<void> {
 		flushSync(() => {});
 		await new Promise((resolve) => setTimeout(resolve, 0));
 	}
+}
+
+function mockDesktopMatchMedia(): void {
+	// Sidebar's media-query effect runs during settle; jsdom has no matchMedia.
+	vi.stubGlobal(
+		'matchMedia',
+		vi.fn((media: string) => ({
+			matches: false,
+			media,
+			onchange: null,
+			addListener: () => {},
+			removeListener: () => {},
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			dispatchEvent: () => false,
+		})),
+	);
 }
 
 // Every Base UI family gets its own mount, STANDALONE — no Field.Root, no provider wrapper.
@@ -1482,6 +1499,11 @@ describe('@octanejs/shadcn — Base UI hover-card rewrites the state dialect', (
 });
 
 describe('@octanejs/shadcn — Base UI sidebar composes this base own families', () => {
+	beforeEach(mockDesktopMatchMedia);
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
 	it('mounts the provider tree and exposes its parts', async () => {
 		const m = mount(F.SidebarCase as never);
 		await settle();
@@ -1602,6 +1624,11 @@ describe('@octanejs/shadcn — Base UI tabs adapts the orientation dialect to th
 });
 
 describe('@octanejs/shadcn — the Base UI sidebar escape hatch is reachable', () => {
+	beforeEach(mockDesktopMatchMedia);
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
 	it('exports the variants the header sends consumers to', () => {
 		// This base drops `asChild` on SidebarMenuButton and documents this helper as the substitute.
 		// It was declared non-exported (faithful to the radix source, which does not need it because

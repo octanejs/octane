@@ -62,6 +62,9 @@ import {
 	UNIVERSAL_COMPILER_RUNTIME_IMPORTS,
 	UNIVERSAL_THREAD_RUNTIME_IMPORTS,
 } from './compile-universal.js';
+import { compileValdi, VALDI_COMPILER_RUNTIME_IMPORTS } from './compile-valdi.js';
+import { HOOK_NAMES } from './hook-names.js';
+export { HOOK_NAMES } from './hook-names.js';
 import {
 	expandDomRendererRegionsAst,
 	prepareRendererBoundaryRegions,
@@ -77,6 +80,7 @@ import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { assertStrongMode } from './strong-mode.js';
 import { createTextTypeFactsLookup } from './text-type-facts.js';
+import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
@@ -381,9 +385,8 @@ function attrLoweringToken(node, bind) {
 /**
  * The runtime helper an attribute binding lowers to, or `null` for a binding
  * that is not one attribute's write (children, refs, spreads, the commit-phase
- * source collectors). Single source of truth for the import the binding needs
- * and for the token `registerAttrLoweringOrigin` claims; the mount/update cases
- * call exactly these.
+ * source collectors). Mount writes call this helper directly; guarded scalar
+ * updates use the comparison wrapper selected by attrBindingUpdateHelper.
  */
 function attrBindingHelper(bind) {
 	const controlled = CONTROLLED_KIND_HELPERS[bind.kind];
@@ -409,6 +412,28 @@ function attrBindingHelper(bind) {
 			return bind.ns && bind.ns !== 'html' ? 'setClassAttr' : 'setClassName';
 		default:
 			return null;
+	}
+}
+
+// Shared scalar comparisons retain the ordinary writer's semantics without
+// repeating the guard and previous-value publication in every component.
+// Certified repeated host rows select the ordinary writer and emit an inline
+// guard instead, avoiding a call and cache publication on unchanged rows.
+// Fresh classes deliberately remain unguarded; controlled form properties
+// likewise must reassert the live DOM value on every render.
+function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
+	const helper = attrBindingHelper(bind);
+	if (inlineBindingGuards) return helper;
+	switch (bind.kind) {
+		case 'attr':
+		case 'stringData':
+		case 'booleanAttr':
+		case 'ariaAttr':
+			return `${helper}IfChanged`;
+		case 'class':
+			return bind.fresh ? helper : `${helper}IfChanged`;
+		default:
+			return helper;
 	}
 }
 
@@ -1095,6 +1120,14 @@ const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'replaceRef',
 	'queueOwnRefDetach',
+	'setAttributeIfChanged',
+	'setStringDataIfChanged',
+	'setBooleanAttributeIfChanged',
+	'setAriaAttributeIfChanged',
+	'setClassNameIfChanged',
+	'setClassAttrIfChanged',
+	'textHoleUpdate',
+	'childTextHoleUpdate',
 	...HOOK_MEMO_RUNTIME_HELPERS,
 ]);
 const INTERNAL_SERVER_RUNTIME_HELPERS = new Set(['ssrSpreadContent']);
@@ -1471,13 +1504,16 @@ function lowerImportedErrorBoundaries(ast) {
 //     the component's boundary capability bit. componentSlot and ssrComponent
 //     read the same bit from the resolved component, so the two sides always
 //     agree without retaining the concrete builtins in the generic component
-//     path. Activity remains a compiler-lowered sentinel rather than a function.
+//     path. Generic Activity sites retain their symbol-aware boundary wrapper.
 // `bodyNodes` is the normalized, HeadHoist-filtered root list of a `@{ … }`
 // (JSXCodeBlock) body — callers gate on the body form.
 function inheritSoleCompRoot(bodyNodes, ctx) {
 	if (bodyNodes.length !== 1) return false;
 	const n = bodyNodes[0];
 	if (n.type !== 'Element' || !isComponentTag(n)) return false;
+	// Returned-JSX extraction can merge an authored key/spread config into one
+	// spread hole. Its descriptor still needs its own keyed reconciliation range.
+	if (n.openingElement?.metadata?.orderedComponentConfig === true) return false;
 	const id = n.openingElement?.name || n.id;
 	if (!id) return false;
 	if (
@@ -1880,28 +1916,6 @@ function classifyViewTransitionOwnership(astBody, production, ownComponents) {
 	}
 	return { global, owners };
 }
-
-export const HOOK_NAMES = new Set([
-	'useState',
-	'useLinkedState',
-	'useReducer',
-	'useEffect',
-	'useLayoutEffect',
-	'useInsertionEffect',
-	'useMemo',
-	'useCallback',
-	'useRef',
-	'useId',
-	'useEffectEvent',
-	'useImperativeHandle',
-	'useDeferredValue',
-	'useTransition',
-	'useSyncExternalStore',
-	// React 19 Actions bundle.
-	'useActionState',
-	'useFormStatus',
-	'useOptimistic',
-]);
 
 function hookRuntimeModulesForCompile(options, universalUnits = []) {
 	const modules = new Set(options?.__hookRuntimeModules || []);
@@ -7795,7 +7809,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, strong?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, dataCallbackHooks?: readonly string[], textTypeFacts?: { version: 1, filename: string, sourceVersion: string, projectVersion: string, stringChildRanges: readonly (readonly [number, number])[] }, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, strong?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, dataCallbackHooks?: readonly string[], valdiWriterFacts?: import('./compile-valdi.js').ValdiWriterFacts, textTypeFacts?: { version: 1, filename: string, sourceVersion: string, projectVersion: string, stringChildRanges: readonly (readonly [number, number])[] }, renderer?: { id: string, module: string, target: 'dom' | 'universal' | 'valdi', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal' | 'valdi', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -7806,13 +7820,17 @@ function instrumentProfileComponents(ast, ctx) {
  *   `import.meta.webpackHot` wiring with dispose-data wrapper handoff. Dev
  *   tooling should select its dialect in serve mode and leave HMR off for
  *   production builds.
- *   `mode` selects the codegen target: `'client'` (default) emits the
- *   template-clone DOM runtime; `'server'` emits HTML-string SSR output (static
+ *   `mode` selects client or server execution. The default client renderer
+ *   emits the template-clone DOM runtime; `renderer.target: 'valdi'` opts into
+ *   the experimental external writer adapter. `'server'` emits HTML-string SSR output (static
  *   chunks interleaved with `ssr*` helpers) carrying the hydration markers the
  *   client `hydrateRoot` adopts.
  *   `rendererBoundaries` and `rendererRegistry` are the normalized static
  *   boundary table and renderer registry. Pass them together when a client
  *   module may contain an explicitly renderer-owned component prop.
+ *   `valdiWriterFacts` supplies exact authored attribute-expression type proofs
+ *   for the Valdi target. That target uses ordinary keyed hook calls and does
+ *   not use the DOM-specific `autoMemo` or `inlineHookMemo` optimizations.
  * @returns {{ code: string, map: any, diagnostics: readonly unknown[] }}
  */
 function cleanCompileFilename(filename) {
@@ -7833,9 +7851,9 @@ export function compile(source, filename, options) {
 // always validates authored source and only exposes the hydrate slice that the
 // same compilation already prepared for production void-export classification.
 export function compileForBundler(source, filename, options) {
-	const metadata = { hydrateAst: null };
+	const metadata = { hydrateAst: null, cssModuleConstantImports: [] };
 	const result = compileAuthored(source, filename, options, metadata);
-	return { result, hydrateAst: metadata.hydrateAst };
+	return { result, ...metadata };
 }
 
 function compileAuthored(source, filename, options, bundlerMetadata) {
@@ -7855,11 +7873,23 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 		cleanFilename,
 		options?.textTypeFacts,
 	);
+	let constantAst = textTypedAst;
+	if (typeof options?.resolveCssModuleConstant === 'function') {
+		const constants = applyCssModuleConstants(
+			textTypedAst,
+			options.resolveCssModuleConstant,
+			options.preserveCssModuleReferences,
+		);
+		constantAst = constants.ast;
+		if (bundlerMetadata !== null) {
+			bundlerMetadata.cssModuleConstantImports = constants.imports;
+		}
+	}
 	return compileInternal(
 		source,
 		filename,
 		options,
-		textTypedAst,
+		constantAst,
 		mode,
 		bundlerMetadata,
 		textTypedAst !== analyzedAst,
@@ -7879,6 +7909,50 @@ function compileInternal(
 	const universalRuntime = normalizeUniversalRuntime(options?.universalRuntime);
 	if (!options?.__rendererBoundariesLowered) {
 		assertUniversalRuntimeTarget(universalRuntime, mode, options?.renderer);
+	}
+	if (options?.renderer?.target === 'valdi') {
+		const renderer = options.renderer;
+		if (mode !== 'client') {
+			throw new Error(
+				`Renderer ${JSON.stringify(renderer.id)} does not provide the serialization/hydration capability required by server compilation.`,
+			);
+		}
+		return compileValdi(
+			source,
+			filename,
+			renderer,
+			(loweredAst, abiGuard) =>
+				compileInternal(
+					source,
+					filename,
+					{
+						...options,
+						renderer: undefined,
+						universalRuntime: undefined,
+						rendererBoundaries: undefined,
+						rendererRegistry: undefined,
+						// The external writer ABI exposes ordinary keyed hook calls,
+						// not DOM-owned memo cells or component scopes.
+						inlineHookMemo: false,
+						autoMemo: false,
+						__hydratePrepared: true,
+						__rendererBoundariesLowered: true,
+						__valdiAbiGuard: abiGuard,
+						__hookRuntimeModules: [...(options.__hookRuntimeModules ?? []), renderer.module],
+						__runtimeImportRoutes: [
+							...(options.__runtimeImportRoutes ?? []),
+							{ module: renderer.module, imported: VALDI_COMPILER_RUNTIME_IMPORTS },
+						],
+						__nativeChangeDiagnostics: [],
+					},
+					loweredAst,
+					mode,
+					null,
+					hasStringChildProofs,
+				),
+			options,
+			analyzedAst,
+		);
 	}
 	if (!options?.__hydratePrepared) {
 		const cleanFilename = cleanCompileFilename(filename);
@@ -8305,6 +8379,7 @@ function compileInternal(
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
 		ctx.foreignImportLocals = imports.foreignLocals;
+		ctx.activityModuleAst = ast;
 	}
 	if (ctx.dev) {
 		for (const node of ast.body) {
@@ -8898,7 +8973,7 @@ function compileInternal(
 	// NODES — in exactly the historical statement order — and printed ONCE by
 	// esrap at the end, which also yields the entire module source map.
 	const bodyNodes = emitServerModuleClientStubs(serverModuleInfo, ctx);
-	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrDialect === 'webpack' };
+	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrEnabled };
 	for (let node of ast.body) {
 		if (
 			node === serverModuleInfo?.declaration ||
@@ -8928,7 +9003,7 @@ function compileInternal(
 				...compileReturnJsxFunction(node.declaration, ctx, {
 					export: true,
 					hmrWrap: hmrEnabled,
-					hmrMutable: hmrDialect === 'webpack',
+					hmrMutable: hmrEnabled,
 				}).nodes,
 			);
 			if (hmrEnabled) hmrComponents.push({ name: node.declaration.id.name, exportKind: 'named' });
@@ -8937,7 +9012,7 @@ function compileInternal(
 				...compileReturnJsxFunction(node.declaration, ctx, {
 					default: true,
 					hmrWrap: hmrEnabled,
-					hmrMutable: hmrDialect === 'webpack',
+					hmrMutable: hmrEnabled,
 				}).nodes,
 			);
 			if (hmrEnabled) hmrComponents.push({ name: node.declaration.id.name, exportKind: 'default' });
@@ -9058,12 +9133,10 @@ function compileInternal(
 	flushTailHookSymbols(ctx);
 	const helperNodes = hoistedHelperNodes(ctx);
 
-	// HMR plumbing — sits AFTER the component bodies so the wrappers can
-	// reference the `Comp` const that was just declared. Each exported
-	// component gets rewrapped (`Comp = hmr(Comp);`), default exports get
-	// re-exported afterwards (we already emitted the `export default Comp;`
-	// line earlier — re-exporting again would conflict, so the rewrap mutates
-	// the binding in place). Mirrors `tsrx-ripple`'s emit shape.
+	// Re-evaluated modules hand their fresh bodies to the canonical wrappers
+	// held by importers and mounted components, then re-export those wrappers.
+	// Vite replaces accept callbacks after each evaluation, so an evaluation-local
+	// callback cannot carry the mounted owners across consecutive updates.
 	const hmrNodes = [];
 	if (hmrComponents.length > 0) {
 		// `hmr` is already registered as a needed runtime symbol by the
@@ -9077,128 +9150,139 @@ function compileInternal(
 			property: b.id('meta'),
 			metadata: { path: [] },
 		});
-		if (hmrDialect === 'webpack') {
-			// Rspack/webpack re-evaluates the accepted module and exposes the previous
-			// module's dispose data to that NEW evaluation. Hand the fresh body to the
-			// previous canonical wrapper, then make the new ESM binding point back to
-			// it. Persist that canonical identity again for the next update. This keeps
-			// working across any number of edits; accept callbacks in webpack are error
-			// handlers, not Vite-style callbacks carrying the new module namespace.
-			// Keep every access after the recognized `import.meta.webpackHot` root on a
-			// local. Rspack's React/Rsbuild transform pipeline otherwise treats deeper
-			// expressions such as `import.meta.webpackHot.data` as unsupported even
-			// though it lowers the root itself to `module.hot`.
-			const webpackHotName = allocCompilerName(ctx, '_$webpackHot');
-			const webpackHot = () => b.id(webpackHotName);
+		// Rspack only lowers the recognized import.meta.webpackHot root reliably;
+		// Vite instead requires the literal import.meta.hot.accept call to discover
+		// self-accepting modules. Keep that distinction at the access root.
+		const webpackHotName = hmrDialect === 'webpack' ? allocCompilerName(ctx, '_$webpackHot') : null;
+		const hot = () =>
+			webpackHotName === null ? b.member(importMeta(), 'hot') : b.id(webpackHotName);
+		if (webpackHotName !== null) {
 			hmrNodes.push(
 				inheritOriginLoc(
 					b.const(webpackHotName, b.member(importMeta(), 'webpackHot')),
 					moduleOrigin,
 				),
 			);
-			const previousComponent = (name, optional) =>
-				b.member(
-					b.member(
-						b.member(webpackHot(), b.id('data')),
-						b.id('__octaneComponents'),
-						false,
-						optional,
+		}
+		const componentKey = (component) =>
+			component.exportKind === 'default' ? 'default' : component.name;
+		const componentStore = (optional = false) =>
+			b.member(b.member(hot(), 'data'), b.id('__octaneComponents'), false, optional);
+		const previousComponent = (component) =>
+			b.member(componentStore(), b.id(componentKey(component)));
+		const handoffs = hmrComponents.map((c) =>
+			b.if(
+				// Newly added exports may be named constructor or __proto__; inherited
+				// object members are not retained wrappers. Avoid a shadowable Object global.
+				b.logical(
+					'&&',
+					componentStore(true),
+					b.call(
+						b.member(b.member(b.object([]), 'hasOwnProperty'), 'call'),
+						componentStore(),
+						b.literal(componentKey(c)),
 					),
-					b.id(name),
-					false,
-					optional,
-				);
-			const handoffs = hmrComponents.map((c) =>
-				b.if(
-					previousComponent(c.name, true),
-					b.block([
-						b.if(
-							b.unary(
-								'!',
-								b.call(
-									b.member(
-										b.member(previousComponent(c.name, false), b.id('_$HMR'), true),
-										'update',
-									),
-									b.id(c.name),
-								),
+				),
+				b.block([
+					b.if(
+						b.unary(
+							'!',
+							b.call(
+								b.member(b.member(previousComponent(c), b.id('_$HMR'), true), 'update'),
+								b.id(c.name),
 							),
-							b.block([b.stmt(b.call(b.member(webpackHot(), 'invalidate')))]),
-							b.block([b.stmt(b.assignment('=', b.id(c.name), previousComponent(c.name, false)))]),
 						),
+						b.block([b.stmt(b.call(b.member(hot(), 'invalidate')))]),
+						b.block([b.stmt(b.assignment('=', b.id(c.name), previousComponent(c)))]),
+					),
+				]),
+				null,
+			),
+		);
+		const persist = b.stmt(
+			b.assignment(
+				'=',
+				b.member(
+					webpackHotName === null ? b.member(hot(), 'data') : b.id('data'),
+					'__octaneComponents',
+				),
+				b.object(
+					hmrComponents.map((c) => {
+						const key = componentKey(c);
+						// Expanding __proto__ shorthand downstream must not turn this data
+						// property into an object-literal prototype setter.
+						const computed = key === '__proto__';
+						return b.prop(
+							'init',
+							computed ? b.literal(key) : b.id(key),
+							b.id(c.name),
+							computed,
+							!computed && c.exportKind !== 'default',
+						);
+					}),
+				),
+			),
+		);
+		const hmrModuleName = webpackHotName === null ? allocCompilerName(ctx, '_$hmrModule') : null;
+		const accept = b.stmt(
+			b.call(
+				b.member(hot(), 'accept'),
+				...(webpackHotName === null
+					? [
+							b.arrow(
+								[b.id(hmrModuleName)],
+								b.block([
+									b.if(
+										b.logical(
+											'&&',
+											b.id(hmrModuleName),
+											hmrComponents
+												.map((c) =>
+													b.binary(
+														'!==',
+														b.member(b.id(hmrModuleName), componentKey(c)),
+														b.id(c.name),
+													),
+												)
+												.reduce((left, right) => b.logical('||', left, right)),
+										),
+										b.stmt(b.call(b.member(hot(), 'invalidate'))),
+									),
+								]),
+							),
+						]
+					: []),
+			),
+		);
+		// Vite's data object itself survives evaluations. Persist directly: Vite
+		// keeps only one dispose callback, which renderer/thread cleanup may own.
+		// Webpack creates the next data object through its dispose callback instead.
+		// Vite's callback only validates that the old export boundary survived;
+		// updating there too would remount the already-handed-off component twice.
+		// A host without persistent data can still load the module and invalidate
+		// on replacement, but cannot retain wrapper identity across evaluations.
+		hmrNodes.push(
+			inheritOriginLoc(
+				b.if(
+					hot(),
+					b.block([
+						...handoffs,
+						webpackHotName === null
+							? b.if(b.member(hot(), 'data'), b.block([persist]))
+							: b.stmt(
+									b.call(b.member(hot(), 'dispose'), b.arrow([b.id('data')], b.block([persist]))),
+								),
+						accept,
 					]),
 					null,
 				),
-			);
-			hmrNodes.push(
-				inheritOriginLoc(
-					b.if(
-						webpackHot(),
-						b.block([
-							...handoffs,
-							b.stmt(
-								b.call(
-									b.member(webpackHot(), 'dispose'),
-									b.arrow(
-										[b.id('data')],
-										b.block([
-											b.stmt(
-												b.assignment(
-													'=',
-													b.member(b.id('data'), '__octaneComponents'),
-													b.object(
-														hmrComponents.map((c) =>
-															b.prop('init', b.id(c.name), b.id(c.name), false, true),
-														),
-													),
-												),
-											),
-										]),
-									),
-								),
-							),
-							b.stmt(b.call(b.member(webpackHot(), 'accept'))),
-						]),
-						null,
-					),
-					moduleOrigin,
-				),
-			);
-		} else {
-			const hot = () => b.member(importMeta(), 'hot');
-			const updates = hmrComponents.map((c) => {
-				const accessor =
-					c.exportKind === 'default'
-						? b.member(b.id('module'), 'default')
-						: b.member(b.id('module'), c.name);
-				return b.if(
-					b.unary(
-						'!',
-						b.call(b.member(b.member(b.id(c.name), b.id('_$HMR'), true), 'update'), accessor),
-					),
-					b.stmt(b.call(b.member(hot(), 'invalidate'))),
-					null,
-				);
-			});
-			hmrNodes.push(
-				inheritOriginLoc(
-					b.if(
-						hot(),
-						b.block([
-							b.stmt(
-								b.call(b.member(hot(), 'accept'), b.arrow([b.id('module')], b.block(updates))),
-							),
-						]),
-						null,
-					),
-					moduleOrigin,
-				),
-			);
-		}
+				moduleOrigin,
+			),
+		);
 	}
 
 	// Profiling registrations intentionally run AFTER the HMR handoff block in
-	// the final output. On a webpack/Rspack update the local binding is reassigned
+	// the final output. On a hot update the local binding is reassigned
 	// to the previous canonical wrapper during that handoff; registering earlier
 	// would attach the fresh metadata to a short-lived replacement instead. The
 	// runtime helper records metadata without wrapping or replacing the function.
@@ -9280,6 +9364,17 @@ function compileInternal(
 		...hmrNodes,
 		...profileNodes,
 	];
+	if (options?.__valdiAbiGuard !== undefined) {
+		// Fail before even compiler-hoisted hook-slot allocation can call an
+		// incompatible external adapter. Keep imports first for downstream
+		// CommonJS transforms that lower imports at their statement positions.
+		const imports = [];
+		const statements = [];
+		for (const node of moduleBody) {
+			(node.type === 'ImportDeclaration' ? imports : statements).push(node);
+		}
+		moduleBody = [...imports, options.__valdiAbiGuard, ...statements];
+	}
 	if (ctx.inlineHookMemo && ctx.hasSlotMemoCandidates) {
 		moduleBody = lowerSlotMemoFunctions(moduleBody, {
 			allocateName: (preferred) => allocCompilerName(ctx, preferred),
@@ -9479,6 +9574,7 @@ function compileServer(
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
 		ctx.foreignImportLocals = imports.foreignLocals;
+		ctx.activityModuleAst = ast;
 	}
 	// M3 inherit-range exclusion set — must match the client compile's
 	// (see inheritSoleCompRoot; both modes read the same import declarations).
@@ -11433,7 +11529,11 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	// this context flag. Only this component's immediate children sub inherits the
 	// returned-fragment mode; control-flow arm subs intentionally reset it.
 	const returnedFragmentTemplate = ctx._returnedFragmentTemplate === true;
-	const compExpr = tagExprNode(node);
+	const activityDescriptor = isActivityLongForm(node, ctx);
+	const descriptorConfig = activityDescriptor || hasKeyedSpreadConfig(node);
+	const compExpr = activityDescriptor
+		? inheritOriginLoc(b.id(requireRuntimeForContext(ctx, 'Activity')), node)
+		: tagExprNode(node);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const propNodes = [];
 	let keyExpr = null;
@@ -11445,7 +11545,7 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const attrName = attr.name.name || attr.name;
 		const val = attr.value;
-		if (attrName === 'key') {
+		if (attrName === 'key' && !descriptorConfig) {
 			if (val != null) {
 				const inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
 				keyExpr = tsrxExprNode(inner, ctx, name, inlinedSubs);
@@ -11504,7 +11604,7 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		);
 	} else if (sourceChildren.length > 0) {
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
-		const opaqueChildren = !isActivityLongForm(node) && !isFragmentLongForm(node, ctx);
+		const opaqueChildren = !activityDescriptor && !isFragmentLongForm(node, ctx);
 		const descriptorChildren =
 			(tagBindingName(node) !== null &&
 				ctx.descriptorChildrenBindings?.has(tagBindingName(node))) ||
@@ -11574,6 +11674,26 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 				),
 			);
 		}
+	}
+	if (descriptorConfig) {
+		// The direct mode-only Activity was lowered to ActivityStatement. Richer
+		// Activity configs and generic explicit-key + spread sites keep one ordered
+		// element config, matching createElement without changing simple call sites.
+		ctx.runtimeNeeded.add('createElement');
+		ctx.runtimeNeeded.add('ssrChild');
+		const descriptor = ssrCall(
+			'createElement',
+			[compExpr, inheritOriginLoc(b.object(propNodes), node)],
+			node,
+		);
+		const child = ssrCall('ssrChild', [descriptor, b.id('__s')], node);
+		if (componentNs === null) return child;
+		ctx.runtimeNeeded.add('ssrInNamespace');
+		return ssrCall(
+			'ssrInNamespace',
+			[b.literal(componentNs, JSON.stringify(componentNs)), ssrThunk(child, node)],
+			node,
+		);
 	}
 	const explicitNamespace = componentNs !== null;
 	const helper = explicitNamespace ? 'ssrComponentNS' : 'ssrComponent';
@@ -13100,12 +13220,9 @@ function compileComponent(node, ctx, options) {
 				)
 			: warmedFn;
 
-	// HMR-wrap exported components inline so the binding stays a `const` (no
-	// reassignment dance needed in Vite). Webpack/Rspack HMR instead uses a `let`
-	// binding so a re-evaluated module can hand its export back to the previous
-	// canonical wrapper stored in hot dispose data. `hmr` returns a wrapper that
-	// delegates to whatever fn is currently committed, and
-	// `module.Foo[HMR].update(...)` swaps it on each accept.
+	// HMR exports use mutable, live bindings so a re-evaluated module can hand
+	// its fresh body to the previous canonical wrapper and re-export that same
+	// identity. Production components retain their tree-shakeable const binding.
 	let valueExpr = hmrWrap && isExported ? inheritOriginLoc(b.call('_$hmr', abiFn), node) : abiFn;
 	if (!hmrWrap && componentInfo?.singleRoot === true) {
 		valueExpr = inheritOriginLoc(singleRootInitializer(ctx, valueExpr), node);
@@ -13490,6 +13607,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			cssHash,
 			mountCallbackSinks,
 			options?.keyedSelection ?? null,
+			options?.inlineBindingGuards === true,
 		);
 	}
 	ctx.currentInvariantLocals = prevInvariantLocals;
@@ -16911,9 +17029,32 @@ function hasJsxSpreadAttribute(node) {
 	);
 }
 
-// Merge the complete Fragment config in authored order: object-spread getters,
-// explicit values, key expressions, and the final ref all evaluate exactly once.
-function fragmentSpreadRefExpression(node) {
+// An explicit key cannot be split from a spread config: whichever occurs last
+// wins, and all getters/expressions must run in source order. Extracted templates
+// retain the proof after the complete config becomes a single spread hole.
+function hasKeyedSpreadConfig(node) {
+	if (node.openingElement?.metadata?.orderedComponentConfig === true) return true;
+	const attributes = node.attributes || node.openingElement?.attributes || [];
+	if (attributes.length < 2) return false;
+	let key = false;
+	let spread = false;
+	for (const attribute of attributes) {
+		if (attribute.type === 'SpreadAttribute' || attribute.type === 'JSXSpreadAttribute') {
+			spread = true;
+		} else if (
+			(attribute.type === 'Attribute' || attribute.type === 'JSXAttribute') &&
+			jsxAttrRawName(attribute) === 'key'
+		) {
+			key = true;
+		}
+		if (key && spread) return true;
+	}
+	return false;
+}
+
+// Merge a complete JSX config in authored order. Boundary lowering must not
+// move spread getters after later explicit values or discard ignored props.
+function jsxAttributeConfigExpression(node) {
 	const properties = [];
 	for (const attr of node.attributes || node.openingElement?.attributes || []) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
@@ -16946,7 +17087,12 @@ function fragmentSpreadRefExpression(node) {
 			),
 		);
 	}
-	return inheritOriginLoc(b.member(inheritOriginLoc(b.object(properties), node), 'ref'), node);
+	return inheritOriginLoc(b.object(properties), node);
+}
+
+// Fragment only consumes ref, but every authored config expression still runs.
+function fragmentSpreadRefExpression(node) {
+	return inheritOriginLoc(b.member(jsxAttributeConfigExpression(node), 'ref'), node);
 }
 
 // Activity is always compiler-owned template syntax. Long-form Fragment only
@@ -16954,7 +17100,7 @@ function fragmentSpreadRefExpression(node) {
 // descendant that itself needs normalization. An ordinary/no-ref/keyed Fragment
 // remains a runtime descriptor so its explicit reconciliation boundary survives.
 function isLongFormTemplateSentinel(node, parentNs = 'html', allowHeadHoists = true, ctx = null) {
-	if (isActivityLongForm(node)) return true;
+	if (isActivityLongForm(node, ctx)) return true;
 	if (!isFragmentLongForm(node, ctx)) return false;
 	if (hasJsxAttribute(node, 'ref') || hasJsxSpreadAttribute(node)) return true;
 	return (node.children || []).some((child) =>
@@ -17045,7 +17191,7 @@ function requiresTemplateNormalization(
 	const childAllowsHeadHoists =
 		allowHeadHoists &&
 		tag !== 'noscript' &&
-		(!isComponentTag(node) || isActivityLongForm(node) || isFragmentLongForm(node, ctx));
+		(!isComponentTag(node) || isActivityLongForm(node, ctx) || isFragmentLongForm(node, ctx));
 	return (node.children || []).some((child) =>
 		requiresTemplateNormalization(child, childNs, childAllowsHeadHoists, ctx),
 	);
@@ -17162,6 +17308,11 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const newAttrs = [];
 	const mergedFragmentSpread = isFragmentLongForm(node, ctx) && hasJsxSpreadAttribute(node);
+	const mergedKeyedSpreadConfig =
+		!mergedFragmentSpread && isComponentTag(node) && hasKeyedSpreadConfig(node);
+	const mergedComponentConfig =
+		mergedKeyedSpreadConfig ||
+		(isActivityLongForm(node, ctx) && !isDirectActivityLongForm(node, ctx));
 	if (mergedFragmentSpread) {
 		// Hoisting each spread operand separately delays its getters until the
 		// renderer runs, after later attributes and child holes already evaluated.
@@ -17183,7 +17334,21 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 					),
 		);
 	}
-	for (const attr of mergedFragmentSpread ? [] : attrs) {
+	if (mergedComponentConfig) {
+		// Keep the WHOLE config together at returned-JSX sites. Capturing spread
+		// operands individually would defer their getters until the hoisted
+		// renderer, after subsequent attributes and child expressions had run.
+		const expression = jsxAttributeConfigExpression(node);
+		const hn = `h${holeProps.length}`;
+		holeProps.push(objectProp(hn, rewriteJsxValues(expression, ctx)));
+		newAttrs.push(
+			inheritOriginLoc(
+				b.jsx_spread_attribute(memberProps(hn, expression)),
+				node.openingElement || node,
+			),
+		);
+	}
+	for (const attr of mergedFragmentSpread || mergedComponentConfig ? [] : attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
 			// `{...expr}` — the spread expression is a DYNAMIC input too. Thread it out
 			// as an `hN` hole (exactly like an attribute value) so any prop/local it
@@ -17604,6 +17769,12 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 	// The emission normalizes from `openingElement.attributes`, so update it too.
 	if (node.openingElement) {
 		out.openingElement = { ...node.openingElement, attributes: newAttrs };
+		if (mergedKeyedSpreadConfig) {
+			out.openingElement.metadata = {
+				...node.openingElement.metadata,
+				orderedComponentConfig: true,
+			};
+		}
 	}
 	return out;
 }
@@ -17634,7 +17805,7 @@ function extractFragmentRoot(node, ctx, holeProps, parentNs = 'html') {
 	if (
 		(node.type === 'Element' || node.type === 'JSXElement') &&
 		isComponentTag(node) &&
-		!isActivityLongForm(node) &&
+		!isActivityLongForm(node, ctx) &&
 		!isFragmentLongForm(node, ctx)
 	) {
 		return extractFragmentComponent(node, ctx, holeProps, parentNs);
@@ -18497,15 +18668,18 @@ function autoMemoReturnedProviderChild(node, nameNode, ctx) {
 // component Element node. Recurses into prop values so nested JSX values lower too.
 function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 	const nameNode = node.openingElement?.name || node.id;
-	const componentTag = isComponentTag(node);
+	const activity = isActivityLongForm(node, ctx);
+	const componentTag = activity || isComponentTag(node);
 	// Host (lowercase) tag → string literal (`'li'`) for the de-opt renderer;
 	// component (capitalized / member / dynamic) → the identifier/member ref.
-	const compNode = componentTag
-		? jsxNameToExpr(nameNode)
-		: inheritOriginLoc(
-				b.literal(nameNode.name != null ? nameNode.name : String(nameNode)),
-				nameNode,
-			);
+	const compNode = activity
+		? inheritOriginLoc(b.id(requireRuntimeForContext(ctx, 'Activity')), nameNode)
+		: componentTag
+			? jsxNameToExpr(nameNode)
+			: inheritOriginLoc(
+					b.literal(nameNode.name != null ? nameNode.name : String(nameNode)),
+					nameNode,
+				);
 	if (!componentTag) {
 		rejectVoidElementContent(compNode.value, node, ctx);
 		rejectDangerouslySetInnerHTMLChildren(compNode.value, node, ctx);
@@ -19235,7 +19409,7 @@ function rewriteOpaqueTitles(node, ctx, namespace = 'html') {
 	if (type === 'Element' || type === 'JSXElement') {
 		const tag = jsxTagName(node) || elementTagName(node);
 		const ordinaryComponent =
-			isComponentTag(node) && !isActivityLongForm(node) && !isFragmentLongForm(node, ctx);
+			isComponentTag(node) && !isActivityLongForm(node, ctx) && !isFragmentLongForm(node, ctx);
 		if (
 			!ordinaryComponent &&
 			tag === 'title' &&
@@ -19623,11 +19797,10 @@ function normalizeChildren(nodes, inSvg = false, ctx = null, inNoscript = false)
 				}
 				continue;
 			}
-			// `<Activity mode={…}>…</Activity>` (React 19). Matched by name BEFORE
-			// the generic Element branch (it would otherwise route through
-			// componentSlot). Lower to an ActivityStatement carrying the mode expr
-			// and the raw children (compiled into one body by makeActivityCall).
-			if (isActivityLongForm(n)) {
+			// The mode-only builtin keeps its direct boundary lowering. Richer
+			// configs retain the ordinary element descriptor path below, where keys,
+			// spreads, children props, and authored evaluation order are preserved.
+			if (isDirectActivityLongForm(n, ctx)) {
 				const modeAttr = (n.openingElement.attributes || []).find(
 					(a) =>
 						(a.type === 'Attribute' || a.type === 'JSXAttribute') &&
@@ -19685,6 +19858,9 @@ function normalizeChildren(nodes, inSvg = false, ctx = null, inNoscript = false)
 				selfClosing: n.openingElement.selfClosing,
 				loc: n.loc, // preserve element position for dev hydration LOC (component slots)
 			};
+			// `unstable_Activity` starts with a lowercase letter but is a component
+			// when it resolves to the builtin. Keep that fact on this rare node only.
+			if (isActivityLongForm(n, ctx)) element.activityDescriptor = true;
 			// Preserve @tsrx/core's raw-text script discriminator without changing
 			// the normalized object shape of every ordinary element.
 			if (elementTagName(element) === 'script' && typeof n.content === 'string') {
@@ -20446,6 +20622,58 @@ function emitAutoMemoRegion(
 	]);
 }
 
+// Certified repeated host rows keep these guards in their body so stable
+// primitives perform neither a wrapper call nor cache-field publication.
+// Complex children still reconcile at stable identity, and writers run before caches
+// change so held-transition journaling observes the previous binding state.
+function inlineRenderableValueDeclarations(valueExpr) {
+	const V = () => b.id('_v');
+	return [
+		b.const('_v', valueExpr),
+		b.const(
+			'_o',
+			b.logical(
+				'&&',
+				b.binary('!==', V(), b.literal(null)),
+				b.logical(
+					'||',
+					b.binary('===', b.unary('typeof', V()), b.literal('object')),
+					b.binary('===', b.unary('typeof', V()), b.literal('function')),
+				),
+			),
+		),
+	];
+}
+
+function emitInlineRenderableUpdate(previous, cachedNode, slowCall) {
+	const V = () => b.id('_v');
+	return b.if(
+		b.logical('||', b.id('_o'), b.binary('!==', previous(), V())),
+		b.block([
+			b.const('_t', cachedNode()),
+			b.if(
+				andChain([
+					b.binary('!=', b.id('_t'), b.literal(null)),
+					b.unary('!', b.id('_o')),
+					b.binary('!==', V(), b.literal(null)),
+				]),
+				b.stmt(
+					b.call(
+						'_$setText',
+						b.id('_t'),
+						// Bare renderable booleans are empty; explicit text bindings
+						// retain their ordinary coercion through setText.
+						b.conditional(b.binary('===', V(), b.literal(true)), b.literal(''), V()),
+					),
+				),
+				b.stmt(b.assignment('=', cachedNode(), slowCall)),
+			),
+			b.stmt(b.assignment('=', previous(), V())),
+		]),
+		null,
+	);
+}
+
 function planJsx(
 	jsxNodesRaw,
 	ctx,
@@ -20455,6 +20683,7 @@ function planJsx(
 	cssHash = null,
 	mountCallbackSinks = null,
 	keyedSelection = null,
+	inlineBindingGuards = false,
 ) {
 	// DEV ONLY: per-element source-location map for THIS body (path-key → [line, col]),
 	// populated at the top of emitElementHtml and read in the binding mount loop to emit
@@ -20992,12 +21221,21 @@ function planJsx(
 		if (b.kind === 'text' || b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('setText');
 		if (b.kind === 'text') ctx.runtimeNeeded.add('htextSwap');
 		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
-		// One resolution for both consumers: the import this binding needs, and
-		// the token the authored attribute name is claimed against.
+		// Mounts use the unconditional writer; reactive scalar bindings use either
+		// that writer behind an inline guard or its compact comparison helper.
+		// Claim both authored-name tokens when both paths exist, and do not retain
+		// a mount-only import for deferred writes.
 		const attrHelper = attrBindingHelper(b);
 		if (attrHelper !== null) {
-			ctx.runtimeNeeded.add(attrHelper);
-			registerAttrLoweringOrigin(ctx, b.nameOrigin, attrHelper, b.name);
+			if (!b.deferred) {
+				ctx.runtimeNeeded.add(attrHelper);
+				registerAttrLoweringOrigin(ctx, b.nameOrigin, attrHelper, b.name);
+			}
+			if (!b.mountOnly) {
+				const updateHelper = attrBindingUpdateHelper(b, inlineBindingGuards);
+				ctx.runtimeNeeded.add(updateHelper);
+				registerAttrLoweringOrigin(ctx, b.nameOrigin, updateHelper, b.name);
+			}
 		}
 		if (b.kind === 'htmlOnlyChild') ctx.runtimeNeeded.add('setDangerouslySetInnerHTML');
 		if (b.kind === 'dangerCommit') ctx.runtimeNeeded.add('setDangerouslySetInnerHTMLSources');
@@ -21023,7 +21261,10 @@ function planJsx(
 		}
 		if (b.kind === 'nativeChangeRuntime') ctx.runtimeNeeded.add('queueNativeChangeDiagnostic');
 		if (b.kind === 'formDiagnostic') ctx.runtimeNeeded.add('queueFormAuthoringDiagnostic');
-		if (b.kind === 'event' && b.dev) ctx.runtimeNeeded.add('devEventListener');
+		if (b.kind === 'event') {
+			ctx.runtimeNeeded.add('setEventHandler');
+			if (b.dev) ctx.runtimeNeeded.add('devEventListener');
+		}
 		if (b.kind === 'event-bundle') {
 			// 3b: mount builds the descriptor via evtN. Lifetime-stable bundles skip
 			// the update helper but still share the compact mount helper call.
@@ -21254,7 +21495,7 @@ function planJsx(
 	const updateLines = [];
 	const everyRenderLines = [];
 	for (const b of elementBindings) {
-		const updateEmit = emitBindingUpdate(b, bag);
+		const updateEmit = emitBindingUpdate(b, bag, inlineBindingGuards);
 		if (!updateEmit) continue;
 		if (b.deferred) everyRenderLines.push(updateEmit);
 		else updateLines.push(updateEmit);
@@ -21274,7 +21515,7 @@ function planJsx(
 				keyedSelection.selectedName,
 			]).size === 0
 		) {
-			keyedSelection.update = emitBindingUpdate(classes[0], bag);
+			keyedSelection.update = emitBindingUpdate(classes[0], bag, inlineBindingGuards);
 		}
 	}
 
@@ -21647,11 +21888,9 @@ function planJsx(
 		if (cc.isChild) {
 			const V = () => b.id('_v');
 			// MARKERLESS only-child renderable: append a primitive as a single Text
-			// node (no `<!>`, no slot state), `setText` it inline on update — exactly
-			// like a `.tsrx` only-child text binding — and fall back to `childTextHole`
-			// (→ childSlot, lazy markers) only for objects / first render / mode switch.
+			// node (no `<!>`, no slot state). Either the shared helper or the inline
+			// row guard compares its cached value/node before the ordinary child path.
 			if (cc.onlyChildText && !noTemplate) {
-				ctx.runtimeNeeded.add('childTextHole');
 				const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
 				const chv = () => bagFieldNode(bag, `_chv$${cc.id}`);
 				// A host that can receive dangerouslySetInnerHTML must validate its
@@ -21659,6 +21898,7 @@ function planJsx(
 				// identity-skip an unchanged child while a raw-HTML writer activates in
 				// the same render, bypassing childTextHole's mutual-exclusion check.
 				if (cc.potentialDangerouslySetInnerHTML) {
+					ctx.runtimeNeeded.add('childTextHole');
 					pushAfterStmt(
 						cc.id,
 						org,
@@ -21683,38 +21923,40 @@ function planJsx(
 					);
 					continue;
 				}
-				ctx.runtimeNeeded.add('setText');
+				ctx.runtimeNeeded.add(inlineBindingGuards ? 'childTextHole' : 'childTextHoleUpdate');
+				if (inlineBindingGuards) ctx.runtimeNeeded.add('setText');
 				const updateHole = () =>
-					b.if(
-						b.logical('||', b.id('_o'), b.binary('!==', chp(), V())),
-						b.block([
-							b.const('_t', chv()),
-							b.if(
-								andChain([
-									b.binary('!=', b.id('_t'), b.literal(null)),
-									b.unary('!', b.id('_o')),
-									b.binary('!==', V(), b.literal(null)),
-								]),
-								b.stmt(b.call('_$setText', b.id('_t'), V())),
+					inlineBindingGuards
+						? emitInlineRenderableUpdate(
+								chp,
+								chv,
+								b.call(
+									'_$childTextHole',
+									b.id('__s'),
+									b.literal(slotIndex),
+									hostExpr(),
+									V(),
+									b.id('_t'),
+								),
+							)
+						: b.block([
 								b.stmt(
 									b.assignment(
 										'=',
 										chv(),
 										b.call(
-											'_$childTextHole',
+											'_$childTextHoleUpdate',
 											b.id('__s'),
 											b.literal(slotIndex),
 											hostExpr(),
 											V(),
-											b.id('_t'),
+											chv(),
+											chp(),
 										),
 									),
 								),
-							),
-							b.stmt(b.assignment('=', chp(), V())),
-						]),
-						null,
-					);
+								b.stmt(b.assignment('=', chp(), V())),
+							]);
 				const ordinary = updateHole();
 				let update = ordinary;
 				if (cc.autoMemoValue === true) {
@@ -21741,19 +21983,9 @@ function planJsx(
 					cc.id,
 					org,
 					b.block([
-						b.const('_v', cc.valueExpr),
-						b.const(
-							'_o',
-							b.logical(
-								'&&',
-								b.binary('!==', V(), b.literal(null)),
-								b.logical(
-									'||',
-									b.binary('===', b.unary('typeof', V()), b.literal('object')),
-									b.binary('===', b.unary('typeof', V()), b.literal('function')),
-								),
-							),
-						),
+						...(inlineBindingGuards
+							? inlineRenderableValueDeclarations(cc.valueExpr)
+							: [b.const('_v', cc.valueExpr)]),
 						update,
 					]),
 				);
@@ -21775,83 +22007,60 @@ function planJsx(
 				pushAfterStmt(cc.id, org, b.stmt(b.call('_$textSlot', ...args)));
 				continue;
 			}
-			// Template body: INLINE the text-hole hot path. Cache the text node
-			// (`_chv`) + last value (`_chp`) on the bag and, when the value is an
-			// unchanged-skippable primitive already backed by a text node, do a direct
-			// `setText` — exactly like a `.tsrx` `{… as string}` text binding. Objects /
-			// functions (component / element / array), the first render, and mode
-			// switches go through `textHole` → the full `childSlot` — INCLUDING when
-			// the value is identity-UNCHANGED: only childSlot's bail path refreshes
-			// changed-context consumers below (a stable `{children}` passthrough under
-			// a re-rendering Provider), so an inline identity skip would strand them.
-			// Only unchanged primitives/null (no consumers possible) skip the call.
-			ctx.runtimeNeeded.add('textHole');
+			// Keep the same cached text node + raw value and share the primitive
+			// comparison/coercion path. Objects/functions still reach childSlot on
+			// every render so unchanged descriptors propagate changed context.
 			// When the slot has its OWN `<!>` placeholder, tell textHole/childSlot to
 			// reuse it as the end marker (no second comment minted) — `ownEnd`.
 			const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
 			const chv = () => bagFieldNode(bag, `_chv$${cc.id}`);
-			const textHoleCall = (lastArg) => {
-				const args = [
-					b.id('__s'),
-					b.literal(slotIndex),
-					hostExpr(),
-					lastArg,
-					childAnchor ?? b.literal(null),
-				];
+			const textHoleCall = (lastArg, updating = false) => {
+				const args = [b.id('__s'), b.literal(slotIndex), hostExpr(), lastArg];
+				if (updating) args.push(chv(), chp());
+				args.push(childAnchor ?? b.literal(null));
 				if (cc.anchorVar) args.push(b.literal(true));
 				if (cc.coalesceRange) {
 					if (!cc.anchorVar) args.push(undefinedNode());
 					args.push(b.literal(true));
 				}
-				return b.call('_$textHole', ...args);
+				return b.call(updating ? '_$textHoleUpdate' : '_$textHole', ...args);
 			};
 			if (cc.potentialDangerouslySetInnerHTML) {
+				ctx.runtimeNeeded.add('textHole');
 				pushAfterStmt(
 					cc.id,
 					org,
 					b.block([
 						b.const('_v', cc.valueExpr),
-						b.stmt(b.assignment('=', chp(), V())),
 						b.stmt(b.assignment('=', chv(), textHoleCall(V()))),
+						b.stmt(b.assignment('=', chp(), V())),
 					]),
 				);
 				continue;
 			}
-			ctx.runtimeNeeded.add('setText');
+			if (inlineBindingGuards) {
+				ctx.runtimeNeeded.add('textHole');
+				ctx.runtimeNeeded.add('setText');
+				pushAfterStmt(
+					cc.id,
+					org,
+					b.block([
+						...inlineRenderableValueDeclarations(cc.valueExpr),
+						emitInlineRenderableUpdate(chp, chv, textHoleCall(V())),
+					]),
+				);
+				continue;
+			}
+			ctx.runtimeNeeded.add('textHoleUpdate');
+			// Publish the raw value after the helper: setText must journal the old
+			// binding bag before a held transition can roll the DOM write back.
 			pushAfterStmt(
 				cc.id,
 				org,
 				b.block([
 					b.const('_v', cc.valueExpr),
-					b.const(
-						'_o',
-						b.logical(
-							'&&',
-							b.binary('!==', V(), b.literal(null)),
-							b.logical(
-								'||',
-								b.binary('===', b.unary('typeof', V()), b.literal('object')),
-								b.binary('===', b.unary('typeof', V()), b.literal('function')),
-							),
-						),
-					),
-					b.if(
-						b.logical('||', b.id('_o'), b.binary('!==', chp(), V())),
-						b.block([
-							b.stmt(b.assignment('=', chp(), V())),
-							b.const('_t', chv()),
-							b.if(
-								andChain([
-									b.binary('!=', b.id('_t'), b.literal(null)),
-									b.unary('!', b.id('_o')),
-									b.binary('!==', V(), b.literal(null)),
-								]),
-								b.stmt(b.call('_$setText', b.id('_t'), V())),
-								b.stmt(b.assignment('=', chv(), textHoleCall(V()))),
-							),
-						]),
-						null,
-					),
+					b.stmt(b.assignment('=', chv(), textHoleCall(V(), true))),
+					b.stmt(b.assignment('=', chp(), V())),
 				]),
 			);
 			continue;
@@ -22660,11 +22869,9 @@ function emitBindingMount(bind, elVar, bag) {
 			const value = bind.dev
 				? b.call('_$devEventListener', b.literal(bind.name), bind.expr)
 				: bind.expr;
-			const slotAssign = b.stmt(
-				b.assignment('=', b.member(el(), slotKeyLiteral(bind), true), value),
-			);
-			if (bind.mountOnly) return st(slotAssign);
-			return [...mountHost().map(st), st(slotAssign)];
+			const install = b.stmt(b.call('_$setEventHandler', el(), slotKeyLiteral(bind), value));
+			if (bind.mountOnly) return st(install);
+			return [...mountHost().map(st), st(install)];
 		}
 		case 'formAction': {
 			// <form action={fn}> / <button formAction={fn}>: wire the submit handler
@@ -22759,7 +22966,7 @@ function emitBindingMount(bind, elVar, bag) {
 	return null;
 }
 
-function emitBindingUpdate(bind, bag) {
+function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 	if (bind.mountOnly) return null;
 	const org = bindingOrigin(bind);
 	const st = (node) => inheritOriginLoc(node, org);
@@ -22769,7 +22976,8 @@ function emitBindingUpdate(bind, bag) {
 	const F = (prefix) => bagFieldNode(bag, `${prefix}$${bind.id}`);
 	// See emitBindingMount: the helper and the name literal carry the authored
 	// attribute name, so the name resolves to the update write too.
-	const callee = () => attrLoweringToken(b.id(`_$${attrBindingHelper(bind)}`), bind);
+	const callee = () =>
+		attrLoweringToken(b.id(`_$${attrBindingUpdateHelper(bind, inlineBindingGuards)}`), bind);
 	const nameLit = () => attrLoweringToken(b.literal(bind.name), bind);
 	switch (bind.kind) {
 		case 'nativeChangeRuntime': {
@@ -22862,18 +23070,29 @@ function emitBindingUpdate(bind, bag) {
 		case 'stringData':
 		case 'booleanAttr':
 		case 'ariaAttr': {
+			if (inlineBindingGuards) {
+				return st(
+					b.block([
+						b.const('_v', bind.expr),
+						b.if(
+							b.binary('!==', F('_prev'), V()),
+							b.block([
+								b.stmt(b.call(callee(), F('_el'), nameLit(), V())),
+								b.stmt(b.assignment('=', F('_prev'), V())),
+							]),
+							null,
+						),
+					]),
+				);
+			}
 			return st(
-				b.block([
-					b.const('_v', bind.expr),
-					b.if(
-						b.binary('!==', F('_prev'), V()),
-						b.block([
-							b.stmt(b.call(callee(), F('_el'), nameLit(), V())),
-							b.stmt(b.assignment('=', F('_prev'), V())),
-						]),
-						null,
+				b.stmt(
+					b.assignment(
+						'=',
+						F('_prev'),
+						b.call(callee(), bind.expr, F('_prev'), F('_el'), nameLit()),
 					),
-				]),
+				),
 			);
 		}
 		case 'value':
@@ -22893,18 +23112,23 @@ function emitBindingUpdate(bind, bag) {
 			if (bind.fresh) {
 				return st(b.stmt(b.call(callee(), F('_el'), bind.expr)));
 			}
+			if (inlineBindingGuards) {
+				return st(
+					b.block([
+						b.const('_v', bind.expr),
+						b.if(
+							b.binary('!==', F('_prev'), V()),
+							b.block([
+								b.stmt(b.call(callee(), F('_el'), V())),
+								b.stmt(b.assignment('=', F('_prev'), V())),
+							]),
+							null,
+						),
+					]),
+				);
+			}
 			return st(
-				b.block([
-					b.const('_v', bind.expr),
-					b.if(
-						b.binary('!==', F('_prev'), V()),
-						b.block([
-							b.stmt(b.call(callee(), F('_el'), V())),
-							b.stmt(b.assignment('=', F('_prev'), V())),
-						]),
-						null,
-					),
-				]),
+				b.stmt(b.assignment('=', F('_prev'), b.call(callee(), bind.expr, F('_prev'), F('_el')))),
 			);
 		}
 		case 'style': {
@@ -22979,7 +23203,7 @@ function emitBindingUpdate(bind, bag) {
 			const value = bind.dev
 				? b.call('_$devEventListener', b.literal(bind.name), bind.expr)
 				: bind.expr;
-			return st(b.stmt(b.assignment('=', b.member(F('_el'), slotKeyLiteral(bind), true), value)));
+			return st(b.stmt(b.call('_$setEventHandler', F('_el'), slotKeyLiteral(bind), value)));
 		}
 		case 'formAction': {
 			return st(
@@ -25051,6 +25275,7 @@ function hoistBodyHelper(
 	envNames,
 	idOrigin = null,
 	keyedSelection = null,
+	inlineBindingGuards = false,
 ) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
 	const ownEnvNames = envNames === null ? null : helperCaptures(ctx, stmts, params);
@@ -25095,8 +25320,10 @@ function hoistBodyHelper(
 		},
 		fakeOrigin,
 	);
+	const helperOptions =
+		inlineBindingGuards || keyedSelection !== null ? { keyedSelection, inlineBindingGuards } : null;
 	if (envNames == null) {
-		inlinedSubs.push(compileFunctionBody(fake, ctx, helperName, parentNs, cssHash));
+		inlinedSubs.push(compileFunctionBody(fake, ctx, helperName, parentNs, cssHash, helperOptions));
 		return helperName;
 	}
 	// Module-scope placement. Nested constructs compiled INSIDE this body
@@ -25118,14 +25345,7 @@ function hoistBodyHelper(
 	);
 	let helperFn;
 	try {
-		helperFn = compileFunctionBody(
-			fake,
-			ctx,
-			helperName,
-			parentNs,
-			cssHash,
-			keyedSelection === null ? null : { keyedSelection },
-		);
+		helperFn = compileFunctionBody(fake, ctx, helperName, parentNs, cssHash, helperOptions);
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.currentInvariantLocals = prevInvariantLocals;
@@ -25267,14 +25487,77 @@ function makeActivityCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = n
 	};
 }
 
-/** Long-form `<Activity>` tag — matched by name, mirroring isFragmentLongForm. */
-function isActivityLongForm(node) {
+function isActivityName(value) {
+	return value === 'Activity' || value === 'unstable_Activity';
+}
+
+// The component-local set does not include a module callback's parameters or
+// names declared inside nested JavaScript blocks. Resolve those rare builtin
+// candidates against the authored AST's actual scopes. Only modules containing
+// an Activity candidate allocate this analysis; normalized tags retain their
+// original name node, and synthesized names use the conservative fallback.
+function activityReferenceBinding(name, node, ctx) {
+	if (!ctx?.activityModuleAst) return undefined;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope =
+		lexical.nodeScopes.get(name) ??
+		lexical.nodeScopes.get(node.openingElement) ??
+		lexical.nodeScopes.get(node);
+	return scope === undefined ? undefined : lexical.resolveBinding(scope, name.name);
+}
+
+/** Resolve builtin Activity tags without claiming foreign or shadowed names. */
+function isActivityLongForm(node, ctx = null) {
 	const name = node.openingElement?.name || node.id;
 	if (!name) return false;
-	if (name.type !== 'Identifier' && name.type !== 'JSXIdentifier') return false;
-	// `unstable_Activity` mirrors the unstable_ViewTransition alias so React
-	// experimental-channel ports compile unchanged.
-	return name.name === 'Activity' || name.name === 'unstable_Activity';
+	if (name.type === 'Identifier' || name.type === 'JSXIdentifier') {
+		const local = name.name;
+		if (ctx?.currentComponentLocals?.has(local)) return false;
+		const imported = ctx?.octaneImportLocals?.get(local);
+		if (imported !== undefined) {
+			if (!isActivityName(imported)) return false;
+			const binding = activityReferenceBinding(name, node, ctx);
+			return binding === undefined || binding?.importSource?.value === 'octane';
+		}
+		if (!isActivityName(local)) return false;
+		if (ctx?.foreignImportLocals?.has(local)) return false;
+		if (ctx?.componentInfo?.has(local)) return false;
+		const binding = activityReferenceBinding(name, node, ctx);
+		if (binding !== undefined) return binding === null;
+		// A synthesized conventional spelling has no original scope identity.
+		if (ctx?.activityModuleAst) {
+			ctx.activityModuleBindingNames ??= collectModuleLevelBindings(ctx.activityModuleAst.body);
+			if (ctx.activityModuleBindingNames.has(local)) return false;
+		}
+		return true;
+	}
+	if (name.type !== 'MemberExpression' && name.type !== 'JSXMemberExpression') return false;
+	const object = name.object;
+	const property = name.property;
+	if (
+		name.computed !== true &&
+		(object?.type === 'Identifier' || object?.type === 'JSXIdentifier') &&
+		(property?.type === 'Identifier' || property?.type === 'JSXIdentifier') &&
+		isActivityName(property.name) &&
+		ctx?.octaneImportNamespaces?.has(object.name) === true &&
+		!ctx.currentComponentLocals?.has(object.name)
+	) {
+		const binding = activityReferenceBinding(object, node, ctx);
+		return binding === undefined || binding?.importSource?.value === 'octane';
+	}
+	return false;
+}
+
+/** Only a mode-only config can skip ordinary JSX element/key semantics. */
+function isDirectActivityLongForm(node, ctx = null) {
+	if (!isActivityLongForm(node, ctx)) return false;
+	const attrs = node.attributes || node.openingElement?.attributes || [];
+	return (
+		attrs.length === 0 ||
+		(attrs.length === 1 &&
+			(attrs[0].type === 'Attribute' || attrs[0].type === 'JSXAttribute') &&
+			(attrs[0].name?.name || attrs[0].name) === 'mode')
+	);
 }
 
 // ===========================================================================
@@ -25311,6 +25594,7 @@ function isFragmentLongForm(node, ctx = null) {
 }
 
 function isComponentTag(node) {
+	if (node.activityDescriptor === true) return true;
 	const name = node.openingElement?.name || node.id;
 	if (!name) return false;
 	if (name.type === 'MemberExpression' || name.type === 'JSXMemberExpression') return true;
@@ -25560,9 +25844,13 @@ function makeCompCall(
 	const id = ctx.nextHelperId++;
 	const compName = tagBindingName(node);
 	const staticFragmentRenderer = node.openingElement?.metadata?.staticFragmentRenderer;
-	const compNode = staticFragmentRenderer
-		? inheritOriginLoc(b.id(staticFragmentRenderer.name), node.openingElement?.name || node.id)
-		: tagExprNode(node);
+	const activityDescriptor = isActivityLongForm(node, ctx);
+	const descriptorConfig = activityDescriptor || hasKeyedSpreadConfig(node);
+	const compNode = activityDescriptor
+		? inheritOriginLoc(b.id(requireRuntimeForContext(ctx, 'Activity')), node)
+		: staticFragmentRenderer
+			? inheritOriginLoc(b.id(staticFragmentRenderer.name), node.openingElement?.name || node.id)
+			: tagExprNode(node);
 	// `</Card>` emits nothing — lend it the opening name's generated ranges so a
 	// closing tag is reachable for components the way it is for host elements.
 	registerOriginAlias(ctx, node.closingElement?.name, node.id || node.openingElement?.name);
@@ -25576,11 +25864,9 @@ function makeCompCall(
 	let hasSpreadProp = false;
 	let hasChildrenProp = false;
 	const propDependencyNodes = [];
-	// `key={expr}` is consumed by the componentSlot runtime (drives key-driven
-	// remount on identity change), NOT passed as a prop — matches React, where
-	// `props.key` is undefined inside the component body. When `key` follows a
-	// spread, the spread cannot inject `key` either: we filter it out of the
-	// emitted propsExpr but keep its expression for the slot arg.
+	// Simple `key={expr}` sites pass the key separately to componentSlot. When
+	// explicit keys and spreads coexist, keep the complete config ordered and let
+	// createElement extract the effective key without passing it to the component.
 	let keyExpr = null;
 	for (const attr of attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
@@ -25591,7 +25877,7 @@ function makeCompCall(
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const attrName = attr.name.name || attr.name;
 		const val = attr.value;
-		if (attrName === 'key') {
+		if (attrName === 'key' && !descriptorConfig) {
 			// `<Foo key/>` (no value) is meaningless — skip silently.
 			if (val == null) continue;
 			const keyInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
@@ -25646,7 +25932,7 @@ function makeCompCall(
 	} else if (sourceChildren.length > 0) {
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
 		const childrenParentNs =
-			!isActivityLongForm(node) && !isFragmentLongForm(node, ctx) ? 'opaque' : parentNs;
+			!activityDescriptor && !isFragmentLongForm(node, ctx) ? 'opaque' : parentNs;
 		if (compName !== null && ctx.descriptorChildrenBindings?.has(compName)) {
 			const kids = children
 				.map((child) => lowerInspectableJsxChild(child, ctx))
@@ -25698,6 +25984,17 @@ function makeCompCall(
 
 	// The props object as a node; the call-site emit embeds it directly.
 	const propsExpr = staticFragmentRenderer?.props ?? inheritOriginLoc(b.object(propNodes), node);
+	if (descriptorConfig) {
+		ctx.runtimeNeeded.add('createElement');
+		return {
+			id,
+			loc: devLoc(ctx, node),
+			origin: node,
+			isChild: true,
+			anchorlessAppendSafe: true,
+			valueExpr: inheritOriginLoc(b.call('_$createElement', compNode, propsExpr), node),
+		};
+	}
 
 	// Design (c) v0: decide whether the call site can use componentSlotLite
 	// (Scope-only, no Block / no Comment markers / no CompSlot wrapper).
@@ -26689,6 +26986,9 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					helper: null,
 				}
 			: null;
+	// The existing direct-host-row proof also scopes inline binding guards to
+	// this repeatedly invoked body. Do not inherit that emission policy into
+	// other helpers, or widen it based on a list's observed size or key shape.
 	const itemHelperName = hoistBodyHelper(
 		ctx,
 		inlinedSubs,
@@ -26700,6 +27000,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		envNames,
 		directiveKeywordOrigin(ctx, node),
 		keyedSelection,
+		hostMountSafe,
 	);
 
 	const mapCall = node.nativeArrayMap || null;

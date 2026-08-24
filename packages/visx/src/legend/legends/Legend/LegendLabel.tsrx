@@ -1,5 +1,5 @@
-import type { HTMLProps } from 'react';
 import type { OctaneNode } from 'octane';
+import type { Octane } from 'octane/jsx-runtime';
 
 export type LegendLabelOwnProps = {
 	/** Horizontal alignment of the label text. Maps to CSS justify-content property. */
@@ -15,7 +15,7 @@ export type LegendLabelOwnProps = {
 };
 
 export type LegendLabelProps =
-	LegendLabelOwnProps & Omit<HTMLProps<HTMLDivElement>, keyof LegendLabelOwnProps>;
+	LegendLabelOwnProps & Omit<Octane.HTMLAttributes<HTMLDivElement>, keyof LegendLabelOwnProps>;
 
 export default function LegendLabel({
 	flex = '1',

@@ -6,14 +6,17 @@ import {
 	addTooltipEntrySettings,
 	removeTooltipEntrySettings,
 	replaceTooltipEntrySettings,
+	type TooltipPayloadConfiguration,
 } from './tooltipSlice';
 import { useIsPanorama } from '../context/PanoramaContext';
 
-export function SetTooltipEntrySettings(props: { tooltipEntrySettings: unknown }): null {
+export function SetTooltipEntrySettings(props: {
+	tooltipEntrySettings: TooltipPayloadConfiguration;
+}): null {
 	const { tooltipEntrySettings } = props;
 	const dispatch = useAppDispatch();
 	const isPanorama = useIsPanorama();
-	const prevSettingsRef = useRef<unknown>(null);
+	const prevSettingsRef = useRef<TooltipPayloadConfiguration | null>(null);
 	useLayoutEffect(() => {
 		if (isPanorama) {
 			// Panorama graphical items should never contribute to Tooltip payload.

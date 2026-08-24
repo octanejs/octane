@@ -1,0 +1,4 @@
+React StrictMode double-invoke is an intentional Octane non-feature. The four
+strict-mode identities remain pristine-oracle evidence in the zag-pristine lane
+and are dispositioned pristine-only in audit/runtime-case-dispositions.json;
+they are not adapted one-for-one.

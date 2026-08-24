@@ -1,5 +1,7 @@
+import type { Ref } from '../util/OctaneTypes.ts';
+
 import { arrayTooltipSearcher } from '../state/optionsSlice';
-import { defaultPolarChartProps, PolarChart } from './PolarChart';
+import { defaultPolarChartProps, PolarChart } from './PolarChart.tsrx';
 import { PolarChartProps, TooltipEventType } from '../util/types';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 
@@ -17,7 +19,9 @@ export const defaultPieChartProps = {
  * @provides PolarViewBoxContext
  * @provides PolarChartContext
  */
-export function PieChart(props: PolarChartProps<unknown>) {
+export function PieChart<DataPointType = unknown>(props: PolarChartProps<DataPointType> & {
+	ref?: Ref<SVGSVGElement>;
+}) {
 	const { ref, ...rest } = props;
 	const propsWithDefaults = resolveDefaultProps(rest, defaultPieChartProps);
 	return <PolarChart

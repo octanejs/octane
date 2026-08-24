@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@apollo/client",
+    "version": "4.2.6",
+    "repository": {
+      "owner": "apollographql",
+      "repo": "apollo-client",
+      "subdirectory": null
+    },
+    "commit": "f934b60720fc828a61e04b00988eeefb83d273bc",
+    "integrity": "sha512-zAkN947OHLLvSaEZvhXmT2YGPuDSJyIlW3+ylvxbRfSQFJW5PiaGs0PvhhMGfyYvO8gtfg+JjI8jjkczQSwt5w=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "6d4568f2adac9fd90e85a2802a1e8ae25f707af9243cd5a8843402399b92b3c4"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "src/react/context/__tests__/ApolloProvider.test.tsx",
+    "src/react/hooks/__tests__/useApolloClient.test.tsx"
+  ],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "src/react/context/__tests__/ApolloProvider.test.tsx",
+      "gitBlob": "45a1c2666f8ef0c41d0bd10a5065770883896cbe",
+      "size": 4979
+    },
+    {
+      "path": "src/react/hooks/__tests__/useApolloClient.test.tsx",
+      "gitBlob": "89f00838ac7e0e74f5795768e4f3079d58233dda",
+      "size": 1024
+    }
+  ],
+  "fingerprint": "b51a367065a70b5cda63b663cac09530b4b63c5656439710a6089acc173a2a99"
+}

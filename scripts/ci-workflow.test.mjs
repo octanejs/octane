@@ -958,7 +958,7 @@ describe('Pull request labels', () => {
 	test('falls back to a type-prefixed title or head branch', async () => {
 		for (const [title, headRef, type] of [
 			['fix/gallery-list-fills-wrapper', 'topic/gallery-list', 'fix'],
-			['Add Solana bindings', 'feat/solana-react-binding', 'feat'],
+			['Add Solana bindings', 'feat/solana-kit-binding', 'feat'],
 		]) {
 			const { added, removed, failures } = await runLabeller({ title, headRef });
 

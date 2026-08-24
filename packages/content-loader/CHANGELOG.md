@@ -1,0 +1,10 @@
+# @octanejs/content-loader
+
+## 0.0.2
+
+### Patch Changes
+
+- b536a52: Add Octane bindings for wouter 3.10.0, html-react-parser 6.1.7, use-stick-to-bottom 1.1.6, react-image-crop 11.1.2, react-content-loader 7.1.2, react-to-print 3.3.0, react-calendar 6.0.1, and @formkit/auto-animate 0.10.0.
+- Updated dependencies [7e96f71]
+- Updated dependencies [d7226ff]
+  - octane@0.1.46

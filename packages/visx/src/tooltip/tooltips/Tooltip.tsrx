@@ -1,5 +1,6 @@
-import type { CSSProperties, HTMLAttributes, Ref } from 'react';
+import type { CSSProperties, Ref } from 'react';
 import type { OctaneNode } from 'octane';
+import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 
 export type TooltipProps = {
@@ -56,7 +57,9 @@ const Tooltip = ({
 	applyPositionStyle = false,
 	ref,
 	...restProps
-}: TooltipProps & HTMLAttributes<HTMLDivElement> & { ref?: Ref<HTMLDivElement> }) => <div
+}: TooltipProps & Omit<Octane.HTMLAttributes<HTMLDivElement>, keyof TooltipProps> & {
+	ref?: Ref<HTMLDivElement>;
+}) => <div
 	ref={ref}
 	className={cx('visx-tooltip', className)}
 	style={{

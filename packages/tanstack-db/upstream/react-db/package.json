@@ -16,6 +16,13 @@
     "typescript",
     "tanstack-intent"
   ],
+  "scripts": {
+    "build": "vite build",
+    "build:minified": "vite build --minify",
+    "dev": "vite build --watch",
+    "test": "vitest --run",
+    "lint": "eslint . --fix"
+  },
   "type": "module",
   "main": "dist/cjs/index.cjs",
   "module": "dist/esm/index.js",
@@ -40,8 +47,8 @@
     "skills"
   ],
   "dependencies": {
-    "use-sync-external-store": "^1.6.0",
-    "@tanstack/db": "0.7.0"
+    "@tanstack/db": "workspace:*",
+    "use-sync-external-store": "^1.6.0"
   },
   "peerDependencies": {
     "react": ">=16.8.0"
@@ -55,12 +62,5 @@
     "@vitest/coverage-istanbul": "^3.2.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
-  },
-  "scripts": {
-    "build": "vite build",
-    "build:minified": "vite build --minify",
-    "dev": "vite build --watch",
-    "test": "vitest --run",
-    "lint": "eslint . --fix"
   }
 }

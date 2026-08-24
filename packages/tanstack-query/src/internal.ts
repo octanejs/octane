@@ -1,25 +1,8 @@
 // Shared internals for the binding hooks.
 import { shouldThrowError } from '@tanstack/query-core';
-import { use, useRef } from 'octane';
+import { subSlot, use, useRef } from 'octane';
 
-// Derive a stable, distinct sub-slot from a wrapper's compiler-injected slot, so
-// a hook composing multiple base hooks gives each one its own identity. Tags are
-// namespaced per hook (e.g. ':oq:obs', ':ms:cb') to avoid cross-hook collisions.
-// Memoized: subSlot runs on EVERY hook call every render, and the naive form
-// pays a string concat + global symbol-registry lookup each time. The cache is
-// keyed by the slot symbol itself; the minted value is byte-identical to the
-// uncached Symbol.for result, so identity is preserved across HMR re-evals and
-// the per-package copies of this helper. Key universe is bounded: slots are
-// per-call-site module constants (never minted per render).
-const subSlotCache = new Map<symbol, Map<string, symbol>>();
-export function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-	if (slot === undefined) return undefined;
-	let byTag = subSlotCache.get(slot);
-	if (byTag === undefined) subSlotCache.set(slot, (byTag = new Map()));
-	let sym = byTag.get(tag);
-	if (sym === undefined) byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':' + tag)));
-	return sym;
-}
+export { subSlot };
 
 // Split the compiler-injected trailing slot off a hook's runtime args, returning
 // the user args (everything before it) and the slot.

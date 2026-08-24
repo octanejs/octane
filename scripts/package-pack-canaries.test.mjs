@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
 	createPackedJavascriptConsumerManifest,
+	assertPackedTsrxConsumerSucceeded,
 	createPackedExampleManifest,
 	createPackedTsrxConsumerConfig,
+	resolvePackedTsrxSourceDirectories,
 	createPackedTsrxConsumerManifest,
 	findPackedTsrxSourceConsumerPackages,
 	findPackedTsrxSourceConsumerSpecifiers,
@@ -18,10 +22,15 @@ import {
 	renderPackedDraggableEsmConsumerSource,
 	renderPackedEsmConsumerSource,
 	renderPackedTsrxConsumerSource,
+	renderPackedTsrxBrowserAmbientProbe,
 	renderPackedTsrxSourceImports,
 	renderPackedTsrxConsumerTypeProbe,
+	renderPackedStrictBrowserConsumerTypeProbe,
+	renderPackedStrictBrowserConsumerSource,
 	PACKED_TSRX_CONSUMER_PROJECTS,
+	PACKED_TSRX_BROWSER_AMBIENT_FILE,
 	PACKED_TSRX_PROBE_PACKAGES,
+	PACKED_TSRX_STRICT_BROWSER_PACKAGES,
 } from './package-pack-canaries.mjs';
 
 describe('packed JavaScript consumers', () => {
@@ -188,12 +197,14 @@ describe('packed TSRX source consumers', () => {
 			archiveSpecs,
 			toolingVersions,
 			Object.keys(archiveSpecs),
+			{ esrap: '^2.3.2' },
 		);
 
 		assert.deepEqual(manifest.dependencies, archiveSpecs);
 		assert.deepEqual(manifest.devDependencies, {
 			'@tsrx/typescript-plugin': '0.3.116',
 			'@types/node': '24.13.3',
+			esrap: '2.3.6',
 			typescript: '5.9.3',
 		});
 		assert.equal(manifest.private, true);
@@ -217,7 +228,7 @@ describe('packed TSRX source consumers', () => {
 	test('typechecks TSRX with the Octane language plugin and full strict diagnostics', () => {
 		const config = createPackedTsrxConsumerConfig({
 			nodeTypes: true,
-			sourcePackageNames: ['@octanejs/jotai'],
+			sourcePackageDirectories: ['node_modules/@octanejs/jotai'],
 		});
 
 		assert.equal(config.compilerOptions.strict, true);
@@ -236,6 +247,32 @@ describe('packed TSRX source consumers', () => {
 		assert.equal(config.compilerOptions.paths, undefined);
 	});
 
+	test('uses canonical installed source roots without duplicating package symlinks', (context) => {
+		const directory = mkdtempSync(path.join(tmpdir(), 'packed-source-roots-'));
+		context.after(() => rmSync(directory, { recursive: true, force: true }));
+		const packageDirectory = 'node_modules/.pnpm/source@file+archive/node_modules/@octanejs/source';
+		const installedPackage = path.join(directory, packageDirectory);
+		mkdirSync(installedPackage, { recursive: true });
+		mkdirSync(path.join(directory, 'node_modules/@octanejs'), { recursive: true });
+		for (const packageName of ['source', 'alias']) {
+			symlinkSync(
+				installedPackage,
+				path.join(directory, 'node_modules/@octanejs', packageName),
+				'junction',
+			);
+		}
+		const sourcePackageDirectories = resolvePackedTsrxSourceDirectories(directory, [
+			'@octanejs/source',
+			'@octanejs/alias',
+		]);
+		const config = createPackedTsrxConsumerConfig({ sourcePackageDirectories });
+		assert.deepEqual(config.include, [
+			'src/**/*.ts',
+			'src/**/*.tsrx',
+			`${packageDirectory}/**/*.tsrx`,
+		]);
+	});
+
 	test('also models browser consumers without Node ambient types', () => {
 		const config = createPackedTsrxConsumerConfig({
 			consumerSourceFiles: ['src/published-browser-source-imports.ts'],
@@ -243,14 +280,115 @@ describe('packed TSRX source consumers', () => {
 		});
 
 		assert.deepEqual(config.compilerOptions.types, []);
-		assert.deepEqual(config.include, ['src/published-browser-source-imports.ts']);
+		assert.deepEqual(config.include, [
+			'src/published-browser-source-imports.ts',
+			PACKED_TSRX_BROWSER_AMBIENT_FILE,
+		]);
 		assert.equal(config.compilerOptions.strict, true);
 		assert.equal(config.compilerOptions.skipLibCheck, false);
 		assert.deepEqual(config.tsrx, { compiler: 'octane/compiler/volar' });
 	});
 
-	test('executes both Node and browser ambient typecheck projects', () => {
-		assert.deepEqual(PACKED_TSRX_CONSUMER_PROJECTS, ['tsconfig.json', 'tsconfig.browser.json']);
+	test('rejects Node ambient types leaked by an imported declaration', async (context) => {
+		const ts = (await import('typescript')).default;
+		const directory = mkdtempSync(path.join(tmpdir(), 'packed-browser-ambient-'));
+		context.after(() => rmSync(directory, { recursive: true, force: true }));
+		mkdirSync(path.join(directory, 'src'));
+		const nodeTypes = path.join(directory, 'node_modules/@types/node');
+		mkdirSync(nodeTypes, { recursive: true });
+		writeFileSync(
+			path.join(nodeTypes, 'index.d.ts'),
+			`declare const process: { env: { NODE_ENV?: string } };
+declare const Buffer: { from(value: string): Uint8Array };
+declare namespace NodeJS { interface Process { env: { NODE_ENV?: string } } }
+`,
+		);
+		const source = path.join(directory, 'src/imports.ts');
+		writeFileSync(source, 'export {};\n');
+		const ambientProbe = path.join(directory, PACKED_TSRX_BROWSER_AMBIENT_FILE);
+		writeFileSync(ambientProbe, renderPackedTsrxBrowserAmbientProbe());
+		const config = ts.parseJsonConfigFileContent(
+			createPackedTsrxConsumerConfig({
+				consumerSourceFiles: ['src/imports.ts'],
+				nodeTypes: false,
+			}),
+			ts.sys,
+			directory,
+		);
+		const diagnostics = () =>
+			ts.getPreEmitDiagnostics(ts.createProgram(config.fileNames, config.options));
+		assert.deepEqual(diagnostics(), []);
+
+		// A dependency can include Node's ambient declarations even with types: [].
+		writeFileSync(source, '/// <reference types="node" />\nexport {};\n');
+		assert.deepEqual(
+			diagnostics().map(({ code, file }) => ({ code, file: file?.fileName })),
+			Array.from({ length: 3 }, () => ({ code: 2578, file: ambientProbe })),
+		);
+	});
+
+	test('adds an ESNext browser project for the strict consumer regressions', () => {
+		assert.deepEqual(PACKED_TSRX_CONSUMER_PROJECTS, [
+			'tsconfig.json',
+			'tsconfig.browser.json',
+			'tsconfig.strict-browser.json',
+		]);
+		const config = createPackedTsrxConsumerConfig({
+			consumerSourceFiles: ['strict-browser/**/*'],
+			ecmaVersion: 'esnext',
+			nodeTypes: false,
+		});
+		assert.deepEqual(config.compilerOptions.lib, ['dom', 'dom.iterable', 'esnext']);
+		assert.equal(config.compilerOptions.target, 'esnext');
+		assert.deepEqual(config.compilerOptions.types, []);
+		assert.deepEqual(config.include, ['strict-browser/**/*', PACKED_TSRX_BROWSER_AMBIENT_FILE]);
+		const source = renderPackedStrictBrowserConsumerSource();
+		assert.match(source, /<Provider\b/);
+		assert.match(source, /<MemoryRouter\b/);
+		assert.match(source, /<Group\b/);
+		assert.match(source, /<BarChart\b/);
+	});
+
+	test('checks precise public contracts rather than only rejecting top-level any', () => {
+		const source = renderPackedStrictBrowserConsumerTypeProbe();
+		for (const packageName of PACKED_TSRX_STRICT_BROWSER_PACKAGES) {
+			assert.ok(
+				source.includes(`from '${packageName}${packageName.endsWith('/visx') ? '/group' : ''}'`),
+			);
+		}
+		assert.match(source, /AssertNotAny<BarProps\['dataKey'\]>/);
+		assert.match(source, /AssertNotAny<BarShapeProps\['x'\]>/);
+		assert.match(source, /invalidBarComponent: Parameters<typeof Bar>\[0\]/);
+		assert.match(source, /nativeTarget: SVGGElement = event.currentTarget/);
+		assert.match(source, /event\.nativeEvent/);
+		assert.match(source, /setCount\('not-a-number'\)/);
+		assert.match(source, /invalidSelection: string = selected/);
+		assert.match(source, /invalidGroupOffset/);
+		assert.match(source, /invalidFormRef/);
+		assert.match(source, /invalidNavLinkRef/);
+		assert.match(source, /Parameters<typeof Bar<Datum, number>>/);
+	});
+
+	test('rejects TSRX parser diagnostics even when the checker exits successfully', () => {
+		const diagnostic =
+			'[tsrx-tsc] node_modules/@octanejs/source/src/Component.tsrx: Add a trailing comma, as in `<T,>() => ...`.\n';
+		for (const stream of ['stdout', 'stderr']) {
+			assert.throws(
+				() => assertPackedTsrxConsumerSucceeded({ status: 0, [stream]: diagnostic }, 'browser'),
+				/Component\.tsrx: Add a trailing comma/,
+			);
+		}
+		assert.doesNotThrow(() =>
+			assertPackedTsrxConsumerSucceeded({ status: 0, stdout: 'Typecheck completed.\n' }, 'browser'),
+		);
+		assert.throws(
+			() =>
+				assertPackedTsrxConsumerSucceeded(
+					{ status: 2, stdout: 'error TS2322: invalid prop' },
+					'browser',
+				),
+			/TS2322: invalid prop/,
+		);
 	});
 
 	test('keeps declaration-only probe packages installed independently of source enrollment', () => {
@@ -364,6 +502,37 @@ describe('packed TSRX source consumers', () => {
 		);
 	});
 
+	test('discovers source entry points that expose separate public subpath graphs', () => {
+		assert.deepEqual(
+			findPackedTsrxSourceConsumerSpecifiers(
+				'@octanejs/components',
+				{
+					exports: {
+						'.': './src/index.ts',
+						'./utils': './src/utils.ts',
+						'./server': { types: './src/server.d.ts', default: './src/server.js' },
+						'./Button': './src/Button.tsrx',
+						'./theme.css': './src/theme.css',
+						'./package.json': './package.json',
+					},
+				},
+				new Set([
+					'src/index.ts',
+					'src/utils.ts',
+					'src/server.d.ts',
+					'src/server.js',
+					'src/Button.tsrx',
+				]),
+			),
+			[
+				'@octanejs/components',
+				'@octanejs/components/utils',
+				'@octanejs/components/server',
+				'@octanejs/components/Button',
+			],
+		);
+	});
+
 	test('exercises the published bindings from a real local TSRX component', () => {
 		const source = renderPackedTsrxConsumerSource();
 
@@ -379,10 +548,6 @@ describe('packed TSRX source consumers', () => {
 		assert.match(source, /<Command\b/);
 		assert.match(source, /<OTPInput\b/);
 		assert.match(source, /<BarChart\b/);
-		assert.doesNotMatch(
-			renderPackedTsrxConsumerSource({ includeRecharts: false }),
-			/from '@octanejs\/recharts'|<BarChart\b/,
-		);
 		assert.match(source, /<Toaster\b/);
 		assert.match(source, /<animated\.div\b/);
 		assert.match(source, /<Parallax\b/);

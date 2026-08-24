@@ -1,0 +1,1395 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-day-picker",
+    "version": "10.0.1",
+    "repository": {
+      "owner": "gpbl",
+      "repo": "react-day-picker",
+      "subdirectory": "packages/react-day-picker"
+    },
+    "commit": "6d3929d655779d178638d8f80171597a579468e8",
+    "integrity": "sha512-eNh6BlwcYInWaJtRv18mXQ06Ys/H6rdTZAnTaSdOYJuTpwP1JMCHNd1FDRadA+gbeinq+psdULN5Xnowy9mV8w=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "22cdffdf17a2b6b4d2e1a8c93df0ad35535193b84e6d32ed4945373126f4f3e6"
+      },
+      {
+        "path": "packages/react-day-picker/LICENSE",
+        "sha256": "22cdffdf17a2b6b4d2e1a8c93df0ad35535193b84e6d32ed4945373126f4f3e6"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["LICENSE", "package.json", "src"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "07372a10539d2ac6d2dcb52944b55420ff464556",
+      "size": 1122
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "df11eb996a1233ac1c1053d1263f18953261f62b",
+      "size": 4675
+    },
+    {
+      "path": "src/classes/CalendarDay.test.ts",
+      "gitBlob": "4e0c0bb64e753b812069a300b9ab2843e6961ef7",
+      "size": 729
+    },
+    {
+      "path": "src/classes/CalendarDay.ts",
+      "gitBlob": "b72aba256303e17fdc81145bed5e536b17d87c9a",
+      "size": 2291
+    },
+    {
+      "path": "src/classes/CalendarMonth.test.ts",
+      "gitBlob": "d54ab133e4fa1fc59a8b33cd259ab69f2eafef3b",
+      "size": 836
+    },
+    {
+      "path": "src/classes/CalendarMonth.ts",
+      "gitBlob": "98806e02b04b515773ec85ae1037713f31f990fd",
+      "size": 476
+    },
+    {
+      "path": "src/classes/CalendarWeek.test.ts",
+      "gitBlob": "63844d4ff2f6c5f8e8d8fd71a5101f4a97cfef9d",
+      "size": 543
+    },
+    {
+      "path": "src/classes/CalendarWeek.ts",
+      "gitBlob": "a01d4228ce6001f79a05230f262de78f883f7b4f",
+      "size": 469
+    },
+    {
+      "path": "src/classes/DateLib.test.ts",
+      "gitBlob": "c803d91af4e7344678471b8bc8d801a8df5575ac",
+      "size": 1712
+    },
+    {
+      "path": "src/classes/DateLib.ts",
+      "gitBlob": "309f9c1b37b9e7334bab89d9309714f19ba0d7c1",
+      "size": 20136
+    },
+    {
+      "path": "src/classes/index.ts",
+      "gitBlob": "d1f840aaec9814bd9f2b39930854da0957409a57",
+      "size": 135
+    },
+    {
+      "path": "src/components/CaptionLabel.tsx",
+      "gitBlob": "e34ec75ec9e56b4193747ff1a84eb7124de4c806",
+      "size": 415
+    },
+    {
+      "path": "src/components/Chevron.tsx",
+      "gitBlob": "b2a826b5f19fd03e0f2e64da0c3599fbc57b029e",
+      "size": 1482
+    },
+    {
+      "path": "src/components/custom-components.tsx",
+      "gitBlob": "1637b9db3305e1837f6235064505e367050158da",
+      "size": 793
+    },
+    {
+      "path": "src/components/Day.tsx",
+      "gitBlob": "6ad08f362964e7cac8c7918634c0f9876b75e683",
+      "size": 852
+    },
+    {
+      "path": "src/components/DayButton.tsx",
+      "gitBlob": "61f20565236f5ebb04b43da03e54c6a24a895bba",
+      "size": 902
+    },
+    {
+      "path": "src/components/Dropdown.tsx",
+      "gitBlob": "e2ed78bb87f294e33deef38f1a3e0e812d8c84db",
+      "size": 2030
+    },
+    {
+      "path": "src/components/DropdownNav.tsx",
+      "gitBlob": "f4357f06a177f19689025a19fa5abf49620d32d3",
+      "size": 420
+    },
+    {
+      "path": "src/components/Footer.tsx",
+      "gitBlob": "afced53966f1c6423c40b1f34d6edaa6d70d6614",
+      "size": 385
+    },
+    {
+      "path": "src/components/Month.tsx",
+      "gitBlob": "ef2e94223760f0d3405be10ad84c5ef825e4a14c",
+      "size": 750
+    },
+    {
+      "path": "src/components/MonthCaption.tsx",
+      "gitBlob": "8a88e52b053d63ea033bc4a8af451d0769dd558e",
+      "size": 718
+    },
+    {
+      "path": "src/components/MonthGrid.tsx",
+      "gitBlob": "e34056a7ffdc783eeb65f6a0ae7fbaa05c40f33c",
+      "size": 422
+    },
+    {
+      "path": "src/components/Months.tsx",
+      "gitBlob": "ca1d3bf32f50ca1434ae5eab116ceece65659b43",
+      "size": 395
+    },
+    {
+      "path": "src/components/MonthsDropdown.tsx",
+      "gitBlob": "723f41e3983183a8405a1bf6e64befebeb10eb18",
+      "size": 428
+    },
+    {
+      "path": "src/components/Nav.tsx",
+      "gitBlob": "2811918f4491d452a350154bd085ad33b1840fe6",
+      "size": 2790
+    },
+    {
+      "path": "src/components/NextMonthButton.tsx",
+      "gitBlob": "a59ed0ee6c42af4a90ed291f63d140e792e846ee",
+      "size": 474
+    },
+    {
+      "path": "src/components/Option.tsx",
+      "gitBlob": "d7a2485598747975031be916444b45497541b9cf",
+      "size": 396
+    },
+    {
+      "path": "src/components/PreviousMonthButton.tsx",
+      "gitBlob": "a5594f4a4379bb3dc7ed7129a6c010d5ae68d2aa",
+      "size": 498
+    },
+    {
+      "path": "src/components/Root.tsx",
+      "gitBlob": "223341c8be9418865dc3c769d7bc0f32b741b686",
+      "size": 560
+    },
+    {
+      "path": "src/components/Select.tsx",
+      "gitBlob": "e75924f332cdf31407feda0ae7c3eebfbc834de3",
+      "size": 395
+    },
+    {
+      "path": "src/components/Week.tsx",
+      "gitBlob": "588248dae7510aa44c842f34c6f2d94922a89838",
+      "size": 568
+    },
+    {
+      "path": "src/components/Weekday.tsx",
+      "gitBlob": "061122308e83565ec14045600b481d2a01fc70d7",
+      "size": 437
+    },
+    {
+      "path": "src/components/Weekdays.tsx",
+      "gitBlob": "35042772dead6c20db7e969dc0d4de73f3b89d22",
+      "size": 462
+    },
+    {
+      "path": "src/components/WeekNumber.tsx",
+      "gitBlob": "da50299b895ad57ae9c74f78d5a3431c9c6b3b66",
+      "size": 597
+    },
+    {
+      "path": "src/components/WeekNumberHeader.tsx",
+      "gitBlob": "3f272ec609dd2d0e79c376caa99b71dd2a0d9c22",
+      "size": 456
+    },
+    {
+      "path": "src/components/Weeks.tsx",
+      "gitBlob": "8048d9244ad7c1f8713cbbe59e25b244865350c6",
+      "size": 411
+    },
+    {
+      "path": "src/components/YearsDropdown.tsx",
+      "gitBlob": "d6a265560ee917d78d76d9c2a33324f300ca6645",
+      "size": 426
+    },
+    {
+      "path": "src/DayPicker.test.tsx",
+      "gitBlob": "bc0359837b793e33c56db716e84a72bde412d4c2",
+      "size": 22216
+    },
+    {
+      "path": "src/DayPicker.tsx",
+      "gitBlob": "d53d133d08a6741f5a8a2738539cb76faa0eaae7",
+      "size": 31296
+    },
+    {
+      "path": "src/formatters/formatCaption.test.ts",
+      "gitBlob": "65144eb4e83d395cb641846dd94cb79b34cae0fa",
+      "size": 965
+    },
+    {
+      "path": "src/formatters/formatCaption.ts",
+      "gitBlob": "50b687c948c65417dc82e9402b650075ad00a13d",
+      "size": 730
+    },
+    {
+      "path": "src/formatters/formatDay.test.ts",
+      "gitBlob": "07288958e72c6e13a99d543b4d58877b4e0e8379",
+      "size": 173
+    },
+    {
+      "path": "src/formatters/formatDay.ts",
+      "gitBlob": "5ad2a535232f1ddd44913b9e9bf93666dfad25c4",
+      "size": 654
+    },
+    {
+      "path": "src/formatters/formatMonthDropdown.test.ts",
+      "gitBlob": "453f849710a0a9b94d27463fd8da5f0b4e26b7bd",
+      "size": 520
+    },
+    {
+      "path": "src/formatters/formatMonthDropdown.ts",
+      "gitBlob": "ebad7582755f5262cb861ad45126caaf51b03e54",
+      "size": 603
+    },
+    {
+      "path": "src/formatters/formatWeekdayName.test.ts",
+      "gitBlob": "c37763bec769db9bee213dfd4eb5740613a3ec16",
+      "size": 419
+    },
+    {
+      "path": "src/formatters/formatWeekdayName.ts",
+      "gitBlob": "8080034d000247e2752665523614e415b6987c0d",
+      "size": 743
+    },
+    {
+      "path": "src/formatters/formatWeekNumber.test.ts",
+      "gitBlob": "397cea28b6b3955a8a350cd9b3a702b091b35aab",
+      "size": 502
+    },
+    {
+      "path": "src/formatters/formatWeekNumber.ts",
+      "gitBlob": "bcfe5d3597fa8f1a1cf329416076388afdb464b2",
+      "size": 711
+    },
+    {
+      "path": "src/formatters/formatWeekNumberHeader.ts",
+      "gitBlob": "9325f22f123a2ebd5b845059abb26a66d595e008",
+      "size": 302
+    },
+    {
+      "path": "src/formatters/formatYearDropdown.test.ts",
+      "gitBlob": "8b47fabe2d47d73a986f352095c4774140c42fa4",
+      "size": 248
+    },
+    {
+      "path": "src/formatters/formatYearDropdown.ts",
+      "gitBlob": "48c3615a5a92035861a7c68c3d829da77270a772",
+      "size": 531
+    },
+    {
+      "path": "src/formatters/index.ts",
+      "gitBlob": "ff88b2a757b719da5386f8503f9f772bde294e79",
+      "size": 275
+    },
+    {
+      "path": "src/helpers/broadcastCalendar.test.ts",
+      "gitBlob": "d12dcf2259abd3712147c08b16026d3002817868",
+      "size": 1515
+    },
+    {
+      "path": "src/helpers/calculateFocusTarget.test.ts",
+      "gitBlob": "68cb84721be22440c5abab54a09e6f742015d530",
+      "size": 4405
+    },
+    {
+      "path": "src/helpers/calculateFocusTarget.ts",
+      "gitBlob": "76e14b9150ea46d1c8c75c8b50b83e927cd182f4",
+      "size": 2811
+    },
+    {
+      "path": "src/helpers/createGetModifiers.test.ts",
+      "gitBlob": "a12ef631d2545a19995fea83ecd9abb685e109b2",
+      "size": 5444
+    },
+    {
+      "path": "src/helpers/createGetModifiers.ts",
+      "gitBlob": "0bc960ddde6714539a7e4084fc045b521d5d5191",
+      "size": 3948
+    },
+    {
+      "path": "src/helpers/endOfBroadcastWeek.test.ts",
+      "gitBlob": "90d4f1f66b2bf42433509bbf7bccb79db7a71c91",
+      "size": 1060
+    },
+    {
+      "path": "src/helpers/endOfBroadcastWeek.ts",
+      "gitBlob": "9d14c1e32643ecf63e56fa9992f7c7037d339ad2",
+      "size": 855
+    },
+    {
+      "path": "src/helpers/getBroadcastWeeksInMonth.test.ts",
+      "gitBlob": "dd8f4aa0b8e3a6fc080f854dfa33f471e31ed1a6",
+      "size": 832
+    },
+    {
+      "path": "src/helpers/getBroadcastWeeksInMonth.ts",
+      "gitBlob": "850b473e7d3e427d4cf9c3fe460dfcd93e829f86",
+      "size": 1234
+    },
+    {
+      "path": "src/helpers/getClassNamesForModifiers.ts",
+      "gitBlob": "572f1b3dea3a278165f2883ca62127d239bf827d",
+      "size": 1410
+    },
+    {
+      "path": "src/helpers/getComponents.ts",
+      "gitBlob": "d7596764929d7a7a778aadcbb510efeabca38a0d",
+      "size": 646
+    },
+    {
+      "path": "src/helpers/getDataAttributes.test.tsx",
+      "gitBlob": "3b3472fc8c5992d200f87ed4d1f8bec3ca1eadd8",
+      "size": 1098
+    },
+    {
+      "path": "src/helpers/getDataAttributes.tsx",
+      "gitBlob": "5050536cc050b81bde77b601d4e1d44288625efd",
+      "size": 1056
+    },
+    {
+      "path": "src/helpers/getDates.test.ts",
+      "gitBlob": "5a15c161e639173cd9bac61d7900a025ab25787f",
+      "size": 7584
+    },
+    {
+      "path": "src/helpers/getDates.ts",
+      "gitBlob": "cdb1e91a38abc49a82cb668000e52c1a7e108cc5",
+      "size": 2824
+    },
+    {
+      "path": "src/helpers/getDays.test.ts",
+      "gitBlob": "1cf39b31c517f5a7c96c0ed4604031dde76bc7db",
+      "size": 1151
+    },
+    {
+      "path": "src/helpers/getDays.ts",
+      "gitBlob": "ccffd108d3bb122c74cdee58067c3b5731494d3a",
+      "size": 710
+    },
+    {
+      "path": "src/helpers/getDefaultClassNames.test.ts",
+      "gitBlob": "247ad274fc350f7b59390886ffa2f3befa5741be",
+      "size": 1620
+    },
+    {
+      "path": "src/helpers/getDefaultClassNames.ts",
+      "gitBlob": "245e71388482a657630099094ec6fc00c464d03a",
+      "size": 1155
+    },
+    {
+      "path": "src/helpers/getDisplayMonths.test.ts",
+      "gitBlob": "237c8dc8aeac5bf66b94d8cf6ff3ed3fea6ca786",
+      "size": 1315
+    },
+    {
+      "path": "src/helpers/getDisplayMonths.ts",
+      "gitBlob": "3034ee8acaa8ef4553b8e8121021298b93e2db16",
+      "size": 1006
+    },
+    {
+      "path": "src/helpers/getFocusableDate.test.ts",
+      "gitBlob": "d761dfcccb1477e7f7cb6ce02989f6c7b98d0410",
+      "size": 3819
+    },
+    {
+      "path": "src/helpers/getFocusableDate.ts",
+      "gitBlob": "ef06d314194dfc30a120f90b8e30c5d5075a0411",
+      "size": 2154
+    },
+    {
+      "path": "src/helpers/getFormatters.test.ts",
+      "gitBlob": "2e6ab5871a47ee5d9f0d87bfecd6f5b665b43ce3",
+      "size": 628
+    },
+    {
+      "path": "src/helpers/getFormatters.ts",
+      "gitBlob": "cbe458223839b47476b74ce58c80d22250e8caf9",
+      "size": 480
+    },
+    {
+      "path": "src/helpers/getInitialMonth.test.ts",
+      "gitBlob": "6f217a40594be8044fa2d97807256a90303b6f4b",
+      "size": 3207
+    },
+    {
+      "path": "src/helpers/getInitialMonth.ts",
+      "gitBlob": "3ff2e9a44bb0cdb3d2587cdc8b894d86ffebf3bd",
+      "size": 1363
+    },
+    {
+      "path": "src/helpers/getLabels.test.ts",
+      "gitBlob": "238c8d5dc8e0761de76534ac3a0101819c4d9f76",
+      "size": 2388
+    },
+    {
+      "path": "src/helpers/getLabels.ts",
+      "gitBlob": "647979c8e2d87af4b0e25733d5d6bfae3fae9531",
+      "size": 3165
+    },
+    {
+      "path": "src/helpers/getMonthOptions.test.ts",
+      "gitBlob": "e05e49c9d385c0adb5f4c70c92645f2096ad236b",
+      "size": 8241
+    },
+    {
+      "path": "src/helpers/getMonthOptions.ts",
+      "gitBlob": "4b19ece46d4b3c47d44fd45fc38792495ae0d27a",
+      "size": 1637
+    },
+    {
+      "path": "src/helpers/getMonths.test.ts",
+      "gitBlob": "dc4b3a3369ee04aeb74e45bb47e3c2d6a43cac4c",
+      "size": 2773
+    },
+    {
+      "path": "src/helpers/getMonths.ts",
+      "gitBlob": "d8f424fc7c165de375a8e1324c2cdff5611edd75",
+      "size": 3102
+    },
+    {
+      "path": "src/helpers/getNavMonth.test.ts",
+      "gitBlob": "6a69bf49f24576ca7bc4460af3f82ef8f7015072",
+      "size": 3178
+    },
+    {
+      "path": "src/helpers/getNavMonth.ts",
+      "gitBlob": "1585ed6ebf1df621591bd08f07059988cedff804",
+      "size": 1360
+    },
+    {
+      "path": "src/helpers/getNextFocus.test.tsx",
+      "gitBlob": "eb6cf79a367b1589ffeb173c8c9b3b6bfa7a34dc",
+      "size": 2232
+    },
+    {
+      "path": "src/helpers/getNextFocus.tsx",
+      "gitBlob": "53f44f192e12baae31dc3a9baca5afc3bfdbdf2e",
+      "size": 2387
+    },
+    {
+      "path": "src/helpers/getNextMonth.test.ts",
+      "gitBlob": "16a5a771d0595f2658c9f3afd18618b521b83630",
+      "size": 3049
+    },
+    {
+      "path": "src/helpers/getNextMonth.ts",
+      "gitBlob": "d853c0f75361aeca4d8a293a2deee256a85aecbf",
+      "size": 1636
+    },
+    {
+      "path": "src/helpers/getPreviousMonth.test.ts",
+      "gitBlob": "d8bcd95ad224e736251ea7a2326e1bca832a3800",
+      "size": 2044
+    },
+    {
+      "path": "src/helpers/getPreviousMonth.ts",
+      "gitBlob": "88a433414c8fcf6bdfb39d632bbcb92a4d3b4d1e",
+      "size": 1633
+    },
+    {
+      "path": "src/helpers/getStyleForModifiers.test.ts",
+      "gitBlob": "efc03810efceca0ddb55ba934a3e145f24cfb86d",
+      "size": 2568
+    },
+    {
+      "path": "src/helpers/getStyleForModifiers.ts",
+      "gitBlob": "9b7c6500ad0e3d25e27fd9fafdcaf446d06e7967",
+      "size": 1006
+    },
+    {
+      "path": "src/helpers/getWeekdays.test.ts",
+      "gitBlob": "b9e67d09e8e5ea1319ccddf3a20524e73053dcfc",
+      "size": 1075
+    },
+    {
+      "path": "src/helpers/getWeekdays.ts",
+      "gitBlob": "b5907e875dbd224b71fe84b31372a3b9a78949f7",
+      "size": 1114
+    },
+    {
+      "path": "src/helpers/getWeeks.test.ts",
+      "gitBlob": "797b7c69e9bcc89e29deafecf442aeaa554787a8",
+      "size": 1136
+    },
+    {
+      "path": "src/helpers/getWeeks.ts",
+      "gitBlob": "aa28f9474b43ddff4ece74537a2dc367c708bc32",
+      "size": 457
+    },
+    {
+      "path": "src/helpers/getYearOptions.test.ts",
+      "gitBlob": "45c4f9069b3d15561ea5bc49260a6ed5fafee15f",
+      "size": 1827
+    },
+    {
+      "path": "src/helpers/getYearOptions.ts",
+      "gitBlob": "7c47a706a4fd1d6a5510e942ddbfa32c2bc20875",
+      "size": 1559
+    },
+    {
+      "path": "src/helpers/index.ts",
+      "gitBlob": "dd7fda5102841f5bb33b599818abac34bc702ba0",
+      "size": 106
+    },
+    {
+      "path": "src/helpers/startOfBroadcastWeek.test.ts",
+      "gitBlob": "3fa7d5e3233ae65be326e2cb94c5cbc7c43840af",
+      "size": 1201
+    },
+    {
+      "path": "src/helpers/startOfBroadcastWeek.ts",
+      "gitBlob": "55e8f2af1f6f1dea437b6e7c8300d2e2fae2f14c",
+      "size": 900
+    },
+    {
+      "path": "src/helpers/useControlledValue.test.ts",
+      "gitBlob": "fbbd1c19701692f96878b86a16d4b0aaba4746bc",
+      "size": 1593
+    },
+    {
+      "path": "src/helpers/useControlledValue.ts",
+      "gitBlob": "7cc96202462267e94f39565123208f7f6ce16265",
+      "size": 1381
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "56214e793077267c9c6edfeea897199d9a655a6d",
+      "size": 398
+    },
+    {
+      "path": "src/labels/index.ts",
+      "gitBlob": "dd50f936f5cbc3a908901a671652e4d7f94c46b9",
+      "size": 434
+    },
+    {
+      "path": "src/labels/labelDayButton.test.ts",
+      "gitBlob": "46b8c1799d4d83a3f38f51754c83ebf7e0dadca3",
+      "size": 1004
+    },
+    {
+      "path": "src/labels/labelDayButton.ts",
+      "gitBlob": "82ff010a3e4b48fc04714ef5adfae91cb8f7f2f8",
+      "size": 1049
+    },
+    {
+      "path": "src/labels/labelGrid.test.ts",
+      "gitBlob": "47e1d62c71f3a8f9036139c7b3c4057631e9c605",
+      "size": 333
+    },
+    {
+      "path": "src/labels/labelGrid.ts",
+      "gitBlob": "3fbd765be33839c72918743f441054e306eeba20",
+      "size": 752
+    },
+    {
+      "path": "src/labels/labelGridcell.test.ts",
+      "gitBlob": "f202c405c7802b503cb860913e367dfee415046f",
+      "size": 193
+    },
+    {
+      "path": "src/labels/labelGridcell.ts",
+      "gitBlob": "cfd7e2d05e7ab9282f52a6013e8b5cce73ab31de",
+      "size": 866
+    },
+    {
+      "path": "src/labels/labelMonthDropdown.test.ts",
+      "gitBlob": "b6d34dc84dcf23e160b3e063c12d86ac3ef72568",
+      "size": 166
+    },
+    {
+      "path": "src/labels/labelMonthDropdown.ts",
+      "gitBlob": "9469c6cd5ae42e623644a1f48165399d0aec81d4",
+      "size": 463
+    },
+    {
+      "path": "src/labels/labelNav.test.ts",
+      "gitBlob": "e03de84fca0c3429f5fc7d2e4672bb545cc3e7b7",
+      "size": 118
+    },
+    {
+      "path": "src/labels/labelNav.ts",
+      "gitBlob": "553272625694d3057cc439c955cfc3f0d034dfc0",
+      "size": 272
+    },
+    {
+      "path": "src/labels/labelNext.test.ts",
+      "gitBlob": "75f4bfa96b2d63e56c0c59eb95ed5f9f88b27288",
+      "size": 1056
+    },
+    {
+      "path": "src/labels/labelNext.ts",
+      "gitBlob": "aea3af76ccaaa4d3d28c8e9a61634a29ee6f40d7",
+      "size": 559
+    },
+    {
+      "path": "src/labels/labelPrevious.test.ts",
+      "gitBlob": "32db2677feac3fbb735a76f54d6e398242cbd307",
+      "size": 167
+    },
+    {
+      "path": "src/labels/labelPrevious.ts",
+      "gitBlob": "21f95285f2df391b1ecbc9a3f9ea531341700575",
+      "size": 462
+    },
+    {
+      "path": "src/labels/labelWeekday.test.ts",
+      "gitBlob": "f7b8e90ab65051dc7e2325021fa4d7c2162762a8",
+      "size": 415
+    },
+    {
+      "path": "src/labels/labelWeekday.ts",
+      "gitBlob": "f4245ebe4147d71142afec5c24334b6d7aff42ae",
+      "size": 742
+    },
+    {
+      "path": "src/labels/labelWeekNumber.test.ts",
+      "gitBlob": "f81a66f1d84c95f1c6f3ee66301e975ac0089b93",
+      "size": 146
+    },
+    {
+      "path": "src/labels/labelWeekNumber.ts",
+      "gitBlob": "aae8b6559c34f3fc1955869f69f3198a146bde28",
+      "size": 572
+    },
+    {
+      "path": "src/labels/labelWeekNumberHeader.test.ts",
+      "gitBlob": "efe97fc87470aa3764032333be71b0a1b4d606be",
+      "size": 168
+    },
+    {
+      "path": "src/labels/labelWeekNumberHeader.ts",
+      "gitBlob": "aea41c2c35552701659917cc315de6436cba8b6d",
+      "size": 478
+    },
+    {
+      "path": "src/labels/labelYearDropdown.test.ts",
+      "gitBlob": "6e3e29c312204967c5004157134168e2ad3a0747",
+      "size": 160
+    },
+    {
+      "path": "src/labels/labelYearDropdown.ts",
+      "gitBlob": "04d8f8adec3f131987cb54169c9e160df381ac9b",
+      "size": 458
+    },
+    {
+      "path": "src/locale.test.ts",
+      "gitBlob": "a6cf6929e916817e6e66227caeea9a26e5fe3940",
+      "size": 680
+    },
+    {
+      "path": "src/locale.ts",
+      "gitBlob": "db9f6467a32a5ffd36a2bb2daa4e36f170cbba2d",
+      "size": 3972
+    },
+    {
+      "path": "src/locale/af.ts",
+      "gitBlob": "71d1623a78faba52c4d10bffccee73a6ea89de02",
+      "size": 1664
+    },
+    {
+      "path": "src/locale/ar-DZ.ts",
+      "gitBlob": "5903b09d990a6102c7a4d13e82ce968289fd14ab",
+      "size": 1768
+    },
+    {
+      "path": "src/locale/ar-EG.ts",
+      "gitBlob": "407bdb2bd29da963d84c054441aaf2d01374d32f",
+      "size": 1766
+    },
+    {
+      "path": "src/locale/ar-MA.ts",
+      "gitBlob": "e9c39221b8436e1e74c56e9e1fbc2f74b59cb70a",
+      "size": 1768
+    },
+    {
+      "path": "src/locale/ar-SA.ts",
+      "gitBlob": "c9267c79b954585df3a70ef209c180e3fcab6618",
+      "size": 1773
+    },
+    {
+      "path": "src/locale/ar-TN.ts",
+      "gitBlob": "f3b2590c00a8c70158e2c7785230b37bcd0699e1",
+      "size": 1768
+    },
+    {
+      "path": "src/locale/ar.ts",
+      "gitBlob": "06e4cdd9e7b2d984a3045a89dd25f1368d0eb165",
+      "size": 1750
+    },
+    {
+      "path": "src/locale/az.ts",
+      "gitBlob": "87bb0f69231d7e90c54d153b19b069e0c6904323",
+      "size": 1675
+    },
+    {
+      "path": "src/locale/be-tarask.ts",
+      "gitBlob": "55f81fc9404958323272ad29944ad6ba9d656e9f",
+      "size": 1865
+    },
+    {
+      "path": "src/locale/be.ts",
+      "gitBlob": "87e4f1d37e8db6fd7785e53b1621add0ff14c0a8",
+      "size": 1807
+    },
+    {
+      "path": "src/locale/bg.ts",
+      "gitBlob": "6a1f4d4c229bfd6d4364efbcb06d33210013a391",
+      "size": 1786
+    },
+    {
+      "path": "src/locale/bn.ts",
+      "gitBlob": "60aee6954434220e5c64aee3ebf46719cd180612",
+      "size": 1864
+    },
+    {
+      "path": "src/locale/bs.ts",
+      "gitBlob": "c02f0ccf503c61b4ae4885a52a0c92656434a820",
+      "size": 1681
+    },
+    {
+      "path": "src/locale/ca.ts",
+      "gitBlob": "d8f69c628126ec3e932be90a34139f8065bf8939",
+      "size": 1670
+    },
+    {
+      "path": "src/locale/ckb.ts",
+      "gitBlob": "c2cc2aaa8468b0b85ba03221a89bbf18dc046483",
+      "size": 1791
+    },
+    {
+      "path": "src/locale/cs.ts",
+      "gitBlob": "9116614651b2dfaaebb33d5f27678d1d0d448823",
+      "size": 1683
+    },
+    {
+      "path": "src/locale/cy.ts",
+      "gitBlob": "34f69ad6ba37ca28d3f28a36cd4e62f1b3c5e526",
+      "size": 1676
+    },
+    {
+      "path": "src/locale/da.ts",
+      "gitBlob": "232c10e9be848dae3e07d8fef1ad8951cbe218d9",
+      "size": 1654
+    },
+    {
+      "path": "src/locale/de-AT.ts",
+      "gitBlob": "b19a995d8b8e44d2f84d8ec474a52debacb43e49",
+      "size": 1690
+    },
+    {
+      "path": "src/locale/de.ts",
+      "gitBlob": "d62dc389a7923d2e165409041ee66090bc1c5a70",
+      "size": 1672
+    },
+    {
+      "path": "src/locale/el.ts",
+      "gitBlob": "897a5a3d3c04b9eb4ec40a96756fb7966836bcc1",
+      "size": 1826
+    },
+    {
+      "path": "src/locale/en-AU.ts",
+      "gitBlob": "3b92c8f0ccd504029ea2d0ad6cec1affd9ec5f3f",
+      "size": 1690
+    },
+    {
+      "path": "src/locale/en-CA.ts",
+      "gitBlob": "8b0dfc8eae495a574d26a074f170f9f5094db191",
+      "size": 1687
+    },
+    {
+      "path": "src/locale/en-GB.ts",
+      "gitBlob": "70b07f80fc2b19eacd223917138b2ede213b1e48",
+      "size": 1702
+    },
+    {
+      "path": "src/locale/en-IE.ts",
+      "gitBlob": "8fcbcea7d5f06c0c70710cf646621c2c3d1f4b11",
+      "size": 1688
+    },
+    {
+      "path": "src/locale/en-IN.ts",
+      "gitBlob": "0db8370fce38301e6ac2523c3b99f63f9ea7e635",
+      "size": 1686
+    },
+    {
+      "path": "src/locale/en-NZ.ts",
+      "gitBlob": "91fd7b27bae25f651fc97014f46dac13e6dd99b7",
+      "size": 1692
+    },
+    {
+      "path": "src/locale/en-US.ts",
+      "gitBlob": "68bb7553aa6f59a8113b176e2a0008c5a9b86347",
+      "size": 2766
+    },
+    {
+      "path": "src/locale/en-ZA.ts",
+      "gitBlob": "ce81d597d20153d65888096fa615807ad5483e55",
+      "size": 1693
+    },
+    {
+      "path": "src/locale/eo.ts",
+      "gitBlob": "64956e047e8d104b937ff3e64229d40409e5eaaa",
+      "size": 1683
+    },
+    {
+      "path": "src/locale/es.ts",
+      "gitBlob": "b1729cadf9f023f238efd0b08ddd076c9a43a927",
+      "size": 1673
+    },
+    {
+      "path": "src/locale/et.ts",
+      "gitBlob": "c8b1c55bfdf99173ae7357becf81643772c0eaf1",
+      "size": 1662
+    },
+    {
+      "path": "src/locale/eu.ts",
+      "gitBlob": "5f11edc5cc4b40b22ec55f8bc361de82f031ea70",
+      "size": 1673
+    },
+    {
+      "path": "src/locale/fa-IR.ts",
+      "gitBlob": "183678094ddc47d5e0dbada9b2ff21fcd52d2dbf",
+      "size": 1773
+    },
+    {
+      "path": "src/locale/fi.ts",
+      "gitBlob": "725b899c506e2f7d29b052a34038c12f292a2d1c",
+      "size": 1692
+    },
+    {
+      "path": "src/locale/fr-CA.ts",
+      "gitBlob": "132ecfcf59bfd74f081aec182fc1463a4bc2a6ed",
+      "size": 1720
+    },
+    {
+      "path": "src/locale/fr-CH.ts",
+      "gitBlob": "cad996ed70b7e7d76469bc351b407f9e4b6e05f7",
+      "size": 1725
+    },
+    {
+      "path": "src/locale/fr.ts",
+      "gitBlob": "dbf390363a67e524a83c6b3f76172c598e933934",
+      "size": 1703
+    },
+    {
+      "path": "src/locale/fy.ts",
+      "gitBlob": "ff6cfc01d3cbac83cfd7874436feea12da4a175d",
+      "size": 1662
+    },
+    {
+      "path": "src/locale/gd.ts",
+      "gitBlob": "497d481eda828fecd342e3a1c2e60a712e9ebfa8",
+      "size": 1703
+    },
+    {
+      "path": "src/locale/gl.ts",
+      "gitBlob": "85ad0fcba36036a45390e41ad8d1697c2aa80d83",
+      "size": 1676
+    },
+    {
+      "path": "src/locale/gu.ts",
+      "gitBlob": "59249dbb355f5f76315df4230a1bd02b2a87aae5",
+      "size": 1854
+    },
+    {
+      "path": "src/locale/he.ts",
+      "gitBlob": "1c8124af1f42bd32019869b3e1b7785b904fbad3",
+      "size": 1713
+    },
+    {
+      "path": "src/locale/hi.ts",
+      "gitBlob": "f77baf4137d8b42fcf8bf4de8a52d0869c7ddbad",
+      "size": 1820
+    },
+    {
+      "path": "src/locale/hr.ts",
+      "gitBlob": "d3506de34da7ff6b7d6fe7d7293fd0d731b2cdd2",
+      "size": 1690
+    },
+    {
+      "path": "src/locale/ht.ts",
+      "gitBlob": "e227368e6a86ab44da7147204acb5c2a636d83f2",
+      "size": 1665
+    },
+    {
+      "path": "src/locale/hu.ts",
+      "gitBlob": "1bbbfe5d6c5dde9c1d8bf05db3cf6e118d172b2d",
+      "size": 1697
+    },
+    {
+      "path": "src/locale/hy.ts",
+      "gitBlob": "c0c3c4608b806313a4aef2f5bc32f01aaf4fe626",
+      "size": 1775
+    },
+    {
+      "path": "src/locale/id.ts",
+      "gitBlob": "49fe9e10dcb8be9ec9d6cbaefb8162e023371d92",
+      "size": 1666
+    },
+    {
+      "path": "src/locale/is.ts",
+      "gitBlob": "379d3e9b166896b188e2c0186999da3275f36a73",
+      "size": 1666
+    },
+    {
+      "path": "src/locale/it-CH.ts",
+      "gitBlob": "d90a4f510ab60b5d57cb655b4f6b96973beea2ca",
+      "size": 1705
+    },
+    {
+      "path": "src/locale/it.ts",
+      "gitBlob": "af8f9f50379641d4040262963fa690b1caef723d",
+      "size": 1685
+    },
+    {
+      "path": "src/locale/ja-Hira.ts",
+      "gitBlob": "3f34630cba28241f5177f713406b54e6b795d06f",
+      "size": 1744
+    },
+    {
+      "path": "src/locale/ja.ts",
+      "gitBlob": "5678b3466caeb8ec888e3c1f47de55d0b927f47d",
+      "size": 1665
+    },
+    {
+      "path": "src/locale/ka.ts",
+      "gitBlob": "88c8cf9b1bc6be710ccc410141d190dae40a7a48",
+      "size": 1872
+    },
+    {
+      "path": "src/locale/kk.ts",
+      "gitBlob": "5936364b7afc903a7d8f6009409c4e480e3b4922",
+      "size": 1755
+    },
+    {
+      "path": "src/locale/km.ts",
+      "gitBlob": "15cd2629e27b7af2d268481c065b4d2fafb7d8e2",
+      "size": 1798
+    },
+    {
+      "path": "src/locale/kn.ts",
+      "gitBlob": "2ff5d263b6a8f3f32ed9ffbd5f21aaaa05c7597f",
+      "size": 1863
+    },
+    {
+      "path": "src/locale/ko.ts",
+      "gitBlob": "ae60cad707e38fe5710265f6ca176c675b857797",
+      "size": 1657
+    },
+    {
+      "path": "src/locale/lb.ts",
+      "gitBlob": "988ad3981cbaacd1afd6303ef7af9d6d3e1749bb",
+      "size": 1671
+    },
+    {
+      "path": "src/locale/lt.ts",
+      "gitBlob": "2ca75c7055ad09370078a48fa984e8ae521acafd",
+      "size": 1711
+    },
+    {
+      "path": "src/locale/lv.ts",
+      "gitBlob": "0d8f4c6a7c2341e6462daaeeca160484f82ea7ab",
+      "size": 1693
+    },
+    {
+      "path": "src/locale/mk.ts",
+      "gitBlob": "072ae5b69b2de56e0fbaec61bb70e72671ab5803",
+      "size": 1799
+    },
+    {
+      "path": "src/locale/mn.ts",
+      "gitBlob": "2bb8dc33fae91872fd4918285dd793a68300d8db",
+      "size": 1824
+    },
+    {
+      "path": "src/locale/ms.ts",
+      "gitBlob": "bb4bb800508ebed7365ac9b30ad7c4f5040f0426",
+      "size": 1672
+    },
+    {
+      "path": "src/locale/mt.ts",
+      "gitBlob": "9c0214f4c185500d819dd0a389c097507d9415d9",
+      "size": 1695
+    },
+    {
+      "path": "src/locale/nb.ts",
+      "gitBlob": "b515b80ba4c2b80672bc033aa49a193b72306954",
+      "size": 1662
+    },
+    {
+      "path": "src/locale/nl-BE.ts",
+      "gitBlob": "3a92b4d77cc43a6351b345622627cbebb0119653",
+      "size": 1685
+    },
+    {
+      "path": "src/locale/nl.ts",
+      "gitBlob": "18457e3aba01f8f860e678a83871e0adb5b572ff",
+      "size": 1667
+    },
+    {
+      "path": "src/locale/nn.ts",
+      "gitBlob": "c2246e6e26852a12e3d515a3057858df811d42d4",
+      "size": 1660
+    },
+    {
+      "path": "src/locale/oc.ts",
+      "gitBlob": "94a567ae80729c413e01e6ee41387cb725296b57",
+      "size": 1689
+    },
+    {
+      "path": "src/locale/pl.ts",
+      "gitBlob": "461f6400309e3156f520924416bd36776258f569",
+      "size": 1700
+    },
+    {
+      "path": "src/locale/pt-BR.ts",
+      "gitBlob": "0a2a44e9f65ad2305bc2c895a98f9275dbcaf491",
+      "size": 1703
+    },
+    {
+      "path": "src/locale/pt.ts",
+      "gitBlob": "b9e17d9815aa5ac8565b5b536c934c9625258d7f",
+      "size": 1686
+    },
+    {
+      "path": "src/locale/ro.ts",
+      "gitBlob": "2eef0a53ff50c67fdaf595e9031c895beca720da",
+      "size": 1691
+    },
+    {
+      "path": "src/locale/ru.ts",
+      "gitBlob": "1f8166f347f821cdecaf703eb5edf6c88bdfc72f",
+      "size": 1810
+    },
+    {
+      "path": "src/locale/se.ts",
+      "gitBlob": "64a2089a5837e870e0fa50b4861f8afa8ffaae74",
+      "size": 1671
+    },
+    {
+      "path": "src/locale/sk.ts",
+      "gitBlob": "e675113f0a4672f3bcb3e43f94d55b2bd7c49f87",
+      "size": 1691
+    },
+    {
+      "path": "src/locale/sl.ts",
+      "gitBlob": "ace3a5679bcdc62437745198af1bc4b5638dfcae",
+      "size": 1680
+    },
+    {
+      "path": "src/locale/sq.ts",
+      "gitBlob": "6657d7c9a61e1a4dddb2457ed7fa0beea56dd6ac",
+      "size": 1677
+    },
+    {
+      "path": "src/locale/sr-Latn.ts",
+      "gitBlob": "eecbc7f75631ec7b57bdc2d626d3be6ad6f1b7fb",
+      "size": 1704
+    },
+    {
+      "path": "src/locale/sr.ts",
+      "gitBlob": "1a798eaa0ef8a88520ec8510547135a28ce27baf",
+      "size": 1807
+    },
+    {
+      "path": "src/locale/sv.ts",
+      "gitBlob": "61a388639d2d3f16512ad3411bddc1d49426e872",
+      "size": 1663
+    },
+    {
+      "path": "src/locale/ta.ts",
+      "gitBlob": "56465d4d462ba36315a91b44dabe398b99705d49",
+      "size": 2018
+    },
+    {
+      "path": "src/locale/te.ts",
+      "gitBlob": "39d3bf8955bc868a9428f389e239d63873c06fa9",
+      "size": 1926
+    },
+    {
+      "path": "src/locale/th.ts",
+      "gitBlob": "fbbdf21b0ce9db6ffe18404df51bc81a161ea350",
+      "size": 1827
+    },
+    {
+      "path": "src/locale/tr.ts",
+      "gitBlob": "b2aaf489a45c2bb59035bb9687af6de7f10b6d00",
+      "size": 1657
+    },
+    {
+      "path": "src/locale/ug.ts",
+      "gitBlob": "2d4fe22f6537ce5d0233893fca4067a12ed4d713",
+      "size": 1766
+    },
+    {
+      "path": "src/locale/uk.ts",
+      "gitBlob": "8c688800603408346de9d4c27e36dc2e450ef625",
+      "size": 1824
+    },
+    {
+      "path": "src/locale/uz-Cyrl.ts",
+      "gitBlob": "c89060051868a360cdc3994f9f7c22fa1c8fab51",
+      "size": 1791
+    },
+    {
+      "path": "src/locale/uz.ts",
+      "gitBlob": "f06d8f562d459c54972dcdba307c4505b1feb0ac",
+      "size": 1671
+    },
+    {
+      "path": "src/locale/vi.ts",
+      "gitBlob": "0189cb573b372a758836d07d9accc447590f6bc0",
+      "size": 1688
+    },
+    {
+      "path": "src/locale/zh-CN.ts",
+      "gitBlob": "9d5c487f679213876c42d5f223c74f75146f11a1",
+      "size": 1669
+    },
+    {
+      "path": "src/locale/zh-HK.ts",
+      "gitBlob": "45601de84a159646aeda0774a5a55bd3d5aa57da",
+      "size": 1688
+    },
+    {
+      "path": "src/locale/zh-TW.ts",
+      "gitBlob": "5c09c8f6be1f2844c765f2f790fd34889f94f233",
+      "size": 1685
+    },
+    {
+      "path": "src/noonDateLib.ts",
+      "gitBlob": "f3e3519139154909660dac08b8023031974baf9b",
+      "size": 6632
+    },
+    {
+      "path": "src/selection/useMulti.test.tsx",
+      "gitBlob": "0caa2107498a2df29b486f3dee6f401fce4b2516",
+      "size": 1248
+    },
+    {
+      "path": "src/selection/useMulti.tsx",
+      "gitBlob": "9336e88b04d57766a28711b46b980cb21479699d",
+      "size": 2204
+    },
+    {
+      "path": "src/selection/useRange.test.tsx",
+      "gitBlob": "548bc5eac16a07cd41079be587ee82d589a97ad4",
+      "size": 6635
+    },
+    {
+      "path": "src/selection/useRange.tsx",
+      "gitBlob": "b58d533d46158c59bf769b04a7adbcaa54d7d2b5",
+      "size": 2909
+    },
+    {
+      "path": "src/selection/useSingle.test.tsx",
+      "gitBlob": "52207267c93381559971d2cf992beaabf4e1da2c",
+      "size": 1150
+    },
+    {
+      "path": "src/selection/useSingle.tsx",
+      "gitBlob": "88fe2216b66f908365eaec747ee01d77f885a9a9",
+      "size": 2030
+    },
+    {
+      "path": "src/style.css",
+      "gitBlob": "94f3f9161de4189c913aa898837443ccbf22a28f",
+      "size": 11314
+    },
+    {
+      "path": "src/style.css.d.ts",
+      "gitBlob": "7b0a63356750376adb2c8547a6504ae40e8e22c7",
+      "size": 54
+    },
+    {
+      "path": "src/style.module.css",
+      "gitBlob": "85425e0bef0d5732a1fe00c187b6d2aace608705",
+      "size": 10998
+    },
+    {
+      "path": "src/style.module.css.d.ts",
+      "gitBlob": "4bf72490c20c87db6e419ee31c1333edc40a5ae8",
+      "size": 569
+    },
+    {
+      "path": "src/types/index.ts",
+      "gitBlob": "a4b077f4e897f0835d07246f152ab98952238ccc",
+      "size": 89
+    },
+    {
+      "path": "src/types/props.test.tsx",
+      "gitBlob": "0133f147d213fb0cf02b09fcd597217370d28e07",
+      "size": 7156
+    },
+    {
+      "path": "src/types/props.ts",
+      "gitBlob": "75e201819a41a56517f1f26699571acc3c209619",
+      "size": 20637
+    },
+    {
+      "path": "src/types/selection.ts",
+      "gitBlob": "00ef7f810a8b73157cc9c5e862aa930133b2de3e",
+      "size": 3266
+    },
+    {
+      "path": "src/types/shared.ts",
+      "gitBlob": "0da93d6d8bd52ddbc87c49047b8ca552118ae773",
+      "size": 10661
+    },
+    {
+      "path": "src/UI.ts",
+      "gitBlob": "f8ebd840d1507968ee8d0caa0a3aa7e70059e3bf",
+      "size": 4278
+    },
+    {
+      "path": "src/useAnimation.test.tsx",
+      "gitBlob": "6ea81b22d2a3e2c0b4b8361335135c5a9bcf6ffd",
+      "size": 11849
+    },
+    {
+      "path": "src/useAnimation.ts",
+      "gitBlob": "81a88a5079beb9d84a25904276c07f994008ee5e",
+      "size": 8431
+    },
+    {
+      "path": "src/useCalendar.ts",
+      "gitBlob": "44a02c0f115c8668dede919169cad0f9eed1b749",
+      "size": 6100
+    },
+    {
+      "path": "src/useDayPicker.test.tsx",
+      "gitBlob": "1e0b982cd533e10f314582d104f2d6f09eef3303",
+      "size": 6301
+    },
+    {
+      "path": "src/useDayPicker.ts",
+      "gitBlob": "351978ae4f65847684fc081be9c3754d24361ce6",
+      "size": 3048
+    },
+    {
+      "path": "src/useFocus.ts",
+      "gitBlob": "05e66862d1ae3136080ba34a27d84a962ecabe8a",
+      "size": 2967
+    },
+    {
+      "path": "src/useSelection.ts",
+      "gitBlob": "f93761ec47a98bfa459ac5b2c3ac81646bb5be31",
+      "size": 1134
+    },
+    {
+      "path": "src/utc.tsx",
+      "gitBlob": "143d25d0c8e65a7eb27b8a75c453c5048479affb",
+      "size": 519
+    },
+    {
+      "path": "src/utils/addToRange.test.ts",
+      "gitBlob": "e5d9781fe238217ed769083ff758ff62231b85a9",
+      "size": 5146
+    },
+    {
+      "path": "src/utils/addToRange.ts",
+      "gitBlob": "62dd07cd3c277bd8fdc0f393f75fa0a24271bab6",
+      "size": 3083
+    },
+    {
+      "path": "src/utils/convertMatchersToTimeZone.test.ts",
+      "gitBlob": "9f3014935df2dc64c943519f58df57df9d776897",
+      "size": 4739
+    },
+    {
+      "path": "src/utils/convertMatchersToTimeZone.ts",
+      "gitBlob": "164429d4dcc2e5d14e52906fd876759201311f11",
+      "size": 2355
+    },
+    {
+      "path": "src/utils/dateMatchModifiers.test.ts",
+      "gitBlob": "6b74f379bc6d275f288ded173e78fa3035950646",
+      "size": 3470
+    },
+    {
+      "path": "src/utils/dateMatchModifiers.ts",
+      "gitBlob": "f249d05869103856b7c36db24dafcd1f0fc9c8f1",
+      "size": 2347
+    },
+    {
+      "path": "src/utils/index.ts",
+      "gitBlob": "967c825b9d93bc650a14bfcb4c285a6a0afb9028",
+      "size": 273
+    },
+    {
+      "path": "src/utils/rangeContainsDayOfWeek.test.ts",
+      "gitBlob": "038500ec2189bad59676561940d96578665d5b76",
+      "size": 1754
+    },
+    {
+      "path": "src/utils/rangeContainsDayOfWeek.ts",
+      "gitBlob": "f761f2105812a0877d7f132644c871b6ae240f65",
+      "size": 1125
+    },
+    {
+      "path": "src/utils/rangeContainsModifiers.test.ts",
+      "gitBlob": "b7e9d136a141e98cb17d80183c5557f5c855521f",
+      "size": 9413
+    },
+    {
+      "path": "src/utils/rangeContainsModifiers.ts",
+      "gitBlob": "8c3f48c9b162bf8906a269523fe11bebfc548e81",
+      "size": 3237
+    },
+    {
+      "path": "src/utils/rangeIncludesDate.test.ts",
+      "gitBlob": "ed5bae2522b5ebbaa84e15850d7164d69fa47607",
+      "size": 1364
+    },
+    {
+      "path": "src/utils/rangeIncludesDate.ts",
+      "gitBlob": "5a0db439f97639205f7b20f2c148853884f0206e",
+      "size": 1216
+    },
+    {
+      "path": "src/utils/rangeOverlaps.test.ts",
+      "gitBlob": "88fb345c965108b5de8b97e489bceb4cfc8a1eab",
+      "size": 2283
+    },
+    {
+      "path": "src/utils/rangeOverlaps.ts",
+      "gitBlob": "7ae1aee88fbf407283ea13ec79282ed83fdbb661",
+      "size": 849
+    },
+    {
+      "path": "src/utils/toTimeZone.test.ts",
+      "gitBlob": "36f59e5026f31114326e75264d31d1b75e137f23",
+      "size": 1708
+    },
+    {
+      "path": "src/utils/toTimeZone.ts",
+      "gitBlob": "4f5fc31eb475114c3e3708c45dae4a1939ad0172",
+      "size": 436
+    },
+    {
+      "path": "src/utils/typeguards.test.ts",
+      "gitBlob": "cae079147901fff4ccd10471033f793539981359",
+      "size": 2707
+    },
+    {
+      "path": "src/utils/typeguards.ts",
+      "gitBlob": "18966e933d9b577f1d727fad10fd4e72635aa82d",
+      "size": 2395
+    }
+  ],
+  "fingerprint": "81e4da7d82b85a3c77aa51b37622ce1435c595f720130941403aaf2547b53b27"
+}

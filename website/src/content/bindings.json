@@ -1,7 +1,7 @@
 [
   {
     "title": "Shared state",
-    "description": "Small stores, atoms, observable state, Redux, RTK Query, and TanStack Store.",
+    "description": "Small stores, atoms, observable state, state machines, Redux, RTK Query, and TanStack Store.",
     "packages": [
       "@octanejs/alien-signals",
       "@octanejs/zustand",
@@ -11,7 +11,9 @@
       "@octanejs/rxjs",
       "@octanejs/redux",
       "@octanejs/redux-toolkit",
-      "@octanejs/tanstack-store"
+      "@octanejs/tanstack-store",
+      "@octanejs/xstate",
+      "@octanejs/xstate-store"
     ]
   },
   {
@@ -29,13 +31,14 @@
       "@octanejs/tanstack-router-ssr-query",
       "@octanejs/remix-router",
       "@octanejs/inertia",
-      "@octanejs/nuqs"
+      "@octanejs/nuqs",
+      "@octanejs/wouter"
     ]
   },
   {
     "title": "Web3",
     "description": "Wallet connection, chain state, contract reads, signing, and transactions.",
-    "packages": ["@octanejs/wagmi", "@octanejs/rainbowkit", "@octanejs/solana-react"]
+    "packages": ["@octanejs/wagmi", "@octanejs/rainbowkit", "@octanejs/solana-kit"]
   },
   {
     "title": "UI and interaction",
@@ -58,6 +61,7 @@
       "@octanejs/sonner",
       "@octanejs/draggable",
       "@octanejs/react-error-boundary",
+      "@octanejs/resizable-panels",
       "@octanejs/transition-group",
       "@octanejs/day-picker",
       "@octanejs/textarea-autosize",
@@ -68,8 +72,15 @@
       "@octanejs/phosphor-icons",
       "@octanejs/usehooks-ts",
       "@octanejs/intersection-observer",
+      "@octanejs/waypoint",
       "@octanejs/tanstack-hotkeys",
-      "@octanejs/tanstack-pacer"
+      "@octanejs/tanstack-pacer",
+      "@octanejs/stick-to-bottom",
+      "@octanejs/image-crop",
+      "@octanejs/content-loader",
+      "@octanejs/to-print",
+      "@octanejs/calendar",
+      "@octanejs/auto-animate"
     ]
   },
   {
@@ -88,7 +99,8 @@
       "@octanejs/monaco-editor",
       "@octanejs/syntax-highlighter",
       "@octanejs/mdx",
-      "@octanejs/i18next"
+      "@octanejs/i18next",
+      "@octanejs/html-react-parser"
     ]
   },
   {

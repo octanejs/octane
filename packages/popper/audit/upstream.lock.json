@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-popper",
+    "version": "2.3.0",
+    "repository": {
+      "owner": "floating-ui",
+      "repo": "react-popper",
+      "subdirectory": null
+    },
+    "commit": "b636fa3ceee14245d670a0c438fe4343c31258e5",
+    "integrity": "sha512-e1hj8lL3uM+sgSR4Lxzn5h1GxBlpa4CQz0XLF8kx4MDrDRWY0Ena4c97PUeSX9i5W3UAfDP0z0FXCTQkoXUl3Q=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "7d8e07a60e4aa02d24648ce987b644c2e0978234d209fe454a4fe91701867355"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [".babelrc", "LICENSE", "README.md", "jest.setup.js", "package.json", "src", "typings"],
+  "adaptedMappings": [
+    {
+      "fromRoot": "src/__snapshots__",
+      "toRoot": "tests/upstream/tag/snapshots"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "https://goo.gl/fbAQLP",
+      "replace": "https://jestjs.io/docs/snapshot-testing"
+    }
+  ],
+  "files": [
+    {
+      "path": ".babelrc",
+      "gitBlob": "26a409e8e97a1d4b8cfe86062bdfdb68b4fab596",
+      "size": 411
+    },
+    {
+      "path": "jest.setup.js",
+      "gitBlob": "c6d771a5292731c1005e58f829f6fb423ac74082",
+      "size": 42
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "e19c5ca02b77a917cb90965fdada5d26c85bb111",
+      "size": 1087
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "8ff062018144bf25cf324fe66678b0200c86c86d",
+      "size": 3751
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "6b90ad3690e97a1a461275a35c0a41b439a0f627",
+      "size": 2501
+    },
+    {
+      "path": "src/__snapshots__/Manager.test.js.snap",
+      "gitBlob": "a65840d6980f6dcc450b28b184e5b283f5401878",
+      "size": 208
+    },
+    {
+      "path": "src/__snapshots__/Popper.test.js.snap",
+      "gitBlob": "11e7cc5af1a618b57eca6ab27d5a9d4d9419f74f",
+      "size": 374
+    },
+    {
+      "path": "src/__snapshots__/Reference.test.js.snap",
+      "gitBlob": "8b5f24ec8c49a5e927455026b3a7127e1cba5766",
+      "size": 157
+    },
+    {
+      "path": "src/__typings__/main-test.js",
+      "gitBlob": "9339fbd269070777ff67cb9d0a1f0f03e9fede35",
+      "size": 1509
+    },
+    {
+      "path": "src/index.js",
+      "gitBlob": "1a51de8aa05b8813568c4e46f3d755ca8e2d2990",
+      "size": 607
+    },
+    {
+      "path": "src/Manager.js",
+      "gitBlob": "2c5d781cc1d6c731f6b4cbbf4002445e12289d93",
+      "size": 1053
+    },
+    {
+      "path": "src/Manager.test.js",
+      "gitBlob": "8c4067f616334467cdb1290bbd3081501dff5194",
+      "size": 934
+    },
+    {
+      "path": "src/Popper.js",
+      "gitBlob": "c656e83895f6172dd19ec4cfc5daf9dbc31c0dce",
+      "size": 3111
+    },
+    {
+      "path": "src/Popper.test.js",
+      "gitBlob": "d228f45dc5c205e742dd11085b7dfd5c95743737",
+      "size": 3907
+    },
+    {
+      "path": "src/Reference.js",
+      "gitBlob": "81cd115f4518e160ecb26c00d7f3ce0139f24f3d",
+      "size": 1142
+    },
+    {
+      "path": "src/Reference.test.js",
+      "gitBlob": "4359fc62d87e8aa9529e7c9c8bb2713fc8c4281b",
+      "size": 1980
+    },
+    {
+      "path": "src/RefTypes.js",
+      "gitBlob": "1581a974c00104ebc6ff64636f750ed213a7cf77",
+      "size": 145
+    },
+    {
+      "path": "src/usePopper.js",
+      "gitBlob": "ebc1291b6aa54d4f1fd0b5c873161a3d2ac02b4a",
+      "size": 4052
+    },
+    {
+      "path": "src/usePopper.test.js",
+      "gitBlob": "bc1b7f84b95cc367fc0ca884450f4d179de0e67b",
+      "size": 3398
+    },
+    {
+      "path": "src/utils.js",
+      "gitBlob": "d0757bbfad838050299dd59a2713b64019e0a990",
+      "size": 1497
+    },
+    {
+      "path": "typings/react-popper.d.ts",
+      "gitBlob": "34d8f825236f554f2f16043866be12e2c1a6b50f",
+      "size": 2708
+    },
+    {
+      "path": "typings/tests/main-test.tsx",
+      "gitBlob": "8af4ba6c4b9f74fc4592a5f5777cfbf468155b44",
+      "size": 2033
+    },
+    {
+      "path": "typings/tests/svg-test.tsx",
+      "gitBlob": "e514fcdd7f6745a16cc1814cb11612b9c14dcc72",
+      "size": 1116
+    },
+    {
+      "path": "typings/tests/tsconfig.json",
+      "gitBlob": "758c797697dffb5a602cc38999c25bf3c977c025",
+      "size": 235
+    }
+  ],
+  "fingerprint": "a02710e9a87ed41adf77c9ddcb680239f74d5230d36a136a6b7c683b48406d04"
+}

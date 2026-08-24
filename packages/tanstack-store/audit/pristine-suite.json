@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-store-pristine",
+  "vitestConfig": "tests/upstream-vitest.config.ts",
+  "rootEnvVar": "TANSTACK_STORE_PRISTINE_ROOT",
+  "copy": ["src", "tests"],
+  "inlineFiles": {
+    "tsconfig.json": {
+      "compilerOptions": {
+        "esModuleInterop": true,
+        "jsx": "react-jsx",
+        "jsxImportSource": "react",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "target": "ES2020"
+      }
+    }
+  }
+}

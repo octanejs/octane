@@ -244,9 +244,10 @@ Runtime (`packages/octane/src/runtime.ts`):
 - `SuspenseException` unwinds synchronously to the enclosing `tryBlock`'s
   `__suspenseHandler` (~8654) → `handleSuspense()` (~8741). No sibling
   prerendering: the rest of the body is simply not reached.
-- `handleSuspense` implements React-18-style hold semantics: transition suspends
-  keep prior DOM (`transitionHeld`, 5s fallback timeout via
-  `swapToPendingFallback`), non-transition suspends swap to `@pending`.
+- `handleSuspense` keeps already-visible content during a suspended transition
+  with no fallback timeout by default. A finite timeout is an explicit Octane
+  extension; the earlier five-second-default description is superseded by the
+  [current shell-retention contract](../packages/octane/audit/SUSPENSE_DIVERGENCE.md#8-transition-shell-retention--no-fallback-timeout-by-default).
 - `attachResume()` (~9147) stores a **single** `state.pendingThenable` and wires
   `thenable.then(retry, retry)`; `commitResume()` (~8961) replays the try body
   (`renderBlock` with `__thenableIdx` reset) and re-enters `handleSuspense` if the

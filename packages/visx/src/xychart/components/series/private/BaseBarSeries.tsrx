@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo } from 'octane';
-import type { FC } from 'react';
+import type { ComponentBody } from 'octane';
 import type { AxisScale } from '@octanejs/visx/axis';
 import DataContext from '../../../context/DataContext.tsrx';
 import type { Bar, BarsProps, DataContextType, SeriesProps } from '../../../types';
@@ -13,7 +13,7 @@ import useSeriesEvents from '../../../hooks/useSeriesEvents.tsrx';
 export type BaseBarSeriesProps<XScale extends AxisScale, YScale extends AxisScale, Datum extends object> =
 	SeriesProps<XScale, YScale, Datum> & {
 		/** Rendered component which is passed BarsProps by BaseBarSeries after processing. */
-		BarsComponent: FC<BarsProps<XScale, YScale>>;
+		BarsComponent: ComponentBody<BarsProps<XScale, YScale>>;
 		/**
  * Specify bar padding when bar thickness does not come from a `band` scale.
  * Accepted values are [0, 1], 0 = no padding, 1 = no bar, defaults to 0.1.

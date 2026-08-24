@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as ServerRuntime from 'octane/server';
-import { createElement, flushSync, hydrateRoot, use } from '../src/index.js';
+import { createElement, flushSync, hydrateRoot, use, type OctaneNode } from '../src/index.js';
 import { act, mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
 import {
@@ -38,6 +38,8 @@ import {
 	NestedKeyedReorderList,
 	NestedKeyedReorderBoundary,
 	NestedKeyedReorderTransition,
+	HostBindingList,
+	HostMappedBindingList,
 	setExternal,
 	setNestedConditionalActivityMode,
 } from './_fixtures/for.tsrx';
@@ -1403,5 +1405,179 @@ describe('nested keyed list reordering', () => {
 		r.click('[data-reorder-row="112"] button');
 		expect(picked).toEqual([[1, 112]]);
 		r.unmount();
+	});
+});
+
+describe.each([
+	['@for', HostBindingList],
+	['native map', HostMappedBindingList],
+] as const)('host-row bindings — %s', (_kind, Body) => {
+	function loggedRow(label: string, log: string[], beforeTitleCoercion = () => {}) {
+		const className = ['row', label];
+		const title = {
+			toString() {
+				log.push('coerce-title');
+				beforeTitleCoercion();
+				return label;
+			},
+		};
+		const data = {
+			toString() {
+				log.push('coerce-data');
+				return label;
+			},
+		};
+		return {
+			id: 1,
+			get className() {
+				log.push('class');
+				return className;
+			},
+			get title() {
+				log.push('title');
+				return title as unknown as string;
+			},
+			get data() {
+				log.push('data');
+				return data as unknown as string;
+			},
+			get aria() {
+				log.push('aria');
+				return label;
+			},
+			get hidden() {
+				log.push('hidden');
+				return label === 'second';
+			},
+			get only() {
+				log.push('only');
+				return label;
+			},
+			get mixed() {
+				log.push('mixed');
+				return label;
+			},
+		};
+	}
+	const readAndCoerce = [
+		'class',
+		'title',
+		'coerce-title',
+		'data',
+		'coerce-data',
+		'aria',
+		'hidden',
+		'only',
+		'mixed',
+	];
+
+	it('evaluates bindings once in order and skips coercing unchanged scalar values', () => {
+		const log: string[] = [];
+		const r = mount(Body, { items: [loggedRow('first', log)], version: 0, context: 'inside' });
+		try {
+			const host = r.find('li');
+			expect(log.splice(0)).toEqual(readAndCoerce);
+			const second = loggedRow('second', log);
+			r.update(Body, { items: [second], version: 1, context: 'inside' });
+			expect(log.splice(0)).toEqual(readAndCoerce);
+			expect(r.find('li')).toBe(host);
+			expect(host.className).toBe('row second');
+			expect(host.getAttribute('title')).toBe('second');
+			expect(host.getAttribute('data-value')).toBe('second');
+			expect(host.getAttribute('aria-label')).toBe('second');
+			expect(host.hasAttribute('hidden')).toBe(true);
+			expect(r.find('[data-kind="only"]').textContent).toBe('second');
+			expect(r.find('[data-kind="mixed"]').textContent).toBe('beforesecondafter');
+			r.update(Body, { items: [second], version: 2, context: 'inside' });
+			expect(log).toEqual(['class', 'title', 'data', 'aria', 'hidden', 'only', 'mixed']);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('retries the same scalar value after coercion throws without reading later bindings', () => {
+		const log: string[] = [];
+		const r = mount(Body, { items: [loggedRow('first', log)], version: 0, context: 'inside' });
+		try {
+			log.length = 0;
+			let shouldThrow = true;
+			const second = loggedRow('second', log, () => {
+				if (shouldThrow) throw new Error('title coercion failed');
+			});
+			expect(() => r.update(Body, { items: [second], version: 1, context: 'inside' })).toThrow(
+				'title coercion failed',
+			);
+			expect(log.splice(0)).toEqual(['class', 'title', 'coerce-title']);
+			shouldThrow = false;
+			r.update(Body, { items: [second], version: 2, context: 'inside' });
+			expect(log).toEqual(readAndCoerce);
+			expect(r.find('li').getAttribute('title')).toBe('second');
+			expect(r.find('li').getAttribute('data-value')).toBe('second');
+			expect(r.find('[data-kind="only"]').textContent).toBe('second');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('preserves only-child and mixed-child ownership across primitive and complex updates', () => {
+		const row = { id: 1, className: 'row', title: '', data: '', aria: '', hidden: false };
+		const r = mount(Body, {
+			items: [{ ...row, only: 'first', mixed: 'first' }],
+			version: 0,
+			context: 'initial',
+		});
+		try {
+			const host = r.find('li');
+			const only = r.find('[data-kind="only"]');
+			const mixed = r.find('[data-kind="mixed"]');
+			const onlyText = only.firstChild;
+			const mixedText = Array.from(mixed.childNodes).find(
+				(node) => node.nodeType === Node.TEXT_NODE && node.textContent === 'first',
+			);
+			let version = 0;
+			const update = (content: OctaneNode, text: string, context = 'inside') => {
+				r.update(Body, {
+					items: [{ ...row, only: content, mixed: content }],
+					version: ++version,
+					context,
+				});
+				expect(r.find('li')).toBe(host);
+				expect(r.find('[data-kind="only"]')).toBe(only);
+				expect(r.find('[data-kind="mixed"]')).toBe(mixed);
+				expect(only.textContent).toBe(text);
+				expect(mixed.textContent).toBe(`before${text}after`);
+			};
+			update('second', 'second');
+			expect(only.firstChild).toBe(onlyText);
+			expect(Array.from(mixed.childNodes)).toContain(mixedText);
+			for (const value of [0, -0, false, true, null, undefined, '', NaN]) {
+				update(value, typeof value === 'number' ? String(value) : '');
+			}
+			const clicks: string[] = [];
+			let label = 'function first';
+			const render = () => createElement('button', { onClick: () => clicks.push(label) }, label);
+			update(render, label);
+			const buttons = r.findAll('button');
+			label = 'function second';
+			update(render, label);
+			expect(r.findAll('button')).toEqual(buttons);
+			r.click('[data-kind="only"] button');
+			expect(clicks).toEqual(['function second']);
+			function CurrentContext() {
+				return createElement('b', null, use(FastRowContext));
+			}
+			const descriptor = createElement(CurrentContext, {});
+			update(descriptor, 'context first', 'context first');
+			expect(buttons.every((button) => !button.isConnected)).toBe(true);
+			const consumers = r.findAll('b');
+			update(descriptor, 'context second', 'context second');
+			expect(r.findAll('b')).toEqual(consumers);
+			update([createElement('u', null, 'array'), ' tail'], 'array tail');
+			expect(consumers.every((consumer) => !consumer.isConnected)).toBe(true);
+			update('final', 'final');
+			expect(r.findAll('button, b, u')).toHaveLength(0);
+		} finally {
+			r.unmount();
+		}
 	});
 });

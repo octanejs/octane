@@ -1,0 +1,26 @@
+{
+  "upstream": {
+    "package": "react-content-loader",
+    "version": "7.1.2",
+    "source": "https://github.com/danilowoz/react-content-loader/tree/c8a6b6c6669d7e663f9d7e1efecec08e876b0e5d",
+    "license": "MIT"
+  },
+  "surface": "Web runtime at react-content-loader 7.1.2: default ContentLoader, Facebook, Instagram, Code, List, and BulletList presets, and IContentLoaderProps. ./native is an explicit gap.",
+  "inventory": {
+    "supported": ["ContentLoader", "Facebook", "Instagram", "Code", "List", "BulletList"],
+    "subpaths": []
+  },
+  "divergences": [
+    "Consumers import from @octanejs/content-loader instead of react-content-loader.",
+    "The React Native ./native entry is not published because Octane has no React Native renderer.",
+    "React test-renderer and shallow-renderer observations are asserted through mounted SVG DOM without changing their numeric expectations.",
+    "useId values use Octane's opaque identifier format.",
+    "Octane serializes SVG/CSS url() functions with quotes while React's test renderer reports the unquoted form; uniqueKey/baseUrl relationships are unchanged.",
+    "Octane inserts empty comment holes between children; snapshots compare the public SVG tree after stripping those markers.",
+    "rtl=false uses an empty style object instead of null so the style spread typechecks.",
+    "IContentLoaderProps.style is an object map rather than Octane's string-or-object SVG style union, matching React SVGAttributes.",
+    "Git package.json at the pin SHA advertises 6.2.1; npm published 7.1.2 from that SHA."
+  ],
+  "ssr": "Supported. uniqueKey pins clip and gradient identifiers; otherwise useId remains opaque and request-local.",
+  "verified": "2026-08-20"
+}

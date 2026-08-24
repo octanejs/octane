@@ -48,15 +48,15 @@ const lanes = [
 const upstreamFiles = ['packages/input-otp/tests/pristine/upstream.browser.test.ts'];
 const pristineLedgerPath = 'packages/input-otp/audit/pristine-adaptation-ledger.json';
 const pinnedUpstreamFiles = [
-	'packages/input-otp/upstream/source/apps/playground/src/tests/base.delete-word.spec.ts',
-	'packages/input-otp/upstream/source/apps/playground/src/tests/base.props.spec.ts',
-	'packages/input-otp/upstream/source/apps/playground/src/tests/base.render.spec.ts',
-	'packages/input-otp/upstream/source/apps/playground/src/tests/base.selections.spec.ts',
-	'packages/input-otp/upstream/source/apps/playground/src/tests/base.slot.spec.ts',
-	'packages/input-otp/upstream/source/apps/playground/src/tests/base.typing.spec.ts',
-	'packages/input-otp/upstream/source/apps/playground/src/tests/pwm-space.spec.ts',
-	'packages/input-otp/upstream/source/apps/playground/src/tests/with-autofocus.spec.ts',
-	'packages/input-otp/upstream/source/apps/playground/src/tests/with-on-complete.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/base.delete-word.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/base.props.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/base.render.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/base.selections.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/base.slot.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/base.typing.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/pwm-space.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/with-autofocus.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/with-on-complete.spec.ts',
 ];
 
 function sha(contents) {
@@ -197,7 +197,7 @@ await writeJson(pristineCrosswalkPath, {
 	},
 	identityCrosswalk,
 	allowedTransforms: [
-		'Consolidate the eight upstream Playwright spec modules into one Vitest module.',
+		'Consolidate the nine upstream Playwright spec modules into one Vitest module.',
 		'Replace Playwright test imports and webServer routing with the local Vite/Chromium harness.',
 		'Preserve each upstream test title, interaction sequence, and assertion outcome.',
 	],
@@ -292,6 +292,8 @@ const manifest = {
 				'Adapted execution of all 19 pinned upstream React identities in real Chromium; complete pinned-source hashes, rewritten-source hash, and allowed transforms are recorded in the crosswalk.',
 			execution: { kind: 'vitest-full', inventory: pristinePath },
 			files: [
+				// The lane's pinned-tree evidence: the lock's upstream git blob shas.
+				await support('packages/input-otp/audit/upstream.lock.json'),
 				await support(pristinePath),
 				await support(pristineCrosswalkPath),
 				await support(pristineLedgerPath),

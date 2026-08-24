@@ -182,4 +182,24 @@ describe('@octanejs/input-otp component state and projection', () => {
 		expect(input.value).toBe('1234');
 		app.unmount();
 	});
+
+	it('keeps shared styles while mounted inputs still use them', () => {
+		const first = mount(EmptyInput);
+		flushEffects();
+		expect(document.getElementById('input-otp-style')).not.toBeNull();
+		document.getElementById('input-otp-style')?.remove();
+
+		const second = mount(EmptyInput);
+		flushEffects();
+		const reinstalled = document.getElementById('input-otp-style');
+		expect(reinstalled).not.toBeNull();
+
+		first.unmount();
+		flushEffects();
+		expect(document.getElementById('input-otp-style')).toBe(reinstalled);
+
+		second.unmount();
+		flushEffects();
+		expect(document.getElementById('input-otp-style')).toBeNull();
+	});
 });

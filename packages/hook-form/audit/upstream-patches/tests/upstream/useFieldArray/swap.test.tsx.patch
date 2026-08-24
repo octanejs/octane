@@ -1,0 +1,15 @@
+diff --git a/tests/upstream/useFieldArray/swap.test.tsx b/tests/upstream/useFieldArray/swap.test.tsx
+--- a/tests/upstream/useFieldArray/swap.test.tsx
++++ b/tests/upstream/useFieldArray/swap.test.tsx
+@@ -15,7 +15,10 @@ import noop from '../../../src/utils/noop';
+ 
+ let i = 0;
+ 
+-vi.mock('../../../src/logic/generateId', () => () => String(i++));
++// octane: vitest module mock — path resolved from tests/upstream/useFieldArray/, factory returns { default }
++vi.mock('../../../src/logic/generateId', () => ({
++  default: () => String(i++),
++}));
+ 
+ describe('swap', () => {
+   beforeEach(() => {

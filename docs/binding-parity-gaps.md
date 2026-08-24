@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**0 active pin(s) across 82 binding package(s).**
+**0 active pin(s) across 94 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -19,9 +19,12 @@ surface and evidence.
 | `@octanejs/animejs` | 0 |
 | `@octanejs/apollo-client` | 0 |
 | `@octanejs/aria` | 0 |
+| `@octanejs/auto-animate` | 0 |
 | `@octanejs/base-ui` | 0 |
+| `@octanejs/calendar` | 0 |
 | `@octanejs/cmdk` | 0 |
 | `@octanejs/colorful` | 0 |
+| `@octanejs/content-loader` | 0 |
 | `@octanejs/day-picker` | 0 |
 | `@octanejs/devtools` | 0 |
 | `@octanejs/dexie` | 0 |
@@ -34,7 +37,9 @@ surface and evidence.
 | `@octanejs/floating-ui` | 0 |
 | `@octanejs/gsap` | 0 |
 | `@octanejs/hook-form` | 0 |
+| `@octanejs/html-react-parser` | 0 |
 | `@octanejs/i18next` | 0 |
+| `@octanejs/image-crop` | 0 |
 | `@octanejs/inertia` | 0 |
 | `@octanejs/ink` | 0 |
 | `@octanejs/input-otp` | 0 |
@@ -61,11 +66,13 @@ surface and evidence.
 | `@octanejs/redux` | 0 |
 | `@octanejs/redux-toolkit` | 0 |
 | `@octanejs/remix-router` | 0 |
+| `@octanejs/resizable-panels` | 0 |
 | `@octanejs/rxjs` | 0 |
 | `@octanejs/shadcn` | 0 |
-| `@octanejs/solana-react` | 0 |
+| `@octanejs/solana-kit` | 0 |
 | `@octanejs/sonner` | 0 |
 | `@octanejs/spring` | 0 |
+| `@octanejs/stick-to-bottom` | 0 |
 | `@octanejs/streamdown` | 0 |
 | `@octanejs/styled-components` | 0 |
 | `@octanejs/stylex` | 0 |
@@ -88,12 +95,17 @@ surface and evidence.
 | `@octanejs/textarea-autosize` | 0 |
 | `@octanejs/three` | 0 |
 | `@octanejs/tiptap` | 0 |
+| `@octanejs/to-print` | 0 |
 | `@octanejs/transition-group` | 0 |
 | `@octanejs/usehooks-ts` | 0 |
 | `@octanejs/valtio` | 0 |
 | `@octanejs/vaul` | 0 |
 | `@octanejs/visx` | 0 |
 | `@octanejs/wagmi` | 0 |
+| `@octanejs/waypoint` | 0 |
 | `@octanejs/window` | 0 |
+| `@octanejs/wouter` | 0 |
+| `@octanejs/xstate` | 0 |
+| `@octanejs/xstate-store` | 0 |
 | `@octanejs/zag` | 0 |
 | `@octanejs/zustand` | 0 |

@@ -1,0 +1,24 @@
+diff --git a/tests/upstream/type.test.tsx b/tests/upstream/type.test.tsx
+--- a/tests/upstream/type.test.tsx
++++ b/tests/upstream/type.test.tsx
+@@ -89,16 +89,16 @@ test('should work with optional field with Controller', () => {
+           name="firstName"
+           defaultValue=""
+           control={control}
+-          render={({ field: { value, onChange } }) => {
+-            return <input value={value} onChange={onChange} />;
++          render={({ field: { value, onInput: onChange } }) => {
++            return <input value={value} onInput={onChange} />;
+           }}
+         />
+         <Controller
+           name="lastName"
+           defaultValue=""
+           control={control}
+-          render={({ field: { value, onChange } }) => {
+-            return <input value={value} onChange={onChange} />;
++          render={({ field: { value, onInput: onChange } }) => {
++            return <input value={value} onInput={onChange} />;
+           }}
+         />
+       </div>

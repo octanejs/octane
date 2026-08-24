@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-markdown",
+    "version": "10.1.0",
+    "repository": {
+      "owner": "remarkjs",
+      "repo": "react-markdown",
+      "subdirectory": null
+    },
+    "commit": "44d2e4a44b37461ab7778d6870c1a9eb36393ad2",
+    "integrity": "sha512-qKxVopLT/TyA6BX3Ue5NwabOsAzm0Q7kAPwq6L+wWDwisYs7R8vZ0nRXqq6rkueboxpkjvLGU9fWifiX/ZZFxQ=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "license",
+        "sha256": "f6196c64e144f9a6fa9154c3a80bc8b89615a9567934b83a8951879f06ba2aef"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["index.js", "lib", "license", "package.json", "script", "test.jsx", "tsconfig.json"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "index.js",
+      "gitBlob": "d0fc80e04772fe9bcb0e1a8a428155d93931b7bb",
+      "size": 493
+    },
+    {
+      "path": "lib/index.js",
+      "gitBlob": "b6f5ed00a2ca9b653f0c85734d9aa31e0e76e859",
+      "size": 12802
+    },
+    {
+      "path": "license",
+      "gitBlob": "f552fc95706b283bba87db2d89ef8d42996ed36f",
+      "size": 1079
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "35fe1fa93ff7c77457323752e40665b8f01afed3",
+      "size": 5047
+    },
+    {
+      "path": "script/load-jsx.js",
+      "gitBlob": "d78a33c75c830d428f0e78d1d125f6451b01d68d",
+      "size": 2202
+    },
+    {
+      "path": "test.jsx",
+      "gitBlob": "d9644a185db7bd2e0413d62757b5eb8756ca0a07",
+      "size": 35418
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "95ae95ae8b326b7981a719c051ea3466127a0d2b",
+      "size": 422
+    }
+  ],
+  "fingerprint": "f41985312031da6adeca39ff2c2000c224b5a81071851c3ecb91d9b7461b6ecb"
+}

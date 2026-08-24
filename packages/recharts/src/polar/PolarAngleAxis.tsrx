@@ -1,22 +1,24 @@
-import * as React from 'octane';
-import {
+import type {
 	FunctionComponent,
-	ReactNode,
+	NativeMouseEvent,
+	NativeTouchEvent,
+	OctaneNode,
 	SVGProps,
-	useEffect,
-	useMemo,
-	type OctaneNode,
-} from 'octane';
+	SVGPropsForHost,
+} from '../util/OctaneTypes.ts';
+import * as React from 'octane';
+import { useEffect, useMemo } from 'octane';
 import { clsx } from 'clsx';
-import { Layer } from '../container/Layer';
-import { Dot } from '../shape/Dot';
-import { Polygon } from '../shape/Polygon';
-import { Text, TextAnchor, TextVerticalAnchor } from '../component/Text';
+import { Layer } from '../container/Layer.tsrx';
+import { Dot } from '../shape/Dot.tsrx';
+import { Polygon } from '../shape/Polygon.tsrx';
+import { Text, TextAnchor, TextVerticalAnchor } from '../component/Text.tsrx';
 import {
 	adaptEventsOfChild,
 	AxisDomain,
+	AxisTick,
 	AxisDomainTypeInput,
-	BaseTickContentProps,
+	PolarTickContentProps,
 	EvaluatedAxisDomainType,
 	PresentationAttributesAdaptChildEvent,
 	RenderableAxisProps,
@@ -40,7 +42,7 @@ import {
 	svgPropertiesNoEventsFromUnknown,
 } from '../util/svgPropertiesNoEvents';
 import { RequiresDefaultProps, resolveDefaultProps } from '../util/resolveDefaultProps';
-import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer';
+import { ZIndexable, ZIndexLayer } from '../zIndex/ZIndexLayer.tsrx';
 import { RechartsScale } from '../util/scale/RechartsScale';
 import type { CustomScaleDefinition } from '../util/scale/CustomScaleDefinition';
 import { usePolarChartLayout } from '../context/chartLayoutContext';
@@ -68,7 +70,7 @@ export interface PolarAngleAxisProps<DataPointType = any, DataValueType = any> e
  * @example <PolarAngleAxis axisLine={false} />
  * @example <PolarAngleAxis stroke='red' strokeWidth={2} strokeDasharray={4} />
  */
-	axisLine?: boolean | SVGProps<SVGLineElement>;
+	axisLine?: boolean | SVGProps<SVGCircleElement | SVGPathElement>;
 	/**
  * @defaultValue false
  */
@@ -166,12 +168,12 @@ export interface PolarAngleAxisProps<DataPointType = any, DataValueType = any> e
  * - `false`: Do not render any tick labels.
  * - `true`: Render tick labels with default settings.
  * - `object`: An object of props to be merged into the internally calculated tick props.
- * - `ReactElement`: A custom React element to be used as the tick label.
+ * - `OctaneElement`: A custom React element to be used as the tick label.
  * - `function`: A function that returns a React element for custom rendering of tick labels.
  *
  * @defaultValue true
  */
-	tick?: TickProp<BaseTickContentProps>;
+	tick?: TickProp<PolarTickContentProps>;
 	/**
  * The count of axis ticks. Not used if 'type' is 'category'.
  */
@@ -194,9 +196,9 @@ export interface PolarAngleAxisProps<DataPointType = any, DataValueType = any> e
  */
 	tickSize?: number;
 	/**
- * The array of every tick's value and angle.
+ * The array of tick values to map through the axis scale.
  */
-	ticks?: ReadonlyArray<TickItem>;
+	ticks?: ReadonlyArray<AxisTick>;
 	/**
  * The type of axis.
  *
@@ -228,45 +230,45 @@ type PolarAngleAxisEvents = {
 	/**
  * The customized event handler of click on the ticks of this axis
  */
-	onClick?: (data: TickItem, index: number, e: React.MouseEvent<SVGTextElement>) => void;
+	onClick?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mousedown on the ticks of this axis
  */
-	onMouseDown?: (data: TickItem, index: number, e: React.MouseEvent<SVGTextElement>) => void;
+	onMouseDown?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseup on the ticks of this axis
  */
-	onMouseUp?: (data: TickItem, index: number, e: React.MouseEvent<SVGTextElement>) => void;
+	onMouseUp?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mousemove on the ticks of this axis
  */
-	onMouseMove?: (data: TickItem, index: number, e: React.MouseEvent<SVGTextElement>) => void;
+	onMouseMove?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseover on the ticks of this axis
  */
-	onMouseOver?: (data: TickItem, index: number, e: React.MouseEvent<SVGTextElement>) => void;
+	onMouseOver?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseout on the ticks of this axis
  */
-	onMouseOut?: (data: TickItem, index: number, e: React.MouseEvent<SVGTextElement>) => void;
+	onMouseOut?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseenter on the ticks of this axis
  */
-	onMouseEnter?: (data: TickItem, index: number, e: React.MouseEvent<SVGTextElement>) => void;
+	onMouseEnter?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
 	/**
  * The customized event handler of mouseleave on the ticks of this axis
  */
-	onMouseLeave?: (data: TickItem, index: number, e: React.MouseEvent<SVGTextElement>) => void;
-	onTouchStart?: (data: TickItem, index: number, e: React.TouchEvent<SVGTextElement>) => void;
-	onTouchMove?: (data: TickItem, index: number, e: React.TouchEvent<SVGTextElement>) => void;
-	onTouchEnd?: (data: TickItem, index: number, e: React.TouchEvent<SVGTextElement>) => void;
+	onMouseLeave?: (data: TickItem, index: number, e: NativeMouseEvent<SVGGElement>) => void;
+	onTouchStart?: (data: TickItem, index: number, e: NativeTouchEvent<SVGGElement>) => void;
+	onTouchMove?: (data: TickItem, index: number, e: NativeTouchEvent<SVGGElement>) => void;
+	onTouchEnd?: (data: TickItem, index: number, e: NativeTouchEvent<SVGGElement>) => void;
 };
 
 type AxisSvgProps =
 	Omit<
-		PresentationAttributesAdaptChildEvent<TickItem, SVGTextElement>,
-		'scale' | 'type' | 'dangerouslySetInnerHTML'
-	>;
+		PresentationAttributesAdaptChildEvent<TickItem, SVGGElement>,
+		'scale' | 'type' | 'dangerouslySetInnerHTML' | 'ref'
+	> & { ref?: never };
 
 export type Props<DataPointType = any, DataValueType = any> =
 	AxisSvgProps & PolarAngleAxisProps<DataPointType, DataValueType>;
@@ -275,7 +277,7 @@ type PropsWithDefaults<DataPointType = any, DataValueType = any> =
 	RequiresDefaultProps<Props<DataPointType, DataValueType>, typeof defaultPolarAngleAxisProps>;
 
 type InternalPolarAngleAxisProps =
-	Omit<PropsWithDefaults, 'scale'> & {
+	Omit<PropsWithDefaults, 'scale' | 'ticks'> & {
 		cx: number;
 		cy: number;
 		radius: number;
@@ -287,11 +289,11 @@ const AXIS_TYPE = 'angleAxis';
 
 type AngleAxisSettingsReporter =
 	Omit<AngleAxisSettings, 'type'> & {
-		children: ReactNode;
+		children: OctaneNode;
 		type: AxisDomainTypeInput;
 	};
 
-function SetAngleAxisSettings(props: AngleAxisSettingsReporter): ReactNode {
+function SetAngleAxisSettings(props: AngleAxisSettingsReporter): OctaneNode {
 	const dispatch = useAppDispatch();
 	const layout = usePolarChartLayout();
 	const settings: AngleAxisSettings | undefined = useMemo(() => {
@@ -401,10 +403,9 @@ const AxisLine = (props: InternalPolarAngleAxisProps) => {
 	};
 
 	if (axisLineType === 'circle') {
-		// @ts-expect-error wrong SVG element type
 		return <Dot
 			className="recharts-polar-angle-axis-line"
-			{...axisLineProps}
+			{...axisLineProps as SVGPropsForHost<typeof axisLineProps, SVGCircleElement>}
 			cx={cx}
 			cy={cy}
 			r={radius}
@@ -412,17 +413,20 @@ const AxisLine = (props: InternalPolarAngleAxisProps) => {
 	}
 	const points = ticks.map((entry) => polarToCartesian(cx, cy, radius, entry.coordinate));
 
-	// @ts-expect-error wrong SVG element type
-	return <Polygon className="recharts-polar-angle-axis-line" {...axisLineProps} points={points} />;
+	return <Polygon
+		className="recharts-polar-angle-axis-line"
+		{...axisLineProps as SVGPropsForHost<typeof axisLineProps, SVGPathElement>}
+		points={points}
+	/>;
 };
 
 type TickItemProps = {
-	tick: TickProp<BaseTickContentProps>;
-	tickProps: BaseTickContentProps;
+	tick: TickProp<PolarTickContentProps>;
+	tickProps: PolarTickContentProps;
 	value: string | number;
 };
 
-const TickItemText = ({ tick, tickProps, value }: TickItemProps): ReactNode => {
+const TickItemText = ({ tick, tickProps, value }: TickItemProps): OctaneNode => {
 	if (!tick) {
 		return null;
 	}
@@ -449,14 +453,11 @@ const Ticks = (props: InternalPolarAngleAxisProps) => {
 		const lineCoord = getTickLineCoord(entry, props);
 		const textAnchor: TextAnchor = getTickTextAnchor(entry, props.orientation);
 		const verticalAnchor: TextVerticalAnchor = getTickTextVerticalAnchor(entry);
-		const tickProps: BaseTickContentProps = {
+		const tickProps: PolarTickContentProps = {
 			...axisProps,
-			// @ts-expect-error customTickProps is contributing unknown props
 			textAnchor,
 			verticalAnchor,
-			// @ts-expect-error customTickProps is contributing unknown props
 			stroke: 'none',
-			// @ts-expect-error customTickProps is contributing unknown props
 			fill: stroke,
 			...customTickProps,
 			index: i,
@@ -542,7 +543,6 @@ export function PolarAngleAxis<DataPointType = any, DataValueType = any>(
 		allowDecimals={props.allowDecimals}
 		tickCount={props.tickCount}
 		niceTicks={props.niceTicks ?? 'auto'}
-		// @ts-expect-error the type does not match. Is RadiusAxis really expecting what it says?
 		ticks={props.ticks}
 		tick={props.tick}
 		domain={props.domain}

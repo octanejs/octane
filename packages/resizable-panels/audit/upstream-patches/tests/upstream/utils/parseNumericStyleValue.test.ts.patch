@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/utils/parseNumericStyleValue.test.ts b/tests/upstream/utils/parseNumericStyleValue.test.ts
+--- a/tests/upstream/utils/parseNumericStyleValue.test.ts
++++ b/tests/upstream/utils/parseNumericStyleValue.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, test } from "vitest";
+-import { parseNumericStyleValue } from "./parseNumericStyleValue";
++import { parseNumericStyleValue } from "../../../src/utils/parseNumericStyleValue";
+ 
+ describe("parseNumericStyleValue", () => {
+   test("should handle undefined styles", () => {

@@ -14,6 +14,11 @@ import {
 	SuspensePreservationApp,
 } from '../../_fixtures/suspense-preserves-dom.tsrx';
 import { FastHostControlledList } from '../../_fixtures/for.tsrx';
+import {
+	StructuralRoot,
+	StructuralRootReplacement,
+	type StructuralRootProps,
+} from './root-suspension.tsrx';
 
 type Controls = {
 	urgent(next: string): void;
@@ -198,6 +203,161 @@ function mountSuspenseCase(): void {
 		unmount() {
 			root.unmount();
 		},
+		snapshot,
+	};
+}
+
+function mountRootSuspensionCase(): void {
+	const container = document.querySelector('#suspense-root') as HTMLElement;
+	const requestedShape = search.get('shape');
+	const shape: StructuralRootProps['shape'] =
+		requestedShape === 'branch' ||
+		requestedShape === 'root' ||
+		requestedShape === 'keyed' ||
+		requestedShape === 'empty'
+			? requestedShape
+			: 'component';
+	const next = deferred<string>();
+	const lifecycle: string[] = [];
+	const nativeEvents: string[] = [];
+	const onLifecycle = (event: string) => lifecycle.push(event);
+	const initial: StructuralRootProps = {
+		shape,
+		changed: false,
+		promise: fulfilled('A'),
+		onLifecycle,
+	};
+	const pending: StructuralRootProps = { ...initial, changed: true, promise: next.promise };
+	let urgent: () => void;
+	let unmount: () => void;
+	const onUncaughtError = (error: unknown) => globalFailures.push(`root: ${String(error)}`);
+
+	if (search.get('implementation') === 'react') {
+		function ReactInput(props: { onLifecycle: (event: string) => void }) {
+			React.useLayoutEffect(() => {
+				const input = document.getElementById('root-suspension-input');
+				props.onLifecycle('input:mount');
+				return () =>
+					props.onLifecycle(input?.isConnected ? 'input:cleanup' : 'input:cleanup-detached');
+			}, [props.onLifecycle]);
+			return React.createElement(
+				'section',
+				{ 'data-root-slot': 'before' },
+				React.createElement('input', {
+					id: 'root-suspension-input',
+					defaultValue: 'initial browser value',
+				}),
+			);
+		}
+		function ReactReplacement() {
+			return React.createElement('section', { 'data-root-slot': 'after' }, 'replacement');
+		}
+		function ReactReader(props: { promise: PromiseLike<string> }) {
+			return React.createElement('span', { id: 'root-suspension-value' }, React.use(props.promise));
+		}
+		function ReactStructuralRoot(props: StructuralRootProps) {
+			let content: React.ReactElement;
+			if (props.shape === 'keyed' || props.shape === 'empty') {
+				const items = props.changed
+					? props.shape === 'empty'
+						? []
+						: ['keep']
+					: ['remove', 'keep'];
+				content = React.createElement(
+					'ul',
+					null,
+					items.length === 0
+						? React.createElement('li', { 'data-root-empty': true }, 'empty')
+						: items.map((item) =>
+								React.createElement(
+									'li',
+									{ key: item, 'data-root-key': item },
+									item === 'remove'
+										? React.createElement(ReactInput, { onLifecycle: props.onLifecycle })
+										: React.createElement('span', null, 'survivor'),
+								),
+							),
+				);
+			} else {
+				content = props.changed
+					? React.createElement(ReactReplacement)
+					: React.createElement(ReactInput, { onLifecycle: props.onLifecycle });
+				if (props.shape === 'branch') {
+					content = React.createElement('section', { 'data-root-branch': true }, content);
+				}
+			}
+			return React.createElement(
+				'main',
+				{ 'data-root-shape': props.shape },
+				content,
+				React.createElement(ReactReader, { promise: props.promise }),
+			);
+		}
+		function ReactRootReplacement(props: StructuralRootProps) {
+			return React.createElement(
+				'article',
+				{ 'data-root-replacement': true },
+				React.createElement(ReactReplacement),
+				React.createElement(ReactReader, { promise: props.promise }),
+			);
+		}
+		const root = createReactRoot(container, { onUncaughtError });
+		flushReactSync(() => root.render(React.createElement(ReactStructuralRoot, initial)));
+		urgent = () =>
+			flushReactSync(() =>
+				root.render(
+					React.createElement(
+						shape === 'root' ? ReactRootReplacement : ReactStructuralRoot,
+						pending,
+					),
+				),
+			);
+		unmount = () => flushReactSync(() => root.unmount());
+	} else {
+		const root = createRoot(container, { onUncaughtError });
+		flushSync(() => root.render(StructuralRoot, initial));
+		urgent = () =>
+			flushSync(() =>
+				root.render(shape === 'root' ? StructuralRootReplacement : StructuralRoot, pending),
+			);
+		unmount = () => root.unmount();
+	}
+
+	const capturedInput = container.querySelector('#root-suspension-input') as HTMLInputElement;
+	const capturedKeep = container.querySelector('[data-root-key="keep"]');
+	for (const name of ['blur', 'focusout', 'focus', 'focusin']) {
+		capturedInput.addEventListener(name, () => nativeEvents.push(name));
+	}
+	function snapshot() {
+		return {
+			inputSame: container.querySelector('#root-suspension-input') === capturedInput,
+			inputConnected: capturedInput.isConnected,
+			activeId: (document.activeElement as HTMLElement | null)?.id ?? '',
+			inputValue: capturedInput.value,
+			selectionStart: capturedInput.selectionStart,
+			selectionEnd: capturedInput.selectionEnd,
+			keepSame: container.querySelector('[data-root-key="keep"]') === capturedKeep,
+			emptyCount: container.querySelectorAll('[data-root-empty]').length,
+			value: container.querySelector('#root-suspension-value')?.textContent ?? '',
+			replacementCount: container.querySelectorAll('[data-root-slot="after"]').length,
+			nativeEvents: nativeEvents.slice(),
+			lifecycle: lifecycle.slice(),
+			globalFailures: globalFailures.slice(),
+		};
+	}
+	window.__suspenseHydration = {
+		kind: 'root-suspension',
+		prepareInput() {
+			capturedInput.focus();
+			capturedInput.setSelectionRange(2, 9);
+			nativeEvents.length = 0;
+			return snapshot();
+		},
+		urgent,
+		resolve() {
+			next.resolve('B');
+		},
+		unmount,
 		snapshot,
 	};
 }
@@ -479,6 +639,7 @@ function mountReactBaselineCase(): void {
 
 if (testCase === 'hydration') mountHydrationCase();
 else if (testCase === 'suspense') mountSuspenseCase();
+else if (testCase === 'root-suspension') mountRootSuspensionCase();
 else if (testCase === 'direct-ref-unmount') mountDirectRefUnmountCase();
 else if (testCase === 'focus-restoration') mountFocusRestorationCase();
 else if (testCase === 'editable-focus-restoration') mountEditableFocusRestorationCase();
@@ -490,6 +651,7 @@ declare global {
 			kind:
 				| 'hydration'
 				| 'suspense'
+				| 'root-suspension'
 				| 'react-baseline'
 				| 'direct-ref-unmount'
 				| 'focus-restoration'

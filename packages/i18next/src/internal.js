@@ -3,24 +3,9 @@
 // composed base hook gets a deterministic sub-slot. Tag-only symbols cover
 // renderHook and other slotless callers while remaining distinct inside the
 // runtime's ambient withSlot path.
-const subSlotCache = new Map();
-const bareTagCache = new Map();
+import { createSubSlot } from 'octane';
 
-export function subSlot(slot, tag) {
-	if (slot === undefined) {
-		let bare = bareTagCache.get(tag);
-		if (bare === undefined) bareTagCache.set(tag, (bare = Symbol.for(`:${tag}`)));
-		return bare;
-	}
-	let byTag = subSlotCache.get(slot);
-	if (byTag === undefined) subSlotCache.set(slot, (byTag = new Map()));
-	let symbol = byTag.get(tag);
-	if (symbol === undefined) {
-		symbol = Symbol.for(`${slot.description ?? ''}:${tag}`);
-		byTag.set(tag, symbol);
-	}
-	return symbol;
-}
+export const subSlot = createSubSlot({ slotlessPrefix: ':' });
 
 export function splitSlot(args) {
 	const tail = args[args.length - 1];

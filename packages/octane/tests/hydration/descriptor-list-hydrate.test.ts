@@ -199,6 +199,22 @@ describe('descriptor-authored keyed lists hydrate self-delimiting server hosts',
 				);
 				expect([...container.querySelectorAll('li')]).toEqual([rows[1], rows[0]]);
 				expect(betaInput.value).toBe('typed before hydration');
+
+				const betaButton = rows[1].querySelector('button')!;
+				const betaText = betaButton.firstChild;
+				for (const label of ['Beta streamed', 'Beta streamed again']) {
+					flushSync(() =>
+						root.render(client.DescriptorRows, {
+							items: [{ ...items[1], label }, items[0]],
+							onPick,
+							refs,
+						}),
+					);
+					expect(rows[1].querySelector('button')).toBe(betaButton);
+					expect(betaButton.firstChild).toBe(betaText);
+					expect(betaButton.textContent).toBe(label);
+					expect(betaInput.value).toBe('typed before hydration');
+				}
 			} finally {
 				root.unmount();
 			}

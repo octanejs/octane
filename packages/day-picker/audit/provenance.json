@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "filesEqual": [
+    {
+      "path": "LICENSE",
+      "equalsPath": "upstream/LICENSE"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream/LICENSE"
+    }
+  ],
+  "filesInclude": [
+    {
+      "path": "upstream/LICENSE",
+      "includes": ["MIT License"]
+    }
+  ]
+}

@@ -15,7 +15,7 @@
 //
 // Note: v5 recommends `useShallow` over this equality-fn pattern for object
 // slices; `traditional` exists for code that still uses it.
-import { useSyncExternalStore, useRef } from 'octane';
+import { createSubSlot, useSyncExternalStore, useRef } from 'octane';
 import { createStore } from 'zustand/vanilla';
 import type { StateCreator, StoreApi } from 'zustand/vanilla';
 
@@ -24,21 +24,7 @@ type ReadonlyStoreApi<T> = Pick<StoreApi<T>, 'getState' | 'getInitialState' | 's
 
 const identity = <T>(arg: T): T => arg;
 
-// Derive a stable, distinct sub-slot from the wrapper's slot. `Symbol.for` interns
-// by description, so the same call site always yields the same sub-slot; the
-// `:wsel:` namespace keeps it clear of useSyncExternalStore's `:uses:` slots.
-// Memoized — subSlot runs per hook call per render; the cache returns the
-// identical Symbol.for-interned value without the concat + registry lookup.
-const subSlotCache = new Map<symbol, Map<string, symbol>>();
-function subSlot(slot: symbol | undefined, tag: string): symbol | undefined {
-	if (slot === undefined) return undefined;
-	let byTag = subSlotCache.get(slot);
-	if (byTag === undefined) subSlotCache.set(slot, (byTag = new Map()));
-	let sym = byTag.get(tag);
-	if (sym === undefined)
-		byTag.set(tag, (sym = Symbol.for((slot.description ?? '') + ':wsel:' + tag)));
-	return sym;
-}
+const subSlot = createSubSlot({ tagPrefix: ':wsel:' });
 
 interface SelectionCell<U> {
 	hasValue: boolean;

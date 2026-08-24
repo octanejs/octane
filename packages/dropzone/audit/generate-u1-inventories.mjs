@@ -4,7 +4,7 @@ import { basename, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const pristineRoot = resolve(root, 'upstream/canonical');
+const pristineRoot = resolve(root, 'upstream');
 const reportPath = process.argv[2];
 if (!reportPath)
 	throw new Error('usage: generate-u1-inventories.mjs <pristine Vitest JSON report>');
@@ -17,7 +17,9 @@ const walk = (dir) =>
 const write = (path, value) =>
 	writeFileSync(resolve(root, path), `${JSON.stringify(value, null, 2)}\n`);
 
-const files = walk(resolve(root, 'upstream'))
+// The committed upstream/ git tree verifies against audit/upstream.lock.json;
+// these inventories pin only the unpacked npm artifact evidence.
+const files = walk(resolve(root, 'upstream-artifact'))
 	.map((path) => ({ path: relative(root, path), sha256: sha256(path) }))
 	.sort((a, b) => a.path.localeCompare(b.path));
 write('audit/upstream-files.json', {
@@ -32,7 +34,7 @@ write('audit/upstream-files.json', {
 	files,
 });
 write('audit/npm-files.json', {
-	files: files.filter(({ path }) => path.startsWith('upstream/npm/')),
+	files: files.filter(({ path }) => path.startsWith('upstream-artifact/')),
 });
 
 const report = JSON.parse(readFileSync(reportPath, 'utf8'));
@@ -54,16 +56,13 @@ write('audit/runtime-inventories/pristine-runtime.json', {
 	cases,
 	snapshotFiles: [
 		{
-			file: 'upstream/canonical/src/__snapshots__/index.spec.tsx.snap',
-			sha256: sha256(resolve(root, 'upstream/canonical/src/__snapshots__/index.spec.tsx.snap')),
+			file: 'upstream/src/__snapshots__/index.spec.tsx.snap',
+			sha256: sha256(resolve(root, 'upstream/src/__snapshots__/index.spec.tsx.snap')),
 		},
 	],
 });
 
-const testSources = [
-	'upstream/canonical/src/index.spec.tsx',
-	'upstream/canonical/src/utils/index.spec.ts',
-];
+const testSources = ['upstream/src/index.spec.tsx', 'upstream/src/utils/index.spec.ts'];
 const registrations = testSources.flatMap((file) => {
 	const text = readFileSync(resolve(root, file), 'utf8');
 	return [...text.matchAll(/\b(?:it|test)(?:\.each\([^)]*\))?\s*\(\s*([`'\"])(.*?)\1/gs)].map(
@@ -72,7 +71,7 @@ const registrations = testSources.flatMap((file) => {
 });
 write('audit/runtime-inventories/static-registrations.json', { files: testSources, registrations });
 
-const typeFiles = walk(resolve(root, 'upstream/canonical/type-tests'))
+const typeFiles = walk(resolve(root, 'upstream/type-tests'))
 	.map((path) => ({
 		file: basename(path),
 		sha256: sha256(path),

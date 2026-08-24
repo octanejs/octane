@@ -16,7 +16,7 @@ export const KNOWN_BINDINGS = {
 	'mobx-react-lite': '@octanejs/mobx',
 	'mobx-react': '@octanejs/mobx',
 	'@apollo/client': '@octanejs/apollo-client',
-	'@solana/react': '@octanejs/solana-react',
+	'@solana/react': '@octanejs/solana-kit',
 	'@tanstack/ai-react': '@octanejs/tanstack-ai',
 	'@tanstack/react-db': '@octanejs/tanstack-db',
 	'@tanstack/react-devtools': '@octanejs/tanstack-devtools',
@@ -27,11 +27,14 @@ export const KNOWN_BINDINGS = {
 	'@rainbow-me/rainbowkit': '@octanejs/rainbowkit',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
 	'@tanstack/react-store': '@octanejs/tanstack-store',
+	'@xstate/react': '@octanejs/xstate',
+	'@xstate/store-react': '@octanejs/xstate-store',
 	'@tanstack/react-router-ssr-query': '@octanejs/tanstack-router-ssr-query',
 	'@tanstack/react-hotkeys': '@octanejs/tanstack-hotkeys',
 	'@tanstack/react-pacer': '@octanejs/tanstack-pacer',
 	'@tanstack/react-table': '@octanejs/tanstack-table',
 	'@tanstack/react-virtual': '@octanejs/tanstack-virtual',
+	'react-waypoint': '@octanejs/waypoint',
 	'react-window': '@octanejs/window',
 	'framer-motion': '@octanejs/motion',
 	motion: '@octanejs/motion',
@@ -62,6 +65,7 @@ export const KNOWN_BINDINGS = {
 	'react-dropzone': '@octanejs/dropzone',
 	sonner: '@octanejs/sonner',
 	'react-error-boundary': '@octanejs/react-error-boundary',
+	'react-resizable-panels': '@octanejs/resizable-panels',
 	'react-transition-group': '@octanejs/transition-group',
 	'react-day-picker': '@octanejs/day-picker',
 	'input-otp': '@octanejs/input-otp',
@@ -71,6 +75,12 @@ export const KNOWN_BINDINGS = {
 	'react-intersection-observer': '@octanejs/intersection-observer',
 	'react-draggable': '@octanejs/draggable',
 	'react-colorful': '@octanejs/colorful',
+	'use-stick-to-bottom': '@octanejs/stick-to-bottom',
+	'react-image-crop': '@octanejs/image-crop',
+	'react-content-loader': '@octanejs/content-loader',
+	'react-to-print': '@octanejs/to-print',
+	'react-calendar': '@octanejs/calendar',
+	'@formkit/auto-animate': '@octanejs/auto-animate',
 	streamdown: '@octanejs/streamdown',
 	'react-syntax-highlighter': '@octanejs/syntax-highlighter',
 	// The official plugins are consolidated as subpaths of the same package.
@@ -145,11 +155,13 @@ export const KNOWN_BINDINGS = {
 	'@react-rxjs/utils': '@octanejs/rxjs',
 	'@testing-library/react': '@octanejs/testing-library',
 	'react-i18next': '@octanejs/i18next',
+	'html-react-parser': '@octanejs/html-react-parser',
 	'@inertiajs/react': '@octanejs/inertia',
 	ink: '@octanejs/ink',
 	'@mdx-js/react': '@octanejs/mdx',
 	'dexie-react-hooks': '@octanejs/dexie',
 	'@livestore/react': '@octanejs/livestore',
+	wouter: '@octanejs/wouter',
 };
 
 // Octane-specific ecosystem packages that have no React import to rewrite.
@@ -183,10 +195,12 @@ export const KNOWN_VANILLA_CORES = {
 	'@dnd-kit/react': '@dnd-kit/dom',
 	'embla-carousel-react': 'embla-carousel',
 	'@xstate/react': 'xstate',
+	'@xstate/store-react': '@xstate/store',
 	'react-redux': 'redux',
 	'@reduxjs/toolkit': 'redux',
 	'react-i18next': 'i18next',
 	'react-hook-form': null,
+	'@formkit/auto-animate': '@formkit/auto-animate',
 	'react-alien-signals': 'alien-signals',
 	zustand: 'zustand/vanilla',
 	valtio: 'valtio/vanilla',
@@ -264,11 +278,11 @@ export const REACT_API_MAP = {
 		note: "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not).",
 	},
 	Component: {
-		status: 'unsupported',
+		status: 'rewrite',
 		note: 'No class components. Rewrite as a function component.',
 	},
 	PureComponent: {
-		status: 'unsupported',
+		status: 'rewrite',
 		note: 'No class components. Rewrite as a function component with memo.',
 	},
 	StrictMode: {
@@ -277,7 +291,7 @@ export const REACT_API_MAP = {
 	},
 	Profiler: { status: 'unsupported', note: 'Not present.' },
 	SuspenseList: { status: 'unsupported', note: 'Not present.' },
-	findDOMNode: { status: 'unsupported', note: 'Removed in React 19 too. Use refs.' },
+	findDOMNode: { status: 'rewrite', note: 'Removed in React 19 too. Use refs.' },
 	renderToString: {
 		status: 'rewrite',
 		note: 'Use renderToString() from octane/server (sync) or prerender() from octane/static (async, awaits Suspense); both return { html, css }.',
@@ -496,8 +510,8 @@ function apiRows(totals) {
 }
 
 function verdictFor(rows, classComponents) {
-	if (classComponents || rows.some((row) => row.status === 'unsupported')) return 'needs-rework';
-	if (rows.some((row) => row.status === 'rewrite' || row.status === 'partial')) {
+	if (rows.some((row) => row.status === 'unsupported')) return 'needs-rework';
+	if (classComponents || rows.some((row) => row.status === 'rewrite' || row.status === 'partial')) {
 		return 'bridgeable-with-rewrites';
 	}
 	return 'bridgeable';

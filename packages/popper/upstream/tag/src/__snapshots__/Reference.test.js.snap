@@ -1,7 +1,0 @@
-// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
-
-exports[`Arrow component renders the expected markup 1`] = `
-<DocumentFragment>
-  <div />
-</DocumentFragment>
-`;

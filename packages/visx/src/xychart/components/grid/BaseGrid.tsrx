@@ -1,5 +1,5 @@
 import { useContext } from 'octane';
-import type { FC } from 'react';
+import type { ComponentBody } from 'octane';
 import type { CommonGridProps, AllGridRowsProps, GridColumnsProps } from '@octanejs/visx/grid';
 import type { AxisScale } from '@octanejs/visx/axis';
 import DataContext from '../../context/DataContext.tsrx';
@@ -10,9 +10,9 @@ export type BaseGridProps = {
 		/** Whether to render GridColumns. */
 		columns?: boolean;
 		/** Rendered GridRows component which is passed GridRowProps by BaseGrid. */
-		GridRowsComponent: FC<AllGridRowsProps<AxisScale>>;
+		GridRowsComponent: ComponentBody<AllGridRowsProps<AxisScale>>;
 		/** Rendered GridColumns component which is passed GridColumnsProps by BaseGrid. */
-		GridColumnsComponent: FC<GridColumnsProps<AxisScale>>;
+		GridColumnsComponent: ComponentBody<GridColumnsProps<AxisScale>>;
 	} & CommonGridProps;
 
 /** Component that handles all  */

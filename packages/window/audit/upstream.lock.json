@@ -1,0 +1,447 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-window",
+    "version": "2.3.0",
+    "repository": {
+      "owner": "bvaughn",
+      "repo": "react-window",
+      "subdirectory": null
+    },
+    "commit": "4d9eebbb510262b3b7e95463cf49a10de53ea77d",
+    "integrity": "sha512-FW6TIpaOH646k51X7yE+LSCWGkt5Pfsnc1fVyq/sCI9h0pTqmMiBXM04pzFKg3Bt7NGkeV6kqbU8d/QjmFS7Ug=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "a8f1e0280bf14adcf5d017547db85eb5c3bac0feb1690ca98650874002eaa8ea"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["LICENSE.md", "lib", "package.json", "src/constants.ts", "vitest.setup.js"],
+  "adaptedMappings": [
+    {
+      "fromRoot": "lib",
+      "toRoot": "tests/upstream",
+      "include": "\\.test\\.[tj]sx?$"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "import { render, screen } from \"@testing-library/react\";",
+      "replace": "/** @jsxImportSource octane */\nimport { render, screen } from \"@testing-library/react\";"
+    },
+    {
+      "find": "import { act, render, screen } from \"@testing-library/react\";",
+      "replace": "/** @jsxImportSource octane */\nimport { act, render, screen } from \"@testing-library/react\";"
+    },
+    {
+      "find": "import { fireEvent, render, renderHook, screen } from \"@testing-library/react\";",
+      "replace": "/** @jsxImportSource octane */\nimport { fireEvent, render, renderHook, screen } from \"@testing-library/react\";"
+    },
+    {
+      "find": "import { act, createRef, useEffect, useLayoutEffect, useRef } from \"react\";",
+      "replace": "import { createRef } from \"../../../create-ref\";\nimport { act, useEffect, useLayoutEffect, useRef } from \"octane\";"
+    },
+    {
+      "find": "import { createRef, useEffect, useLayoutEffect, useRef } from \"react\";",
+      "replace": "import { createRef } from \"../../../create-ref\";\nimport { useEffect, useLayoutEffect, useRef } from \"octane\";"
+    },
+    {
+      "find": "\"@testing-library/react\"",
+      "replace": "\"@octanejs/testing-library\""
+    },
+    {
+      "find": "import type { CellComponentProps, GridImperativeAPI } from \"./types\";",
+      "replace": "import type { CellComponentProps, GridImperativeAPI } from \"../../../../src/components/grid/types\";"
+    },
+    {
+      "find": "import { type ListImperativeAPI, type RowComponentProps } from \"./types\";",
+      "replace": "import { type ListImperativeAPI, type RowComponentProps } from \"../../../../src/components/list/types\";"
+    },
+    {
+      "find": "\"../../../src/constants\"",
+      "replace": "\"../../../../src/constants\""
+    },
+    {
+      "find": "\"../../src/constants\"",
+      "replace": "\"../../../src/constants\""
+    },
+    {
+      "find": "\"../../utils/assert\"",
+      "replace": "\"../../../../src/utils/assert\""
+    },
+    {
+      "find": "\"../../utils/test/mockResizeObserver\"",
+      "replace": "\"../../../utils/mockResizeObserver\""
+    },
+    {
+      "find": "\"../utils/test/mockResizeObserver\"",
+      "replace": "\"../../utils/mockResizeObserver\""
+    },
+    {
+      "find": "\"../types\"",
+      "replace": "\"../../../src/types\""
+    },
+    {
+      "find": "\"../utils/getScrollbarSize\"",
+      "replace": "\"../../../src/utils/getScrollbarSize\""
+    },
+    {
+      "find": "\"./createCachedBounds\"",
+      "replace": "\"../../../src/core/createCachedBounds\""
+    },
+    {
+      "find": "\"./getEstimatedSize\"",
+      "replace": "\"../../../src/core/getEstimatedSize\""
+    },
+    {
+      "find": "\"./getOffsetForIndex\"",
+      "replace": "\"../../../src/core/getOffsetForIndex\""
+    },
+    {
+      "find": "\"./getStartStopIndices\"",
+      "replace": "\"../../../src/core/getStartStopIndices\""
+    },
+    {
+      "find": "\"./useCachedBounds\"",
+      "replace": "\"../../../src/core/useCachedBounds\""
+    },
+    {
+      "find": "\"./useVirtualizer\"",
+      "replace": "\"../../../src/core/useVirtualizer\""
+    },
+    {
+      "find": "\"./useMemoizedObject\"",
+      "replace": "\"../../../src/hooks/useMemoizedObject\""
+    },
+    {
+      "find": "\"./useResizeObserver\"",
+      "replace": "\"../../../src/hooks/useResizeObserver\""
+    },
+    {
+      "find": "\"./useStableCallback\"",
+      "replace": "\"../../../src/hooks/useStableCallback\""
+    },
+    {
+      "find": "\"./parseNumericStyleValue\"",
+      "replace": "\"../../../src/utils/parseNumericStyleValue\""
+    },
+    {
+      "find": "\"./shallowCompare\"",
+      "replace": "\"../../../src/utils/shallowCompare\""
+    },
+    {
+      "find": "\"./Grid\"",
+      "replace": "\"../../../../src/components/grid/Grid\""
+    },
+    {
+      "find": "\"./useGridCallbackRef\"",
+      "replace": "\"../../../../src/components/grid/useGridCallbackRef\""
+    },
+    {
+      "find": "\"./List\"",
+      "replace": "\"../../../../src/components/list/List\""
+    },
+    {
+      "find": "\"./useDynamicRowHeight\"",
+      "replace": "\"../../../../src/components/list/useDynamicRowHeight\""
+    },
+    {
+      "find": "\"./useListCallbackRef\"",
+      "replace": "\"../../../../src/components/list/useListCallbackRef\""
+    }
+  ],
+  "files": [
+    {
+      "path": "lib/components/grid/Grid.test.tsx",
+      "gitBlob": "9417c382c3f368165cb784b0193f922962fe670f",
+      "size": 21103
+    },
+    {
+      "path": "lib/components/grid/Grid.tsx",
+      "gitBlob": "d31c03d2fc4a6433452d183eda40b5d2e94b853f",
+      "size": 8360
+    },
+    {
+      "path": "lib/components/grid/types.ts",
+      "gitBlob": "2c9e09e601fc2f298b797a9856a8667060bef30c",
+      "size": 10914
+    },
+    {
+      "path": "lib/components/grid/useGridCallbackRef.ts",
+      "gitBlob": "ff7615e02a0b7cde7fde97b269e35d57bdb28a42",
+      "size": 351
+    },
+    {
+      "path": "lib/components/grid/useGridRef.ts",
+      "gitBlob": "f69ea2aadc0b6c99961e9ba71d4e0b00645157b3",
+      "size": 236
+    },
+    {
+      "path": "lib/components/list/isDynamicRowHeight.ts",
+      "gitBlob": "8aa867f83fdcbbf7dc4861848246e44697394de7",
+      "size": 292
+    },
+    {
+      "path": "lib/components/list/List.test.tsx",
+      "gitBlob": "f4424924ce8f9e47422762557ab1fb7ee7b2cefe",
+      "size": 25820
+    },
+    {
+      "path": "lib/components/list/List.tsx",
+      "gitBlob": "009030776b3c3f3d0d45413576d4951f9cd0a239",
+      "size": 5583
+    },
+    {
+      "path": "lib/components/list/types.ts",
+      "gitBlob": "92fcc18d37669e94edbfe83b39b023f083788797",
+      "size": 6657
+    },
+    {
+      "path": "lib/components/list/useDynamicRowHeight.test.ts",
+      "gitBlob": "d6fea725c06a84ec25c804db335776df7a531919",
+      "size": 5482
+    },
+    {
+      "path": "lib/components/list/useDynamicRowHeight.ts",
+      "gitBlob": "f5d9c654ff541b56eac14ffce281b515d6568696",
+      "size": 3531
+    },
+    {
+      "path": "lib/components/list/useListCallbackRef.ts",
+      "gitBlob": "1b3cd6db02bd76468096818f704b18c4bec41d36",
+      "size": 351
+    },
+    {
+      "path": "lib/components/list/useListRef.ts",
+      "gitBlob": "41af6934f5d97abb63e9b0faa88a4930c9ddeb0a",
+      "size": 236
+    },
+    {
+      "path": "lib/core/createCachedBounds.test.ts",
+      "gitBlob": "367ac0fd6a14b1211871b0d2b747583ecec78652",
+      "size": 1721
+    },
+    {
+      "path": "lib/core/createCachedBounds.ts",
+      "gitBlob": "3e52747340e92c6d62fccbc63ae14810e51c509a",
+      "size": 1655
+    },
+    {
+      "path": "lib/core/getEstimatedSize.test.ts",
+      "gitBlob": "0b65fd0ab2b144411c48b4fc0b598c99bb451a96",
+      "size": 2269
+    },
+    {
+      "path": "lib/core/getEstimatedSize.ts",
+      "gitBlob": "c0c2bd51e2242900253ac892b917a7f874385b07",
+      "size": 737
+    },
+    {
+      "path": "lib/core/getOffsetForIndex.test.ts",
+      "gitBlob": "71915eab5cac1198c1b48d56daefb8aebdcc6f3b",
+      "size": 3101
+    },
+    {
+      "path": "lib/core/getOffsetForIndex.ts",
+      "gitBlob": "c1a0614eaf4850b1c1627e9e617ebc0f77de13f7",
+      "size": 2152
+    },
+    {
+      "path": "lib/core/getStartStopIndices.test.ts",
+      "gitBlob": "17a60e8f331018c3bc8d0cf0b2d729285d060fbe",
+      "size": 4706
+    },
+    {
+      "path": "lib/core/getStartStopIndices.ts",
+      "gitBlob": "c38d84a3cee698e959b4dec7a2e46cdd2cdb9e67",
+      "size": 1553
+    },
+    {
+      "path": "lib/core/types.ts",
+      "gitBlob": "d9f409f6f95fe39275ecab134e5a2bb8a6b2fd33",
+      "size": 338
+    },
+    {
+      "path": "lib/core/useCachedBounds.test.ts",
+      "gitBlob": "0c3dc2d34d360fb5be433bc6b0b6e9752313395c",
+      "size": 1093
+    },
+    {
+      "path": "lib/core/useCachedBounds.ts",
+      "gitBlob": "ce368d8ecf9f65421cdeeac063c37a94375fae20",
+      "size": 516
+    },
+    {
+      "path": "lib/core/useIsRtl.ts",
+      "gitBlob": "ee687b5ff6a55f28af69f266a57b7d966c3df3e0",
+      "size": 422
+    },
+    {
+      "path": "lib/core/useItemSize.ts",
+      "gitBlob": "b86520e3d0557e16bc53c2f522bfdfda4bec98d3",
+      "size": 839
+    },
+    {
+      "path": "lib/core/useVirtualizer.test.ts",
+      "gitBlob": "2e23b37f9781c734489196150778d0f05abe7cb7",
+      "size": 5408
+    },
+    {
+      "path": "lib/core/useVirtualizer.ts",
+      "gitBlob": "11aabf1f4a92805ded3b6267ef983f2d3d77d7b7",
+      "size": 6874
+    },
+    {
+      "path": "lib/hooks/useIsomorphicLayoutEffect.ts",
+      "gitBlob": "ea6a0bc0166aaeba8cca3bc5ba793fe7e295af70",
+      "size": 157
+    },
+    {
+      "path": "lib/hooks/useMemoizedObject.test.ts",
+      "gitBlob": "cfac99ca0345c2087dc9cd8caa8e804cc1ca9d1b",
+      "size": 1065
+    },
+    {
+      "path": "lib/hooks/useMemoizedObject.ts",
+      "gitBlob": "c905c73e15e14f91974dd42fe6176031e7c4b2cd",
+      "size": 274
+    },
+    {
+      "path": "lib/hooks/useResizeObserver.test.ts",
+      "gitBlob": "23812f8c5029bc48c481376d8b8dca3f9be77383",
+      "size": 4016
+    },
+    {
+      "path": "lib/hooks/useResizeObserver.ts",
+      "gitBlob": "5ab7ea8881a11fc6daffad6b07d0e184a1f81621",
+      "size": 2168
+    },
+    {
+      "path": "lib/hooks/useStableCallback.test.tsx",
+      "gitBlob": "be126d5e4110b9ad0a65c00ea761423942a9dc8a",
+      "size": 815
+    },
+    {
+      "path": "lib/hooks/useStableCallback.ts",
+      "gitBlob": "d009f388de24c84564076e50561c0106a00bb53a",
+      "size": 987
+    },
+    {
+      "path": "lib/index.ts",
+      "gitBlob": "e178c64877654180af4cdd13e089d4162133f4f1",
+      "size": 788
+    },
+    {
+      "path": "lib/types.ts",
+      "gitBlob": "79fafcba2cc2ba6eb2576d55e4e380640efe0ad6",
+      "size": 155
+    },
+    {
+      "path": "lib/utils/adjustScrollOffsetForRtl.ts",
+      "gitBlob": "49bef8d265f52d08dde32288c3536fb226c16c79",
+      "size": 1070
+    },
+    {
+      "path": "lib/utils/areArraysEqual.ts",
+      "gitBlob": "8f2fddafd4977914f6e5c66733f70d667f7a4a8b",
+      "size": 256
+    },
+    {
+      "path": "lib/utils/arePropsEqual.ts",
+      "gitBlob": "ead35cf67da50be65f76b197a20ad0a0203063b1",
+      "size": 814
+    },
+    {
+      "path": "lib/utils/assert.ts",
+      "gitBlob": "ff8d568424042401f3f50fc508bb48a3e5817776",
+      "size": 212
+    },
+    {
+      "path": "lib/utils/colors/getContrastColor.ts",
+      "gitBlob": "a8cc49f92c585b0c79906f42600dc113b8ee3fc1",
+      "size": 987
+    },
+    {
+      "path": "lib/utils/colors/stringToColor.ts",
+      "gitBlob": "76939ea463f67a20d3faefdc1c4adc6340eee538",
+      "size": 331
+    },
+    {
+      "path": "lib/utils/debug.ts",
+      "gitBlob": "f17a2a8f38368238c5c841e3507095f7a675d5aa",
+      "size": 406
+    },
+    {
+      "path": "lib/utils/getRTLOffsetType.ts",
+      "gitBlob": "fb5e8b5a6c5b7c87c69b88de3997348b8b2882cb",
+      "size": 1658
+    },
+    {
+      "path": "lib/utils/getScrollbarSize.ts",
+      "gitBlob": "ca385ed8aec258fab0fc969d5350ec06ad8e501d",
+      "size": 513
+    },
+    {
+      "path": "lib/utils/isRtl.ts",
+      "gitBlob": "f466bcaae099e41211f43f341fa51241b7994670",
+      "size": 279
+    },
+    {
+      "path": "lib/utils/parseNumericStyleValue.test.ts",
+      "gitBlob": "c631b0cf279e00f229a9825a5b287117e0fb364d",
+      "size": 971
+    },
+    {
+      "path": "lib/utils/parseNumericStyleValue.ts",
+      "gitBlob": "ff0a13a6113c4c184e18f4a6815e933209eb9241",
+      "size": 392
+    },
+    {
+      "path": "lib/utils/shallowCompare.test.ts",
+      "gitBlob": "10934f7f488e435f2045a301bdb4dac5c00c471a",
+      "size": 719
+    },
+    {
+      "path": "lib/utils/shallowCompare.ts",
+      "gitBlob": "3e324ca240c4ad08bac2d6411b41bb2532155ebb",
+      "size": 467
+    },
+    {
+      "path": "lib/utils/test/mockResizeObserver.ts",
+      "gitBlob": "e5b7b0b980a922a39dd250a4c27b5da4cde25c3b",
+      "size": 3536
+    },
+    {
+      "path": "lib/utils/test/mockScrollTo.ts",
+      "gitBlob": "34bfc62a351e83addfe62d48394d0fd483b87470",
+      "size": 797
+    },
+    {
+      "path": "LICENSE.md",
+      "gitBlob": "0569d0a7b8b2156e35b1cc7680f65344dc68ba96",
+      "size": 1079
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "cb6c91f51c0a18f2bc884bc7414b8d44c2df7bcf",
+      "size": 3884
+    },
+    {
+      "path": "src/constants.ts",
+      "gitBlob": "6a1f7a02fc3cc7731550160b4b054df4c0b3c311",
+      "size": 113
+    },
+    {
+      "path": "vitest.setup.js",
+      "gitBlob": "75d1342f122a20566da18eea8f0c0a4797c5deaf",
+      "size": 594
+    }
+  ],
+  "fingerprint": "be6cf4ca0e496fe6158421b3063d46bd7f34e638d67d1e347f47f034050e61d6"
+}

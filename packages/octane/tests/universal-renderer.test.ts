@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { builders as b, parseModule } from '@tsrx/core';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
+import ts from 'typescript';
 import { compile } from '../src/compiler/compile.js';
 import { lowerUniversalRendererRegionAst } from '../src/compiler/compile-universal.js';
 import { normalizeRendererConfig } from '../src/compiler/renderers.js';
 import * as UniversalRuntime from '../src/universal.js';
+import { act } from '../src/index.js';
 import {
 	createObjectContainer,
 	createObjectDriver,
@@ -160,6 +162,40 @@ function objectRoot(compilerLeafProps = false) {
 			: driver,
 	);
 	return { container, root };
+}
+
+type HmrModule = Record<string, any>;
+type HmrDispose = (data: Record<string, unknown>) => void;
+type HmrAccept = (module: HmrModule | undefined) => void;
+
+interface HmrContext {
+	data: Record<string, unknown> | undefined;
+	dispose(callback: HmrDispose): void;
+	accept(callback?: HmrAccept): void;
+	invalidate(): void;
+}
+
+function evaluateUniversalHmrModule(
+	code: string,
+	hot: HmrContext,
+	modules: Record<string, unknown> = { 'octane/universal': UniversalRuntime },
+): HmrModule {
+	// Preserve ESM semantics: default-expression snapshots must remain
+	// distinguishable from live export aliases after a hot handoff.
+	const executable = ts.transpileModule(
+		code.replaceAll('import.meta.webpackHot', '__hot').replaceAll('import.meta.hot', '__hot'),
+		{ compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ESNext } },
+	).outputText;
+	const exports: HmrModule = {};
+	new Function('require', 'exports', '__hot', executable)(
+		(request: string) => {
+			if (request in modules) return modules[request];
+			throw new Error(`Unexpected compiled module import: ${request}`);
+		},
+		exports,
+		hot,
+	);
+	return exports;
 }
 
 function walkCompiledAst(root: unknown, visit: (node: any) => void): void {
@@ -2611,47 +2647,282 @@ export function Scene() @{
 		);
 	});
 
-	it('evaluates a webpack-HMR universal module before any dispose data exists', () => {
-		const source = `
-			export function Scene() @{ <scene /> }
-		`;
-		let output = compile(source, '/src/HotData.object.tsrx', { renderer, hmr: 'webpack' }).code;
-		expect(output).toContain('const __octaneWebpackHot = import.meta.webpackHot;');
-		expect(output).not.toContain('import.meta.webpackHot.data');
-		output = output.replace(
-			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
-			(_match, specifiers: string) =>
-				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+	it.each([
+		['Vite shorthand', 'vite', 'tsrx', undefined],
+		['Vite JSX', true, 'tsx', undefined],
+		['webpack shorthand', 'webpack', 'tsrx', undefined],
+		['webpack JSX', 'webpack', 'tsx', undefined],
+		['Vite addition of constructor', 'vite', 'tsrx', 'constructor'],
+		['Vite addition of __proto__', 'vite', 'tsrx', '__proto__'],
+		['Vite addition of toString', 'vite', 'tsrx', 'toString'],
+	] as const)(
+		'refreshes mounted and newly imported universal components across repeated %s updates',
+		async (_label, hmr, extension, addedExport) => {
+			const hotData: Record<string, unknown> = {};
+			let dispose: HmrDispose[] = [];
+			let accept: HmrAccept[] = [];
+			const invalidate = vi.fn();
+			const evaluate = (
+				version: number,
+				data: Record<string, unknown> | undefined,
+				defaultName = 'Default',
+			) => {
+				const component = (name: string) => {
+					const output = `<scene version={${version}} count={count} increment={() => setCount(count + 1)} />`;
+					const setup = 'const [count, setCount] = useState(0);';
+					return extension === 'tsrx'
+						? `function ${name}() @{ ${setup} ${output} }`
+						: `function ${name}() { ${setup} return ${output}; }`;
+				};
+				const added =
+					version > 1 && addedExport !== undefined ? `\nexport ${component(addedExport)}` : '';
+				const source = `import { useState } from 'octane';\nexport ${component('Named')}\nexport default ${component(defaultName)}${added}`;
+				const output = compile(source, `/src/HotData.object.${extension}`, { renderer, hmr }).code;
+				const hot = {
+					data,
+					dispose(callback: HmrDispose) {
+						// Vite replaces a module's dispose handler; webpack accumulates them.
+						if (hmr === 'webpack') dispose.push(callback);
+						else dispose = [callback];
+					},
+					accept(callback: HmrAccept = () => {}) {
+						accept.push(callback);
+					},
+					invalidate,
+				};
+				return evaluateUniversalHmrModule(output, hot);
+			};
+			const update = async (version: number, defaultName = 'Default') => {
+				const previousAccept = accept;
+				const data = hmr === 'webpack' ? {} : hotData;
+				for (const callback of dispose) callback(data);
+				dispose = [];
+				accept = [];
+				const next = evaluate(version, data, defaultName);
+				if (hmr !== 'webpack') {
+					for (const callback of previousAccept) callback(next);
+				}
+				await Promise.resolve();
+				return next;
+			};
+			const first = evaluate(1, hmr === 'webpack' ? undefined : hotData);
+			const mounted = ['Named', 'default'].map((name) => {
+				const result = objectRoot();
+				result.root.render(first[name], undefined);
+				return result;
+			});
+			const laterExports = [
+				'Named',
+				'default',
+				...(addedExport === undefined ? [] : [addedExport]),
+			];
+			const later = laterExports.map(() => objectRoot());
+			try {
+				for (const { container } of mounted) {
+					expect(container.children[0].props).toMatchObject({ version: 1, count: 0 });
+					(container.children[0].props.increment as () => void)();
+				}
+				await Promise.resolve();
+				const second = await update(2);
+				for (const { container } of mounted) {
+					expect(container.children[0].props).toMatchObject({ version: 2, count: 1 });
+				}
+				for (const [index, name] of laterExports.entries()) {
+					later[index].root.render(second[name], undefined);
+					expect(later[index].container.children[0].props).toMatchObject({ version: 2, count: 0 });
+				}
+				await update(3);
+				for (const { container } of mounted) {
+					expect(container.children[0].props).toMatchObject({ version: 3, count: 1 });
+					(container.children[0].props.increment as () => void)();
+				}
+				for (const { container } of later) {
+					expect(container.children[0].props).toMatchObject({ version: 3, count: 0 });
+				}
+				await Promise.resolve();
+				for (const { container } of mounted) {
+					expect(container.children[0].props.count).toBe(2);
+				}
+				await update(4, 'RenamedDefault');
+				for (const { container } of [...mounted, ...later]) {
+					expect(container.children[0].props.version).toBe(4);
+				}
+				for (const { root } of [...mounted, ...later]) root.unmount();
+				await update(5, 'RenamedDefault');
+				for (const { container } of [...mounted, ...later]) expect(container.children).toEqual([]);
+				expect(invalidate).not.toHaveBeenCalled();
+			} finally {
+				for (const { root } of [...mounted, ...later]) root.unmount();
+			}
+		},
+	);
+
+	it.each([
+		['Named', 'export default function Default() @{ <scene version={2} /> }'],
+		['default', 'export function Named() @{ <scene version={2} /> }'],
+	] as const)(
+		'invalidates a Vite update that removes the %s universal export',
+		(exportName, source) => {
+			let accept: HmrAccept[] = [];
+			const hot: HmrContext = {
+				data: {},
+				dispose() {},
+				accept(callback = () => {}) {
+					accept.push(callback);
+				},
+				invalidate: vi.fn(),
+			};
+			const evaluate = (source: string) =>
+				evaluateUniversalHmrModule(
+					compile(source, '/src/RemovedBoundary.object.tsrx', { renderer, hmr: true }).code,
+					hot,
+				);
+			const first = evaluate(`
+export function Named() @{ <scene version={1} /> }
+export default function Default() @{ <scene version={1} /> }`);
+			const { root, container } = objectRoot();
+			root.render(first[exportName], undefined);
+			try {
+				expect(container.children[0].props.version).toBe(1);
+				const previousAccept = accept;
+				accept = [];
+				const next = evaluate(source);
+				for (const callback of previousAccept) callback(next);
+				expect(hot.invalidate).toHaveBeenCalled();
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('keeps mounted universal output when Vite reports a failed module evaluation', () => {
+		let accept: HmrAccept = () => {};
+		const hot: HmrContext = {
+			data: {},
+			dispose() {},
+			accept(callback = () => {}) {
+				accept = callback;
+			},
+			invalidate: vi.fn(),
+		};
+		const module = evaluateUniversalHmrModule(
+			compile(
+				'export function Scene() @{ <scene version={1} /> }',
+				'/src/FailedUpdate.object.tsrx',
+				{
+					renderer,
+					hmr: true,
+				},
+			).code,
+			hot,
 		);
-		output = output.replaceAll('import.meta.webpackHot', '__hot');
-		output = output.replace('export let Scene =', 'let Scene =');
-		interface WebpackHot {
-			data: object | undefined;
-			dispose(callback: (data: object) => void): void;
-			accept(): void;
+		const { root, container } = objectRoot();
+		root.render(module.Scene, undefined);
+		try {
+			accept(undefined);
+			expect(container.children[0].props.version).toBe(1);
+			expect(hot.invalidate).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
 		}
-		const evaluate = (hot: WebpackHot) =>
-			new Function('__universal', '__hot', `${output}\nreturn Scene;`)(
-				UniversalRuntime,
-				hot,
-			) as object;
+	});
 
-		// Webpack and rspack leave `hot.data` undefined until a previous instance
-		// of the module has disposed, so the first evaluation must not read it.
-		const disposals: Array<(data: object) => void> = [];
-		const first = evaluate({
-			data: undefined,
-			dispose: (callback) => disposals.push(callback),
-			accept: () => {},
+	it('preserves thread cleanup across Vite edits to mixed renderer modules', async () => {
+		const domRuntime = await import('../src/index.js');
+		const definitions = new Map<string, (...args: any[]) => unknown>();
+		let failRegistration = false;
+		const bridgeModule = '@test/hmr-renderer-bridge';
+		const config = normalizeRendererConfig({
+			registry: {
+				object: {
+					module: 'octane/universal',
+					text: 'host',
+					capabilities: ['thread-functions'],
+				},
+			},
+			boundaries: {
+				[bridgeModule]: {
+					Canvas: { ownerRenderer: 'dom', childRenderer: 'object', prop: 'children' },
+					Html: { ownerRenderer: 'object', childRenderer: 'dom', prop: 'children' },
+				},
+			},
 		});
-		expect(first).toBeTruthy();
-		expect(disposals).toHaveLength(1);
-
-		// A hot update hands the retained canonical component to the new module.
-		const bag = {};
-		disposals[0]!(bag);
-		const second = evaluate({ data: bag, dispose: () => {}, accept: () => {} });
-		expect(second).toBe(first);
+		const modules = {
+			octane: domRuntime,
+			'octane/internal/client': domRuntime,
+			'octane/universal': {
+				...UniversalRuntime,
+				registerThreadFunction(
+					_kind: string,
+					id: string,
+					implementation: (...args: any[]) => unknown,
+				) {
+					definitions.set(id, implementation);
+					if (failRegistration) throw new Error('module initialization failed');
+				},
+				unregisterThreadFunction(_kind: string, id: string) {
+					definitions.delete(id);
+				},
+			},
+			[bridgeModule]: {
+				Canvas: UniversalRuntime.createUniversalHostBoundary('object'),
+				Html: defineUniversalComponent('object', () => null),
+			},
+		};
+		const data: Record<string, unknown> = {};
+		let dispose: HmrDispose | undefined;
+		let accept: HmrAccept[] = [];
+		const hot: HmrContext = {
+			data,
+			dispose(callback) {
+				dispose = callback;
+			},
+			accept(callback = () => {}) {
+				accept.push(callback);
+			},
+			invalidate: vi.fn(),
+		};
+		const evaluate = (version: number, fail = false) => {
+			failRegistration = fail;
+			const source = `
+import { Canvas, Html } from '${bridgeModule}';
+export function App() @{
+  <group>
+    <Html>
+      <main data-version={${version}}>
+        <Canvas><scene main-thread:bindtap={() => { 'main thread'; return ${version}; }} /></Canvas>
+        <Canvas><scene version={${version}} /></Canvas>
+      </main>
+    </Html>
+  </group>
+}`;
+			const output = compile(source, '/src/MixedHmr.object.tsrx', {
+				hmr: true,
+				renderer: { ...renderer, capabilities: ['thread-functions'] },
+				rendererBoundaries: config.boundaries,
+				rendererRegistry: config.registry,
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			}).code;
+			return evaluateUniversalHmrModule(output, hot, modules);
+		};
+		let previousAccept: HmrAccept[] = [];
+		for (const version of [1, 2]) {
+			accept = [];
+			const module = evaluate(version);
+			for (const callback of previousAccept) callback(module);
+			expect(
+				[...definitions.values()].map((implementation) => implementation([], undefined, [])),
+			).toEqual([version]);
+			dispose?.(data);
+			expect(definitions.size).toBe(0);
+			previousAccept = accept;
+		}
+		expect(() => evaluate(3, true)).toThrow('module initialization failed');
+		expect(
+			[...definitions.values()].map((implementation) => implementation([], undefined, [])),
+		).toEqual([3]);
+		dispose?.(data);
+		expect(definitions.size).toBe(0);
 	});
 
 	it('warms adjacent universal component trees from a parent with no use()', async () => {
@@ -4044,6 +4315,109 @@ describe('mixed DOM and universal ownership', () => {
 		root.unmount();
 	});
 
+	it('releases an abandoned DOM scope before retrying with a delayed foreign cleanup scheduler', async () => {
+		const container = createObjectContainer();
+		const scheduled: Array<() => void> = [];
+		const root = createUniversalRoot(container, createObjectDriver(), {
+			scheduleMicrotask(callback) {
+				scheduled.push(callback);
+			},
+		});
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [
+				['theme', 0],
+				['value', 1],
+			],
+		});
+		let resolve!: (value: string) => void;
+		const pending = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const Child = defineUniversalComponent('object', () =>
+			universalValue(plan, [useUniversalContext(UniversalTheme), use(pending)]),
+		);
+		const props = {
+			root,
+			component: Child,
+			childProps: {},
+			theme: 'dark',
+			log: () => {},
+			failAfterPrepare: false,
+		};
+		const mounted = mount(UniversalBoundaryFixture, props);
+		try {
+			expect(container.children).toEqual([]);
+			// The DOM retry uses native microtasks. The foreign renderer's queued
+			// attempt cleanup deliberately has not run before the new scope mounts.
+			await act(async () => {
+				resolve('ready');
+				await pending;
+			});
+			expect(mounted.container.querySelector('.caught')).toBeNull();
+			expect(container.children).toHaveLength(1);
+			const host = container.children[0];
+			expect(host.props).toMatchObject({ theme: 'dark', value: 'ready' });
+			// Stale abort/bridge-release callbacks must not invalidate the new
+			// owner. A later context update proves its bridge still points live.
+			for (const callback of scheduled.splice(0)) callback();
+			mounted.update(UniversalBoundaryFixture, { ...props, theme: 'light' });
+			expect(container.children).toEqual([host]);
+			expect(host.props).toMatchObject({ theme: 'light', value: 'ready' });
+		} finally {
+			mounted.unmount();
+			root.unmount();
+		}
+		expect(container.children).toEqual([]);
+	});
+
+	it('does not transfer abandoned root suspension ownership to replacement props', async () => {
+		const { container, root } = objectRoot();
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [['value', 0]],
+		});
+		let resolve!: (value: string) => void;
+		const pending = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const Suspends = defineUniversalComponent('object', () => universalValue(plan, [use(pending)]));
+		const Throw = defineUniversalComponent('object', () => {
+			throw new Error('replacement prepare failed');
+		});
+		const Safe = defineUniversalComponent('object', () => universalValue(plan, ['safe']));
+		const props = {
+			root,
+			component: Suspends,
+			childProps: {},
+			theme: 'dark',
+			log: () => {},
+			failAfterPrepare: false,
+		};
+		const mounted = mount(UniversalBoundaryFixture, props);
+		try {
+			mounted.update(UniversalBoundaryFixture, { ...props, component: Throw });
+			expect(mounted.find('.caught').textContent).toBe('caught: replacement prepare failed');
+			expect(container.children).toEqual([]);
+			// This failure belongs to a superseding request, not the abandoned
+			// suspension's retry. It must not consume an uncommitted host root.
+			expect(root.render(Safe, undefined).status).toBe('committed');
+			const host = container.children[0];
+			await act(async () => {
+				resolve('obsolete');
+				await pending;
+			});
+			expect(container.children).toEqual([host]);
+			expect(host.props.value).toBe('safe');
+			expect(mounted.find('.caught').textContent).toBe('caught: replacement prepare failed');
+		} finally {
+			mounted.unmount();
+			root.unmount();
+		}
+	});
+
 	it('retains suspended ownership for retry and tears it down when the retry errors', async () => {
 		const { container, root } = objectRoot();
 		const plan = universalPlan('object', {
@@ -4074,10 +4448,10 @@ describe('mixed DOM and universal ownership', () => {
 		expect(container.instanceCount).toBe(0);
 
 		failRetry = true;
-		resolve('ready');
-		await pending;
-		await Promise.resolve();
-		await Promise.resolve();
+		await act(async () => {
+			resolve('ready');
+			await pending;
+		});
 
 		expect(mounted.find('.caught').textContent).toBe('caught: object retry failed');
 		expect(container.commits).toHaveLength(0);

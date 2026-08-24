@@ -6,7 +6,7 @@
     "pristine": {
       "compiler": "tsc",
       "project": "packages/window/typetests/tsconfig.pristine.json",
-      "moduleAlias": "packages/window/upstream/npm/dist/react-window.d.ts"
+      "moduleAlias": "packages/window/upstream-artifact/dist/react-window.d.ts"
     },
     "adapted": {
       "compiler": "tsrx-tsc",

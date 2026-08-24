@@ -1,0 +1,10 @@
+diff --git a/tests/upstream/global/utils/objectsEqual.test.ts b/tests/upstream/global/utils/objectsEqual.test.ts
+--- a/tests/upstream/global/utils/objectsEqual.test.ts
++++ b/tests/upstream/global/utils/objectsEqual.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, test } from "vitest";
+-import { objectsEqual } from "./objectsEqual";
++import { objectsEqual } from "../../../../src/global/utils/objectsEqual";
+ 
+ const EMPTY = {};
+ const A = { a: 25, b: 75 };

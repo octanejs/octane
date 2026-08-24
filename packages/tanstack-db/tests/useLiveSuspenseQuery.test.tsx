@@ -1,5 +1,6 @@
+/** @jsxImportSource octane */
 import { describe, expect, it } from 'vitest';
-import { render, renderHook, waitFor } from '@octanejs/testing-library';
+import { act, render, renderHook, waitFor } from '@octanejs/testing-library';
 import { createCollection, createLiveQueryCollection, eq, gt } from '@tanstack/db';
 import { Suspense } from 'octane';
 import { useLiveSuspenseQuery } from '../src/useLiveSuspenseQuery';
@@ -610,12 +611,8 @@ describe(`useLiveSuspenseQuery`, () => {
 	// forbids).
 
 	it(`renders the Suspense fallback while an async collection loads, then the data`, async () => {
-		// Regression for the raw-promise-throw bug. Octane Suspense only recognizes
-		// the sentinel from `use(thenable)`; the pre-fix `throw promiseRef.current`
-		// reached Octane's error path, so the fallback never rendered. Every other
-		// suspense test uses a synchronous fixture that is already `ready` at first
-		// render, so none of them exercises the suspend path. This one gates the
-		// collection's readiness behind a promise so the hook must actually suspend.
+		// Gate collection readiness so this exercises actual suspension instead of
+		// an already-ready synchronous collection.
 		let releaseLoad: (() => void) | null = null;
 		const loadGate = new Promise<void>((resolve) => {
 			releaseLoad = resolve;
@@ -649,19 +646,18 @@ describe(`useLiveSuspenseQuery`, () => {
 
 		const { container } = render(<App />);
 
-		// The fallback must be in the DOM while the collection loads. With the raw
-		// `throw promise`, this assertion fails (the error path runs instead).
+		// Loading is visible and no ready data is exposed while readiness is pending.
 		await waitFor(() => {
 			expect(container.textContent).toContain(`Loading...`);
 		});
 		expect(container.textContent).not.toContain(`ready:`);
 
 		// Resolve the load; the suspended content replaces the fallback.
-		releaseLoad!();
+		await act(() => releaseLoad!());
 		await waitFor(() => {
 			expect(container.textContent).toContain(`ready:3`);
+			expect(container.textContent).not.toContain(`Loading...`);
 		});
-		expect(container.textContent).not.toContain(`Loading...`);
 	});
 
 	it(`keeps a later sibling suspended when an earlier query resolves first`, async () => {
@@ -721,7 +717,7 @@ describe(`useLiveSuspenseQuery`, () => {
 		// Release ONLY the first collection. The second is still loading, so the
 		// component must stay on the fallback. Pre-fix, the second hook read the
 		// first's fulfilled thenable and rendered `a:3|b:0` here.
-		first.release();
+		await act(() => first.release());
 		await waitFor(() => {
 			expect(first.collection.status).toBe(`ready`);
 		});
@@ -729,11 +725,11 @@ describe(`useLiveSuspenseQuery`, () => {
 		expect(container.textContent).not.toContain(`b:`);
 
 		// Release the second collection; now both are ready and the pair renders.
-		second.release();
+		await act(() => second.release());
 		await waitFor(() => {
 			expect(container.textContent).toContain(`a:3|b:3`);
+			expect(container.textContent).not.toContain(`Loading...`);
 		});
-		expect(container.textContent).not.toContain(`Loading...`);
 	});
 
 	it(`should not re-suspend after hasBeenReady when isLoadingSubset changes`, async () => {

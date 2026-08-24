@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "upstreamDeclaration": "upstream-artifact/dist/react-resizable-panels.d.ts",
+  "reactTypeDependencies": [
+    "ReactNode",
+    "HTMLAttributes<HTMLDivElement>",
+    "CSSProperties",
+    "Ref<T>",
+    "RefObject<T>",
+    "Dispatch<SetStateAction<T>>",
+    "JSX.Element"
+  ],
+  "categories": {
+    "node": "expressible with OctaneNode's intentionally opaque unknown contract; object-backed renderables are accepted",
+    "intrinsicAttributes": "expressible with Octane.JSX.IntrinsicElements; its intentional type-only React lineage preserves equal strictness",
+    "events": "expressible through Octane's strict intrinsic surface and native DOM event callbacks",
+    "css": "expressible through the strict intrinsic style property",
+    "ref": "expressible through the Octane JSX ref contract",
+    "dispatch": "expressible as a value-or-updater function union and single-argument dispatcher",
+    "jsxResult": "expressible as OctaneNode, subject to the Octane package's own declaration dependencies"
+  },
+  "decision": "accepted",
+  "constraints": [
+    "The binding must derive strict host types from Octane rather than hand-writing or widening them.",
+    "The binding must not require a React runtime dependency or a non-optional React/ReactDOM peer.",
+    "Type-only React lineage inherited through Octane is acceptable because Octane owns that dependency."
+  ]
+}

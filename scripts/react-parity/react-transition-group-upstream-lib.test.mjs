@@ -38,8 +38,12 @@ async function fixture() {
 		new URL('../../packages/transition-group/tests/ssr/upstream-import.test.ts', import.meta.url),
 		join(root, 'packages/transition-group/tests/ssr/upstream-import.test.ts'),
 	);
+	await cp(
+		new URL('../../packages/transition-group/LICENSE.upstream', import.meta.url),
+		join(root, 'packages/transition-group/LICENSE.upstream'),
+	);
 	for (const file of [
-		'SHA256SUMS',
+		'upstream.lock.json',
 		'adapted-evidence.SHA256SUMS',
 		'adapted-case-contracts.json',
 		'upstream-test-dispositions.json',
@@ -117,15 +121,11 @@ import * as ReactTransitionGroup from '../src'; // eslint-disable-line no-unused
 describe('SSR', () => {});
 `,
 	);
-	const { renderReactTransitionGroupUpstreamInventory } =
-		await import('./react-transition-group-upstream-lib.mjs');
-	await writeFile(
-		join(root, 'packages/transition-group/audit/SHA256SUMS'),
-		renderReactTransitionGroupUpstreamInventory(root),
-	);
+	// Byte mutations of pinned upstream files now fail at the lock layer
+	// before the semantic caseCount check can observe them.
 	assert.throws(function run() {
 		verifyReactTransitionGroupUpstream(root);
-	}, /caseCount|case inventory drifted/);
+	}, /drifted from the lock/);
 });
 
 test('rejects a deleted upstream suite file', async function rejectsDeletedSuite(t) {
@@ -134,15 +134,10 @@ test('rejects a deleted upstream suite file', async function rejectsDeletedSuite
 		return rm(root, { recursive: true, force: true });
 	});
 	await rm(join(root, 'packages/transition-group/upstream/test/SSR-test.js'));
-	const { renderReactTransitionGroupUpstreamInventory } =
-		await import('./react-transition-group-upstream-lib.mjs');
-	await writeFile(
-		join(root, 'packages/transition-group/audit/SHA256SUMS'),
-		renderReactTransitionGroupUpstreamInventory(root),
-	);
+	// A deleted pinned file fails the lock layer before artifact dispositions.
 	assert.throws(function run() {
 		verifyReactTransitionGroupUpstream(root);
-	}, /must account for every upstream\/test artifact/);
+	}, /drifted from the lock/);
 });
 
 test('rejects adapted case drift against the crosswalk', async function rejectsAdaptedCaseDrift(t) {

@@ -51,6 +51,9 @@ import { verifyReactDraggableTypes } from './react-draggable-types-lib.mjs';
 import { verifyReactDropzoneEvidence } from './react-dropzone-evidence-lib.mjs';
 import { verifyReactMarkdownTestClassifications } from './react-markdown-classifications-lib.mjs';
 import { verifyReactMarkdownTypes } from './react-markdown-types-lib.mjs';
+import { verifyReactResizablePanelsTestClassifications } from './react-resizable-panels-classifications-lib.mjs';
+import { verifyReactResizablePanelsTypes } from './react-resizable-panels-types-lib.mjs';
+import { verifyReactResizablePanelsUpstream } from './react-resizable-panels-upstream-lib.mjs';
 import { verifyReactSpringUpstream } from './react-spring-upstream-lib.mjs';
 import { verifyReactTextareaAutosizeTestClassifications } from './react-textarea-autosize-classifications-lib.mjs';
 import { verifyReactTextareaAutosizeCrosswalk } from './react-textarea-autosize-crosswalk-lib.mjs';
@@ -58,7 +61,7 @@ import { verifyReactTextareaAutosizeTypes } from './react-textarea-autosize-type
 import { verifyReactTransitionGroupTestClassifications } from './react-transition-group-classifications-lib.mjs';
 import { verifyReactTransitionGroupTypes } from './react-transition-group-types-lib.mjs';
 import { verifyReactTransitionGroupUpstream } from './react-transition-group-upstream-lib.mjs';
-import { verifySolanaReactTypes } from './solana-react-types-lib.mjs';
+import { verifySolanaReactTypes } from './solana-kit-types-lib.mjs';
 import { verifyTanstackDevtoolsTestClassifications } from './tanstack-devtools-classifications-lib.mjs';
 import { verifyTanstackHotkeysTestClassifications } from './tanstack-hotkeys-classifications-lib.mjs';
 import { verifyTanstackPacerTypes } from './tanstack-pacer-types-lib.mjs';
@@ -74,13 +77,18 @@ import { verifyVaulAdaptedRuntimeStructure } from './vaul-runtime-lib.mjs';
 import { verifyVaulUpstream } from './vaul-upstream-lib.mjs';
 import { verifyVisxTestClassifications } from './visx-classifications-lib.mjs';
 import { verifyVisxTypes } from './visx-types-lib.mjs';
+import { verifyXstateStoreTypes, verifyXstateTypes } from './xstate-types-lib.mjs';
 import { verifyZagTestClassifications } from './zag-classifications-lib.mjs';
 import { verifyZagRuntimeCrosswalk } from './zag-runtime-crosswalk.mjs';
 import { verifyZagTypes } from './zag-types-lib.mjs';
 import { parseShard } from './shard-lib.mjs';
 import { loadRequiredVitestLanes } from './vitest-batch-lib.mjs';
 import { validateVitestContracts } from './vitest-contract.mjs';
-import { verifyZagUpstream } from '../../packages/zag/scripts/verify-upstream.mjs';
+import {
+	discoverMaterializedUpstreamPackages,
+	materializeUpstreamEvidence,
+	verifyMaterializedUpstreamEvidence,
+} from './materialized-upstream-lib.mjs';
 import baseVitestConfig from '../../vitest.config.js';
 import shardedVitestConfig from '../../vitest.ci-sharded.config.js';
 
@@ -113,6 +121,11 @@ const BINDING_MANIFESTS = readdirSync(path.join(REPO, 'packages'), { withFileTyp
 	.map((entry) => `packages/${entry.name}/audit/react-parity.json`)
 	.filter((manifest) => existsSync(path.join(REPO, manifest)))
 	.sort();
+// Lock-pinned packages regenerate their pristine/adapted upstream trees from
+// audit/upstream.lock.json instead of committing the bytes. Materialize them
+// before any verifier, contract walk, or lane reads those paths; an already
+// verified tree is reused offline.
+materializeUpstreamEvidence(REPO);
 const HARNESS_PATH = path.join(REPO, 'scripts/react-parity/harness.mjs');
 // Vitest owns the runner until its parity-wide batch exits. The remaining
 // runners are internally single-process: TypeScript/Node use one process, Jest
@@ -133,6 +146,7 @@ const SPECIALIZED_CLASSIFICATION_BINDINGS = new Set([
 	'markdown',
 	'pdf',
 	'popper',
+	'resizable-panels',
 	'transition-group',
 	'tanstack-devtools',
 	'tanstack-hotkeys',
@@ -163,6 +177,13 @@ await capture('intersection-observer test classifications', () =>
 	verifyIntersectionObserverTestClassifications(REPO),
 );
 await capture('react-dropzone evidence', () => verifyReactDropzoneEvidence(REPO));
+await capture('react-resizable-panels upstream evidence', () =>
+	verifyReactResizablePanelsUpstream(REPO),
+);
+await capture('react-resizable-panels type evidence', () => verifyReactResizablePanelsTypes(REPO));
+await capture('react-resizable-panels test classifications', () =>
+	verifyReactResizablePanelsTestClassifications(REPO),
+);
 await capture('livestore type evidence', () => verifyLivestoreTypes(REPO));
 await capture('livestore test classifications', () => verifyLivestoreTestClassifications(REPO));
 await capture('alien-signals type evidence', () => verifyAlienSignalsTypes(REPO));
@@ -189,7 +210,7 @@ await capture('react-markdown type evidence', () => verifyReactMarkdownTypes(REP
 await capture('react-markdown test classifications', () =>
 	verifyReactMarkdownTestClassifications(REPO),
 );
-await capture('@octanejs/solana-react type evidence', () => verifySolanaReactTypes(REPO));
+await capture('@octanejs/solana-kit type evidence', () => verifySolanaReactTypes(REPO));
 await capture('react-spring upstream evidence', () => verifyReactSpringUpstream(REPO));
 await capture('@octanejs/tanstack-table type evidence', () => verifyTanstackTableTypes(REPO));
 await capture('tanstack-table test classifications', () =>
@@ -206,7 +227,11 @@ await capture('@octanejs/colorful type evidence', () => verifyReactColorfulTypes
 await capture('@octanejs/colorful test classifications', () =>
 	verifyReactColorfulTestClassifications(REPO),
 );
-await capture('zag upstream evidence', () => verifyZagUpstream(path.join(REPO, 'packages/zag')));
+for (const materializedPackage of discoverMaterializedUpstreamPackages(REPO)) {
+	await capture(`${materializedPackage} materialized upstream evidence`, () =>
+		verifyMaterializedUpstreamEvidence(REPO, materializedPackage),
+	);
+}
 await capture('zag type evidence', () => verifyZagTypes(REPO));
 await capture('zag test classifications', () => verifyZagTestClassifications(REPO));
 await capture('zag runtime inventory crosswalk', () => verifyZagRuntimeCrosswalk(REPO));
@@ -272,6 +297,8 @@ await capture('react-draggable test classifications', () =>
 await capture('@octanejs/popper type evidence', () => verifyPopperTypes(REPO));
 await capture('@octanejs/popper test classifications', () => verifyPopperTestClassifications(REPO));
 await capture('pdf test classifications', () => verifyPdfTestClassifications(REPO));
+await capture('@octanejs/xstate type evidence', () => verifyXstateTypes(REPO));
+await capture('@octanejs/xstate-store type evidence', () => verifyXstateStoreTypes(REPO));
 
 // The home marketing surface was split from a single Home.tsrx into per-section
 // .tsrx files, and its benchmark/marketing copy also moved into shared components.

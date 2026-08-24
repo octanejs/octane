@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'octane';
+import { createSubSlot, useCallback, useEffect, useMemo, useState } from 'octane';
 
 import type { OTPInputProps } from './types';
 
@@ -26,22 +26,11 @@ export const PASSWORD_MANAGERS_SELECTORS = [
 	'[style$="2147483647 !important;"]',
 ].join(',');
 
-const childSlots = new Map<symbol, Map<string, symbol>>();
-
-function subSlot(slot: symbol | undefined, key: string): symbol | undefined {
-	if (!slot) return undefined;
-	let children = childSlots.get(slot);
-	if (!children) {
-		children = new Map();
-		childSlots.set(slot, children);
-	}
-	let child = children.get(key);
-	if (!child) {
-		child = Symbol(`input-otp:usePasswordManagerBadge:${key}`);
-		children.set(key, child);
-	}
-	return child;
-}
+const subSlot = createSubSlot({
+	parentPrefix: 'input-otp:usePasswordManagerBadge',
+	includeParentDescription: false,
+	global: false,
+});
 
 export function usePasswordManagerBadge(
 	options: {
@@ -105,8 +94,9 @@ export function usePasswordManagerBadge(
 			if (!container || pushPasswordManagerStrategy === 'none' || typeof window === 'undefined') {
 				return;
 			}
+			const mountedContainer = container;
 			function checkHasSpace() {
-				setHasPWMBadgeSpace(availableBadgeSpace(container) >= PWM_BADGE_SPACE_WIDTH_PX);
+				setHasPWMBadgeSpace(availableBadgeSpace(mountedContainer) >= PWM_BADGE_SPACE_WIDTH_PX);
 			}
 			checkHasSpace();
 			const interval = setInterval(checkHasSpace, 1000);

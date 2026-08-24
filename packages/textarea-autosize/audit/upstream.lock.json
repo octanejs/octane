@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-textarea-autosize",
+    "version": "8.5.9",
+    "repository": {
+      "owner": "Andarist",
+      "repo": "react-textarea-autosize",
+      "subdirectory": null
+    },
+    "commit": "ed1894cd8611d99fbea1c47adcf6ee522b1030fd",
+    "integrity": "sha512-U1DGlIQN5AwgjTyOEnI1oCcMuEr1pv1qOtklB2l4nyMGbHzWrI0eFsYK0zos2YWqAolJyG0IWJaqWmWj5ETh0A=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "2c2a938456c54cab1c4ecd38ea08230c063d9f1a478fc30ec5b172682f9fb1b1"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["package.json", "src"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "package.json",
+      "gitBlob": "31be1e40c7dbe128702f1e2de0f272872f25ffc7",
+      "size": 6281
+    },
+    {
+      "path": "src/__tests__/__snapshots__/index.test.js.snap",
+      "gitBlob": "d77b5755ffbb612967d316d844a4032bca6f1783",
+      "size": 323
+    },
+    {
+      "path": "src/__tests__/index.test.js",
+      "gitBlob": "a5459f200a05209b7a0d66c4b9d2712c930621ef",
+      "size": 884
+    },
+    {
+      "path": "src/calculateNodeHeight.ts",
+      "gitBlob": "c1d7ca3de7654a3cb19542f59b3b530bdcd55970",
+      "size": 2347
+    },
+    {
+      "path": "src/conditions/false.ts",
+      "gitBlob": "33136544dba2632d4264645378e8108c7ec82513",
+      "size": 22
+    },
+    {
+      "path": "src/conditions/is-browser.ts",
+      "gitBlob": "7a5de7b4d055534042796995630b5e76a59a7481",
+      "size": 48
+    },
+    {
+      "path": "src/conditions/true.ts",
+      "gitBlob": "ff3177babdde03fa7b9b668e0f1485bc619ddf65",
+      "size": 21
+    },
+    {
+      "path": "src/forceHiddenStyles.ts",
+      "gitBlob": "3f90a8009a90152d9b726b877dfcdec7d1759f60",
+      "size": 531
+    },
+    {
+      "path": "src/getSizingData.ts",
+      "gitBlob": "60fb6d28be7a7e8df1a8f09f39eb5c8be3ebc650",
+      "size": 2062
+    },
+    {
+      "path": "src/hooks.ts",
+      "gitBlob": "b022fecf84a3f37e7cb3e82aee46395fb0ede8dc",
+      "size": 2101
+    },
+    {
+      "path": "src/index.tsx",
+      "gitBlob": "58459c034f7fa3686157a11efbf3a7db77d77cfa",
+      "size": 3332
+    },
+    {
+      "path": "src/utils.ts",
+      "gitBlob": "9c26ec970cfbf46e5c18c6c8add0855c827a0009",
+      "size": 264
+    }
+  ],
+  "fingerprint": "e558aec8a73d1168f9c62e39c85c1a03dbd02b0a5f817fe603f93963ff52c073"
+}

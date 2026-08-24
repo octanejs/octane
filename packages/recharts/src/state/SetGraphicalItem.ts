@@ -10,11 +10,13 @@ import {
 	removePolarGraphicalItem,
 	replaceCartesianGraphicalItem,
 	replacePolarGraphicalItem,
+	type CartesianGraphicalItemSettings,
+	type PolarGraphicalItemSettings,
 } from './graphicalItemsSlice';
 
-const SetCartesianGraphicalItemImpl = (props: Record<string, unknown>): null => {
+const SetCartesianGraphicalItemImpl = (props: CartesianGraphicalItemSettings): null => {
 	const dispatch = useAppDispatch();
-	const prevPropsRef = useRef<Record<string, unknown> | null>(null);
+	const prevPropsRef = useRef<CartesianGraphicalItemSettings | null>(null);
 	useLayoutEffect(() => {
 		if (prevPropsRef.current === null) {
 			dispatch(addCartesianGraphicalItem(props));
@@ -36,9 +38,9 @@ const SetCartesianGraphicalItemImpl = (props: Record<string, unknown>): null => 
 
 export const SetCartesianGraphicalItem = memo(SetCartesianGraphicalItemImpl);
 
-const SetPolarGraphicalItemImpl = (props: Record<string, unknown>): null => {
+const SetPolarGraphicalItemImpl = (props: PolarGraphicalItemSettings): null => {
 	const dispatch = useAppDispatch();
-	const prevPropsRef = useRef<Record<string, unknown> | null>(null);
+	const prevPropsRef = useRef<PolarGraphicalItemSettings | null>(null);
 	useLayoutEffect(() => {
 		if (prevPropsRef.current === null) {
 			dispatch(addPolarGraphicalItem(props));

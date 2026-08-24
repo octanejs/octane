@@ -1,11 +1,11 @@
 import { Fragment, useContext, useCallback, useMemo, useEffect } from 'octane';
-import type { FC } from 'react';
 import type { Octane } from 'octane/jsx-runtime';
 import type { AxisScale } from '@octanejs/visx/axis';
 import type { AreaProps, LinePathProps } from '@octanejs/visx/shape';
 import { Area, LinePath } from '@octanejs/visx/shape';
 import DataContext from '../../../context/DataContext.tsrx';
 import type { DataContextType, GlyphsProps, SeriesProps } from '../../../types';
+import type { SvgPathComponent } from '../../../types/svgPath';
 import getScaledValueFactory from '../../../utils/getScaledValueFactory';
 import getScaleBaseline from '../../../utils/getScaleBaseline';
 import isValidNumber from '../../../typeguards/isValidNumber';
@@ -31,8 +31,11 @@ export type BaseAreaSeriesProps<XScale extends AxisScale, YScale extends AxisSca
 		| 'children'
 		| 'defined'>;
 		/** Rendered component which is passed path props by BaseAreaSeries after processing. */
-		PathComponent?: FC<Omit<Octane.SVGProps<SVGPathElement>, 'ref'>> | 'path';
-	} & Omit<Octane.SVGProps<SVGPathElement>, 'x' | 'y' | 'x0' | 'x1' | 'y0' | 'y1' | 'ref'>;
+		PathComponent?: SvgPathComponent;
+	} & Omit<
+		Octane.SVGProps<SVGPathElement>,
+		'x' | 'y' | 'x0' | 'x1' | 'y0' | 'y1' | 'ref' | 'children'
+	>;
 
 function BaseAreaSeries<XScale extends AxisScale, YScale extends AxisScale, Datum extends object>({
 	PathComponent = 'path',
