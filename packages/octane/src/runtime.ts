@@ -29132,6 +29132,11 @@ function updateSurvivor<T>(
 	}
 }
 
+function consumeAdoptQueuePrefix(adopt: Array<{ key: any; node: Node }>, count: number): void {
+	if (count < adopt.length) adopt.copyWithin(0, count);
+	adopt.length -= count;
+}
+
 /**
  * Linear first-fill of an EMPTY keyed list — the hydration-adopt / first-mount
  * path: append (or adopt) each item in order and build the survivor machinery
@@ -29169,6 +29174,7 @@ function mountItemsLinear<T>(
 	// order. Non-front key matches (a reorder in the very same render) mount
 	// fresh — the unconsumed nodes are swept by the caller.
 	const adopt = state.adopt;
+	let adoptIndex = 0;
 	let prev: Block | null = null;
 	const mounted: Block[] = [];
 	try {
@@ -29177,9 +29183,14 @@ function mountItemsLinear<T>(
 			const key = getKey(item, i);
 			let adoptNode: Node | null = null;
 			let anchor: Node = state.end;
-			if (adopt !== null && adopt.length !== 0) {
-				if (adopt[0].key === key) adoptNode = adopt.shift()!.node;
-				else anchor = adopt[0].node;
+			if (adopt !== null && adoptIndex < adopt.length) {
+				const candidate = adopt[adoptIndex];
+				if (candidate.key === key) {
+					adoptNode = candidate.node;
+					adoptIndex++;
+				} else {
+					anchor = candidate.node;
+				}
 			}
 			const block = mountItem(
 				parentBlock,
@@ -29205,6 +29216,9 @@ function mountItemsLinear<T>(
 		state.tail = prev;
 		state.size = newLen;
 	} catch (error) {
+		// Adopted nodes still belong to the committed raw host tree and the cleanup
+		// below deliberately leaves them connected. Keep the full queue so the root
+		// rollback/retry can adopt the same prefix instead of mounting duplicates.
 		// A list item may suspend while mounting (most visibly a lazy
 		// component). None of this empty->fill pass has committed yet: discard
 		// every completed prefix item, while mountItem discards the throwing
@@ -29220,6 +29234,9 @@ function mountItemsLinear<T>(
 		state.size = 0;
 		throw error;
 	}
+	// Adoption consumes only a queue prefix. Compact it once after the pass
+	// instead of shifting every adopted node and repeatedly reindexing the tail.
+	if (adoptIndex !== 0) consumeAdoptQueuePrefix(adopt!, adoptIndex);
 }
 
 function reconcileKeyed<T>(

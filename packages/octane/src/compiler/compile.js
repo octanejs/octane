@@ -13878,12 +13878,15 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 	);
 	const transformed = new WeakSet();
 	const components = new Map();
-	for (const entry of metadata.components || []) {
+	const componentEntries = metadata.components || [];
+	// Reverse each name bucket while building it so pop() consumes source order.
+	for (let index = componentEntries.length - 1; index >= 0; index--) {
+		const entry = componentEntries[index];
 		const queue = components.get(entry.name) || [];
 		queue.push(entry);
 		components.set(entry.name, queue);
 	}
-	const takeComponent = (name) => components.get(name)?.shift() || null;
+	const takeComponent = (name) => components.get(name)?.pop() || null;
 	let regionIndex = 0;
 
 	const calleeName = (node) =>
@@ -13970,7 +13973,9 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 	const annotateAuthoredHooks = (fn, component, componentName) => {
 		if (!ctx.profile || !component?.hooks?.length) return;
 		const queues = new Map();
-		for (const hook of component.hooks) {
+		// Preserve authored order with constant-time drains and no cursor objects.
+		for (let index = component.hooks.length - 1; index >= 0; index--) {
+			const hook = component.hooks[index];
 			const queue = queues.get(hook.name) || [];
 			queue.push(hook);
 			queues.set(hook.name, queue);
@@ -14002,7 +14007,7 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 				) {
 					hookName = node.callee.property.name;
 				}
-				const hook = queues.get(hookName)?.shift();
+				const hook = queues.get(hookName)?.pop();
 				if (hook !== undefined) {
 					// Identity-keyed ctx side channels (see profileSourceLoc and
 					// annotateProfileHookOwners) — the walked tree is never written to.

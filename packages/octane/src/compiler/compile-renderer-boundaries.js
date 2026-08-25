@@ -520,8 +520,8 @@ function ownerReachableComponentsAst(ast, localSpecializations) {
 		tag: record,
 	});
 	const queue = [...reachable];
-	while (queue.length > 0) {
-		for (const dependency of dependencies.get(queue.shift()) ?? []) {
+	for (let queueIndex = 0; queueIndex < queue.length; queueIndex++) {
+		for (const dependency of dependencies.get(queue[queueIndex]) ?? []) {
 			if (reachable.has(dependency)) continue;
 			reachable.add(dependency);
 			queue.push(dependency);
@@ -708,8 +708,8 @@ function specializeLocalComponentsAst(region, index, state) {
 		...localCallReferences(region, localNames),
 	]);
 	const queue = [...selected];
-	while (queue.length > 0) {
-		const name = queue.shift();
+	for (let queueIndex = 0; queueIndex < queue.length; queueIndex++) {
+		const name = queue[queueIndex];
 		const component = state.localSpecializations.components.get(name);
 		if (!component) continue;
 		for (const reference of new Set([

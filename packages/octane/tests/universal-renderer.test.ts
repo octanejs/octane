@@ -1869,6 +1869,83 @@ export function Scene() @{
 		);
 	});
 
+	it('walks deep local component graphs for child specialization and owner validation', () => {
+		const localChain = (prefix: string) => {
+			const components: string[] = [];
+			for (let index = 0; index < 63; index++) {
+				components.push(`function ${prefix}${index}() @{ <${prefix}${index + 1} /> }`);
+			}
+			components.push(`function ${prefix}63() @{ <view id={document.title} /> }`);
+			return components.join('\n');
+		};
+		const config = normalizeRendererConfig({
+			registry: {
+				inner: {
+					module: '@renderers/inner',
+					text: 'host',
+					validation: { forbiddenGlobals: ['document'] },
+				},
+				outer: {
+					module: '@renderers/outer',
+					text: 'host',
+					validation: {},
+				},
+			},
+			boundaries: {
+				'@scene/bridge': {
+					Native: {
+						ownerRenderer: 'outer',
+						childRenderer: 'inner',
+						prop: 'children',
+					},
+				},
+			},
+		});
+		const options = {
+			hmr: false,
+			renderer: { id: 'outer', ...config.registry.outer },
+			rendererBoundaries: config.boundaries,
+			rendererRegistry: config.registry,
+		};
+		const childOnly = `
+import { Native } from '@scene/bridge';
+${localChain('Child')}
+export function Scene() @{ <Native><Child0 /></Native> }
+`;
+		expect(() => compile(childOnly, '/src/DeepChild.native.tsrx', options)).toThrow(
+			/renderer "inner" forbids unbound global "document".*DeepChild\.native\.tsrx:/,
+		);
+
+		const ownerStrictConfig = normalizeRendererConfig({
+			registry: {
+				inner: {
+					module: '@renderers/inner',
+					text: 'host',
+					validation: {},
+				},
+				outer: {
+					module: '@renderers/outer',
+					text: 'host',
+					validation: { forbiddenGlobals: ['document'] },
+				},
+			},
+			boundaries: config.boundaries,
+		});
+		const shared = `
+import { Native } from '@scene/bridge';
+${localChain('Shared')}
+export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
+`;
+		expect(() =>
+			compile(shared, '/src/DeepShared.native.tsrx', {
+				...options,
+				renderer: { id: 'outer', ...ownerStrictConfig.registry.outer },
+				rendererBoundaries: ownerStrictConfig.boundaries,
+				rendererRegistry: ownerStrictConfig.registry,
+			}),
+		).toThrow(/renderer "outer" forbids unbound global "document".*DeepShared\.native\.tsrx:/);
+	});
+
 	it('emits a static host plan with dynamic values and keyed range lowering', () => {
 		const source = `
 			export function Scene({items, color}) @{
@@ -2638,12 +2715,19 @@ export function Scene() @{
 		expect(output).toContain('_$useBatch([__pu$0, __pu$1])');
 		expect(output).toContain('__warm:');
 		expect(output).toContain('import.meta.hot.accept');
-		expect(inspectProfileOutput(output).hooks.map(({ metadata }) => metadata)).toContainEqual(
-			expect.objectContaining({
-				componentId: '/src/Profiled.object.tsrx#Scene@3:10',
-				line: 4,
-				column: 14,
-			}),
+		expect(inspectProfileOutput(output).hooks.map(({ metadata }) => metadata)).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					componentId: '/src/Profiled.object.tsrx#Scene@3:10',
+					line: 4,
+					column: 14,
+				}),
+				expect.objectContaining({
+					componentId: '/src/Profiled.object.tsrx#Scene@3:10',
+					line: 5,
+					column: 14,
+				}),
+			]),
 		);
 	});
 
