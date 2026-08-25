@@ -2,5 +2,6 @@
 'octane': patch
 ---
 
-Drain queued behavior-root interactions with a cursor so late behavior modules
-activate in linear time while preserving FIFO and reentrant event delivery.
+Drain queued behavior-root interactions with amortized cursor compaction and
+constant-time pending-adoption bookkeeping so late modules and separately
+settling async adoptions stay linear while preserving FIFO and reentrant delivery.
