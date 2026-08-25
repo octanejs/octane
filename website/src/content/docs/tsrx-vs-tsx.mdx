@@ -67,6 +67,24 @@ These compile to the same kind of component. `@{ ... }` is optional in a `.tsrx`
 file, so use a normal function body when an early return or a non-JSX value reads
 better.
 
+Within JSX, a nested `@{ ... }` creates a child render scope at that sibling
+position. It can capture parent locals and use hooks whose state survives parent
+updates. Its final JSX node is optional, so a code-only block can run setup while
+rendering no element; an empty block disappears, and a render-only block is
+transparent grouping.
+
+```tsrx
+<section>
+	@{
+		const [count, setCount] = useState(0);
+		<button onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>
+	}
+	@{
+		props.observe();
+	}
+</section>
+```
+
 <h2 id="rendered-control-flow">Branches and lists that read top to bottom</h2>
 
 TSX puts rendered control flow inside JavaScript expressions: ternaries, `&&`, and
