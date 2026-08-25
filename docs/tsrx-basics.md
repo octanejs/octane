@@ -50,6 +50,36 @@ function Label(props) {
 }
 ```
 
+### Nested child scopes
+
+Inside JSX, a nested `@{ … }` block owns a child render scope at that exact
+sibling position. Its setup runs when the child renders, may use hooks and
+capture parent locals, and keeps its hook state across parent updates. The final
+JSX node is optional: a code-only block runs its setup and renders no element.
+
+```jsx
+export function AccountRow(props: {
+	name: string;
+	observe: (name: string) => void;
+}) @{
+	<li>
+		<span>{props.name as string}</span>
+		@{
+			const [expanded, setExpanded] = useState(false);
+			<button onClick={() => setExpanded(!expanded)}>
+				{expanded ? 'Hide details' : 'Show details'}
+			</button>
+		}
+		@{
+			props.observe(props.name);
+		}
+	</li>
+}
+```
+
+An empty child block disappears. A child block containing only a JSX node is
+transparent grouping and does not create an extra render scope.
+
 Dynamic text needs a cast, `{expr as string}`, unless the expression is provably
 a string. A bare `{expr}` is a renderable hole, not text.
 

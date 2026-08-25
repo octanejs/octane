@@ -893,7 +893,7 @@ describe('template directives in a returned fragment', () => {
 		container.remove();
 	});
 
-	it('preserves returned-fragment template diagnostics', () => {
+	it('preserves returned-fragment head diagnostics', () => {
 		for (const mode of ['client', 'server'] as const) {
 			expect(() =>
 				compile(
@@ -902,30 +902,35 @@ describe('template directives in a returned fragment', () => {
 					{ mode },
 				),
 			).toThrow(/<head>.*not supported/);
+		}
+	});
+
+	it('compiles a setup-bearing child block in a returned fragment', () => {
+		for (const mode of ['client', 'server'] as const) {
 			expect(() =>
 				compile(
-					`export function BadBlock() { return <>@{ const value = 'bad'; <span>{value}</span> }</>; }`,
+					`export function ChildBlock() { return <>@{ const value = 'ok'; <span>{value}</span> }</>; }`,
 					`returned-child-block-${mode}.tsrx`,
 					{ mode },
 				),
-			).toThrow(/setup statements.*not supported at JSX child position/);
+			).not.toThrow();
 		}
 	});
 });
 
 describe('template directives in JSX setup values', () => {
-	it('preserves child-code-block diagnostics in client and server compilation', () => {
+	it('compiles a setup-bearing child block in a stored JSX value', () => {
 		for (const mode of ['client', 'server'] as const) {
 			expect(() =>
 				compile(
-					`export function BadSlot() @{
-						const slot = <div>@{ const value = 'bad'; <span>{value}</span> }</div>;
+					`export function Slot() @{
+						const slot = <div>@{ const value = 'ok'; <span>{value}</span> }</div>;
 						<main>{slot}</main>
 					}`,
 					`setup-value-child-block-${mode}.tsrx`,
 					{ mode },
 				),
-			).toThrow(/setup statements.*not supported at JSX child position/);
+			).not.toThrow();
 		}
 	});
 

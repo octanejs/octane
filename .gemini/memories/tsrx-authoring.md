@@ -18,6 +18,24 @@ export function X() @{ <div /> }
 function getX() { return <div />; }
 ```
 
+Inside JSX, a nested `@{ … }` block owns a child render scope at its authored
+sibling position. Its setup may use hooks and capture parent locals; the scope
+and hook state survive parent updates. Its final JSX output is optional, so a
+code-only block is valid and renders no element. An empty child block disappears,
+while a render-only child block is transparent grouping.
+
+```tsx
+<section>
+	@{
+		const [count, setCount] = useState(0);
+		<button onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>
+	}
+	@{
+		observe();
+	}
+</section>
+```
+
 ## Text holes
 
 Dynamic text uses a cast: `{expr as string}`.
