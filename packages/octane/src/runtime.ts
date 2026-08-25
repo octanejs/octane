@@ -7482,7 +7482,14 @@ function memoEntryStillValid(scope: Scope, prev: MemoHookEntry, deps: any[] | un
 function invalidateInlineHookMemoCaches(block: Block): void {
 	const slots: any = block.slots;
 	for (const key in slots) {
-		if (key.startsWith('_k$')) delete slots[key];
+		if (!key.startsWith('_k$')) continue;
+		const cells = slots[key];
+		if (!Array.isArray(cells) || cells.length === 0) continue;
+		// Clear in place so held-transition rollback can restore via
+		// journalHookMemoCells; deleting the slot property is not journaled.
+		const cleared = new Array(cells.length);
+		if (ACTIVE_TRANSITION_ATTEMPT !== null) journalHookMemoCells(cells, 0, cleared);
+		for (let i = 0; i < cells.length; i++) cells[i] = undefined;
 	}
 }
 
