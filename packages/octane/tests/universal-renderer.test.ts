@@ -2715,12 +2715,19 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 		expect(output).toContain('_$useBatch([__pu$0, __pu$1])');
 		expect(output).toContain('__warm:');
 		expect(output).toContain('import.meta.hot.accept');
-		expect(inspectProfileOutput(output).hooks.map(({ metadata }) => metadata)).toContainEqual(
-			expect.objectContaining({
-				componentId: '/src/Profiled.object.tsrx#Scene@3:10',
-				line: 4,
-				column: 14,
-			}),
+		expect(inspectProfileOutput(output).hooks.map(({ metadata }) => metadata)).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					componentId: '/src/Profiled.object.tsrx#Scene@3:10',
+					line: 4,
+					column: 14,
+				}),
+				expect.objectContaining({
+					componentId: '/src/Profiled.object.tsrx#Scene@3:10',
+					line: 5,
+					column: 14,
+				}),
+			]),
 		);
 	});
 
