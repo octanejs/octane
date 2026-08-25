@@ -108,7 +108,7 @@ Key public observations are now executable assertions:
 | Composition | Constructed protocol asserts composition/input order in both runtimes; Chromium CDP smoke preserves the accepted candidate | Same protocol, plus React's input-derived synthetic change |
 
 The local Volar result now exposes the additive diagnostic array, but the
-external `Ripple-TS/ripple` TypeScript/language-server/VS Code packages described
+external `tsrx-org/tsrx` TypeScript/language-server/VS Code packages described
 in section 2.1 are not part of this repository. Mapping that array to an editor
 warning and publishing minimum compatible versions remains a coordinated
 cross-repository rollout item; it does not block the local compiler, build-tool,
@@ -146,18 +146,18 @@ editor-consumer integration. A `console.warn` embedded in `compile.js`, or
 putting a warning in Volar's `errors` array, would be incomplete and would
 misstate severity.
 
-The external owner is identifiable. At Ripple repository commit
-`4fe5134732d7a222425cf73a1d31b815384e9202`,
+The external owner is identifiable. At TSRX repository commit
+`9e727cf87f8c9654ae458bcc2448ceeaa146f925`,
 `@tsrx/typescript-plugin` [selects Octane's Volar compiler
-entry](https://github.com/Ripple-TS/ripple/blob/4fe5134732d7a222425cf73a1d31b815384e9202/packages/typescript-plugin/src/language.js#L33-L90)
+entry](https://github.com/tsrx-org/tsrx/blob/9e727cf87f8c9654ae458bcc2448ceeaa146f925/packages/typescript-plugin/src/language.js#L46-L89)
 has an [unused diagnostic
-placeholder](https://github.com/Ripple-TS/ripple/blob/4fe5134732d7a222425cf73a1d31b815384e9202/packages/typescript-plugin/src/language.js#L211-L225)
-but [copies only `transpiled.errors`](https://github.com/Ripple-TS/ripple/blob/4fe5134732d7a222425cf73a1d31b815384e9202/packages/typescript-plugin/src/language.js#L351-L361),
-while `@ripple-ts/language-server` [maps only fatal/usage compile errors to
-LSP errors](https://github.com/Ripple-TS/ripple/blob/4fe5134732d7a222425cf73a1d31b815384e9202/packages/language-server/src/compileErrorDiagnosticPlugin.js#L1-L107).
-The `@ripple-ts/vscode-plugin` [bundles both
-packages](https://github.com/Ripple-TS/ripple/blob/4fe5134732d7a222425cf73a1d31b815384e9202/packages/vscode-plugin/package.json#L45-L62).
-Therefore the editor work belongs in `Ripple-TS/ripple` packages
+placeholder](https://github.com/tsrx-org/tsrx/blob/9e727cf87f8c9654ae458bcc2448ceeaa146f925/packages/typescript-plugin/src/language.js#L220-L250)
+but [copies only `transpiled.errors`](https://github.com/tsrx-org/tsrx/blob/9e727cf87f8c9654ae458bcc2448ceeaa146f925/packages/typescript-plugin/src/language.js#L379-L389),
+while `@tsrx/language-server` [maps only fatal/usage compile errors to
+LSP errors](https://github.com/tsrx-org/tsrx/blob/9e727cf87f8c9654ae458bcc2448ceeaa146f925/packages/language-server/src/compileErrorDiagnosticPlugin.js#L29-L53).
+The `@tsrx/vscode-plugin` [bundles both
+packages](https://github.com/tsrx-org/tsrx/blob/9e727cf87f8c9654ae458bcc2448ceeaa146f925/packages/vscode-plugin/package.json#L40-L49).
+Therefore the editor work belongs in `tsrx-org/tsrx` packages
 `typescript-plugin`, `language-server`, and its VS Code packaging smoke, not in
 `@tsrx/core` or Volar itself.
 
@@ -449,11 +449,11 @@ Required consumers:
   failures. A golden test owns that local result schema and its source ranges.
 - Editor display is a distinct integration dependency: the external
   `@tsrx/typescript-plugin` must retain `transpiled.diagnostics` on
-  `TSRXVirtualCode`, and `@ripple-ts/language-server` must translate
+  `TSRXVirtualCode`, and `@tsrx/language-server` must translate
   `severity: 'warning'` to LSP `DiagnosticSeverity.Warning` in its compile
   diagnostic service. Returning the field from this repository does not by
   itself prove that an editor shows it. Add a language-server request test for
-  an Octane `.tsrx` document and a packaged `@ripple-ts/vscode-plugin` smoke;
+  an Octane `.tsrx` document and a packaged `@tsrx/vscode-plugin` smoke;
   release patch versions of the two public packages and record the minimum
   versions in Octane's editor documentation.
 - Direct `compile()` callers can inspect `diagnostics`. Update the website/MCP
@@ -966,10 +966,10 @@ pnpm --filter @octanejs/evals test
 - Add the shared classifier, structured compile result, stable code/ranges,
   suppression syntax, build-adapter forwarding, and additive Volar diagnostic
   result.
-- Specify the external `Ripple-TS/ripple` follow-up: teach
+- Specify the external `tsrx-org/tsrx` follow-up: teach
   `@tsrx/typescript-plugin` to retain the additive array,
-  `@ripple-ts/language-server` to map it to LSP warning severity, and
-  `@ripple-ts/vscode-plugin` to pass a packaged-extension smoke. Release patch
+  `@tsrx/language-server` to map it to LSP warning severity, and
+  `@tsrx/vscode-plugin` to pass a packaged-extension smoke. Release patch
   versions and add the minimum supported versions to Octane's editor docs.
 - Carry static safe/warn/runtime-check classification through output JSX and
   value-position lowering with hydrate-recursion dedupe.
@@ -1138,7 +1138,7 @@ If Chromium is absent:
 pnpm --filter octane exec playwright install chromium
 ```
 
-External editor-consumer gate, from the coordinated `Ripple-TS/ripple`
+External editor-consumer gate, from the coordinated `tsrx-org/tsrx`
 checkout (the new test names are part of Wave 1):
 
 ```bash
@@ -1146,12 +1146,12 @@ pnpm vitest run packages/typescript-plugin/tests/octane-diagnostics.test.js pack
 pnpm typecheck
 pnpm format:check
 pnpm changeset:check
-pnpm --filter @ripple-ts/vscode-plugin build-and-package
+pnpm --filter @tsrx/vscode-plugin build-and-package
 ```
 
 The language-server test must issue an LSP document-diagnostic request for an
 Octane file, not merely inspect `TSRXVirtualCode.diagnostics`. Record the
-passing Ripple commit and released package versions in the evidence report.
+passing TSRX commit and released package versions in the evidence report.
 
 Generated-source checks:
 
@@ -1269,7 +1269,7 @@ while fixing diagnostics or native controlled restoration.
 5. The React ledger remains honest about the synthetic plugin as a non-goal.
    Four relevant entries now link to the native text, programmatic-write,
    checkbox, and radio public evidence instead of bulk-reclassifying the suite.
-6. **Remaining external follow-up:** assign and land the `Ripple-TS/ripple`
+6. **Remaining external follow-up:** assign and land the `tsrx-org/tsrx`
    TypeScript/language-server/VS Code integration, then record its PR, release
    versions, and minimum supported versions in Octane's editor documentation.
 7. **Post-merge eval follow-up:** repin the new training task's environment and

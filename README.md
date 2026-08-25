@@ -47,7 +47,7 @@ docs into a `.tsx` file and it runs. Or author in `.tsrx`, the spiritual
 successor to JSX, and get template directives (`@if`, `@for`, `@switch`, `@try`)
 that compile to keyed fast paths, plus an `@{ … }` shorthand that puts setup next
 to the output. Mix both dialects in one app and import across the boundary.
-[TSRX for VS Code](https://marketplace.visualstudio.com/items?itemName=Ripple-TS.ripple-ts-vscode-plugin)
+[TSRX Syntax for VS Code](https://marketplace.visualstudio.com/items?itemName=TSRX.tsrx-vscode-plugin)
 adds syntax highlighting, diagnostics, navigation, and completions for `.tsrx`
 files.
 
