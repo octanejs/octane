@@ -2,4 +2,4 @@
 'octane': patch
 ---
 
-Speed up pure-host keyed-list upgrades by consuming adopted DOM nodes in one linear pass instead of repeatedly shifting the adoption queue.
+Speed up pure-host keyed-list upgrades and renderer-boundary graph walks while preserving adopted keyed nodes across suspended upgrade retries.

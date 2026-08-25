@@ -29216,7 +29216,9 @@ function mountItemsLinear<T>(
 		state.tail = prev;
 		state.size = newLen;
 	} catch (error) {
-		if (adoptIndex !== 0) consumeAdoptQueuePrefix(adopt!, adoptIndex);
+		// Adopted nodes still belong to the committed raw host tree and the cleanup
+		// below deliberately leaves them connected. Keep the full queue so the root
+		// rollback/retry can adopt the same prefix instead of mounting duplicates.
 		// A list item may suspend while mounting (most visibly a lazy
 		// component). None of this empty->fill pass has committed yet: discard
 		// every completed prefix item, while mountItem discards the throwing
