@@ -547,7 +547,7 @@ describe('website routes', () => {
 		expect(callout).toBeTruthy();
 		expect(callout!.querySelector('p p')).toBeNull();
 		expect(callout!.querySelector('a p')).toBeNull();
-		expect(callout!.querySelector('a')?.textContent).toBe('TSRX for VS Code');
+		expect(callout!.querySelector('a')?.textContent).toBe('TSRX Syntax for VS Code');
 	});
 
 	it('/docs/tsrx-vs-tsx keeps the editor-support link inline', async () => {
@@ -562,7 +562,7 @@ describe('website routes', () => {
 			element = element.nextElementSibling;
 		}
 
-		expect(link?.textContent).toBe('TSRX for VS Code');
+		expect(link?.textContent).toBe('TSRX Syntax for VS Code');
 		expect(link?.querySelector('p')).toBeNull();
 	});
 
