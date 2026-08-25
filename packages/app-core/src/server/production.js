@@ -156,8 +156,10 @@ export function createHandler(manifest, deps) {
 	const runtime = manifest.runtime;
 	validateSsrTemplate(htmlTemplate);
 	// Also pin the built-template contract up front. The marker is emitted by
-	// the integration's HTML transform and survives source hashing.
-	applyHydrationNonce(htmlTemplate, null);
+	// the integration's HTML transform and survives source hashing. Keep the
+	// normalized no-nonce template: this is the common request path, and its
+	// output is identical for every request handled by this manifest.
+	const hydrationTemplate = applyHydrationNonce(htmlTemplate, null);
 
 	// RPC lookup for statically imported `module server` functions
 	// (compiler hash → server function).
@@ -328,7 +330,8 @@ export function createHandler(manifest, deps) {
 		}
 
 		const headContent = [...preloadTags, dataScript].join('\n');
-		const noncedTemplate = applyHydrationNonce(htmlTemplate, nonce);
+		const noncedTemplate =
+			nonce === null ? hydrationTemplate : applyHydrationNonce(htmlTemplate, nonce);
 
 		const status = route.status ?? 200;
 		const headers = { 'Content-Type': 'text/html; charset=utf-8' };

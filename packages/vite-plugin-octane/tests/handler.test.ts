@@ -172,14 +172,16 @@ describe('createHandler', () => {
 	});
 
 	it('threads a middleware CSP nonce through renderer and inline hydration scripts', async () => {
-		let rendererNonce: string | undefined;
+		const rendererNonces: Array<string | undefined> = [];
 		let rendererSignal: AbortSignal | undefined;
 		const nonce = 'request-123"&';
 		const handler = createHandler(
 			makeManifest({
 				middlewares: [
-					(context: { state: Map<string, unknown> }, next: () => Promise<Response>) => {
-						context.state.set(OCTANE_NONCE_STATE_KEY, nonce);
+					(context: { state: Map<string, unknown>; url: URL }, next: () => Promise<Response>) => {
+						if (context.url.searchParams.has('nonce')) {
+							context.state.set(OCTANE_NONCE_STATE_KEY, nonce);
+						}
 						return next();
 					},
 				],
@@ -191,17 +193,22 @@ describe('createHandler', () => {
 					_props: unknown,
 					options: { nonce?: string; signal?: AbortSignal } | undefined,
 				) => {
-					rendererNonce = options?.nonce;
+					rendererNonces.push(options?.nonce);
 					rendererSignal = options?.signal;
 					return streamOf('<main>page</main>');
 				},
 			} as any,
 		);
-		const request = new Request('http://localhost/');
-		const html = await (await handler(request)).text();
-		expect(rendererNonce).toBe(nonce);
-		expect(rendererSignal).toBe(request.signal);
+		const plainRequest = new Request('http://localhost/');
+		const noncedRequest = new Request('http://localhost/?nonce');
+		const firstPlainHtml = await (await handler(plainRequest)).text();
+		const html = await (await handler(noncedRequest)).text();
+		const secondPlainHtml = await (await handler(plainRequest)).text();
+		expect(rendererNonces).toEqual([undefined, nonce, undefined]);
+		expect(rendererSignal).toBe(plainRequest.signal);
 		expect(html.match(/nonce="request-123&quot;&amp;"/g)).toHaveLength(2);
+		expect(firstPlainHtml).not.toContain(' nonce=');
+		expect(secondPlainHtml).toBe(firstPlainHtml);
 	});
 
 	it('passes request Context.state to server route props without serializing it', async () => {
