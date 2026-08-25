@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import { compile } from 'octane/compiler';
-import { mount } from './_helpers';
+import { mount, nextPaint } from './_helpers';
 import { flushSync, hydrateRoot } from '../src/index.js';
 import { loadServerFixture } from './_server-fixture.js';
 import {
@@ -9,6 +9,8 @@ import {
 	MultipleBlocks,
 	EmptyBlockDropped,
 	SetupBearingChild,
+	ConditionalHooksInSetupBearingChild,
+	TemplateIfHooksInSetupBearingChild,
 	ExplicitSetupBearingChild,
 	ReturnedSetupBearingChild,
 	StoredSetupBearingChild,
@@ -71,6 +73,55 @@ describe('@{ } at JSX child position', () => {
 		r.update(SetupBearingChild, { label: 'second' });
 		expect(r.find('#setup-action')).toBe(action);
 		expect(action.textContent).toBe('second:1');
+		r.unmount();
+	});
+
+	it('preserves conditional hook state and lifecycle in a scoped child', async () => {
+		const log: string[] = [];
+		const r = mount(ConditionalHooksInSetupBearingChild, { enabled: true, log });
+		const action = r.find('#conditional-hook-action') as HTMLButtonElement;
+
+		await nextPaint();
+		expect(action.textContent).toBe('count:0');
+		expect(log).toEqual(['create:0']);
+
+		r.click('#conditional-hook-action');
+		await nextPaint();
+		expect(action.textContent).toBe('count:1');
+		expect(log).toEqual(['create:0', 'cleanup:0', 'create:1']);
+
+		r.update(ConditionalHooksInSetupBearingChild, { enabled: false, log });
+		await nextPaint();
+		expect(r.find('#conditional-hook-action')).toBe(action);
+		expect(action.textContent).toBe('disabled');
+		expect(log).toEqual(['create:0', 'cleanup:0', 'create:1', 'cleanup:1']);
+
+		r.update(ConditionalHooksInSetupBearingChild, { enabled: true, log });
+		await nextPaint();
+		expect(r.find('#conditional-hook-action')).toBe(action);
+		expect(action.textContent).toBe('count:1');
+		expect(log).toEqual(['create:0', 'cleanup:0', 'create:1', 'cleanup:1', 'create:1']);
+
+		r.unmount();
+		await nextPaint();
+		expect(log.at(-1)).toBe('cleanup:1');
+	});
+
+	it('keeps @if hook state scoped to its branch inside a scoped child', () => {
+		const r = mount(TemplateIfHooksInSetupBearingChild);
+		const action = r.find('#template-if-action');
+
+		r.click('#template-if-action');
+		expect(action.textContent).toBe('count:1');
+
+		r.click('#template-if-toggle');
+		expect(r.findAll('#template-if-action')).toHaveLength(0);
+
+		r.click('#template-if-toggle');
+		const remountedAction = r.find('#template-if-action');
+		expect(remountedAction).not.toBe(action);
+		expect(remountedAction.textContent).toBe('count:0');
+
 		r.unmount();
 	});
 

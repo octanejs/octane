@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { useEffect, useState } from 'octane';
 
 // `@{ … }` at JSX child position. Empty blocks disappear, render-only
 // blocks merge into their parent template, and setup-bearing blocks own a
@@ -51,6 +51,48 @@ export function SetupBearingChild(props: { label: string }) @{
 		}
 		<span id="setup-after">{'after'}</span>
 	</section>
+}
+
+export function ConditionalHooksInSetupBearingChild(props: {
+	enabled: boolean;
+	log: string[];
+}) @{
+	<section id="conditional-hook-child">@{
+		let label = 'disabled';
+		let increment = () => {};
+
+		if (props.enabled) {
+			const [count, setCount] = useState(0);
+			useEffect(() => {
+				props.log.push('create:' + count);
+				return () => {
+					props.log.push('cleanup:' + count);
+				};
+			}, [count, props.log]);
+			label = 'count:' + count;
+			increment = () => setCount(count + 1);
+		}
+
+		<button id="conditional-hook-action" onClick={increment}>{label}</button>
+	}</section>
+}
+
+export function TemplateIfHooksInSetupBearingChild() @{
+	<section id="template-if-hook-child">@{
+		const [show, setShow] = useState(true);
+
+		<div>
+			<button id="template-if-toggle" onClick={() => setShow(!show)}>
+				{show ? 'hide' : 'show'}
+			</button>
+			@if (show) {
+				const [count, setCount] = useState(0);
+				<button id="template-if-action" onClick={() => setCount(count + 1)}>
+					{'count:' + count}
+				</button>
+			}
+		</div>
+	}</section>
 }
 
 export function ExplicitSetupBearingChild(props: { label: string }) @{
