@@ -47,6 +47,25 @@ function Keyed() {
 	);
 }
 
+function KeyedWithStaleTail() {
+	const [items, setItems] = useState(['a', 'b', 'c']);
+	const [on, setOn] = useState(false);
+	return createElement(
+		'ul',
+		null,
+		createElement(
+			'button',
+			{
+				'data-testid': 'replace',
+				onClick: () => (setItems(['a', 'x', 'c']), setOn(true)),
+			},
+			'replace',
+		),
+		items.map((v) => createElement('li', { key: v, 'data-testid': `li-${v}` }, v)),
+		on && createElement(Inner, null),
+	);
+}
+
 function NestedFlip() {
 	const [on, setOn] = useState(false);
 	return createElement(
@@ -87,6 +106,20 @@ describe('de-opt pure-host → component upgrade', () => {
 		expect(r.find('[data-testid="li-a"]')).toBe(liA);
 		expect(r.find('[data-testid="li-b"]')).toBe(liB);
 		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['a', 'b', 'c']);
+		r.unmount();
+	});
+
+	it('keeps an adopted prefix while removing incompatible stale list nodes', () => {
+		const r = mount(KeyedWithStaleTail);
+		const liA = r.find('[data-testid="li-a"]');
+		const staleB = r.find('[data-testid="li-b"]');
+		const staleC = r.find('[data-testid="li-c"]');
+		r.click('[data-testid="replace"]');
+		expect(r.find('[data-testid="li-a"]')).toBe(liA);
+		expect(r.find('[data-testid="li-c"]')).not.toBe(staleC);
+		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['a', 'x', 'c']);
+		expect(staleB.isConnected).toBe(false);
+		expect(staleC.isConnected).toBe(false);
 		r.unmount();
 	});
 
