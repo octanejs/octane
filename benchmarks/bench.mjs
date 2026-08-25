@@ -336,6 +336,15 @@ const SUITES = [
 		],
 	})),
 	{
+		// Headless-Chromium production scaling for late behavior events whose
+		// distinct asynchronous adoptions settle one at a time.
+		name: 'behavior-root-events',
+		cwd: 'behavior-root-events',
+		servers: [],
+		iter: { normal: 8, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Selector-based fan-out: 512 subscribers read one store through a
 		// selector, then the parent re-renders 20 times with the store untouched.
 		// Reuses the news per-target toolchains with its own page, so the shared
