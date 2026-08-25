@@ -3,6 +3,9 @@ import { flushSync } from '../src/index.js';
 import { mount } from './_helpers';
 import { ForUseMemoRemove } from './_fixtures/for-usememo-remove.tsrx';
 
+// No differential React oracle: @tsrx/react lowers `@for` to a loop where per-item
+// hooks violate React's rules of hooks. Behavioral coverage is here only.
+
 declare global {
 	// eslint-disable-next-line no-var
 	var i: number;
