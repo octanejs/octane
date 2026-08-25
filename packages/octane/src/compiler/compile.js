@@ -12375,9 +12375,30 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 		return ssrEmitIf(asIf, ctx, name, inlinedSubs, parentNs, cssHash, componentNs);
 	}
 	ctx.runtimeNeeded.add('ssrChild');
-	// rewriteHookCalls first (key any `use(thenable)` in the hole — it bypasses the
-	// setup rewrite), then rewriteJsxValues (lower nested JSX to createElement).
-	const lowered = rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx);
+	let lowered;
+	if (expr?.type === 'ArrowFunctionExpression' && expr.body?.type === 'JSXCodeBlock') {
+		// A child-position `@{ … }` is represented internally as a zero-argument
+		// sub-template arrow. Compile its setup + optional render node as a local
+		// server component so ssrChild emits the same independently stateful range
+		// that the client childSlot owns. The declaration remains inside the parent
+		// body, preserving lexical captures without evaluating setup eagerly.
+		const helperName = `__tsrx$${ctx.nextHelperId++}`;
+		const synth = inheritOriginLoc(
+			{
+				params: expr.params || [],
+				body: expr.body,
+			},
+			expr,
+		);
+		inlinedSubs.push(
+			ssrCompileBody(synth, ctx, helperName, cssHash, [], parentNs, false, componentNs),
+		);
+		lowered = inheritOriginLoc(b.id(helperName), expr);
+	} else {
+		// rewriteHookCalls first (key any `use(thenable)` in the hole — it bypasses
+		// the setup rewrite), then rewriteJsxValues (lower nested JSX to createElement).
+		lowered = rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx);
+	}
 	const childExpr = ssrCall('ssrChild', [resolveStyleExpr(lowered, cssHash), b.id('__s')], node);
 	if (componentNs === null) return childExpr;
 	ctx.runtimeNeeded.add('ssrInNamespace');
@@ -17247,6 +17268,32 @@ function objectProp(hn, valNode) {
 	return b.prop('init', b.id(hn), valNode);
 }
 
+// Dynamic values extracted from a returned host/fragment are evaluated in the
+// owning component and threaded into its hoisted renderer as props. Sub-template
+// arrows need one additional lowering step there: their compiled helper must live
+// in the OWNER's body so it can close over setup locals, while the renderer only
+// receives the helper function as its ordinary `props.hN` hole value.
+function rewriteExtractedFragmentHole(expression, ctx, parentNs) {
+	const lowered = rewriteChildHoleValue(expression, ctx);
+	if (lowered?.type !== 'ArrowFunctionExpression' || lowered.body?.type !== 'JSXCodeBlock') {
+		return lowered;
+	}
+	const fold = ctx._foldCtx;
+	if (fold?.compInlinedSubs === undefined) return lowered;
+	return rewriteTsrxBlocks(lowered, ctx, 'fragment', fold.compInlinedSubs, parentNs, fold.cssHash);
+}
+
+// A bare sub-template arrow at a renderable child hole is owned by the rich
+// child dispatcher: rewriteTsrxBlocks compiles it immediately afterward. Keep
+// its JSXCodeBlock intact until then. Other value positions still need the full
+// rewriteJsxValues walk, whose server folding semantics are intentionally
+// different (nested component declarations and portal body values rely on it).
+function rewriteChildHoleValue(expression, ctx) {
+	return expression?.type === 'ArrowFunctionExpression' && expression.body?.type === 'JSXCodeBlock'
+		? expression
+		: rewriteJsxValues(expression, ctx);
+}
+
 // A bare, immutable same-module component needs no descriptor when its JSX is
 // consumed immediately by a returned host. Keep every value/props boundary on
 // the ordinary path: only this attribute-free call can remain in the template
@@ -17422,14 +17469,14 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const hn = `h${holeProps.length}`;
 			if (expr && expr.type === 'TSAsExpression') {
 				// Preserve the `as T` cast in the renderer (it marks a dynamic TEXT hole).
-				holeProps.push(objectProp(hn, rewriteJsxValues(expr.expression, ctx)));
+				holeProps.push(objectProp(hn, rewriteExtractedFragmentHole(expr.expression, ctx, childNs)));
 				newChildren.push(
 					b.jsx_expression_container(
 						b.ts_as(memberProps(hn, expr.expression), expr.typeAnnotation),
 					),
 				);
 			} else {
-				holeProps.push(objectProp(hn, rewriteJsxValues(expr, ctx)));
+				holeProps.push(objectProp(hn, rewriteExtractedFragmentHole(expr, ctx, childNs)));
 				// A hole the compiler proved is a string (concat / template / tracked
 				// local) is a TEXT hole — but the renderer only sees `props.hN`, which it
 				// can't prove. Re-assert it with an `as string` cast so the renderer keeps
@@ -17489,14 +17536,34 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			// renderer. Extract its dynamic values/directives too; leaving it raw would
 			// make authored outer locals resolve against the renderer's hole-props object.
 			newChildren.push(extractFragment(child, ctx, holeProps, childNs));
-		} else if (t === 'JSXCodeBlock' && (child.body || []).length === 0 && child.render) {
-			// A render-only child block is transparent template grouping. Extract its
-			// render root too so expressions still evaluate in the outer component and
-			// arrive as ordered hole props in the hoisted renderer.
-			newChildren.push({
-				...child,
-				render: extractFragmentRoot(child.render, ctx, holeProps, childNs),
-			});
+		} else if (t === 'JSXCodeBlock') {
+			const body = child.body || [];
+			if (body.length === 0) {
+				if (child.render) {
+					// A render-only child block is transparent template grouping. Extract its
+					// render root too so expressions still evaluate in the outer component and
+					// arrive as ordered hole props in the hoisted renderer.
+					newChildren.push({
+						...child,
+						render: extractFragmentRoot(child.render, ctx, holeProps, childNs),
+					});
+				}
+			} else {
+				// Setup-bearing (including code-only) child blocks are independent render
+				// scopes. Pass their compiled body helper into the returned fragment rather
+				// than moving setup into the module-hoisted renderer, where outer captures
+				// would be out of scope.
+				const expression = childCodeBlockArrow(child);
+				const hn = `h${holeProps.length}`;
+				holeProps.push(objectProp(hn, rewriteExtractedFragmentHole(expression, ctx, childNs)));
+				newChildren.push(b.jsx_expression_container(memberProps(hn, child)));
+			}
+		} else if (t === 'TSRXExpression') {
+			// prepareSetupValueDirective may normalize a setup-bearing child block
+			// before fragment extraction. It is still an owner-side renderable hole.
+			const hn = `h${holeProps.length}`;
+			holeProps.push(objectProp(hn, rewriteExtractedFragmentHole(child.expression, ctx, childNs)));
+			newChildren.push(b.jsx_expression_container(memberProps(hn, child)));
 		} else if ((t === 'IfStatement' || t === 'JSXIfExpression') && ctx._foldCtx) {
 			// FOLD a directive: lower its branch bodies on the COMPONENT side (so the
 			// `__then$N`/`__else$N` helpers keep their closure over setup locals/props),
@@ -17894,7 +17961,14 @@ function lowerHostFragment(
  * locals via closure. It cannot capture params of nested arrows — see
  * compiler README.
  */
-function rewriteTsrxBlocks(node, ctx, componentName, inlinedSubs) {
+function rewriteTsrxBlocks(
+	node,
+	ctx,
+	componentName,
+	inlinedSubs,
+	parentNs = 'html',
+	cssHash = null,
+) {
 	return mapAst(node, (n) => {
 		if (n.type === 'Tsrx' || n.type === 'Tsx') {
 			const helperName = `__tsrx$${ctx.nextHelperId++}`;
@@ -17904,7 +17978,7 @@ function rewriteTsrxBlocks(node, ctx, componentName, inlinedSubs) {
 				params: [],
 				body: n.children || [],
 			};
-			inlinedSubs.push(compileFunctionBody(fakeBody, ctx, helperName));
+			inlinedSubs.push(compileFunctionBody(fakeBody, ctx, helperName, parentNs, cssHash));
 			// The hoisted-helper reference maps to the authored sub-template.
 			return inheritOriginLoc(b.id(helperName), n);
 		}
@@ -17922,7 +17996,7 @@ function rewriteTsrxBlocks(node, ctx, componentName, inlinedSubs) {
 			);
 			fakeBody.generator = n.generator;
 			if (n.returnType !== undefined) fakeBody.returnType = n.returnType;
-			inlinedSubs.push(compileFunctionBody(fakeBody, ctx, helperName));
+			inlinedSubs.push(compileFunctionBody(fakeBody, ctx, helperName, parentNs, cssHash));
 			return inheritOriginLoc(b.id(helperName), n);
 		}
 		return null;
@@ -17970,10 +18044,10 @@ function prepareSetupValueDirective(directive, ctx, componentName) {
 		// as <title>, exactly like returned descriptor-backed fragments do.
 		const opaque = rewriteOpaqueTitles(prepared, ctx, 'opaque');
 		if (opaque.type !== 'JSXCodeBlock') return opaque;
-		// Render-only child blocks are transparent grouping; normalize them now so
-		// the server does not mistake the code-block node for another setup value
-		// and recurse indefinitely. normalizeChildren also owns the durable error
-		// for setup-bearing child blocks, keeping client/server diagnostics aligned.
+		// Normalize child blocks now so the server does not mistake the code-block
+		// node for another setup value and recurse indefinitely. Render-only blocks
+		// become transparent children; setup-bearing and code-only blocks become
+		// scoped sub-template expressions.
 		return inheritOriginLoc(b.jsx_fragment(normalizeChildren([opaque], false, ctx)), opaque);
 	} finally {
 		ctx._puInlineLowering = prevPuInlineLowering;
@@ -19934,18 +20008,11 @@ function normalizeChildren(nodes, inSvg = false, ctx = null, inNoscript = false)
 			// synthetic SwitchStatement for makeSwitchCall to consume.
 			out.push(inheritOriginLoc(b.switch(n.discriminant, n.cases || []), n));
 		} else if (n.type === 'JSXCodeBlock') {
-			// `@{ … }` at child position — tsrx 0.1.29 lets `@{}` appear here as
-			// well as on function bodies. The node has `.body` (setup statements)
-			// and `.render` (the single optional render output).
-			//   - Empty: drop (degenerate but legal).
-			//   - Render-only: recurse — the wrapped JSX is a sibling.
-			//   - Code-only or setup+render: ambiguous at child position (when do
-			//     the setup statements run? Per-render? Once per parent mount?
-			//     The runtime would need a fresh Scope and a way to thread state
-			//     back to siblings — there is no sensible answer in our model).
-			//     Throw with a workaround hint pointing at the render-prop arrow
-			//     form `{() => @{ … }}`, which IS supported via the existing
-			//     ArrowFunctionExpression → JSXCodeBlock path (compile.js:1081).
+			// `@{ … }` at child position has `.body` setup statements and one optional
+			// `.render` output. Render-only grouping stays transparent. A setup-bearing
+			// or code-only block lowers to the existing sub-template/childSlot path: its
+			// setup runs in an independent child scope at this exact sibling position,
+			// can close over the parent render, and keeps hook state across parent updates.
 			const body = n.body || [];
 			const render = n.render || null;
 			if (body.length === 0 && render === null) continue;
@@ -19953,10 +20020,14 @@ function normalizeChildren(nodes, inSvg = false, ctx = null, inNoscript = false)
 				// Recurse — render is a single JSX node, treat as a sibling child.
 				out.push(...normalizeChildren([render], inSvg, ctx, inNoscript));
 			} else {
-				throw new Error(
-					'`@{ … }` with setup statements is not supported at JSX child position. ' +
-						'Wrap it in a render-prop arrow form instead — `{() => @{ … }}` — ' +
-						'or extract the setup into its own component.',
+				out.push(
+					inheritOriginLoc(
+						{
+							type: 'TSRXExpression',
+							expression: childCodeBlockArrow(n),
+						},
+						n,
+					),
 				);
 			}
 		} else {
@@ -19964,6 +20035,10 @@ function normalizeChildren(nodes, inSvg = false, ctx = null, inNoscript = false)
 		}
 	}
 	return out;
+}
+
+function childCodeBlockArrow(block) {
+	return inheritOriginLoc(b.arrow([], block), block);
 }
 
 /**
@@ -22490,9 +22565,9 @@ function makeBag() {
 
 // Apply server-mode hook keying and `<tsrx>`/`() => @{…}` hoisting at
 // expression position, returning the rewritten AST for direct embedding.
-function tsrxExprNode(node, ctx, componentName, inlinedSubs) {
+function tsrxExprNode(node, ctx, componentName, inlinedSubs, parentNs = 'html', cssHash = null) {
 	const keyed = ctx.mode === 'server' ? rewriteHookCalls(node, ctx, componentName) : node;
-	return rewriteTsrxBlocks(keyed, ctx, componentName, inlinedSubs);
+	return rewriteTsrxBlocks(keyed, ctx, componentName, inlinedSubs, parentNs, cssHash);
 }
 
 // Placeholder nodes for positional runtime-call arguments. Fresh per call —
@@ -23584,7 +23659,7 @@ function emitNodeHtml(
 		// Bare `{expr}` (no string cast) → RENDERABLE hole at a top-level / multi-
 		// root position. Host is the parent (the dropped last path segment), anchor
 		// is this node's `<!>` slot.
-		const ch = makeChildCall(node.expression, ctx, componentName, inlinedSubs, cssHash);
+		const ch = makeChildCall(node.expression, ctx, componentName, inlinedSubs, cssHash, parentNs);
 		ch.hostPath = path.slice(0, -1);
 		ch.anchorPath = path;
 		compCalls.push(ch);
@@ -23622,7 +23697,7 @@ function emitNodeHtml(
 			(ctx._portalCalls ??= []).push(pc);
 			return templatePart('<!>', 'anchor');
 		}
-		const ch = makeChildCall(node.expression, ctx, componentName, inlinedSubs, cssHash);
+		const ch = makeChildCall(node.expression, ctx, componentName, inlinedSubs, cssHash, parentNs);
 		ch.hostPath = path.slice(0, -1);
 		ch.anchorPath = path;
 		compCalls.push(ch);
@@ -24764,7 +24839,14 @@ function emitElementHtml(
 			// runtime `childTextHole` owns that branch; the server emits `ssrChildText`
 			// (markerless text for a primitive, a `<!--[-->…<!--]-->` block otherwise),
 			// so hydration adopts either shape.
-			const ch = makeChildCall(txtChild.expression, ctx, componentName, inlinedSubs, cssHash);
+			const ch = makeChildCall(
+				txtChild.expression,
+				ctx,
+				componentName,
+				inlinedSubs,
+				cssHash,
+				childNs,
+			);
 			ch.hostPath = path;
 			ch.onlyChildText = true;
 			ch.potentialDangerouslySetInnerHTML = potentialDangerouslySetInnerHTML;
@@ -24931,7 +25013,14 @@ function emitElementHtml(
 					// Bare `{expr}` (no string cast) → RENDERABLE hole (component /
 					// element / children-fn render; primitive → text; nullish/boolean →
 					// nothing). Same `<!>` anchor + host as a component child.
-					const ch = makeChildCall(child.expression, ctx, componentName, inlinedSubs, cssHash);
+					const ch = makeChildCall(
+						child.expression,
+						ctx,
+						componentName,
+						inlinedSubs,
+						cssHash,
+						childNs,
+					);
 					ch.hostPath = path;
 					ch.anchorPath = [...path, childIdx];
 					compCalls.push(ch);
@@ -25122,7 +25211,7 @@ function emitElementHtml(
 					// `{<li/>}`, and array-of-elements children compile (the runtime
 					// de-opt childSlot renders the result) — and rides the TSRX-aware
 					// printer + childSlot path like the simpler Text branch.
-					const ch = makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash);
+					const ch = makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash, childNs);
 					ch.hostPath = path;
 					ch.anchorPath = [...path, childIdx];
 					ch.potentialDangerouslySetInnerHTML = potentialDangerouslySetInnerHTML;
@@ -25673,17 +25762,19 @@ function soleRenderPropChild(children) {
 // emitted `childSlot(...)` call as unparseable source. The transformed
 // expression remains AST throughout so a nested `() => @{…}` sub-template
 // hoists (and server-mode `use(thenable)` calls get their stable keys).
-function makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash) {
+function makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash, parentNs = 'html') {
 	const child = {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, expr),
 		origin: expr,
 		isChild: true,
 		valueExpr: tsrxExprNode(
-			resolveStyleExpr(rewriteJsxValues(expr, ctx), cssHash),
+			resolveStyleExpr(rewriteChildHoleValue(expr, ctx), cssHash),
 			ctx,
 			componentName,
 			inlinedSubs,
+			parentNs,
+			cssHash,
 		),
 	};
 	if (
