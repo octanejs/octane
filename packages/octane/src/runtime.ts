@@ -5725,6 +5725,12 @@ function renderBlockInner(block: Block): void {
 	const effectEventActionCheckpoint = effectEventActionTarget.length;
 	CURRENT_SCOPE = block;
 	CURRENT_BLOCK = block;
+	if (block.forSlot !== null && Array.isArray(block.extra)) {
+		const committed = (block as Block & { __forEnvCommitted?: any[] }).__forEnvCommitted;
+		if (committed !== undefined && !depsEqual(committed, block.extra)) {
+			invalidateInlineHookMemoCaches(block);
+		}
+	}
 	CURRENT_EFFECT_RENDER_VERSION = block.effectSlots === null ? 0 : NEXT_EFFECT_RENDER_VERSION++;
 	CURRENT_EFFECT_REACHED = 0;
 	const continuesParentTree = prevBlock !== null && blockIsAncestor(prevBlock, block);
@@ -5818,6 +5824,9 @@ function renderBlockInner(block: Block): void {
 			block.effectEventCompletedVersion = block.effectEventRenderVersion;
 		}
 		renderCompleted = true;
+		if (block.forSlot !== null && Array.isArray(block.extra)) {
+			(block as Block & { __forEnvCommitted?: any[] }).__forEnvCommitted = block.extra;
+		}
 		// Body completed without suspending: its use() episode is over — the
 		// next render (replay or not) must not reuse these entries.
 		(block as any).__thenableDone = true;
@@ -7448,6 +7457,33 @@ interface MemoHookEntry<T = any> {
 	deps: any[] | undefined;
 	value: T;
 	warmEpisode?: number;
+	/** Snapshot of a keyed `@for` item block's env tuple when this entry was published. */
+	forEnv?: any[];
+}
+
+function forItemEnvSnapshot(block: Block): any[] | undefined {
+	const extra = block.extra;
+	return block.forSlot !== null && Array.isArray(extra) ? extra : undefined;
+}
+
+function forItemEnvDrifted(block: Block, committed: any[] | undefined): boolean {
+	if (committed === undefined) return false;
+	const extra = block.extra;
+	if (!Array.isArray(extra)) return true;
+	return !depsEqual(committed, extra);
+}
+
+function memoEntryStillValid(scope: Scope, prev: MemoHookEntry, deps: any[] | undefined): boolean {
+	if (deps === undefined || depsChanged(prev.deps, deps)) return false;
+	if (prev.forEnv !== undefined && forItemEnvDrifted(scope.block, prev.forEnv)) return false;
+	return true;
+}
+
+function invalidateInlineHookMemoCaches(block: Block): void {
+	const slots: any = block.slots;
+	for (const key in slots) {
+		if (key.startsWith('_k$')) delete slots[key];
+	}
 }
 
 function memoEntryHit<T>(slot: HookSlot, entry: MemoHookEntry<T>): MemoHookEntry<T> {
@@ -7463,10 +7499,12 @@ function memoEntryHit<T>(slot: HookSlot, entry: MemoHookEntry<T>): MemoHookEntry
 function adoptMemoEntry<T>(scope: Scope, slot: HookSlot, deps: any[]): MemoHookEntry<T> | null {
 	const adopted = adoptWarmValue(slot, deps);
 	if (adopted === WARM_MISS) return null;
+	const forEnv = forItemEnvSnapshot(scope.block);
 	const entry: MemoHookEntry<T> = {
 		deps,
 		value: adopted as T,
 		warmEpisode: CURRENT_WARM_EPISODE,
+		...(forEnv !== undefined ? { forEnv } : {}),
 	};
 	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalMemoEntry(scope, slot, entry);
 	ensureHooks(scope).set(slot, entry);
@@ -7481,7 +7519,7 @@ function readMemoEntry<T>(
 	const prev = scope.hooks?.get(slot) as MemoHookEntry<T> | undefined;
 	// deps === undefined → recompute every render (`null` at the public API;
 	// direct/uncompiled omitted calls also retain this runtime fallback).
-	if (prev && deps !== undefined && !depsChanged(prev.deps, deps)) {
+	if (prev && deps !== undefined && memoEntryStillValid(scope, prev, deps)) {
 		return memoEntryHit(slot, prev);
 	}
 	// Parallel-use warming: before recomputing, adopt a prefetched creation for
@@ -7492,7 +7530,8 @@ function readMemoEntry<T>(
 }
 
 function publishMemoEntry<T>(scope: Scope, slot: HookSlot, deps: any[] | undefined, value: T): T {
-	const entry: MemoHookEntry<T> = { deps, value };
+	const forEnv = forItemEnvSnapshot(scope.block);
+	const entry: MemoHookEntry<T> = forEnv !== undefined ? { deps, value, forEnv } : { deps, value };
 	// The attempt records the replacement both ways: the cue re-render must
 	// dep-hit the old entry (never re-create old-version requests), and the
 	// promoted render must dep-hit this one (never create twice).
@@ -10884,7 +10923,7 @@ export function memoTake0(slot: HookSlot): MemoHookEntry | null {
 	const scope = CURRENT_SCOPE!;
 	const prev = scope.hooks?.get(slot) as MemoHookEntry | undefined;
 	if (prev !== undefined && prev.deps !== undefined && prev.deps.length === 0) {
-		return memoEntryHit(slot, prev);
+		if (memoEntryStillValid(scope, prev, [])) return memoEntryHit(slot, prev);
 	}
 	return WARM_EVER ? adoptMemoEntry(scope, slot, []) : null;
 }
@@ -10895,7 +10934,7 @@ export function memoTake1(slot: HookSlot, d0: any): MemoHookEntry | null {
 	if (prev !== undefined) {
 		const pd = prev.deps;
 		if (pd !== undefined && pd.length === 1 && Object.is(pd[0], d0)) {
-			return memoEntryHit(slot, prev);
+			if (memoEntryStillValid(scope, prev, pd)) return memoEntryHit(slot, prev);
 		}
 	}
 	return WARM_EVER ? adoptMemoEntry(scope, slot, [d0]) : null;
@@ -10907,7 +10946,7 @@ export function memoTake2(slot: HookSlot, d0: any, d1: any): MemoHookEntry | nul
 	if (prev !== undefined) {
 		const pd = prev.deps;
 		if (pd !== undefined && pd.length === 2 && Object.is(pd[0], d0) && Object.is(pd[1], d1)) {
-			return memoEntryHit(slot, prev);
+			if (memoEntryStillValid(scope, prev, pd)) return memoEntryHit(slot, prev);
 		}
 	}
 	return WARM_EVER ? adoptMemoEntry(scope, slot, [d0, d1]) : null;
@@ -10925,7 +10964,7 @@ export function memoTake3(slot: HookSlot, d0: any, d1: any, d2: any): MemoHookEn
 			Object.is(pd[1], d1) &&
 			Object.is(pd[2], d2)
 		) {
-			return memoEntryHit(slot, prev);
+			if (memoEntryStillValid(scope, prev, pd)) return memoEntryHit(slot, prev);
 		}
 	}
 	return WARM_EVER ? adoptMemoEntry(scope, slot, [d0, d1, d2]) : null;
@@ -10950,7 +10989,7 @@ export function memoTake4(
 			Object.is(pd[2], d2) &&
 			Object.is(pd[3], d3)
 		) {
-			return memoEntryHit(slot, prev);
+			if (memoEntryStillValid(scope, prev, pd)) return memoEntryHit(slot, prev);
 		}
 	}
 	return WARM_EVER ? adoptMemoEntry(scope, slot, [d0, d1, d2, d3]) : null;
