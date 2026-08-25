@@ -440,6 +440,14 @@
     "note": "Same-run Playwright typing into 512 controlled fields while preserving the input, focus, insertion caret, and latest validation. A verified quick run measured about 1.01x; 2x leaves browser and keyboard-event noise headroom."
   },
   {
+    "suite": "behavior-root-events",
+    "op": "resume_per_1000_events",
+    "target": "events-8000",
+    "reference": "events-1000",
+    "maxRatio": 1.6,
+    "note": "Same-page production Chromium resume cost for FIFO queued events whose distinct async adoptions settle one at a time. The rejected per-resume compaction/full-scan path measured 6.05x per event at 8k versus 1k, while amortized compaction and constant-time pending bookkeeping measured 0.93x and 1.14x in verified quick runs. The 1.6x ceiling leaves browser timing headroom."
+  },
+  {
     "suite": "external-store-fanout",
     "op": "broad_write",
     "target": "octane-tsrx",

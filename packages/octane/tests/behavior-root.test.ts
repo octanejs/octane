@@ -648,6 +648,112 @@ describe('behavior-only roots', () => {
 		expect(original.defaultPrevented).toBe(false);
 	});
 
+	it('preserves synchronous FIFO delivery when a queued handler dispatches another event', async () => {
+		container.innerHTML = '<button data-action>Action</button>';
+		const button = container.querySelector('button')!;
+		const moduleReady = deferred<void>();
+		const order: string[] = [];
+		const root = attach();
+		const behavior = root.registerBehavior({
+			target: '[data-action]',
+			events: ['probe'],
+			ready: moduleReady.promise,
+			adopt() {},
+			handleEvent(event) {
+				const detail = (event as CustomEvent<string>).detail;
+				order.push(`start:${detail}`);
+				if (detail === 'first') {
+					button.dispatchEvent(new CustomEvent('probe', { bubbles: true, detail: 'nested' }));
+					order.push('after:nested-dispatch');
+				}
+				order.push(`end:${detail}`);
+			},
+		});
+
+		button.dispatchEvent(new CustomEvent('probe', { bubbles: true, detail: 'first' }));
+		button.dispatchEvent(new CustomEvent('probe', { bubbles: true, detail: 'second' }));
+		moduleReady.resolve(undefined);
+		await behavior.ready;
+
+		expect(order).toEqual([
+			'start:first',
+			'start:second',
+			'end:second',
+			'start:nested',
+			'end:nested',
+			'after:nested-dispatch',
+			'end:first',
+		]);
+	});
+
+	it('preserves FIFO delivery while asynchronous adoptions resume the queue', async () => {
+		container.innerHTML = [
+			'<button data-action="first">First</button>',
+			'<button data-action="second">Second</button>',
+			'<button data-action="third">Third</button>',
+		].join('');
+		const first = container.querySelector<HTMLButtonElement>('[data-action="first"]')!;
+		const second = container.querySelector<HTMLButtonElement>('[data-action="second"]')!;
+		const third = container.querySelector<HTMLButtonElement>('[data-action="third"]')!;
+		const moduleReady = deferred<void>();
+		const firstReady = deferred<void>();
+		const secondReady = deferred<void>();
+		const thirdReady = deferred<void>();
+		const order: string[] = [];
+		const root = attach();
+		const adopt = vi.fn((element: Element) => {
+			if (element === first) return firstReady.promise;
+			if (element === second) return secondReady.promise;
+			if (element === third) return thirdReady.promise;
+			throw new Error('Unexpected behavior target');
+		});
+		const behavior = root.registerBehavior({
+			target: '[data-action]',
+			events: ['probe'],
+			ready: moduleReady.promise,
+			adopt,
+			handleEvent(event) {
+				const detail = (event as CustomEvent<string>).detail;
+				order.push(`start:${detail}`);
+				if (detail === 'first') {
+					first.dispatchEvent(new CustomEvent('probe', { bubbles: true, detail: 'nested' }));
+					order.push('after:nested-dispatch');
+				}
+				order.push(`end:${detail}`);
+			},
+		});
+
+		first.dispatchEvent(new CustomEvent('probe', { bubbles: true, detail: 'first' }));
+		second.dispatchEvent(new CustomEvent('probe', { bubbles: true, detail: 'second' }));
+		third.dispatchEvent(new CustomEvent('probe', { bubbles: true, detail: 'third' }));
+		moduleReady.resolve(undefined);
+		await vi.waitFor(() => expect(adopt).toHaveBeenCalledTimes(3));
+
+		firstReady.resolve(undefined);
+		await firstReady.promise;
+		await Promise.resolve();
+		expect(order).toEqual(['start:first', 'after:nested-dispatch', 'end:first']);
+
+		thirdReady.resolve(undefined);
+		await thirdReady.promise;
+		await Promise.resolve();
+		expect(order).toEqual(['start:first', 'after:nested-dispatch', 'end:first']);
+
+		secondReady.resolve(undefined);
+		await behavior.ready;
+		expect(order).toEqual([
+			'start:first',
+			'after:nested-dispatch',
+			'end:first',
+			'start:second',
+			'end:second',
+			'start:third',
+			'end:third',
+			'start:nested',
+			'end:nested',
+		]);
+	});
+
 	it('handles delegated behavior on descendants inserted after registration', async () => {
 		container.innerHTML = '<section data-stream></section>';
 		const stream = container.firstElementChild!;
@@ -1228,6 +1334,37 @@ describe('behavior-only roots', () => {
 		root.dispose();
 		expect(cleanup).toHaveBeenCalledOnce();
 		expect(container.querySelector('[data-action]')).not.toBeNull();
+	});
+
+	it('does not let a removed pending adoption delay behavior readiness', async () => {
+		container.innerHTML =
+			'<button data-action="removed">Removed</button><button data-action="live">Live</button>';
+		const removed = container.querySelector<HTMLButtonElement>('[data-action="removed"]')!;
+		const live = container.querySelector<HTMLButtonElement>('[data-action="live"]')!;
+		const removedReady = deferred<() => void>();
+		const liveReady = deferred<void>();
+		const removedCleanup = vi.fn();
+		let removedSignal: AbortSignal | undefined;
+		const adopt = vi.fn((element: Element, context: { signal: AbortSignal }) => {
+			if (element === removed) {
+				removedSignal = context.signal;
+				return removedReady.promise;
+			}
+			if (element === live) return liveReady.promise;
+			throw new Error('Unexpected behavior target');
+		});
+		const root = attach();
+		const behavior = root.registerBehavior({ target: '[data-action]', adopt });
+		await vi.waitFor(() => expect(adopt).toHaveBeenCalledTimes(2));
+
+		removed.remove();
+		await vi.waitFor(() => expect(removedSignal?.aborted).toBe(true));
+		liveReady.resolve(undefined);
+		await behavior.ready;
+
+		removedReady.resolve(removedCleanup);
+		await vi.waitFor(() => expect(removedCleanup).toHaveBeenCalledOnce());
+		expect(container.firstElementChild).toBe(live);
 	});
 
 	it('does not adopt a stale asynchronously loaded behavior after its root is disposed', async () => {
