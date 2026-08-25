@@ -648,6 +648,44 @@ describe('behavior-only roots', () => {
 		expect(original.defaultPrevented).toBe(false);
 	});
 
+	it('preserves synchronous FIFO delivery when a queued handler dispatches another event', async () => {
+		container.innerHTML = '<button data-action>Action</button>';
+		const button = container.querySelector('button')!;
+		const moduleReady = deferred<void>();
+		const order: string[] = [];
+		const root = attach();
+		const behavior = root.registerBehavior({
+			target: '[data-action]',
+			events: ['probe'],
+			ready: moduleReady.promise,
+			adopt() {},
+			handleEvent(event) {
+				const detail = (event as CustomEvent<string>).detail;
+				order.push(`start:${detail}`);
+				if (detail === 'first') {
+					button.dispatchEvent(new CustomEvent('probe', { bubbles: true, detail: 'nested' }));
+					order.push('after:nested-dispatch');
+				}
+				order.push(`end:${detail}`);
+			},
+		});
+
+		button.dispatchEvent(new CustomEvent('probe', { bubbles: true, detail: 'first' }));
+		button.dispatchEvent(new CustomEvent('probe', { bubbles: true, detail: 'second' }));
+		moduleReady.resolve(undefined);
+		await behavior.ready;
+
+		expect(order).toEqual([
+			'start:first',
+			'start:second',
+			'end:second',
+			'start:nested',
+			'end:nested',
+			'after:nested-dispatch',
+			'end:first',
+		]);
+	});
+
 	it('handles delegated behavior on descendants inserted after registration', async () => {
 		container.innerHTML = '<section data-stream></section>';
 		const stream = container.firstElementChild!;
