@@ -239,9 +239,9 @@ same-module custom-hook declarations, not a `use*` naming heuristic. Transitive
 and cyclic hook paths reach a fixed point. Memo guards witness a callable, its
 receiver, and explicit arguments; derived receivers are represented by their
 producing operation and inputs rather than a transient result identity. Guards
-at component-projection boundaries compare inputs with `Object.is`,
-distinguishing signed zero while stabilizing `NaN`; keyed selection retains
-authored strict equality.
+at component and ordinary-list projection boundaries compare inputs with
+`Object.is`, distinguishing signed zero while stabilizing `NaN`; a certified
+keyed-selection operand retains authored strict equality.
 
 The compiler checks the violations it can prove, but the analysis is deliberately
 bounded: an unknown call is assumed pure instead of disabling Strong memoization.

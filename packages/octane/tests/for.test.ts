@@ -16,6 +16,7 @@ import {
 	NestedConditionalTransition,
 	PlainCalleeList,
 	KeyedSelectionList,
+	KeyedSelectionProjectionList,
 	KeyedSelectionControlledList,
 	KeyedSelectionRenderableList,
 	KeyedSelectionTransition,
@@ -53,8 +54,10 @@ import {
 	StrongFactoryReadProp,
 	StrongMapJoinProp,
 	StrongOptionalAliasedContextRows,
+	StrongOptionalNamespaceContextRows,
 	StrongShadowedAssignmentContextRows,
 	StrongSignedZeroConstructedProp,
+	StrongSignedZeroListProjections,
 	StrongSuspenseLayoutEffect,
 	StrongTheme,
 	SnapshotCalculation,
@@ -654,6 +657,18 @@ describe('Strong memoization preserves dependency and setup semantics', () => {
 		r.unmount();
 	});
 
+	it('does not skip an optional namespace hook when it is the only keyed-row setup call', () => {
+		const r = mount(StrongOptionalNamespaceContextRows);
+		expect(
+			r.findAll('.strong-optional-namespace-only-context-row').map((row) => row.textContent),
+		).toEqual(['first', 'first']);
+		r.click('#strong-optional-namespace-context-update');
+		expect(
+			r.findAll('.strong-optional-namespace-only-context-row').map((row) => row.textContent),
+		).toEqual(['second', 'second']);
+		r.unmount();
+	});
+
 	it('finds setup hooks through cyclic same-module call graphs independent of declaration order', () => {
 		const r = mount(StrongCyclicContextReaders);
 		expect(r.find('#strong-cycle-reader-a').textContent).toBe('first');
@@ -683,6 +698,23 @@ describe('Strong memoization preserves dependency and setup semantics', () => {
 		expect(r.find('#strong-signed-zero-constructor').textContent).toBe('+0');
 		r.update(StrongSignedZeroConstructedProp, { Projector, value: -0 });
 		expect(r.find('#strong-signed-zero-constructor').textContent).toBe('-0');
+		r.unmount();
+	});
+
+	it('preserves signed-zero projection inputs through ordinary list caches', () => {
+		const Projector = class {
+			result: string;
+			constructor(value: number) {
+				this.result = Object.is(value, -0) ? '-0' : '+0';
+			}
+		} satisfies StrongNumberProjectorConstructor;
+		const items = [{ id: 1 }];
+		const r = mount(StrongSignedZeroListProjections, { items, Projector, value: 0 });
+		expect(r.find('.strong-signed-zero-list-child').textContent).toBe('+0');
+		expect(r.find('.strong-signed-zero-list-inline').textContent).toBe('+0');
+		r.update(StrongSignedZeroListProjections, { items, Projector, value: -0 });
+		expect(r.find('.strong-signed-zero-list-child').textContent).toBe('-0');
+		expect(r.find('.strong-signed-zero-list-inline').textContent).toBe('-0');
 		r.unmount();
 	});
 
@@ -991,6 +1023,25 @@ describe('keyed list selection', () => {
 		expect(r.findAll('li.selected')).toHaveLength(0);
 		r.update(KeyedSelectionList, { items: reordered, selected: 0 });
 		expect(r.findAll('li.selected')).toEqual([originalRows[1]]);
+		r.unmount();
+	});
+
+	it('uses SameValue for other captures in a strict-equality selection list', () => {
+		const items = makeRows();
+		const r = mount(KeyedSelectionProjectionList, { items, selected: 1, projection: 0 });
+		expect(r.findAll('li').map((row) => row.getAttribute('data-projection'))).toEqual([
+			'Infinity',
+			'Infinity',
+			'Infinity',
+		]);
+
+		r.update(KeyedSelectionProjectionList, { items, selected: 1, projection: -0 });
+		expect(r.findAll('li').map((row) => row.getAttribute('data-projection'))).toEqual([
+			'-Infinity',
+			'-Infinity',
+			'-Infinity',
+		]);
+		expect(r.find('.selected').textContent).toBe('first');
 		r.unmount();
 	});
 

@@ -489,8 +489,9 @@ state, suspension, and effect lifecycle handling even through aliases or cyclic
 call graphs. Projection guards witness both a method/callable and its receiver,
 plus explicit arguments; derived receivers are witnessed through the operation
 and inputs that produce them rather than their transient result identity. Guard
-equality at component-projection boundaries is `Object.is`, including its `NaN`
-and signed-zero behavior; keyed selection retains authored strict equality.
+equality at component and ordinary-list projection boundaries is `Object.is`,
+including its `NaN` and signed-zero behavior; a certified keyed-selection
+operand retains authored strict equality.
 
 The diagnostics above are bounded; they do not prove arbitrary imported code or
 method bodies pure, and an unknown call does not make memoization fall back. A

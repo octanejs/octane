@@ -242,9 +242,10 @@ For an eligible operation, the cache guard witnesses the callable and its
 receiver as well as explicit arguments. A derived receiver such as
 `factory().read(input)` is represented by the factory, its receiver, and its
 arguments rather than by a transient returned-object identity. Witnesses use
-`Object.is` equality at component-projection boundaries, so repeated `NaN` is
-stable while `0` and `-0` invalidate separately. Keyed selection guards retain
-the authored strict-equality semantics. Hiding hook state, a state getter,
+`Object.is` equality at component and ordinary-list projection boundaries, so
+repeated `NaN` is stable while `0` and `-0` invalidate separately. A certified
+keyed-selection operand retains the authored strict-equality semantics while
+other list captures still use `Object.is`. Hiding hook state, a state getter,
 `ref.current`, a clock or random
 value, mutable module state, or an external live store behind a render call
 violates the assertion because the result can change without a witnessed input

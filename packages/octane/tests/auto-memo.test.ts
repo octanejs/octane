@@ -4952,7 +4952,7 @@ describe('compiler-owned component-region memoization', () => {
 			{ hmr: false, autoMemo: true },
 		).code;
 		expect(tsxCode).toContain('__memoCommitted');
-		expect(tsxCode).toMatch(/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*/);
+		expect(tsxCode).toMatch(/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)/);
 
 		const rejected = [
 			// A component-tag spread nested in the callee body…

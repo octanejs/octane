@@ -211,6 +211,22 @@ export function StrongOptionalAliasedContextRows() @{
 	</div>
 }
 
+export function StrongOptionalNamespaceContextRows() @{
+	const [theme, setTheme] = useState('first');
+	const [items] = useState([{ id: 1 }, { id: 2 }]);
+	<div>
+		<button id="strong-optional-namespace-context-update" onClick={() => setTheme('second')}>
+			update
+		</button>
+		<StrongTheme.Provider value={theme}>
+			@for (const item of items.slice(); key item.id) {
+				const value = (OctaneHooks as any)['useContext' as string]?.(StrongTheme);
+				<span class="strong-optional-namespace-only-context-row">{value as string}</span>
+			}
+		</StrongTheme.Provider>
+	</div>
+}
+
 function useCycleA(context: typeof StrongTheme, depth: number): string {
 	if (depth === 0) return useCycleB(context, 1);
 	if (depth === 1) return useCycleC(context, 2);
@@ -286,6 +302,44 @@ export function StrongSignedZeroConstructedProp(props: {
 		id="strong-signed-zero-constructor"
 		value={new props.Projector(props.value).result}
 	/>
+}
+
+function StrongSignedZeroListChild(props: {
+	Projector: StrongNumberProjectorConstructor;
+	value: number;
+}) @{
+	<span
+		class="strong-signed-zero-list-child"
+	>{new props.Projector(props.value).result as string}</span>
+}
+
+export function StrongSignedZeroListProjections({
+	items,
+	Projector,
+	value,
+}: {
+	items: readonly { id: number }[];
+	Projector: StrongNumberProjectorConstructor;
+	value: number;
+}) @{
+	<div>
+		<ul>
+			@for (const item of items; key item.id) {
+				<li>
+					<StrongSignedZeroListChild Projector={Projector} value={value} />
+				</li>
+			}
+		</ul>
+		<ul>
+			@for (const item of items; key item.id) {
+				<li>
+					<span
+						class="strong-signed-zero-list-inline"
+					>{new Projector(value).result as string}</span>
+				</li>
+			}
+		</ul>
+	</div>
 }
 
 function StrongLayoutEffectChild(props: { log: string[] }) @{

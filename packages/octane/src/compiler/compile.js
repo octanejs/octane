@@ -4216,13 +4216,17 @@ function autoMemoBuiltinHookName(call, ctx) {
 	) {
 		return call.callee.name;
 	}
-	if (call.type !== 'OptionalCallExpression' || ctx == null) return null;
+	if ((call.type !== 'OptionalCallExpression' && call.optional !== true) || ctx == null) {
+		return null;
+	}
 
 	// Optional calls are rebuilt after hook-dependency annotations have run, so
-	// some parser shapes do not retain those stamps. Recover provenance from the
-	// module imports plus the same lexical binding analysis used by the
-	// same-module hook graph. A shadowed helper named `useContext` is therefore
-	// still an ordinary Strong projection; spelling alone never makes it a hook.
+	// some parser shapes do not retain those stamps. Depending on the authored
+	// chain, Babel represents them as either OptionalCallExpression or a regular
+	// CallExpression carrying `optional: true`. Recover provenance from the module
+	// imports plus the same lexical binding analysis used by the same-module hook
+	// graph. A shadowed helper named `useContext` is therefore still an ordinary
+	// Strong projection; spelling alone never makes it a hook.
 	const lexical =
 		ctx.autoMemoHookLexical ?? ctx.activityLexical ?? createLexicalAnalysis(ctx.activityModuleAst);
 	ctx.autoMemoHookLexical = lexical;
@@ -20967,6 +20971,7 @@ function emitAutoMemoRegion(
 	restoreCachedContext = false,
 	publicationWitnesses = null,
 	sameValueDependencies = false,
+	strictEqualityDependencyIndex = -1,
 ) {
 	const witnessCount = publicationWitnesses?.length ?? 0;
 	const cell = allocAutoMemoCell(ctx, dependencies.length + (contextAware ? 1 : 0) + witnessCount);
@@ -20995,7 +21000,7 @@ function emitAutoMemoRegion(
 	misses.push(b.binary('!==', cacheAt(cell.init), b.literal(true)));
 	for (let index = 0; index < depNames.length; index++) {
 		misses.push(
-			sameValueDependencies
+			sameValueDependencies && index !== strictEqualityDependencyIndex
 				? b.unary('!', hkObjectIs(ctx, cacheAt(cell.base + index), b.id(depNames[index])))
 				: b.binary('!==', cacheAt(cell.base + index), b.id(depNames[index])),
 		);
@@ -22114,6 +22119,18 @@ function planJsx(
 		// arg forces the flags placeholder too (positional alignment).
 		const hasDeps = fc.depNames.length > 0;
 		const depNode = depNodeFor(fc);
+		// Whole-list projection caches use SameValue just like their nested
+		// component/item guards. A certified keyed-selection dependency is the one
+		// exception: its authored `selected === row.key` contract intentionally
+		// treats signed zero as equal. Keep only that dependency on strict equality;
+		// other captured projection inputs must still distinguish 0 from -0.
+		let strictListDependencyIndex = -1;
+		if (fc.keyedSelectionIndex >= 0 && fc.autoMemoDeps !== null) {
+			const selectionName = fc.depNames[fc.keyedSelectionIndex];
+			const selectionMemoIndex = fc.autoMemoDeps.indexOf(selectionName);
+			if (selectionMemoIndex >= 0) strictListDependencyIndex = selectionMemoIndex + 1;
+		}
+		const sameValueListDependencies = fc.keyedSelectionIndex < 0 || strictListDependencyIndex >= 0;
 		let flagsExpr = b.literal(flags || 0);
 		if (fc.itemMemoFlags !== 0) {
 			flagsExpr = b.binary(
@@ -22198,6 +22215,10 @@ function planJsx(
 					fc.autoMemoContextAware,
 					depNode,
 					b.id(nativeName),
+					false,
+					null,
+					sameValueListDependencies,
+					strictListDependencyIndex,
 				);
 				pushAfterStmt(fc.id, org, b.block([...prefix, guarded]));
 			} else {
@@ -22246,6 +22267,11 @@ function planJsx(
 				witnessMiss,
 				fc.autoMemoContextAware,
 				depNode,
+				null,
+				false,
+				null,
+				sameValueListDependencies,
+				strictListDependencyIndex,
 			);
 			pushAfterStmt(fc.id, org, b.block([b.const('_v', fc.itemsExpr), guarded]));
 		} else {

@@ -140,8 +140,9 @@ point, so aliases and cycles retain context, state, suspension, and effect
 lifecycle behavior. Projection guards witness a method/callable, its receiver,
 and its explicit arguments; derived receivers are witnessed through the
 operations and inputs that produce them rather than transient result identities.
-Component-projection witnesses use `Object.is`, distinguishing signed zero while
-stabilizing `NaN`; keyed selection retains authored strict equality.
+Component and ordinary-list projection witnesses use `Object.is`, distinguishing
+signed zero while stabilizing `NaN`; a certified keyed-selection operand retains
+authored strict equality.
 
 Strong diagnostics catch violations the compiler can prove. The analysis is
 bounded, so an unknown call is assumed pure rather than making memoization fall

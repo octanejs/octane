@@ -9,10 +9,10 @@ local, dynamic, ordinary hook-shaped, callback-bearing, constructed, and tagged
 call shapes without React hook-name heuristics, while preserving compiler-proven
 hook setup, compatibility-mode live receivers, and changing event captures.
 Witness callable and receiver identities alongside explicit inputs, compare
-memoized component-projection inputs with `Object.is`, and preserve optional,
-aliased, cyclic, or lexically shadowed setup-hook paths. Add bounded diagnostics for detectable
-state-snapshot mutations and impure clock or random reads, and document the
-assumptions the production memoizer trusts.
+memoized component and ordinary-list projection inputs with `Object.is`, and
+preserve optional, aliased, cyclic, or lexically shadowed setup-hook paths. Add
+bounded diagnostics for detectable state-snapshot mutations and impure clock or
+random reads, and document the assumptions the production memoizer trusts.
 
 Expose the template-call memoization benchmark through the Octane MCP benchmark
 tool.
