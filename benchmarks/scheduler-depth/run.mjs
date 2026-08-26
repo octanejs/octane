@@ -2,6 +2,7 @@ process.env.NODE_ENV = 'production';
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -23,6 +24,7 @@ if (process.env.OCTANE_SCHEDULER_DEPTH_STACK !== '1') {
 
 const ROOT = import.meta.dirname;
 const REPO = path.resolve(ROOT, '../..');
+const newsRequire = createRequire(path.join(REPO, 'benchmarks/news/package.json'));
 const rawIterations = process.argv[2] ?? '9';
 const iterations = Number(rawIterations);
 const COUNTS = [500, 2_000];
@@ -32,7 +34,7 @@ if (!Number.isSafeInteger(iterations) || iterations <= 0) {
 }
 
 async function buildEntry(outDir) {
-	const { build } = await import('vite');
+	const { build } = await import(pathToFileURL(newsRequire.resolve('vite')).href);
 	const octaneSource = path.join(REPO, 'packages/octane/src');
 	await build({
 		root: REPO,
