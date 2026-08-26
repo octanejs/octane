@@ -20969,6 +20969,7 @@ function emitAutoMemoRegion(
 	initValue = null,
 	restoreCachedContext = false,
 	publicationWitnesses = null,
+	sameValueDependencies = false,
 ) {
 	const witnessCount = publicationWitnesses?.length ?? 0;
 	const cell = allocAutoMemoCell(ctx, dependencies.length + (contextAware ? 1 : 0) + witnessCount);
@@ -20996,15 +20997,14 @@ function emitAutoMemoRegion(
 	if (extraMiss !== null) misses.push(extraMiss);
 	misses.push(b.binary('!==', cacheAt(cell.init), b.literal(true)));
 	for (let index = 0; index < depNames.length; index++) {
-		misses.push(b.unary('!', hkObjectIs(ctx, cacheAt(cell.base + index), b.id(depNames[index]))));
+		misses.push(
+			sameValueDependencies
+				? b.unary('!', hkObjectIs(ctx, cacheAt(cell.base + index), b.id(depNames[index])))
+				: b.binary('!==', cacheAt(cell.base + index), b.id(depNames[index])),
+		);
 	}
 	for (let index = 0; index < witnessCount; index++) {
-		misses.push(
-			b.unary(
-				'!',
-				hkObjectIs(ctx, cacheAt(witnessBase + index), b.id(publicationWitnesses[index])),
-			),
-		);
+		misses.push(b.binary('!==', cacheAt(witnessBase + index), b.id(publicationWitnesses[index])));
 	}
 	const publish = () => [
 		...depNames.map((name, index) =>
@@ -22565,6 +22565,7 @@ function planJsx(
 					null,
 					false,
 					cc.autoMemoPublicationWitnesses,
+					true,
 				),
 			);
 			continue;
