@@ -4,6 +4,7 @@
 // byte-compat path is covered end-to-end in production.test.ts.
 import { describe, it, expect } from 'vitest';
 import { createHandler } from '../src/server/production.js';
+import { HYDRATION_NONCE_PLACEHOLDER } from '../src/server/html-template.js';
 import { RenderRoute, ServerRoute } from '../src/routes.js';
 import { OCTANE_NONCE_STATE_KEY } from '../src/constants.js';
 
@@ -171,10 +172,14 @@ describe('createHandler', () => {
 		expect(missing.status).toBe(404);
 	});
 
-	it('threads a middleware CSP nonce through renderer and inline hydration scripts', async () => {
+	it('isolates middleware CSP nonces across requests and threads them through SSR', async () => {
 		const rendererNonces: Array<string | undefined> = [];
 		let rendererSignal: AbortSignal | undefined;
 		const nonce = 'request-123"&';
+		const builtTemplate = TEMPLATE.replace(
+			' data-octane-hydrate',
+			` data-octane-hydrate nonce="${HYDRATION_NONCE_PLACEHOLDER}"`,
+		);
 		const handler = createHandler(
 			makeManifest({
 				middlewares: [
@@ -188,6 +193,7 @@ describe('createHandler', () => {
 			}) as any,
 			{
 				...baseDeps,
+				htmlTemplate: builtTemplate,
 				renderToReadableStream: async (
 					_component: Function,
 					_props: unknown,
@@ -208,6 +214,7 @@ describe('createHandler', () => {
 		expect(rendererSignal).toBe(plainRequest.signal);
 		expect(html.match(/nonce="request-123&quot;&amp;"/g)).toHaveLength(2);
 		expect(firstPlainHtml).not.toContain(' nonce=');
+		expect(firstPlainHtml).not.toContain(HYDRATION_NONCE_PLACEHOLDER);
 		expect(secondPlainHtml).toBe(firstPlainHtml);
 	});
 
