@@ -38,16 +38,25 @@ function compileVariant(variant) {
 	const result = compile(variant.source, `${variant.name}.tsrx`, options);
 	const elapsed = performance.now() - started;
 	const witnesses = result.code.match(/const __memoDep[\w$]* = live;/g)?.length ?? 0;
+	const hoistedDeclarations =
+		result.code.match(/^(?:export )?function Component\d+\(/gm)?.length ?? 0;
+	const expectedHoistedDeclarations = variant.name === 'dependent-first' ? COMPONENTS - 1 : 0;
 	assert.equal(result.diagnostics.length, 0, `${variant.name} emitted compiler diagnostics`);
 	assert.equal(
 		witnesses,
 		COMPONENTS - 1,
 		`${variant.name} did not preserve every transitive live-binding witness`,
 	);
+	assert.equal(
+		hoistedDeclarations,
+		expectedHoistedDeclarations,
+		`${variant.name} changed its above-declaration component references`,
+	);
 	variant.meta = {
 		components: COMPONENTS,
 		callEdges: COMPONENTS - 1,
 		liveBindingWitnesses: witnesses,
+		hoistedDeclarations,
 		sourceBytes: Buffer.byteLength(variant.source),
 		outputBytes: Buffer.byteLength(result.code),
 		correctness: 'pass',

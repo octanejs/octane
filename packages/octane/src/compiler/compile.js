@@ -8364,6 +8364,7 @@ function compileInternal(
 		// hookless lite path). Populated by the pre-pass below; read by
 		// makeCompCall to branch the call-site emit.
 		componentInfo: new Map(),
+		earlyComponentReferenceOffsets: collectEarlyComponentReferenceOffsets(source, ast.body),
 		profileComponents: [],
 		profileComponentIds: new Set(),
 		profileComponentCandidates: new Set(),
@@ -9616,6 +9617,7 @@ function compileServer(
 		nextFragId: 0,
 		nextHelperId: 0,
 		componentInfo: new Map(),
+		earlyComponentReferenceOffsets: collectEarlyComponentReferenceOffsets(source, ast.body),
 		descriptorChildrenBindings: collectDescriptorChildrenBindings(
 			ast,
 			options?.isDescriptorChildrenImport,
@@ -9836,14 +9838,7 @@ function compileServerComponent(node, ctx) {
 	// component referenced ABOVE its declaration keeps real function-declaration
 	// hoisting instead of a TDZ `const` binding. Server and client compiles must
 	// agree, or the same route module renders on one side and crashes on the other.
-	const ssrSourceBeforeNode =
-		typeof node.start === 'number' && typeof ctx.mapSource === 'string'
-			? stripNonReferenceText(ctx.mapSource.slice(0, node.start))
-			: '';
-	if (
-		ssrSourceBeforeNode !== '' &&
-		new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(ssrSourceBeforeNode)
-	) {
+	if (componentReferencedAboveDeclaration(ctx, node, name)) {
 		const declaration = isDefault ? b.export_default(fn) : isExported ? b.export(fn) : fn;
 		const nodes = [inheritOriginLoc(declaration, node)];
 		if (warmNode !== null) {
@@ -12953,6 +12948,57 @@ function stripNonReferenceText(source) {
 	);
 }
 
+const EARLY_COMPONENT_REFERENCE_SCAN =
+	/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|\/\/[^\n]*|\/\*[\s\S]*?\*\/|\b([A-Za-z_]\w*)\b/g;
+const PLAIN_EARLY_COMPONENT_NAME = /^[A-Za-z_]\w*$/;
+
+/**
+ * Record the first source occurrence of every ordinary component identifier in
+ * one module scan. Strings and comments stay invisible, while template literals
+ * deliberately remain visible for the TDZ-safety reason above.
+ */
+function collectEarlyComponentReferenceOffsets(source, body) {
+	const names = new Set();
+	for (const statement of body) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: statement;
+		if (
+			declaration?.id?.type === 'Identifier' &&
+			(isComponentFunction(declaration) || isReturnJsxFunction(declaration)) &&
+			PLAIN_EARLY_COMPONENT_NAME.test(declaration.id.name)
+		) {
+			names.add(declaration.id.name);
+		}
+	}
+	if (names.size === 0) return null;
+
+	const offsets = new Map();
+	for (const match of source.matchAll(EARLY_COMPONENT_REFERENCE_SCAN)) {
+		const name = match[1];
+		if (name !== undefined && names.has(name) && !offsets.has(name)) {
+			offsets.set(name, match.index);
+			if (offsets.size === names.size) break;
+		}
+	}
+	return offsets;
+}
+
+function componentReferencedAboveDeclaration(ctx, node, name) {
+	const start = node.start;
+	if (typeof start !== 'number' || typeof ctx.mapSource !== 'string') return false;
+	if (PLAIN_EARLY_COMPONENT_NAME.test(name)) {
+		const first = ctx.earlyComponentReferenceOffsets?.get(name);
+		return first !== undefined && first < start;
+	}
+	// Preserve the historical \b behavior for uncommon $, Unicode, and other
+	// parser-supported identifier spellings without taxing ordinary modules.
+	return new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(
+		stripNonReferenceText(ctx.mapSource.slice(0, start)),
+	);
+}
+
 // Attach definition metadata through the component's initializer rather than a
 // free-standing module mutation. The call-site annotation is valid because every
 // caller passes a freshly-created compiler function that cannot yet be observed;
@@ -13213,13 +13259,7 @@ function compileComponent(node, ctx, options) {
 	// function object, so the pre-declaration capture observes them before any
 	// render can run. Components without early references keep the `const` +
 	// PURE-initializer form, which bundlers can drop when unused.
-	const sourceBeforeNode =
-		typeof node.start === 'number' && typeof ctx.mapSource === 'string'
-			? stripNonReferenceText(ctx.mapSource.slice(0, node.start))
-			: '';
-	const referencedAboveDeclaration =
-		sourceBeforeNode !== '' &&
-		new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(sourceBeforeNode);
+	const referencedAboveDeclaration = componentReferencedAboveDeclaration(ctx, node, name);
 	if (referencedAboveDeclaration) {
 		if (owner !== null) {
 			for (const event of owner.delegatedEvents) ctx.unownedDelegatedEvents.add(event);
