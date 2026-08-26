@@ -6,7 +6,7 @@
 //   - all 96 case endpoints are serialized from the live DOM and compared with
 //     the independent shared model;
 //   - keyed survivors must retain DOM identity for every transition;
-//   - Octane, React, and Solid must render the same semantic signatures and
+//   - Octane, React, Preact, and Solid must render the same semantic signatures and
 //     element counts (framework marker comments are deliberately outside the
 //     oracle).
 //
@@ -14,6 +14,7 @@
 //   pnpm --filter octane-tsrx-uibench-bench preview  # :5315
 //   pnpm --filter react-uibench-bench preview        # :5316
 //   pnpm --filter solid-uibench-bench preview        # :5317
+//   pnpm --filter preact-uibench-bench preview       # :5318
 //
 // Usage: node run.mjs [iterations]
 // Env: TARGETS='[{"name":"octane-tsrx","url":"http://localhost:5315/"}]'
@@ -49,6 +50,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'octane-tsrx', url: 'http://localhost:5315/' },
 			{ name: 'react', url: 'http://localhost:5316/' },
 			{ name: 'solid', url: 'http://localhost:5317/' },
+			{ name: 'preact', url: 'http://localhost:5318/' },
 		];
 
 const EXPECTED = new Map(
@@ -82,7 +84,7 @@ async function seedRandom(page) {
 
 async function gateTarget(page) {
 	return page.evaluate(
-		(names) => {
+		async (names) => {
 			const root = document.getElementById('main');
 			if (root === null) throw new Error('missing #main');
 
@@ -136,9 +138,11 @@ async function gateTarget(page) {
 
 			const results = [];
 			for (const name of names) {
-				window.__prepare(name);
+				const prepared = window.__prepare(name);
+				if (prepared && typeof prepared.then === 'function') await prepared;
 				const before = new Map(semanticItems().map((element) => [element.dataset.id, element]));
-				window.__run(name);
+				const committed = window.__run(name);
+				if (committed && typeof committed.then === 'function') await committed;
 				const after = semanticItems();
 				let identityShared = 0;
 				let identityBroken = 0;
@@ -170,21 +174,28 @@ async function timeCase(page, name) {
 			const settle = () => new Promise((resolvePromise) => setTimeout(resolvePromise, 0));
 			for (let index = 0; index < warmup; index++) {
 				for (let repeat = 0; repeat < repetitionsPerSample; repeat++) {
-					window.__prepare(caseName);
-					window.__run(caseName);
+					const prepared = window.__prepare(caseName);
+					if (prepared && typeof prepared.then === 'function') await prepared;
+					const committed = window.__run(caseName);
+					if (committed && typeof committed.then === 'function') await committed;
 				}
 			}
 
 			const samples = [];
 			for (let index = 0; index < iterations; index++) {
-				window.__prepare(caseName);
+				const initial = window.__prepare(caseName);
+				if (initial && typeof initial.then === 'function') await initial;
 				await settle();
 				if (typeof gc === 'function') gc();
 				let elapsed = 0;
 				for (let repeat = 0; repeat < repetitionsPerSample; repeat++) {
-					if (repeat > 0) window.__prepare(caseName);
+					if (repeat > 0) {
+						const prepared = window.__prepare(caseName);
+						if (prepared && typeof prepared.then === 'function') await prepared;
+					}
 					const start = performance.now();
-					window.__run(caseName);
+					const committed = window.__run(caseName);
+					if (committed && typeof committed.then === 'function') await committed;
 					elapsed += performance.now() - start;
 				}
 				samples.push(elapsed / repetitionsPerSample);

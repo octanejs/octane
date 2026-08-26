@@ -3324,5 +3324,80 @@
     "minRatio": 1,
     "maxRatio": 1,
     "note": "Semantic control: all 32,543 keyed survivors observed across the matrix retain DOM identity in Octane and Solid. A replacement is a correctness failure before this count is emitted."
+  },
+  {
+    "suite": "uibench",
+    "op": "table/[100,4]/render",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 2.1,
+    "note": "UIbench's largest table mount creates 100 keyed rows with five cells each. Octane measured 1.36x Preact on both the 10-sample and quick Preact introduction runs (2026-08-26); the ceiling catches a mount-path cliff while retaining broad sub-millisecond noise headroom."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/render",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 1.9,
+    "note": "Deep binary mount creates 2,046 keyed nodes across ten recursive levels. Octane measured 1.24x Preact on the 10-sample introduction run and 1.37x quick (2026-08-26); this is the recursive mount guard with same-run browser-noise headroom."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[50,10]/[reverse]",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 0.8,
+    "note": "Reverses 50 keyed containers while preserving their 500 keyed children and every surviving DOM node. Octane measured 0.22x Preact on the 10-sample introduction run and 0.24x quick (2026-08-26); the ceiling protects the nested-list reorder path."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[500]/[kivi_worst_case]",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 0.6,
+    "note": "Historical UIbench adversarial case removes both ends and reverses 498 surviving keyed nodes. Octane measured 0.17x Preact on the 10-sample introduction run and 0.18x quick (2026-08-26); a move toward 0.6x signals a keyed-reconcile cliff."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[10,10,10,10]/no_change",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 1.5,
+    "note": "Publishes a fresh but value-identical 11,110-node tree while Preact's native queued commit remains inside the timed interval. Octane measured 0.96x Preact on the 10-sample introduction run and 1.04x quick (2026-08-26)."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/no_change",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 1.5,
+    "note": "Publishes a fresh but value-identical ten-level binary tree. Octane measured 0.90x Preact on the 10-sample introduction run and 1.08x quick (2026-08-26); the ceiling isolates recursive no-change diff cost at the smaller shape."
+  },
+  {
+    "suite": "uibench",
+    "op": "cases",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: Octane and Preact must pass and publish all 96 desktop cases. Every endpoint is independently serialized against the model before timings are accepted."
+  },
+  {
+    "suite": "uibench",
+    "op": "elements_largest",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: the largest endpoint contains exactly 23,331 visible elements in Octane and Preact; missing work cannot look like a performance win."
+  },
+  {
+    "suite": "uibench",
+    "op": "identity_shared",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: all 32,543 keyed survivors observed across the matrix retain DOM identity in Octane and Preact. A replacement is a correctness failure before this count is emitted."
   }
 ]
