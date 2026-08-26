@@ -854,6 +854,14 @@
   {
     "suite": "codegen-size",
     "op": "raw",
+    "target": "component-module-200",
+    "reference": "component-module-100",
+    "maxRatio": 2.1,
+    "note": "Deterministic production output scaling for a module with twice as many memoizable component bodies. Compact collision-free compiler locals measured 2.04x after the fix; the 2.1x ceiling keeps raw intermediate code near linear instead of growing one identifier character per preceding component."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "raw",
     "target": "text-types-inferred",
     "reference": "text-types-explicit",
     "maxRatio": 1.0,

@@ -3193,7 +3193,8 @@ const AST_WALK_SKIP_KEYS = new Set(['type', 'loc', 'start', 'end', 'range', 'met
 // user scopes, so both top-level duplicates and nested shadowing are unsafe.
 // Seed the allocator from lexical Identifier nodes (not raw source text, which
 // would spuriously treat comments/strings as bindings), then reserve each name
-// as it is emitted.
+// as it is emitted. Repeated bases keep a numeric suffix cursor: appending one
+// character per collision makes output size quadratic in component count.
 function collectIdentifierNames(root) {
 	const names = new Set();
 	const walk = (node) => {
@@ -3214,7 +3215,15 @@ function collectIdentifierNames(root) {
 
 function allocCompilerName(ctx, preferred) {
 	let name = preferred;
-	while (ctx.usedCompilerNames.has(name)) name += '$';
+	if (ctx.usedCompilerNames.has(name)) {
+		const suffixes = (ctx.compilerNameSuffixes ??= new Map());
+		let suffix = suffixes.get(preferred) ?? 1;
+		do {
+			name = suffix === 1 ? `${preferred}$` : `${preferred}$${suffix}`;
+			suffix++;
+		} while (ctx.usedCompilerNames.has(name));
+		suffixes.set(preferred, suffix);
+	}
 	ctx.usedCompilerNames.add(name);
 	return name;
 }
@@ -8277,6 +8286,7 @@ function compileInternal(
 	const ctx = {
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
+		compilerNameSuffixes: null,
 		profileFilename: (options && options.profileFilename) || filename,
 		mode,
 		nativeChangeClassifications: nativeChangeAnalysis.classifications,
@@ -9522,6 +9532,7 @@ function compileServer(
 	const ctx = {
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
+		compilerNameSuffixes: null,
 		mode: 'server',
 		hmr: false, // SSR never hot-swaps in place; client/server production slot shapes stay aligned
 		dev: !!(options && options.dev),
