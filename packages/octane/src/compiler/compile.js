@@ -8891,37 +8891,84 @@ function compileInternal(
 			}
 		}
 	}
-	// Pull live imported captures through the safe same-module call graph. This
-	// is a second fixed point because A -> B -> C chains and pure recursion may
-	// be declared in any order.
-	let autoMemoCapturesChanged = true;
-	while (autoMemoCapturesChanged) {
-		autoMemoCapturesChanged = false;
-		for (const [, info] of ctx.componentInfo) {
-			if (!info.autoMemoSafe) continue;
-			const captures = new Set(info.autoMemoCaptures);
-			const importedComponents = new Set(info.autoMemoImportedComponents);
-			let mayReadContext = info.autoMemoMayReadContext;
-			for (const name of info.autoMemoComponentDeps) {
-				const child = ctx.componentInfo.get(name);
-				if (!child?.autoMemoSafe) continue;
-				for (const capture of child.autoMemoCaptures) captures.add(capture);
-				for (const component of child.autoMemoImportedComponents) {
-					importedComponents.add(component);
-				}
-				if (child.autoMemoMayReadContext) mayReadContext = true;
-			}
-			if (
-				captures.size !== info.autoMemoCaptures.length ||
-				importedComponents.size !== info.autoMemoImportedComponents.length ||
-				mayReadContext !== info.autoMemoMayReadContext
-			) {
-				info.autoMemoCaptures = [...captures].sort();
-				info.autoMemoImportedComponents = [...importedComponents].sort();
-				info.autoMemoMayReadContext = mayReadContext;
-				autoMemoCapturesChanged = true;
-			}
+	// Pull live imported captures through the safe same-module call graph. Work
+	// flows from a dependency to its dependents, so declaration order cannot turn
+	// an A -> B -> C chain into one whole-module scan per edge. Pending deltas also
+	// let recursive components converge without repeatedly copying settled sets.
+	const autoMemoDependents = new Map();
+	const autoMemoPropagation = new Map();
+	const autoMemoQueue = [];
+	const enqueueAutoMemo = (name, state) => {
+		if (state.queued) return;
+		state.queued = true;
+		autoMemoQueue.push(name);
+	};
+	for (const [name, info] of ctx.componentInfo) {
+		if (!info.autoMemoSafe) continue;
+		const state = {
+			captures: new Set(info.autoMemoCaptures),
+			importedComponents: new Set(info.autoMemoImportedComponents),
+			mayReadContext: info.autoMemoMayReadContext,
+			pendingCaptures: [...info.autoMemoCaptures],
+			pendingImportedComponents: [...info.autoMemoImportedComponents],
+			pendingContext: info.autoMemoMayReadContext,
+			queued: false,
+		};
+		autoMemoPropagation.set(name, state);
+		if (
+			state.pendingCaptures.length > 0 ||
+			state.pendingImportedComponents.length > 0 ||
+			state.pendingContext
+		) {
+			enqueueAutoMemo(name, state);
 		}
+		for (const dependency of info.autoMemoComponentDeps) {
+			if (ctx.componentInfo.get(dependency)?.autoMemoSafe !== true) continue;
+			let dependents = autoMemoDependents.get(dependency);
+			if (dependents === undefined) {
+				autoMemoDependents.set(dependency, (dependents = []));
+			}
+			dependents.push(name);
+		}
+	}
+	for (let index = 0; index < autoMemoQueue.length; index++) {
+		const name = autoMemoQueue[index];
+		const state = autoMemoPropagation.get(name);
+		state.queued = false;
+		const pendingCaptures = state.pendingCaptures;
+		const pendingImportedComponents = state.pendingImportedComponents;
+		const pendingContext = state.pendingContext;
+		state.pendingCaptures = [];
+		state.pendingImportedComponents = [];
+		state.pendingContext = false;
+		for (const dependent of autoMemoDependents.get(name) ?? []) {
+			const dependentState = autoMemoPropagation.get(dependent);
+			let changed = false;
+			for (const capture of pendingCaptures) {
+				if (dependentState.captures.has(capture)) continue;
+				dependentState.captures.add(capture);
+				dependentState.pendingCaptures.push(capture);
+				changed = true;
+			}
+			for (const component of pendingImportedComponents) {
+				if (dependentState.importedComponents.has(component)) continue;
+				dependentState.importedComponents.add(component);
+				dependentState.pendingImportedComponents.push(component);
+				changed = true;
+			}
+			if (pendingContext && !dependentState.mayReadContext) {
+				dependentState.mayReadContext = true;
+				dependentState.pendingContext = true;
+				changed = true;
+			}
+			if (changed) enqueueAutoMemo(dependent, dependentState);
+		}
+	}
+	for (const [name, state] of autoMemoPropagation) {
+		const info = ctx.componentInfo.get(name);
+		info.autoMemoCaptures = [...state.captures].sort();
+		info.autoMemoImportedComponents = [...state.importedComponents].sort();
+		info.autoMemoMayReadContext = state.mayReadContext;
 	}
 	if (ctx.autoMemo) {
 		classifyStableHookfulChildCalls(ast.body, ctx);

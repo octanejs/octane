@@ -3070,5 +3070,13 @@
     "reference": "activity-bundle-model",
     "maxRatio": 0,
     "note": "The executed ordinary production bundle must tree-shake the optional Activity implementation. The shared reachability oracle verifies actual behavior before the diagnostic is accepted; existing bundle byte budgets are not loosened."
+  },
+  {
+    "suite": "tsrx-component-graph",
+    "op": "compile",
+    "target": "dependent-first",
+    "reference": "dependency-first",
+    "maxRatio": 1.25,
+    "note": "A 2,400-component live-import chain declared root-first must stay within 25% of the same graph declared leaf-first. Both orders verify every transitive witness and alternate measurement order; whole-module fixed-point rescans were about 2x slower."
   }
 ]

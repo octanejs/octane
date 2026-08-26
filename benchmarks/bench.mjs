@@ -732,6 +732,13 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		name: 'tsrx-component-graph',
+		cwd: 'tsrx-component-graph',
+		servers: [],
+		iter: { normal: 8, quick: 4 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Shipped-bytes comparison (Node-only): production `vite build` of each
 		// js-framework app with ONE normalized minify setting, reporting raw/gzip/
 		// brotli JS bytes per framework. Deterministic; the iteration knob is unused.
