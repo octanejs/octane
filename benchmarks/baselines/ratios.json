@@ -448,6 +448,14 @@
     "note": "Same-process jsdom development commits over read-only controlled text inputs. Linear diagnostic membership stays roughly flat per host; the benchmark measured the original whole-queue scan at 1.74x per host for 32k versus 4k, while the generation-stamped queue measured 0.94x. The 1.4x ceiling leaves timing headroom while catching the quadratic path."
   },
   {
+    "suite": "tsrx-nesting-diagnostics",
+    "op": "compile_per_1000_sites",
+    "target": "sites-2000",
+    "reference": "sites-500",
+    "maxRatio": 1.3,
+    "note": "Same-process development TSRX compilation with every emitted nesting validation parsed and checked. The original repeated serialization and whole-array scan measured 1.59x per invalid site at 2,000 versus 500 sites, while plan-local Set membership measured 1.07x. The 1.3x ceiling leaves timing headroom while catching the quadratic path."
+  },
+  {
     "suite": "behavior-root-events",
     "op": "resume_per_1000_events",
     "target": "events-8000",

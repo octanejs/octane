@@ -97,6 +97,7 @@ export const BENCHMARK_SUITES = [
 	'hook-memo',
 	'compiler-throughput',
 	'tsrx-component-graph',
+	'tsrx-nesting-diagnostics',
 	'bundle-size',
 	'bundle-reachability',
 	'three-renderer',

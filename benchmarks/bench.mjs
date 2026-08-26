@@ -739,6 +739,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Development TSRX compiler scaling: distinct authored HTML-nesting
+		// diagnostics at two sizes, normalized per invalid site in one process.
+		name: 'tsrx-nesting-diagnostics',
+		cwd: 'tsrx-nesting-diagnostics',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Shipped-bytes comparison (Node-only): production `vite build` of each
 		// js-framework app with ONE normalized minify setting, reporting raw/gzip/
 		// brotli JS bytes per framework. Deterministic; the iteration knob is unused.

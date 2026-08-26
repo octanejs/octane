@@ -20835,6 +20835,7 @@ function planJsx(
 	const previousNestingWarnings = ctx._clientNestingWarnings;
 	ctx._elemLocs = ctx.dev ? new Map() : null;
 	ctx._clientNestingWarnings = ctx.dev ? [] : null;
+	const nestingWarningIdentities = ctx.dev ? new Set() : null;
 	// NESTED HeadHoists lifted out of host-element children during the walk (see
 	// emitNodeHtml's element case) join this plan's head list, so client mounts
 	// match the server's any-depth hoisting. Saved/restored per plan: an @if
@@ -20953,7 +20954,12 @@ function planJsx(
 		const node = jsxNodes[rootI];
 		const nodeIsComp = node.type === 'Element' && isComponentTag(node);
 		if (ctx.dev && node.type === 'Element' && !nodeIsComp) {
-			collectClientHtmlNestingWarnings(node, ctx, parentNs === 'opaque' ? 'html' : parentNs);
+			collectClientHtmlNestingWarnings(
+				node,
+				ctx,
+				parentNs === 'opaque' ? 'html' : parentNs,
+				nestingWarningIdentities,
+			);
 		}
 		// Single non-comp Element: path=[] (lives at _root directly).
 		// Otherwise (wrapped in <octane-frag>): path=[htmlIdx] when HTML-contributing.
@@ -23873,7 +23879,7 @@ function emitNodeHtml(
 	return createTemplateIr();
 }
 
-function collectClientHtmlNestingWarnings(root, ctx, inheritedNamespace) {
+function collectClientHtmlNestingWarnings(root, ctx, inheritedNamespace, identities) {
 	const sourceLocation = (node) => {
 		const loc = node?.loc?.start;
 		return loc ? `${ctx.mapSourceName}:${loc.line}:${loc.column}` : undefined;
@@ -23881,7 +23887,8 @@ function collectClientHtmlNestingWarnings(root, ctx, inheritedNamespace) {
 	const append = (message) => {
 		if (message === null) return;
 		const identity = JSON.stringify(message);
-		if (!ctx._clientNestingWarnings.some((existing) => JSON.stringify(existing) === identity)) {
+		if (!identities.has(identity)) {
+			identities.add(identity);
 			ctx._clientNestingWarnings.push(message);
 		}
 	};
