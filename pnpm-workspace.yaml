@@ -564,7 +564,7 @@ catalogs:
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
-  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37 || 0.1.39 || 0.1.42 || 0.1.43 || 0.1.45 || 0.1.46
+  - octane@0.1.29 || 0.1.31 || 0.1.32 || 0.1.33 || 0.1.34 || 0.1.36 || 0.1.37 || 0.1.39 || 0.1.42 || 0.1.43 || 0.1.45 || 0.1.46 || 0.1.47
   - react-dropzone@20.0.0
   - '@tanstack/db@0.7.0'
   - '@oxc-tsrx/native-darwin-arm64@0.5.0'
@@ -595,3 +595,5 @@ minimumReleaseAgeExclude:
 # are published in the required @tsrx/core >= 0.1.60.
 patchedDependencies:
   '@changesets/cli@2.31.1': patches/@changesets__cli@2.31.1.patch
+  # Temporary until tsrx-org/tsrx#4 is released; remove this patch when that release is adopted.
+  '@tsrx/core@0.1.61': patches/@tsrx__core@0.1.61.patch
