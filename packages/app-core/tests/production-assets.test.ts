@@ -157,20 +157,34 @@ describe.each(['buffered', 'streaming'] as const)('%s production route assets', 
 		expect(html).toMatch(/<script(?=[^>]*data-octane-hydrate)(?=[^>]*nonce="asset-nonce")[^>]*>/);
 	});
 
-	it('only includes the matched page and its configured boundaries', async () => {
+	it('keeps matched page assets isolated across concurrent and subsequent requests', async () => {
 		const handler = createHandler(makeManifest(render), renderOptions);
-		const response = await handler(new Request('https://octane.test/other'));
-		const html = await response.text();
+		const selectedRequest = new Request('https://octane.test/selected/ready');
+		const [firstSelectedResponse, otherResponse] = await Promise.all([
+			handler(selectedRequest),
+			handler(new Request('https://octane.test/other')),
+		]);
+		const [firstSelected, other] = await Promise.all([
+			firstSelectedResponse.text(),
+			otherResponse.text(),
+		]);
+		const secondSelected = await (await handler(selectedRequest)).text();
 
-		expect(response.status).toBe(200);
-		expect(html).toContain('class="other"');
-		expect(assetHrefs(html, 'stylesheet')).toEqual([
+		expect(otherResponse.status).toBe(200);
+		expect(other).toContain('class="other"');
+		expect(assetHrefs(other, 'stylesheet')).toEqual([
 			'/assets/other.css',
 			'/assets/shared.css',
 			'/assets/pending.css',
 			'/assets/catch.css',
 		]);
-		expect(assetHrefs(html, 'modulepreload')).toEqual(['/assets/other.js']);
+		expect(assetHrefs(other, 'modulepreload')).toEqual(['/assets/other.js']);
+		expect(assetHrefs(secondSelected, 'stylesheet')).toEqual(
+			assetHrefs(firstSelected, 'stylesheet'),
+		);
+		expect(assetHrefs(secondSelected, 'modulepreload')).toEqual(
+			assetHrefs(firstSelected, 'modulepreload'),
+		);
 	});
 
 	it('keeps layout and boundary CSS when the page has no asset record', async () => {

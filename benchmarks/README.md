@@ -202,6 +202,7 @@ internally, get their own baseline and guard namespace.
 | `hydration-stress` | hydration-stress | none (builds) | withheld-chunk hydration, keyboard and pointer Send delivery, DOM adoption, and explicit replay/drop diagnostics at 6× CPU throttling |
 | `lifecycle-memory` | lifecycle-memory | none (builds) | 1,000+ effectful mount/update/unmount cycles, real listener/subscription/timer cleanup, post-teardown event probes, and explicitly collected Chromium heap across all six frameworks |
 | `controlled-form` | controlled-form | none (builds) | 512 controlled fields, real typing, DOM identity, focus and caret, validation cancellation, complete submit/reset, and native select/checkbox/radio correctness |
+| `dev-form-diagnostics` | dev-form-diagnostics | none (Node/jsdom) | development-only controlled-form diagnostic commit scaling at 4,000 and 32,000 hosts |
 | `external-store-fanout` | external-store-fanout | none (builds) | 512 subscribers, narrow and broad writes, rapid-write tearing checks, deterministic 100-notification work guards, and balanced subscription removal |
 | `external-store-integrations` | external-store-integrations | none (builds) | real Zustand stores, Jotai atoms, and TanStack Query caches with selector fan-out, query invalidation, and six-framework cleanup gates |
 | `store-selector-fanout` | store-selector-fanout | none (builds) | 512 subscribers reading one store through a `with-selector`-shaped selector, 20 unrelated parent re-renders with the store untouched, and deterministic selector-invocation counts beside render and snapshot counts |
@@ -209,6 +210,7 @@ internally, get their own baseline and guard namespace.
 | `scheduler-responsiveness` | scheduler-responsiveness | none (builds) | real controlled typing during eight 512-subscriber store updates at 6× CPU throttling, with focus, caret, frame, and notification gates |
 | `suspense-recovery` | suspense-recovery | none (builds) | six-framework visible async pending, rejection, retry, cancellation, and stale-response correctness |
 | `event-delegation` | event-delegation | none (builds) | 128 real native input events, 512 event-bearing hosts, capture/bubble accounting, and every controlled output |
+| `behavior-root-events` | behavior-root-events | none (headless Chromium) | queued events across 1,000 and 8,000 distinct async behavior adoptions, with FIFO/exactly-once gates |
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
 | `effectful-list` | effectful-list | Octane + reference frameworks | effect/ref cleanup churn |

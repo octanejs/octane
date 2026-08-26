@@ -5,6 +5,7 @@ import { createContext, createElement, flushSync, hydrateRoot } from '../src/ind
 import { act, flushEffects, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { AutoMemoApp } from './_fixtures/auto-memo.tsrx';
+import { CompilerNameCollisionApp } from './_fixtures/auto-memo-name-collisions.tsrx';
 import { ParentCaptureApp } from './_fixtures/auto-memo-parent-capture.tsrx';
 import {
 	TsxAutoMemoApp,
@@ -4722,6 +4723,37 @@ describe('compiler-owned component-region memoization', () => {
 			{ hmr: false, autoMemo: true },
 		).code;
 		expect(transitiveCapture.match(/const __memoDep[\w$]* = \(?live\)?;/g)).toHaveLength(2);
+	});
+
+	it('preserves authored locals that overlap compiler-generated names', () => {
+		const selections: string[] = [];
+		const root = mount(CompilerNameCollisionApp, {
+			first: 1,
+			second: 2,
+			third: 3,
+			fourth: 4,
+			fifth: 5,
+			sixth: 6,
+			onSelect: () => selections.push('selected'),
+		});
+
+		expect(root.find('#compiler-name-collision-total').textContent).toBe('21');
+		root.click('#compiler-name-collision');
+		expect(selections).toEqual(['selected']);
+
+		root.update(CompilerNameCollisionApp, {
+			first: 2,
+			second: 3,
+			third: 4,
+			fourth: 5,
+			fifth: 6,
+			sixth: 7,
+			onSelect: () => selections.push('updated'),
+		});
+		expect(root.find('#compiler-name-collision-total').textContent).toBe('27');
+		root.click('#compiler-name-collision');
+		expect(selections).toEqual(['selected', 'updated']);
+		root.unmount();
 	});
 
 	it('memoizes destructured-props callees while pattern-evaluating shapes fall back', () => {
