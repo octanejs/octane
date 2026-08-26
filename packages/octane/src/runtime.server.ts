@@ -2361,6 +2361,7 @@ export function ssrAttrs(
 		string,
 		readonly [name: string, value: unknown, firstOrder: number, lastOrder: number]
 	>();
+	let needsWinningOrderSort = false;
 	for (const writer of props.values()) {
 		const { rawName, value, firstOrder, lastOrder } = writer;
 		if (
@@ -2385,20 +2386,25 @@ export function ssrAttrs(
 		// SVG/MathML retain their case-sensitive qualified names.
 		const identity = namespace === 'html' ? name.toLowerCase() : name;
 		const previous = resolved.get(identity);
-		if (previous === undefined || previous[3] < lastOrder) {
-			resolved.set(identity, [
-				process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
-					? rawName
-					: name,
-				value,
-				firstOrder,
-				lastOrder,
-			]);
+		if (previous !== undefined) {
+			if (previous[3] >= lastOrder) continue;
+			// Map order already matches firstOrder unless a later raw alias replaces
+			// an earlier normalized identity without moving its Map entry.
+			needsWinningOrderSort = true;
 		}
+		resolved.set(identity, [
+			process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
+				? rawName
+				: name,
+			value,
+			firstOrder,
+			lastOrder,
+		]);
 	}
 
 	let out = '';
-	const ordered = [...resolved.values()].sort((a, b) => a[2] - b[2]);
+	const ordered = [...resolved.values()];
+	if (needsWinningOrderSort) ordered.sort((a, b) => a[2] - b[2]);
 	if (process.env.NODE_ENV !== 'production') {
 		devValidateSsrAriaProps(
 			ordered.map(([name]) => name),
