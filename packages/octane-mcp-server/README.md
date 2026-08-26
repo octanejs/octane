@@ -163,7 +163,7 @@ one manifest suite by name (`js-framework`, `todomvc`, `weather-app`,
 `controlled-form`, `external-store-fanout`, `external-store-integrations`,
 `scheduler-responsiveness`, `suspense-recovery`, `event-delegation`,
 `application-composition`, `scaling-curves`, `dev-form-diagnostics`,
-`behavior-root-events`, `activity`, `streaming-ssr`, `streaming-backpressure`,
+`behavior-root-events`, `router-dispatch`, `activity`, `streaming-ssr`, `streaming-backpressure`,
 `compiler-throughput`, `tsrx-component-graph`, `codegen-size`, `hook-memo`,
 `template-call-memo`, `bundle-size`, `bundle-reachability`, `three-renderer`,
 `three-bundle-size`, …)

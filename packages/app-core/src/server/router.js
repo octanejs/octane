@@ -14,20 +14,20 @@
 /**
  * @typedef {Object} CompiledRoute
  * @property {Route} route
- * @property {RegExp} pattern
+ * @property {string | RegExp} pattern
  * @property {string[]} paramNames
  * @property {number} specificity - Higher = more specific (static > param > catch-all)
  */
 
 /**
- * Convert a route path pattern to a RegExp
+ * Compile a route path into an exact string or capturing RegExp
  * Supports:
  * - Static segments: /about, /api/hello
  * - Named params: /posts/:id, /users/:userId/posts/:postId
  * - Catch-all: /docs/*slug
  *
  * @param {string} path
- * @returns {{ pattern: RegExp, paramNames: string[], specificity: number }}
+ * @returns {{ pattern: string | RegExp, paramNames: string[], specificity: number }}
  */
 function compilePath(path) {
 	/** @type {string[]} */
@@ -62,7 +62,9 @@ function compilePath(path) {
 		})
 		.join('/');
 
-	const pattern = new RegExp(`^${regexString || '/'}$`);
+	// Static paths are already exact matchers. Keep RegExp capture work for the
+	// parameter and catch-all routes that need it.
+	const pattern = paramNames.length === 0 ? path || '/' : new RegExp(`^${regexString || '/'}$`);
 	return { pattern, paramNames, specificity };
 }
 
@@ -98,24 +100,30 @@ export function createRouter(routes) {
 		 * @returns {RouteMatch | null}
 		 */
 		match(method, pathname) {
+			let normalizedMethod;
 			for (const { route, pattern, paramNames } of compiledRoutes) {
 				// Check method for ServerRoute
 				if (route.type === 'server') {
 					const methods = /** @type {ServerRoute} */ (route).methods;
-					if (!methods.includes(method.toUpperCase())) {
+					normalizedMethod ??= method.toUpperCase();
+					if (!methods.includes(normalizedMethod)) {
 						continue;
 					}
 				}
 
-				const match = pathname.match(pattern);
-				if (match) {
-					/** @type {Record<string, string>} */
-					const params = {};
-					for (let i = 0; i < paramNames.length; i++) {
-						params[paramNames[i]] = decodeURIComponent(match[i + 1]);
-					}
-					return { route, params };
+				if (typeof pattern === 'string') {
+					if (pathname === pattern) return { route, params: {} };
+					continue;
 				}
+
+				const match = pathname.match(pattern);
+				if (!match) continue;
+				/** @type {Record<string, string>} */
+				const params = {};
+				for (let i = 0; i < paramNames.length; i++) {
+					params[paramNames[i]] = decodeURIComponent(match[i + 1]);
+				}
+				return { route, params };
 			}
 			return null;
 		},
