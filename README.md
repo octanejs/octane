@@ -96,6 +96,10 @@ they are written down in
 - **Behavior-only roots for externally owned DOM.** Attach abortable behavior
   and delegated native events to server-rendered or independently streamed
   markup without rendering it or taking reconciliation ownership.
+- **Optional immutable render snapshots.** Add `"use strong"` to one module, or
+  enable Strong mode for an application, to catch detectable render-purity
+  violations and unlock conservative production memoization for snapshot
+  receiver methods.
 - **`class` / `className` composes clsx-style** everywhere: strings, arrays,
   objects, and nesting, at every apply site.
 - **A current-state getter.** `useState` and `useReducer` return

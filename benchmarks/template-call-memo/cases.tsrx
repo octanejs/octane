@@ -6,7 +6,9 @@ export function Rows({ rows, suffix, tick }: Props) @{
 		<output>{String(tick)}</output>
 		<ul>
 			@for (const row of rows; key row.id) {
-				<li data-row={row.id}><span>{row.read(suffix) as string}</span></li>
+				<li data-row={row.id}>
+					<span>{row.read(suffix) as string}</span>
+				</li>
 			}
 		</ul>
 	</section>
@@ -18,18 +20,17 @@ export function LoggedRows({ rows, suffix, tick }: Props) @{
 		<ul>
 			@for (const row of rows; key row.id) {
 				console.log('row', row.id);
-				<li data-row={row.id}><span>{row.read(suffix) as string}</span></li>
+				<li data-row={row.id}>
+					<span>{row.read(suffix) as string}</span>
+				</li>
 			}
 		</ul>
 	</section>
 }
 
-export function CapturedRows({
-	rows,
-	suffix,
-	tick,
-	onRows,
-}: Props & { onRows: (rows: readonly Row[]) => void }) @{
+export function CapturedRows({ rows, suffix, tick, onRows }: Props & {
+	onRows: (rows: readonly Row[]) => void;
+}) @{
 	<section>
 		<output>{String(tick)}</output>
 		<ul>

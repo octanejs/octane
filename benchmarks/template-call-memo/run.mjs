@@ -210,7 +210,10 @@ function exercise(bundle, observed) {
 						check();
 						assert.equal(rows.length, ROWS, 'remove uses the appended array');
 						assert.equal(rows.at(-1).id, ROWS, 'remove retains the appended row');
-						assert.ok(rows.every((item) => item.id !== 0), 'original row removed');
+						assert.ok(
+							rows.every((item) => item.id !== 0),
+							'original row removed',
+						);
 					});
 				} else {
 					phase('prepend', () => {
@@ -218,9 +221,7 @@ function exercise(bundle, observed) {
 						render();
 					});
 					phase('snapshot', () => {
-						rows = Object.freeze(
-							rows.map((item) => (item.id === 0 ? row(0, 'changed') : item)),
-						);
+						rows = Object.freeze(rows.map((item) => (item.id === 0 ? row(0, 'changed') : item)));
 						render();
 					});
 					phase('argument', () => {

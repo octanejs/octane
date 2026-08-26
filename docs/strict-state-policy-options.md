@@ -27,15 +27,21 @@ application-owned source: dependencies and separately manifested workspace
 packages retain their existing React-compatible behavior unless their own module
 opts in. Vite, Rspack, and Rsbuild also expose a `strong: true` plugin option.
 
-The shipped enforcement is **compile-time only**: it rejects statically provable
-state updates during render or synchronous effect setup and render-time
-`ref.current` writes. State initializers, `useLinkedState` reconcilers, and its
+The shipped contract is **compiler-owned**: Strong modules assert immutable
+render snapshots and pure render projections. The compiler rejects statically
+provable state updates during render or synchronous effect setup, render-time
+`ref.current` writes and state-snapshot mutations, and direct reads from known
+clock or randomness APIs. Production client builds may also memoize eligible
+statically named receiver methods while their snapshot inputs remain unchanged.
+State initializers, `useLinkedState` reconcilers, and its
 `sourceEqual`/`valueEqual` callbacks execute synchronously during render;
 genuinely deferred callbacks remain valid. `useLinkedState` replaces the
 originally proposed keyed-reset hook and compares sources with `Object.is` by
 default, including arrays; composite comparisons require `sourceEqual`.
 
-There is no runtime execution-phase guard, strict/compat hook-cell policy,
+These diagnostics are bounded rather than a whole-program purity proof, and
+imported live accessors do not become immutable merely because their caller is
+Strong. There is no runtime execution-phase guard, strict/compat hook-cell policy,
 package-manifest state-policy field, compatibility allowlist, package approval
 flow, or policy inventory. Published Octane packages ship authored source, not
 precompiled policy-bearing artifacts. See the current [Strong-mode

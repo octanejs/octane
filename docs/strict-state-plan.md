@@ -168,7 +168,7 @@ Three layers, with distinct jobs:
 
 | Layer | Current status | Intended role |
 | ----- | -------------- | ------------- |
-| Compiler | **Shipped**, opt-in Strong mode | Reject statically provable render/effect-setup updates and render-time ref writes with actionable diagnostics. |
+| Compiler | **Shipped**, opt-in Strong mode | Enforce the bounded immutable-snapshot and pure-render contract with actionable diagnostics, and admit eligible snapshot method calls to production client memoization. |
 | Runtime phase guard | **Not implemented**; historical proposal | Enforce a future runtime policy for user-callable setters/dispatchers in development and production. |
 | Dependency compatibility | **Shipped** through package containment | Keep dependencies and separate workspace packages in their existing mode unless their own module opts into Strong mode. |
 | Per-cell `stateWrites` policy | **Not implemented**; historical proposal | Attach a hypothetical strict/compat policy to hook cells if runtime enforcement is ever introduced. |

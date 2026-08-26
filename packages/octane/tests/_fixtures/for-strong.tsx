@@ -1,5 +1,5 @@
 /** @jsxImportSource octane */
-"use strong";
+'use strong';
 
 import { createContext, useContext, useState } from 'octane';
 import type { SnapshotListProps } from './for-strong.tsrx';

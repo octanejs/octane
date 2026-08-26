@@ -13,7 +13,9 @@ const EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
 const DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
 
 describe('Strong mode immutable render inputs', () => {
-	const component = (setup: string) => `import { useState, useReducer, useLinkedState } from 'octane';
+	const component = (
+		setup: string,
+	) => `import { useState, useReducer, useLinkedState } from 'octane';
 export function App(props) @{
   ${setup}
   <div />
@@ -105,7 +107,8 @@ export function App(props) @{
 	});
 
 	it('allows local copies, shadowed hooks, and snapshot methods without an array proof', () => {
-		const source = component(`const [state] = useState({ count: 0, sort() { return 1; }, set() { return 2; } });
+		const source =
+			component(`const [state] = useState({ count: 0, sort() { return 1; }, set() { return 2; } });
   const [items] = useState([2, 1]);
   const copy = { ...state };
   copy.count++;
@@ -280,7 +283,10 @@ export function App() @{
   <div />
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
-		const memo = source.replace('const [time] = useState(initialTime);', 'useMemo(initialTime, []);');
+		const memo = source.replace(
+			'const [time] = useState(initialTime);',
+			'useMemo(initialTime, []);',
+		);
 		expect(() => compile(memo, '/src/App.tsrx')).toThrow(RENDER_IMPURE_CALL);
 	});
 
@@ -2956,11 +2962,11 @@ export function App() {
 		expect(() => compile(source, '/src/App.tsx')).toThrow(RENDER_STATE_UPDATE);
 	});
 
-	it('does not ban nondeterministic render values', () => {
+	it('keeps opaque crypto methods outside the bounded purity diagnostics', () => {
 		const source = `"use strong";
 export function App() @{
-  const value = Date.now() + Math.random() + crypto.randomUUID();
-  <p>{value as string}</p>
+	  const value = crypto.randomUUID();
+	  <p>{value as string}</p>
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
