@@ -148,9 +148,9 @@ requirements, and optional fallbacks.
 
 <h2 id="strong-mode">Strong mode</h2>
 
-Strong mode asks the compiler to reject state, ref, and Effect Event patterns
-that make a component harder to follow. It is off by default, so you can try it
-in one file:
+Strong mode opts into immutable render snapshots and asks the compiler to reject
+detectable state, ref, Effect Event, and purity violations. It is off by default,
+so you can try it in one file:
 
 ```tsx
 'use strong';
@@ -209,6 +209,11 @@ A Strong module cannot:
   (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
 - Include a statically known Effect Event in explicit hook dependencies
   (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`).
+- Mutate a provable state snapshot while rendering
+  (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`).
+- Read a known clock or random source directly while rendering, such as
+  `Date.now()` or `Math.random()` (`OCTANE_STRONG_RENDER_IMPURE_CALL`). Lazy state
+  initialization may still capture an initial timestamp or random value.
 
 These checks follow provable synchronous calls through local helpers,
 `useCallback` and `useEffectEvent` results, and functions returned by analyzable
@@ -219,6 +224,14 @@ arrays retain their existing meaning and are never rewritten.
 Factories with unknown return values or complex control flow remain opaque.
 Dependency checks follow literal arrays, including statically selected or spread
 literals; they do not assume an aliased or externally produced array is unchanged.
+
+Production client builds may also memoize statically named member calls such as
+`item.format(prefix)`. Their receivers and inputs must be immutable snapshots;
+an opaque method must not return changing state behind the same receiver. Hooks,
+ref-backed reads, and unsupported call shapes stay conservative. Keep consumers
+of live library accessors in compatibility mode, or pass a snapshot into a
+separate Strong component. See
+[the memoization contract](/docs/differences-from-react#strong-mode).
 
 Use `useLinkedState` when state should reset or adjust after an input changes.
 Event handlers may update state normally. Genuinely deferred callbacks, effect

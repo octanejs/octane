@@ -97,8 +97,8 @@ valid.
 
 <h2 id="strong-mode">Strong mode is optional</h2>
 
-Strong mode helps catch state and ref patterns that React applications sometimes
-use as workarounds. Enable it for a single module with `"use strong"` before its
+Strong mode opts into immutable render snapshots and helps catch detectable
+state, ref, and purity violations. Enable it for a single module with `"use strong"` before its
 imports, or across your application with `compiler: { strong: true }` in
 `octane.config.ts`.
 
@@ -114,6 +114,33 @@ Use `useLinkedState` when editable state should follow a changing prop. Event
 handlers, genuinely deferred callbacks, effect cleanup, effects that synchronize
 external systems, and normal DOM or timer refs remain supported. Installed
 dependencies keep their existing behavior unless they opt in themselves.
+
+Strong also rejects render-time mutations of provable state snapshots and
+direct reads of known clocks or random sources, such as `Date.now()` and
+`Math.random()`. Events, effects, and lazy state initializers may obtain these
+values. The checks follow supported aliases and synchronous helpers, but cannot
+prove arbitrary imported code pure.
+
+Default compatibility mode conservatively reevaluates method calls: a stable
+receiver can hide changing state. React Compiler also identifies APIs with
+interior mutability, including TanStack Table v8, as
+[incompatible with memoization](https://react.dev/reference/eslint-plugin-react-hooks/lints/incompatible-library).
+
+In a Strong module, statically named render methods such as `item.format(prefix)`
+assert that unchanged receivers and inputs produce the same value. Production
+client builds can then reuse eligible regions and keyed rows. Hooks, ref-backed
+reads, dynamic methods, and opaque callback arguments remain conservative. Keep
+live library accessors in a compatibility-mode consumer, or pass an actual
+snapshot into a separate Strong component; opting in does not make a library's
+live objects immutable.
+
+Keys preserve surviving DOM nodes, not an exact evaluation count. A diagnostic
+`console.log` no longer disqualifies an otherwise eligible Strong row, but a
+handler such as `() => setItems(items.filter(...))` still captures `items`.
+Appending changes that capture, so the row must receive its current handler.
+Strong mode preserves those closure semantics. Logging can therefore differ
+across production, development, HMR, and profiling builds and is not a commit
+counter.
 
 <h2 id="events-and-dom">Events come from the browser</h2>
 

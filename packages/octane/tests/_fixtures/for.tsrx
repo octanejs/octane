@@ -111,8 +111,8 @@ export function setExternal(v: string) {
 // A render-time call through a MEMBER callee defeats the survivor short-circuit
 // entirely: `item.read()` reads mutable state through a STABLE item ref (the
 // TanStack Table header pattern — `header.column.getIsSorted()` flips while the
-// header object stays memoized), so the body must re-run on every parent render,
-// React-parity. Contrast DepPureList below: a bare module-var READ stays
+// header object stays memoized), so compatibility mode re-runs the body on parent
+// renders, like ordinary React without its compiler. Contrast DepPureList: a bare module-var READ stays
 // eligible (documented at-your-own-risk), and so does a call through a plain
 // identifier callee (PlainCalleeList) — the receiver is what carries the hazard.
 const callItems = [
