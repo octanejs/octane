@@ -232,7 +232,12 @@ memoization on that assertion for every user-authored render operation, includin
 local, imported, member, computed, and call-produced callees; calls with callback
 arguments; construction; and tagged templates. A name beginning with `use` does
 not change this contract or reintroduce Rules of Hooks. Actual hooks still belong
-in component or custom-hook setup, where the compiler assigns their slots.
+in component or custom-hook setup, where the compiler assigns their slots and
+preserves context, state, suspension, and effect lifecycles. Recognition uses
+built-in import provenance and transitive same-module custom-hook declarations, not a `use*`
+naming heuristic. Memo guards witness a callable, its receiver, and explicit
+arguments; derived receivers are represented by their producing operation and
+inputs rather than a transient result identity.
 
 The compiler checks the violations it can prove, but the analysis is deliberately
 bounded: an unknown call is assumed pure instead of disabling Strong memoization.

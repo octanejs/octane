@@ -133,7 +133,13 @@ assertion to every user-authored render operation—local, imported, static or
 computed member, call-produced, callback-bearing, constructed, or tagged—and can
 then reuse eligible regions and keyed rows. A `use*` name is not a purity oracle
 and does not reintroduce Rules of Hooks; actual hook calls stay in normal
-component or custom-hook setup and use compiler-assigned slots.
+component or custom-hook setup and use compiler-assigned slots. Built-ins are
+recognized by import provenance, and immutable same-module custom-hook declarations are
+followed to those built-ins, so aliases retain context, state, suspension, and
+effect lifecycle behavior. Projection guards witness a method/callable, its
+receiver, and its explicit arguments; derived receivers are witnessed through
+the operations and inputs that produce them rather than transient result
+identities.
 
 Strong diagnostics catch violations the compiler can prove. The analysis is
 bounded, so an unknown call is assumed pure rather than making memoization fall

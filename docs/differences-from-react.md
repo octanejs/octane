@@ -231,7 +231,15 @@ Production client builds can therefore condition eligible regions on their
 witnessed inputs without using `use*` spelling as a purity oracle. An ordinary
 function named `useFormat` is no less memoizable than `format`; Strong does not
 reintroduce React's Rules of Hooks through a naming heuristic. Actual hooks keep
-their compiler-owned setup semantics. Hiding hook state, a state getter,
+their compiler-owned setup semantics. The compiler recognizes built-in hooks by
+import provenance and follows immutable same-module custom-hook declarations to those
+built-ins; their context subscriptions, state cells, suspension points, and
+effect lifecycles remain outside ordinary projection caches.
+
+For an eligible operation, the cache guard witnesses the callable and its
+receiver as well as explicit arguments. A derived receiver such as
+`factory().read(input)` is represented by the factory, its receiver, and its
+arguments rather than by a transient returned-object identity. Hiding hook state, a state getter,
 `ref.current`, a clock or random value, mutable module state, or an external live
 store behind a render call violates the assertion because the result can change
 without a witnessed input changing.

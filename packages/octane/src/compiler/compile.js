@@ -4203,6 +4203,93 @@ function containsAutoMemoContextRead(root, ctx) {
 	return found;
 }
 
+const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext']);
+
+function autoMemoBuiltinHookName(call) {
+	if (call?.type !== 'CallExpression') return null;
+	const imported = call._octaneImportedHook ?? call._octaneHookRuntimeImportedHook;
+	if (imported !== undefined && AUTO_MEMO_SETUP_HOOK_NAMES.has(imported)) return imported;
+	if (
+		call._octaneUnboundCallee === true &&
+		call.callee?.type === 'Identifier' &&
+		AUTO_MEMO_SETUP_HOOK_NAMES.has(call.callee.name)
+	) {
+		return call.callee.name;
+	}
+	return null;
+}
+
+// Strong asserts that USER render operations are pure; it does not turn
+// compiler-owned hook setup into a projection. Resolve direct builtins from the
+// provenance attached by applyHookDependencies, then follow only immutable
+// same-module functions that really resolve at the call site. Hook-shaped
+// spelling alone is deliberately irrelevant: an ordinary `useFormat()` helper
+// remains eligible, while `function useTheme() { return useContext(...); }` is
+// kept on the lifecycle-aware path.
+function autoMemoCallExecutesSetupHook(call, ctx, active = new Set(), cycle = { hit: false }) {
+	if (autoMemoBuiltinHookName(call) !== null) return true;
+	const callee = unwrapTsExpr(call?.callee);
+	if (callee?.type !== 'Identifier') return false;
+	const name = callee.name;
+	const declaration = ctx?.moduleFunctionDeclarations?.get(name);
+	if (declaration === undefined) return false;
+	const cache = ctx.__autoMemoSetupHookFunctions ?? (ctx.__autoMemoSetupHookFunctions = new Map());
+	let containsHook = cache.get(name);
+	if (containsHook === undefined) {
+		if (active.has(name)) {
+			cycle.hit = true;
+			return false;
+		}
+		const enteredWithCycle = cycle.hit;
+		active.add(name);
+		containsHook = false;
+		const seen = new WeakSet();
+		function walk(node) {
+			if (containsHook || node == null || typeof node !== 'object') return;
+			if (Array.isArray(node)) {
+				for (const child of node) walk(child);
+				return;
+			}
+			if (seen.has(node)) return;
+			seen.add(node);
+			if (
+				node !== declaration &&
+				(node.type === 'ArrowFunctionExpression' ||
+					node.type === 'FunctionExpression' ||
+					node.type === 'FunctionDeclaration')
+			) {
+				return;
+			}
+			if (
+				node.type === 'CallExpression' &&
+				autoMemoCallExecutesSetupHook(node, ctx, active, cycle)
+			) {
+				containsHook = true;
+				return;
+			}
+			for (const key in node) {
+				if (AST_WALK_SKIP_KEYS.has(key)) continue;
+				walk(node[key]);
+			}
+		}
+		walk(declaration);
+		active.delete(name);
+		// A negative result reached through a cycle is not final: another member
+		// of that cycle may prove a hook later in the outer traversal. Positive
+		// proofs are final, and acyclic negatives remain worth caching.
+		if (containsHook || cycle.hit === enteredWithCycle) cache.set(name, containsHook);
+	}
+	if (!containsHook) return false;
+
+	// A component-local declaration can shadow the module function with the same
+	// name. Pay for lexical resolution only after the module target is known to
+	// contain setup hooks; ordinary Strong projections never allocate this pass.
+	const lexical = (ctx.autoMemoHookLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope = lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(call);
+	const binding = scope === undefined ? null : lexical.resolveBinding(scope, name);
+	return binding?.scope === lexical.rootScope;
+}
+
 /**
  * True when the body executes a call DURING render: CallExpression /
  * NewExpression / TaggedTemplateExpression in render-value position (holes,
@@ -4245,6 +4332,10 @@ function containsRenderCall(stmts, memoCtx = null) {
 			t === 'NewExpression' ||
 			t === 'TaggedTemplateExpression'
 		) {
+			if (memoCtx !== null && t === 'CallExpression' && autoMemoCallExecutesSetupHook(n, memoCtx)) {
+				found = true;
+				return;
+			}
 			const assumedPureOperation =
 				memoCtx?.strongMemo === true && (t === 'NewExpression' || t === 'TaggedTemplateExpression');
 			if (assumedPureOperation || (memoCtx !== null && plainCalleeIsMemoizable(n, memoCtx))) {
@@ -25977,6 +26068,31 @@ function collectAutoMemoDependencyExpressions(nodes) {
 			coveredRoots.add(name);
 		}
 	}
+	function addDependency(node) {
+		const expression = `\0${astStructuralKey(node)}`;
+		dependencies.add(expression);
+		// Keep the AST alongside the structural key so emit embeds the authored
+		// expression directly.
+		if (!dependencyNodes.has(expression)) dependencyNodes.set(expression, node);
+		if (!dependencyOrder.has(expression)) {
+			dependencyOrder.set(expression, autoMemoDependencyOrderKey(node));
+		}
+		for (const name of collectFreeIdentifiers(node, [])) coveredRoots.add(name);
+	}
+	function walkCallable(original) {
+		const callee = unwrapTsExpr(original);
+		if (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') {
+			// A method value alone is not a complete witness: inherited `.call`,
+			// `.apply`, `.bind`, and shared prototype methods retain one identity while
+			// the callable/receiver (and therefore `this`) changes. Track both.
+			if (isAutoMemoCalculationDependency(callee)) addDependency(callee);
+			else walk(callee);
+			walk(callee.object);
+			if (callee.computed) walk(callee.property);
+			return;
+		}
+		walk(callee);
+	}
 	function walk(original) {
 		const node = unwrapTsExpr(original);
 		if (!node || typeof node !== 'object') return;
@@ -25997,21 +26113,40 @@ function collectAutoMemoDependencyExpressions(nodes) {
 			node.type === 'LogicalExpression' ||
 			node.type === 'ConditionalExpression' ||
 			node.type === 'ChainExpression' ||
-			((node.type === 'MemberExpression' || node.type === 'CallExpression') && node.optional)
+			((node.type === 'MemberExpression' ||
+				node.type === 'OptionalMemberExpression' ||
+				node.type === 'CallExpression' ||
+				node.type === 'OptionalCallExpression') &&
+				node.optional)
 		) {
 			safe = false;
 			return;
 		}
-		if (isAutoMemoCalculationDependency(node)) {
-			const expression = `\0${astStructuralKey(node)}`;
-			dependencies.add(expression);
-			// Keep the AST alongside the structural key so emit embeds the authored
-			// expression directly.
-			if (!dependencyNodes.has(expression)) dependencyNodes.set(expression, node);
-			if (!dependencyOrder.has(expression)) {
-				dependencyOrder.set(expression, autoMemoDependencyOrderKey(node));
+		if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
+			walkCallable(node.callee);
+			walk(node.arguments);
+			return;
+		}
+		if (node.type === 'NewExpression') {
+			walk(node.callee);
+			walk(node.arguments);
+			return;
+		}
+		if (node.type === 'TaggedTemplateExpression') {
+			walkCallable(node.tag);
+			walk(node.quasi?.expressions);
+			return;
+		}
+		if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+			if (isAutoMemoCalculationDependency(node)) addDependency(node);
+			else {
+				walk(node.object);
+				if (node.computed) walk(node.property);
 			}
-			for (const name of collectFreeIdentifiers(node, [])) coveredRoots.add(name);
+			return;
+		}
+		if (isAutoMemoCalculationDependency(node)) {
+			addDependency(node);
 			return;
 		}
 		if (

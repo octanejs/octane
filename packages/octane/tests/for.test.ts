@@ -45,9 +45,18 @@ import {
 } from './_fixtures/for.tsrx';
 import {
 	CapturedSnapshotList,
+	StrongAliasedContextRows,
+	StrongCallableDependencies,
+	StrongConstructedResultProp,
+	StrongCustomHookContext,
+	StrongFactoryReadProp,
+	StrongMapJoinProp,
+	StrongSuspenseLayoutEffect,
+	StrongTheme,
 	SnapshotCalculation,
 	SnapshotMethodList,
 	WrappedSnapshotCalculation,
+	type StrongProjectorConstructor,
 	type SnapshotRow,
 } from './_fixtures/for-strong.tsrx';
 import { SnapshotMappedList } from './_fixtures/for-strong.js';
@@ -394,6 +403,242 @@ describe('Strong list methods preserve snapshot and event semantics', () => {
 		expect(selected).toEqual(['apricot']);
 		root.unmount();
 		container.remove();
+	});
+});
+
+describe('Strong memoization preserves dependency and setup semantics', () => {
+	it.each([
+		[
+			'member results after a call',
+			StrongMapJoinProp,
+			{ items: ['a', 'b'], project: (value: string) => value.toUpperCase() },
+			'#strong-map-join',
+			'A,B',
+		],
+		[
+			'method results from a factory',
+			StrongFactoryReadProp,
+			{ factory: () => ({ read: (value: string) => `read:${value}` }), value: 'a' },
+			'#strong-factory-read',
+			'read:a',
+		],
+		[
+			'properties of constructed values',
+			StrongConstructedResultProp,
+			{
+				Projector: class {
+					result: string;
+					constructor(value: string) {
+						this.result = `new:${value}`;
+					}
+				} satisfies StrongProjectorConstructor,
+				value: 'a',
+			},
+			'#strong-constructed-result',
+			'new:a',
+		],
+	] as const)(
+		'mounts component props containing %s',
+		(_label, Component, props, selector, value) => {
+			const r = mount(Component as any, props);
+			expect(r.find(selector).textContent).toBe(value);
+			r.unmount();
+		},
+	);
+
+	it('invalidates call helpers and method receivers when their immutable identities change', () => {
+		const make = function (this: { prefix: string }) {
+			const prefix = this.prefix;
+			return (value: string) => prefix + value;
+		};
+		const tag = function (this: { prefix: string }, _strings: TemplateStringsArray, value: string) {
+			return this.prefix + value;
+		};
+		const first = {
+			value: 'value',
+			format: (value: string) => `first:${value}`,
+			tagger: { prefix: 'first:', make },
+			template: { prefix: 'first:', tag },
+		};
+		const second = {
+			value: 'value',
+			format: (value: string) => `second:${value}`,
+			tagger: { prefix: 'second:', make },
+			template: { prefix: 'second:', tag },
+		};
+		const r = mount(StrongCallableDependencies, first);
+		for (const selector of [
+			'#strong-call',
+			'#strong-apply',
+			'#strong-bind',
+			'#strong-produced-callee',
+			'#strong-tag',
+		]) {
+			expect(r.find(selector).textContent).toBe('first:value');
+		}
+
+		r.update(StrongCallableDependencies, second);
+		for (const selector of [
+			'#strong-call',
+			'#strong-apply',
+			'#strong-bind',
+			'#strong-produced-callee',
+			'#strong-tag',
+		]) {
+			expect(r.find(selector).textContent).toBe('second:value');
+		}
+		r.unmount();
+	});
+
+	it.each([
+		[
+			'StrongMapJoinProp',
+			StrongMapJoinProp,
+			{ items: ['a', 'b'], project: (value: string) => value.toUpperCase() },
+			'#strong-map-join',
+			'A,B',
+		],
+		[
+			'StrongFactoryReadProp',
+			StrongFactoryReadProp,
+			{ factory: () => ({ read: (value: string) => `read:${value}` }), value: 'a' },
+			'#strong-factory-read',
+			'read:a',
+		],
+		[
+			'StrongConstructedResultProp',
+			StrongConstructedResultProp,
+			{
+				Projector: class {
+					result: string;
+					constructor(value: string) {
+						this.result = `new:${value}`;
+					}
+				} satisfies StrongProjectorConstructor,
+				value: 'a',
+			},
+			'#strong-constructed-result',
+			'new:a',
+		],
+	] as const)(
+		'hydrates %s component props without replacing the output',
+		(exportName, Component, props, selector, value) => {
+			const server = loadServerFixture('packages/octane/tests/_fixtures/for-strong.tsrx', {
+				compileOptions: { hmr: false, dev: false },
+			});
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = ServerRuntime.renderToString((server as any)[exportName], props).html;
+			const original = container.querySelector(selector);
+			const root = hydrateRoot(container, Component as any, props);
+			flushSync(() => {});
+			expect(container.querySelector(selector)).toBe(original);
+			expect(original?.textContent).toBe(value);
+			root.unmount();
+			container.remove();
+		},
+	);
+
+	it('hydrates and then invalidates changed callable and receiver identities', () => {
+		const make = function (this: { prefix: string }) {
+			const prefix = this.prefix;
+			return (value: string) => prefix + value;
+		};
+		const tag = function (this: { prefix: string }, _strings: TemplateStringsArray, value: string) {
+			return this.prefix + value;
+		};
+		const props = (prefix: string) => ({
+			value: 'value',
+			format: (value: string) => `${prefix}:${value}`,
+			tagger: { prefix: `${prefix}:`, make },
+			template: { prefix: `${prefix}:`, tag },
+		});
+		const first = props('first');
+		const second = props('second');
+		const selectors = [
+			'#strong-call',
+			'#strong-apply',
+			'#strong-bind',
+			'#strong-produced-callee',
+			'#strong-tag',
+		];
+		const server = loadServerFixture('packages/octane/tests/_fixtures/for-strong.tsrx', {
+			compileOptions: { hmr: false, dev: false },
+		});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = ServerRuntime.renderToString(
+			server.StrongCallableDependencies,
+			first,
+		).html;
+		const original = selectors.map((selector) => container.querySelector(selector));
+		const root = hydrateRoot(container, StrongCallableDependencies, first);
+		flushSync(() => {});
+		expect(selectors.map((selector) => container.querySelector(selector))).toEqual(original);
+
+		flushSync(() => root.render(StrongCallableDependencies, second));
+		for (const selector of selectors) {
+			expect(container.querySelector(selector)?.textContent).toBe('second:value');
+		}
+		root.unmount();
+		container.remove();
+	});
+
+	it('invalidates a child whose setup custom hook reads context', () => {
+		function ContextHost(props: { value: string }): OctaneNode {
+			return createElement(
+				StrongTheme.Provider,
+				{ value: props.value },
+				createElement(StrongCustomHookContext, { context: StrongTheme }),
+			);
+		}
+		const r = mount(ContextHost, { value: 'first' });
+		expect(r.find('#strong-custom-hook-context').textContent).toBe('first');
+		r.update(ContextHost, { value: 'second' });
+		expect(r.find('#strong-custom-hook-context').textContent).toBe('second');
+		r.unmount();
+	});
+
+	it('does not skip an aliased built-in hook in keyed-row setup', () => {
+		const r = mount(StrongAliasedContextRows);
+		expect(r.findAll('.strong-aliased-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		r.click('#strong-aliased-context-update');
+		expect(r.findAll('.strong-aliased-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		r.unmount();
+	});
+
+	it('reconnects cached-child layout effects after a Suspense reveal', async () => {
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const log: string[] = [];
+		let show!: () => void;
+		const r = mount(StrongSuspenseLayoutEffect, {
+			promise,
+			log,
+			bind: (next: () => void) => {
+				show = next;
+			},
+		});
+		await act(() => {});
+		expect(log).toEqual(['create']);
+
+		await act(() => show());
+		expect(r.find('#strong-layout-effect-pending').textContent).toBe('pending');
+		expect(log).toEqual(['create', 'destroy']);
+
+		await act(() => resolve('ready'));
+		expect(r.findAll('#strong-layout-effect-pending')).toHaveLength(0);
+		expect(r.find('#strong-async-child').textContent).toBe('ready');
+		expect(log).toEqual(['create', 'destroy', 'create']);
+		r.unmount();
 	});
 });
 
