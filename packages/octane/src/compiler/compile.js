@@ -4205,7 +4205,7 @@ function containsAutoMemoContextRead(root, ctx) {
 
 const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext']);
 
-function autoMemoBuiltinHookName(call) {
+function autoMemoBuiltinHookName(call, ctx) {
 	if (call?.type !== 'CallExpression' && call?.type !== 'OptionalCallExpression') return null;
 	const imported = call._octaneImportedHook ?? call._octaneHookRuntimeImportedHook;
 	if (imported !== undefined && AUTO_MEMO_SETUP_HOOK_NAMES.has(imported)) return imported;
@@ -4215,6 +4215,51 @@ function autoMemoBuiltinHookName(call) {
 		AUTO_MEMO_SETUP_HOOK_NAMES.has(call.callee.name)
 	) {
 		return call.callee.name;
+	}
+	if (call.type !== 'OptionalCallExpression' || ctx == null) return null;
+
+	// Optional calls are rebuilt after hook-dependency annotations have run, so
+	// some parser shapes do not retain those stamps. Recover provenance from the
+	// module imports plus the same lexical binding analysis used by the
+	// same-module hook graph. A shadowed helper named `useContext` is therefore
+	// still an ordinary Strong projection; spelling alone never makes it a hook.
+	const lexical =
+		ctx.autoMemoHookLexical ?? ctx.activityLexical ?? createLexicalAnalysis(ctx.activityModuleAst);
+	ctx.autoMemoHookLexical = lexical;
+	ctx.activityLexical ??= lexical;
+	const callee = unwrapTsExpr(call.callee);
+	if (callee?.type === 'Identifier') {
+		const scope = lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(call);
+		const binding = scope === undefined ? null : lexical.resolveBinding(scope, callee.name);
+		const importedName = ctx.octaneImportLocals?.get(callee.name);
+		if (
+			importedName !== undefined &&
+			AUTO_MEMO_SETUP_HOOK_NAMES.has(importedName) &&
+			binding?.scope === lexical.rootScope
+		) {
+			return importedName;
+		}
+		if (binding === null && AUTO_MEMO_SETUP_HOOK_NAMES.has(callee.name)) return callee.name;
+		return null;
+	}
+	if (
+		(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
+		callee.object?.type === 'Identifier'
+	) {
+		const property = callee.computed ? callee.property?.value : callee.property?.name;
+		if (
+			typeof property === 'string' &&
+			AUTO_MEMO_SETUP_HOOK_NAMES.has(property) &&
+			ctx.octaneImportNamespaces?.has(callee.object.name)
+		) {
+			const scope =
+				lexical.nodeScopes.get(callee.object) ??
+				lexical.nodeScopes.get(callee) ??
+				lexical.rootScope;
+			if (lexical.resolveBinding(scope, callee.object.name)?.scope === lexical.rootScope) {
+				return property;
+			}
+		}
 	}
 	return null;
 }
@@ -4330,7 +4375,7 @@ function autoMemoSetupHookFunctions(ctx) {
 				return;
 			}
 			if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
-				if (autoMemoBuiltinHookName(node) !== null) {
+				if (autoMemoBuiltinHookName(node, ctx) !== null) {
 					hookful.add(name);
 				} else {
 					const callee = unwrapTsExpr(node.callee);
@@ -4383,7 +4428,7 @@ function autoMemoSetupHookFunctions(ctx) {
 // remains eligible, while `function useTheme() { return useContext(...); }` is
 // kept on the lifecycle-aware path.
 function autoMemoCallExecutesSetupHook(call, ctx) {
-	if (autoMemoBuiltinHookName(call) !== null) return true;
+	if (autoMemoBuiltinHookName(call, ctx) !== null) return true;
 	const callee = unwrapTsExpr(call?.callee);
 	if (callee?.type !== 'Identifier') return false;
 	const name = callee.name;

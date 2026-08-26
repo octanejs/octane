@@ -620,11 +620,19 @@ describe('Strong memoization preserves dependency and setup semantics', () => {
 
 	it('does not skip an optional aliased built-in hook in keyed-row setup', () => {
 		const r = mount(StrongOptionalAliasedContextRows);
+		expect(r.findAll('.strong-optional-direct-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
 		expect(r.findAll('.strong-optional-context-row').map((row) => row.textContent)).toEqual([
 			'first',
 			'first',
 		]);
 		r.click('#strong-optional-context-update');
+		expect(r.findAll('.strong-optional-direct-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
 		expect(r.findAll('.strong-optional-context-row').map((row) => row.textContent)).toEqual([
 			'second',
 			'second',

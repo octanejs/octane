@@ -191,8 +191,12 @@ export function StrongOptionalAliasedContextRows() @{
 		</button>
 		<StrongTheme.Provider value={theme}>
 			@for (const item of items.slice(); key item.id) {
+				const directValue = useContext?.(StrongTheme);
 				const value = readContext?.(StrongTheme);
-				<span class="strong-optional-context-row">{value as string}</span>
+				<span class="strong-optional-context-pair">
+					<span class="strong-optional-direct-context-row">{directValue as string}</span>
+					<span class="strong-optional-context-row">{value as string}</span>
+				</span>
 			}
 		</StrongTheme.Provider>
 	</div>
