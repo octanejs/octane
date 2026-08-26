@@ -4206,11 +4206,11 @@ function containsAutoMemoContextRead(root, ctx) {
 const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext']);
 
 function autoMemoBuiltinHookName(call) {
-	if (call?.type !== 'CallExpression') return null;
+	if (call?.type !== 'CallExpression' && call?.type !== 'OptionalCallExpression') return null;
 	const imported = call._octaneImportedHook ?? call._octaneHookRuntimeImportedHook;
 	if (imported !== undefined && AUTO_MEMO_SETUP_HOOK_NAMES.has(imported)) return imported;
 	if (
-		call._octaneUnboundCallee === true &&
+		(call._octaneUnboundCallee === true || call.type === 'OptionalCallExpression') &&
 		call.callee?.type === 'Identifier' &&
 		AUTO_MEMO_SETUP_HOOK_NAMES.has(call.callee.name)
 	) {
@@ -4261,7 +4261,7 @@ function autoMemoCallExecutesSetupHook(call, ctx, active = new Set(), cycle = { 
 				return;
 			}
 			if (
-				node.type === 'CallExpression' &&
+				(node.type === 'CallExpression' || node.type === 'OptionalCallExpression') &&
 				autoMemoCallExecutesSetupHook(node, ctx, active, cycle)
 			) {
 				containsHook = true;
@@ -4332,7 +4332,11 @@ function containsRenderCall(stmts, memoCtx = null) {
 			t === 'NewExpression' ||
 			t === 'TaggedTemplateExpression'
 		) {
-			if (memoCtx !== null && t === 'CallExpression' && autoMemoCallExecutesSetupHook(n, memoCtx)) {
+			if (
+				memoCtx !== null &&
+				(t === 'CallExpression' || t === 'OptionalCallExpression') &&
+				autoMemoCallExecutesSetupHook(n, memoCtx)
+			) {
 				found = true;
 				return;
 			}
