@@ -1,8 +1,17 @@
 {
   "upstream": { "package": "@floating-ui/react", "version": "0.27.19" },
-  "surface": "Positioning (`useFloating`, ref-aware `arrow`, the `@floating-ui/dom` middleware re-exports, the floating tree), the full interaction-hook set (`useInteractions`, `useHover` + `safePolygon`, `useClick`, `useFocus`, `useDismiss`, `useRole`, `useClientPoint`, `useListNavigation`, `useTypeahead`), the component layer (`FloatingPortal`, `FloatingOverlay`, `FloatingFocusManager`, `FloatingArrow`, `FloatingList`, `Composite`), and transitions + `FloatingDelayGroup`.",
-  "divergences": ["`forwardRef` becomes octane's ref-as-prop."],
-  "ssr": "No dedicated SSR/hydration tests.",
-  "verified": "2026-07-05",
-  "notes": ["Not yet ported: the `inner`/`useInnerOffset` middleware pair."]
+  "provenance": {
+    "source": "https://github.com/floating-ui/floating-ui/tree/d8020ee98c702caa31fa9b4d929ca782c6b58c59/packages/react",
+    "license": "MIT",
+    "commit": "d8020ee98c702caa31fa9b4d929ca782c6b58c59",
+    "verification": "verified"
+  },
+  "surface": "Complete @floating-ui/react 0.27.19 export surface: positioning (`useFloating`, ref-aware `arrow`, and the framework-neutral middleware re-exports), floating tree and list primitives, every interaction hook, portals/overlays/focus management/arrows/composites, transitions, both delay-group APIs, and the deprecated `inner`/`useInnerOffset` pair. Runtime parity is executable and bounded: 272 adapted assertions pass compatibly, 29 remain executable expected-failure negative controls, and 6 upstream-declared skips are non-evidence.",
+  "divergences": [
+    "`ref-as-prop`: React forwardRef component APIs become Octane ref-as-prop APIs.",
+    "Twenty-nine upstream assertions remain executable expected-failure controls across ref/focus/effect scheduling, dynamic-child registration, iframe realms, render counts, React-only context fixtures, and list registration; audit/expected-failures.json names every case.",
+    "The combined Octane entry point cannot preserve every @floating-ui/react-dom-only type narrowing; the one-for-one adapted type program records those diagnostics explicitly."
+  ],
+  "ssr": "No dedicated SSR/hydration lane; the supported claims are client positioning and interactions.",
+  "verified": "2026-08-26"
 }

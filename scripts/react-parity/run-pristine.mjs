@@ -10,6 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const runners = new Map([
 	['alien-signals', { module: './alien-signals-pristine-runtime.mjs', label: 'Alien Signals' }],
 	['draggable', { module: './react-draggable-pristine-runtime.mjs', label: 'react-draggable' }],
+	['floating-ui', { module: './floating-ui-pristine-runtime.mjs', label: '@floating-ui/react' }],
 	['livestore', { module: './livestore-pristine-runtime.mjs', label: 'LiveStore' }],
 	[
 		'monaco-editor',

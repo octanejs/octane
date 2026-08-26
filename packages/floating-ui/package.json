@@ -33,7 +33,11 @@
   "files": [
     "src",
     "dist/cjs",
-    "README.md"
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE",
+    "LICENSE.upstream",
+    "LICENSE.react.upstream"
   ],
   "exports": {
     ".": {
@@ -46,7 +50,14 @@
   "scripts": {
     "build:cjs": "node ../../scripts/build-package-commonjs.mjs",
     "prepack": "pnpm build:cjs",
-    "test": "vitest run"
+    "test": "pnpm upstream:verify && node ../../scripts/react-parity/harness.mjs run-required --manifest packages/floating-ui/audit/react-parity.json && ../../node_modules/.bin/vitest run --root ../.. --project floating-ui",
+    "test:upstream": "node ../../scripts/react-parity/run-pristine.mjs floating-ui",
+    "test:adapted-upstream": "vitest run --config tests/adapted-vitest.config.ts",
+    "parity:evidence:generate": "node scripts/generate-parity-evidence.mjs",
+    "parity:evidence:check": "node scripts/generate-parity-evidence.mjs --check",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json",
+    "typecheck:pristine": "tsc --noEmit -p typetests/tsconfig.pristine.json",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
   },
   "dependencies": {
     "@floating-ui/dom": "catalog:default",
@@ -57,11 +68,31 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@radix-ui/react-checkbox": "1.0.4",
+    "@radix-ui/react-icons": "1.3.0",
+    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/react": "16.2.0",
+    "@testing-library/user-event": "14.6.1",
+    "@types/react": "18.3.19",
+    "@types/react-dom": "18.3.1",
+    "@tsrx/react": "catalog:default",
+    "@vitest/browser": "4.1.10",
     "@floating-ui/react": "catalog:default",
+    "@floating-ui/react-dom": "2.1.8",
     "esbuild": "catalog:default",
+    "clsx": "1.2.1",
     "octane": "workspace:*",
-    "react": "catalog:default",
-    "react-dom": "catalog:default",
-    "vitest": "catalog:default"
+    "playwright": "catalog:default",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-responsive": "9.0.2",
+    "resize-observer-polyfill": "1.5.1",
+    "tabbable-pristine": "npm:tabbable@6.2.0",
+    "typescript": "5.4.2",
+    "use-isomorphic-layout-effect": "1.2.1",
+    "vite": "catalog:default",
+    "vitest": "3.0.9",
+    "vitest-browser-react": "0.1.1"
   }
 }

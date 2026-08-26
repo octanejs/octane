@@ -1,0 +1,4 @@
+/tests/upstream/
+/.pristine-upstream-*/
+/.upstream-vitest-cache/
+/upstream/.octane-materialize.json
