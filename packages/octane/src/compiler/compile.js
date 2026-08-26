@@ -2480,9 +2480,10 @@ function rewriteAutoCallback(stmt, stable, componentLocals, ctx, invariant) {
 // what it keys on.
 //
 // A calculation is admitted on exactly the callee rule that governs regions
-// (plainCalleeIsMemoizable): the receiver of a member call can return a new
+// (plainCalleeIsMemoizable): in compatibility mode the receiver can return a new
 // answer while its own identity holds, and that hazard does not become safe
-// because the author named the result. `virtualizer.getVirtualItems()` in
+// because the author named the result. Strong modules explicitly opt into
+// snapshot receiver semantics. `virtualizer.getVirtualItems()` in
 // examples/pulseboard is the same shape as `header.column.getIsSorted()` — its
 // window moves with scroll while the virtualizer instance stays put — so
 // caching it froze a virtualized list mid-scroll. One rule, both paths.
@@ -2860,8 +2861,8 @@ function rewriteAutoCalculation(
 	// An arrow/function init is auto-callback's job, not ours.
 	if (FN_TYPES.has(init?.type)) return stmt;
 	if (!isPropCreationExpr(init, ctx)) return stmt;
-	// Every call reached during render must be a proven value projection — the
-	// same admission the region cache uses. A member call fails closed.
+	// Every call reached during render must satisfy the same projection contract
+	// the region cache uses. Compatibility-mode member calls fail closed.
 	const immutableProjection = immutableArrayProjection(init, immutableStates);
 	if (immutableProjection === null && containsRenderCall([init], ctx)) return stmt;
 	const deps = [];
@@ -4212,7 +4213,7 @@ function containsAutoMemoContextRead(root, ctx) {
  * item/deps a skipped survivor would have, so they can't go stale at render
  * time — the walk does not descend into function bodies or parameters.
  *
- * Passing `memoCtx` admits calls that are provable value projections — see
+ * Passing `memoCtx` admits projections under the selected render contract — see
  * `plainCalleeIsMemoizable` for the contract and why callee shapes are
  * classified differently. Callers that need "no call executes here" for a reason
  * other than memo staleness (SSR item identity) omit it and keep every call.
@@ -4245,8 +4246,10 @@ function containsRenderCall(stmts, memoCtx = null) {
 			t === 'TaggedTemplateExpression'
 		) {
 			if (memoCtx !== null && plainCalleeIsMemoizable(n, memoCtx)) {
-				// The callee is a proven projection; its ARGUMENTS still carry the
-				// render-value contract, so `fmt(row.get())` stays disqualified.
+				// Admitting a call never admits the expressions that resolve its
+				// callee or arguments. In compatibility mode `fmt(row.get())` still
+				// fails closed; Strong mode applies its snapshot contract to each call.
+				walk(n.callee);
 				walk(n.arguments);
 				return;
 			}
@@ -4278,6 +4281,234 @@ function isHookCalleeName(name) {
 	return HOOK_NAME_CONVENTION_RE.test(name);
 }
 
+const STRONG_MEMO_OPAQUE_GLOBAL_NAMES = new Set([
+	'Date',
+	'Math',
+	'performance',
+	'crypto',
+	'globalThis',
+	'window',
+	'self',
+	'global',
+]);
+
+// Strong mode may trust an opaque receiver's snapshot contract, but visible
+// callbacks must not hide hook cells behind a newly admitted method call.
+// Names are deliberately conservative across scopes: a shadowed callback name
+// only declines an optimization. Factory results passed as arguments also stay
+// opaque; they may return a callback that the method invokes synchronously.
+function containsStrongMemoCallbackValue(root, names) {
+	const seen = new WeakSet();
+	function walk(node) {
+		if (node === null || typeof node !== 'object') return false;
+		if (Array.isArray(node)) return node.some(walk);
+		if (seen.has(node)) return false;
+		seen.add(node);
+		if (isDeferredRefRead(node)) return true;
+		if (FN_TYPES.has(node.type) || node.type === 'ClassExpression') return true;
+		if (node.type === 'Identifier') return isHookCalleeName(node.name) || names.has(node.name);
+		if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
+			return true;
+		}
+		if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+			return (
+				walk(node.object) ||
+				(node.computed
+					? walk(node.property)
+					: isHookCalleeName(node.property?.name) || names.has(node.property?.name))
+			);
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			if (
+				key === 'key' &&
+				(node.type === 'Property' || node.type === 'ObjectProperty') &&
+				!node.computed
+			)
+				continue;
+			if (walk(node[key])) return true;
+		}
+		return false;
+	}
+	return walk(root);
+}
+
+// Build the small dependency graph once, then propagate known hook aliases.
+// Ordinary method objects stay clean; only a reference to a hook or an already
+// tainted callable poisons its containing function/value. State-hook results
+// are snapshots, not aliases of the hook that produced them.
+function collectStrongMemoHookAliases(root) {
+	const aliases = new Set();
+	const dependents = new Map();
+	const visited = new WeakMap();
+	let opaqueStateTuple = false;
+	function references(name, owners) {
+		if (isHookCalleeName(name) || STRONG_MEMO_OPAQUE_GLOBAL_NAMES.has(name)) aliases.add(name);
+		if (owners.length === 0) return;
+		let targets = dependents.get(name);
+		if (targets === undefined) dependents.set(name, (targets = new Set()));
+		for (const owner of owners) targets.add(owner);
+	}
+	function targetNames(pattern) {
+		const names = new Set();
+		collectBindings(pattern, names);
+		if (pattern?.type === 'MemberExpression' && !pattern.computed && pattern.property?.name) {
+			names.add(pattern.property.name);
+		}
+		return [...names];
+	}
+	function walk(node, owners = []) {
+		if (opaqueStateTuple || node === null || typeof node !== 'object') return;
+		// Rewrites share subtrees. Visit each node only once per owner so sharing
+		// cannot multiply work, while a new enclosing value still gets its edges.
+		let previous = visited.get(node);
+		if (previous === undefined) visited.set(node, (previous = new Set()));
+		if (owners.length === 0) {
+			if (previous.has(null)) return;
+			previous.add(null);
+		} else {
+			owners = owners.filter((name) => {
+				if (previous.has(name)) return false;
+				previous.add(name);
+				return true;
+			});
+			if (owners.length === 0) return;
+		}
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child, owners);
+			return;
+		}
+		if (isDeferredRefRead(node)) {
+			for (const owner of owners) aliases.add(owner);
+			if (node.type === 'ObjectPattern') collectBindings(node, aliases);
+		}
+		if (node.type === 'Identifier') {
+			references(node.name, owners);
+			return;
+		}
+		if (node.type === 'ImportSpecifier') {
+			if (isHookCalleeName(node.imported?.name ?? node.imported?.value) && node.local?.name) {
+				aliases.add(node.local.name);
+			}
+			return;
+		}
+		if (
+			(node.type === 'FunctionDeclaration' ||
+				node.type === 'ClassDeclaration' ||
+				node.type === 'ClassExpression') &&
+			node.id?.name
+		) {
+			owners = [...owners, node.id.name];
+		} else if (
+			node.type === 'VariableDeclarator' ||
+			node.type === 'AssignmentExpression' ||
+			node.type === 'AssignmentPattern'
+		) {
+			const pattern = node.id ?? node.left;
+			const value = node.init ?? node.right;
+			const call = unwrapTsExpr(value);
+			const hook = stableHookCallName(call);
+			walk(pattern, owners);
+			if (hook === 'useState' || hook === 'useReducer' || hook === 'useLinkedState') {
+				// A retained tuple can launder its live getter through arbitrary
+				// indices and object wrappers. Keep this rare module on the existing
+				// compatibility memo path instead of guessing which element escapes.
+				if (pattern?.type !== 'ArrayPattern') {
+					opaqueStateTuple = true;
+					return;
+				}
+				collectBindings(pattern.elements[1], aliases);
+				collectBindings(pattern.elements[2], aliases);
+			}
+			// Follow a hook's supplied values, not the hook invocation itself:
+			// useState([]) is clean, but a supplied callback bag may hide hooks.
+			const callee = call?.type === 'CallExpression' ? unwrapTsExpr(call.callee) : null;
+			const calleeName =
+				hook ?? (callee?.type === 'Identifier' ? callee.name : callee?.property?.name);
+			if (calleeName !== undefined && isHookCalleeName(calleeName)) {
+				walk(call.callee, owners);
+				walk(call.arguments, [...owners, ...targetNames(pattern)]);
+			} else {
+				walk(value, [...owners, ...targetNames(pattern)]);
+			}
+			return;
+		} else if (
+			(node.type === 'Property' ||
+				node.type === 'ObjectProperty' ||
+				node.type === 'MethodDefinition' ||
+				node.type === 'PropertyDefinition' ||
+				node.type === 'ClassProperty') &&
+			(!node.computed || node.key?.type === 'Literal')
+		) {
+			const name = node.key?.name ?? node.key?.value;
+			if (typeof name === 'string') {
+				if (isHookCalleeName(name)) collectBindings(node.value, aliases);
+				walk(node.value, [...owners, name]);
+				return;
+			}
+		} else if (isJsxReturningMapCall(node)) {
+			// Returned JSX is folded to a keyed list after this pass. Carry the
+			// iterable's known hook-bearing values into the eventual item binding.
+			walk(node.callee.object, [...owners, ...targetNames(node.arguments[0].params[0])]);
+		} else if (node.type === 'JSXForExpression' || node.type === 'ForOfStatement') {
+			const pattern =
+				node.left?.type === 'VariableDeclaration' ? node.left.declarations?.[0]?.id : node.left;
+			walk(node.right, [...owners, ...targetNames(pattern)]);
+			for (const key in node) {
+				if (key === 'right' || AST_WALK_SKIP_KEYS.has(key)) continue;
+				walk(node[key], owners);
+			}
+			return;
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(node[key], owners);
+		}
+	}
+	walk(root);
+	if (opaqueStateTuple) return null;
+	const queue = [...aliases];
+	for (let index = 0; index < queue.length; index++) {
+		for (const name of dependents.get(queue[index]) ?? []) {
+			if (aliases.has(name)) continue;
+			aliases.add(name);
+			queue.push(name);
+		}
+	}
+	return aliases;
+}
+
+function strongMemberCalleeIsMemoizable(callee, ctx) {
+	if (
+		ctx?.strongMemo !== true ||
+		ctx._universalRuntimeUnit != null ||
+		callee?.type !== 'MemberExpression'
+	)
+		return false;
+	let receiver = callee;
+	while (receiver?.type === 'MemberExpression') {
+		if (
+			receiver.computed ||
+			receiver.property?.type !== 'Identifier' ||
+			receiver.property.name === 'current' ||
+			receiver.property.name === 'call' ||
+			receiver.property.name === 'apply' ||
+			receiver.property.name === 'bind' ||
+			isHookCalleeName(receiver.property.name) ||
+			ctx.strongMemoHookAliases.has(receiver.property.name)
+		)
+			return false;
+		receiver = unwrapTsExpr(receiver.object);
+	}
+	if (receiver?.type !== 'Identifier') return false;
+	if (isHookCalleeName(receiver.name) || ctx.strongMemoHookAliases.has(receiver.name)) return false;
+	// Strong does not turn clocks, randomness, or arbitrary global-object APIs
+	// into snapshot projections. Decline even a same-named local here; exact
+	// global provenance matters for diagnostics, not for this optional fast path.
+	if (STRONG_MEMO_OPAQUE_GLOBAL_NAMES.has(receiver.name)) return false;
+	return true;
+}
+
 /**
  * Is this call a memoizable value projection — `segText(seg, done)`,
  * `formatPrice(cents)`, `t('key')`?
@@ -4288,8 +4519,10 @@ function isHookCalleeName(name) {
  * in library bindings: reading mutable state through an object reachable from
  * the item or props, where neither the item ref nor any dep witnesses the change
  * (`header.column.getIsSorted()` flips while `header` stays the memoized
- * object). That hazard is carried by the RECEIVER, so a member callee always
- * fails closed.
+ * object). Compatibility mode therefore rejects every member callee. Strong
+ * modules explicitly assert immutable snapshots and pure render calls, so their
+ * production client regions can admit static non-hook receiver paths. Known
+ * callbacks, refs, dynamic methods, clocks, and randomness remain opaque.
  *
  * A bare identifier callee is admitted ONLY when the binding it resolves to is
  * a module-scope immutable identity:
@@ -4301,7 +4534,7 @@ function isHookCalleeName(name) {
  *     own body is a pure projection (see moduleHelperIsPureProjection). Because
  *     we CAN read that body, we check it: `function sortIcon(h) { return
  *     h.getIsSorted(); }` is the receiver hazard moved one call frame away and
- *     must fail closed exactly like the direct member call.
+ *     follows the same compatibility/Strong decision as the direct method.
  *
  * Everything else fails closed — in particular a COMPONENT-LOCAL callee. A local
  * `const read = () => item.read()` (or a local function declaration) wraps the
@@ -4322,9 +4555,19 @@ function isHookCalleeName(name) {
  * and React Compiler key on, and it is what the blanket call veto was
  * incidentally covering here.
  */
-function plainCalleeIsMemoizable(node, ctx) {
+function plainCalleeIsMemoizable(node, ctx, seen) {
 	if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return false;
 	const callee = node.callee;
+	if (ctx?.strongMemo === true) {
+		const hook = node._octaneImportedHook ?? node._octaneHookRuntimeImportedHook;
+		if (
+			(hook !== undefined && isHookCalleeName(hook)) ||
+			(callee?.type === 'Identifier' && ctx.strongMemoHookAliases.has(callee.name)) ||
+			containsStrongMemoCallbackValue(node.arguments, ctx.strongMemoHookAliases)
+		)
+			return false;
+		if (strongMemberCalleeIsMemoizable(callee, ctx)) return true;
+	}
 	if (callee?.type !== 'Identifier') return false;
 	const name = callee.name;
 	if (isHookCalleeName(name)) return false;
@@ -4332,20 +4575,21 @@ function plainCalleeIsMemoizable(node, ctx) {
 	// bare is not callable as a projection.
 	if (ctx?.importNamespaceNames?.has(name)) return false;
 	if (ctx?.importedNames?.has(name)) return true;
-	return moduleHelperIsPureProjection(name, ctx);
+	return moduleHelperIsPureProjection(name, ctx, seen);
 }
 
 /**
  * Can a same-module `function` helper stand in for the value projection its call
- * site claims to be? True when its body performs no member-callee call, no
- * construction, and no tagged template in render-value position, and every plain
- * call it makes is itself an admitted projection.
+ * site claims to be? Every call in its body must satisfy the same admission
+ * rule as the call site, including Strong's explicitly opted-in member calls.
+ * Construction and tagged templates remain opaque in both modes.
  *
  * Cycles resolve to false: a recursive helper cannot be proven, and failing
  * closed is the safe direction. Nested function VALUES inside the helper are not
  * descended into for the same reason `containsRenderCall` skips them — they run
  * when invoked, not while the helper projects a value — but a helper that
- * *invokes* one through `.map(...)` trips the member-callee rule anyway.
+ * *invokes* one through `.map(...)` fails closed in compatibility mode and keeps
+ * Strong's callback-argument guard.
  */
 function moduleHelperIsPureProjection(name, ctx, seen) {
 	const decl = ctx?.moduleFunctionDeclarations?.get(name);
@@ -4379,18 +4623,11 @@ function moduleHelperIsPureProjection(name, ctx, seen) {
 			return;
 		}
 		if (t === 'CallExpression' || t === 'OptionalCallExpression') {
-			const callee = n.callee;
-			if (callee?.type !== 'Identifier' || isHookCalleeName(callee.name)) {
+			if (!plainCalleeIsMemoizable(n, ctx, active)) {
 				pure = false;
 				return;
 			}
-			if (
-				!ctx.importedNames?.has(callee.name) &&
-				!moduleHelperIsPureProjection(callee.name, ctx, active)
-			) {
-				pure = false;
-				return;
-			}
+			walk(n.callee);
 			walk(n.arguments);
 			return;
 		}
@@ -7874,7 +8111,8 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	const analyzedAst = parseModule(source, cleanFilename);
 	analyzeTsrx(analyzedAst, cleanFilename);
 	adoptParserAst(analyzedAst);
-	assertStrongMode(analyzedAst, source, cleanFilename, options);
+	const strongModeEnabled =
+		assertStrongMode(analyzedAst, source, cleanFilename, options)?.enabled === true;
 	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = analyzedAst;
 	const textTypedAst = applyStringChildProofs(
 		analyzedAst,
@@ -7902,6 +8140,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 		mode,
 		bundlerMetadata,
 		textTypedAst !== analyzedAst,
+		strongModeEnabled,
 	);
 }
 
@@ -7913,6 +8152,7 @@ function compileInternal(
 	mode,
 	bundlerMetadata,
 	hasStringChildProofs,
+	strongModeEnabled,
 ) {
 	const authoredSource = source;
 	const universalRuntime = normalizeUniversalRuntime(options?.universalRuntime);
@@ -7958,6 +8198,7 @@ function compileInternal(
 					mode,
 					null,
 					hasStringChildProofs,
+					strongModeEnabled,
 				),
 			options,
 			analyzedAst,
@@ -8004,6 +8245,7 @@ function compileInternal(
 				mode,
 				null,
 				hasStringChildProofs,
+				strongModeEnabled,
 			);
 			return compiled;
 		}
@@ -8137,6 +8379,7 @@ function compileInternal(
 					mode,
 					null,
 					hasStringChildProofs,
+					strongModeEnabled,
 				);
 				return compiled;
 			},
@@ -8259,6 +8502,8 @@ function compileInternal(
 	// a stale-UI report can be bisected memoizer-vs-elsewhere in one line.
 	const autoMemoEnabled =
 		options?.autoMemo !== false && !hmrEnabled && !devEnabled && !profileEnabled;
+	const strongMemoEnabled =
+		strongModeEnabled && autoMemoEnabled && mode === 'client' && options?.__universal == null;
 	// Like `autoMemo: false`, `inlineHookMemo: false` is a diagnostic escape
 	// hatch only: it re-routes useMemo/useCallback and parallel-use creations
 	// back through the runtime-callback form so a miscompare can be bisected
@@ -8283,6 +8528,7 @@ function compileInternal(
 	});
 	const universalUnits =
 		options?.__universalUnits ?? rendererBoundaryPreparation?.universalUnits ?? [];
+	const strongMemoHookAliases = strongMemoEnabled ? collectStrongMemoHookAliases(ast) : null;
 	const ctx = {
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
@@ -8293,6 +8539,8 @@ function compileInternal(
 		dev: devEnabled,
 		profile: profileEnabled,
 		autoMemo: autoMemoEnabled,
+		strongMemo: strongMemoHookAliases !== null,
+		strongMemoHookAliases,
 		// A split Hydrate query module is invoked as the existing server-rendered
 		// boundary body. Its sole component child must therefore keep the server's
 		// own component marker pair instead of borrowing the Hydrate block range.
@@ -26866,13 +27114,12 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			}
 		}
 		const hasNestedComp = containsComponentCallOrControlFlow(subStmts);
-		// A render-time call through a METHOD disqualifies the survivor
-		// short-circuit entirely: it can read state neither the item ref nor the
-		// deps tuple witnesses (`header.column.getIsSorted()` flips while `header`
-		// stays the memoized object), so a skipped body would render stale output —
-		// React re-runs bodies unconditionally. Property reads and plain-callee
-		// projections stay eligible (see plainCalleeIsMemoizable; the measured
-		// js-framework-benchmark/dbmon wins are read-only bodies).
+		// Compatibility mode keeps method calls live: an unchanged receiver can
+		// hide mutable state (`header.column.getIsSorted()` flips while `header`
+		// stays the same object). Strong production modules explicitly assert
+		// snapshot behavior and can admit static methods. Both modes still witness
+		// every capture, including callbacks that need the latest parent state;
+		// neither promise permits skipping hooks or ref reads.
 		const hasRenderCall = containsRenderCall(subStmts, ctx);
 		itemMemo =
 			ctx.autoMemo === true &&

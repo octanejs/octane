@@ -394,7 +394,8 @@ JavaScript. Only inject source you trust.
 
 ## Strong mode
 
-Strong mode is an optional compiler check for state, refs, and Effect Events.
+Strong mode is an optional immutable render-snapshot contract with compiler
+checks for state, refs, Effect Events, and detectable impure render calls.
 Start with one module by putting `"use strong"` before its imports:
 
 ```tsx
@@ -435,6 +436,12 @@ These patterns become compile errors:
   (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`).
 - Including a statically known Effect Event in an explicit hook dependency list
   (`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`).
+- Mutating a provable state snapshot during render, including supported aliases
+  and array mutations on state initialized with an array literal
+  (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`).
+- Calling unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`,
+  or `new Date()` without arguments during render
+  (`OCTANE_STRONG_RENDER_IMPURE_CALL`).
 
 The checks follow provable synchronous calls through local helpers,
 `useCallback` and `useEffectEvent` results, and functions returned by analyzable
@@ -451,8 +458,20 @@ or externally produced array is unchanged.
 Update state in event handlers instead. When state should reset or adjust after
 an input changes, use `useLinkedState`. Effects that connect to external systems,
 genuinely deferred callbacks, effect cleanup, and refs used for DOM elements,
-timers, or event callbacks remain valid. Strong mode does not restrict
-`Date.now()`, `Math.random()`, or similar values.
+timers, or event callbacks remain valid. Obtain changing timestamps or random
+values in events or effects and put them in state. A lazy state initializer such
+as `useState(() => new Date())` may also capture the initial value.
+
+Production client builds can memoize statically named member calls under this
+contract: an unchanged receiver and unchanged inputs must produce the same render
+value. Hooks, ref-backed reads, and opaque callback arguments retain their
+existing conservative treatment. Compiler diagnostics are bounded; an imported
+library with live accessors does not become snapshot-safe just because its
+caller opts in. Keep such consumers in compatibility mode, or pass snapshots to
+a Strong component. See
+[Automatic memoization and calls in templates](./differences-from-react.md#automatic-memoization-and-calls-in-templates)
+for the exact boundary and why changing event captures still invalidates keyed
+rows.
 
 `"use strong"` only affects its own module. Put it at the top of the file, before
 imports or other code; comments and other directives may come first. In files

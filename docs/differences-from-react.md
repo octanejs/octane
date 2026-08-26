@@ -179,8 +179,9 @@ hook calls inside a custom hook; it only declines to modify calls to wrappers.
 
 ## Automatic memoization and calls in templates
 
-Production builds automatically memoize component regions under the same
-pure-render, immutable-snapshot contract assumed by React Compiler:
+Production builds automatically memoize component regions. The default
+compatibility mode is conservative about calls whose receivers can hide mutable
+state:
 
 ```tsx
 {formatPrice(cents)} // May memoize: formatPrice is imported.
@@ -196,7 +197,7 @@ A call keeps its surrounding region memoizable only when the callee is an
 imported binding or an unreassigned same-module function whose body is itself a
 value projection. Arguments must satisfy the same rule.
 
-Member calls fail closed because the receiver may be a live object:
+In compatibility mode, member calls fail closed because the receiver may be a live object:
 `header.getIsSorted()` can return a new answer while `header` retains the same
 identity. A module helper that merely wraps that method has the same hazard and
 does not qualify. Component-local callees, hooks (including `unstable_use*`),
@@ -209,6 +210,57 @@ rendering belongs in state or context. Octane cannot read across a module
 boundary, so an imported helper is taken at its word — that is the one place
 this analysis trusts rather than proves, and it matches React Compiler's own
 assumption.
+
+This preserves ordinary React rendering for live receivers; it is not a promise
+to reproduce every React Compiler optimization. React Compiler also identifies
+APIs with interior mutability, including TanStack Table v8, as
+[incompatible with memoization](https://react.dev/reference/eslint-plugin-react-hooks/lints/incompatible-library).
+Stable function or object identity alone does not prove a result is unchanged.
+
+### Strong mode and render calls
+
+A module that opts into [`"use strong"`](#optional-strong-mode) asserts a stricter
+contract: props, state, context, and method receivers represent immutable render
+snapshots. An ordinary render method must be a value projection of those inputs;
+it must not secretly read changing state behind an unchanged receiver. This lets
+production client builds memoize statically named member calls such as
+`item.format(prefix)` and the same-module helpers that wrap them. No new runtime
+cache or global behavior change is involved.
+
+Hooks and ref-backed receivers such as `ref.current.read()` remain live. Dynamic
+method names, callback-bearing or call-produced arguments, and known clocks and
+randomness remain conservative. Strong mode is not a whole-program purity
+proof: imported code and opaque methods still have to honor the snapshot
+contract. Keep a component using live accessors in compatibility mode, or pass an
+actual snapshot into a separate Strong component. Enabling Strong on a caller
+does not make an imported library's live object immutable.
+
+### Keyed rows and logging
+
+A key preserves a surviving row's DOM identity; it does not promise that its
+JavaScript body runs only once. In Strong production builds, diagnostic calls
+such as `console.log('row', item.id)` no longer disqualify an otherwise eligible
+row from reuse. Logging frequency is not a render or commit contract, and can
+differ in development, HMR, and profiling builds.
+
+A changed captured value still invalidates a row, including captures inside its
+event handlers:
+
+```tsx
+onClick={() => setItems(items.filter((entry) => entry.id !== item.id))}
+```
+
+Appending changes `items`, so surviving rows must receive a handler for the new
+snapshot. Skipping that update could make removing an original row also discard
+the appended item. If removal should use the latest state, a functional update
+does not capture the parent array:
+
+```tsx
+onClick={() => setItems((current) => current.filter((entry) => entry.id !== item.id))}
+```
+
+The first form remains correct and supported. Strong mode does not change its
+closure semantics or promise to skip its reevaluation.
 
 ## Derived values are cached at their declaration
 
@@ -223,7 +275,7 @@ An eligible `const` keeps the same identity until its tracked component-local
 inputs change. This lets a region key on the identity of a derived value instead
 of seeing a new array or object on every render.
 
-The same callee rule governs declaration caching. The virtualizer call must stay
+The same callee rule governs declaration caching. In compatibility mode, the virtualizer call must stay
 live because its window can move while the virtualizer object keeps the same
 identity. Most member calls, including arbitrary `items.filter(...)` calls,
 therefore remain uncached.
@@ -318,8 +370,9 @@ The tuple also supports the same optional latest-value getter as `useState`.
 
 ## Optional Strong mode
 
-Strong mode adds compile-time checks for patterns that make rendering harder to
-reason about. Opt into one module with a directive before its imports:
+Strong mode opts into the immutable render-snapshot contract above and adds
+compile-time checks for detectable violations. Opt into one module with a
+directive before its imports:
 
 ```tsx
 "use strong";
@@ -338,6 +391,13 @@ and functions returned by analyzable `useMemo` factories. Calling a statically
 known Effect Event during render or including it in an explicit hook dependency
 list is also a compile error. The hooks themselves remain supported, and other
 explicit dependency lists retain their existing meaning.
+
+The compiler also rejects render-time writes through a provable state snapshot
+(`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`) and direct calls to known
+non-idempotent globals such as `Date.now()` and `Math.random()`
+(`OCTANE_STRONG_RENDER_IMPURE_CALL`). These checks follow supported aliases and
+synchronous helpers; they do not prove arbitrary method bodies or imported code
+pure. Lazy state initialization may obtain an initial timestamp or random value.
 
 Event handlers, genuinely deferred callbacks, effect cleanup, effects that
 synchronize an external system, and normal DOM or timer refs remain supported.

@@ -3094,5 +3094,69 @@
     "reference": "dependency-first",
     "maxRatio": 1.25,
     "note": "A 2,400-component live-import chain declared root-first must stay within 25% of the same graph declared leaf-first. Both orders verify every transitive witness and alternate measurement order; whole-module fixed-point rescans were about 2x slower."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "stable_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "Two 16-row immutable lists receive 32 unrelated visible parent updates. Strong mode must reuse unchanged receiver-method rows, including the fixture with production console logging. Every label and survivor identity is checked."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "insert_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Appending and prepending one row to each of two Strong lists may read only the four inserted rows. Stable keyed survivors have no changed snapshot, method argument, or event capture."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "snapshot_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Replacing one immutable row snapshot in each list may read only those two rows. Both changed labels must update while retaining their keyed DOM nodes."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "argument_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "A changed real method argument reaches all 36 current rows. Full output checks prevent an apparent saving obtained by retaining stale results."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "reorder_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "Reversing lists that do not read the item index must preserve order and survivor identity without repeating snapshot receiver calls."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "stable_logs",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "A production diagnostic console.log in a Strong keyed row must not defeat reuse across unrelated parent updates. The externally observed clean fixture still checks every row value and node identity."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "captured_append_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "The control's remove handlers capture the whole rows array, so appending legitimately invalidates survivors. At most 17 reads are needed, and clicking the original remove handler must retain the appended row."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "captured_remove_reads",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Removing the original row after append must preserve all 16 current survivors and their DOM identity, with no duplicate receiver reads."
   }
 ]

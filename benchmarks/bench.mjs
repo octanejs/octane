@@ -725,6 +725,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: () => [] }],
 	},
 	{
+		// Strong-mode keyed row reuse, with receiver calls observed outside the
+		// compiled source and DOM/event controls for every dependency change.
+		name: 'template-call-memo',
+		cwd: 'template-call-memo',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
 		name: 'compiler-throughput',
 		cwd: 'compiler-throughput',
 		servers: [],

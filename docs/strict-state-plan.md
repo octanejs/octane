@@ -32,7 +32,7 @@ composite sources need an explicit `sourceEqual` comparator. The optional
 `valueEqual` comparator and compiler-selected third getter are supported across
 client, server, hydration, and universal rendering.
 
-Strong mode is an optional **compiler check**, not a runtime state policy:
+Strong mode is an optional compiler contract, not a runtime state policy:
 
 ```ts
 // octane.config.ts
@@ -62,6 +62,12 @@ linked-state equality callbacks are render contexts too. Genuinely deferred
 callbacks and effect cleanup remain valid. There is no runtime phase guard,
 hook-cell policy, runtime-only enforcement, cleanup ban, or `stateWrites`
 configuration in the shipped model.
+
+Strong mode also opts into immutable render snapshots for production member-call
+memoization, with bounded state-snapshot mutation and nondeterministic-call
+diagnostics. Compatibility-mode consumers retain live-method behavior. See the
+current [call contract](./differences-from-react.md#automatic-memoization-and-calls-in-templates)
+for the optimization boundary and the limits of static enforcement.
 
 For current authoring guidance, see [State that follows another
 value](./tsrx-basics.md#state-that-follows-another-value),
@@ -162,7 +168,7 @@ Three layers, with distinct jobs:
 
 | Layer | Current status | Intended role |
 | ----- | -------------- | ------------- |
-| Compiler | **Shipped**, opt-in Strong mode | Reject statically provable render/effect-setup updates and render-time ref writes with actionable diagnostics. |
+| Compiler | **Shipped**, opt-in Strong mode | Enforce the bounded immutable-snapshot and pure-render contract with actionable diagnostics, and admit eligible snapshot method calls to production client memoization. |
 | Runtime phase guard | **Not implemented**; historical proposal | Enforce a future runtime policy for user-callable setters/dispatchers in development and production. |
 | Dependency compatibility | **Shipped** through package containment | Keep dependencies and separate workspace packages in their existing mode unless their own module opts into Strong mode. |
 | Per-cell `stateWrites` policy | **Not implemented**; historical proposal | Attach a hypothetical strict/compat policy to hook cells if runtime enforcement is ever introduced. |

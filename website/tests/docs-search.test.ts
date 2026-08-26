@@ -148,12 +148,12 @@ describe('docs search ranking', () => {
 		}
 	});
 
-	it('deep links Strong-mode searches to the build configuration guide', async () => {
+	it('deep links Strong-mode searches to the render contract guide', async () => {
 		const index = await loadSearchIndex();
 		const [top] = searchDocs(index, 'strong mode');
 
 		expect(top).toBeDefined();
-		expect(top.slug).toBe('build-tools');
+		expect(top.slug).toBe('differences-from-react');
 		expect(top.id).toBe('strong-mode');
 	});
 

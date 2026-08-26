@@ -295,9 +295,10 @@ On the first render, `previous` is `undefined`. When the source changes, it is
 Like `useState`, the hook also offers an optional third tuple item, `getValue`, for
 reading the latest value inside an async or delayed callback.
 
-<h3 id="strong-mode">Catch state mistakes with Strong mode</h3>
+<h3 id="strong-mode">Enforce render snapshots with Strong mode</h3>
 
-Strong mode is an optional compiler check. Add `"use strong"` before a module's
+Strong mode is an optional immutable render-snapshot contract with compiler
+checks. Add `"use strong"` before a module's
 imports to try it one file at a time, or set `compiler: { strong: true }` in
 `octane.config.ts` to cover your application.
 
@@ -318,6 +319,13 @@ also follows provable calls through `useCallback`, `useEffectEvent`, and functio
 returned by analyzable `useMemo` factories. A statically known Effect Event cannot
 be called during render or listed in explicit hook dependencies. These hooks
 remain supported, and other explicit dependency lists keep their existing meaning.
+
+Strong also rejects detectable state-snapshot mutations and direct clock or
+random reads during render. Lazy state initialization may still obtain an
+initial value. Production client builds can memoize statically named render
+methods under the snapshot contract; imported methods with hidden mutable state
+must stay in a compatibility-mode consumer. See
+[Strong mode and memoization](/docs/differences-from-react#strong-mode).
 
 Event handlers can still update state. Genuinely deferred callbacks, effect
 cleanup, effects that synchronize external systems, and refs for DOM nodes or

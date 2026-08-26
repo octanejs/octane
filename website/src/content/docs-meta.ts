@@ -153,7 +153,7 @@ export const docsMeta: DocMeta[] = [
 				title: 'Keep editable state in sync with useLinkedState',
 				level: 3,
 			},
-			{ id: 'strong-mode', title: 'Catch state mistakes with Strong mode', level: 3 },
+			{ id: 'strong-mode', title: 'Enforce render snapshots with Strong mode', level: 3 },
 			{ id: 'lists-and-conditions', title: 'Lists and conditions' },
 			{ id: 'context', title: 'Sharing data with context' },
 			{ id: 'refs-and-effects', title: 'Refs and effects' },

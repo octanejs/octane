@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import { createElement, flushSync, hydrateRoot, use, type OctaneNode } from '../src/index.js';
 import { act, mount } from './_helpers';
@@ -43,6 +43,23 @@ import {
 	setExternal,
 	setNestedConditionalActivityMode,
 } from './_fixtures/for.tsrx';
+import {
+	CapturedSnapshotList,
+	ContextArgumentMethodList,
+	RefMethodList,
+	SnapshotCalculation,
+	SnapshotMethodList,
+	WrappedSnapshotCalculation,
+	type SnapshotRow,
+} from './_fixtures/for-strong.tsrx';
+import { ComputedHookMappedRows, SnapshotMappedList } from './_fixtures/for-strong.tsx';
+import {
+	AliasedRefMethodRows,
+	ComputedHookMethodRows,
+	DestructuredRefMethodRows,
+	RefArgumentMethodRows,
+} from './_fixtures/for-strong-hooks.tsrx';
+import { TupleGetterMethodRows } from './_fixtures/for-strong-getter.tsrx';
 
 const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
 
@@ -207,12 +224,12 @@ describe('forBlock — a plain-callee projection stays reactive to its real inpu
 	});
 });
 
-describe('forBlock — render-time calls defeat the survivor short-circuit', () => {
-	it('a body calling an item method re-runs on every parent render (React parity)', () => {
+describe('forBlock — live methods in compatibility mode', () => {
+	it('keeps live item methods reactive in compatibility mode', () => {
 		// The TanStack Table header pattern: stable item refs whose methods read
 		// mutable state (`header.column.getIsSorted()`). Neither the item ref nor
 		// any dep changes, so a PURE/DEP-PURE skip would freeze the output — the
-		// compiler must classify call-bearing bodies as NORMAL.
+		// compatibility compiler must keep these bodies live.
 		const r = mount(CallBodyList);
 		expect(r.findAll('.cb-row').map((li) => li.textContent)).toEqual(['r1:tick0', 'r2:tick0']);
 
@@ -238,6 +255,206 @@ describe('forBlock — render-time calls defeat the survivor short-circuit', () 
 		]);
 		r.unmount();
 		setExternal('tick0');
+	});
+});
+
+describe('Strong list methods preserve snapshot and event semantics', () => {
+	const row = (id: number, label: string): SnapshotRow => ({
+		id,
+		label,
+		read(prefix) {
+			return prefix + this.label;
+		},
+	});
+
+	it.each([
+		['keyed templates', SnapshotMethodList],
+		['returned JSX', SnapshotMappedList],
+	])('updates snapshots, arguments, and captured callbacks in %s', (_dialect, Component) => {
+		const items = [row(1, 'apple'), row(2, 'banana')];
+		const selected: string[] = [];
+		const onSelect = (item: SnapshotRow) => selected.push('first:' + item.label);
+		const r = mount(Component, { items, prefix: 'old:', onSelect });
+		const original = r.findAll('li');
+		const editor = r.find('input') as HTMLInputElement;
+		editor.value = 'my draft';
+		const text = () => r.findAll('.snapshot-label').map((element) => element.textContent);
+		expect(text()).toEqual(['old:apple', 'old:banana']);
+
+		const appended = [...items, row(3, 'cherry')];
+		r.update(Component, { items: appended, prefix: 'old:', onSelect });
+		expect(text()).toEqual(['old:apple', 'old:banana', 'old:cherry']);
+		expect(r.findAll('li').slice(0, 2)).toEqual(original);
+		expect(r.find('input')).toBe(editor);
+		expect(editor.value).toBe('my draft');
+		r.click('li[data-id="1"] button');
+
+		r.update(Component, { items: appended, prefix: 'new:', onSelect });
+		expect(text()).toEqual(['new:apple', 'new:banana', 'new:cherry']);
+		const latestSelect = (item: SnapshotRow) => selected.push('latest:' + item.label);
+		r.update(Component, { items: appended, prefix: 'new:', onSelect: latestSelect });
+		r.click('li[data-id="1"] button');
+		expect(selected).toEqual(['first:apple', 'latest:apple']);
+
+		const replacement = row(1, 'apricot');
+		const reordered = [appended[2]!, replacement, items[1]!];
+		r.update(Component, { items: reordered, prefix: 'new:', onSelect: latestSelect });
+		expect(text()).toEqual(['new:cherry', 'new:apricot', 'new:banana']);
+		expect(r.findAll('li')[1]).toBe(original[0]);
+		expect(r.findAll('li')[2]).toBe(original[1]);
+		r.click('li[data-id="1"] button');
+		expect(selected).toEqual(['first:apple', 'latest:apple', 'latest:apricot']);
+
+		r.update(Component, { items: [replacement], prefix: 'last:', onSelect: latestSelect });
+		expect(text()).toEqual(['last:apricot']);
+		expect(r.find('li')).toBe(original[0]);
+		r.update(Component, { items: [], prefix: 'last:', onSelect: latestSelect });
+		expect(r.findAll('.snapshot-label')).toHaveLength(0);
+		r.update(Component, { items, prefix: 'restored:', onSelect });
+		expect(text()).toEqual(['restored:apple', 'restored:banana']);
+		r.unmount();
+	});
+
+	it('keeps appended items when an original row removes itself using the captured list', () => {
+		const diagnostic = vi.spyOn(console, 'log').mockImplementation(() => {});
+		const r = mount(CapturedSnapshotList);
+		try {
+			const original = r.findAll('.captured-row');
+			const text = () => r.findAll('.captured-row span').map((element) => element.textContent);
+			r.click('#captured-append');
+			expect(text()).toEqual(['apple', 'banana', 'cherry', 'item 4']);
+			expect(r.findAll('.captured-row').slice(0, 3)).toEqual(original);
+			r.click('.captured-row[data-id="1"] button');
+			expect(text()).toEqual(['banana', 'cherry', 'item 4']);
+
+			r.click('#captured-prepend');
+			r.click('#captured-reverse');
+			expect(text()).toEqual(['item 4', 'cherry', 'banana', 'item 5']);
+			expect(r.findAll('.captured-row')[2]).toBe(original[1]);
+			r.click('.captured-row[data-id="2"] button');
+			expect(text()).toEqual(['item 4', 'cherry', 'item 5']);
+			r.click('#captured-clear');
+			expect(r.find('.captured-empty').textContent).toBe('Empty');
+			r.click('#captured-append');
+			expect(text()).toEqual(['item 6']);
+		} finally {
+			r.unmount();
+			diagnostic.mockRestore();
+		}
+	});
+
+	it('keeps hooks in method arguments and ref-backed receivers live', () => {
+		const items = [row(1, 'apple'), row(2, 'banana')];
+		const context = mount(ContextArgumentMethodList, { items, prefix: 'first:' });
+		expect(labels(context)).toEqual(['first:apple', 'first:banana']);
+		context.update(ContextArgumentMethodList, { items, prefix: 'second:' });
+		expect(labels(context)).toEqual(['second:apple', 'second:banana']);
+		context.unmount();
+
+		const refItems = [{ id: 1, current: { read: () => 'first' } }];
+		const refs = mount(RefMethodList, { items: refItems });
+		expect(labels(refs)).toEqual(['first']);
+		refItems[0]!.current = { read: () => 'second' };
+		refs.update(RefMethodList, { items: refItems });
+		expect(labels(refs)).toEqual(['second']);
+		refs.unmount();
+	});
+
+	it.each([
+		['keyed templates', ComputedHookMethodRows],
+		['returned JSX', ComputedHookMappedRows],
+	])('keeps computed hook methods live in %s', (_dialect, Component) => {
+		const context = mount(Component, { value: 'first' });
+		expect(labels(context)).toEqual(['first']);
+		context.update(Component, { value: 'second' });
+		expect(labels(context)).toEqual(['second']);
+		context.update(Component, { value: 'third' });
+		expect(labels(context)).toEqual(['third']);
+		context.unmount();
+	});
+
+	it('keeps state getters inside stable method objects live', () => {
+		const getter = mount(TupleGetterMethodRows);
+		expect(labels(getter)).toEqual(['0']);
+		getter.click('#tuple-method-bump');
+		expect(labels(getter)).toEqual(['1']);
+		getter.click('#tuple-method-bump');
+		expect(labels(getter)).toEqual(['2']);
+		getter.unmount();
+	});
+
+	it.each([
+		['direct ref arguments', RefArgumentMethodRows],
+		['ref value aliases', AliasedRefMethodRows],
+		['destructured ref values', DestructuredRefMethodRows],
+	])('observes event mutations through %s', (_shape, Component) => {
+		const refs = mount(Component);
+		expect(labels(refs)).toEqual(['first']);
+		refs.click('#mutate-ref');
+		expect(labels(refs)).toEqual(['second']);
+		refs.unmount();
+	});
+
+	it.each([
+		['direct methods', SnapshotCalculation],
+		['same-module wrappers', WrappedSnapshotCalculation],
+	])('updates calculations through %s when any input changes', (_shape, Component) => {
+		const first = row(1, 'apple');
+		const formatter = { read: (item: SnapshotRow, prefix: string) => prefix + item.label };
+		const r = mount(Component, { item: first, prefix: 'first:', formatter });
+		expect(r.find('p').textContent).toBe('first:apple');
+		r.update(Component, { item: first, prefix: 'next:', formatter });
+		expect(r.find('p').textContent).toBe('next:apple');
+		const replacement = row(1, 'apricot');
+		r.update(Component, { item: replacement, prefix: 'next:', formatter });
+		expect(r.find('p').textContent).toBe('next:apricot');
+		r.update(Component, {
+			item: replacement,
+			prefix: 'next:',
+			formatter: { read: (item: SnapshotRow) => item.label + '!' },
+		});
+		expect(r.find('p').textContent).toBe('apricot!');
+		r.unmount();
+	});
+
+	it('adopts Strong method rows and preserves edits and current handlers after hydration', () => {
+		const items = [row(1, 'apple'), row(2, 'banana')];
+		const selected: string[] = [];
+		const props = {
+			items,
+			prefix: 'server:',
+			onSelect: (item: SnapshotRow) => selected.push(item.label),
+		};
+		const server = loadServerFixture('packages/octane/tests/_fixtures/for-strong.tsrx', {
+			compileOptions: { hmr: false, dev: false },
+		});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = ServerRuntime.renderToString(server.SnapshotMethodList, props).html;
+		const original = Array.from(container.querySelectorAll('li'));
+		const editor = container.querySelector('input')!;
+		editor.value = 'typed before hydration';
+		const root = hydrateRoot(container, SnapshotMethodList, props);
+		flushSync(() => {});
+		expect(Array.from(container.querySelectorAll('li'))).toEqual(original);
+		expect(container.querySelector('input')).toBe(editor);
+		expect(editor.value).toBe('typed before hydration');
+
+		flushSync(() =>
+			root.render(SnapshotMethodList, {
+				...props,
+				items: [row(1, 'apricot'), items[1]!],
+				prefix: 'client:',
+			}),
+		);
+		expect(
+			Array.from(container.querySelectorAll('.snapshot-label')).map((el) => el.textContent),
+		).toEqual(['client:apricot', 'client:banana']);
+		expect(Array.from(container.querySelectorAll('li'))).toEqual(original);
+		(container.querySelector('button') as HTMLButtonElement).click();
+		expect(selected).toEqual(['apricot']);
+		root.unmount();
+		container.remove();
 	});
 });
 
