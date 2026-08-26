@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
-import { posix as posixPath, relative, resolve, sep } from 'node:path';
+import { relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
