@@ -97,7 +97,7 @@
         {
           "path": "scripts/react-parity/hook-form-upstream-lib.mjs",
           "role": "support",
-          "sha256": "037d1cd3bfe6e91a1ed479c977e525a484d308d68109181705b71e658fd9a77d"
+          "sha256": "2db8c3a241c70135c362fa16405621e9a9fc4fafba3c1b20be78f8f2e44fc5c5"
         },
         {
           "path": "packages/hook-form/audit/upstream-patches/tests/upstream/__snapshots__/useFieldArray.test.tsx.snap.patch",

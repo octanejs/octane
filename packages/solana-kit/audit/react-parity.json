@@ -80,7 +80,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "87904edd7a2209e81c7aba9a6912c0ab7ebd68a2d6890e1371fb9f2498fe9595"
+          "sha256": "782ddd57cde9872250d6cde93c403879b4b3edc912af2302a6a28d27089ad131"
         },
         {
           "path": "packages/solana-kit/tests/upstream-vitest.config.ts",
@@ -226,7 +226,7 @@
         {
           "path": "scripts/react-parity/solana-kit-types.mjs",
           "role": "support",
-          "sha256": "96279ba452ea19bcb3759827bbd84b6c2acf0e46018eca2939095e6e4b571356"
+          "sha256": "1a34130505ba26d71779665ed44515e0aa6db47b77dbe200f820833f33ee232d"
         }
       ]
     }

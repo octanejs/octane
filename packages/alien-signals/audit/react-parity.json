@@ -80,7 +80,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "87904edd7a2209e81c7aba9a6912c0ab7ebd68a2d6890e1371fb9f2498fe9595"
+          "sha256": "782ddd57cde9872250d6cde93c403879b4b3edc912af2302a6a28d27089ad131"
         },
         {
           "path": "packages/alien-signals/audit/pristine-oracle-environment.json",
@@ -120,7 +120,7 @@
         {
           "path": "scripts/react-parity/alien-signals-runtime-lib.mjs",
           "role": "support",
-          "sha256": "add1e9bdffb4850a6836b76916b5d7f5efee7f6ad931ae09a98fa1a353761328"
+          "sha256": "f6503ad693b55f06da6e57ac09bf84cca6bff163bcbff3a9702ab060816dabc4"
         },
         {
           "path": "scripts/react-parity/alien-signals-types-lib.mjs",

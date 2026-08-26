@@ -417,7 +417,7 @@
         {
           "path": "scripts/react-parity/type-parity-lib.mjs",
           "role": "support",
-          "sha256": "ee82aa915902af6fd21def6305657a24b1f13b6fa346bd0e5d1706501cbbb093"
+          "sha256": "17225ed41987285358d9cc9dbd8e4c0ae174812b03b32ae02aeb0320daaf78e9"
         }
       ]
     },
@@ -460,7 +460,7 @@
         {
           "path": "scripts/react-parity/type-parity-lib.mjs",
           "role": "support",
-          "sha256": "ee82aa915902af6fd21def6305657a24b1f13b6fa346bd0e5d1706501cbbb093"
+          "sha256": "17225ed41987285358d9cc9dbd8e4c0ae174812b03b32ae02aeb0320daaf78e9"
         }
       ]
     },
@@ -503,7 +503,7 @@
         {
           "path": "scripts/react-parity/type-parity-lib.mjs",
           "role": "support",
-          "sha256": "ee82aa915902af6fd21def6305657a24b1f13b6fa346bd0e5d1706501cbbb093"
+          "sha256": "17225ed41987285358d9cc9dbd8e4c0ae174812b03b32ae02aeb0320daaf78e9"
         }
       ]
     },
@@ -546,7 +546,7 @@
         {
           "path": "scripts/react-parity/type-parity-lib.mjs",
           "role": "support",
-          "sha256": "ee82aa915902af6fd21def6305657a24b1f13b6fa346bd0e5d1706501cbbb093"
+          "sha256": "17225ed41987285358d9cc9dbd8e4c0ae174812b03b32ae02aeb0320daaf78e9"
         }
       ]
     },

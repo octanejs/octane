@@ -85,7 +85,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "87904edd7a2209e81c7aba9a6912c0ab7ebd68a2d6890e1371fb9f2498fe9595"
+          "sha256": "782ddd57cde9872250d6cde93c403879b4b3edc912af2302a6a28d27089ad131"
         },
         {
           "path": "packages/draggable/tests/upstream-vitest.config.ts",
