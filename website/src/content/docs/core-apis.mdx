@@ -295,7 +295,7 @@ On the first render, `previous` is `undefined`. When the source changes, it is
 Like `useState`, the hook also offers an optional third tuple item, `getValue`, for
 reading the latest value inside an async or delayed callback.
 
-<h3 id="strong-mode">Catch state mistakes with Strong mode</h3>
+<h3 id="strong-mode">Enforce render snapshots with Strong mode</h3>
 
 Strong mode is an optional immutable render-snapshot contract with compiler
 checks. Add `"use strong"` before a module's

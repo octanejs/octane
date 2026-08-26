@@ -1,4 +1,4 @@
-"use strong";
+'use strong';
 
 import { useMemo, useState } from 'octane';
 

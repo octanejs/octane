@@ -1,4 +1,4 @@
-"use strong";
+'use strong';
 
 import { createContext, useContext, useState } from 'octane';
 
@@ -72,7 +72,9 @@ export function CapturedSnapshotList() @{
 				<li class="captured-row" data-id={item.id}>
 					<span>{item.label as string}</span>
 					{console.log('eval:', item.id)}
-					<button onClick={() => setItems(items.filter((entry) => entry.id !== item.id))}>remove</button>
+					<button onClick={() => setItems(items.filter((entry) => entry.id !== item.id))}>
+						remove
+					</button>
 				</li>
 			} @empty {
 				<li class="captured-empty">Empty</li>
@@ -93,7 +95,9 @@ export function ContextArgumentMethodList({ items, prefix }: Omit<SnapshotListPr
 	</PrefixContext.Provider>
 }
 
-export function RefMethodList({ items }: {
+export function RefMethodList({
+	items,
+}: {
 	items: Array<{ id: number; current: { read(): string } }>;
 }) @{
 	<ul>

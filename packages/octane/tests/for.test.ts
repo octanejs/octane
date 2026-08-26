@@ -440,15 +440,16 @@ describe('Strong list methods preserve snapshot and event semantics', () => {
 		expect(container.querySelector('input')).toBe(editor);
 		expect(editor.value).toBe('typed before hydration');
 
-		flushSync(() => root.render(SnapshotMethodList, {
-			...props,
-			items: [row(1, 'apricot'), items[1]!],
-			prefix: 'client:',
-		}));
-		expect(Array.from(container.querySelectorAll('.snapshot-label')).map((el) => el.textContent)).toEqual([
-			'client:apricot',
-			'client:banana',
-		]);
+		flushSync(() =>
+			root.render(SnapshotMethodList, {
+				...props,
+				items: [row(1, 'apricot'), items[1]!],
+				prefix: 'client:',
+			}),
+		);
+		expect(
+			Array.from(container.querySelectorAll('.snapshot-label')).map((el) => el.textContent),
+		).toEqual(['client:apricot', 'client:banana']);
 		expect(Array.from(container.querySelectorAll('li'))).toEqual(original);
 		(container.querySelector('button') as HTMLButtonElement).click();
 		expect(selected).toEqual(['apricot']);

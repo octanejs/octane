@@ -397,7 +397,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				return true;
 			}
 			for (const key in value) {
-				if (!SKIP_KEYS.has(key) && !key.startsWith('_octane') && containsJsx(value[key])) return true;
+				if (!SKIP_KEYS.has(key) && !key.startsWith('_octane') && containsJsx(value[key]))
+					return true;
 			}
 			return false;
 		}
@@ -2208,7 +2209,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						callee?.type === 'MemberExpression' &&
 						snapshotBinding(callee.object, scope)?.array === true &&
 						ARRAY_MUTATORS.has(
-							callee.computed ? staticPrimitiveValue(callee.property, scope) : callee.property?.name,
+							callee.computed
+								? staticPrimitiveValue(callee.property, scope)
+								: callee.property?.name,
 						)
 					) {
 						reportSnapshotMutation(callee);
