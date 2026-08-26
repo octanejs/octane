@@ -106,6 +106,7 @@ function maskNonCode(source) {
  * @param {string} id
  */
 function ownsServerModule(source, id) {
+	if (!source.includes('module') || !source.includes('server')) return false;
 	if (!SERVER_MODULE_CANDIDATE.test(maskNonCode(source))) return false;
 	const compiled = compile(source, id, { mode: 'server' });
 	return COMPILED_SERVER_NAMESPACE.test(maskNonCode(compiled.code));
