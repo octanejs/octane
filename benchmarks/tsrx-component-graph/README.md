@@ -12,6 +12,11 @@ analysis should not care about that ordinary function-hoisting choice.
 Both variants require zero diagnostics and exactly 2,399 emitted live-binding
 witnesses before their samples count.
 
+The declaration orders also pin the compiler's component-hoisting decision.
+`dependent-first` has 2,399 real references above their declarations, while
+`dependency-first` has none. The harness verifies both counts so the compiler
+can index those references once without changing module-evaluation semantics.
+
 ```bash
 node benchmarks/bench.mjs --quick --ratios tsrx-component-graph
 node benchmarks/bench.mjs tsrx-component-graph

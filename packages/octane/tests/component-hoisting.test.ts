@@ -91,6 +91,20 @@ describe('component hoisting — emission properties', () => {
 		expect(code).toContain('export function Chip(');
 	});
 
+	it('classifies multiple ordinary component names independently in both compile modes', () => {
+		const src =
+			'export const Registry = { component: Card2 };\n' +
+			"export const note = 'Unused3'; // Unused3 is still not a reference.\n" +
+			'function Card2() @{\n\t<p>card</p>\n}\n' +
+			'function Unused3() @{\n\t<p>unused</p>\n}\n' +
+			'export { Unused3 };\n';
+		for (const mode of ['client', 'server'] as const) {
+			const { code } = compile(src, 'App.tsrx', { mode });
+			expect(code).toMatch(/^function Card2\(/m);
+			expect(code).not.toMatch(/^function Unused3\(/m);
+		}
+	});
+
 	it('server compile mirrors the string-blindness (const form retained)', () => {
 		const src =
 			"export const Route = { path: '/Home' };\n" +
