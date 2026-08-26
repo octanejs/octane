@@ -54,6 +54,10 @@ import { patch_global_fetch, build_rpc_lookup, is_rpc_request } from '@ripple-ts
 
 export { resolveOctaneConfig } from '../resolve-config.js';
 
+const HEAD_MARKER = '<!--ssr-head-->';
+const BODY_MARKER = '<!--ssr-body-->';
+const BODY_CLOSE_TAG = /<\/body\s*>/i;
+
 // A server integration can reload its compiled manifest repeatedly while the
 // process (and global fetch) stays alive. Ripple's fetch patch is deliberately
 // idempotent, so calling it again cannot replace its closed-over handler or
@@ -125,6 +129,37 @@ function buildRpcDescriptors(rpcModules, hashFn) {
 }
 
 /**
+ * Split the immutable, validated production template around both insertion
+ * markers once. Dynamic head content is then concatenated into the prepared
+ * fragments without rescanning the complete template on every request.
+ *
+ * `splitSsrTemplate` historically revalidated after head insertion. Preserve
+ * that behavior on the exceptional path where inserted content could change
+ * the body-marker contract.
+ *
+ * @param {string} html
+ * @returns {(headContent: string) => string[]}
+ */
+function prepareSsrTemplate(html) {
+	const [prefix, suffix] = splitSsrTemplate(html);
+	const prefixHeadAt = prefix.indexOf(HEAD_MARKER);
+	const headInPrefix = prefixHeadAt !== -1;
+	const headAt = headInPrefix ? prefixHeadAt : suffix.indexOf(HEAD_MARKER);
+	const headSide = headInPrefix ? prefix : suffix;
+	const beforeHead = headSide.slice(0, headAt);
+	const afterHead = headSide.slice(headAt + HEAD_MARKER.length);
+
+	return (headContent) => {
+		const nextPrefix = headInPrefix ? beforeHead + headContent + afterHead : prefix;
+		const nextSuffix = headInPrefix ? suffix : beforeHead + headContent + afterHead;
+		if (headContent.includes(BODY_MARKER) || BODY_CLOSE_TAG.test(headContent)) {
+			return splitSsrTemplate(nextPrefix + BODY_MARKER + nextSuffix);
+		}
+		return [nextPrefix, nextSuffix];
+	};
+}
+
+/**
  * @typedef {import('@octanejs/app-core').RenderRoute} RenderRoute
  * @typedef {import('@octanejs/app-core').Middleware} Middleware
  * @typedef {import('@octanejs/app-core').Context} Context
@@ -156,8 +191,10 @@ export function createHandler(manifest, deps) {
 	const runtime = manifest.runtime;
 	validateSsrTemplate(htmlTemplate);
 	// Also pin the built-template contract up front. The marker is emitted by
-	// the integration's HTML transform and survives source hashing.
-	applyHydrationNonce(htmlTemplate, null);
+	// the integration's HTML transform and survives source hashing. Prepare the
+	// normalized no-nonce template once: this is the common request path, and its
+	// static fragments are identical for every request handled by this manifest.
+	const splitHydrationTemplate = prepareSsrTemplate(applyHydrationNonce(htmlTemplate, null));
 
 	// RPC lookup for statically imported `module server` functions
 	// (compiler hash → server function).
@@ -328,7 +365,7 @@ export function createHandler(manifest, deps) {
 		}
 
 		const headContent = [...preloadTags, dataScript].join('\n');
-		const noncedTemplate = applyHydrationNonce(htmlTemplate, nonce);
+		const noncedTemplate = nonce === null ? null : applyHydrationNonce(htmlTemplate, nonce);
 
 		const status = route.status ?? 200;
 		const headers = { 'Content-Type': 'text/html; charset=utf-8' };
@@ -346,8 +383,12 @@ export function createHandler(manifest, deps) {
 		// match, and this text now carries author-controlled metadata as well as
 		// the serialized route data.
 		/** @param {string} hoistedHead */
-		const splitAroundBody = (hoistedHead) =>
-			splitSsrTemplate(noncedTemplate.replace('<!--ssr-head-->', () => headContent + hoistedHead));
+		const splitAroundBody = (hoistedHead) => {
+			const completeHead = headContent + hoistedHead;
+			return noncedTemplate === null
+				? splitHydrationTemplate(completeHead)
+				: splitSsrTemplate(noncedTemplate.replace(HEAD_MARKER, () => completeHead));
+		};
 
 		if (manifest.render === 'buffered') {
 			// Await-everything fallback (`prerender` from octane/static): no

@@ -4,6 +4,7 @@
 // byte-compat path is covered end-to-end in production.test.ts.
 import { describe, it, expect } from 'vitest';
 import { createHandler } from '../src/server/production.js';
+import { HYDRATION_NONCE_PLACEHOLDER } from '../src/server/html-template.js';
 import { RenderRoute, ServerRoute } from '../src/routes.js';
 import { OCTANE_NONCE_STATE_KEY } from '../src/constants.js';
 
@@ -171,37 +172,50 @@ describe('createHandler', () => {
 		expect(missing.status).toBe(404);
 	});
 
-	it('threads a middleware CSP nonce through renderer and inline hydration scripts', async () => {
-		let rendererNonce: string | undefined;
+	it('isolates middleware CSP nonces across requests and threads them through SSR', async () => {
+		const rendererNonces: Array<string | undefined> = [];
 		let rendererSignal: AbortSignal | undefined;
 		const nonce = 'request-123"&';
+		const builtTemplate = TEMPLATE.replace(
+			' data-octane-hydrate',
+			` data-octane-hydrate nonce="${HYDRATION_NONCE_PLACEHOLDER}"`,
+		);
 		const handler = createHandler(
 			makeManifest({
 				middlewares: [
-					(context: { state: Map<string, unknown> }, next: () => Promise<Response>) => {
-						context.state.set(OCTANE_NONCE_STATE_KEY, nonce);
+					(context: { state: Map<string, unknown>; url: URL }, next: () => Promise<Response>) => {
+						if (context.url.searchParams.has('nonce')) {
+							context.state.set(OCTANE_NONCE_STATE_KEY, nonce);
+						}
 						return next();
 					},
 				],
 			}) as any,
 			{
 				...baseDeps,
+				htmlTemplate: builtTemplate,
 				renderToReadableStream: async (
 					_component: Function,
 					_props: unknown,
 					options: { nonce?: string; signal?: AbortSignal } | undefined,
 				) => {
-					rendererNonce = options?.nonce;
+					rendererNonces.push(options?.nonce);
 					rendererSignal = options?.signal;
 					return streamOf('<main>page</main>');
 				},
 			} as any,
 		);
-		const request = new Request('http://localhost/');
-		const html = await (await handler(request)).text();
-		expect(rendererNonce).toBe(nonce);
-		expect(rendererSignal).toBe(request.signal);
+		const plainRequest = new Request('http://localhost/');
+		const noncedRequest = new Request('http://localhost/?nonce');
+		const firstPlainHtml = await (await handler(plainRequest)).text();
+		const html = await (await handler(noncedRequest)).text();
+		const secondPlainHtml = await (await handler(plainRequest)).text();
+		expect(rendererNonces).toEqual([undefined, nonce, undefined]);
+		expect(rendererSignal).toBe(plainRequest.signal);
 		expect(html.match(/nonce="request-123&quot;&amp;"/g)).toHaveLength(2);
+		expect(firstPlainHtml).not.toContain(' nonce=');
+		expect(firstPlainHtml).not.toContain(HYDRATION_NONCE_PLACEHOLDER);
+		expect(secondPlainHtml).toBe(firstPlainHtml);
 	});
 
 	it('passes request Context.state to server route props without serializing it', async () => {
