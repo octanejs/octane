@@ -1,0 +1,59 @@
+{
+  "suite": "tsrx-component-graph",
+  "iterations": 8,
+  "targets": [
+    {
+      "name": "dependent-first",
+      "ops": {
+        "compile": {
+          "score": 547.9454081999996,
+          "median": 573.0002910000003,
+          "min": 497.684874999999,
+          "mean": 554.2704999999996,
+          "p95": 593.553042,
+          "sd": 34.6998367642841,
+          "rme": 5.234700256566655,
+          "scoreRme": 8.070372100966491,
+          "warmupRatio": 1.02152884799008,
+          "samples": 8,
+          "p99": 593.553042
+        }
+      },
+      "meta": {
+        "components": 2400,
+        "callEdges": 2399,
+        "liveBindingWitnesses": 2399,
+        "sourceBytes": 139419,
+        "outputBytes": 2101978,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "dependency-first",
+      "ops": {
+        "compile": {
+          "score": 568.8790668000004,
+          "median": 557.7939589999996,
+          "min": 538.6395000000002,
+          "mean": 569.1891512500002,
+          "p95": 633.2404169999991,
+          "sd": 34.540953307324955,
+          "rme": 5.074156494518103,
+          "scoreRme": 8.094480463119899,
+          "warmupRatio": 0.9881976968536257,
+          "samples": 8,
+          "p99": 633.2404169999991
+        }
+      },
+      "meta": {
+        "components": 2400,
+        "callEdges": 2399,
+        "liveBindingWitnesses": 2399,
+        "sourceBytes": 139419,
+        "outputBytes": 2064782,
+        "correctness": "pass"
+      }
+    }
+  ],
+  "harnessExit": 0
+}

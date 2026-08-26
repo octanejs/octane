@@ -96,6 +96,7 @@ export const BENCHMARK_SUITES = [
 	'codegen-size',
 	'hook-memo',
 	'compiler-throughput',
+	'tsrx-component-graph',
 	'bundle-size',
 	'bundle-reachability',
 	'three-renderer',
