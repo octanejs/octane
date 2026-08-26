@@ -196,6 +196,7 @@ catalogs:
     '@floating-ui/dom': ^1.8.0
     '@floating-ui/react': 0.27.19
     '@floating-ui/utils': ^0.2.12
+    '@formisch/react': 1.0.0-rc.0
     '@tanstack/form-core': 1.33.2
     '@tanstack/react-form': 1.33.2
     'aria-hidden': ^1.2.6
@@ -455,6 +456,7 @@ catalogs:
     three: 0.172.0
     type-fest: ^5.8.0
     typescript: ^5.9.3
+    valibot: ^1.4.1
     valtio: ^2.3.2
     vite: ^8.1.5
     astro: ^5.16.0

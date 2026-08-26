@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "components/Field/Field.test.tsx",
+      "upstreamSha256": "eb6ae89bce3e329e93154206a23c2c1392cfbb719ca469dc4a7ec68dd9e2cf6b",
+      "adaptedSha256": "ef185bca02eab6fcf6f1f81cc9b015e3ccd83419a04044d9192617436250ace5"
+    },
+    {
+      "path": "components/FieldArray/FieldArray.test.tsx",
+      "upstreamSha256": "9db08e0068f5653a76aea0de39f59a1df2e701efe8badaa63eae147975caa68c",
+      "adaptedSha256": "f016111e0a2909049c42cfbe2d47c714e995f99f52525b8201366cd406763362"
+    },
+    {
+      "path": "components/Form/Form.test.tsx",
+      "upstreamSha256": "69d167b0f2f6cb0502c1e2819e6053d634f19d0be6cfc5faf140518a14ff2b86",
+      "adaptedSha256": "a429c643618dc7787d8bac390713bc00039d1bb38696da0d817e67559545b395"
+    },
+    {
+      "path": "hooks/useField/useField.test.tsx",
+      "upstreamSha256": "230e8f20149d457b1b237e24573a83441480972b10c04864e92fb87cdc2cec82",
+      "adaptedSha256": "56ea9d94039d909c577a540bc2a9ec1667c277474a8966cb86e9d4822d8910e4"
+    },
+    {
+      "path": "hooks/useFieldArray/useFieldArray.test.tsx",
+      "upstreamSha256": "0487938cf2567fca2ea83286d9ce301ef527c2bcc46fd7f76bfc0dd32dbcdad7",
+      "adaptedSha256": "e0d01a75b423fa583e3f59087308508f23d8b05439910183ee6862d1f1571ab4"
+    },
+    {
+      "path": "hooks/useForm/useForm.test.tsx",
+      "upstreamSha256": "b19acb1028e531fe986d17592f98f3dd8183e3ed4c2261165296d294bb89f8d0",
+      "adaptedSha256": "43e58f751797951b9b140824c5c18f8f5a6b9ad430469203db1d113f76f5aba2"
+    },
+    {
+      "path": "hooks/useSignals/useSignals.test.tsx",
+      "upstreamSha256": "442d99419d851e81b5e9da146fb28d43e38bb5779a6dec1461f4700d6bac1219",
+      "adaptedSha256": "f156eaabdc34d6284837d92ec970b173dce0ce1bf9b690171968483f48e10ea0"
+    }
+  ]
+}

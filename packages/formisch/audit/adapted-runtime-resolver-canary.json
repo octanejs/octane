@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "formisch-adapted-resolver-canary",
+  "roots": ["packages/formisch/audit", "packages/formisch/tests/upstream/frameworks/react/src"],
+  "files": ["packages/formisch/audit/resolver-canary/resolver.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:ef102c338adda8bb",
+      "file": "packages/formisch/audit/resolver-canary/resolver.test.ts",
+      "fullName": "adapted core and methods tests resolve to the Octane source tree"
+    }
+  ]
+}

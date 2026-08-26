@@ -1,0 +1,1537 @@
+{
+  "schemaVersion": 1,
+  "project": "formisch-pristine-core",
+  "roots": ["packages/formisch/upstream/packages/core/src"],
+  "files": [
+    "packages/formisch/upstream/packages/core/src/array/copyItemState/copyItemState.test.ts",
+    "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+    "packages/formisch/upstream/packages/core/src/array/swapItemState/swapItemState.test.ts",
+    "packages/formisch/upstream/packages/core/src/field/focusFieldElement/focusFieldElement.test.ts",
+    "packages/formisch/upstream/packages/core/src/field/getDirtyFieldInput/getDirtyFieldInput.test.ts",
+    "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+    "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+    "packages/formisch/upstream/packages/core/src/field/getFieldInput/getFieldInput.test.ts",
+    "packages/formisch/upstream/packages/core/src/field/getFieldStore/getFieldStore.test.ts",
+    "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+    "packages/formisch/upstream/packages/core/src/field/setFieldBool/setFieldBool.test.ts",
+    "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+    "packages/formisch/upstream/packages/core/src/field/setInitialFieldInput/setInitialFieldInput.test.ts",
+    "packages/formisch/upstream/packages/core/src/field/walkFieldStore/walkFieldStore.test.ts",
+    "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+    "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+    "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+    "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:0e54bbcf8844f4d5",
+      "file": "packages/formisch/upstream/packages/core/src/array/copyItemState/copyItemState.test.ts",
+      "fullName": "copyItemState array fields should copy array state including items"
+    },
+    {
+      "id": "runtime:e2f2794d64db63a8",
+      "file": "packages/formisch/upstream/packages/core/src/array/copyItemState/copyItemState.test.ts",
+      "fullName": "copyItemState array fields should initialize missing children when copying larger array"
+    },
+    {
+      "id": "runtime:6e0e17f7e7b7c3f1",
+      "file": "packages/formisch/upstream/packages/core/src/array/copyItemState/copyItemState.test.ts",
+      "fullName": "copyItemState edge cases should handle null errors"
+    },
+    {
+      "id": "runtime:37df85f78c420404",
+      "file": "packages/formisch/upstream/packages/core/src/array/copyItemState/copyItemState.test.ts",
+      "fullName": "copyItemState object fields should copy nested object state recursively"
+    },
+    {
+      "id": "runtime:2310ba37ad5e4300",
+      "file": "packages/formisch/upstream/packages/core/src/array/copyItemState/copyItemState.test.ts",
+      "fullName": "copyItemState value fields should copy basic state between value fields"
+    },
+    {
+      "id": "runtime:21e86213ded0a34a",
+      "file": "packages/formisch/upstream/packages/core/src/array/copyItemState/copyItemState.test.ts",
+      "fullName": "copyItemState value fields should copy elements array"
+    },
+    {
+      "id": "runtime:35776735c26874e7",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState array fields should generate new IDs for items"
+    },
+    {
+      "id": "runtime:73a1bc88310c2b04",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState array fields should reset array field with new items"
+    },
+    {
+      "id": "runtime:cca3364d156f7919",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState array fields should reset non-nullish array to present empty when input is nullish"
+    },
+    {
+      "id": "runtime:24148e5a15cf82f4",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState array fields should reset nullish array to null when input is null"
+    },
+    {
+      "id": "runtime:f8b2846dcbc1e736",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState edge cases should initialize missing array children"
+    },
+    {
+      "id": "runtime:973f6ee34f005da4",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState edge cases should keep a non-nullish tuple at its fixed length when input is nullish"
+    },
+    {
+      "id": "runtime:e0288492242c47dd",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState edge cases should not grow a tuple beyond its fixed children"
+    },
+    {
+      "id": "runtime:2ae6f42fba2e40d9",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState elements should keep initialElements in sync when the store owns its array"
+    },
+    {
+      "id": "runtime:463bfb405742570f",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState elements should not touch initialElements when a reorder moved the elements"
+    },
+    {
+      "id": "runtime:d63509bf8671766b",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState keepStart should keep start input as the dirty baseline for value fields"
+    },
+    {
+      "id": "runtime:9791637c3e56a36d",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState keepStart should keep start items as the dirty baseline for array fields"
+    },
+    {
+      "id": "runtime:8f2ff3d3edb6329c",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState object fields should handle null input for object"
+    },
+    {
+      "id": "runtime:82a2088ecdc24981",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState object fields should reset object field and children"
+    },
+    {
+      "id": "runtime:d54ff924cdb70c2f",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState value fields should handle undefined input"
+    },
+    {
+      "id": "runtime:ff0c431e38d553f5",
+      "file": "packages/formisch/upstream/packages/core/src/array/resetItemState/resetItemState.test.ts",
+      "fullName": "resetItemState value fields should reset value field to new input"
+    },
+    {
+      "id": "runtime:6c24b2fdd7283925",
+      "file": "packages/formisch/upstream/packages/core/src/array/swapItemState/swapItemState.test.ts",
+      "fullName": "swapItemState array fields should initialize missing children in first array when second has more items"
+    },
+    {
+      "id": "runtime:08ae6a3b51d7cba2",
+      "file": "packages/formisch/upstream/packages/core/src/array/swapItemState/swapItemState.test.ts",
+      "fullName": "swapItemState array fields should initialize missing children in second array when first has more items"
+    },
+    {
+      "id": "runtime:b5131557d0b621c2",
+      "file": "packages/formisch/upstream/packages/core/src/array/swapItemState/swapItemState.test.ts",
+      "fullName": "swapItemState array fields should swap array state including items"
+    },
+    {
+      "id": "runtime:016d02a967ea1538",
+      "file": "packages/formisch/upstream/packages/core/src/array/swapItemState/swapItemState.test.ts",
+      "fullName": "swapItemState edge cases should handle swapping startInput values"
+    },
+    {
+      "id": "runtime:42c45aca5d5659b5",
+      "file": "packages/formisch/upstream/packages/core/src/array/swapItemState/swapItemState.test.ts",
+      "fullName": "swapItemState edge cases should swap items within same array (typical array reorder use case)"
+    },
+    {
+      "id": "runtime:d73ecc7218f8a39f",
+      "file": "packages/formisch/upstream/packages/core/src/array/swapItemState/swapItemState.test.ts",
+      "fullName": "swapItemState edge cases should swap nested objects within array items"
+    },
+    {
+      "id": "runtime:89188975d1ab2fe3",
+      "file": "packages/formisch/upstream/packages/core/src/array/swapItemState/swapItemState.test.ts",
+      "fullName": "swapItemState object fields should swap nested object state recursively"
+    },
+    {
+      "id": "runtime:827082e5199e2f42",
+      "file": "packages/formisch/upstream/packages/core/src/array/swapItemState/swapItemState.test.ts",
+      "fullName": "swapItemState value fields should swap basic state between value fields"
+    },
+    {
+      "id": "runtime:ea218cb12f1dc86e",
+      "file": "packages/formisch/upstream/packages/core/src/array/swapItemState/swapItemState.test.ts",
+      "fullName": "swapItemState value fields should swap elements arrays"
+    },
+    {
+      "id": "runtime:4e531d1525c90baf",
+      "file": "packages/formisch/upstream/packages/core/src/field/focusFieldElement/focusFieldElement.test.ts",
+      "fullName": "focusFieldElement should fall through to the next element when the first is not focusable"
+    },
+    {
+      "id": "runtime:017fd928900be317",
+      "file": "packages/formisch/upstream/packages/core/src/field/focusFieldElement/focusFieldElement.test.ts",
+      "fullName": "focusFieldElement should focus a connected element and return true"
+    },
+    {
+      "id": "runtime:bc60283309b34caa",
+      "file": "packages/formisch/upstream/packages/core/src/field/focusFieldElement/focusFieldElement.test.ts",
+      "fullName": "focusFieldElement should focus an element inside a shadow root and return true"
+    },
+    {
+      "id": "runtime:3abb2c1f7566c980",
+      "file": "packages/formisch/upstream/packages/core/src/field/focusFieldElement/focusFieldElement.test.ts",
+      "fullName": "focusFieldElement should focus the first focusable element when several exist"
+    },
+    {
+      "id": "runtime:325259563df11c50",
+      "file": "packages/formisch/upstream/packages/core/src/field/focusFieldElement/focusFieldElement.test.ts",
+      "fullName": "focusFieldElement should return false and focus nothing for a field without elements"
+    },
+    {
+      "id": "runtime:d6e8380fe3dbf91e",
+      "file": "packages/formisch/upstream/packages/core/src/field/focusFieldElement/focusFieldElement.test.ts",
+      "fullName": "focusFieldElement should skip a detached element and return false"
+    },
+    {
+      "id": "runtime:109e0ce24d067dba",
+      "file": "packages/formisch/upstream/packages/core/src/field/focusFieldElement/focusFieldElement.test.ts",
+      "fullName": "focusFieldElement should skip a disabled element and return false"
+    },
+    {
+      "id": "runtime:93d07d6b6bf974f7",
+      "file": "packages/formisch/upstream/packages/core/src/field/getDirtyFieldInput/getDirtyFieldInput.test.ts",
+      "fullName": "getDirtyFieldInput should include dirty leaves under a clean object parent"
+    },
+    {
+      "id": "runtime:91bd64de8828f900",
+      "file": "packages/formisch/upstream/packages/core/src/field/getDirtyFieldInput/getDirtyFieldInput.test.ts",
+      "fullName": "getDirtyFieldInput should omit clean siblings of a dirty value"
+    },
+    {
+      "id": "runtime:336ff0603a4b7a81",
+      "file": "packages/formisch/upstream/packages/core/src/field/getDirtyFieldInput/getDirtyFieldInput.test.ts",
+      "fullName": "getDirtyFieldInput should return the full current array when any item is dirty"
+    },
+    {
+      "id": "runtime:73f19bf4aa3f19b2",
+      "file": "packages/formisch/upstream/packages/core/src/field/getDirtyFieldInput/getDirtyFieldInput.test.ts",
+      "fullName": "getDirtyFieldInput should return the value when called directly on a dirty value field"
+    },
+    {
+      "id": "runtime:b2c6db2535ff9d40",
+      "file": "packages/formisch/upstream/packages/core/src/field/getDirtyFieldInput/getDirtyFieldInput.test.ts",
+      "fullName": "getDirtyFieldInput should return undefined when called directly on a clean value field"
+    },
+    {
+      "id": "runtime:e26bf4be15c49f40",
+      "file": "packages/formisch/upstream/packages/core/src/field/getDirtyFieldInput/getDirtyFieldInput.test.ts",
+      "fullName": "getDirtyFieldInput should return undefined when no field is dirty"
+    },
+    {
+      "id": "runtime:8bef985bef8a4470",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput checkbox inputs should return array of checked values for checkbox group"
+    },
+    {
+      "id": "runtime:23bfc97c490606de",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput checkbox inputs should return checked state for single checkbox"
+    },
+    {
+      "id": "runtime:43b0c0fc52882473",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput file inputs should return file for single file input"
+    },
+    {
+      "id": "runtime:45250e6c2e183544",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput file inputs should return files array for multiple file input"
+    },
+    {
+      "id": "runtime:a7b297b0c8e73cd9",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput radio inputs should return previous value when radio is not checked"
+    },
+    {
+      "id": "runtime:64bb3ed003e73acc",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput radio inputs should return value when radio is checked"
+    },
+    {
+      "id": "runtime:2c6f5dcc82e422f3",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput select inputs should exclude disabled options from multiple select"
+    },
+    {
+      "id": "runtime:0a9a2b19ef99d204",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput select inputs should return array for multiple select"
+    },
+    {
+      "id": "runtime:f1b176ac38513fcc",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput select inputs should return value for single select"
+    },
+    {
+      "id": "runtime:e89bf1060591c50c",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput text inputs should return value for email input"
+    },
+    {
+      "id": "runtime:0f112a0baae91a24",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput text inputs should return value for number input"
+    },
+    {
+      "id": "runtime:c1b823a6fa7b01ba",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput text inputs should return value for text input"
+    },
+    {
+      "id": "runtime:c04d0500820b5f94",
+      "file": "packages/formisch/upstream/packages/core/src/field/getElementInput/getElementInput.test.ts",
+      "fullName": "getElementInput textarea should return value for textarea"
+    },
+    {
+      "id": "runtime:fc7967664b3195f5",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+      "fullName": "getFieldBool array fields should return false when no array items have property"
+    },
+    {
+      "id": "runtime:0d164aa5688062d4",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+      "fullName": "getFieldBool array fields should return true when array item has property"
+    },
+    {
+      "id": "runtime:0cfe7d15aed13491",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+      "fullName": "getFieldBool array fields should return true when array itself has property"
+    },
+    {
+      "id": "runtime:fcb83a623ffab8d3",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+      "fullName": "getFieldBool deeply nested should find property in deeply nested structure"
+    },
+    {
+      "id": "runtime:c26c6544eef3d4c5",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+      "fullName": "getFieldBool object fields should return false when no nested fields have property"
+    },
+    {
+      "id": "runtime:7aa334e0a162b0a2",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+      "fullName": "getFieldBool object fields should return true when nested field has property"
+    },
+    {
+      "id": "runtime:489a084980966c0c",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+      "fullName": "getFieldBool object fields should return true when object itself has property"
+    },
+    {
+      "id": "runtime:42e3e27b9011e6e4",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+      "fullName": "getFieldBool value fields should check errors property"
+    },
+    {
+      "id": "runtime:89cb2e69b5366c4d",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+      "fullName": "getFieldBool value fields should check isDirty property"
+    },
+    {
+      "id": "runtime:0849fb9aa7256de5",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+      "fullName": "getFieldBool value fields should check isEdited property"
+    },
+    {
+      "id": "runtime:784633598394ac09",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+      "fullName": "getFieldBool value fields should return false when property is false"
+    },
+    {
+      "id": "runtime:98b547670ee7f825",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldBool/getFieldBool.test.ts",
+      "fullName": "getFieldBool value fields should return true when property is true"
+    },
+    {
+      "id": "runtime:2a78991f0208c4be",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldInput/getFieldInput.test.ts",
+      "fullName": "getFieldInput array fields should collect input from all items"
+    },
+    {
+      "id": "runtime:37ab80514a954a12",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldInput/getFieldInput.test.ts",
+      "fullName": "getFieldInput array fields should return empty array for empty array input"
+    },
+    {
+      "id": "runtime:45c45bc972ed6229",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldInput/getFieldInput.test.ts",
+      "fullName": "getFieldInput array fields should return null for nullish array input"
+    },
+    {
+      "id": "runtime:0dced934caff7501",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldInput/getFieldInput.test.ts",
+      "fullName": "getFieldInput nested structures should collect deeply nested input"
+    },
+    {
+      "id": "runtime:3cae84d6ad1ca05a",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldInput/getFieldInput.test.ts",
+      "fullName": "getFieldInput object fields should collect input from all children"
+    },
+    {
+      "id": "runtime:4511830e4f8a80a5",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldInput/getFieldInput.test.ts",
+      "fullName": "getFieldInput object fields should return null for nullish object input"
+    },
+    {
+      "id": "runtime:70da7524951840b0",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldInput/getFieldInput.test.ts",
+      "fullName": "getFieldInput object fields should return undefined for undefined object input"
+    },
+    {
+      "id": "runtime:abbf1d443fb3ba8a",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldInput/getFieldInput.test.ts",
+      "fullName": "getFieldInput value fields should return number value"
+    },
+    {
+      "id": "runtime:2c63c934fd58d847",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldInput/getFieldInput.test.ts",
+      "fullName": "getFieldInput value fields should return string value"
+    },
+    {
+      "id": "runtime:d6730d799305608e",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldInput/getFieldInput.test.ts",
+      "fullName": "getFieldInput value fields should return undefined for uninitialized field"
+    },
+    {
+      "id": "runtime:c514434b2683feb1",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldStore/getFieldStore.test.ts",
+      "fullName": "getFieldStore should return array item store"
+    },
+    {
+      "id": "runtime:dc5ff94f694baade",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldStore/getFieldStore.test.ts",
+      "fullName": "getFieldStore should return child store for single-key path"
+    },
+    {
+      "id": "runtime:e599d0ff41a6a774",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldStore/getFieldStore.test.ts",
+      "fullName": "getFieldStore should return deeply nested array item store"
+    },
+    {
+      "id": "runtime:5b6b564570f98056",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldStore/getFieldStore.test.ts",
+      "fullName": "getFieldStore should return nested store for multi-key path"
+    },
+    {
+      "id": "runtime:fa8bd6995b530e3b",
+      "file": "packages/formisch/upstream/packages/core/src/field/getFieldStore/getFieldStore.test.ts",
+      "fullName": "getFieldStore should return root store for empty path"
+    },
+    {
+      "id": "runtime:04efe26425639faf",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore array fields should initialize empty array"
+    },
+    {
+      "id": "runtime:456e857b6ccb46da",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore array fields should initialize with children for each item"
+    },
+    {
+      "id": "runtime:1ce29ae8414305bc",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore array fields should set input to true for array fields"
+    },
+    {
+      "id": "runtime:f76db644413674cf",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should apply configured empty input per type"
+    },
+    {
+      "id": "runtime:053a0132f89f5c33",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should apply configured empty input to nested and array children"
+    },
+    {
+      "id": "runtime:403b8623bd6d5f5e",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should default nested required string to empty string"
+    },
+    {
+      "id": "runtime:6a3b4d5fe3593c42",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should default number and boolean to undefined"
+    },
+    {
+      "id": "runtime:853316c0a6994973",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should default required piped string to empty string"
+    },
+    {
+      "id": "runtime:c4c8fdd42040c2ec",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should default required string to empty string"
+    },
+    {
+      "id": "runtime:16d2099d3be1eac3",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should keep a non-nullish inside a nullish as undefined"
+    },
+    {
+      "id": "runtime:594fac0831c958f0",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should keep a non-optional inside an optional as undefined"
+    },
+    {
+      "id": "runtime:27a773d03d845a95",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should keep nullable string as undefined"
+    },
+    {
+      "id": "runtime:9425cb4ff6179851",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should keep optional string as undefined"
+    },
+    {
+      "id": "runtime:de73f09686370b4c",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should not default required non-string to empty string"
+    },
+    {
+      "id": "runtime:a430e87d1e0b78e2",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should opt out of the empty string default"
+    },
+    {
+      "id": "runtime:f5e8da45cb5ae222",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should store whether a value field is nullish for resetting"
+    },
+    {
+      "id": "runtime:163849e5af9536b5",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore empty input config should use explicit initial input over empty string default"
+    },
+    {
+      "id": "runtime:6fffa4d397d32616",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore lazy schemas should unwrap lazy schema"
+    },
+    {
+      "id": "runtime:9ff247cb3cee89f7",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore lazy schemas should unwrap nested lazy schema"
+    },
+    {
+      "id": "runtime:41bd10052e715d1e",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore nullable/nullish + lazy + option schemas should initialize normally for nullable lazy variant with value"
+    },
+    {
+      "id": "runtime:b7865c6568a173d7",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore nullable/nullish + lazy + option schemas should preserve null input for nullable lazy union"
+    },
+    {
+      "id": "runtime:94f1e863b2ccf201",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore nullable/nullish + lazy + option schemas should preserve null input for nullable lazy variant"
+    },
+    {
+      "id": "runtime:58d57210c31d1e93",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore nullable/nullish + option schemas should initialize normally for nullable variant with value"
+    },
+    {
+      "id": "runtime:e37a9c198b54c8fc",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore nullable/nullish + option schemas should preserve null input for nullable intersect"
+    },
+    {
+      "id": "runtime:21f4d3ec4934e41f",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore nullable/nullish + option schemas should preserve null input for nullable union"
+    },
+    {
+      "id": "runtime:a28fb806a8b70b0c",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore nullable/nullish + option schemas should preserve null input for nullable variant"
+    },
+    {
+      "id": "runtime:c85b26d961f338f0",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore nullable/nullish + option schemas should preserve null input for nullish variant"
+    },
+    {
+      "id": "runtime:b96a68d9c23268c4",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore nullable/nullish + option schemas should preserve undefined input for nullish variant"
+    },
+    {
+      "id": "runtime:14ccb9a8da0e505f",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore object fields should initialize nested object"
+    },
+    {
+      "id": "runtime:1bd11a1559708959",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore object fields should initialize with children"
+    },
+    {
+      "id": "runtime:b0ae91da82bfc7dd",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore object fields should set input to true for object fields"
+    },
+    {
+      "id": "runtime:81c462a1c0c64878",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore object fields should set the path for deeply nested fields"
+    },
+    {
+      "id": "runtime:1120ecf1b2e06920",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore reinitialization errors should throw when reinitializing array as object"
+    },
+    {
+      "id": "runtime:ff690d933590788e",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore reinitialization errors should throw when reinitializing object as array"
+    },
+    {
+      "id": "runtime:a9a7a0071cb9ec04",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore reinitialization errors should throw when variant branches have same key as array and value"
+    },
+    {
+      "id": "runtime:b89d8eafbd5b4599",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore reinitialization errors should throw when variant branches have same key as object and value"
+    },
+    {
+      "id": "runtime:91d9984c8e0956c8",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore reinitialization errors should throw when variant branches have same key as value and array"
+    },
+    {
+      "id": "runtime:08c985364896b3d6",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore reinitialization errors should throw when variant branches have same key as value and object"
+    },
+    {
+      "id": "runtime:c0a66fe4c3d26af1",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore tuple schemas should initialize fixed tuple items"
+    },
+    {
+      "id": "runtime:25d1f18f287c5111",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore union schemas should initialize for each union option"
+    },
+    {
+      "id": "runtime:f817e70bfc95e9b0",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore unsupported schemas should throw for object_with_rest schema"
+    },
+    {
+      "id": "runtime:bc8cbb784cd44f41",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore unsupported schemas should throw for record schema"
+    },
+    {
+      "id": "runtime:a2510fb74f5cddcd",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore value fields should initialize with correct properties"
+    },
+    {
+      "id": "runtime:665dafe8b937dc48",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore wrapped schemas should unwrap non_optional schema"
+    },
+    {
+      "id": "runtime:10439cab37b4523d",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore wrapped schemas should unwrap nullable schema"
+    },
+    {
+      "id": "runtime:437141903f25beb5",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore wrapped schemas should unwrap nullish schema with null input"
+    },
+    {
+      "id": "runtime:fbfdb867465698f4",
+      "file": "packages/formisch/upstream/packages/core/src/field/initializeFieldStore/initializeFieldStore.test.ts",
+      "fullName": "initializeFieldStore wrapped schemas should unwrap optional schema"
+    },
+    {
+      "id": "runtime:72d9e18806cd321a",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldBool/setFieldBool.test.ts",
+      "fullName": "setFieldBool array fields should set property on array and all items"
+    },
+    {
+      "id": "runtime:39ebdc19967344d9",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldBool/setFieldBool.test.ts",
+      "fullName": "setFieldBool deeply nested should set property on all descendants"
+    },
+    {
+      "id": "runtime:5d05f44a29edeefa",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldBool/setFieldBool.test.ts",
+      "fullName": "setFieldBool object fields should set property on all nested children"
+    },
+    {
+      "id": "runtime:662b0746482825cd",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldBool/setFieldBool.test.ts",
+      "fullName": "setFieldBool object fields should set property on object itself"
+    },
+    {
+      "id": "runtime:e5ff869e1102fb87",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldBool/setFieldBool.test.ts",
+      "fullName": "setFieldBool value fields should set isDirty"
+    },
+    {
+      "id": "runtime:8276c480aacb67b8",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldBool/setFieldBool.test.ts",
+      "fullName": "setFieldBool value fields should set isTouched to false"
+    },
+    {
+      "id": "runtime:79ea169f2f79d7cb",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldBool/setFieldBool.test.ts",
+      "fullName": "setFieldBool value fields should set isTouched to true"
+    },
+    {
+      "id": "runtime:00b498ef0a884d37",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput array fields should extend array when setting longer array"
+    },
+    {
+      "id": "runtime:2cc9f2d3761904e8",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput array fields should keep a tuple at its fixed length when given a longer input"
+    },
+    {
+      "id": "runtime:1d54f6f58698d35d",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput array fields should not grow a tuple beyond its children when items were cleared"
+    },
+    {
+      "id": "runtime:32346fed3037a0d5",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput array fields should set array item value"
+    },
+    {
+      "id": "runtime:f9035b9abd90c8b7",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput array fields should set null for nullish array"
+    },
+    {
+      "id": "runtime:416095bc96e324ae",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput array fields should truncate array when setting shorter array"
+    },
+    {
+      "id": "runtime:4836930ef6cde274",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput dirty state for arrays should clear array isDirty after reverting from longer back to initial"
+    },
+    {
+      "id": "runtime:719d2aadac061711",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput dirty state for arrays should clear array isDirty after reverting to initial input"
+    },
+    {
+      "id": "runtime:e828e6933447780c",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput dirty state for arrays should mark array as dirty when length changes"
+    },
+    {
+      "id": "runtime:508927ff4e28b91c",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput dirty state for objects should mark object as dirty when input becomes null"
+    },
+    {
+      "id": "runtime:8690591c1e2b419e",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput object fields should mark parent input as truthy when setting nested field"
+    },
+    {
+      "id": "runtime:14a723b0aa4d3604",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput object fields should set nested object value"
+    },
+    {
+      "id": "runtime:1f07ca28df251bcb",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput reusing child stores when growing should clear stale errors but keep the dirty baseline when reused"
+    },
+    {
+      "id": "runtime:745cd4dd2efd3e2e",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput reusing child stores when growing should report clean after shrinking then growing back to initial"
+    },
+    {
+      "id": "runtime:f9eba3b5bf98aeb6",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput reusing child stores when growing should report dirty after shrinking then growing with changed values"
+    },
+    {
+      "id": "runtime:2aabd44bdaa7e6d0",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput value fields should keep field edited after reverting to initial value"
+    },
+    {
+      "id": "runtime:25fb27914b27b4d9",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput value fields should mark field as dirty when value changes"
+    },
+    {
+      "id": "runtime:b787320e5a76a965",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput value fields should mark field as edited"
+    },
+    {
+      "id": "runtime:acfa61edbd183d2b",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput value fields should mark field as touched"
+    },
+    {
+      "id": "runtime:37f2a9a558edbd8c",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput value fields should not mark field as dirty for NaN from undefined"
+    },
+    {
+      "id": "runtime:d26dde17635fa880",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput value fields should not mark field as dirty for empty string from undefined"
+    },
+    {
+      "id": "runtime:b95169d3b07a3bfb",
+      "file": "packages/formisch/upstream/packages/core/src/field/setFieldInput/setFieldInput.test.ts",
+      "fullName": "setFieldInput value fields should set string value"
+    },
+    {
+      "id": "runtime:b9be564582c73787",
+      "file": "packages/formisch/upstream/packages/core/src/field/setInitialFieldInput/setInitialFieldInput.test.ts",
+      "fullName": "setInitialFieldInput array fields should initialize new children when array grows"
+    },
+    {
+      "id": "runtime:77e37bc869625326",
+      "file": "packages/formisch/upstream/packages/core/src/field/setInitialFieldInput/setInitialFieldInput.test.ts",
+      "fullName": "setInitialFieldInput array fields should keep a tuple at its fixed length when given a longer input"
+    },
+    {
+      "id": "runtime:e8465e391fb8e517",
+      "file": "packages/formisch/upstream/packages/core/src/field/setInitialFieldInput/setInitialFieldInput.test.ts",
+      "fullName": "setInitialFieldInput array fields should set initial input on existing children"
+    },
+    {
+      "id": "runtime:bfad37e43e350b31",
+      "file": "packages/formisch/upstream/packages/core/src/field/setInitialFieldInput/setInitialFieldInput.test.ts",
+      "fullName": "setInitialFieldInput array fields should set initial items"
+    },
+    {
+      "id": "runtime:f44a5984be7797e7",
+      "file": "packages/formisch/upstream/packages/core/src/field/setInitialFieldInput/setInitialFieldInput.test.ts",
+      "fullName": "setInitialFieldInput array fields should set null initial input for nullish array"
+    },
+    {
+      "id": "runtime:e977eb10e883341f",
+      "file": "packages/formisch/upstream/packages/core/src/field/setInitialFieldInput/setInitialFieldInput.test.ts",
+      "fullName": "setInitialFieldInput object fields should set initial input on nested children"
+    },
+    {
+      "id": "runtime:95eb4668b5a3236e",
+      "file": "packages/formisch/upstream/packages/core/src/field/setInitialFieldInput/setInitialFieldInput.test.ts",
+      "fullName": "setInitialFieldInput object fields should set null initial input for nullish object"
+    },
+    {
+      "id": "runtime:10fb65c2e98e477d",
+      "file": "packages/formisch/upstream/packages/core/src/field/setInitialFieldInput/setInitialFieldInput.test.ts",
+      "fullName": "setInitialFieldInput value fields should set initial input"
+    },
+    {
+      "id": "runtime:ec4c00f8d8993ac9",
+      "file": "packages/formisch/upstream/packages/core/src/field/walkFieldStore/walkFieldStore.test.ts",
+      "fullName": "walkFieldStore should call callback for single value field"
+    },
+    {
+      "id": "runtime:1a05ac3bbf90529e",
+      "file": "packages/formisch/upstream/packages/core/src/field/walkFieldStore/walkFieldStore.test.ts",
+      "fullName": "walkFieldStore should return false when callback never stops the walk"
+    },
+    {
+      "id": "runtime:28a98c69b0a75f12",
+      "file": "packages/formisch/upstream/packages/core/src/field/walkFieldStore/walkFieldStore.test.ts",
+      "fullName": "walkFieldStore should stop early and return true when callback returns true"
+    },
+    {
+      "id": "runtime:4b3fdad7a700d743",
+      "file": "packages/formisch/upstream/packages/core/src/field/walkFieldStore/walkFieldStore.test.ts",
+      "fullName": "walkFieldStore should stop early within nested structures"
+    },
+    {
+      "id": "runtime:3d5d1de5f8c62077",
+      "file": "packages/formisch/upstream/packages/core/src/field/walkFieldStore/walkFieldStore.test.ts",
+      "fullName": "walkFieldStore should walk array fields in depth-first order"
+    },
+    {
+      "id": "runtime:a1d92970bea4e660",
+      "file": "packages/formisch/upstream/packages/core/src/field/walkFieldStore/walkFieldStore.test.ts",
+      "fullName": "walkFieldStore should walk mixed array and object structures"
+    },
+    {
+      "id": "runtime:11ca11b510185c73",
+      "file": "packages/formisch/upstream/packages/core/src/field/walkFieldStore/walkFieldStore.test.ts",
+      "fullName": "walkFieldStore should walk nested structures"
+    },
+    {
+      "id": "runtime:d9eabc34c78cea8d",
+      "file": "packages/formisch/upstream/packages/core/src/field/walkFieldStore/walkFieldStore.test.ts",
+      "fullName": "walkFieldStore should walk object fields in depth-first order"
+    },
+    {
+      "id": "runtime:f93d123b9f9b3ee6",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore custom configuration should use both custom validation modes"
+    },
+    {
+      "id": "runtime:16ab237267dbe7f1",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore custom configuration should use custom revalidate mode"
+    },
+    {
+      "id": "runtime:675695af2013e93b",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore custom configuration should use custom validate mode"
+    },
+    {
+      "id": "runtime:ba378d23b82a9f69",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore default configuration should assign the parse function"
+    },
+    {
+      "id": "runtime:39f9ef178dc22144",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore default configuration should initialize all boolean signals to false"
+    },
+    {
+      "id": "runtime:e22d2c1745ff5ed9",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore default configuration should initialize validators to 0"
+    },
+    {
+      "id": "runtime:7ada1f764cb5866e",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore default configuration should use default validation modes when not specified"
+    },
+    {
+      "id": "runtime:338428fdd7a5a033",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore field store initialization should initialize array schema"
+    },
+    {
+      "id": "runtime:e1afce84ee9555c6",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore field store initialization should initialize nested object schema"
+    },
+    {
+      "id": "runtime:05492202f110afe4",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore field store initialization should initialize simple object schema"
+    },
+    {
+      "id": "runtime:936f6bda2a2ebaf8",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore field store initialization should initialize with initial input"
+    },
+    {
+      "id": "runtime:1d6f914e3e106b5e",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore validation modes should accept \"blur\" as revalidate mode"
+    },
+    {
+      "id": "runtime:59d5e3de3e773f7c",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore validation modes should accept \"blur\" as validate mode"
+    },
+    {
+      "id": "runtime:f1234a0aad26c96b",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore validation modes should accept \"change\" as revalidate mode"
+    },
+    {
+      "id": "runtime:ab24edda098b493e",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore validation modes should accept \"change\" as validate mode"
+    },
+    {
+      "id": "runtime:956e61badb43a24e",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore validation modes should accept \"initial\" as validate mode"
+    },
+    {
+      "id": "runtime:646b42e6ad864bfd",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore validation modes should accept \"input\" as revalidate mode"
+    },
+    {
+      "id": "runtime:a4a3dd3d5058210a",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore validation modes should accept \"input\" as validate mode"
+    },
+    {
+      "id": "runtime:85f6f210ea034213",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore validation modes should accept \"submit\" as revalidate mode"
+    },
+    {
+      "id": "runtime:88be202cdf93c201",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore validation modes should accept \"submit\" as validate mode"
+    },
+    {
+      "id": "runtime:6e41089c6d606265",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore validation modes should accept \"touch\" as revalidate mode"
+    },
+    {
+      "id": "runtime:9389a7e247465f55",
+      "file": "packages/formisch/upstream/packages/core/src/form/createFormStore/createFormStore.test.ts",
+      "fullName": "createFormStore validation modes should accept \"touch\" as validate mode"
+    },
+    {
+      "id": "runtime:b0232aac059d27a3",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData arrays should collect repeated keys into an array"
+    },
+    {
+      "id": "runtime:e0d5661ce6ff680d",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData arrays should decode a single repeated key into an array"
+    },
+    {
+      "id": "runtime:171824dbc3b022a9",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData arrays should decode indexed arrays of objects"
+    },
+    {
+      "id": "runtime:abff5745823ae45c",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData arrays should decode indexed arrays of primitives"
+    },
+    {
+      "id": "runtime:cf6ef1363f46ff22",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData arrays should default absent arrays to empty arrays"
+    },
+    {
+      "id": "runtime:3e151fd513917884",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData arrays should fill boolean defaults within array items"
+    },
+    {
+      "id": "runtime:1df335ebc149d84a",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData booleans defaults should default absent booleans to false"
+    },
+    {
+      "id": "runtime:104558e75e131ece",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData booleans defaults should default booleans inside present nested objects"
+    },
+    {
+      "id": "runtime:817eee34059456b3",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData combinators should descend into intersect options"
+    },
+    {
+      "id": "runtime:093d16524b5aabbf",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData combinators should descend into union options"
+    },
+    {
+      "id": "runtime:20766a528699e0ca",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData combinators should descend into variant options"
+    },
+    {
+      "id": "runtime:835a026d3c12a30b",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData combinators should fall back to a string when no union option matches"
+    },
+    {
+      "id": "runtime:0809958703f1756a",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData combinators should support an intersect root schema"
+    },
+    {
+      "id": "runtime:69d034c77a6d5bf0",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData extra and unknown fields should build unknown nested fields as objects"
+    },
+    {
+      "id": "runtime:dd1cee396f2138e8",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData extra and unknown fields should decode unknown leaf values as strings"
+    },
+    {
+      "id": "runtime:b26ce3865f9ed807",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData files should keep empty files that have a name"
+    },
+    {
+      "id": "runtime:ae1adbf9faa9721b",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData files should keep files for non-file schemas unchanged"
+    },
+    {
+      "id": "runtime:8c49753e2aeed522",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData files should keep selected files unchanged"
+    },
+    {
+      "id": "runtime:fe813909e46d7d0d",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData files should skip empty file inputs of unselected files"
+    },
+    {
+      "id": "runtime:7130aec5c8a12f69",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData integration should produce values that validate against the schema"
+    },
+    {
+      "id": "runtime:799c600117a86ef1",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData invalid keys should ignore empty array keys"
+    },
+    {
+      "id": "runtime:834a3cb3120a080b",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData invalid keys should ignore keys that are not valid JSON"
+    },
+    {
+      "id": "runtime:f7041974579f3c73",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData invalid keys should ignore keys that do not parse to an array"
+    },
+    {
+      "id": "runtime:ab5170ba90e9aa44",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData invalid keys should ignore keys with empty segments"
+    },
+    {
+      "id": "runtime:264e9467b0a3f892",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData invalid keys should ignore keys with non-string or non-number segments"
+    },
+    {
+      "id": "runtime:77bfbb9b26438842",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData lazy schemas should unwrap lazy schemas"
+    },
+    {
+      "id": "runtime:9150d12dbe958338",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData limits should ignore string properties on arrays"
+    },
+    {
+      "id": "runtime:e5bab101442565d1",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData limits should throw when an array index exceeds the maximum length"
+    },
+    {
+      "id": "runtime:50d3a28779855aaa",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData nested objects should decode nested objects and reuse containers"
+    },
+    {
+      "id": "runtime:2c024b4587ab91c1",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData nested objects should leave absent objects absent"
+    },
+    {
+      "id": "runtime:9659deab57f50c00",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData nested objects should not crash on a scalar entry before a nested entry"
+    },
+    {
+      "id": "runtime:e9b190ae04e73ede",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData nested objects should not crash when an object is replaced by a primitive"
+    },
+    {
+      "id": "runtime:d83e67e59c8537ea",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData pipelines should decode values through pipe schemas"
+    },
+    {
+      "id": "runtime:4c046c3f547f2bc5",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData prototype pollution should ignore __proto__ keys"
+    },
+    {
+      "id": "runtime:a3bb6967f3440cdc",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData prototype pollution should ignore constructor and prototype keys"
+    },
+    {
+      "id": "runtime:0ceb0fec5e3bcd38",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData prototype pollution should stop at a dangerous key deeper in the path"
+    },
+    {
+      "id": "runtime:6da1a6b4d3ed14ac",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData tuples should complete absent array at end of tuple"
+    },
+    {
+      "id": "runtime:630a4541a3df7c2b",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData tuples should complete missing trailing tuple items"
+    },
+    {
+      "id": "runtime:349360b1cf1da62d",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData tuples should decode tuples"
+    },
+    {
+      "id": "runtime:c9d6e98a820ce837",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData tuples should fill boolean holes within tuples"
+    },
+    {
+      "id": "runtime:994b18a48713a488",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData tuples should leave absent tuples absent"
+    },
+    {
+      "id": "runtime:33fe65ae2ddb69fd",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData tuples should support loose and strict tuples"
+    },
+    {
+      "id": "runtime:6e3f56d0b9471a00",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData value decoding should decode \"null\" and \"undefined\" numbers"
+    },
+    {
+      "id": "runtime:1df04c7949f6a1d2",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData value decoding should decode bigints"
+    },
+    {
+      "id": "runtime:34bd1297fe49f3f5",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData value decoding should decode booleans"
+    },
+    {
+      "id": "runtime:7d8e768b072430c7",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData value decoding should decode empty number to null"
+    },
+    {
+      "id": "runtime:4e173808c1c95ce5",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData value decoding should decode empty, \"null\" and \"undefined\" dates"
+    },
+    {
+      "id": "runtime:8ca2b0e2365c1004",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData value decoding should decode non-numeric number values to NaN"
+    },
+    {
+      "id": "runtime:9030f414969a6c59",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData value decoding should decode numbers"
+    },
+    {
+      "id": "runtime:19b36ce44fe2d520",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData value decoding should decode the common date and date-time formats"
+    },
+    {
+      "id": "runtime:a1e24caedf8724fd",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData value decoding should default absent and \"undefined\" booleans to false"
+    },
+    {
+      "id": "runtime:f5bce9cb72b5325e",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData value decoding should keep enum, picklist and literal values as strings"
+    },
+    {
+      "id": "runtime:741ddd0e8a780cfc",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData value decoding should keep strings as strings"
+    },
+    {
+      "id": "runtime:a506f3d78e32b159",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData value decoding should preserve decoded null for nullable booleans"
+    },
+    {
+      "id": "runtime:b145a6e6453575cb",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData wrappers should unwrap every wrapper schema for decoding"
+    },
+    {
+      "id": "runtime:031862404273c9ce",
+      "file": "packages/formisch/upstream/packages/core/src/form/decodeFormData/decodeFormData.test.ts",
+      "fullName": "decodeFormData wrappers should unwrap wrapped containers"
+    },
+    {
+      "id": "runtime:ccf895e449b498e5",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput edge cases for path handling should build partial path when unsupported type appears mid-path"
+    },
+    {
+      "id": "runtime:e7b52ecccf5107ea",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput edge cases for path handling should stop path building at map type path items"
+    },
+    {
+      "id": "runtime:565ea92b4f29847c",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput edge cases for path handling should stop path building at set type path items"
+    },
+    {
+      "id": "runtime:c73e4741108cda07",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput edge cases for path handling should stop path building at symbol keys"
+    },
+    {
+      "id": "runtime:2e6c365e715ff2ff",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput focus behavior should focus first error field when shouldFocus is true"
+    },
+    {
+      "id": "runtime:c5319ea94ec8edfd",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput focus behavior should focus next error field when the first has no element"
+    },
+    {
+      "id": "runtime:ba8aac79d436cd6b",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput focus behavior should not focus when shouldFocus is false"
+    },
+    {
+      "id": "runtime:ca4527efcbb910b0",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput focus behavior should not focus when shouldFocus is undefined"
+    },
+    {
+      "id": "runtime:57c51080eb6f4a4a",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput focus behavior should only focus first field with error"
+    },
+    {
+      "id": "runtime:5a6688568fc3bbef",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput focus behavior should skip an erroring field whose element cannot be focused"
+    },
+    {
+      "id": "runtime:24358aeb2f71e72a",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput successful validation should return success result when no issues"
+    },
+    {
+      "id": "runtime:887cb3b7fabf3d62",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput successful validation should set all field errors to null on success"
+    },
+    {
+      "id": "runtime:c09abe5fe33a60a4",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput validation state management should handle concurrent validations"
+    },
+    {
+      "id": "runtime:72a00fba6c30a242",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput validation state management should increment and decrement validators counter"
+    },
+    {
+      "id": "runtime:becc9b7454898405",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput validation state management should reset validation state when parse rejects"
+    },
+    {
+      "id": "runtime:7cb7f41e9429f530",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput validation state management should set isValidating to false after validation"
+    },
+    {
+      "id": "runtime:2dd4989a6318b072",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput validation state management should set isValidating to true during validation"
+    },
+    {
+      "id": "runtime:f9acd596ed3fdb8f",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput validation with errors should accumulate multiple errors on same field"
+    },
+    {
+      "id": "runtime:737d0601eecdaa7f",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput validation with errors should assign nested errors for issues with path"
+    },
+    {
+      "id": "runtime:00f5c56a41bdebf6",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput validation with errors should assign root errors for issues without path"
+    },
+    {
+      "id": "runtime:cdcc5cacbff82fe0",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput validation with errors should handle array path with index"
+    },
+    {
+      "id": "runtime:e564a56e24bcb1ff",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput validation with errors should handle multiple root errors"
+    },
+    {
+      "id": "runtime:bd9f16c92eb31946",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateFormInput/validateFormInput.test.ts",
+      "fullName": "validateFormInput validation with errors should handle nested object path"
+    },
+    {
+      "id": "runtime:8f0fe101fea8b623",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired mode matching validate=blur (no errors) should match mode=blur"
+    },
+    {
+      "id": "runtime:adf623343330ef24",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired mode matching validate=change (no errors) should match mode=change"
+    },
+    {
+      "id": "runtime:7e4bba3675736625",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired mode matching validate=initial with revalidate=blur should match mode=blur"
+    },
+    {
+      "id": "runtime:c46ff71d024a66cf",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired mode matching validate=initial with revalidate=change should match mode=change"
+    },
+    {
+      "id": "runtime:314af17f2162aa4c",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired mode matching validate=initial with revalidate=input should match mode=input"
+    },
+    {
+      "id": "runtime:22cef31c0bf7b17d",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired mode matching validate=initial with revalidate=submit should match mode=submit"
+    },
+    {
+      "id": "runtime:a514f5414fc5ecde",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired mode matching validate=initial with revalidate=touch should match mode=touch"
+    },
+    {
+      "id": "runtime:13a54cbaaae3d543",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired mode matching validate=input (no errors) should match mode=input"
+    },
+    {
+      "id": "runtime:9e9b76a85aa96ae6",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired mode matching validate=submit (no errors) should match mode=submit"
+    },
+    {
+      "id": "runtime:37349adc2ac16fb3",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired mode matching validate=touch (no errors) should match mode=touch"
+    },
+    {
+      "id": "runtime:278f23bdd954c6a7",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired nested field errors should check nested field errors for arrays"
+    },
+    {
+      "id": "runtime:1b0f3e7a84b869ca",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired nested field errors should check nested field errors for objects"
+    },
+    {
+      "id": "runtime:58d74020b5fec2ca",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = blur should validate on blur when no errors"
+    },
+    {
+      "id": "runtime:c4e166eeae61ee97",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = blur should validate on input when has errors (revalidate)"
+    },
+    {
+      "id": "runtime:9cd159d8e5e1429d",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = change should validate on blur when has errors (revalidate)"
+    },
+    {
+      "id": "runtime:2ea4d9573605d8c6",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = change should validate on change when no errors"
+    },
+    {
+      "id": "runtime:9709c6c19a53dc17",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = initial should not validate when mode does not match revalidate"
+    },
+    {
+      "id": "runtime:2d92ff3324313012",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = initial should use revalidate mode when validate is initial"
+    },
+    {
+      "id": "runtime:ae1d17a0f7fc9491",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = input (non-submit, non-initial) should not validate when mode does not match and no errors"
+    },
+    {
+      "id": "runtime:6825dfe04bc1b5ec",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = input (non-submit, non-initial) should use revalidate mode when field has errors"
+    },
+    {
+      "id": "runtime:08976f00c4bfb770",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = input (non-submit, non-initial) should use validate mode when field has no errors"
+    },
+    {
+      "id": "runtime:a7873d9f8ab67311",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = submit should not validate when mode does not match and not submitted"
+    },
+    {
+      "id": "runtime:fa2c5eef4aeb2ff3",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = submit should use revalidate mode when form is submitted"
+    },
+    {
+      "id": "runtime:edbf16e9d9dcfe9c",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = submit should use validate mode when form is not submitted"
+    },
+    {
+      "id": "runtime:1f0ee9e5d153eb25",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = touch should validate on change when has errors (revalidate)"
+    },
+    {
+      "id": "runtime:8e66fe9a21819c87",
+      "file": "packages/formisch/upstream/packages/core/src/form/validateIfRequired/validateIfRequired.test.ts",
+      "fullName": "validateIfRequired validate = touch should validate on touch when no errors"
+    }
+  ]
+}

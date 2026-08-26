@@ -18,6 +18,8 @@ import {
 import { verifyDreiReactParity } from './drei-parity-lib.mjs';
 import { verifyDreiTypes } from './drei-types-lib.mjs';
 import { verifyEmblaCarouselTestClassifications } from './embla-carousel-classifications-lib.mjs';
+import { verifyFormischTestClassifications } from './formisch-classifications-lib.mjs';
+import { verifyFormischUpstream } from './formisch-upstream-lib.mjs';
 import {
 	isVitestLane,
 	loadManifest,
@@ -72,6 +74,7 @@ import { verifyTanstackTableTypes } from './tanstack-table-types-lib.mjs';
 import { verifyTiptapTestClassifications } from './tiptap-classifications-lib.mjs';
 import { verifyTiptapRuntimeCrosswalk } from './tiptap-runtime-lib.mjs';
 import { verifyTiptapTypes } from './tiptap-types-lib.mjs';
+import { verifyTypeParity } from './type-parity-lib.mjs';
 import { verifyVaulTestClassifications } from './vaul-classifications-lib.mjs';
 import { verifyVaulAdaptedRuntimeStructure } from './vaul-runtime-lib.mjs';
 import { verifyVaulUpstream } from './vaul-upstream-lib.mjs';
@@ -141,6 +144,7 @@ const SPECIALIZED_CLASSIFICATION_BINDINGS = new Set([
 	'dropzone',
 	'drei',
 	'embla-carousel',
+	'formisch',
 	'intersection-observer',
 	'livestore',
 	'markdown',
@@ -169,6 +173,15 @@ async function capture(label, check) {
 
 await capture('react-hook-form upstream evidence', () => verifyHookFormUpstream(REPO));
 await capture('react-hook-form type evidence', () => verifyHookFormTypes(REPO));
+await capture('formisch upstream evidence', () =>
+	verifyFormischUpstream(REPO, {
+		integrity: '3f9c1c6da89473296033cc2701405080b2cb11478724bc7f045063ee618aaf57',
+	}),
+);
+await capture('formisch type evidence', () =>
+	verifyTypeParity(REPO, { configPath: 'packages/formisch/audit/type-parity.json' }),
+);
+await capture('formisch test classifications', () => verifyFormischTestClassifications(REPO));
 await capture('react-intersection-observer upstream evidence', () =>
 	verifyIntersectionObserverUpstream(REPO),
 );

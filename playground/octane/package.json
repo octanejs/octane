@@ -25,6 +25,7 @@
     "@octanejs/aria": "workspace:*",
     "@octanejs/cmdk": "workspace:*",
     "@octanejs/drei": "workspace:*",
+    "@octanejs/formisch": "workspace:*",
     "@octanejs/gsap": "workspace:*",
     "@octanejs/intersection-observer": "workspace:*",
     "@octanejs/input-otp": "workspace:*",
@@ -65,7 +66,8 @@
     "pdfjs-dist": "5.4.296",
     "rxjs": "catalog:default",
     "tailwind-merge": "catalog:default",
-    "three": "catalog:default"
+    "three": "catalog:default",
+    "valibot": "catalog:default"
   },
   "devDependencies": {
     "@tailwindcss/vite": "catalog:default",

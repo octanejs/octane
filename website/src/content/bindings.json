@@ -87,6 +87,7 @@
     "title": "Forms and content",
     "description": "Forms, file acquisition, rich-text editing, streaming Markdown, MDX, and translations.",
     "packages": [
+      "@octanejs/formisch",
       "@octanejs/hook-form",
       "@octanejs/input-otp",
       "@octanejs/dropzone",

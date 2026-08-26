@@ -10,6 +10,7 @@ type HydrationBinding =
 	| 'aria'
 	| 'base-ui'
 	| 'docusaurus'
+	| 'formisch'
 	| 'monaco-editor'
 	| 'pdf'
 	| 'rainbowkit'
@@ -57,6 +58,10 @@ function bindingAliases(binding: HydrationBinding) {
 				replacement: resolve(repositoryRoot, 'packages/remix-router/src/index.ts'),
 			},
 		];
+	}
+
+	if (binding === 'formisch') {
+		return [{ find: /^@octanejs\/formisch$/, replacement: resolve(source, 'index.ts') }];
 	}
 
 	if (binding === 'solana-kit') {

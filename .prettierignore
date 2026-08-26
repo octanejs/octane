@@ -30,6 +30,10 @@ packages/syntax-highlighter/src/
 packages/tanstack-devtools/src/index.ts
 # DefinitelyTyped suites are preserved byte-exact as pinned provenance.
 packages/*/upstream-types/
+# Formisch's legacy pristine React and adapted type evidence is hash-owned by
+# its parity verifier and must remain byte-exact until its pin is migrated.
+packages/formisch/audit/pristine-react/
+packages/formisch/typetests/upstream/
 # One-for-one adapted type-suite mirrors must stay structurally identical to
 # the vendored upstream typetests after permitted import rewrites only.
 packages/solana-kit/typetests/__typetests__/

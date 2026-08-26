@@ -18,6 +18,7 @@ import { InputOTPDemo } from './demos/InputOTP.tsrx';
 import { KeyedList } from './demos/KeyedList.tsrx';
 import { ReactSpringDemo } from './demos/ReactSpring.tsrx';
 import { ErrorBoundaryDemo } from './demos/ErrorBoundary.tsrx';
+import { FormischDemo } from './demos/Formisch.tsrx';
 import { LiveStoreDemo } from './demos/LiveStore.tsrx';
 import { ReactTextareaAutosizeDemo } from './demos/ReactTextareaAutosize.tsrx';
 import { ReactSyntaxHighlighterDemo } from './demos/ReactSyntaxHighlighter.tsrx';
@@ -59,6 +60,7 @@ import inputOTPSource from './demos/InputOTP.tsrx?raw';
 import keyedListSource from './demos/KeyedList.tsrx?raw';
 import reactSpringSource from './demos/ReactSpring.tsrx?raw';
 import errorBoundarySource from './demos/ErrorBoundary.tsrx?raw';
+import formischSource from './demos/Formisch.tsrx?raw';
 import liveStoreSource from './demos/LiveStore.tsrx?raw';
 import reactTextareaAutosizeSource from './demos/ReactTextareaAutosize.tsrx?raw';
 import reactSyntaxHighlighterSource from './demos/ReactSyntaxHighlighter.tsrx?raw';
@@ -314,6 +316,12 @@ export const GROUPS: readonly DemoGroup[] = [
 				title: 'MobX',
 				Component: MobxDemo,
 				source: mobxSource,
+			},
+			{
+				id: 'formisch',
+				title: 'Formisch',
+				Component: FormischDemo,
+				source: formischSource,
 			},
 			{
 				id: 'error-boundary',

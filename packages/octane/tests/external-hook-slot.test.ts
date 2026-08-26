@@ -723,6 +723,7 @@ describe('manifest-declared manual hook slots', () => {
 			'drei',
 			'electron',
 			'floating-ui',
+			'formisch',
 			'gsap',
 			'i18next',
 			'inertia',
