@@ -68,6 +68,7 @@ export const BENCHMARK_SUITES = [
 	'scaling-curves',
 	'dev-form-diagnostics',
 	'behavior-root-events',
+	'router-dispatch',
 	'store-selector-fanout',
 	'hook-store-composition',
 	'activity',

@@ -354,6 +354,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Node-only app-core route matching across large static, method-miss,
+		// and dynamic route tables with cost normalized per candidate route.
+		name: 'router-dispatch',
+		cwd: 'router-dispatch',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Selector-based fan-out: 512 subscribers read one store through a
 		// selector, then the parent re-renders 20 times with the store untouched.
 		// Reuses the news per-target toolchains with its own page, so the shared

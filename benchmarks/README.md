@@ -213,6 +213,7 @@ internally, get their own baseline and guard namespace.
 | `behavior-root-events` | behavior-root-events | none (headless Chromium) | queued events across 1,000 and 8,000 distinct async behavior adoptions, with FIFO/exactly-once gates |
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
+| `router-dispatch` | router-dispatch | none (Node-only) | app-core static, wrong-method, and dynamic matching across 1,000-route tables |
 | `effectful-list` | effectful-list | Octane + reference frameworks | effect/ref cleanup churn |
 | `activity` | activity | none (builds) | same-source Octane/React Activity lifecycle, hidden/nested work, retained state/effects/DOM, cold-vs-used ordinary-ref controls, and optional-runtime bundle reachability |
 | `list-clear` | list-clear | Octane-only | keyed-list bulk clear by parent shape — the only coverage of the shared-parent path |
