@@ -138,7 +138,7 @@ function buildRpcDescriptors(rpcModules, hashFn) {
  * the body-marker contract.
  *
  * @param {string} html
- * @returns {(headContent: string) => [string, string]}
+ * @returns {(headContent: string) => string[]}
  */
 function prepareSsrTemplate(html) {
 	const [prefix, suffix] = splitSsrTemplate(html);
