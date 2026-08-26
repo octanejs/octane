@@ -191,6 +191,20 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Fresh implementation of localvoid/UIbench's complete 96-case desktop
+		// matrix: tables, sparse animation updates, keyed flat/deep tree
+		// transforms, historical worst cases, and large no-change diffs. Every
+		// endpoint and surviving node identity is correctness-gated before timing.
+		name: 'uibench',
+		cwd: 'uibench',
+		servers: [
+			{ filter: 'octane-tsrx-uibench-bench', port: 5315 },
+			{ filter: 'react-uibench-bench', port: 5316 },
+		],
+		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		name: 'dbmon',
 		cwd: 'dbmon',
 		servers: [

@@ -3174,5 +3174,80 @@
     "reference": "work-model",
     "maxRatio": 1,
     "note": "Removing the original row after append must preserve all 16 current survivors and their DOM identity, with no duplicate receiver reads."
+  },
+  {
+    "suite": "uibench",
+    "op": "table/[100,4]/render",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 2.2,
+    "note": "UIbench's largest table mount creates 100 keyed rows with five cells each. Observed 1.38x on the 10-sample introduction run (2026-08-26); the loose ceiling catches a template-clone or row-mount cliff without overfitting a sub-millisecond browser timing."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/render",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.9,
+    "note": "Deep binary mount creates 2,046 keyed nodes across ten recursive levels. Observed 1.21x on the 10-sample introduction run (2026-08-26); this is the mount-path guard with enough same-run headroom for browser noise."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[50,10]/[reverse]",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.5,
+    "note": "Reverses 50 keyed containers while preserving their 500 keyed children and every surviving DOM node. Observed 0.88x on the 10-sample introduction run (2026-08-26); the guard protects the common nested-list reorder path."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[500]/[kivi_worst_case]",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.8,
+    "note": "Historical UIbench adversarial case removes both ends and reverses 498 surviving keyed nodes. Observed 0.35x on the 10-sample introduction run (2026-08-26); a move toward 0.8x signals a keyed-reconcile cliff."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[10,10,10,10]/no_change",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.7,
+    "note": "Publishes a fresh but value-identical 11,110-node tree to measure diff/prev-guard overhead. Normal and quick introduction runs ranged from 0.93x to 1.34x (2026-08-26); 1.7x retains noise headroom while guarding the full-tree walk."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/no_change",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.4,
+    "note": "Publishes a fresh but value-identical ten-level binary tree. Observed 0.70x on the 10-sample introduction run and 0.78x quick (2026-08-26); the guard isolates recursive no-change diff cost at a smaller shape."
+  },
+  {
+    "suite": "uibench",
+    "op": "cases",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: both fixtures must pass and publish all 96 desktop cases. Every endpoint is independently serialized against the model before timings are accepted."
+  },
+  {
+    "suite": "uibench",
+    "op": "elements_largest",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: the largest endpoint contains exactly 23,331 visible elements in both fixtures; missing work cannot look like a performance win."
+  },
+  {
+    "suite": "uibench",
+    "op": "identity_shared",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: all 32,543 keyed survivors observed across the matrix retain DOM identity in both fixtures. A replacement is a correctness failure before this count is emitted."
   }
 ]
