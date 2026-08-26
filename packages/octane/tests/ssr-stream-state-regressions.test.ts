@@ -152,6 +152,12 @@ const mod = evalServer(
 				<i data-waiting={props.label}>{props.label + ':waiting' as string}</i>
 			}
 		}
+		export function PendingFallbackWithSibling(props) @{
+			<main>
+				<PendingInsideFallback outer={props.outer} inner={props.inner} />
+				<SharedBoundary label="sibling" promise={props.sibling} />
+			</main>
+		}
 		export function SharedAcrossOuterArms(props) @{
 			@try {
 				const outer = use(props.outer);
@@ -538,6 +544,34 @@ describe('SSR stream state regressions', () => {
 		await output.ended;
 		const container = activateChunks(output.chunks);
 		expect(container.querySelector('.outer-ready')!.textContent).toBe('READY');
+		expect(container.querySelector('.fallback-inner-pending')).toBeNull();
+		expect(onError).not.toHaveBeenCalled();
+		container.remove();
+		resetStreamRuntimeGlobals();
+	});
+
+	it('retires a removed fallback boundary without losing an independent sibling', async () => {
+		const outer = deferred<string>();
+		const inner = deferred<string>();
+		const sibling = deferred<string>();
+		const output = collector();
+		const onError = vi.fn();
+		ServerRuntime.renderToPipeableStream(
+			mod.PendingFallbackWithSibling,
+			{ outer: outer.promise, inner: inner.promise, sibling: sibling.promise },
+			{ timeoutMs: 80, onError },
+		).pipe(output.destination);
+
+		sibling.resolve('READY');
+		await vi.waitFor(() => {
+			expect(output.chunks.some((chunk) => chunk.includes('sibling:READY'))).toBe(true);
+		});
+		outer.resolve('OUTER');
+		await output.ended;
+
+		const container = activateChunks(output.chunks);
+		expect(container.querySelector('.outer-ready')!.textContent).toBe('OUTER');
+		expect(container.querySelector('[data-label="sibling"]')!.textContent).toBe('sibling:READY');
 		expect(container.querySelector('.fallback-inner-pending')).toBeNull();
 		expect(onError).not.toHaveBeenCalled();
 		container.remove();

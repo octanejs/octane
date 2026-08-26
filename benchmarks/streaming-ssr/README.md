@@ -138,8 +138,10 @@ TARGETS=octane,react node benchmarks/streaming-ssr/run.mjs 10 --no-build
 `shell_allfast`, `total_allfast` (the latter carries `opsPerSec`); chunk
 counts, bytes, skeleton counts and all-fast renders/sec land in `meta`.
 Octane additionally reports `shell_cpu_10`, `total_cpu_10`, `shell_cpu_100`,
-`total_cpu_100`, `shell_cpu_waves_50`, and `total_cpu_waves_50`, with the actual
-card/group sizes, chunks, and bytes in `meta.controlledCpu`. Every CPU case
-passes the same complete-card-output gate and checks that the shell precedes
-the controlled data. Increase the iteration count for sub-millisecond cases;
-quick smoke runs establish correctness, not a performance claim.
+`total_cpu_100`, `shell_cpu_800`, `total_cpu_800`, `shell_cpu_waves_50`, and
+`total_cpu_waves_50`, with the actual card/group sizes, chunks, and bytes in
+`meta.controlledCpu`. The 800-card wave makes superlinear boundary bookkeeping
+visible. Every CPU case passes the same complete-card-output gate and checks
+that the shell precedes the controlled data. Increase the iteration count for
+sub-millisecond cases; quick smoke runs establish correctness, not a performance
+claim.

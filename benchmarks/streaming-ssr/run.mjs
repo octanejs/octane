@@ -68,6 +68,7 @@ const SCENARIOS = ['staggered', 'all-fast'];
 const CPU_SCENARIOS = [
 	{ name: 'cpu-10', cards: 10, waveSize: 10 },
 	{ name: 'cpu-100', cards: 100, waveSize: 100 },
+	{ name: 'cpu-800', cards: 800, waveSize: 800 },
 	{ name: 'cpu-waves-50', cards: 50, waveSize: 5 },
 ];
 const CARD_COUNT = 10;
