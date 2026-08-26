@@ -50,6 +50,7 @@ export const BENCHMARK_SUITES = [
 	'chat-stream',
 	'streamdown-hosted',
 	'svg-dashboard',
+	'uibench',
 	'dbmon',
 	'recursive-context',
 	'spa-navigation',
