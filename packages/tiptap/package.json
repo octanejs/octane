@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tiptap",
-  "version": "0.0.40",
+  "version": "0.0.41",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

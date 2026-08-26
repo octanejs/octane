@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/redux-toolkit",
-  "version": "0.1.41",
+  "version": "0.1.42",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

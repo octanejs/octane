@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/to-print",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Octane binding for react-to-print 3.3.0.",
   "license": "MIT",
   "type": "module",

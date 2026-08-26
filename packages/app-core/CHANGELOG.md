@@ -1,5 +1,24 @@
 # @octanejs/app-core
 
+## 0.0.43
+
+### Patch Changes
+
+- 60581f4: Prepare and reuse normalized production HTML template fragments across SSR
+  requests that do not set a CSP nonce, avoiding repeated hydration normalization
+  and static-template validation on every render.
+- 7a639fd: Reuse production render-route indices and lazily cached per-route asset tags instead of rebuilding them for every request.
+- Updated dependencies [af0d999]
+- Updated dependencies [c800a1f]
+- Updated dependencies [c1bb057]
+- Updated dependencies [97b9349]
+- Updated dependencies [4393bea]
+- Updated dependencies [7dfef16]
+- Updated dependencies [7e62361]
+- Updated dependencies [964783a]
+- Updated dependencies [d3dbd78]
+  - octane@0.1.47
+
 ## 0.0.42
 
 ### Patch Changes

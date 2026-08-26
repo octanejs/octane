@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/mobx",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "license": "MIT",
   "type": "module",
   "engines": {

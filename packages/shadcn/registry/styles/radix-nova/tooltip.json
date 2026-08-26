@@ -12,7 +12,7 @@
     }
   ],
   "dependencies": [
-    "@octanejs/radix@0.1.45"
+    "@octanejs/radix@0.1.46"
   ],
   "registryDependencies": [
     "@octane/utils"
