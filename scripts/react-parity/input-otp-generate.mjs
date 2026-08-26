@@ -40,6 +40,7 @@ const lanes = [
 			'packages/input-otp/tests/browser/upstream/base.typing.spec.ts',
 			'packages/input-otp/tests/browser/upstream/with-autofocus.spec.ts',
 			'packages/input-otp/tests/browser/upstream/with-on-complete.spec.ts',
+			'packages/input-otp/tests/browser/upstream/pwm-space.spec.ts',
 		],
 	],
 ];
@@ -47,14 +48,15 @@ const lanes = [
 const upstreamFiles = ['packages/input-otp/tests/pristine/upstream.browser.test.ts'];
 const pristineLedgerPath = 'packages/input-otp/audit/pristine-adaptation-ledger.json';
 const pinnedUpstreamFiles = [
-	'packages/input-otp/upstream/apps/test/src/tests/base.delete-word.spec.ts',
-	'packages/input-otp/upstream/apps/test/src/tests/base.props.spec.ts',
-	'packages/input-otp/upstream/apps/test/src/tests/base.render.spec.ts',
-	'packages/input-otp/upstream/apps/test/src/tests/base.selections.spec.ts',
-	'packages/input-otp/upstream/apps/test/src/tests/base.slot.spec.ts',
-	'packages/input-otp/upstream/apps/test/src/tests/base.typing.spec.ts',
-	'packages/input-otp/upstream/apps/test/src/tests/with-autofocus.spec.ts',
-	'packages/input-otp/upstream/apps/test/src/tests/with-on-complete.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/base.delete-word.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/base.props.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/base.render.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/base.selections.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/base.slot.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/base.typing.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/pwm-space.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/with-autofocus.spec.ts',
+	'packages/input-otp/upstream/apps/playground/src/tests/with-on-complete.spec.ts',
 ];
 
 function sha(contents) {
@@ -195,7 +197,7 @@ await writeJson(pristineCrosswalkPath, {
 	},
 	identityCrosswalk,
 	allowedTransforms: [
-		'Consolidate the eight upstream Playwright spec modules into one Vitest module.',
+		'Consolidate the nine upstream Playwright spec modules into one Vitest module.',
 		'Replace Playwright test imports and webServer routing with the local Vite/Chromium harness.',
 		'Preserve each upstream test title, interaction sequence, and assertion outcome.',
 	],
@@ -244,12 +246,12 @@ const manifest = {
 	schemaVersion: 1,
 	provenance: {
 		repo: 'https://github.com/guilhermerodz/input-otp.git',
-		version: '1.4.2',
-		commit: '81ccdb48c010d800b24942aa231909f0c971b1ca',
+		version: '1.5.0',
+		commit: '3daad8fc88c9a041dbce98e97185efd65b3d87de',
 		sourceRoot: 'packages/input-otp',
-		testRoot: 'apps/test/src/tests',
+		testRoot: 'apps/playground/src/tests',
 		license: 'MIT',
-		integrity: 'sha256:372ada860a04000a06a9bd10732e0ea79a2587c473e6a738930728529de51c77',
+		integrity: 'sha256:62112dac2d8eea337fb8bafb5c9ce5a5d3574f03e06adfe1411ae40e3cc84d97',
 		verification: 'verified',
 	},
 	upstreamSuites: { runtime: 'present', types: 'absent' },
@@ -287,7 +289,7 @@ const manifest = {
 			project: 'input-otp-pristine-browser',
 			evidenceOrigin: 'upstream-suite',
 			notes:
-				'Adapted execution of all 15 pinned upstream React identities in real Chromium; complete pinned-source hashes, rewritten-source hash, and allowed transforms are recorded in the crosswalk.',
+				'Adapted execution of all 19 pinned upstream React identities in real Chromium; complete pinned-source hashes, rewritten-source hash, and allowed transforms are recorded in the crosswalk.',
 			execution: { kind: 'vitest-full', inventory: pristinePath },
 			files: [
 				// The lane's pinned-tree evidence: the lock's upstream git blob shas.
@@ -309,7 +311,7 @@ const manifest = {
 			notes: [
 				'Complete adapted DOM and hydration suite.',
 				'React-free SSR lane.',
-				'Existing Vitest-full real Chromium lane containing all eight adapted upstream files and three port conformance cases.',
+				'Existing Vitest-full real Chromium lane containing all nine adapted upstream files and three port conformance cases.',
 			][index],
 			execution: {
 				kind: 'vitest-full',

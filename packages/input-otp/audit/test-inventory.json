@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "root": "upstream/apps/test/src/tests",
-  "artifactCount": 8,
-  "caseCount": 15,
+  "root": "upstream/apps/playground/src/tests",
+  "artifactCount": 9,
+  "caseCount": 19,
   "requiredPortAuthoredClassifications": [
     "browser-conformance",
     "differential",
@@ -48,18 +48,26 @@
     },
     {
       "path": "base.selections.spec.ts",
-      "caseCount": 3,
+      "caseCount": 5,
       "disposition": "adapted",
       "adaptedPath": "tests/browser/upstream/base.selections.spec.ts",
       "upstreamConditionalSkip": "process.env.CI === 'true' (Shift-key limitation)",
       "adaptedSkipDisposition": "removed; all cases must execute in CI",
       "cases": [
         { "identity": "should replace selected char if another is pressed", "adaptedActive": true },
+        { "identity": "should replace last char if another one is pressed", "adaptedActive": true },
+        {
+          "identity": "should move slot selection with arrow keys when input is full",
+          "adaptedActive": true
+        },
+        {
+          "identity": "should select previous slot when pressing arrow left in insert mode",
+          "adaptedActive": true
+        },
         {
           "identity": "should replace multi-selected chars if another is pressed",
           "adaptedActive": true
-        },
-        { "identity": "should replace last char if another one is pressed", "adaptedActive": true }
+        }
       ]
     },
     {
@@ -78,6 +86,19 @@
         { "identity": "should start as empty value", "adaptedActive": true },
         { "identity": "should change the input value", "adaptedActive": true },
         { "identity": "should prevent typing greater than max length", "adaptedActive": true }
+      ]
+    },
+    {
+      "path": "pwm-space.spec.ts",
+      "caseCount": 2,
+      "disposition": "adapted",
+      "adaptedPath": "tests/browser/upstream/pwm-space.spec.ts",
+      "cases": [
+        { "identity": "pushes the badge when the gutter fits", "adaptedActive": true },
+        {
+          "identity": "does not push inside a constrained scroll container",
+          "adaptedActive": true
+        }
       ]
     },
     {

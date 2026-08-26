@@ -11,6 +11,8 @@ describe('@octanejs/input-otp SSR', () => {
 		expect(first.match(/data-input-otp=""/g)).toHaveLength(1);
 		expect(first).toContain('autoComplete="one-time-code"');
 		expect(first).toContain('value="12"');
+		expect(first).toContain('translate="no"');
+		expect(first).toContain('spellCheck');
 		expect(first).toContain('Hydrated verification code');
 	});
 });

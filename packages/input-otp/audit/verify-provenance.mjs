@@ -55,15 +55,15 @@ function verifyHashes() {
 	const expectedArtifacts = new Map([
 		[
 			'upstream-artifact/README.md',
-			'a2ebcaba0c3cb28a82956b0de2d4cc35ec1b453933137a79bb2395ad679a087c',
+			'44adbdf7084e81ff10ac88ff526260c1ee6bbcaa112bb87f3ab2eea8ab9e9cac',
 		],
 		[
 			'upstream-artifact/package.json',
-			'9590df2c15b05beccf02c5cffcfb4d90fdfe21debd191fade385cdd1e9821ed4',
+			'f300f78728425f50970a82eea4ebe74bb845c0d8677778c0604fb7f77c7b2a02',
 		],
 		[
 			'upstream-artifact/dist/index.d.mts',
-			'b843496b17a2bbd79c83809c73fd9c59fab53d3e361e04e52e2d489524eea764',
+			'0314c9d647a901249a28b151b9b03bd7be4bfbbb72d861d564f4099cc8e37750',
 		],
 	]);
 	const actualPaths = walk(join(packageRoot, 'upstream-artifact')).map((path) =>
@@ -125,7 +125,7 @@ function verifyApi(
 		readFileSync(join(packageRoot, 'upstream-artifact/package.json'), 'utf8'),
 	);
 	for (const metadata of [sourcePackage, npmPackage]) {
-		if (metadata.name !== 'input-otp' || metadata.version !== '1.4.2') {
+		if (metadata.name !== 'input-otp' || metadata.version !== '1.5.0') {
 			fail('Pinned package name/version drift');
 		}
 		if (metadata.license !== 'MIT') fail('Pinned package license drift');
@@ -136,7 +136,7 @@ function verifyApi(
 }
 
 function extractTests() {
-	const root = join(packageRoot, 'upstream/apps/test/src/tests');
+	const root = join(packageRoot, 'upstream/apps/playground/src/tests');
 	return walk(root)
 		.filter((path) => path.endsWith('.spec.ts'))
 		.map((path) => {
@@ -160,11 +160,11 @@ function verifyTests(
 	}));
 	if (JSON.stringify(recorded) !== JSON.stringify(actual))
 		fail('Upstream test identity inventory drift');
-	if (inventory.artifactCount !== 8 || inventory.artifactCount !== actual.length) {
+	if (inventory.artifactCount !== 9 || inventory.artifactCount !== actual.length) {
 		fail('Upstream test artifact count drift');
 	}
 	const caseCount = actual.reduce((count, artifact) => count + artifact.caseCount, 0);
-	if (inventory.caseCount !== 15 || inventory.caseCount !== caseCount) {
+	if (inventory.caseCount !== 19 || inventory.caseCount !== caseCount) {
 		fail('Upstream test case count drift');
 	}
 	if (!sameMembers(inventory.requiredPortAuthoredClassifications, expectedPortClassifications)) {
@@ -265,5 +265,5 @@ if (process.argv.includes('--negative-controls')) {
 }
 
 console.log(
-	`Verified the lock-pinned upstream tree, ${expectedRuntime.length} runtime exports, ${expectedTypes.length} public types, 8 upstream artifacts, and 15 upstream cases.`,
+	`Verified the lock-pinned upstream tree, ${expectedRuntime.length} runtime exports, ${expectedTypes.length} public types, 9 upstream artifacts, and 19 upstream cases.`,
 );

@@ -72,6 +72,18 @@ function Complete() {
 		</OTPInput>
 	);
 }
+function PwmSpace() {
+	return (
+		<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 40 }}>
+			<div data-testid="roomy" style={{ width: 'fit-content' }}>
+				<OTPInput maxLength={6} render={(state) => <Slots {...state} />} />
+			</div>
+			<div data-testid="tight" style={{ width: 'fit-content', overflowX: 'auto', padding: 8 }}>
+				<OTPInput maxLength={6} render={(state) => <Slots {...state} />} />
+			</div>
+		</div>
+	);
+}
 function App() {
 	const path = window.location.pathname;
 	return (
@@ -82,6 +94,8 @@ function App() {
 				<Autofocus />
 			) : path === '/with-on-complete' ? (
 				<Complete />
+			) : path === '/pwm-space' ? (
+				<PwmSpace />
 			) : (
 				<Base />
 			)}

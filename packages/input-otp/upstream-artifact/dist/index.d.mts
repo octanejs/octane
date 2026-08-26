@@ -22,6 +22,7 @@ type OTPInputBaseProps = OverrideProps<React.InputHTMLAttributes<HTMLInputElemen
     pasteTransformer?: (pasted: string) => string;
     containerClassName?: string;
     noScriptCSSFallback?: string | null;
+    nonce?: string;
 }>;
 type InputOTPRenderFn = (props: RenderProps) => React.ReactNode;
 type OTPInputProps = OTPInputBaseProps & ({

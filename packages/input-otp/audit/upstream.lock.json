@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "identity": {
     "packageName": "input-otp",
-    "version": "1.4.2",
+    "version": "1.5.0",
     "repository": {
       "owner": "guilhermerodz",
       "repo": "input-otp",
       "subdirectory": null
     },
-    "commit": "81ccdb48c010d800b24942aa231909f0c971b1ca",
-    "integrity": "sha512-l3jWwYNvrEa6NTCt7BECfCm48GvwuZzkoeG3gBL2w4CHeOXW3eKFmf9UNYkNfYc3mxMrthMnxjIE07MT0zLBQA=="
+    "commit": "3daad8fc88c9a041dbce98e97185efd65b3d87de",
+    "integrity": "sha512-3AcfdW1sNG0FmSA5hHMBXG7jNW5CdcdKs8ln8JOmn6S2SRkoXoJx+2UwC+ZvjflfnOdHJx0SfQ9/YjlxVYLtGQ=="
   },
   "license": {
     "spdx": "MIT",
@@ -22,162 +22,172 @@
     ],
     "notices": []
   },
-  "scopes": ["LICENSE", "README.md", "apps/test", "packages/input-otp"],
+  "scopes": ["LICENSE", "README.md", "apps/playground", "packages/input-otp"],
   "adaptedMappings": [],
   "adaptedRewrites": [],
   "files": [
     {
-      "path": "apps/test/.eslintrc.json",
+      "path": "apps/playground/.eslintrc.json",
       "gitBlob": "60535487093a20a19d379c919c86c61a2cc81210",
       "size": 106
     },
     {
-      "path": "apps/test/.gitignore",
-      "gitBlob": "fd3dbb571a12a1c3baf000db049e141c888d05a8",
-      "size": 391
+      "path": "apps/playground/.gitignore",
+      "gitBlob": "1bab06fea1555fb85af953c84413004cf11d648d",
+      "size": 403
     },
     {
-      "path": "apps/test/next.config.mjs",
-      "gitBlob": "4678774e6d606704bce1897a5dab960cd798bf66",
-      "size": 92
+      "path": "apps/playground/next.config.mjs",
+      "gitBlob": "44ab803ed07f3356a69f3ce6ed7ea114dc829ed3",
+      "size": 392
     },
     {
-      "path": "apps/test/package.json",
-      "gitBlob": "b0fba69b4284669bfa25d1de3fd0df489f615efc",
-      "size": 684
+      "path": "apps/playground/package.json",
+      "gitBlob": "47e8c5392e88ea783e90edff61b5ff47ba7a730c",
+      "size": 678
     },
     {
-      "path": "apps/test/playwright.config.ts",
-      "gitBlob": "b9c9f4557f66da5b6e07ab01cf22a3a564ba2dda",
-      "size": 2220
+      "path": "apps/playground/playwright.config.ts",
+      "gitBlob": "3bfc70c98984e6c7a5fd07b92cb09e2d670530c9",
+      "size": 2061
     },
     {
-      "path": "apps/test/postcss.config.js",
+      "path": "apps/playground/postcss.config.js",
       "gitBlob": "12a703d900da8159c30e75acbd2c4d87ae177f62",
       "size": 83
     },
     {
-      "path": "apps/test/public/next.svg",
+      "path": "apps/playground/public/next.svg",
       "gitBlob": "5174b28c565c285e3e312ec5178be64fbeca8398",
       "size": 1375
     },
     {
-      "path": "apps/test/public/vercel.svg",
+      "path": "apps/playground/public/vercel.svg",
       "gitBlob": "d2f84222734f27b623d1c80dda3561b04d1284af",
       "size": 629
     },
     {
-      "path": "apps/test/README.md",
+      "path": "apps/playground/README.md",
       "gitBlob": "c4033664f80d3cb9cb687fb5facbc82aedb302f6",
       "size": 1383
     },
     {
-      "path": "apps/test/src/app/base/page.tsx",
+      "path": "apps/playground/src/app/base/page.tsx",
       "gitBlob": "ce08c28d2fe8e811a2f68ddc5b1797884d110ec1",
       "size": 433
     },
     {
-      "path": "apps/test/src/app/favicon.ico",
+      "path": "apps/playground/src/app/favicon.ico",
       "gitBlob": "718d6fea4835ec2d246af9800eddb7ffb276240c",
       "size": 25931
     },
     {
-      "path": "apps/test/src/app/globals.css",
+      "path": "apps/playground/src/app/globals.css",
       "gitBlob": "875c01e819b90038f0c3e4aee2a4dcc2086b0e14",
       "size": 606
     },
     {
-      "path": "apps/test/src/app/layout.tsx",
+      "path": "apps/playground/src/app/layout.tsx",
       "gitBlob": "e7aa02ca8589fb0aa6e1070b42249c7e97ea98db",
       "size": 625
     },
     {
-      "path": "apps/test/src/app/page.tsx",
-      "gitBlob": "855b63f5253471fe028871fe7c280000eb9e5217",
-      "size": 227
+      "path": "apps/playground/src/app/page.tsx",
+      "gitBlob": "18c4e3663ca0c2d77fe8ac8779549c48f73b026c",
+      "size": 2696
     },
     {
-      "path": "apps/test/src/app/props/page.tsx",
+      "path": "apps/playground/src/app/props/page.tsx",
       "gitBlob": "2b972f82b3e63060168d7ddc8d670c5920cd6d94",
       "size": 733
     },
     {
-      "path": "apps/test/src/app/with-autofocus/page.tsx",
+      "path": "apps/playground/src/app/pwm-space/page.tsx",
+      "gitBlob": "10a886e2085907123606180b23dc00387625347d",
+      "size": 683
+    },
+    {
+      "path": "apps/playground/src/app/with-autofocus/page.tsx",
       "gitBlob": "da4571cabf355cf87cd8c36ef3a525c2477a2c45",
       "size": 286
     },
     {
-      "path": "apps/test/src/app/with-on-complete/page.tsx",
+      "path": "apps/playground/src/app/with-on-complete/page.tsx",
       "gitBlob": "ec7730eb2790a4fc1aeb2d1b6bdcd47e1e7167ca",
       "size": 390
     },
     {
-      "path": "apps/test/src/components/base-input.tsx",
+      "path": "apps/playground/src/components/base-input.tsx",
       "gitBlob": "386b126fc9d80869b66177fb2710c293c99faa50",
       "size": 1573
     },
     {
-      "path": "apps/test/src/lib/fonts.ts",
+      "path": "apps/playground/src/lib/fonts.ts",
       "gitBlob": "1273e6c77f7bc12203096105511d7855ca0f01e3",
       "size": 459
     },
     {
-      "path": "apps/test/src/lib/utils.ts",
+      "path": "apps/playground/src/lib/utils.ts",
       "gitBlob": "d084ccade0d8b5bd77fd5174993bcef7b57644c9",
       "size": 166
     },
     {
-      "path": "apps/test/src/tests/base.delete-word.spec.ts",
-      "gitBlob": "d608828b43678e4c412741b139e3b7ccbdea910b",
-      "size": 1689
+      "path": "apps/playground/src/tests/base.delete-word.spec.ts",
+      "gitBlob": "07b4e6815ebe39a2aa34428088faa5cb546c2721",
+      "size": 2433
     },
     {
-      "path": "apps/test/src/tests/base.props.spec.ts",
+      "path": "apps/playground/src/tests/base.props.spec.ts",
       "gitBlob": "2fb252bdf2f07ce8fd968f7d23be86feff56888c",
       "size": 1113
     },
     {
-      "path": "apps/test/src/tests/base.render.spec.ts",
+      "path": "apps/playground/src/tests/base.render.spec.ts",
       "gitBlob": "0bd8583babdb2b729f3d6b0f8482b0d1382aaffe",
       "size": 1133
     },
     {
-      "path": "apps/test/src/tests/base.selections.spec.ts",
-      "gitBlob": "689e1bfec957d74ed5dbbb81ef6fd472d4b6b32e",
-      "size": 1290
+      "path": "apps/playground/src/tests/base.selections.spec.ts",
+      "gitBlob": "ace1af04e8f6d100185c4c418d854f3e300ab490",
+      "size": 4361
     },
     {
-      "path": "apps/test/src/tests/base.slot.spec.ts",
+      "path": "apps/playground/src/tests/base.slot.spec.ts",
       "gitBlob": "5c260befab157ae2c6dbe1e151ccc6db41b4c9a7",
       "size": 1237
     },
     {
-      "path": "apps/test/src/tests/base.typing.spec.ts",
-      "gitBlob": "624625685892b970654f899836167ab4d4295a5d",
-      "size": 862
+      "path": "apps/playground/src/tests/base.typing.spec.ts",
+      "gitBlob": "dd74015d6e1707aea62a0a5e4091cf2b5c7b81d5",
+      "size": 947
     },
     {
-      "path": "apps/test/src/tests/util/modifier.ts",
+      "path": "apps/playground/src/tests/pwm-space.spec.ts",
+      "gitBlob": "ea96ddba2452a400dd9c296038123001ac141083",
+      "size": 1922
+    },
+    {
+      "path": "apps/playground/src/tests/util/modifier.ts",
       "gitBlob": "c215bfea8ce0f13f80c11a4b9cbea09cb7ab7ad1",
       "size": 74
     },
     {
-      "path": "apps/test/src/tests/with-autofocus.spec.ts",
+      "path": "apps/playground/src/tests/with-autofocus.spec.ts",
       "gitBlob": "28b20290d2bbb78b11b4421d66bbe1738b281bdf",
       "size": 314
     },
     {
-      "path": "apps/test/src/tests/with-on-complete.spec.ts",
+      "path": "apps/playground/src/tests/with-on-complete.spec.ts",
       "gitBlob": "a53577a283eb68c7b5df0d8f94325d3466cb133a",
       "size": 466
     },
     {
-      "path": "apps/test/tailwind.config.ts",
+      "path": "apps/playground/tailwind.config.ts",
       "gitBlob": "e9a0944e7b319989ec1a7327d9695247c5bd1a41",
       "size": 510
     },
     {
-      "path": "apps/test/tsconfig.json",
+      "path": "apps/playground/tsconfig.json",
       "gitBlob": "7b2858930495fc4a76d7a51d958bacf2d64eb81f",
       "size": 578
     },
@@ -188,8 +198,8 @@
     },
     {
       "path": "packages/input-otp/package.json",
-      "gitBlob": "b791ab3659c3bab0a5177d2710fb9a89fb21a014",
-      "size": 3125
+      "gitBlob": "806a46c2534a5203e425911dcb078ea5cae87939",
+      "size": 3154
     },
     {
       "path": "packages/input-otp/src/index.ts",
@@ -198,8 +208,8 @@
     },
     {
       "path": "packages/input-otp/src/input.tsx",
-      "gitBlob": "4df1db91974a4395719551f467c7d366a4a53ab2",
-      "size": 17362
+      "gitBlob": "53b210a5ab4879d29d86bf5dc9c119bf4b2390a3",
+      "size": 18612
     },
     {
       "path": "packages/input-otp/src/regexp.ts",
@@ -213,8 +223,8 @@
     },
     {
       "path": "packages/input-otp/src/types.ts",
-      "gitBlob": "0af3b24fb857231a24e7dcd56be61e6e4303c233",
-      "size": 1001
+      "gitBlob": "96997bb67ae83fc2af5a93ad143c4057615c5cea",
+      "size": 1244
     },
     {
       "path": "packages/input-otp/src/use-previous.ts",
@@ -223,8 +233,8 @@
     },
     {
       "path": "packages/input-otp/src/use-pwm-badge.tsx",
-      "gitBlob": "01d7b4003d534a6804b072aacbfb508dda2487d6",
-      "size": 4291
+      "gitBlob": "5fc031462a0cd76143ea972771fc35c482f62646",
+      "size": 5830
     },
     {
       "path": "packages/input-otp/tsconfig.json",
@@ -238,9 +248,9 @@
     },
     {
       "path": "README.md",
-      "gitBlob": "1b1ba01e47c53b9c2888285227837efbf3133d01",
-      "size": 14252
+      "gitBlob": "e5f7054500f2b26c6c03ea507cc0b1738f69d048",
+      "size": 12664
     }
   ],
-  "fingerprint": "38578de7720eb68ffc5ccdcceabafe8d80f6396430336838d989da1aeb5329ea"
+  "fingerprint": "73bd33562d848b9060168bcd50bf7c157a994db10f34858f14c7724d27ad18a7"
 }

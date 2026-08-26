@@ -7,75 +7,95 @@
     {
       "id": "runtime:input-otp-pristine-browser:0001",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should autofocus"
+      "fullName": "does not push inside a constrained scroll container"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0002",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should backspace previous word (even if there is not a selected character)"
+      "fullName": "pushes the badge when the gutter fits"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0003",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should backspace selected char"
+      "fullName": "should autofocus"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0004",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should change the input value"
+      "fullName": "should backspace previous word (even if there is not a selected character)"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0005",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should change the input value"
+      "fullName": "should backspace selected char"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0006",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should expose focus flags"
+      "fullName": "should change the input value"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0007",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should expose hover flags"
+      "fullName": "should change the input value"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0008",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should expose the slot value"
+      "fullName": "should expose focus flags"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0009",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should forward-delete character when pressing delete"
+      "fullName": "should expose hover flags"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0010",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should prevent typing greater than max length"
+      "fullName": "should expose the slot value"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0011",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should receive props accordingly"
+      "fullName": "should forward-delete character when pressing delete"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0012",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should replace last char if another one is pressed"
+      "fullName": "should move slot selection with arrow keys when input is full"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0013",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should replace multi-selected chars if another is pressed"
+      "fullName": "should prevent typing greater than max length"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0014",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-      "fullName": "should replace selected char if another is pressed"
+      "fullName": "should receive props accordingly"
     },
     {
       "id": "runtime:input-otp-pristine-browser:0015",
+      "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
+      "fullName": "should replace last char if another one is pressed"
+    },
+    {
+      "id": "runtime:input-otp-pristine-browser:0016",
+      "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
+      "fullName": "should replace multi-selected chars if another is pressed"
+    },
+    {
+      "id": "runtime:input-otp-pristine-browser:0017",
+      "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
+      "fullName": "should replace selected char if another is pressed"
+    },
+    {
+      "id": "runtime:input-otp-pristine-browser:0018",
+      "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
+      "fullName": "should select previous slot when pressing arrow left in insert mode"
+    },
+    {
+      "id": "runtime:input-otp-pristine-browser:0019",
       "file": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
       "fullName": "should start as empty value"
     }

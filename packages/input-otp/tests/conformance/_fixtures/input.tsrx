@@ -82,6 +82,8 @@ export function CallbackInput(props: {
 		required
 		tabIndex={3}
 		autoComplete="off"
+		spellCheck={true}
+		nonce="csp-style"
 		pasteTransformer={(value) => value.replaceAll('-', '')}
 		onFocus={props.onFocus}
 		onBlur={props.onBlur}
