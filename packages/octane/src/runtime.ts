@@ -3597,9 +3597,10 @@ function drainHydrationRenderPhaseUpdates(root: Block): void {
 // ancestor of B then depth(A) < depth(B), so A renders first and its cascade can
 // clear B's `pending` (skipping B's redundant standalone render) regardless of
 // the order their setStates were queued. Depths are precomputed so the comparator
-// doesn't re-walk the chain on every compare. Cache every ancestry prefix reached
-// by the wave so overlapping paths are walked only once.
+// doesn't re-walk the chain on every compare. Resolve each unknown path to its
+// nearest cached queued ancestor, retaining depths only for blocks in this wave.
 function sortWaveByDepth(wave: Block[]): Block[] {
+	const queued = new Set(wave);
 	const depth = new Map<Block, number>();
 	const path: Block[] = [];
 	for (let i = 0; i < wave.length; i++) {
@@ -3612,7 +3613,11 @@ function sortWaveByDepth(wave: Block[]): Block[] {
 			current = current.parentBlock;
 		}
 		let currentDepth = knownDepth ?? -1;
-		while (path.length > 0) depth.set(path.pop()!, ++currentDepth);
+		while (path.length > 0) {
+			const block = path.pop()!;
+			currentDepth++;
+			if (queued.has(block)) depth.set(block, currentDepth);
+		}
 	}
 	wave.sort((a, b) => depth.get(a)! - depth.get(b)!);
 	return wave;
