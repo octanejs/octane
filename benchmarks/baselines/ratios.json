@@ -1968,6 +1968,14 @@
     "note": "First real native tap after the identical 10,000-row mount. A 21-sample run measured Octane 7.62 ms vs ReactLynx 9.06 ms (0.84x); the guard prevents mount work from moving into the first interaction."
   },
   {
+    "suite": "lynx-render",
+    "op": "drain_ms",
+    "target": "octane-lynx-reentrant-20k",
+    "reference": "octane-lynx-reentrant-10k",
+    "maxRatio": 3.5,
+    "note": "Same-run scaling guard for commits queued synchronously during Element PAPI reentry. Matched 5-sample runs measured the cursor drain at 113.9 / 56.4 = 2.02x; the former front-shift drain measured 249.2 / 56.3 = 4.43x."
+  },
+  {
     "suite": "lynx-bundle-size",
     "op": "bundle_gzip",
     "target": "octane-ifr",

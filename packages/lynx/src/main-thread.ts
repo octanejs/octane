@@ -603,7 +603,9 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	let deferredFirstTreeCapabilities: LynxMainThreadCapabilities | undefined;
 	let firstTreeSnapshotSent = false;
 	let uninstallFirstScreenHost: (() => void) | null = null;
-	const queuedCommits: LynxCommitMessage[] = [];
+	// Reentrant PAPI work can enqueue a large burst; consumed slots are tombstoned
+	// so the drain stays linear without retaining every processed message.
+	const queuedCommits: Array<LynxCommitMessage | undefined> = [];
 	const queuedNativeEvents: Array<readonly LynxQueuedNativeEventDelivery[]> = [];
 	const queuedLifecycleMessages: LynxLifecycleMessage[] = [];
 	const queuedReadyRequests = new Set<number>();
@@ -2330,6 +2332,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		commitInProgress = true;
 		try {
 			let next: LynxCommitMessage | undefined = message;
+			let queuedIndex = 0;
 			do {
 				handleCommitExclusive(next, {
 					protocol: next.protocol,
@@ -2341,8 +2344,14 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 					queuedCommits.length = 0;
 					break;
 				}
-				next = queuedCommits.shift();
+				if (queuedIndex === queuedCommits.length) {
+					next = undefined;
+				} else {
+					next = queuedCommits[queuedIndex];
+					queuedCommits[queuedIndex++] = undefined;
+				}
 			} while (next !== undefined);
+			queuedCommits.length = 0;
 		} catch (error) {
 			// A response delivery failure terminally tears down the background
 			// transport. Do not replay commits it dispatched reentrantly before

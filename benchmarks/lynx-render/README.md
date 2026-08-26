@@ -25,6 +25,10 @@ Targets:
   a fully settled mount, including the resulting state and visible-tree update.
   This prevents mount optimizations from merely deferring their work to the
   first user interaction.
+- `drain_ms` on `octane-lynx-reentrant-{10k,20k}` — an Octane-only transport
+  scaling pair that queues a synchronous commit burst from inside one Element
+  PAPI update. Every version must be acknowledged and completed in order, and
+  the final native host must expose the last queued value.
 
 Each 1,000-row sample must create exactly 9,008 reachable host nodes and install
 2,000 native event tokens; 10,000-row samples must create 90,008 nodes and
@@ -34,6 +38,9 @@ order while ignoring allocation order and Octane's renderer-private ref
 selectors. Both targets must also deliver three real native taps through
 `lynxCoreInject.tt.publishEvent`, exercising separate row handlers and state
 updates, and produce matching visible trees after each interaction.
+The reentrant transport pair is intentionally not compared with ReactLynx: it
+exercises Octane's public wire protocol directly and guards 20,000 commits
+against the same-run 10,000-commit baseline to catch superlinear queue drains.
 After each timed Octane mount, the harness also verifies that every keyed row
 used the same compiled nine-host program in one batched run, that host and
 listener identities were derived from contiguous ranges, and that the entire

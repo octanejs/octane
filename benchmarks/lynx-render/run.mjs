@@ -177,6 +177,23 @@ try {
 		}
 	}
 
+	function validateReentrantCommits(count, result) {
+		const target = `octane-lynx-reentrant-${count / 1_000}k`;
+		if (result.diagnostics.length !== 0) {
+			failures.push(`${target}: ${result.diagnostics.join(' | ')}`);
+		}
+		if (result.acknowledgements !== count + 2 || result.completions !== count + 2) {
+			failures.push(
+				`${target}: received ${result.acknowledgements} acknowledgements and ${result.completions} completions, expected ${count + 2} of each.`,
+			);
+		}
+		if (result.finalVersion !== count + 2 || result.finalId !== `queued-${count - 1}`) {
+			failures.push(
+				`${target}: finished at version ${result.finalVersion ?? 'missing'} with id ${JSON.stringify(result.finalId)}, expected version ${count + 2} and id ${JSON.stringify(`queued-${count - 1}`)}.`,
+			);
+		}
+	}
+
 	function run(framework, scenario) {
 		if (scenario.rows === null) return framework.workload.runEmptyStartup();
 		return scenario.op.startsWith('update_')
@@ -209,6 +226,30 @@ try {
 					...(result.transport === undefined ? null : { transport: result.transport }),
 				};
 			}
+		}
+	}
+
+	const reentrantCommitCases = [10_000, 20_000];
+	for (const count of reentrantCommitCases) {
+		validateReentrantCommits(count, workload.runReentrantCommits(count));
+	}
+	for (let iteration = 0; iteration < iterations; iteration++) {
+		const ordered =
+			iteration % 2 === 0 ? reentrantCommitCases : [...reentrantCommitCases].reverse();
+		for (const count of ordered) {
+			const result = workload.runReentrantCommits(count);
+			validateReentrantCommits(count, result);
+			const target = record(
+				`octane-lynx-reentrant-${count / 1_000}k`,
+				'drain_ms',
+				result.durationMs,
+			);
+			target.meta = {
+				acknowledgements: result.acknowledgements,
+				completions: result.completions,
+				finalId: result.finalId,
+				finalVersion: result.finalVersion,
+			};
 		}
 	}
 
