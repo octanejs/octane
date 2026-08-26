@@ -483,12 +483,13 @@ Production client builds may condition every eligible call shape on those
 witnessed inputs. A `use*`-shaped ordinary function is treated like any other
 projection; Strong does not require React's hook naming convention to establish
 purity. Actual hooks still belong in component or custom-hook setup and retain
-their compiler-owned behavior. Built-in hook provenance and immutable
-same-module custom-hook declarations that reach a built-in keep context, state,
-suspension, and effect lifecycle handling even when their names are aliased. Projection guards witness both a
-method/callable and its receiver, plus explicit arguments; derived receivers are
-witnessed through the operation and inputs that produce them rather than their
-transient result identity.
+their compiler-owned behavior. Built-in hook provenance, including optional
+calls, and lexically resolved same-module custom-hook declarations keep context,
+state, suspension, and effect lifecycle handling even through aliases or cyclic
+call graphs. Projection guards witness both a method/callable and its receiver,
+plus explicit arguments; derived receivers are witnessed through the operation
+and inputs that produce them rather than their transient result identity. Guard
+equality is `Object.is`, including its `NaN` and signed-zero behavior.
 
 The diagnostics above are bounded; they do not prove arbitrary imported code or
 method bodies pure, and an unknown call does not make memoization fall back. A

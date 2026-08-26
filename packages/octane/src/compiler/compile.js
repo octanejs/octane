@@ -4206,7 +4206,7 @@ function containsAutoMemoContextRead(root, ctx) {
 const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext']);
 
 function autoMemoBuiltinHookName(call) {
-	if (call?.type !== 'CallExpression') return null;
+	if (call?.type !== 'CallExpression' && call?.type !== 'OptionalCallExpression') return null;
 	const imported = call._octaneImportedHook ?? call._octaneHookRuntimeImportedHook;
 	if (imported !== undefined && AUTO_MEMO_SETUP_HOOK_NAMES.has(imported)) return imported;
 	if (
@@ -4219,33 +4219,102 @@ function autoMemoBuiltinHookName(call) {
 	return null;
 }
 
-// Strong asserts that USER render operations are pure; it does not turn
-// compiler-owned hook setup into a projection. Resolve direct builtins from the
-// provenance attached by applyHookDependencies, then follow only immutable
-// same-module functions that really resolve at the call site. Hook-shaped
-// spelling alone is deliberately irrelevant: an ordinary `useFormat()` helper
-// remains eligible, while `function useTheme() { return useContext(...); }` is
-// kept on the lifecycle-aware path.
-function autoMemoCallExecutesSetupHook(call, ctx, active = new Set(), cycle = { hit: false }) {
-	if (autoMemoBuiltinHookName(call) !== null) return true;
-	const callee = unwrapTsExpr(call?.callee);
-	if (callee?.type !== 'Identifier') return false;
-	const name = callee.name;
-	const declaration = ctx?.moduleFunctionDeclarations?.get(name);
-	if (declaration === undefined) return false;
-	const cache = ctx.__autoMemoSetupHookFunctions ?? (ctx.__autoMemoSetupHookFunctions = new Map());
-	let containsHook = cache.get(name);
-	if (containsHook === undefined) {
-		if (active.has(name)) {
-			cycle.hit = true;
-			return false;
+function autoMemoModuleFunctionDeclarations(ctx) {
+	if (ctx.autoMemoModuleFunctionDeclarations !== undefined) {
+		return ctx.autoMemoModuleFunctionDeclarations;
+	}
+	const declarations = new Map();
+	for (const statement of ctx.activityModuleAst.body) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: statement;
+		if (declaration?.type === 'FunctionDeclaration' && declaration.id?.type === 'Identifier') {
+			declarations.set(declaration.id.name, declaration);
 		}
-		const enteredWithCycle = cycle.hit;
-		active.add(name);
-		containsHook = false;
+	}
+	ctx.autoMemoModuleFunctionDeclarations = declarations;
+	return declarations;
+}
+
+function collectAutoMemoModuleFunctions(ctx, lexical) {
+	const declarations = autoMemoModuleFunctionDeclarations(ctx);
+	const reassigned = new Set();
+	function markPattern(original) {
+		const node = unwrapTsExpr(original);
+		if (node?.type === 'Identifier') {
+			if (!declarations.has(node.name)) return;
+			const scope = lexical.nodeScopes.get(node);
+			if (
+				scope !== undefined &&
+				lexical.resolveBinding(scope, node.name)?.scope === lexical.rootScope
+			) {
+				reassigned.add(node.name);
+			}
+			return;
+		}
+		if (node?.type === 'RestElement') {
+			markPattern(node.argument);
+			return;
+		}
+		if (node?.type === 'AssignmentPattern') {
+			markPattern(node.left);
+			return;
+		}
+		if (node?.type === 'ArrayPattern') {
+			for (const element of node.elements ?? []) markPattern(element);
+			return;
+		}
+		if (node?.type === 'ObjectPattern') {
+			for (const property of node.properties ?? [])
+				markPattern(property.argument ?? property.value);
+		}
+	}
+	const seen = new WeakSet();
+	function walk(node) {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (node.type === 'AssignmentExpression') {
+			markPattern(node.left);
+		} else if (node.type === 'UpdateExpression') {
+			markPattern(node.argument);
+		} else if (
+			(node.type === 'ForInStatement' || node.type === 'ForOfStatement') &&
+			node.left?.type !== 'VariableDeclaration'
+		) {
+			markPattern(node.left);
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(node[key]);
+		}
+	}
+	walk(ctx.activityModuleAst);
+	return { declarations, reassigned };
+}
+
+function autoMemoSetupHookFunctions(ctx) {
+	if (ctx.__autoMemoSetupHookFunctions !== undefined) {
+		return ctx.__autoMemoSetupHookFunctions;
+	}
+	const lexical =
+		ctx.autoMemoHookLexical ?? ctx.activityLexical ?? createLexicalAnalysis(ctx.activityModuleAst);
+	ctx.autoMemoHookLexical = lexical;
+	ctx.activityLexical ??= lexical;
+	const { declarations, reassigned } = collectAutoMemoModuleFunctions(ctx, lexical);
+	const calls = new Map();
+	const hookful = new Set(reassigned);
+	for (const [name, declaration] of declarations) {
+		const outgoing = new Set();
+		calls.set(name, outgoing);
 		const seen = new WeakSet();
 		function walk(node) {
-			if (containsHook || node == null || typeof node !== 'object') return;
+			if (node == null || typeof node !== 'object') return;
 			if (Array.isArray(node)) {
 				for (const child of node) walk(child);
 				return;
@@ -4260,12 +4329,21 @@ function autoMemoCallExecutesSetupHook(call, ctx, active = new Set(), cycle = { 
 			) {
 				return;
 			}
-			if (
-				node.type === 'CallExpression' &&
-				autoMemoCallExecutesSetupHook(node, ctx, active, cycle)
-			) {
-				containsHook = true;
-				return;
+			if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
+				if (autoMemoBuiltinHookName(node) !== null) {
+					hookful.add(name);
+				} else {
+					const callee = unwrapTsExpr(node.callee);
+					if (callee?.type === 'Identifier' && declarations.has(callee.name)) {
+						const scope = lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(node);
+						if (
+							scope !== undefined &&
+							lexical.resolveBinding(scope, callee.name)?.scope === lexical.rootScope
+						) {
+							outgoing.add(callee.name);
+						}
+					}
+				}
 			}
 			for (const key in node) {
 				if (AST_WALK_SKIP_KEYS.has(key)) continue;
@@ -4273,18 +4351,50 @@ function autoMemoCallExecutesSetupHook(call, ctx, active = new Set(), cycle = { 
 			}
 		}
 		walk(declaration);
-		active.delete(name);
-		// A negative result reached through a cycle is not final: another member
-		// of that cycle may prove a hook later in the outer traversal. Positive
-		// proofs are final, and acyclic negatives remain worth caching.
-		if (containsHook || cycle.hit === enteredWithCycle) cache.set(name, containsHook);
 	}
-	if (!containsHook) return false;
+	const callers = new Map();
+	for (const [name, outgoing] of calls) {
+		for (const target of outgoing) {
+			let incoming = callers.get(target);
+			if (incoming === undefined) callers.set(target, (incoming = new Set()));
+			incoming.add(name);
+		}
+	}
+	const queue = [...hookful];
+	for (let index = 0; index < queue.length; index++) {
+		for (const caller of callers.get(queue[index]) ?? []) {
+			if (hookful.has(caller)) continue;
+			hookful.add(caller);
+			queue.push(caller);
+		}
+	}
+	const summaries = new Map();
+	for (const name of declarations.keys()) summaries.set(name, hookful.has(name));
+	ctx.__autoMemoSetupHookFunctions = summaries;
+	return summaries;
+}
 
-	// A component-local declaration can shadow the module function with the same
-	// name. Pay for lexical resolution only after the module target is known to
-	// contain setup hooks; ordinary Strong projections never allocate this pass.
-	const lexical = (ctx.autoMemoHookLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+// Strong asserts that USER render operations are pure; it does not turn
+// compiler-owned hook setup into a projection. Resolve direct builtins from the
+// provenance attached by applyHookDependencies, then solve same-module
+// declaration reachability by lexical binding. Reassigned module bindings are
+// conservatively setup-bearing; shadowed local assignments are not. Hook-shaped
+// spelling alone is deliberately irrelevant: an ordinary `useFormat()` helper
+// remains eligible, while `function useTheme() { return useContext(...); }` is
+// kept on the lifecycle-aware path.
+function autoMemoCallExecutesSetupHook(call, ctx) {
+	if (autoMemoBuiltinHookName(call) !== null) return true;
+	const callee = unwrapTsExpr(call?.callee);
+	if (callee?.type !== 'Identifier') return false;
+	const name = callee.name;
+	if (!autoMemoModuleFunctionDeclarations(ctx).has(name)) return false;
+	const summaries = autoMemoSetupHookFunctions(ctx);
+	if (summaries.get(name) !== true) return false;
+
+	// A component-local declaration can shadow the hookful module function with
+	// the same name. The summary graph uses this same binding resolution for its
+	// transitive edges, so cycles reach a fixed point independent of source order.
+	const lexical = ctx.autoMemoHookLexical;
 	const scope = lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(call);
 	const binding = scope === undefined ? null : lexical.resolveBinding(scope, name);
 	return binding?.scope === lexical.rootScope;
@@ -4332,7 +4442,11 @@ function containsRenderCall(stmts, memoCtx = null) {
 			t === 'NewExpression' ||
 			t === 'TaggedTemplateExpression'
 		) {
-			if (memoCtx !== null && t === 'CallExpression' && autoMemoCallExecutesSetupHook(n, memoCtx)) {
+			if (
+				memoCtx !== null &&
+				(t === 'CallExpression' || t === 'OptionalCallExpression') &&
+				autoMemoCallExecutesSetupHook(n, memoCtx)
+			) {
 				found = true;
 				return;
 			}
@@ -20837,10 +20951,15 @@ function emitAutoMemoRegion(
 	if (extraMiss !== null) misses.push(extraMiss);
 	misses.push(b.binary('!==', cacheAt(cell.init), b.literal(true)));
 	for (let index = 0; index < depNames.length; index++) {
-		misses.push(b.binary('!==', cacheAt(cell.base + index), b.id(depNames[index])));
+		misses.push(b.unary('!', hkObjectIs(ctx, cacheAt(cell.base + index), b.id(depNames[index]))));
 	}
 	for (let index = 0; index < witnessCount; index++) {
-		misses.push(b.binary('!==', cacheAt(witnessBase + index), b.id(publicationWitnesses[index])));
+		misses.push(
+			b.unary(
+				'!',
+				hkObjectIs(ctx, cacheAt(witnessBase + index), b.id(publicationWitnesses[index])),
+			),
+		);
 	}
 	const publish = () => [
 		...depNames.map((name, index) =>

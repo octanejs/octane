@@ -182,6 +182,99 @@ export function StrongAliasedContextRows() @{
 	</div>
 }
 
+export function StrongOptionalAliasedContextRows() @{
+	const [theme, setTheme] = useState('first');
+	const [items] = useState([{ id: 1 }, { id: 2 }]);
+	<div>
+		<button id="strong-optional-context-update" onClick={() => setTheme('second')}>
+			update
+		</button>
+		<StrongTheme.Provider value={theme}>
+			@for (const item of items.slice(); key item.id) {
+				const value = readContext?.(StrongTheme);
+				<span class="strong-optional-context-row">{value as string}</span>
+			}
+		</StrongTheme.Provider>
+	</div>
+}
+
+function useCycleA(context: typeof StrongTheme, depth: number): string {
+	if (depth === 0) return useCycleB(context, 1);
+	if (depth === 1) return useCycleC(context, 2);
+	return useContext(context);
+}
+
+function useCycleB(context: typeof StrongTheme, depth: number): string {
+	return useCycleA(context, depth);
+}
+
+function useCycleC(context: typeof StrongTheme, depth: number): string {
+	return useCycleA(context, depth);
+}
+
+function StrongCycleReaderA(props: { context: typeof StrongTheme }) @{
+	const value = useCycleA(props.context, 0);
+	<span id="strong-cycle-reader-a">{value as string}</span>
+}
+
+function StrongCycleReaderC(props: { context: typeof StrongTheme }) @{
+	const value = useCycleC(props.context, 0);
+	<span id="strong-cycle-reader-c">{value as string}</span>
+}
+
+export function StrongCyclicContextReaders() @{
+	const [theme, setTheme] = useState('first');
+	<div>
+		<button id="strong-cycle-context-update" onClick={() => setTheme('second')}>
+			update
+		</button>
+		<StrongTheme.Provider value={theme}>
+			<StrongCycleReaderA context={StrongTheme} />
+			<StrongCycleReaderC context={StrongTheme} />
+		</StrongTheme.Provider>
+	</div>
+}
+
+function useShadowedTheme(context: typeof StrongTheme): string {
+	return useContext(context);
+}
+
+function unrelatedShadowAssignment(): number {
+	let useShadowedTheme = 0;
+	useShadowedTheme = 1;
+	return useShadowedTheme;
+}
+
+export function StrongShadowedAssignmentContextRows() @{
+	const [theme, setTheme] = useState('first');
+	const [items] = useState([{ id: 1 }]);
+	<div>
+		<button id="strong-shadow-context-update" onClick={() => setTheme('second')}>
+			update
+		</button>
+		<StrongTheme.Provider value={theme}>
+			@for (const item of items.slice(); key item.id) {
+				const value = useShadowedTheme(StrongTheme);
+				<span class="strong-shadow-context-row">{value as string}</span>
+			}
+		</StrongTheme.Provider>
+	</div>
+}
+
+export interface StrongNumberProjectorConstructor {
+	new (value: number): { result: string };
+}
+
+export function StrongSignedZeroConstructedProp(props: {
+	Projector: StrongNumberProjectorConstructor;
+	value: number;
+}) @{
+	<DependencyLeaf
+		id="strong-signed-zero-constructor"
+		value={new props.Projector(props.value).result}
+	/>
+}
+
 function StrongLayoutEffectChild(props: { log: string[] }) @{
 	useLayoutEffect(() => {
 		props.log.push('create');

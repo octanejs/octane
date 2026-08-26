@@ -49,13 +49,18 @@ import {
 	StrongCallableDependencies,
 	StrongConstructedResultProp,
 	StrongCustomHookContext,
+	StrongCyclicContextReaders,
 	StrongFactoryReadProp,
 	StrongMapJoinProp,
+	StrongOptionalAliasedContextRows,
+	StrongShadowedAssignmentContextRows,
+	StrongSignedZeroConstructedProp,
 	StrongSuspenseLayoutEffect,
 	StrongTheme,
 	SnapshotCalculation,
 	SnapshotMethodList,
 	WrappedSnapshotCalculation,
+	type StrongNumberProjectorConstructor,
 	type StrongProjectorConstructor,
 	type SnapshotRow,
 } from './_fixtures/for-strong.tsrx';
@@ -610,6 +615,52 @@ describe('Strong memoization preserves dependency and setup semantics', () => {
 			'second',
 			'second',
 		]);
+		r.unmount();
+	});
+
+	it('does not skip an optional aliased built-in hook in keyed-row setup', () => {
+		const r = mount(StrongOptionalAliasedContextRows);
+		expect(r.findAll('.strong-optional-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		r.click('#strong-optional-context-update');
+		expect(r.findAll('.strong-optional-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		r.unmount();
+	});
+
+	it('finds setup hooks through cyclic same-module call graphs independent of declaration order', () => {
+		const r = mount(StrongCyclicContextReaders);
+		expect(r.find('#strong-cycle-reader-a').textContent).toBe('first');
+		expect(r.find('#strong-cycle-reader-c').textContent).toBe('first');
+		r.click('#strong-cycle-context-update');
+		expect(r.find('#strong-cycle-reader-a').textContent).toBe('second');
+		expect(r.find('#strong-cycle-reader-c').textContent).toBe('second');
+		r.unmount();
+	});
+
+	it('resolves shadowed assignments by binding when following same-module setup hooks', () => {
+		const r = mount(StrongShadowedAssignmentContextRows);
+		expect(r.find('.strong-shadow-context-row').textContent).toBe('first');
+		r.click('#strong-shadow-context-update');
+		expect(r.find('.strong-shadow-context-row').textContent).toBe('second');
+		r.unmount();
+	});
+
+	it('uses SameValue semantics for newly cached constructor inputs', () => {
+		const Projector = class {
+			result: string;
+			constructor(value: number) {
+				this.result = Object.is(value, -0) ? '-0' : '+0';
+			}
+		} satisfies StrongNumberProjectorConstructor;
+		const r = mount(StrongSignedZeroConstructedProp, { Projector, value: 0 });
+		expect(r.find('#strong-signed-zero-constructor').textContent).toBe('+0');
+		r.update(StrongSignedZeroConstructedProp, { Projector, value: -0 });
+		expect(r.find('#strong-signed-zero-constructor').textContent).toBe('-0');
 		r.unmount();
 	});
 
