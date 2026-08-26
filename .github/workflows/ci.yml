@@ -696,6 +696,10 @@ jobs:
           BUN_BINARY: bun
         run: node --test packages/octane/tests/register-hook-bun.integration.test.mjs
 
+      - name: Run OpenTUI native integration tests
+        if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' && steps.setup_heavy_node_bun.outcome == 'success' }}
+        run: pnpm --dir packages/opentui test:native
+
       - name: Run Astro integration tests
         if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' && steps.install_heavy_node_chromium.outcome == 'success' }}
         run: >-

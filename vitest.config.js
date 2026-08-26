@@ -9,6 +9,7 @@ import { octane } from './packages/octane/src/compiler/vite.js';
 import { octaneMdx } from './packages/mdx/src/vite.js';
 import { stylex } from './packages/stylex/src/vite.js';
 import { lynxRspeedyRenderers } from './packages/lynx/src/config.runtime.js';
+import { opentuiRenderers as OPENTUI_RENDERERS } from './packages/opentui/src/config.ts';
 import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.ts';
 import { inkRenderers as INK_RENDERERS } from './packages/ink/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
@@ -139,6 +140,29 @@ const THREE_ALIASES = [
 	{
 		find: /^@octanejs\/three\/intrinsics(?:\/jsx-runtime)?$/,
 		replacement: resolve(THREE_SOURCE, 'intrinsics.ts'),
+	},
+];
+const OPENTUI_SOURCE = resolve(import.meta.dirname, 'packages/opentui/src');
+const OPENTUI_ALIASES = [
+	{
+		find: /^@octanejs\/opentui$/,
+		replacement: resolve(OPENTUI_SOURCE, 'index.ts'),
+	},
+	{
+		find: /^@octanejs\/opentui\/config$/,
+		replacement: resolve(OPENTUI_SOURCE, 'config.ts'),
+	},
+	{
+		find: /^@octanejs\/opentui\/renderer$/,
+		replacement: resolve(OPENTUI_SOURCE, 'renderer.ts'),
+	},
+	{
+		find: /^@octanejs\/opentui\/intrinsics(?:\/jsx-runtime)?$/,
+		replacement: resolve(OPENTUI_SOURCE, 'intrinsics.ts'),
+	},
+	{
+		find: /^@octanejs\/opentui\/test-utils$/,
+		replacement: resolve(OPENTUI_SOURCE, 'test-utils.ts'),
 	},
 ];
 const INK_SOURCE = resolve(import.meta.dirname, 'packages/ink/src');
@@ -4461,6 +4485,20 @@ export default defineConfig({
 					environment: 'node',
 					globals: false,
 				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'opentui',
+					include: [
+						'packages/opentui/tests/config.test.ts',
+						'packages/opentui/tests/props.test.ts',
+					],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ renderers: OPENTUI_RENDERERS, ssr: false })],
+				resolve: { alias: OPENTUI_ALIASES, dedupe: ['@opentui/core'] },
 			},
 			{
 				test: {

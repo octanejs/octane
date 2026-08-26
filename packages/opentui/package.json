@@ -1,0 +1,62 @@
+{
+  "name": "@octanejs/opentui",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "OpenTUI bindings for Octane — terminal components, hooks, and a universal renderer over @opentui/core.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/opentui"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "LICENSE",
+    "LICENSE.upstream",
+    "README.md",
+    "UPSTREAM.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./src/config.ts",
+    "./renderer": "./src/renderer.ts",
+    "./intrinsics": "./src/intrinsics.ts",
+    "./intrinsics/jsx-runtime": "./src/intrinsics.ts",
+    "./test-utils": "./src/test-utils.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project opentui && pnpm test:native",
+    "test:native": "NODE_OPTIONS= REACT_PORT_TEST_REPORT_DIR= bun ../../node_modules/vitest/vitest.mjs run --config vitest.native.config.ts",
+    "typecheck": "tsrx-tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@opentui/core": ">=0.5.8 <0.6.0",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@opentui/core": "catalog:default",
+    "octane": "workspace:*",
+    "vitest": "catalog:default"
+  }
+}

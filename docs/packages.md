@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**108 publishable package(s), including 94 framework binding(s) and 3 framework integration(s).**
+**109 publishable package(s), including 95 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -59,6 +59,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/monaco-editor` | [`packages/monaco-editor`](../packages/monaco-editor) | framework binding | `0.0.14` | 1 |
 | `@octanejs/motion` | [`packages/motion`](../packages/motion) | framework binding | `0.1.45` | 2 |
 | `@octanejs/nuqs` | [`packages/nuqs`](../packages/nuqs) | framework binding | `0.1.35` | 7 |
+| `@octanejs/opentui` | [`packages/opentui`](../packages/opentui) | framework binding | `0.0.1` | 6 |
 | `@octanejs/pdf` | [`packages/pdf`](../packages/pdf) | framework binding | `0.0.12` | 3 |
 | `@octanejs/phosphor-icons` | [`packages/phosphor-icons`](../packages/phosphor-icons) | framework binding | `0.0.26` | 2 |
 | `@octanejs/popper` | [`packages/popper`](../packages/popper) | framework binding | `0.0.12` | 2 |

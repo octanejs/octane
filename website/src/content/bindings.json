@@ -126,6 +126,11 @@
     "packages": ["@octanejs/ink"]
   },
   {
+    "title": "Terminal",
+    "description": "Technical-preview native terminal interfaces through OpenTUI and Octane's universal renderer.",
+    "packages": ["@octanejs/opentui"]
+  },
+  {
     "title": "Desktop",
     "description": "Tauri v2 and Electron desktop bindings for Octane applications.",
     "packages": ["@octanejs/tauri", "@octanejs/electron"]

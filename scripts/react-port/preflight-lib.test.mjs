@@ -10,6 +10,7 @@ import { gzipSync } from 'node:zlib';
 import {
 	assessResolvedEvidence,
 	collectArchiveEvidence,
+	conventionalTestPath,
 	evaluateApprovedLicense,
 	parseTarArchive,
 	parseInput,
@@ -19,6 +20,12 @@ import {
 	validateArchiveEntries,
 	verifyIntegrity,
 } from './preflight-lib.mjs';
+
+test('conventional test discovery excludes fixture modules beside runnable suites', () => {
+	assert.equal(conventionalTestPath('tests/image.test.tsx'), true);
+	assert.equal(conventionalTestPath('tests/runtime-plugin-support.fixture.ts'), false);
+	assert.equal(conventionalTestPath('tests/fixtures/runtime-plugin-support.ts'), false);
+});
 
 const MIT_TEXT = `MIT License
 

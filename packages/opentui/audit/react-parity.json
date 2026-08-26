@@ -1,0 +1,98 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/anomalyco/opentui.git",
+    "version": "0.5.8",
+    "commit": "21b002174255ca2236ed3115e2bb2294642f2cf5",
+    "sourceRoot": "packages/react/src",
+    "testRoot": "packages/react/tests",
+    "license": "MIT",
+    "integrity": "sha256:0ba60ac3d1330c29bf1890b47022d069874ffc1b907c8b7da577a57db3cc9cbb",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/opentui/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/opentui/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "d0fdd9c3b136ccca1ee588193b08e83a97cc88115e817cd5eab2edf49a709205"
+    }
+  },
+  "lanes": [
+    {
+      "id": "opentui-octane-contracts",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "opentui",
+      "notes": "Authenticates the compiler configuration, migration aliases, callback identity, callback argument forwarding, and scheduler-priority adaptations owned by the Octane binding. Native renderer behavior runs separately under Bun because OpenTUI 0.5.8 cannot load its FFI backend on the repository Node execution target.",
+      "files": [
+        {
+          "path": "packages/opentui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "62283a598107348e031c6d89198de645a4bae47cefbf9e668a799b4ea1e985df"
+        },
+        {
+          "path": "packages/opentui/tests/config.test.ts",
+          "role": "test",
+          "sha256": "d4ef7a6194fbca78cd501c9741825114323378455adea3a2f0a412f010f80cd0",
+          "cases": [
+            {
+              "id": "adapted:opentui-renderer-config",
+              "testName": "selects the host-text universal renderer for .opentui.tsrx modules",
+              "fullName": "@octanejs/opentui renderer preset selects the host-text universal renderer for .opentui.tsrx modules"
+            },
+            {
+              "id": "adapted:opentui-slot-registry-alias",
+              "testName": "retains the upstream slot-registry migration alias",
+              "fullName": "@octanejs/opentui renderer preset retains the upstream slot-registry migration alias"
+            }
+          ]
+        },
+        {
+          "path": "packages/opentui/tests/props.test.ts",
+          "role": "test",
+          "sha256": "33d7dcf926c80267c0e7619de083d267051b1fe6439c41bec139c728fa2bb04e",
+          "cases": [
+            {
+              "id": "adapted:opentui-callback-contract",
+              "testName": "reuses wrappers without changing receiver, argument, or scheduler semantics",
+              "fullName": "@octanejs/opentui host callback materialization reuses wrappers without changing receiver, argument, or scheduler semantics"
+            },
+            {
+              "id": "adapted:opentui-continuous-events",
+              "testName": "classifies pointer motion as continuous work",
+              "fullName": "@octanejs/opentui host callback materialization classifies pointer motion as continuous work"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

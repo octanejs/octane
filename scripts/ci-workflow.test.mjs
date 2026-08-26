@@ -534,6 +534,7 @@ describe('CI workflow aggregation', () => {
 			'packages/octane-evals/tests/user-app-corpus.test.ts',
 			'packages/octane/tests/register-hook.test.ts',
 			'packages/octane/tests/register-hook-bun.integration.test.mjs',
+			'pnpm --dir packages/opentui test:native',
 			'packages/astro/tests/astro.e2e.test.ts',
 		]) {
 			assert.ok(combined.includes(spec), `combined heavy integration must run ${spec}`);

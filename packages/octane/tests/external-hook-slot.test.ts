@@ -734,6 +734,7 @@ describe('manifest-declared manual hook slots', () => {
 			'mdx',
 			'mobx',
 			'motion',
+			'opentui',
 			'phosphor-icons',
 			'radix',
 			'rainbowkit',

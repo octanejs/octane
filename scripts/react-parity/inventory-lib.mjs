@@ -858,14 +858,37 @@ export function findPossibleUnexpandedRegistrars(source) {
 		...Object.keys(DEFAULT_HELPER_EXPANSIONS),
 	]);
 	const possible = new Map();
-	const expression = /\b((?:it|test)[A-Z][A-Za-z0-9_$]*)\s*\(/g;
-	let match;
-	while ((match = expression.exec(source)) !== null) {
-		if (known.has(match[1])) continue;
-		const record = possible.get(match[1]) ?? { name: match[1], occurrences: 0 };
-		record.occurrences++;
-		possible.set(match[1], record);
-	}
+	const sourceFile = ts.createSourceFile(
+		'possible-registrars.tsx',
+		source,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.TSX,
+	);
+	const visit = (node) => {
+		if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+			const name = node.expression.text;
+			if (/^(?:it|test)[A-Z][A-Za-z0-9_$]*$/.test(name) && !known.has(name)) {
+				const firstArgument = node.arguments[0];
+				const hasInlineCallback = node.arguments.some(
+					(argument, index) =>
+						index > 0 && (ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)),
+				);
+				const hasNamedCallback =
+					node.arguments.length > 1 &&
+					ts.isIdentifier(node.arguments.at(-1)) &&
+					firstArgument !== undefined &&
+					(ts.isStringLiteralLike(firstArgument) || ts.isCallExpression(firstArgument));
+				if (hasInlineCallback || hasNamedCallback) {
+					const record = possible.get(name) ?? { name, occurrences: 0 };
+					record.occurrences++;
+					possible.set(name, record);
+				}
+			}
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(sourceFile);
 	return [...possible.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 

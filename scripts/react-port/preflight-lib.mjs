@@ -734,9 +734,15 @@ function isScannableSourcePath(entryPath) {
 	return !parts.some((part) => SOURCE_SKIP_PARTS.has(part.toLowerCase()));
 }
 
-function conventionalTestPath(relativePath) {
+export function conventionalTestPath(relativePath) {
 	const segments = relativePath.toLowerCase().split('/');
 	const baseName = segments.at(-1);
+	if (
+		segments.some((segment) => ['fixture', 'fixtures', '__fixtures__'].includes(segment)) ||
+		/(?:^|[.-])fixture\.[cm]?[jt]sx?$/.test(baseName)
+	) {
+		return false;
+	}
 	return (
 		segments.some((segment) =>
 			['test', 'tests', '__tests__', 'typetests', 'type-tests', 'test-d'].includes(segment),

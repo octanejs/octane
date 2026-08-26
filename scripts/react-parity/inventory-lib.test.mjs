@@ -5,11 +5,26 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
 	extractTestCases,
+	findPossibleUnexpandedRegistrars,
 	inventoryFingerprint,
 	syncLedger,
 	validateInventory,
 	validateLedger,
 } from './inventory-lib.mjs';
+
+test('distinguishes custom registrars from render helpers with test-prefixed names', () => {
+	assert.deepEqual(
+		findPossibleUnexpandedRegistrars(`
+			testCustomMatrix('custom helper', () => {});
+			testNamedCase(getTitle(), handler);
+			await testRender(<App />, {width: 10, height: 6});
+		`),
+		[
+			{ name: 'testCustomMatrix', occurrences: 1 },
+			{ name: 'testNamedCase', occurrences: 1 },
+		],
+	);
+});
 
 describe('extractTestCases', () => {
 	test('extracts direct registrations without matching comments, strings, or regexes', () => {
