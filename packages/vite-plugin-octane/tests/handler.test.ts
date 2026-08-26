@@ -106,12 +106,16 @@ describe('createHandler', () => {
 		expect(head).toContain('<title>a $& b $` c</title>');
 	});
 
-	it('uses the RenderRoute status (catch-all 404) and route params', async () => {
-		const handler = createHandler(makeManifest() as any, baseDeps as any);
+	it('uses the RenderRoute status, params, and render-only route index', async () => {
+		const manifest = makeManifest();
+		const [rootRoute, catchAllRoute, serverRoute] = manifest.routes;
+		manifest.routes = [rootRoute, serverRoute, catchAllRoute];
+		const handler = createHandler(manifest as any, baseDeps as any);
 		const response = await handler(new Request('http://localhost/not/a/page'));
 		expect(response.status).toBe(404);
 		const html = await response.text();
 		expect(html).toContain('"params":{"splat":"not/a/page"}');
+		expect(html).toContain('"routeIndex":1');
 	});
 
 	it("render: 'buffered' awaits prerender and sends one document (css leads the body)", async () => {

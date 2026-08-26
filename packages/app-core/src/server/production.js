@@ -169,6 +169,71 @@ function prepareSsrTemplate(html) {
  */
 
 /**
+ * @typedef {Object} PreparedRenderRoute
+ * @property {number} index
+ * @property {string | undefined} assetHead
+ */
+
+/**
+ * Index the production manifest once, matching the router's handler-lifetime
+ * snapshot. Integrations create a new handler when replacing that manifest.
+ * Asset tags are populated lazily on the first request for each route, avoiding
+ * both repeated assembly on hot routes and eager work for routes an isolate may
+ * never serve.
+ *
+ * @param {import('@octanejs/app-core').Route[]} routes
+ * @returns {Map<RenderRoute, PreparedRenderRoute>}
+ */
+function prepareRenderRoutes(routes) {
+	/** @type {Map<RenderRoute, PreparedRenderRoute>} */
+	const prepared = new Map();
+	let index = 0;
+	for (const route of routes) {
+		if (route.type !== 'render') continue;
+		// Preserve Array#indexOf semantics if a caller reuses one route object.
+		if (!prepared.has(route)) prepared.set(route, { index, assetHead: undefined });
+		index++;
+	}
+	return prepared;
+}
+
+/**
+ * @param {ServerManifest} manifest
+ * @param {RenderRoute} route
+ * @param {string | undefined} entryPath
+ * @returns {string}
+ */
+function prepareRouteAssetHead(manifest, route, entryPath) {
+	/** @type {string[]} */
+	const tags = [];
+	const clientAssets = manifest.clientAssets;
+	if (clientAssets) {
+		/** @type {Set<string>} */
+		const stylesheets = new Set();
+		for (const modulePath of [
+			entryPath,
+			route.layout,
+			manifest.rootBoundary?.pending ? manifest.rootBoundaryEntries?.pending?.path : undefined,
+			manifest.rootBoundary?.catch ? manifest.rootBoundaryEntries?.catch?.path : undefined,
+		]) {
+			if (!modulePath) continue;
+			for (const cssFile of clientAssets[modulePath]?.css ?? []) {
+				if (stylesheets.has(cssFile)) continue;
+				stylesheets.add(cssFile);
+				tags.push(`<link rel="stylesheet" href="/${cssFile}">`);
+			}
+		}
+	}
+	// Only the page chunk was already eager; do not promote layout, fallback,
+	// or island JavaScript while making their server-rendered CSS available.
+	const entryAssets = entryPath ? clientAssets?.[entryPath] : undefined;
+	if (entryAssets?.js) {
+		tags.push(`<link rel="modulepreload" href="/${entryAssets.js}">`);
+	}
+	return tags.join('\n');
+}
+
+/**
  * Create the production request handler from a manifest.
  *
  * The returned function is a standard Web `fetch`-style handler:
@@ -185,6 +250,7 @@ function prepareSsrTemplate(html) {
 export function createHandler(manifest, deps) {
 	const { renderToReadableStream, prerender, htmlTemplate, executeServerFunction } = deps;
 	const router = createRouter(manifest.routes);
+	const preparedRenderRoutes = prepareRenderRoutes(manifest.routes);
 	const globalMiddlewares = manifest.middlewares ?? [];
 	const trustProxy = manifest.trustProxy ?? false;
 	const rpcPolicy = manifest.rpc;
@@ -281,6 +347,7 @@ export function createHandler(manifest, deps) {
 	 * @returns {Promise<Response>}
 	 */
 	async function renderRoute(route, context) {
+		const preparedRoute = preparedRenderRoutes.get(route);
 		const entryPath = get_route_entry_path(route.entry);
 		const exportName = get_route_entry_export_name(route.entry);
 		const PageComponent = entryPath
@@ -325,7 +392,7 @@ export function createHandler(manifest, deps) {
 			entry: entryPath,
 			exportName: exportName ?? null,
 			layout: route.layout ?? null,
-			routeIndex: getRenderRouteIndex(manifest.routes, route),
+			routeIndex: preparedRoute?.index,
 			params: context.params,
 			url: requestUrl,
 			preHydrate: manifest.preHydrate ?? null,
@@ -337,34 +404,12 @@ export function createHandler(manifest, deps) {
 		// server HTML before hydration. Their asset records also include CSS for
 		// deferred Hydrate descendants, whose JavaScript must remain lazy. Keep
 		// page CSS first, preserve each record's order, and link shared files once.
-		/** @type {string[]} */
-		const preloadTags = [];
-		const clientAssets = manifest.clientAssets;
-		const entryAssets = entryPath ? clientAssets?.[entryPath] : undefined;
-		if (clientAssets) {
-			/** @type {Set<string>} */
-			const stylesheets = new Set();
-			for (const modulePath of [
-				entryPath,
-				route.layout,
-				manifest.rootBoundary?.pending ? manifest.rootBoundaryEntries?.pending?.path : undefined,
-				manifest.rootBoundary?.catch ? manifest.rootBoundaryEntries?.catch?.path : undefined,
-			]) {
-				if (!modulePath) continue;
-				for (const cssFile of clientAssets[modulePath]?.css ?? []) {
-					if (stylesheets.has(cssFile)) continue;
-					stylesheets.add(cssFile);
-					preloadTags.push(`<link rel="stylesheet" href="/${cssFile}">`);
-				}
-			}
+		let assetHead = preparedRoute?.assetHead;
+		if (assetHead === undefined) {
+			assetHead = prepareRouteAssetHead(manifest, route, entryPath);
+			if (preparedRoute) preparedRoute.assetHead = assetHead;
 		}
-		// Only the page chunk was already eager; do not promote layout, fallback,
-		// or island JavaScript while making their server-rendered CSS available.
-		if (entryAssets?.js) {
-			preloadTags.push(`<link rel="modulepreload" href="/${entryAssets.js}">`);
-		}
-
-		const headContent = [...preloadTags, dataScript].join('\n');
+		const headContent = assetHead === '' ? dataScript : assetHead + '\n' + dataScript;
 		const noncedTemplate = nonce === null ? null : applyHydrationNonce(htmlTemplate, nonce);
 
 		const status = route.status ?? 200;
@@ -436,17 +481,6 @@ export function createHandler(manifest, deps) {
 	}
 
 	return handler;
-}
-
-/**
- * @param {import('@octanejs/app-core').Route[]} routes
- * @param {RenderRoute} route
- * @returns {number | undefined}
- */
-function getRenderRouteIndex(routes, route) {
-	const renderRoutes = routes.filter((r) => r.type === 'render');
-	const index = renderRoutes.indexOf(route);
-	return index === -1 ? undefined : index;
 }
 
 /**
