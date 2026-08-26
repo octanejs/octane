@@ -4229,8 +4229,9 @@ function autoMemoBuiltinHookName(call, ctx) {
 	ctx.activityLexical ??= lexical;
 	const callee = unwrapTsExpr(call.callee);
 	if (callee?.type === 'Identifier') {
-		const scope = lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(call);
-		const binding = scope === undefined ? null : lexical.resolveBinding(scope, callee.name);
+		const scope =
+			lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(call) ?? lexical.rootScope;
+		const binding = lexical.resolveBinding(scope, callee.name);
 		const importedName = ctx.octaneImportLocals?.get(callee.name);
 		if (
 			importedName !== undefined &&
@@ -4242,21 +4243,19 @@ function autoMemoBuiltinHookName(call, ctx) {
 		if (binding === null && AUTO_MEMO_SETUP_HOOK_NAMES.has(callee.name)) return callee.name;
 		return null;
 	}
-	if (
-		(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
-		callee.object?.type === 'Identifier'
-	) {
-		const property = callee.computed ? callee.property?.value : callee.property?.name;
+	if (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') {
+		const object = unwrapTsExpr(callee.object);
+		const propertyNode = unwrapTsExpr(callee.property);
+		const property = callee.computed ? propertyNode?.value : propertyNode?.name;
 		if (
+			object?.type === 'Identifier' &&
 			typeof property === 'string' &&
 			AUTO_MEMO_SETUP_HOOK_NAMES.has(property) &&
-			ctx.octaneImportNamespaces?.has(callee.object.name)
+			ctx.octaneImportNamespaces?.has(object.name)
 		) {
 			const scope =
-				lexical.nodeScopes.get(callee.object) ??
-				lexical.nodeScopes.get(callee) ??
-				lexical.rootScope;
-			if (lexical.resolveBinding(scope, callee.object.name)?.scope === lexical.rootScope) {
+				lexical.nodeScopes.get(object) ?? lexical.nodeScopes.get(callee) ?? lexical.rootScope;
+			if (lexical.resolveBinding(scope, object.name)?.scope === lexical.rootScope) {
 				return property;
 			}
 		}
@@ -4380,11 +4379,9 @@ function autoMemoSetupHookFunctions(ctx) {
 				} else {
 					const callee = unwrapTsExpr(node.callee);
 					if (callee?.type === 'Identifier' && declarations.has(callee.name)) {
-						const scope = lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(node);
-						if (
-							scope !== undefined &&
-							lexical.resolveBinding(scope, callee.name)?.scope === lexical.rootScope
-						) {
+						const scope =
+							lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(node) ?? lexical.rootScope;
+						if (lexical.resolveBinding(scope, callee.name)?.scope === lexical.rootScope) {
 							outgoing.add(callee.name);
 						}
 					}
@@ -4440,8 +4437,8 @@ function autoMemoCallExecutesSetupHook(call, ctx) {
 	// the same name. The summary graph uses this same binding resolution for its
 	// transitive edges, so cycles reach a fixed point independent of source order.
 	const lexical = ctx.autoMemoHookLexical;
-	const scope = lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(call);
-	const binding = scope === undefined ? null : lexical.resolveBinding(scope, name);
+	const scope = lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(call) ?? lexical.rootScope;
+	const binding = lexical.resolveBinding(scope, name);
 	return binding?.scope === lexical.rootScope;
 }
 

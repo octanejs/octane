@@ -628,6 +628,13 @@ describe('Strong memoization preserves dependency and setup semantics', () => {
 			'first',
 			'first',
 		]);
+		expect(r.findAll('.strong-optional-custom-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		expect(
+			r.findAll('.strong-optional-namespace-context-row').map((row) => row.textContent),
+		).toEqual(['first', 'first']);
 		r.click('#strong-optional-context-update');
 		expect(r.findAll('.strong-optional-direct-context-row').map((row) => row.textContent)).toEqual([
 			'second',
@@ -637,6 +644,13 @@ describe('Strong memoization preserves dependency and setup semantics', () => {
 			'second',
 			'second',
 		]);
+		expect(r.findAll('.strong-optional-custom-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		expect(
+			r.findAll('.strong-optional-namespace-context-row').map((row) => row.textContent),
+		).toEqual(['second', 'second']);
 		r.unmount();
 	});
 

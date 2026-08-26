@@ -8,6 +8,7 @@ import {
 	useLayoutEffect,
 	useState,
 } from 'octane';
+import * as OctaneHooks from 'octane';
 
 export interface SnapshotRow {
 	id: number;
@@ -182,6 +183,10 @@ export function StrongAliasedContextRows() @{
 	</div>
 }
 
+function useOptionalStrongTheme(context: typeof StrongTheme): string {
+	return readContext?.(context) as string;
+}
+
 export function StrongOptionalAliasedContextRows() @{
 	const [theme, setTheme] = useState('first');
 	const [items] = useState([{ id: 1 }, { id: 2 }]);
@@ -193,9 +198,13 @@ export function StrongOptionalAliasedContextRows() @{
 			@for (const item of items.slice(); key item.id) {
 				const directValue = useContext?.(StrongTheme);
 				const value = readContext?.(StrongTheme);
+				const customValue = useOptionalStrongTheme?.(StrongTheme);
+				const namespaceValue = (OctaneHooks as any)['useContext' as string]?.(StrongTheme);
 				<span class="strong-optional-context-pair">
 					<span class="strong-optional-direct-context-row">{directValue as string}</span>
 					<span class="strong-optional-context-row">{value as string}</span>
+					<span class="strong-optional-custom-context-row">{customValue as string}</span>
+					<span class="strong-optional-namespace-context-row">{namespaceValue as string}</span>
 				</span>
 			}
 		</StrongTheme.Provider>
