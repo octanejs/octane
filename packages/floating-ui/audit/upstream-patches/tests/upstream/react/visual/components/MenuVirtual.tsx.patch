@@ -1,0 +1,74 @@
+diff --git a/tests/upstream/react/visual/components/MenuVirtual.tsx b/tests/upstream/react/visual/components/MenuVirtual.tsx
+--- a/tests/upstream/react/visual/components/MenuVirtual.tsx
++++ b/tests/upstream/react/visual/components/MenuVirtual.tsx
+@@ -56,10 +56,14 @@ interface MenuProps {
+   virtualItemRef: React.RefObject<HTMLElement>;
+ }
+ 
+-export const MenuComponent = React.forwardRef<
+-  HTMLElement,
+-  MenuProps & React.HTMLAttributes<HTMLElement>
+->(function Menu({children, label, virtualItemRef, ...props}, forwardedRef) {
++// OCTANE DIVERGENCE[floating-ui-ref-prop]: Octane passes refs as ordinary props.
++export function MenuComponent({
++  children,
++  label,
++  virtualItemRef,
++  ref: forwardedRef,
++  ...props
++}: MenuProps & React.HTMLAttributes<HTMLElement> & {ref?: unknown}) {
+   const [isOpen, setIsOpen] = React.useState(false);
+   const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
+   const [allowHover, setAllowHover] = React.useState(false);
+@@ -271,17 +275,19 @@ export const MenuComponent = React.forwardRef<
+       </MenuContext.Provider>
+     </FloatingNode>
+   );
+-});
++}
+ 
+ interface MenuItemProps {
+   label: string;
+   disabled?: boolean;
+ }
+ 
+-export const MenuItem = React.forwardRef<
+-  HTMLElement,
+-  MenuItemProps & React.HTMLAttributes<HTMLElement>
+->(function MenuItem({label, disabled, ...props}, forwardedRef) {
++export function MenuItem({
++  label,
++  disabled,
++  ref: forwardedRef,
++  ...props
++}: MenuItemProps & React.HTMLAttributes<HTMLElement> & {ref?: unknown}) {
+   const menu = React.useContext(MenuContext);
+   const item = useListItem({label: disabled ? null : label});
+   const tree = useFloatingTree();
+@@ -339,12 +345,12 @@ export const MenuItem = React.forwardRef<
+       {label}
+     </div>
+   );
+-});
++}
+ 
+-export const Menu = React.forwardRef<
+-  HTMLButtonElement,
+-  MenuProps & React.HTMLProps<HTMLButtonElement>
+->(function MenuWrapper(props, ref) {
++export function Menu({
++  ref,
++  ...props
++}: MenuProps & React.HTMLProps<HTMLButtonElement> & {ref?: unknown}) {
+   const parentId = useFloatingParentNodeId();
+ 
+   if (parentId === null) {
+@@ -356,7 +362,7 @@ export const Menu = React.forwardRef<
+   }
+ 
+   return <MenuComponent {...props} ref={ref} />;
+-});
++}
+ 
+ export const Main = () => {
+   const virtualItemRef = React.useRef<HTMLElement | null>(null);

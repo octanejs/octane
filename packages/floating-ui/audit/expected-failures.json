@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "runner": "packages/floating-ui/tests/adapted-vitest.config.ts",
+  "semantics": "Every listed test is registered with Vitest's fails modifier: the adapted lane succeeds only while the asserted upstream behavior still fails under Octane.",
+  "tests": [
+    {
+      "id": "divergence:ref-scheduling:01",
+      "file": "packages/floating-ui/tests/upstream/react-dom/index.test.tsx",
+      "fullName": "middleware is always fresh and does not cause an infinite loop",
+      "divergenceId": "floating-ui-ref-scheduling"
+    },
+    {
+      "id": "divergence:ref-scheduling:02",
+      "file": "packages/floating-ui/tests/upstream/react-dom/index.test.tsx",
+      "fullName": "whileElementsMounted calls the cleanup function",
+      "divergenceId": "floating-ui-ref-scheduling"
+    },
+    {
+      "id": "divergence:ref-scheduling:03",
+      "file": "packages/floating-ui/tests/upstream/react-dom/index.test.tsx",
+      "fullName": "unstable callback refs",
+      "divergenceId": "floating-ui-ref-scheduling"
+    },
+    {
+      "id": "divergence:focus-scheduling:01",
+      "file": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "returnFocus return to the first focusable descendent of the reference, if the reference is not focusable",
+      "divergenceId": "floating-ui-focus-scheduling"
+    },
+    {
+      "id": "divergence:iframe-realm:01",
+      "file": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "iframe focus navigation tabs from the popover to the next element in the iframe",
+      "divergenceId": "floating-ui-iframe-realm"
+    },
+    {
+      "id": "divergence:iframe-realm:02",
+      "file": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "iframe focus navigation shift+tab from the popover to the previous element in the iframe",
+      "divergenceId": "floating-ui-iframe-realm"
+    },
+    {
+      "id": "divergence:dynamic-children:01",
+      "file": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Navigation does not focus reference when hovering it",
+      "divergenceId": "floating-ui-dynamic-children"
+    },
+    {
+      "id": "divergence:dynamic-children:02",
+      "file": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Navigation returns focus to reference when floating element was opened by hover but is closed by esc key",
+      "divergenceId": "floating-ui-dynamic-children"
+    },
+    {
+      "id": "divergence:dynamic-children:03",
+      "file": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Navigation returns focus to reference when floating element was opened by hover but is closed by an explicit close button",
+      "divergenceId": "floating-ui-dynamic-children"
+    },
+    {
+      "id": "divergence:dynamic-children:04",
+      "file": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Navigation does not re-open after closing via escape key",
+      "divergenceId": "floating-ui-dynamic-children"
+    },
+    {
+      "id": "divergence:dynamic-children:05",
+      "file": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Navigation closes when unhovering floating element even when focus is inside it",
+      "divergenceId": "floating-ui-dynamic-children"
+    },
+    {
+      "id": "divergence:react-context-fixture:01",
+      "file": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Drawer does not close when clicking another button outside",
+      "divergenceId": "floating-ui-react-context-fixture"
+    },
+    {
+      "id": "divergence:react-context-fixture:02",
+      "file": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Drawer closeOnFocusOut=false - does not close when tabbing out",
+      "divergenceId": "floating-ui-react-context-fixture"
+    },
+    {
+      "id": "divergence:react-context-fixture:03",
+      "file": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "Drawer returns focus when tabbing out then back to close button",
+      "divergenceId": "floating-ui-react-context-fixture"
+    },
+    {
+      "id": "divergence:focus-scheduling:02",
+      "file": "packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx",
+      "fullName": "aria-hidden is not applied on root combobox with virtual nested menu",
+      "divergenceId": "floating-ui-focus-scheduling"
+    },
+    {
+      "id": "divergence:render-count:01",
+      "file": "packages/floating-ui/tests/upstream/react/unit/NextFloatingDelayGroup.test.tsx",
+      "fullName": "does not re-render unrelated consumers",
+      "divergenceId": "floating-ui-render-count"
+    },
+    {
+      "id": "divergence:effect-scheduling:01",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useClientPoint.test.tsx",
+      "fullName": "cleans up window listener when closing or disabling",
+      "divergenceId": "floating-ui-effect-scheduling"
+    },
+    {
+      "id": "divergence:ref-scheduling:04",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useFloating.test.tsx",
+      "fullName": "positionReference handles unstable reference prop",
+      "divergenceId": "floating-ui-ref-scheduling"
+    },
+    {
+      "id": "divergence:ref-scheduling:05",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useFloating.test.tsx",
+      "fullName": "positionReference handles real virtual element",
+      "divergenceId": "floating-ui-ref-scheduling"
+    },
+    {
+      "id": "divergence:effect-scheduling:02",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useListNavigation.test.tsx",
+      "fullName": "resets indexRef to -1 upon close",
+      "divergenceId": "floating-ui-effect-scheduling"
+    },
+    {
+      "id": "divergence:list-registration:01",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation with changing list items",
+      "divergenceId": "floating-ui-list-registration"
+    },
+    {
+      "id": "divergence:list-registration:02",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useListNavigation.test.tsx",
+      "fullName": "grid navigation with disabled list items",
+      "divergenceId": "floating-ui-list-registration"
+    },
+    {
+      "id": "divergence:dynamic-children:06",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useListNavigation.test.tsx",
+      "fullName": "focus management in nested lists",
+      "divergenceId": "floating-ui-dynamic-children"
+    },
+    {
+      "id": "divergence:dynamic-children:07",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useListNavigation.test.tsx",
+      "fullName": "keyboard navigation in nested menus lists",
+      "divergenceId": "floating-ui-dynamic-children"
+    },
+    {
+      "id": "divergence:dynamic-children:08",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useListNavigation.test.tsx",
+      "fullName": "keyboard navigation in nested menus with different orientation",
+      "divergenceId": "floating-ui-dynamic-children"
+    },
+    {
+      "id": "divergence:dynamic-children:09",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useListNavigation.test.tsx",
+      "fullName": "virtual nested Home or End key press",
+      "divergenceId": "floating-ui-dynamic-children"
+    },
+    {
+      "id": "divergence:dynamic-children:10",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useListNavigation.test.tsx",
+      "fullName": "domReference trigger in nested virtual menu is set as virtual item",
+      "divergenceId": "floating-ui-dynamic-children"
+    },
+    {
+      "id": "divergence:dynamic-children:11",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useTypeahead.test.tsx",
+      "fullName": "Menu - skips disabled items and opens submenu on space if no match",
+      "divergenceId": "floating-ui-dynamic-children"
+    },
+    {
+      "id": "divergence:dynamic-children:12",
+      "file": "packages/floating-ui/tests/upstream/react/unit/useTypeahead.test.tsx",
+      "fullName": "Menu - resets once a match is no longer found",
+      "divergenceId": "floating-ui-dynamic-children"
+    }
+  ]
+}

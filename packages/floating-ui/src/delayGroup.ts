@@ -9,11 +9,12 @@ import {
 	useMemo,
 	useReducer,
 	useRef,
+	useState,
 } from 'octane';
 import type { OctaneNode } from 'octane';
 
 import { S, splitSlot, subSlot } from './internal';
-import { getDelay, useModernLayoutEffect } from './utils';
+import { clearTimeoutIfSet, getDelay, useModernLayoutEffect } from './utils';
 import type { Delay, FloatingRootContext } from './types';
 
 export interface GroupState {
@@ -197,4 +198,156 @@ export function useDelayGroup(...args: any[]): GroupContext {
 	);
 
 	return groupContext;
+}
+
+interface NextContextValue {
+	hasProvider: boolean;
+	timeoutMs: number;
+	delayRef: { current: Delay };
+	initialDelayRef: { current: Delay };
+	timeoutIdRef: { current: number };
+	currentIdRef: { current: any };
+	currentContextRef: {
+		current: {
+			onOpenChange: (open: boolean) => void;
+			setIsInstantPhase: (value: boolean) => void;
+		} | null;
+	};
+}
+
+const NextFloatingDelayGroupContext = createContext<NextContextValue>({
+	hasProvider: false,
+	timeoutMs: 0,
+	delayRef: { current: 0 },
+	initialDelayRef: { current: 0 },
+	timeoutIdRef: { current: -1 },
+	currentIdRef: { current: null },
+	currentContextRef: { current: null },
+});
+
+export interface NextFloatingDelayGroupProps {
+	children?: OctaneNode;
+	delay: Delay;
+	timeoutMs?: number;
+}
+
+export function NextFloatingDelayGroup(props: NextFloatingDelayGroupProps): OctaneNode {
+	const children = props.children;
+	const delay = props.delay;
+	const timeoutMs = props.timeoutMs ?? 0;
+	const delayRef = useRef(delay, S('NextFloatingDelayGroup:delay'));
+	const initialDelayRef = useRef(delay, S('NextFloatingDelayGroup:initialDelay'));
+	const currentIdRef = useRef<string | null>(null, S('NextFloatingDelayGroup:currentId'));
+	const currentContextRef = useRef<NextContextValue['currentContextRef']['current']>(
+		null,
+		S('NextFloatingDelayGroup:currentContext'),
+	);
+	const timeoutIdRef = useRef(-1, S('NextFloatingDelayGroup:timeoutId'));
+	const value = useMemo<NextContextValue>(
+		() => ({
+			hasProvider: true,
+			delayRef,
+			initialDelayRef,
+			currentIdRef,
+			timeoutMs,
+			currentContextRef,
+			timeoutIdRef,
+		}),
+		[timeoutMs],
+		S('NextFloatingDelayGroup:value'),
+	);
+	return createElement(NextFloatingDelayGroupContext.Provider, { value, children });
+}
+
+export interface UseNextDelayGroupOptions {
+	enabled?: boolean;
+}
+
+export interface UseNextDelayGroupReturn {
+	delayRef: { current: Delay };
+	isInstantPhase: boolean;
+	hasProvider: boolean;
+}
+
+export function useNextDelayGroup(
+	context: FloatingRootContext,
+	options?: UseNextDelayGroupOptions,
+	slot?: symbol,
+): UseNextDelayGroupReturn;
+export function useNextDelayGroup(...args: any[]): UseNextDelayGroupReturn {
+	const [user, slot] = splitSlot(args);
+	const context = user[0] as FloatingRootContext;
+	const options = (user[1] as UseNextDelayGroupOptions) ?? {};
+	const enabled = options.enabled ?? true;
+	const { open, onOpenChange, floatingId } = context;
+	const groupContext = useContext(NextFloatingDelayGroupContext);
+	const {
+		currentIdRef,
+		delayRef,
+		timeoutMs,
+		initialDelayRef,
+		currentContextRef,
+		hasProvider,
+		timeoutIdRef,
+	} = groupContext;
+	const [isInstantPhase, setIsInstantPhase] = useState(false, subSlot(slot, 'state'));
+
+	useModernLayoutEffect(
+		() => {
+			function unset() {
+				setIsInstantPhase(false);
+				currentContextRef.current?.setIsInstantPhase(false);
+				currentIdRef.current = null;
+				currentContextRef.current = null;
+				delayRef.current = initialDelayRef.current;
+			}
+			if (!enabled || !currentIdRef.current) return;
+			if (!open && currentIdRef.current === floatingId) {
+				setIsInstantPhase(false);
+				if (timeoutMs) {
+					timeoutIdRef.current = window.setTimeout(unset, timeoutMs);
+					return () => clearTimeout(timeoutIdRef.current);
+				}
+				unset();
+			}
+		},
+		[enabled, open, floatingId, timeoutMs],
+		subSlot(slot, 'e:close'),
+	);
+
+	useModernLayoutEffect(
+		() => {
+			if (!enabled || !open) return;
+			const prevContext = currentContextRef.current;
+			const prevId = currentIdRef.current;
+			currentContextRef.current = { onOpenChange, setIsInstantPhase };
+			currentIdRef.current = floatingId;
+			delayRef.current = { open: 0, close: getDelay(initialDelayRef.current, 'close') };
+			if (prevId !== null && prevId !== floatingId) {
+				clearTimeoutIfSet(timeoutIdRef);
+				setIsInstantPhase(true);
+				prevContext?.setIsInstantPhase(true);
+				prevContext?.onOpenChange(false);
+			} else {
+				setIsInstantPhase(false);
+				prevContext?.setIsInstantPhase(false);
+			}
+		},
+		[enabled, open, floatingId, onOpenChange],
+		subSlot(slot, 'e:open'),
+	);
+
+	useModernLayoutEffect(
+		() => () => {
+			currentContextRef.current = null;
+		},
+		[currentContextRef],
+		subSlot(slot, 'e:cleanup'),
+	);
+
+	return useMemo(
+		() => ({ hasProvider, delayRef, isInstantPhase }),
+		[hasProvider, delayRef, isInstantPhase],
+		subSlot(slot, 'result'),
+	);
 }

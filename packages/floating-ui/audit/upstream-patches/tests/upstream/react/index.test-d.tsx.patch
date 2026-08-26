@@ -1,0 +1,16 @@
+diff --git a/tests/upstream/react/index.test-d.tsx b/tests/upstream/react/index.test-d.tsx
+--- a/tests/upstream/react/index.test-d.tsx
++++ b/tests/upstream/react/index.test-d.tsx
+@@ -78,8 +78,10 @@ function App() {
+     },
+   });
+ 
+-  const ref1 = React.useRef<HTMLDivElement>(null);
+-  const ref2 = React.useRef<HTMLDivElement>(null);
++	  // OCTANE DIVERGENCE[floating-ui-nullable-ref-generic]: Octane includes null
++	  // explicitly in a ref's generic parameter.
++	  const ref1 = React.useRef<HTMLDivElement | null>(null);
++	  const ref2 = React.useRef<HTMLDivElement | null>(null);
+   const ref = useMergeRefs([ref1, ref2, arrowRef, null]);
+ 
+   const {context: contextGeneric} = useFloating<HTMLDivElement>();

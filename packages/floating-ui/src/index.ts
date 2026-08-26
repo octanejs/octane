@@ -165,7 +165,10 @@ export {
 	useDelayGroup,
 	useDelayGroupContext,
 	FloatingDelayGroupContext,
+	NextFloatingDelayGroup,
+	useNextDelayGroup,
 } from './delayGroup';
+export { inner, useInnerOffset } from './inner';
 
 // Component / transition prop types (mirror upstream's exported names; the
 // octane adaptations — OctaneNode children, ref-as-prop, native events — are
@@ -185,3 +188,9 @@ export type {
 	UseTransitionStylesProps,
 } from './transitions';
 export type { FloatingDelayGroupProps } from './delayGroup';
+export type {
+	NextFloatingDelayGroupProps,
+	UseNextDelayGroupOptions,
+	UseNextDelayGroupReturn,
+} from './delayGroup';
+export type { InnerProps, UseInnerOffsetProps } from './inner';

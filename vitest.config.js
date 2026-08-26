@@ -3913,6 +3913,15 @@ export default defineConfig({
 						'packages/floating-ui/tests/**/*.test.ts',
 						'packages/floating-ui/tests/**/*.test.tsx',
 					],
+					exclude: [
+						'packages/floating-ui/tests/browser/**/*.test.ts',
+						'packages/floating-ui/tests/differential/**/*.test.ts',
+						'packages/floating-ui/tests/upstream/**/*.test.ts',
+						'packages/floating-ui/tests/upstream/**/*.test.tsx',
+						'packages/floating-ui/tests/adapted-divergences.test.ts',
+						'packages/floating-ui/tests/adapted-original.test.ts',
+						'packages/floating-ui/tests/upstream-original.test.ts',
+					],
 					environment: 'jsdom',
 					globals: false,
 				},
@@ -3922,7 +3931,36 @@ export default defineConfig({
 				// trailing slot).
 				plugins: [octane()],
 				resolve: {
+					dedupe: ['react', 'react-dom'],
 					alias: [
+						{
+							find: /^react\/jsx-runtime$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/octane/node_modules/react/jsx-runtime.js',
+							),
+						},
+						{
+							find: /^react-dom\/client$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/octane/node_modules/react-dom/client.js',
+							),
+						},
+						{
+							find: /^react$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/octane/node_modules/react/index.js',
+							),
+						},
+						{
+							find: /^react-dom$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/octane/node_modules/react-dom/index.js',
+							),
+						},
 						{
 							find: /^@octanejs\/floating-ui$/,
 							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
@@ -3932,6 +3970,107 @@ export default defineConfig({
 							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src') + '/$1.ts',
 						},
 					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'floating-ui-pristine',
+					include: ['packages/floating-ui/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+					sequence: { groupOrder: 1 },
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/floating-ui/tests/adapted-divergences.test.ts',
+						'packages/floating-ui/tests/adapted-original.test.ts',
+					],
+				},
+				test: {
+					name: 'floating-ui-adapted',
+					include: [
+						'packages/floating-ui/tests/adapted-divergences.test.ts',
+						'packages/floating-ui/tests/adapted-original.test.ts',
+					],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/floating-ui/tests/differential/parity.test.ts'],
+				},
+				test: {
+					name: 'floating-ui-differential',
+					include: ['packages/floating-ui/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globalSetup: ['packages/floating-ui/tests/differential/_setup.ts'],
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+					globals: false,
+					server: { deps: { inline: ['@floating-ui/react'] } },
+				},
+				// floating-ui's `.ts` hooks forward the caller's slot via subSlot — its
+				// package.json declares manual hook slots, so the auto-slotting pass skips
+				// them (the `.tsx` fixtures that call them are full-compiled and inject the
+				// trailing slot).
+				plugins: [octane()],
+				resolve: {
+					dedupe: ['react', 'react-dom'],
+					alias: [
+						{
+							find: /^react\/jsx-runtime$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/octane/node_modules/react/jsx-runtime.js',
+							),
+						},
+						{
+							find: /^react-dom\/client$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/octane/node_modules/react-dom/client.js',
+							),
+						},
+						{
+							find: /^react$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/octane/node_modules/react/index.js',
+							),
+						},
+						{
+							find: /^react-dom$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/octane/node_modules/react-dom/index.js',
+							),
+						},
+						{
+							find: /^@octanejs\/floating-ui$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/floating-ui\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'heavy-browser' },
+				test: {
+					name: 'floating-ui-browser',
+					include: ['packages/floating-ui/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
 				},
 			},
 			{

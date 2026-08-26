@@ -101,7 +101,7 @@ const captureHandlerKeys: Record<PressHandlerKey, string> = {
 	mousedown: 'onMouseDownCapture',
 	click: 'onClickCapture',
 };
-const normalizeProp = (
+export const normalizeProp = (
 	normalizable?: boolean | { escapeKey?: boolean; outsidePress?: boolean },
 ) => ({
 	escapeKey: typeof normalizable === 'boolean' ? normalizable : (normalizable?.escapeKey ?? false),

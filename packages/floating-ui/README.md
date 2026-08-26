@@ -8,8 +8,9 @@ tree), the full interaction-hook set (`useInteractions`, `useHover` +
 `safePolygon`, `useClick`, `useFocus`, `useDismiss`, `useRole`,
 `useClientPoint`, `useListNavigation`, `useTypeahead`), the component layer
 (`FloatingPortal`, `FloatingOverlay`, `FloatingFocusManager`, `FloatingArrow`,
-`FloatingList`, `Composite`), and transitions + `FloatingDelayGroup`. As
-everywhere in octane, `forwardRef` becomes a plain `ref` prop.
+`FloatingList`, `Composite`), transitions, both delay-group APIs, and the
+deprecated `inner`/`useInnerOffset` pair. As everywhere in octane, `forwardRef`
+becomes a plain `ref` prop.
 
 ```tsx
 import { useFloating, useInteractions, useHover, offset, flip } from '@octanejs/floating-ui';

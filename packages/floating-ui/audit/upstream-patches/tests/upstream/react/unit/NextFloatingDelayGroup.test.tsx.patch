@@ -1,0 +1,13 @@
+diff --git a/tests/upstream/react/unit/NextFloatingDelayGroup.test.tsx b/tests/upstream/react/unit/NextFloatingDelayGroup.test.tsx
+--- a/tests/upstream/react/unit/NextFloatingDelayGroup.test.tsx
++++ b/tests/upstream/react/unit/NextFloatingDelayGroup.test.tsx
+@@ -200,7 +200,8 @@ test('timeoutMs', async () => {
+   expect(screen.queryByTestId('floating-three')).not.toBeInTheDocument();
+ });
+ 
+-it('does not re-render unrelated consumers', async () => {
++// OCTANE DIVERGENCE[floating-ui-render-count]: Fine-grained Octane updates do not re-run component bodies.
++it.fails('does not re-render unrelated consumers', async () => {
+   function App() {
+     return (
+       <NextFloatingDelayGroup delay={{open: 1000, close: 100}} timeoutMs={500}>

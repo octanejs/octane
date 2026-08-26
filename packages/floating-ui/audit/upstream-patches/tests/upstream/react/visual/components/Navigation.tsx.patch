@@ -1,0 +1,55 @@
+diff --git a/tests/upstream/react/visual/components/Navigation.tsx b/tests/upstream/react/visual/components/Navigation.tsx
+--- a/tests/upstream/react/visual/components/Navigation.tsx
++++ b/tests/upstream/react/visual/components/Navigation.tsx
+@@ -22,16 +22,19 @@ interface SubItemProps {
+   href: string;
+ }
+ 
+-export const NavigationSubItem = React.forwardRef<
+-  HTMLAnchorElement,
+-  SubItemProps & React.HTMLProps<HTMLAnchorElement>
+->(function NavigationSubItem({label, href, ...props}, ref) {
++// OCTANE DIVERGENCE[floating-ui-ref-prop]: Octane passes refs as ordinary props.
++export function NavigationSubItem({
++  label,
++  href,
++  ref,
++  ...props
++}: SubItemProps & React.HTMLProps<HTMLAnchorElement> & {ref?: unknown}) {
+   return (
+     <a {...props} ref={ref} href={href} className="NavigationItem">
+       {label}
+     </a>
+   );
+-});
++}
+ 
+ interface ItemProps {
+   label: string;
+@@ -39,10 +42,13 @@ interface ItemProps {
+   children?: React.ReactNode;
+ }
+ 
+-export const NavigationItem = React.forwardRef<
+-  HTMLAnchorElement,
+-  ItemProps & React.HTMLProps<HTMLAnchorElement>
+->(function NavigationItem({children, label, href, ...props}, ref) {
++export function NavigationItem({
++  children,
++  label,
++  href,
++  ref,
++  ...props
++}: ItemProps & React.HTMLProps<HTMLAnchorElement> & {ref?: unknown}) {
+   const [open, setOpen] = React.useState(false);
+   const hasChildren = !!children;
+ 
+@@ -108,7 +114,7 @@ export const NavigationItem = React.forwardRef<
+       </FloatingPortal>
+     </FloatingNode>
+   );
+-});
++}
+ 
+ interface NavigationProps {
+   children?: React.ReactNode;

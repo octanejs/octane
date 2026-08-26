@@ -1,0 +1,717 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/floating-ui/floating-ui.git",
+    "version": "@floating-ui/react@0.27.19",
+    "commit": "d8020ee98c702caa31fa9b4d929ca782c6b58c59",
+    "sourceRoot": "packages/core; packages/dom; packages/react; packages/react-dom; packages/utils",
+    "testRoot": "packages/react/test; packages/react-dom/test",
+    "license": "MIT",
+    "integrity": "sha256:0971520174c21fae79320f067baa54ba583f023d34237b358b1f650b85844e65",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/floating-ui/src"],
+      "include": ["\\.ts$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/floating-ui/tests"],
+      "include": ["adapted-(?:divergences|original)\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 30,
+    "uniqueIdentities": 30,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "29444489de10fa286620ef4c11cfafe1640ee7317b900e6b2500561a07766168"
+    }
+  },
+  "lanes": [
+    {
+      "id": "floating-ui-pristine-runtime",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "floating-ui-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the lock-pinned byte-exact React/React-DOM suites with upstream Vitest 3.0.9-era dependencies; 301 assertions pass and six upstream skips remain non-evidence.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/floating-ui/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/floating-ui/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "6979b264d95f98a3db21d7909c68c35164b3936403d1e7cbf706e0694a918806"
+        },
+        {
+          "path": "packages/floating-ui/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "1ca8afaa144ca35c57d4ec3524dcb0c590e497fed723ae1260da2eb90b1ab674"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-skips.json",
+          "role": "support",
+          "sha256": "68829cbea9d201a1e50867174184e6068d1a7a905fb94ee883537cbffafc07f6"
+        },
+        {
+          "path": "packages/floating-ui/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "d593ab5d81d8252fa4f59eeb6b40ed4282720424fb4ad9fa149154e7744288f6"
+        },
+        {
+          "path": "packages/floating-ui/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "54be43593d5894c9f41242f903ad2488c61b308f6a274446d83bfefa5b4a166f"
+        },
+        {
+          "path": "packages/floating-ui/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "f0d01817c0bb28aad9c67f8e6eebe384ef4012b03538f914ba09bde83f15191b"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "1c3b34d86802a4908db309d460f40a929a46d27d6b6e54bce2806c3241eb539d"
+        },
+        {
+          "path": "scripts/react-parity/floating-ui-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "f1099ee97f538a977452a4f7df98a254358a8726876c5aa7c2fe5a4894b04f7f"
+        }
+      ]
+    },
+    {
+      "id": "floating-ui-adapted-runtime",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "floating-ui-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "One-for-one adapted suite on the same Vitest 3.0.9 runner: 272 compatible passes plus 29 executable expected-failure negative controls, crosswalked to every pristine executed identity.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/floating-ui/audit/adapted-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/floating-ui/audit/adapted-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "5b88485ca71be7a1c09b0da82dbf89343c2a160223ea64c1ee83c5bdeb603b1d"
+        },
+        {
+          "path": "packages/floating-ui/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "c13559b3600f0e9f910b0892c1df4ac4ab6af352e266060518e094e849338465"
+        },
+        {
+          "path": "packages/floating-ui/audit/runtime-crosswalk.json",
+          "role": "support",
+          "sha256": "e8dfbecb865dc0459816b13b2eb839100750f8666717470f0cabb5c25efb0509"
+        },
+        {
+          "path": "packages/floating-ui/audit/expected-failures.json",
+          "role": "support",
+          "sha256": "727e66f3471eb60d960d820ccef9b9fd4baa63bc8c16153a3f7515c958a2c4b1"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-skips.json",
+          "role": "support",
+          "sha256": "68829cbea9d201a1e50867174184e6068d1a7a905fb94ee883537cbffafc07f6"
+        },
+        {
+          "path": "packages/floating-ui/tests/adapted-original.test.ts",
+          "role": "support",
+          "sha256": "dc3d01618692bf4cc11da7ac690eb5649ff2420f543ba8419258597736b6d114"
+        },
+        {
+          "path": "packages/floating-ui/tests/adapted-divergences.test.ts",
+          "role": "test",
+          "sha256": "fccd2f65df87401a765bfa6f4e2267a06eb74d6483cbd7d1f304c76483812a7b",
+          "cases": [
+            {
+              "id": "divergence:ref-scheduling:01",
+              "testName": "locks divergence:ref-scheduling:01",
+              "fullName": "locks divergence:ref-scheduling:01"
+            },
+            {
+              "id": "divergence:ref-scheduling:02",
+              "testName": "locks divergence:ref-scheduling:02",
+              "fullName": "locks divergence:ref-scheduling:02"
+            },
+            {
+              "id": "divergence:ref-scheduling:03",
+              "testName": "locks divergence:ref-scheduling:03",
+              "fullName": "locks divergence:ref-scheduling:03"
+            },
+            {
+              "id": "divergence:focus-scheduling:01",
+              "testName": "locks divergence:focus-scheduling:01",
+              "fullName": "locks divergence:focus-scheduling:01"
+            },
+            {
+              "id": "divergence:iframe-realm:01",
+              "testName": "locks divergence:iframe-realm:01",
+              "fullName": "locks divergence:iframe-realm:01"
+            },
+            {
+              "id": "divergence:iframe-realm:02",
+              "testName": "locks divergence:iframe-realm:02",
+              "fullName": "locks divergence:iframe-realm:02"
+            },
+            {
+              "id": "divergence:dynamic-children:01",
+              "testName": "locks divergence:dynamic-children:01",
+              "fullName": "locks divergence:dynamic-children:01"
+            },
+            {
+              "id": "divergence:dynamic-children:02",
+              "testName": "locks divergence:dynamic-children:02",
+              "fullName": "locks divergence:dynamic-children:02"
+            },
+            {
+              "id": "divergence:dynamic-children:03",
+              "testName": "locks divergence:dynamic-children:03",
+              "fullName": "locks divergence:dynamic-children:03"
+            },
+            {
+              "id": "divergence:dynamic-children:04",
+              "testName": "locks divergence:dynamic-children:04",
+              "fullName": "locks divergence:dynamic-children:04"
+            },
+            {
+              "id": "divergence:dynamic-children:05",
+              "testName": "locks divergence:dynamic-children:05",
+              "fullName": "locks divergence:dynamic-children:05"
+            },
+            {
+              "id": "divergence:react-context-fixture:01",
+              "testName": "locks divergence:react-context-fixture:01",
+              "fullName": "locks divergence:react-context-fixture:01"
+            },
+            {
+              "id": "divergence:react-context-fixture:02",
+              "testName": "locks divergence:react-context-fixture:02",
+              "fullName": "locks divergence:react-context-fixture:02"
+            },
+            {
+              "id": "divergence:react-context-fixture:03",
+              "testName": "locks divergence:react-context-fixture:03",
+              "fullName": "locks divergence:react-context-fixture:03"
+            },
+            {
+              "id": "divergence:focus-scheduling:02",
+              "testName": "locks divergence:focus-scheduling:02",
+              "fullName": "locks divergence:focus-scheduling:02"
+            },
+            {
+              "id": "divergence:render-count:01",
+              "testName": "locks divergence:render-count:01",
+              "fullName": "locks divergence:render-count:01"
+            },
+            {
+              "id": "divergence:effect-scheduling:01",
+              "testName": "locks divergence:effect-scheduling:01",
+              "fullName": "locks divergence:effect-scheduling:01"
+            },
+            {
+              "id": "divergence:ref-scheduling:04",
+              "testName": "locks divergence:ref-scheduling:04",
+              "fullName": "locks divergence:ref-scheduling:04"
+            },
+            {
+              "id": "divergence:ref-scheduling:05",
+              "testName": "locks divergence:ref-scheduling:05",
+              "fullName": "locks divergence:ref-scheduling:05"
+            },
+            {
+              "id": "divergence:effect-scheduling:02",
+              "testName": "locks divergence:effect-scheduling:02",
+              "fullName": "locks divergence:effect-scheduling:02"
+            },
+            {
+              "id": "divergence:list-registration:01",
+              "testName": "locks divergence:list-registration:01",
+              "fullName": "locks divergence:list-registration:01"
+            },
+            {
+              "id": "divergence:list-registration:02",
+              "testName": "locks divergence:list-registration:02",
+              "fullName": "locks divergence:list-registration:02"
+            },
+            {
+              "id": "divergence:dynamic-children:06",
+              "testName": "locks divergence:dynamic-children:06",
+              "fullName": "locks divergence:dynamic-children:06"
+            },
+            {
+              "id": "divergence:dynamic-children:07",
+              "testName": "locks divergence:dynamic-children:07",
+              "fullName": "locks divergence:dynamic-children:07"
+            },
+            {
+              "id": "divergence:dynamic-children:08",
+              "testName": "locks divergence:dynamic-children:08",
+              "fullName": "locks divergence:dynamic-children:08"
+            },
+            {
+              "id": "divergence:dynamic-children:09",
+              "testName": "locks divergence:dynamic-children:09",
+              "fullName": "locks divergence:dynamic-children:09"
+            },
+            {
+              "id": "divergence:dynamic-children:10",
+              "testName": "locks divergence:dynamic-children:10",
+              "fullName": "locks divergence:dynamic-children:10"
+            },
+            {
+              "id": "divergence:dynamic-children:11",
+              "testName": "locks divergence:dynamic-children:11",
+              "fullName": "locks divergence:dynamic-children:11"
+            },
+            {
+              "id": "divergence:dynamic-children:12",
+              "testName": "locks divergence:dynamic-children:12",
+              "fullName": "locks divergence:dynamic-children:12"
+            }
+          ]
+        },
+        {
+          "path": "packages/floating-ui/tests/adapted-vitest.config.ts",
+          "role": "support",
+          "sha256": "35915e3720ae7ef2ac223e97efc6892bace2d74a3e7db94fd4183b20a90d6bfc"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "1c3b34d86802a4908db309d460f40a929a46d27d6b6e54bce2806c3241eb539d"
+        },
+        {
+          "path": "scripts/react-parity/floating-ui-adapted-runtime.mjs",
+          "role": "support",
+          "sha256": "e36e0d4ecbaed6cc1e375d48e95c5f7fe0936da5e97180be4829a1e1759a7685"
+        },
+        {
+          "path": "packages/floating-ui/scripts/generate-parity-evidence.mjs",
+          "role": "support",
+          "sha256": "7d89b59bdc72b266dfb51fab43c566a191d25b371a44adb5838ad9825e2824cf"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react-dom/index.test-d.tsx.patch",
+          "role": "support",
+          "sha256": "2faaa7d6fd5e8bf542008d525e2990eb8ae273585092f880a1cd409725f7efe3"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react-dom/index.test.tsx.patch",
+          "role": "support",
+          "sha256": "c360e9a2bdd8dd53d8dd7007fc62dde8f2c778efa812cf5b1bb96d372f6772b7"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/index.test-d.tsx.patch",
+          "role": "support",
+          "sha256": "da1e34bd4d18bd5ccf1345237738efffff9d9a1328790e406d9ab9b0f42be8a7"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/FloatingFocusManager.test.tsx.patch",
+          "role": "support",
+          "sha256": "a1a4a0c36ed40159ac4f6d1f24383bcb5c65b836d07542bc9b13f69a93a3fcd9"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/NextFloatingDelayGroup.test.tsx.patch",
+          "role": "support",
+          "sha256": "b40bff86db1950ba5e26eddb62efb87cd53c5050828031f4975ed3cfcab0493c"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/useClientPoint.test.tsx.patch",
+          "role": "support",
+          "sha256": "4a5c350a57a7d7a2bd563393fb61504306723111a9cc624642bd1b013667f210"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/useFloating.test.tsx.patch",
+          "role": "support",
+          "sha256": "df31891f7ce01ccde02ad81eeb9afda5b99b6b25e72d20743282e34cbe3402b8"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/useListNavigation.test.tsx.patch",
+          "role": "support",
+          "sha256": "3a7ba7d26a4317be011260f35393802bf755228b11854c1aef79f80bd5ab3421"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/unit/useTypeahead.test.tsx.patch",
+          "role": "support",
+          "sha256": "2cf6bc52117cdd1ba690dc0a8dbc18b32ff1bf1d9103e05fd1141c1782fab4e6"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/EmojiPicker.tsx.patch",
+          "role": "support",
+          "sha256": "785f0e66161b3e45b4a0825751be6ba6e19c1426f3c00ef81cbf6c30a3ac0b7e"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/Menu.tsx.patch",
+          "role": "support",
+          "sha256": "3c2fcd5dee7f2c38fb9c523f93caacf191d7f6211aee76cb17213e6a207a1c16"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/MenuOrientation.tsx.patch",
+          "role": "support",
+          "sha256": "e80b6a437e6871a37dcff02523418b93acfbcbc49e6058f0d1194372a97a3eaf"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/MenuVirtual.tsx.patch",
+          "role": "support",
+          "sha256": "54d6e10052c83c732c0279436c96a4ef17543b2aff55066edb310af880792ad2"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/components/Navigation.tsx.patch",
+          "role": "support",
+          "sha256": "a909c48e5e4ed5e91a450ecc5870635f908f6e913fd543ec9d29bd38eb2fd5c3"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/visual/lib/Button.tsx.patch",
+          "role": "support",
+          "sha256": "06f053b1c1d280f3840689179abb976252a679eb48ff9f06d1eda83a33f2c8af"
+        }
+      ]
+    },
+    {
+      "id": "floating-ui-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "floating-ui-pristine-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles both byte-exact upstream index.test-d.tsx programs with TypeScript 5.4.2 and the exact React 18 declaration versions from the pinned lock.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "compilerBins": ["packages/floating-ui/node_modules/typescript/bin/tsc"],
+        "project": "packages/floating-ui/typetests/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/floating-ui/audit/pristine-types.json",
+          "role": "test",
+          "sha256": "4554e397497d6576110f3b9d856d9a7cd078644f01fcba6e9bf2802f61b0e167",
+          "cases": [
+            {
+              "id": "types:floating-ui-pristine-react",
+              "testName": "@floating-ui/react declaration program",
+              "fullName": "@floating-ui/react declaration program"
+            },
+            {
+              "id": "types:floating-ui-pristine-react-dom",
+              "testName": "@floating-ui/react-dom declaration program",
+              "fullName": "@floating-ui/react-dom declaration program"
+            }
+          ]
+        },
+        {
+          "path": "packages/floating-ui/audit/type-parity.json",
+          "role": "support",
+          "sha256": "7a50fe4b5201ab26b67c32dd28d0e580045895174dae08e0b312bcdebd729cfd"
+        },
+        {
+          "path": "packages/floating-ui/typetests/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "c720de7d5f48468664cf582223a39347779ae741a35e0c432504cde3bd18011b"
+        },
+        {
+          "path": "packages/floating-ui/typetests/upstream-globals.d.ts",
+          "role": "support",
+          "sha256": "10a09feed9e85ae69e632e862c44ae9f3c8459e29f62062753510cc55497ce2a"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "1c3b34d86802a4908db309d460f40a929a46d27d6b6e54bce2806c3241eb539d"
+        }
+      ]
+    },
+    {
+      "id": "floating-ui-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "floating-ui-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the one-for-one adapted declaration programs with tsrx-tsc and explicit negative controls/permitted transformation records.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/floating-ui/typetests/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/floating-ui/audit/adapted-types.json",
+          "role": "test",
+          "sha256": "45f2f7d7f45cf58b0254e166d182cf75d667a372767212cb1042eb9a00881534",
+          "cases": [
+            {
+              "id": "types:floating-ui-adapted-react",
+              "testName": "@octanejs/floating-ui adapted React declaration program",
+              "fullName": "@octanejs/floating-ui adapted React declaration program"
+            },
+            {
+              "id": "types:floating-ui-adapted-react-dom",
+              "testName": "@octanejs/floating-ui adapted React-DOM declaration program",
+              "fullName": "@octanejs/floating-ui adapted React-DOM declaration program"
+            }
+          ]
+        },
+        {
+          "path": "packages/floating-ui/audit/type-parity.json",
+          "role": "support",
+          "sha256": "7a50fe4b5201ab26b67c32dd28d0e580045895174dae08e0b312bcdebd729cfd"
+        },
+        {
+          "path": "packages/floating-ui/typetests/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "3203c86deb392d135001ce444820148e59e9288f9ec31d8dc931cd067de8a2d9"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react/index.test-d.tsx.patch",
+          "role": "support",
+          "sha256": "da1e34bd4d18bd5ccf1345237738efffff9d9a1328790e406d9ab9b0f42be8a7"
+        },
+        {
+          "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react-dom/index.test-d.tsx.patch",
+          "role": "support",
+          "sha256": "2faaa7d6fd5e8bf542008d525e2990eb8ae273585092f880a1cd409725f7efe3"
+        }
+      ]
+    },
+    {
+      "id": "floating-ui-runtime-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "floating-ui-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Compiles the exact declared TwoTooltips fixture for both adapters and compares independent hook placement output.",
+      "files": [
+        {
+          "path": "packages/floating-ui/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "0dae28933ab386204193b37b5376cb93ab025021afa14dd80d02ed3c07f522f2",
+          "cases": [
+            {
+              "id": "differential:floating-ui-hook-isolation",
+              "testName": "keeps independent useFloating placements byte-identical",
+              "fullName": "differential: @octanejs/floating-ui vs @floating-ui/react keeps independent useFloating placements byte-identical"
+            }
+          ]
+        },
+        {
+          "path": "packages/floating-ui/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "c7f25f8ac18b9aadf2a776acff0f290bf076c46f047773fadb39e53ace2edc46"
+        },
+        {
+          "path": "packages/floating-ui/tests/differential/fixtures.ts",
+          "role": "support",
+          "sha256": "d578f696a72514a2297948311b0352822c1ab589703235f316a04297cecc0b08"
+        },
+        {
+          "path": "packages/floating-ui/tests/differential/fixture-compiler.mjs",
+          "role": "support",
+          "sha256": "a0a1ad1531266f9d32a25bb5299c23e99312e9d8350ba1f124e5d5783c0e8c38"
+        },
+        {
+          "path": "packages/floating-ui/tests/differential/compile-runner.mjs",
+          "role": "support",
+          "sha256": "8ad98bceb3a298463c9c3ceda0dca3ef995eb991fc4cc3af147a8e6d6c28d39d"
+        },
+        {
+          "path": "packages/floating-ui/tests/_fixtures/tooltip.tsx",
+          "role": "support",
+          "sha256": "e0887a39334bcaf261524575ab4ff4127a85165bc459da0c2d95ba1a30c812d4"
+        }
+      ]
+    },
+    {
+      "id": "floating-ui-real-browser",
+      "type": "browser",
+      "oracle": "optional",
+      "environment": "workspace-node",
+      "project": "floating-ui-browser",
+      "notes": "Real-Chromium positioning and ResizeObserver/autoUpdate coverage; supplemental to the jsdom upstream oracle.",
+      "files": [
+        {
+          "path": "packages/floating-ui/tests/browser/positioning.browser.test.ts",
+          "role": "test",
+          "sha256": "f421f0c201e6252212636f1f5668fd9e94582a2e696a5c2e037d41c11716cdd3",
+          "cases": [
+            {
+              "id": "browser:floating-ui-real-layout",
+              "testName": "uses real layout geometry and auto-updates after the reference moves",
+              "fullName": "@octanejs/floating-ui real-browser positioning uses real layout geometry and auto-updates after the reference moves"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "floating-ui-ref-as-prop",
+      "caseIds": ["types:floating-ui-adapted-react"],
+      "upstreamResult": "Custom React components receive forwarded refs through React.forwardRef.",
+      "octaneResult": "Custom Octane components receive ref as an ordinary prop.",
+      "rationale": "Octane has a native ref-as-prop contract and no forwardRef wrapper.",
+      "classification": "framework-integration",
+      "consumerImpact": "Component implementations accept ref in their props instead of using forwardRef.",
+      "migrationGuidance": "Accept and forward the ref prop directly.",
+      "owner": "@octanejs/floating-ui",
+      "reviewCondition": "Review if Octane adopts a distinct ref-forwarding primitive."
+    },
+    {
+      "id": "floating-ui-ref-scheduling",
+      "caseIds": [
+        "divergence:ref-scheduling:01",
+        "divergence:ref-scheduling:02",
+        "divergence:ref-scheduling:03",
+        "divergence:ref-scheduling:04",
+        "divergence:ref-scheduling:05"
+      ],
+      "upstreamResult": "Callback-ref swaps, middleware freshness, and element cleanup follow React commit timing.",
+      "octaneResult": "The same scenarios currently fail under Octane ref/effect scheduling.",
+      "rationale": "These cases remain executable expected-failure controls rather than compatibility claims.",
+      "classification": "known-behavior-gap",
+      "consumerImpact": "Rapid ref replacement or cleanup may be observed at a different point in the update.",
+      "migrationGuidance": "Keep callback refs stable and avoid depending on React-specific detach timing.",
+      "owner": "@octanejs/floating-ui",
+      "reviewCondition": "Remove each case only when it passes without the fails modifier."
+    },
+    {
+      "id": "floating-ui-focus-scheduling",
+      "caseIds": ["divergence:focus-scheduling:01", "divergence:focus-scheduling:02"],
+      "upstreamResult": "Return-focus, aria-hiding, and non-modal tab order match React commit/focus timing.",
+      "octaneResult": "Two focus-order assertions remain expected failures.",
+      "rationale": "Octane native focus/event scheduling differs in these bounded paths.",
+      "classification": "known-behavior-gap",
+      "consumerImpact": "Complex non-modal or nested focus restoration can choose a different target/order.",
+      "migrationGuidance": "Provide explicit initial/return focus for affected composite flows.",
+      "owner": "@octanejs/floating-ui",
+      "reviewCondition": "Review when Octane focus scheduling or FloatingFocusManager changes."
+    },
+    {
+      "id": "floating-ui-effect-scheduling",
+      "caseIds": ["divergence:effect-scheduling:01", "divergence:effect-scheduling:02"],
+      "upstreamResult": "Listener cleanup and index-ref reset occur at React effect timing.",
+      "octaneResult": "Two cleanup/reset timing assertions remain expected failures.",
+      "rationale": "Octane effects have a different scheduling boundary.",
+      "classification": "known-behavior-gap",
+      "consumerImpact": "A listener or navigation index may remain observable until the Octane cleanup boundary.",
+      "migrationGuidance": "Do not synchronously inspect cleanup-only state immediately after closing.",
+      "owner": "@octanejs/floating-ui",
+      "reviewCondition": "Review when Octane effect cleanup timing changes."
+    },
+    {
+      "id": "floating-ui-iframe-realm",
+      "caseIds": ["divergence:iframe-realm:01", "divergence:iframe-realm:02"],
+      "upstreamResult": "Forward and reverse tab navigation crosses the tested iframe realm.",
+      "octaneResult": "The two iframe focus-navigation assertions remain expected failures.",
+      "rationale": "Cross-realm element/focus handling is not yet equivalent.",
+      "classification": "known-behavior-gap",
+      "consumerImpact": "Popover focus navigation embedded in an iframe may not choose the adjacent iframe element.",
+      "migrationGuidance": "Handle cross-iframe focus transfer explicitly.",
+      "owner": "@octanejs/floating-ui",
+      "reviewCondition": "Review when cross-realm focus helpers change."
+    },
+    {
+      "id": "floating-ui-dynamic-children",
+      "caseIds": [
+        "divergence:dynamic-children:01",
+        "divergence:dynamic-children:02",
+        "divergence:dynamic-children:03",
+        "divergence:dynamic-children:04",
+        "divergence:dynamic-children:05",
+        "divergence:dynamic-children:06",
+        "divergence:dynamic-children:07",
+        "divergence:dynamic-children:08",
+        "divergence:dynamic-children:09",
+        "divergence:dynamic-children:10",
+        "divergence:dynamic-children:11",
+        "divergence:dynamic-children:12"
+      ],
+      "upstreamResult": "Nested/dynamic menu children register and restore focus with React child lifecycle timing.",
+      "octaneResult": "Twelve nested-navigation/typeahead assertions remain expected failures.",
+      "rationale": "Dynamic child registration and focus ownership are not yet equivalent in these nested fixtures.",
+      "classification": "known-behavior-gap",
+      "consumerImpact": "Complex nested menus may differ for hover-close, Home/End, submenu, or domReference behavior.",
+      "migrationGuidance": "Keep nested item lists stable and test the required keyboard/focus path under Octane.",
+      "owner": "@octanejs/floating-ui",
+      "reviewCondition": "Review when dynamic child registration or nested navigation changes."
+    },
+    {
+      "id": "floating-ui-react-context-fixture",
+      "caseIds": [
+        "divergence:react-context-fixture:01",
+        "divergence:react-context-fixture:02",
+        "divergence:react-context-fixture:03"
+      ],
+      "upstreamResult": "Three Drawer cases execute through React-only third-party context fixtures.",
+      "octaneResult": "The mechanically adapted fixtures cannot reproduce that React context integration.",
+      "rationale": "The dependency fixture is React-specific and remains an explicit test-environment boundary.",
+      "classification": "fixture-integration",
+      "consumerImpact": "React-only context components cannot be embedded directly in Octane drawers.",
+      "migrationGuidance": "Use an Octane-native equivalent for third-party context components.",
+      "owner": "@octanejs/floating-ui",
+      "reviewCondition": "Review if the fixture dependencies ship Octane-compatible entry points."
+    },
+    {
+      "id": "floating-ui-render-count",
+      "caseIds": ["divergence:render-count:01"],
+      "upstreamResult": "An unrelated NextFloatingDelayGroup consumer does not re-render.",
+      "octaneResult": "The exact render-count assertion remains an expected failure.",
+      "rationale": "Octane context propagation has a different render-count contract in this path.",
+      "classification": "performance-semantics",
+      "consumerImpact": "An unrelated delay-group consumer can render more often.",
+      "migrationGuidance": "Avoid depending on exact React render counts for correctness.",
+      "owner": "@octanejs/floating-ui",
+      "reviewCondition": "Review when Octane context invalidation changes."
+    },
+    {
+      "id": "floating-ui-list-registration",
+      "caseIds": ["divergence:list-registration:01", "divergence:list-registration:02"],
+      "upstreamResult": "Grid navigation immediately incorporates changing and disabled item lists.",
+      "octaneResult": "Two dynamic grid registration assertions remain expected failures.",
+      "rationale": "List registration timing is not equivalent for these dynamic grid mutations.",
+      "classification": "known-behavior-gap",
+      "consumerImpact": "Changing/disabled grid items may require another update before navigation matches the list.",
+      "migrationGuidance": "Keep grid item registration stable during an active navigation interaction.",
+      "owner": "@octanejs/floating-ui",
+      "reviewCondition": "Review when FloatingList registration timing changes."
+    },
+    {
+      "id": "floating-ui-type-entrypoint",
+      "caseIds": ["types:floating-ui-adapted-react-dom"],
+      "upstreamResult": "@floating-ui/react-dom exposes its narrower positioning-only ref and middleware element types.",
+      "octaneResult": "The combined @octanejs/floating-ui entry point exposes interaction-ref unions in those probes.",
+      "rationale": "The legacy binding combines the upstream React and React-DOM entry points.",
+      "classification": "type-surface",
+      "consumerImpact": "Some positioning-only reference narrowing needs an explicit element guard.",
+      "migrationGuidance": "Narrow ReferenceType to Element before calling DOM-only methods.",
+      "owner": "@octanejs/floating-ui",
+      "reviewCondition": "Review if the binding publishes a separate React-DOM-shaped entry point."
+    }
+  ]
+}

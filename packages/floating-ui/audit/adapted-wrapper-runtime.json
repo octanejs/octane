@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "project": "floating-ui-adapted",
+  "roots": ["packages/floating-ui/tests"],
+  "files": [
+    "packages/floating-ui/tests/adapted-divergences.test.ts",
+    "packages/floating-ui/tests/adapted-original.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "divergence:dynamic-children:01",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:dynamic-children:01"
+    },
+    {
+      "id": "divergence:dynamic-children:02",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:dynamic-children:02"
+    },
+    {
+      "id": "divergence:dynamic-children:03",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:dynamic-children:03"
+    },
+    {
+      "id": "divergence:dynamic-children:04",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:dynamic-children:04"
+    },
+    {
+      "id": "divergence:dynamic-children:05",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:dynamic-children:05"
+    },
+    {
+      "id": "divergence:dynamic-children:06",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:dynamic-children:06"
+    },
+    {
+      "id": "divergence:dynamic-children:07",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:dynamic-children:07"
+    },
+    {
+      "id": "divergence:dynamic-children:08",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:dynamic-children:08"
+    },
+    {
+      "id": "divergence:dynamic-children:09",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:dynamic-children:09"
+    },
+    {
+      "id": "divergence:dynamic-children:10",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:dynamic-children:10"
+    },
+    {
+      "id": "divergence:dynamic-children:11",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:dynamic-children:11"
+    },
+    {
+      "id": "divergence:dynamic-children:12",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:dynamic-children:12"
+    },
+    {
+      "id": "divergence:effect-scheduling:01",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:effect-scheduling:01"
+    },
+    {
+      "id": "divergence:effect-scheduling:02",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:effect-scheduling:02"
+    },
+    {
+      "id": "divergence:focus-scheduling:01",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:focus-scheduling:01"
+    },
+    {
+      "id": "divergence:focus-scheduling:02",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:focus-scheduling:02"
+    },
+    {
+      "id": "divergence:iframe-realm:01",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:iframe-realm:01"
+    },
+    {
+      "id": "divergence:iframe-realm:02",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:iframe-realm:02"
+    },
+    {
+      "id": "divergence:list-registration:01",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:list-registration:01"
+    },
+    {
+      "id": "divergence:list-registration:02",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:list-registration:02"
+    },
+    {
+      "id": "divergence:react-context-fixture:01",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:react-context-fixture:01"
+    },
+    {
+      "id": "divergence:react-context-fixture:02",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:react-context-fixture:02"
+    },
+    {
+      "id": "divergence:react-context-fixture:03",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:react-context-fixture:03"
+    },
+    {
+      "id": "divergence:ref-scheduling:01",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:ref-scheduling:01"
+    },
+    {
+      "id": "divergence:ref-scheduling:02",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:ref-scheduling:02"
+    },
+    {
+      "id": "divergence:ref-scheduling:03",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:ref-scheduling:03"
+    },
+    {
+      "id": "divergence:ref-scheduling:04",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:ref-scheduling:04"
+    },
+    {
+      "id": "divergence:ref-scheduling:05",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:ref-scheduling:05"
+    },
+    {
+      "id": "divergence:render-count:01",
+      "file": "packages/floating-ui/tests/adapted-divergences.test.ts",
+      "fullName": "locks divergence:render-count:01"
+    },
+    {
+      "id": "adapted:floating-ui-original-suite",
+      "file": "packages/floating-ui/tests/adapted-original.test.ts",
+      "fullName": "runs the adapted @floating-ui/react 0.27.19 suites on Octane"
+    }
+  ],
+  "snapshots": 0
+}

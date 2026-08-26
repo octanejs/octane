@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -30,5 +31,32 @@ test('only ignores byte-pinned vendored upstream tests', () => {
 	assert.deepEqual(
 		findTestMarkerViolations(repo, ['packages']).map(({ file }) => file),
 		['packages/example/tests/example.spec.ts'],
+	);
+});
+
+test('ignores generated Git-ignored tests but checks force-added tests', () => {
+	const repo = mkdtempSync(path.join(tmpdir(), 'test-markers-git-'));
+	const generated = path.join(repo, 'packages/example/tests/upstream/generated.test.ts');
+	const local = path.join(repo, 'packages/example/tests/local.test.ts');
+	mkdirSync(path.dirname(generated), { recursive: true });
+	writeFileSync(path.join(repo, '.gitignore'), 'packages/example/tests/upstream/\n');
+	writeFileSync(generated, 'test.skip("generated", () => {});\n');
+	writeFileSync(local, 'test.skip("local", () => {});\n');
+	execFileSync('git', ['init'], { cwd: repo, stdio: 'ignore' });
+	execFileSync('git', ['add', '.gitignore', 'packages/example/tests/local.test.ts'], {
+		cwd: repo,
+	});
+
+	assert.deepEqual(
+		findTestMarkerViolations(repo, ['packages']).map(({ file }) => file),
+		['packages/example/tests/local.test.ts'],
+	);
+
+	execFileSync('git', ['add', '--force', 'packages/example/tests/upstream/generated.test.ts'], {
+		cwd: repo,
+	});
+	assert.deepEqual(
+		findTestMarkerViolations(repo, ['packages']).map(({ file }) => file),
+		['packages/example/tests/local.test.ts', 'packages/example/tests/upstream/generated.test.ts'],
 	);
 });

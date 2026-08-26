@@ -78,19 +78,42 @@ export function usePositionFloating(args: any[]): any {
 		subSlot(slot, 'data'),
 	);
 
-	const [latestMiddleware, setLatestMiddleware] = useState(middleware, subSlot(slot, 'mw'));
-	if (!deepEqual(latestMiddleware, middleware)) {
-		setLatestMiddleware(middleware);
+	// Octane state updates requested while rendering are scheduled after the
+	// current pass. Keep the deep-equal upstream stabilization synchronously in
+	// a ref so `update` always observes the middleware from this render without
+	// making fresh-but-equivalent arrays invalidate the positioning effect.
+	const latestMiddlewareRef = useRef({ value: middleware, revision: 0 }, subSlot(slot, 'mw'));
+	if (!deepEqual(latestMiddlewareRef.current.value, middleware)) {
+		latestMiddlewareRef.current.value = middleware;
+		latestMiddlewareRef.current.revision += 1;
 	}
+	const middlewareRevision = latestMiddlewareRef.current.revision;
 
 	const [_reference, _setReference] = useState<ReferenceType | null>(null, subSlot(slot, 'ref'));
 	const [_floating, _setFloating] = useState<HTMLElement | null>(null, subSlot(slot, 'flo'));
 
 	const referenceRef = useRef<ReferenceType | null>(null, subSlot(slot, 'rref'));
 	const floatingRef = useRef<HTMLElement | null>(null, subSlot(slot, 'rflo'));
+	const referenceDetachRef = useRef(0, subSlot(slot, 'rdetach'));
+	const floatingDetachRef = useRef(0, subSlot(slot, 'fdetach'));
 
 	const setReference = useCallback(
 		(node: ReferenceType | null) => {
+			const detach = ++referenceDetachRef.current;
+			if (node === null) {
+				queueMicrotask(() => {
+					const current = referenceRef.current;
+					if (
+						referenceDetachRef.current === detach &&
+						current !== null &&
+						(!(current instanceof Element) || !current.isConnected)
+					) {
+						referenceRef.current = null;
+						_setReference(null);
+					}
+				});
+				return;
+			}
 			if (node !== referenceRef.current) {
 				referenceRef.current = node;
 				_setReference(node);
@@ -101,6 +124,17 @@ export function usePositionFloating(args: any[]): any {
 	);
 	const setFloating = useCallback(
 		(node: HTMLElement | null) => {
+			const detach = ++floatingDetachRef.current;
+			if (node === null) {
+				queueMicrotask(() => {
+					const current = floatingRef.current;
+					if (floatingDetachRef.current === detach && current !== null && !current.isConnected) {
+						floatingRef.current = null;
+						_setFloating(null);
+					}
+				});
+				return;
+			}
 			if (node !== floatingRef.current) {
 				floatingRef.current = node;
 				_setFloating(node);
@@ -128,7 +162,7 @@ export function usePositionFloating(args: any[]): any {
 			const config: Partial<ComputePositionConfig> = {
 				placement,
 				strategy,
-				middleware: latestMiddleware,
+				middleware: latestMiddlewareRef.current.value,
 			};
 			if (platformRef.current) {
 				config.platform = platformRef.current;
@@ -146,7 +180,7 @@ export function usePositionFloating(args: any[]): any {
 				}
 			});
 		},
-		[latestMiddleware, placement, strategy, platformRef, openRef],
+		[middlewareRevision, placement, strategy, platformRef, openRef],
 		subSlot(slot, 'upd'),
 	);
 

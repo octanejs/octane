@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**0 active pin(s) across 96 binding package(s).**
+**29 active pin(s) across 96 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -34,7 +34,7 @@ surface and evidence.
 | `@octanejs/dropzone` | 0 |
 | `@octanejs/electron` | 0 |
 | `@octanejs/embla-carousel` | 0 |
-| `@octanejs/floating-ui` | 0 |
+| `@octanejs/floating-ui` | 29 |
 | `@octanejs/formisch` | 0 |
 | `@octanejs/gsap` | 0 |
 | `@octanejs/hook-form` | 0 |
@@ -111,3 +111,55 @@ surface and evidence.
 | `@octanejs/xstate-store` | 0 |
 | `@octanejs/zag` | 0 |
 | `@octanejs/zustand` | 0 |
+
+## @octanejs/floating-ui
+
+### packages/floating-ui/tests/upstream/react-dom/index.test.tsx
+
+- **middleware is always fresh and does not cause an infinite loop**
+- **calls the cleanup function**
+- **unstable callback refs**
+
+### packages/floating-ui/tests/upstream/react/unit/FloatingFocusManager.test.tsx
+
+- **return to the first focusable descendent of the reference, if the reference is not focusable**
+- **tabs from the popover to the next element in the iframe**
+- **shift+tab from the popover to the previous element in the iframe**
+- **does not focus reference when hovering it**
+- **returns focus to reference when floating element was opened by hover but is closed by esc key**
+- **returns focus to reference when floating element was opened by hover but is closed by an explicit close button**
+- **does not re-open after closing via escape key**
+- **closes when unhovering floating element even when focus is inside it**
+- **does not close when clicking another button outside**
+- **closeOnFocusOut=false - does not close when tabbing out**
+- **returns focus when tabbing out then back to close button**
+- **aria-hidden is not applied on root combobox with virtual nested menu**
+
+### packages/floating-ui/tests/upstream/react/unit/NextFloatingDelayGroup.test.tsx
+
+- **does not re-render unrelated consumers**
+
+### packages/floating-ui/tests/upstream/react/unit/useClientPoint.test.tsx
+
+- **cleans up window listener when closing or disabling**
+
+### packages/floating-ui/tests/upstream/react/unit/useFloating.test.tsx
+
+- **handles unstable reference prop**
+- **handles real virtual element**
+
+### packages/floating-ui/tests/upstream/react/unit/useListNavigation.test.tsx
+
+- **resets indexRef to -1 upon close**
+- **grid navigation with changing list items**
+- **grid navigation with disabled list items**
+- **focus management in nested lists**
+- **keyboard navigation in nested menus lists**
+- **keyboard navigation in nested menus with different orientation**
+- **virtual nested Home or End key press**
+- **domReference trigger in nested virtual menu is set as virtual item**
+
+### packages/floating-ui/tests/upstream/react/unit/useTypeahead.test.tsx
+
+- **Menu - skips disabled items and opens submenu on space if no match**
+- **Menu - resets once a match is no longer found**

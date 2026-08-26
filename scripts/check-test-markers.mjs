@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -28,7 +29,10 @@ function isBytePinnedUpstreamSource(file, repo) {
 }
 
 function* walk(directory) {
-	for (const entry of readdirSync(directory, { withFileTypes: true })) {
+	const entries = readdirSync(directory, { withFileTypes: true }).sort((a, b) =>
+		a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+	);
+	for (const entry of entries) {
 		const absolute = path.join(directory, entry.name);
 		if (entry.isDirectory()) {
 			// Vendored packages/*/upstream trees are byte-exact pins and may carry
@@ -49,10 +53,30 @@ function* walk(directory) {
 	}
 }
 
+function ignoredTestFiles(repo, files) {
+	if (files.length === 0) return new Set();
+	const relativePaths = files.map((file) => path.relative(repo, file).replace(/\\/g, '/'));
+	const result = spawnSync('git', ['-C', repo, 'check-ignore', '--stdin', '-z'], {
+		encoding: 'utf8',
+		input: `${relativePaths.join('\0')}\0`,
+	});
+	// Exit 1 means Git found no ignored paths. A non-repository fixture also falls
+	// back to the filesystem walk so the exported checker stays independently testable.
+	if (result.status !== 0 || !result.stdout) return new Set();
+	return new Set(result.stdout.split('\0').filter(Boolean));
+}
+
 export function findTestMarkerViolations(repo = REPO, roots = ROOTS) {
 	const violations = [];
 	for (const root of roots) {
-		for (const file of walk(path.join(repo, root))) {
+		const files = [...walk(path.join(repo, root))];
+		const ignored = ignoredTestFiles(repo, files);
+		for (const file of files) {
+			const relative = path.relative(repo, file).replace(/\\/g, '/');
+			// Materialized parity suites are deliberately ignored build artifacts.
+			// A force-added (therefore committed) file is not reported by check-ignore
+			// and remains subject to the no-skip policy.
+			if (ignored.has(relative)) continue;
 			if (isBytePinnedUpstreamSource(file, repo)) continue;
 			const lines = readFileSync(file, 'utf8').split('\n');
 			for (let index = 0; index < lines.length; index++) {
