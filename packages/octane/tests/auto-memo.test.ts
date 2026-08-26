@@ -1459,6 +1459,9 @@ describe('compiler-owned component-region memoization', () => {
 	it('preserves dependency, context, child-state, and custom-comparator behavior', () => {
 		const root = mount(AutoMemoApp);
 		const initialOpaqueVersion = trailingVersion(root.find('.opaque').textContent);
+		const initialTransitiveVersion = trailingVersion(
+			root.find('#auto-transitive-live').textContent,
+		);
 		expect(root.find('.own-1').textContent).toBe('t0:a:0');
 		// The destructured-param twin renders through the same cached-region
 		// machinery and must be behaviorally indistinguishable from the
@@ -1474,6 +1477,9 @@ describe('compiler-owned component-region memoization', () => {
 		expect(trailingVersion(root.find('.custom').textContent)).toBe(initialOpaqueVersion + 1);
 		expect(trailingVersion(root.find('.returned-opaque-a').textContent)).toBe(
 			initialOpaqueVersion + 1,
+		);
+		expect(trailingVersion(root.find('#auto-transitive-live').textContent)).toBe(
+			initialTransitiveVersion + 1,
 		);
 
 		root.click('.own-1');
