@@ -3,7 +3,7 @@
 This suite adapts the public desktop workload matrix from Boris Kaul's
 [UIbench](https://github.com/localvoid/uibench) for Octane's unified benchmark
 runner. It measures one synchronous state-to-state commit for each of the 96
-published desktop cases against a production React Compiler control:
+published desktop cases against production React Compiler and Solid 2 controls:
 
 - four table shapes (`[100,4]`, `[50,4]`, `[100,2]`, `[50,2]`) across render,
   remove-all, two sorts, four sparse filters, and four sparse class updates;
@@ -42,9 +42,9 @@ Timing starts only after every case passes three gates:
    and compared with the deterministic model endpoint.
 2. Every keyed row, box, and tree node that survives a transition must retain
    its DOM identity.
-3. Octane and React must report the same signatures and element counts for all
-   96 endpoints. Framework marker comments are reported nowhere in the oracle
-   and cannot make a target pass with missing visible output.
+3. Octane, React, and Solid must report the same signatures and element counts
+   for all 96 endpoints. Framework marker comments are reported nowhere in the
+   oracle and cannot make a target pass with missing visible output.
 
 `cases`, `elements_largest`, and `identity_shared` are emitted as deterministic
 operations for exact same-run ratio guards. A gate failure writes a failed JSON
@@ -61,16 +61,18 @@ case-sized repetition count overcomes Chromium's timer granularity without
 mixing the inverse transition into the result. This matches UIbench's default
 JavaScript-time mode; it does not request style/layout/paint timing. The React
 fixture uses React 19, `flushSync`, and the repository's production React
-Compiler integration. The Octane fixture uses the production `.tsrx` compiler
-and `flushSync`. Both previews send COOP/COEP headers, and the harness rejects a
-page that is not cross-origin isolated, so sub-millisecond cases retain the
-browser's high-resolution timer rather than collapsing to 0.1 ms buckets.
+Compiler integration. The Solid fixture uses the repository's pinned Solid 2
+beta production renderer, keyed `createStore`/`reconcile`, and `flush()`. The
+Octane fixture uses the production `.tsrx` compiler and `flushSync`. All three
+previews send COOP/COEP headers, and the harness rejects a page that is not
+cross-origin isolated, so sub-millisecond cases retain the browser's
+high-resolution timer rather than collapsing to 0.1 ms buckets.
 
-The suite intentionally keeps one VDOM reference control. Its purpose is a
-faithful, compact extraction of the workload matrix and a guard on Octane's
-keyed reconciler and prev-guarded update paths, not another broad framework
-leaderboard; those already exist in `js-framework`, `effectful-list`, and
-`recursive-context`.
+The suite intentionally keeps one VDOM reference control and one fine-grained
+reactive control. Its purpose is a faithful, compact extraction of the workload
+matrix and a guard on Octane's keyed reconciler and prev-guarded update paths,
+not another broad framework leaderboard; those already exist in `js-framework`,
+`effectful-list`, and `recursive-context`.
 
 ## Running
 
@@ -84,7 +86,9 @@ Standalone, after starting the production previews:
 ```bash
 pnpm --filter octane-tsrx-uibench-bench build
 pnpm --filter react-uibench-bench build
+pnpm --filter solid-uibench-bench build
 pnpm --filter octane-tsrx-uibench-bench preview # :5315
 pnpm --filter react-uibench-bench preview       # :5316
+pnpm --filter solid-uibench-bench preview       # :5317
 node benchmarks/uibench/run.mjs 10
 ```

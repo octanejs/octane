@@ -200,6 +200,7 @@ const SUITES = [
 		servers: [
 			{ filter: 'octane-tsrx-uibench-bench', port: 5315 },
 			{ filter: 'react-uibench-bench', port: 5316 },
+			{ filter: 'solid-uibench-bench', port: 5317 },
 		],
 		iter: { normal: 10, quick: 2 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],

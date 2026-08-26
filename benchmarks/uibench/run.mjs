@@ -6,12 +6,14 @@
 //   - all 96 case endpoints are serialized from the live DOM and compared with
 //     the independent shared model;
 //   - keyed survivors must retain DOM identity for every transition;
-//   - Octane and React must render the same semantic signatures and element
-//     counts (framework marker comments are deliberately outside the oracle).
+//   - Octane, React, and Solid must render the same semantic signatures and
+//     element counts (framework marker comments are deliberately outside the
+//     oracle).
 //
 // Servers must be running first (production preview recommended):
 //   pnpm --filter octane-tsrx-uibench-bench preview  # :5315
 //   pnpm --filter react-uibench-bench preview        # :5316
+//   pnpm --filter solid-uibench-bench preview        # :5317
 //
 // Usage: node run.mjs [iterations]
 // Env: TARGETS='[{"name":"octane-tsrx","url":"http://localhost:5315/"}]'
@@ -46,6 +48,7 @@ const TARGETS = process.env.TARGETS
 	: [
 			{ name: 'octane-tsrx', url: 'http://localhost:5315/' },
 			{ name: 'react', url: 'http://localhost:5316/' },
+			{ name: 'solid', url: 'http://localhost:5317/' },
 		];
 
 const EXPECTED = new Map(
@@ -270,10 +273,12 @@ function printResults(targets) {
 	const rows = CASES.map((entry) => {
 		const row = { case: entry.name };
 		for (const target of targets) row[target.name] = scoreOf(target.ops[entry.name])?.toFixed(3);
-		if (targets.length === 2) {
+		if (targets.length > 1) {
 			const left = scoreOf(targets[0].ops[entry.name]);
-			const right = scoreOf(targets[1].ops[entry.name]);
-			row[`${targets[0].name}/${targets[1].name}`] = (left / right).toFixed(2);
+			for (const reference of targets.slice(1)) {
+				const right = scoreOf(reference.ops[entry.name]);
+				row[`${targets[0].name}/${reference.name}`] = (left / right).toFixed(2);
+			}
 		}
 		return row;
 	});

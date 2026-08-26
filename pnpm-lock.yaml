@@ -3892,6 +3892,22 @@ importers:
         specifier: catalog:default
         version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  benchmarks/uibench/solid:
+    dependencies:
+      '@solidjs/web':
+        specifier: catalog:default
+        version: 2.0.0-beta.20(solid-js@2.0.0-beta.20)
+      solid-js:
+        specifier: catalog:default
+        version: 2.0.0-beta.20
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+      vite-plugin-solid:
+        specifier: catalog:default
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.20(solid-js@2.0.0-beta.20))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.20)(supports-color@10.2.2)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
   benchmarks/weather-app:
     dependencies:
       chrome-launcher:
