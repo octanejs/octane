@@ -111,12 +111,14 @@ You can also pass `pluginOctane({ strong: true })`. The plugin option takes
 priority over the app config. Strong mode opts application code into immutable
 render snapshots and pure render projections. The compiler rejects detectable
 state, ref, Effect Event, snapshot-mutation, and nondeterministic-render
-violations; production client builds may also reuse eligible statically named
-receiver methods while their snapshot inputs remain unchanged.
+violations; production client builds condition memoization on the author's
+assertion that every user-authored render operation is pure for its witnessed
+inputs. Callee shape and `use*` spelling do not disable that optimization.
 
 Dependencies retain compatibility behavior unless they begin a module with
-`"use strong"`. Strong analysis is bounded: imported live accessors do not
-become immutable merely because their caller opts in.
+`"use strong"`. Strong analysis is bounded: an unknown call is assumed pure, so
+imported live accessors do not become immutable merely because their caller opts
+in. Keep such consumers in compatibility mode or pass an actual snapshot.
 
 App mode currently serves from the root path and uses Rsbuild's default asset
 prefix. Keep `server.base` at `/` and `output.assetPrefix` at `auto` or `/`; for

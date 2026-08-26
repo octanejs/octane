@@ -220,28 +220,37 @@ Stable function or object identity alone does not prove a result is unchanged.
 ### Strong mode and render calls
 
 A module that opts into [`"use strong"`](#optional-strong-mode) asserts a stricter
-contract: props, state, context, and method receivers represent immutable render
-snapshots. An ordinary render method must be a value projection of those inputs;
-it must not secretly read changing state behind an unchanged receiver. This lets
-production client builds memoize statically named member calls such as
-`item.format(prefix)` and the same-module helpers that wrap them. No new runtime
-cache or global behavior change is involved.
+contract: rendering is a referentially transparent projection of props, state,
+context, and immutable snapshots. Every user-authored call evaluated for render
+output must return the same value for the same witnessed inputs and must not
+perform application-visible work. That assertion covers local and imported
+functions, static and computed methods, call-produced callees, constructors,
+tagged templates, and synchronously invoked callbacks.
 
-Hooks and ref-backed receivers such as `ref.current.read()` remain live. Dynamic
-method names, callback-bearing or call-produced arguments, and known clocks and
-randomness remain conservative. Strong mode is not a whole-program purity
-proof: imported code and opaque methods still have to honor the snapshot
-contract. Keep a component using live accessors in compatibility mode, or pass an
-actual snapshot into a separate Strong component. Enabling Strong on a caller
-does not make an imported library's live object immutable.
+Production client builds can therefore condition eligible regions on their
+witnessed inputs without using `use*` spelling as a purity oracle. An ordinary
+function named `useFormat` is no less memoizable than `format`; Strong does not
+reintroduce React's Rules of Hooks through a naming heuristic. Actual hooks keep
+their compiler-owned setup semantics. Hiding hook state, a state getter,
+`ref.current`, a clock or random value, mutable module state, or an external live
+store behind a render call violates the assertion because the result can change
+without a witnessed input changing.
+
+Compiler diagnostics catch a useful subset of violations, but they are not a
+whole-program proof and unknown call shapes do not fall back to compatibility
+behavior. Calling imported code from a Strong module asserts that the particular
+render use is snapshot-safe; it does not make the library's live objects
+immutable. Keep a consumer of live accessors in compatibility mode, or read an
+actual reactive snapshot and pass it into a separate Strong component.
 
 ### Keyed rows and logging
 
 A key preserves a surviving row's DOM identity; it does not promise that its
 JavaScript body runs only once. In Strong production builds, diagnostic calls
-such as `console.log('row', item.id)` no longer disqualify an otherwise eligible
-row from reuse. Logging frequency is not a render or commit contract, and can
-differ in development, HMR, and profiling builds.
+such as `console.log('row', item.id)` do not disqualify an otherwise eligible
+row from reuse. Do not rely on logging, metrics, mutation, allocation, or any
+other render-time call count: evaluation can differ in production, development,
+HMR, profiling, server rendering, hydration, retries, and aborted work.
 
 A changed captured value still invalidates a row, including captures inside its
 event handlers:
@@ -398,6 +407,13 @@ non-idempotent globals such as `Date.now()` and `Math.random()`
 (`OCTANE_STRONG_RENDER_IMPURE_CALL`). These checks follow supported aliases and
 synchronous helpers; they do not prove arbitrary method bodies or imported code
 pure. Lazy state initialization may obtain an initial timestamp or random value.
+
+The directive is also an author assertion for production memoization, not just a
+request for diagnostics. Render output must not observe changing data through a
+stable ref, state getter, module variable, external store object, or hidden hook.
+All user-authored render calls and synchronously invoked callbacks must be pure
+for their witnessed inputs. Function names—including `use*` names—do not change
+that contract or disable the optimization.
 
 Event handlers, genuinely deferred callbacks, effect cleanup, effects that
 synchronize an external system, and normal DOM or timer refs remain supported.

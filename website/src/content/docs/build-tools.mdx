@@ -225,19 +225,27 @@ Factories with unknown return values or complex control flow remain opaque.
 Dependency checks follow literal arrays, including statically selected or spread
 literals; they do not assume an aliased or externally produced array is unchanged.
 
-Production client builds may also memoize statically named member calls such as
-`item.format(prefix)`. Their receivers and inputs must be immutable snapshots;
-an opaque method must not return changing state behind the same receiver. Hooks,
-ref-backed reads, and unsupported call shapes stay conservative. Keep consumers
-of live library accessors in compatibility mode, or pass a snapshot into a
-separate Strong component. See
+`"use strong"` is also an author assertion that rendering is referentially
+transparent: the same witnessed inputs produce the same output, and render work
+has no application-visible side effects. Production client builds condition
+memoization on that assertion for every user-authored render operation, including
+local, imported, member, computed, and call-produced callees; calls with callback
+arguments; construction; and tagged templates. A name beginning with `use` does
+not change this contract or reintroduce Rules of Hooks. Actual hooks still belong
+in component or custom-hook setup, where the compiler assigns their slots.
+
+The compiler checks the violations it can prove, but the analysis is deliberately
+bounded: an unknown call is assumed pure instead of disabling Strong memoization.
+Do not hide a ref read, state getter, mutable module or global, live external
+store, clock, random source, mutation, or other changing state behind a stable
+receiver or function. Keep live library accessors in compatibility mode, or pass
+an actual snapshot into a separate Strong component. See
 [the memoization contract](/docs/differences-from-react#strong-mode).
 
 Use `useLinkedState` when state should reset or adjust after an input changes.
 Event handlers may update state normally. Genuinely deferred callbacks, effect
 cleanup, effects that connect to external systems, and refs for DOM nodes, timers,
-or event callbacks remain allowed. Values such as `Date.now()` and `Math.random()`
-are not banned.
+or event callbacks remain allowed when they run outside rendering.
 
 <h2 id="mixed-toolchains">Mixed toolchains and file ownership</h2>
 

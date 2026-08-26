@@ -126,13 +126,22 @@ receiver can hide changing state. React Compiler also identifies APIs with
 interior mutability, including TanStack Table v8, as
 [incompatible with memoization](https://react.dev/reference/eslint-plugin-react-hooks/lints/incompatible-library).
 
-In a Strong module, statically named render methods such as `item.format(prefix)`
-assert that unchanged receivers and inputs produce the same value. Production
-client builds can then reuse eligible regions and keyed rows. Hooks, ref-backed
-reads, dynamic methods, and opaque callback arguments remain conservative. Keep
-live library accessors in a compatibility-mode consumer, or pass an actual
-snapshot into a separate Strong component; opting in does not make a library's
-live objects immutable.
+In a Strong module, the author asserts that all rendering is referentially
+transparent: the same witnessed inputs produce the same result and render work
+has no application-visible side effects. Production client builds apply that
+assertion to every user-authored render operation—local, imported, static or
+computed member, call-produced, callback-bearing, constructed, or tagged—and can
+then reuse eligible regions and keyed rows. A `use*` name is not a purity oracle
+and does not reintroduce Rules of Hooks; actual hook calls stay in normal
+component or custom-hook setup and use compiler-assigned slots.
+
+Strong diagnostics catch violations the compiler can prove. The analysis is
+bounded, so an unknown call is assumed pure rather than making memoization fall
+back. A call that hides ref contents, a state getter, a mutable module or global,
+a live external store, a clock, randomness, mutation, or any other changing
+source violates the contract. Keep live accessors in a compatibility-mode
+consumer, or pass an actual snapshot into a separate Strong component; opting in
+does not make a library's live objects immutable.
 
 Keys preserve surviving DOM nodes, not an exact evaluation count. A diagnostic
 `console.log` no longer disqualifies an otherwise eligible Strong row, but a

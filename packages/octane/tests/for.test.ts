@@ -45,21 +45,12 @@ import {
 } from './_fixtures/for.tsrx';
 import {
 	CapturedSnapshotList,
-	ContextArgumentMethodList,
-	RefMethodList,
 	SnapshotCalculation,
 	SnapshotMethodList,
 	WrappedSnapshotCalculation,
 	type SnapshotRow,
 } from './_fixtures/for-strong.tsrx';
-import { ComputedHookMappedRows, SnapshotMappedList } from './_fixtures/for-strong.tsx';
-import {
-	AliasedRefMethodRows,
-	ComputedHookMethodRows,
-	DestructuredRefMethodRows,
-	RefArgumentMethodRows,
-} from './_fixtures/for-strong-hooks.tsrx';
-import { TupleGetterMethodRows } from './_fixtures/for-strong-getter.tsrx';
+import { SnapshotMappedList } from './_fixtures/for-strong.js';
 
 const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
 
@@ -341,58 +332,6 @@ describe('Strong list methods preserve snapshot and event semantics', () => {
 			r.unmount();
 			diagnostic.mockRestore();
 		}
-	});
-
-	it('keeps hooks in method arguments and ref-backed receivers live', () => {
-		const items = [row(1, 'apple'), row(2, 'banana')];
-		const context = mount(ContextArgumentMethodList, { items, prefix: 'first:' });
-		expect(labels(context)).toEqual(['first:apple', 'first:banana']);
-		context.update(ContextArgumentMethodList, { items, prefix: 'second:' });
-		expect(labels(context)).toEqual(['second:apple', 'second:banana']);
-		context.unmount();
-
-		const refItems = [{ id: 1, current: { read: () => 'first' } }];
-		const refs = mount(RefMethodList, { items: refItems });
-		expect(labels(refs)).toEqual(['first']);
-		refItems[0]!.current = { read: () => 'second' };
-		refs.update(RefMethodList, { items: refItems });
-		expect(labels(refs)).toEqual(['second']);
-		refs.unmount();
-	});
-
-	it.each([
-		['keyed templates', ComputedHookMethodRows],
-		['returned JSX', ComputedHookMappedRows],
-	])('keeps computed hook methods live in %s', (_dialect, Component) => {
-		const context = mount(Component, { value: 'first' });
-		expect(labels(context)).toEqual(['first']);
-		context.update(Component, { value: 'second' });
-		expect(labels(context)).toEqual(['second']);
-		context.update(Component, { value: 'third' });
-		expect(labels(context)).toEqual(['third']);
-		context.unmount();
-	});
-
-	it('keeps state getters inside stable method objects live', () => {
-		const getter = mount(TupleGetterMethodRows);
-		expect(labels(getter)).toEqual(['0']);
-		getter.click('#tuple-method-bump');
-		expect(labels(getter)).toEqual(['1']);
-		getter.click('#tuple-method-bump');
-		expect(labels(getter)).toEqual(['2']);
-		getter.unmount();
-	});
-
-	it.each([
-		['direct ref arguments', RefArgumentMethodRows],
-		['ref value aliases', AliasedRefMethodRows],
-		['destructured ref values', DestructuredRefMethodRows],
-	])('observes event mutations through %s', (_shape, Component) => {
-		const refs = mount(Component);
-		expect(labels(refs)).toEqual(['first']);
-		refs.click('#mutate-ref');
-		expect(labels(refs)).toEqual(['second']);
-		refs.unmount();
 	});
 
 	it.each([

@@ -1,6 +1,6 @@
 'use strong';
 
-import { createContext, useContext, useState } from 'octane';
+import { useState } from 'octane';
 
 export interface SnapshotRow {
 	id: number;
@@ -81,28 +81,4 @@ export function CapturedSnapshotList() @{
 			}
 		</ul>
 	</div>
-}
-
-const PrefixContext = createContext('initial:');
-
-export function ContextArgumentMethodList({ items, prefix }: Omit<SnapshotListProps, 'onSelect'>) @{
-	<PrefixContext.Provider value={prefix}>
-		<ul>
-			@for (const item of items; key item.id) {
-				<li>{item.read(useContext(PrefixContext)) as string}</li>
-			}
-		</ul>
-	</PrefixContext.Provider>
-}
-
-export function RefMethodList({
-	items,
-}: {
-	items: Array<{ id: number; current: { read(): string } }>;
-}) @{
-	<ul>
-		@for (const item of items; key item.id) {
-			<li>{item.current.read() as string}</li>
-		}
-	</ul>
 }

@@ -395,7 +395,9 @@ JavaScript. Only inject source you trust.
 ## Strong mode
 
 Strong mode is an optional immutable render-snapshot contract with compiler
-checks for state, refs, Effect Events, and detectable impure render calls.
+checks for state, refs, Effect Events, and detectable impure render calls. It is
+also an author assertion that rendering is pure, which production memoization
+is allowed to trust without proving every call body.
 Start with one module by putting `"use strong"` before its imports:
 
 ```tsx
@@ -462,13 +464,32 @@ timers, or event callbacks remain valid. Obtain changing timestamps or random
 values in events or effects and put them in state. A lazy state initializer such
 as `useState(() => new Date())` may also capture the initial value.
 
-Production client builds can memoize statically named member calls under this
-contract: an unchanged receiver and unchanged inputs must produce the same render
-value. Hooks, ref-backed reads, and opaque callback arguments retain their
-existing conservative treatment. Compiler diagnostics are bounded; an imported
-library with live accessors does not become snapshot-safe just because its
-caller opts in. Keep such consumers in compatibility mode, or pass snapshots to
-a Strong component. See
+For every user-authored operation evaluated to produce render output, Strong
+asserts all of the following:
+
+- The same witnessed props, state, context, receiver, arguments, and captured
+  values produce the same result.
+- Calls, computed methods, call-produced callees, constructors, tagged
+  templates, and synchronously invoked callbacks have no application-visible
+  render side effects.
+- Results do not depend on changing `ref.current` contents, state getters,
+  mutable module or global state, external live stores, clocks, randomness, or
+  hook state hidden behind a stable value.
+- Code does not rely on how often a render expression is evaluated. Development,
+  production, HMR, profiling, server rendering, hydration, retries, and aborted
+  work can evaluate it different numbers of times.
+
+Production client builds may condition every eligible call shape on those
+witnessed inputs. A `use*`-shaped ordinary function is treated like any other
+projection; Strong does not require React's hook naming convention to establish
+purity. Actual hooks still belong in component or custom-hook setup and retain
+their compiler-owned behavior.
+
+The diagnostics above are bounded; they do not prove arbitrary imported code or
+method bodies pure, and an unknown call does not make memoization fall back. A
+Strong caller is asserting that its use of an imported API is snapshot-safe. Keep
+live-accessor consumers in compatibility mode, or pass actual snapshots to a
+Strong component. See
 [Automatic memoization and calls in templates](./differences-from-react.md#automatic-memoization-and-calls-in-templates)
 for the exact boundary and why changing event captures still invalidates keyed
 rows.
