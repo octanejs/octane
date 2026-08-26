@@ -14665,24 +14665,30 @@ export function setHostPropSources(
 		string,
 		readonly [name: string, value: unknown, firstOrder: number, lastOrder: number]
 	>();
+	let needsWinningOrderSort = false;
 	for (const writer of props.values()) {
 		if (writer.rawName === 'key') continue;
 		const [identity, name] = normalizedHostProp(el, writer.rawName);
 		const previous = values.get(identity);
-		if (previous === undefined || previous[3] < writer.lastOrder) {
-			values.set(identity, [
-				process.env.NODE_ENV !== 'production' &&
-				(writer.rawName === 'tabIndex' || writer.rawName === 'htmlFor')
-					? writer.rawName
-					: name,
-				writer.value,
-				writer.firstOrder,
-				writer.lastOrder,
-			]);
+		if (previous !== undefined) {
+			if (previous[3] >= writer.lastOrder) continue;
+			// Map order already matches firstOrder unless a later raw alias replaces
+			// an earlier normalized identity without moving its Map entry.
+			needsWinningOrderSort = true;
 		}
+		values.set(identity, [
+			process.env.NODE_ENV !== 'production' &&
+			(writer.rawName === 'tabIndex' || writer.rawName === 'htmlFor')
+				? writer.rawName
+				: name,
+			writer.value,
+			writer.firstOrder,
+			writer.lastOrder,
+		]);
 	}
 	const resolved: Record<string, unknown> = Object.create(null);
-	const ordered = [...values.values()].sort((a, b) => a[2] - b[2]);
+	const ordered = [...values.values()];
+	if (needsWinningOrderSort) ordered.sort((a, b) => a[2] - b[2]);
 	for (const [name, value] of ordered) resolved[name] = value;
 	const formHost =
 		el.localName === 'input' || el.localName === 'textarea' || el.localName === 'select';
