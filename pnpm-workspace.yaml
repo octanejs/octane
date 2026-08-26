@@ -22,6 +22,7 @@ packages:
   - benchmarks/portal-swarm
   - benchmarks/portal-swarm/*
   - benchmarks/react-hosted-islands
+  - benchmarks/dev-form-diagnostics
   - benchmarks/ssr-throughput
   - benchmarks/ssr-throughput/*
   - benchmarks/streaming-ssr

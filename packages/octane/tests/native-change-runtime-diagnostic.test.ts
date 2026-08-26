@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flushSync, hydrateRoot } from '../src/index.js';
 import * as ServerRuntime from 'octane/server';
-import { mount } from './_helpers.js';
+import { act, mount } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
 import {
+	DiagnosticBatch,
 	DynamicHost,
 	DirectCreateElement,
 	MutableInputHandler,
@@ -127,6 +128,87 @@ describe('native text change development diagnostic', () => {
 		});
 		try {
 			expect(checkableCalls()).toHaveLength(0);
+		} finally {
+			result.unmount();
+		}
+	});
+
+	it('reports each invalid form host once in document order', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const result = mount(NegativeHosts, {
+			hostProps: { checked: true, value: 'missing' },
+		});
+		try {
+			const warnings = error.mock.calls
+				.map((call) => String(call[0]))
+				.filter((message) => message.includes('This will render a read-only field.'));
+			expect(warnings).toEqual(
+				PROD_COMPILE
+					? []
+					: [expect.stringContaining('`checked` prop'), expect.stringContaining('to a select')],
+			);
+		} finally {
+			result.unmount();
+		}
+	});
+
+	it('preserves warning episodes and order across a large reentrant repair', () => {
+		const inputTypes = ['text', 'search', 'tel', 'url', 'email', 'password', 'number'];
+		const items = Array.from({ length: 32 }, (_, index) => ({
+			id: `diagnostic-${index}`,
+			type: inputTypes[index % inputTypes.length],
+		}));
+		let repaired = false;
+		const result = mount(DiagnosticBatch, { items, hostProps: { onInput: noop } });
+		const error = vi.spyOn(console, 'error').mockImplementation((message) => {
+			if (!repaired && String(message).includes('[OCTANE_NATIVE_TEXT_ONCHANGE]')) {
+				repaired = true;
+				result.update(DiagnosticBatch, { items, hostProps: { onInput: noop } });
+			}
+		});
+		try {
+			result.update(DiagnosticBatch, { items, hostProps: { onChange: noop } });
+			expect(diagnosticCalls(error)).toHaveLength(PROD_COMPILE ? 0 : items.length);
+			expect(repaired).toBe(!PROD_COMPILE);
+
+			error.mockClear();
+			result.update(DiagnosticBatch, { items, hostProps: { onChange: noop } });
+			const warnings = diagnosticCalls(error);
+			expect(warnings).toHaveLength(PROD_COMPILE ? 0 : items.length);
+			if (!PROD_COMPILE) {
+				expect(warnings.map((call) => /<input type="([^"]+)">/.exec(String(call[0]))?.[1])).toEqual(
+					items.map((item) => item.type),
+				);
+			}
+		} finally {
+			result.unmount();
+		}
+	});
+
+	it('requeues every host after a large suspended render rolls back', async () => {
+		const items = Array.from({ length: 32 }, (_, index) => ({
+			id: `rollback-diagnostic-${index}`,
+			type: 'text',
+		}));
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const result = mount(DiagnosticBatch, { items, hostProps: { onInput: noop } });
+		try {
+			result.update(DiagnosticBatch, {
+				items,
+				hostProps: { onChange: noop },
+				promise,
+			});
+			expect(diagnosticCalls(error)).toHaveLength(0);
+
+			await act(async () => {
+				resolve('ready');
+				await promise;
+			});
+			expect(diagnosticCalls(error)).toHaveLength(PROD_COMPILE ? 0 : items.length);
 		} finally {
 			result.unmount();
 		}

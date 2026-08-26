@@ -66,6 +66,7 @@ export const BENCHMARK_SUITES = [
 	'event-delegation',
 	'application-composition',
 	'scaling-curves',
+	'dev-form-diagnostics',
 	'behavior-root-events',
 	'store-selector-fanout',
 	'hook-store-composition',

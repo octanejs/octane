@@ -16232,6 +16232,9 @@ let CHECKED_RESTORE: ((input: HTMLInputElement, ctrl: ControlledState) => void) 
 let SELECT_SYNCS: HTMLSelectElement[] = [];
 let SELECT_DEFAULT_SYNCS: { el: HTMLSelectElement; value: unknown }[] = [];
 let DEV_FORM_CHECKS: Element[] | null = process.env.NODE_ENV === 'production' ? null : [];
+const DEV_FORM_CHECK_MARK = /* @__PURE__ */ Symbol('octane.devFormCheck');
+const DEV_FORM_CHECK_LINEAR_LIMIT = 8;
+let DEV_FORM_CHECK_GENERATION = 1;
 let AUTOFOCUS_QUEUE: Element[] = [];
 
 function queueControlledCommit<T>(queue: T[], item: T): void {
@@ -16241,6 +16244,21 @@ function queueControlledCommit<T>(queue: T[], item: T): void {
 			const index = queue.lastIndexOf(item);
 			if (index !== -1) queue.splice(index, 1);
 		});
+}
+
+function queueDevFormCheck(queue: Element[], el: Element): void {
+	queue.push(el);
+	if (ROOT_RENDER_TRANSACTION !== null) {
+		const host = el as any;
+		const generation = DEV_FORM_CHECK_GENERATION;
+		journalUndo(() => {
+			const index = queue.lastIndexOf(el);
+			if (index !== -1) queue.splice(index, 1);
+			// The element can be retried in this same diagnostic generation. Roll back
+			// the stamp alongside the queue entry so that retry is not deduplicated.
+			if (host[DEV_FORM_CHECK_MARK] === generation) delete host[DEV_FORM_CHECK_MARK];
+		});
+	}
 }
 
 /** True when controlled commit work is queued (folds into hasPendingWork). */
@@ -16490,7 +16508,21 @@ function queueDevFormDiagnostic(el: Element, scope?: Scope, force = false): void
 	const q = DEV_FORM_CHECKS;
 	if (q === null || (!force && !hasDevFormDiagnosticContext(el, scope))) return;
 	if (!force && !hasPotentialFormDiagnostic(el)) return;
-	if (q.indexOf(el) === -1) queueControlledCommit(q, el);
+	// Keep the usual tiny queue property-free, then cap membership work by stamping
+	// the first full batch and every later host with this queue's generation.
+	if (q.length < DEV_FORM_CHECK_LINEAR_LIMIT) {
+		if (q.indexOf(el) !== -1) return;
+		queueDevFormCheck(q, el);
+		if (q.length < DEV_FORM_CHECK_LINEAR_LIMIT) return;
+		for (let i = 0; i < q.length; i++) {
+			(q[i] as any)[DEV_FORM_CHECK_MARK] = DEV_FORM_CHECK_GENERATION;
+		}
+		return;
+	}
+	const host = el as any;
+	if (host[DEV_FORM_CHECK_MARK] === DEV_FORM_CHECK_GENERATION) return;
+	queueDevFormCheck(q, el);
+	host[DEV_FORM_CHECK_MARK] = DEV_FORM_CHECK_GENERATION;
 }
 
 /** Compiler-only DEV marker for form hosts whose authoring is otherwise baked. */
@@ -17109,6 +17141,9 @@ function drainDevFormDiagnostics(): void {
 	const q = DEV_FORM_CHECKS;
 	if (q === null || q.length === 0) return;
 	DEV_FORM_CHECKS = [];
+	// Advance before validation: a console.error hook may synchronously render and
+	// enqueue any still-pending host into the fresh queue owned by the reentrant commit.
+	DEV_FORM_CHECK_GENERATION++;
 	for (let i = 0; i < q.length; i++) {
 		const el = q[i];
 		const authoring = getDevFormDiagnosticState(el);
