@@ -1,5 +1,27 @@
 # octane
 
+## 0.1.47
+
+### Patch Changes
+
+- af0d999: Drain queued behavior-root interactions with amortized cursor compaction and
+  constant-time pending-adoption bookkeeping so late modules and separately
+  settling async adoptions stay linear while preserving FIFO and reentrant delivery.
+  Expose the accompanying browser benchmark through the Octane MCP benchmark tool.
+- c800a1f: Allow nested TSRX `@{ ... }` child blocks to contain setup statements, hooks,
+  and no rendered JSX. Setup-bearing blocks now compile as scoped child render
+  bodies in client, server, and hydration output, while render-only blocks remain
+  transparent grouping.
+- c1bb057: Keep compiler-generated local names compact in production modules with many components, reducing compile work and intermediate output size.
+- 97b9349: Skip unrelated sibling boundaries when pruning completed streaming SSR segments.
+- 4393bea: Speed up production TSrX compilation for deep same-module component graphs by propagating automatic-memoization witnesses incrementally.
+- 7dfef16: Speed up pure-host keyed-list upgrades and compiler queue walks while preserving adopted keyed nodes across suspended upgrade retries.
+- 7e62361: Speed up development commits with many controlled form hosts by keeping diagnostic queue deduplication linear.
+- 964783a: Keep development TSRX HTML-nesting diagnostics linear by deduplicating them with
+  one identity set per compiled render plan instead of rescanning and serializing
+  every diagnostic already collected for each new authored site.
+- d3dbd78: Skip sorting normalized client and server host props when no later raw alias changes their insertion order.
+
 ## 0.1.46
 
 ### Patch Changes

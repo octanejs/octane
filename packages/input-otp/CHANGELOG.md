@@ -1,5 +1,21 @@
 # @octanejs/input-otp
 
+## 0.0.13
+
+### Patch Changes
+
+- 12662fd: Bump the `@octanejs/input-otp` pin from `input-otp@1.4.2` to `input-otp@1.5.0`, including overflow-aware password-manager badge space, default `spellCheck={false}`, container `translate="no"`, a `nonce` prop for the injected style tag, the 16px `--root-height` fallback, and stable shared-style ownership when a stylesheet is externally removed and reinstalled.
+- Updated dependencies [af0d999]
+- Updated dependencies [c800a1f]
+- Updated dependencies [c1bb057]
+- Updated dependencies [97b9349]
+- Updated dependencies [4393bea]
+- Updated dependencies [7dfef16]
+- Updated dependencies [7e62361]
+- Updated dependencies [964783a]
+- Updated dependencies [d3dbd78]
+  - octane@0.1.47
+
 ## 0.0.12
 
 ### Patch Changes

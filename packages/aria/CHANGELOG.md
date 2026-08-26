@@ -1,5 +1,24 @@
 # @octanejs/aria
 
+## 0.0.41
+
+### Patch Changes
+
+- 3945221: Complete the `react-aria-components@1.19.0` public surface. The components entry
+  now includes calendar/date/time, color, drag-and-drop, file/drop-zone, toast,
+  data, virtualizer, and layout APIs, with an exact runtime/type export audit
+  against the pinned upstream package.
+- Updated dependencies [af0d999]
+- Updated dependencies [c800a1f]
+- Updated dependencies [c1bb057]
+- Updated dependencies [97b9349]
+- Updated dependencies [4393bea]
+- Updated dependencies [7dfef16]
+- Updated dependencies [7e62361]
+- Updated dependencies [964783a]
+- Updated dependencies [d3dbd78]
+  - octane@0.1.47
+
 ## 0.0.40
 
 ### Patch Changes

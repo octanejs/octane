@@ -1,5 +1,16 @@
 # @octanejs/mcp-server
 
+## 0.2.20
+
+### Patch Changes
+
+- af0d999: Drain queued behavior-root interactions with amortized cursor compaction and
+  constant-time pending-adoption bookkeeping so late modules and separately
+  settling async adoptions stay linear while preserving FIFO and reentrant delivery.
+  Expose the accompanying browser benchmark through the Octane MCP benchmark tool.
+- 7e62361: Expose the development form-diagnostics benchmark through the MCP benchmark tool.
+- 4393bea: Expose the TSrX component-graph compilation benchmark through the MCP benchmark tool.
+
 ## 0.2.19
 
 ### Patch Changes

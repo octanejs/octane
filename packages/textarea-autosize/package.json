@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/textarea-autosize",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "react-textarea-autosize for Octane with matching measurement and lifecycle behavior.",
   "license": "MIT",
   "type": "module",
