@@ -2,7 +2,7 @@
 title: Experimental scoped async signals
 type: experiment
 date: 2026-08-27
-status: implementing
+status: draft-experiment
 branch: codex/experimental-scoped-async-signals
 base: c84edbb271c19488922f3d9941e374f022ead516
 ---
@@ -15,17 +15,18 @@ The plan was accepted for implementation on 2026-08-27. Work is isolated in the 
 
 ## Baseline and authority
 
-| Item                     | Recorded state                                                                                                                                                       |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Worktree                 | `/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment`                                                                                              |
-| Branch                   | `codex/experimental-scoped-async-signals`                                                                                                                            |
-| Initial planning base    | Upstream `octanejs/octane` main at `c84edbb271c19488922f3d9941e374f022ead516`                                                                                        |
-| Why upstream             | The fork's main was still `cc6e5ea2273c418f96519d1b51cf61749cd97875`; it was not a suitable current baseline.                                                        |
-| RFC observed             | Updated 2026-08-27 10:56:18 UTC; [the user's design reply](https://github.com/octanejs/RFCs/discussions/2#discussioncomment-18174418) is part of the requirements.   |
-| Initial lockfile SHA-256 | `0b2fcc89ecac2590ccd05b32609900418f03cf60bc31b113fb1072b0b9157826`                                                                                                   |
-| Runtime/toolchain        | Repository requires Node >=22.22.2 and pnpm 11.15.1; local Node observed as 22.22.3. Benchmark CI uses Node 24. Record the actual selected environment for each run. |
-| Implementation base      | Fast-forwarded to upstream `ba9abbfb634786a1b081852f6eb51845f3d588fc` before implementation; the primary checkout remains unchanged.                                 |
-| Experiment status        | Engine, optional compiler/native runtime, tests, and scale harness are in progress. Results and unmet gates will be recorded separately from this design.            |
+| Item                       | Recorded state                                                                                                                                                                                                                    |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worktree                   | `/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment`                                                                                                                                                           |
+| Branch                     | `codex/experimental-scoped-async-signals`                                                                                                                                                                                         |
+| Initial planning base      | Upstream `octanejs/octane` main at `c84edbb271c19488922f3d9941e374f022ead516`                                                                                                                                                     |
+| Why upstream               | The fork's main was still `cc6e5ea2273c418f96519d1b51cf61749cd97875`; it was not a suitable current baseline.                                                                                                                     |
+| RFC observed               | Updated 2026-08-27 10:56:18 UTC; [the user's design reply](https://github.com/octanejs/RFCs/discussions/2#discussioncomment-18174418) is part of the requirements.                                                                |
+| Initial lockfile SHA-256   | `0b2fcc89ecac2590ccd05b32609900418f03cf60bc31b113fb1072b0b9157826`                                                                                                                                                                |
+| Runtime/toolchain          | Repository requires Node >=22.22.2 and pnpm 11.15.1; local Node observed as 22.22.3. Benchmark CI uses Node 24. Record the actual selected environment for each run.                                                              |
+| Implementation base        | Fast-forwarded to upstream `ba9abbfb634786a1b081852f6eb51845f3d588fc` before implementation; the primary checkout remains unchanged.                                                                                              |
+| Final upstream integration | Merged `97b42683ff64e561638fcc7580ba324e76458244` before final validation; original measurement provenance is preserved.                                                                                                          |
+| Experiment status          | Prototype committed with isolated correctness, scale, and retention evidence. Full compiler/browser validation and application comparisons remain blocked; see the [evidence report](../experimental-scoped-signals-evidence.md). |
 
 Live user instructions outrank this plan. Current source and observable tests outrank summaries. Recheck the RFC and upstream base before implementation; retain the exact baseline revision and inputs used for measurements.
 

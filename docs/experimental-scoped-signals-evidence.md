@@ -6,11 +6,13 @@ contract; the [accepted plan](plans/2026-08-27-experimental-scoped-async-signals
 also describes gates that remain unmet. The pull request stays in draft as
 requested. Skipped draft CI jobs are not validation.
 
-The worktree is based on upstream
-`ba9abbfb634786a1b081852f6eb51845f3d588fc`. Planning originally inspected
-`c84edbb271c19488922f3d9941e374f022ead516`; the worktree incorporated the later
-upstream commit before implementation. Existing primary-checkout work was not
-changed. No packages have been published.
+The worktree contains upstream `97b42683ff64e561638fcc7580ba324e76458244`,
+the Version Packages commit integrated before final validation. Implementation
+began at `ba9abbfb634786a1b081852f6eb51845f3d588fc`; planning originally inspected
+`c84edbb271c19488922f3d9941e374f022ead516`. Earlier measurements retain their
+original inputs. The final package, runtime-probe, bundle, and engine reports
+record the tested source hashes. Existing primary-checkout work was not changed.
+No packages have been published.
 
 ## Implemented surface and explicit limits
 
@@ -88,6 +90,11 @@ batching, and owner disposal. The public API and a separate state oracle are
 the observation boundary; graph fields and scheduler counts are not the
 correctness oracle.
 
+The final [expanded model run](../benchmarks/scoped-signals/results/2026-08-27/engine-models-final.json)
+also passed 20 root seeds, each with 50 cases of 100 actions: 1,000 cases and
+100,000 operations. It records each seed, exact source hashes, and hashes of the
+local raw Vitest reports. The earlier expanded run is preserved separately.
+
 The engine suite covers immediate reads and batching, dynamic dependency
 replacement, purity and write guards, ownership retirement, in-flight query
 sharing and canonical arguments, cancellation-ignoring producers, quiet and
@@ -120,7 +127,8 @@ an immediately failed attempt), or capture producer callback reads as request
 dependencies. Retry now validates its generation and owner after cancellation;
 abort callbacks run untracked, and selection rechecks ownership before attaching.
 
-Direct DOM/SSR ABI probes cover shared roots, unmount, native event batching,
+The final [27-case DOM/SSR ABI run](../benchmarks/scoped-signals/results/2026-08-27/native-dom-abi-final.json)
+covers shared roots, unmount, native event batching,
 seeded hydration, early controlled-input edits, delayed adoption, missing-channel
 recovery, retained/fallback `latest`, per-channel serialization, safe script
 embedding, duplicate owner keys, local hook lifetime, warm/deferred memo reuse,
@@ -140,13 +148,14 @@ remain unrun. These checks do not establish DevTools retention or UI performance
 The app and renderer configuration suites pass 37 tests, including seven new
 `nativeReads` option cases; a default-on mutation fails the opt-in regression.
 
-The independent project-routing, bundle-boundary, retention-scanner, and benchmark-workload checks pass 23 Node
-tests, including intentionally broken semantic controls. The expanded
-repository CI-workflow test command passed 46 of 51 tests in the isolated setup;
-the remaining five lacked dependencies such as the Vite React plugin and the
-configured formatter. This is not recorded as a passing repository CI gate.
+The independent project-routing, bundle-boundary, retention-scanner, and
+benchmark-workload checks pass 23 Node tests, including intentionally broken
+semantic controls. The final broader repository CI-workflow test command passed
+69 of 72 tests in the isolated setup. Three fail because the workspace cannot
+import `@vitejs/plugin-react` or spawn the unlinked Prettier executable. This
+is not recorded as a passing repository CI gate.
 
-The [targeted publication report](../benchmarks/scoped-signals/results/2026-08-27/package-smoke.json)
+The final [targeted publication report](../benchmarks/scoped-signals/results/2026-08-27/package-smoke-final.json)
 passes actual per-file ESM and CommonJS public imports, native SSR seed capture,
 local-hook retirement, and a declaration consumer with type-error controls.
 It found and fixed a split between CommonJS public runtime imports and compiler
@@ -160,15 +169,21 @@ publishable tarball.
 
 The [engine measurement report](../benchmarks/scoped-signals/results/2026-08-27/README.md)
 contains commands, raw results, source hashes, warmups, sample counts, and
-variance. Two complete synchronous engine runs passed every semantic control
-for five graph shapes at sizes 100, 1,000, and 10,000. Continuous ownership
-workloads passed 1,000 cycles with zero, 100, and 1,000 unrelated owners.
+variance. The final frozen-source run and two earlier synchronous engine runs
+passed every semantic control for five graph shapes at sizes 100, 1,000, and
+10,000. Each matched final scenario uses nine samples and 32 update rounds.
+Continuous ownership workloads passed 1,000 cycles with zero, 100, and 1,000
+unrelated owners. The raw Alien bundle and workload source are identical across
+those runs; the final scoped bundle also matches the final async retention run.
 
-The second measured engine version took about 2.3–3.8 times the raw Alien graph
-time for broad updates at size 10,000. Construction and ownership cleanup were
-also materially more expensive. Continuous per-cycle cost stayed roughly flat
-as unrelated owners increased. These measurements do not justify a speed claim
-against ordinary Octane hooks, React, or native UI rendering.
+The final engine takes about 2.1–3.3 times the raw Alien graph time for broad
+updates at 10,000 rows. Construction costs 4.7–17.5 times as much and disposal
+3.8–5.7 times as much, with higher variance in those phases. Continuous scoped
+cost is 96.91, 94.16, and 94.00 microseconds per cycle as unrelated owners
+increase, compared with 17.52, 17.93, and 17.39 for raw Alien. Cost stays roughly
+flat with unrelated owners, but the ownership layer is materially more
+expensive. These measurements do not justify a speed claim against ordinary
+Octane hooks, React, or native UI rendering.
 
 Separate first-version GC and heap-snapshot runs found only the intentionally
 live shared data owner strongly retained at checkpoints 0, 100, and 1,000, and
@@ -176,8 +191,7 @@ none after it retired. The scanner includes a positive control and excludes
 weak edges. RSS grew despite bounded live JS heap, so allocation pressure is
 still a concern. This evidence is for the recorded synchronous workload; it
 does not establish retention behavior for native DOM, historical frames, or
-DevTools. Raw heap snapshots remain local
-because they can contain process values.
+DevTools. Raw heap snapshots remain local because they can contain process values.
 
 A separate [async retention diagnostic](../benchmarks/scoped-signals/results/2026-08-27/async-retention.md)
 externally retains never-settling promise, iterator `next()`, and iterator
@@ -190,9 +204,13 @@ producer promises are released; they contain no owner, controller, or iterator.
 This does not establish historical-frame, native DOM, or DevTools retention.
 
 Later source refinements are not silently covered by earlier timings. A final
-candidate report must match its recorded source hashes. Public-entry bundle
-checks and publication checks have their own reports; bundle reachability does
-not prove compiler-output size or application performance.
+candidate report must match its recorded source hashes. The final
+[public-entry bundle report](../benchmarks/scoped-signals/results/2026-08-27/bundles-final.json)
+passes seven boundary and namespace-export checks against upstream `97b42683f`.
+The ordinary client entry grows by 1,219 gzip bytes (42,785 to 44,004); SSR grows
+by 393 (11,853 to 12,246). Neither ordinary entry retains the scoped engine or
+Alien Signals. These are source-entry bundles, not compiled application deltas
+or native UI performance measurements.
 
 ## Unmet acceptance gates
 
@@ -205,7 +223,8 @@ not prove compiler-output size or application performance.
   forwarding, and configuration-reload matrices for core Vite, app Vite, Rspack,
   and Rsbuild. Dedicated wrapper matrices have not been added or executed.
 - Existing application benchmark comparisons against the pinned baseline, and
-  native UI scaling/continuous lifetime experiments with DevTools off and on.
+  a compiled native Todo/dashboard fixture and UI scaling/continuous lifetime
+  experiments with DevTools off and on.
 - Historical-frame, native DOM, and DevTools retainer snapshots beyond the
   measured synchronous and cancellation-ignoring producer workloads.
 - Complete package build, bundled Volar compiler, and actual package-tarball
