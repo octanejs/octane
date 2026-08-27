@@ -388,6 +388,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Shared-compiler watched-path invalidation after nearest-package
+		// decisions have been cached for small and large source trees.
+		name: 'manifest-cache-invalidation',
+		cwd: 'manifest-cache-invalidation',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Node-only Vite manifest traversal across many routes that converge on
 		// one deep shared chunk graph, plus a shallow-graph control.
 		name: 'vite-client-assets',

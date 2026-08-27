@@ -1307,7 +1307,9 @@ export const Indirect = indirect(Host);
 			// Cached nearest-manifest decisions are stable until the bundler reports
 			// a watched change.
 			expect(compiler.transform(HOOK, id)?.kind).toBe('slots');
-			compiler.invalidate(sourceManifest);
+			compiler.invalidate(id);
+			expect(compiler.transform(HOOK, id)?.kind).toBe('slots');
+			compiler.invalidate(sourceManifest + '?watch=1#created');
 			const refreshed = compiler.transform(HOOK, id);
 			expect(refreshed?.kind).toBe('none');
 			expect(refreshed?.dependencies).toContain(sourceManifest);
@@ -1363,7 +1365,8 @@ export const Indirect = indirect(Host);
 			);
 			writeFileSync(join(packageRoot, 'index.js'), 'export const value = 1;\n');
 
-			const discovered = createOctaneCompiler({ root }).discoverSourceDependencies();
+			const compiler = createOctaneCompiler({ root });
+			const discovered = compiler.discoverSourceDependencies();
 			const resolvedPackageRoot = realpathSync(packageRoot);
 			expect(discovered.packages).toEqual(['raw-octane']);
 			expect(discovered.viteOptimizeDepsExclusions).toEqual([
@@ -1380,6 +1383,11 @@ export const Indirect = indirect(Host);
 			expect(discovered.missingDependencies).toContain(
 				join(realpathSync(root), 'node_modules/missing-child/package.json'),
 			);
+
+			writeFileSync(projectManifest, JSON.stringify({ name: 'app', private: true }));
+			expect(compiler.discoverSourceDependencies().packages).toEqual(['raw-octane']);
+			compiler.invalidate();
+			expect(compiler.discoverSourceDependencies().packages).toEqual([]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

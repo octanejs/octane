@@ -488,6 +488,22 @@
     "note": "Same-process Vite asset mapping over route entries that share one 500-chunk graph and produce the same one-file CSS result. Rewalking the graph for every route measured at 10.16x for 1,000 versus 100 routes; bounded complete-result caching measured at 3.24x. The 6x ceiling leaves timing headroom while catching restoration of the route-count times graph-size traversal."
   },
   {
+    "suite": "manifest-cache-invalidation",
+    "op": "invalidate",
+    "target": "ordinary-large-cache",
+    "reference": "ordinary-small-cache",
+    "maxRatio": 1.5,
+    "note": "Same-process shared-compiler source invalidation after 129 versus 5,001 nearest-manifest decisions. The original whole-cache scan measured 34.8x at the large size, while rejecting non-manifest paths before cache traversal measured 1.00x. The 1.5 ceiling leaves timing headroom while catching cache-size-dependent ordinary invalidation."
+  },
+  {
+    "suite": "manifest-cache-invalidation",
+    "op": "invalidate",
+    "target": "ordinary-large-cache",
+    "reference": "manifest-large-cache",
+    "maxRatio": 0.2,
+    "note": "Same-process invalidation across 5,001 cached manifest decisions with identical cache-preservation checks. The original ordinary path measured at parity with the required package-manifest scan, while the manifest-name gate measured at 0.01x. The 0.2 ceiling preserves more than 10x timing headroom while catching loss of the ordinary-source fast path."
+  },
+  {
     "suite": "external-store-fanout",
     "op": "broad_write",
     "target": "octane-tsrx",

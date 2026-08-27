@@ -71,6 +71,7 @@ export const BENCHMARK_SUITES = [
 	'scheduler-depth',
 	'behavior-root-events',
 	'router-dispatch',
+	'manifest-cache-invalidation',
 	'vite-client-assets',
 	'store-selector-fanout',
 	'hook-store-composition',

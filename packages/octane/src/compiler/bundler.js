@@ -531,6 +531,10 @@ class OctaneBundlerCompiler {
 			return;
 		}
 		const changed = nodePath.resolve(cleanModuleId(path));
+		// Both cache families retain only present or missing package manifests.
+		// Ordinary source edits still start a diagnostic generation above, but
+		// cannot invalidate either cache.
+		if (nodePath.basename(changed) !== 'package.json') return;
 		for (const [directory, entry] of this.manifestRuleCache) {
 			if (entry.dependencies.includes(changed) || entry.missingDependencies.includes(changed)) {
 				this.manifestRuleCache.delete(directory);
