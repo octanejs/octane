@@ -1,5 +1,43 @@
 # octane
 
+## 0.1.48
+
+### Patch Changes
+
+- 3ca30fc: Cache configured root membership and the sorted language-service root list in TypeScript-backed text inference so repeated warm snapshots no longer scale with unrelated project roots, and expose the regression benchmark through the MCP benchmark runner.
+- efdc8cb: Index component references once when compiling component-heavy modules.
+
+  Component declaration lowering now preserves the same client and server hoisting
+  semantics without repeatedly sanitizing and scanning every growing source prefix.
+
+- 922df8c: Skip manifest-cache scans for ordinary watched source changes while preserving package-manifest, full-reset, and diagnostic invalidation behavior. Expose the accompanying manifest-cache invalidation benchmark through the Octane MCP benchmark tool.
+- 8a8afd8: Cache shared ancestry while ordering batched component updates so deeply nested render waves do not repeatedly walk the same parent chains.
+
+  Expose the scheduler-depth benchmark through the Octane MCP benchmark tool.
+
+- 37a8ca1: Index conditional JSX return value uses once per module so component-heavy
+  TSRX modules no longer repeat a full AST scan for every component.
+- c84edbb: Propagate same-module fetch-tree warm reachability through reverse component
+  edges instead of repeatedly rescanning every component. Deep TSrX component
+  graphs now compile without a declaration-order-dependent fixed-point penalty
+  while preserving opaque descendants, prop ownership, and synchronous cycles.
+- d5175ca: Keep virtual TypeScript generation working for computed object methods and create deferred FocusScope autofocus events in the scope element's DOM realm.
+- 4a4996e: Treat `"use strong"` as an author assertion that every user-authored render call
+  is a pure projection of immutable snapshots and witnessed inputs. Condition
+  local, dynamic, ordinary hook-shaped, callback-bearing, constructed, and tagged
+  call shapes without React hook-name heuristics, while preserving compiler-proven
+  hook setup, compatibility-mode live receivers, and changing event captures.
+  Witness callable and receiver identities alongside explicit inputs, compare
+  memoized component and ordinary-list projection inputs with `Object.is`, and
+  preserve optional, aliased, cyclic, function-valued, or lexically shadowed
+  setup-hook paths. Add
+  bounded diagnostics for detectable state-snapshot mutations, cross-row writes
+  from retained keyed scopes, and impure clock or random reads, and document the
+  assumptions the production memoizer trusts.
+
+  Expose the template-call memoization benchmark through the Octane MCP benchmark
+  tool.
+
 ## 0.1.47
 
 ### Patch Changes
