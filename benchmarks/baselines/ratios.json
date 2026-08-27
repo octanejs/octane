@@ -3174,5 +3174,45 @@
     "reference": "work-model",
     "maxRatio": 1,
     "note": "Removing the original row after append must preserve all 16 current survivors and their DOM identity, with no duplicate receiver reads."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_stable_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "Strong mode is an author assertion of render purity. Stable rows must reuse hook-shaped ordinary functions, local and computed callees, call-produced callees, constructors, tagged templates, and callback-bearing projections without relying on React's hook naming convention."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_insert_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Appending and prepending one Strong row may execute the seven author-asserted pure call shapes only for each inserted snapshot."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_snapshot_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Replacing one immutable Strong row snapshot must execute its seven assumed-pure projections and update that row's retained DOM node."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_argument_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Changing a captured argument must invalidate all 18 Strong rows and execute every assumed-pure call shape, proving the optimization remains conditioned on real inputs."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_reorder_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "Reordering index-independent Strong rows must preserve output and DOM identity without repeating any author-asserted pure call shape."
   }
 ]

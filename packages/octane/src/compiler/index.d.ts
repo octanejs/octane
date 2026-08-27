@@ -55,7 +55,7 @@ export interface CompileOptions {
 	mode?: 'client' | 'server';
 	hmr?: boolean | 'vite' | 'webpack';
 	dev?: boolean;
-	/** Opt into immutable render snapshots, bounded purity checks, and production call memoization. */
+	/** Assert pure immutable-snapshot renders, enable bounded checks, and trust production call memoization. */
 	strong?: boolean;
 	profile?: boolean;
 	profileFilename?: string;

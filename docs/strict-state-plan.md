@@ -63,9 +63,11 @@ callbacks and effect cleanup remain valid. There is no runtime phase guard,
 hook-cell policy, runtime-only enforcement, cleanup ban, or `stateWrites`
 configuration in the shipped model.
 
-Strong mode also opts into immutable render snapshots for production member-call
-memoization, with bounded state-snapshot mutation and nondeterministic-call
-diagnostics. Compatibility-mode consumers retain live-method behavior. See the
+Strong mode also asserts pure rendering over immutable snapshots for production
+call memoization, with bounded state-snapshot mutation and nondeterministic-call
+diagnostics. The memoizer trusts every user-authored render call shape rather
+than using hook-like names or syntax as a purity proof. Compatibility-mode
+consumers retain live-call behavior. See the
 current [call contract](./differences-from-react.md#automatic-memoization-and-calls-in-templates)
 for the optimization boundary and the limits of static enforcement.
 
@@ -168,7 +170,7 @@ Three layers, with distinct jobs:
 
 | Layer | Current status | Intended role |
 | ----- | -------------- | ------------- |
-| Compiler | **Shipped**, opt-in Strong mode | Enforce the bounded immutable-snapshot and pure-render contract with actionable diagnostics, and admit eligible snapshot method calls to production client memoization. |
+| Compiler | **Shipped**, opt-in Strong mode | Enforce bounded diagnostics and trust the author-asserted immutable-snapshot/pure-render contract when conditioning eligible user-authored calls in production clients. |
 | Runtime phase guard | **Not implemented**; historical proposal | Enforce a future runtime policy for user-callable setters/dispatchers in development and production. |
 | Dependency compatibility | **Shipped** through package containment | Keep dependencies and separate workspace packages in their existing mode unless their own module opts into Strong mode. |
 | Per-cell `stateWrites` policy | **Not implemented**; historical proposal | Attach a hypothetical strict/compat policy to hook cells if runtime enforcement is ever introduced. |

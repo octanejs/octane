@@ -4203,6 +4203,261 @@ function containsAutoMemoContextRead(root, ctx) {
 	return found;
 }
 
+const AUTO_MEMO_SETUP_HOOK_NAMES = new Set([...HOOK_NAMES, 'use', 'useContext']);
+
+function autoMemoBuiltinHookName(call, ctx) {
+	if (call?.type !== 'CallExpression' && call?.type !== 'OptionalCallExpression') return null;
+	const imported = call._octaneImportedHook ?? call._octaneHookRuntimeImportedHook;
+	if (imported !== undefined && AUTO_MEMO_SETUP_HOOK_NAMES.has(imported)) return imported;
+	if (
+		call._octaneUnboundCallee === true &&
+		call.callee?.type === 'Identifier' &&
+		AUTO_MEMO_SETUP_HOOK_NAMES.has(call.callee.name)
+	) {
+		return call.callee.name;
+	}
+	if ((call.type !== 'OptionalCallExpression' && call.optional !== true) || ctx == null) {
+		return null;
+	}
+
+	// Optional calls are rebuilt after hook-dependency annotations have run, so
+	// some parser shapes do not retain those stamps. Depending on the authored
+	// chain, Babel represents them as either OptionalCallExpression or a regular
+	// CallExpression carrying `optional: true`. Recover provenance from the module
+	// imports plus the same lexical binding analysis used by the same-module hook
+	// graph. A shadowed helper named `useContext` is therefore still an ordinary
+	// Strong projection; spelling alone never makes it a hook.
+	const lexical =
+		ctx.autoMemoHookLexical ?? ctx.activityLexical ?? createLexicalAnalysis(ctx.activityModuleAst);
+	ctx.autoMemoHookLexical = lexical;
+	ctx.activityLexical ??= lexical;
+	const callee = unwrapTsExpr(call.callee);
+	if (callee?.type === 'Identifier') {
+		const scope =
+			lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(call) ?? lexical.rootScope;
+		const binding = lexical.resolveBinding(scope, callee.name);
+		const importedName = ctx.octaneImportLocals?.get(callee.name);
+		if (
+			importedName !== undefined &&
+			AUTO_MEMO_SETUP_HOOK_NAMES.has(importedName) &&
+			binding?.scope === lexical.rootScope
+		) {
+			return importedName;
+		}
+		if (binding === null && AUTO_MEMO_SETUP_HOOK_NAMES.has(callee.name)) return callee.name;
+		return null;
+	}
+	if (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') {
+		const object = unwrapTsExpr(callee.object);
+		const propertyNode = unwrapTsExpr(callee.property);
+		const property = callee.computed ? propertyNode?.value : propertyNode?.name;
+		if (
+			object?.type === 'Identifier' &&
+			typeof property === 'string' &&
+			AUTO_MEMO_SETUP_HOOK_NAMES.has(property) &&
+			ctx.octaneImportNamespaces?.has(object.name)
+		) {
+			const scope =
+				lexical.nodeScopes.get(object) ?? lexical.nodeScopes.get(callee) ?? lexical.rootScope;
+			if (lexical.resolveBinding(scope, object.name)?.scope === lexical.rootScope) {
+				return property;
+			}
+		}
+	}
+	return null;
+}
+
+function autoMemoModuleFunctions(ctx) {
+	if (ctx.autoMemoModuleFunctions !== undefined) {
+		return ctx.autoMemoModuleFunctions;
+	}
+	const declarations = new Map();
+	for (const statement of ctx.activityModuleAst.body) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: statement;
+		if (declaration?.type === 'FunctionDeclaration' && declaration.id?.type === 'Identifier') {
+			declarations.set(declaration.id.name, declaration);
+		} else if (declaration?.type === 'VariableDeclaration') {
+			for (const declarator of declaration.declarations ?? []) {
+				const initializer = unwrapTsExpr(declarator.init);
+				if (
+					declarator.id?.type === 'Identifier' &&
+					(initializer?.type === 'ArrowFunctionExpression' ||
+						initializer?.type === 'FunctionExpression')
+				) {
+					declarations.set(declarator.id.name, initializer);
+				}
+			}
+		}
+	}
+	ctx.autoMemoModuleFunctions = declarations;
+	return declarations;
+}
+
+function collectAutoMemoModuleFunctions(ctx, lexical) {
+	const declarations = autoMemoModuleFunctions(ctx);
+	const reassigned = new Set();
+	function markPattern(original) {
+		const node = unwrapTsExpr(original);
+		if (node?.type === 'Identifier') {
+			if (!declarations.has(node.name)) return;
+			const scope = lexical.nodeScopes.get(node);
+			if (
+				scope !== undefined &&
+				lexical.resolveBinding(scope, node.name)?.scope === lexical.rootScope
+			) {
+				reassigned.add(node.name);
+			}
+			return;
+		}
+		if (node?.type === 'RestElement') {
+			markPattern(node.argument);
+			return;
+		}
+		if (node?.type === 'AssignmentPattern') {
+			markPattern(node.left);
+			return;
+		}
+		if (node?.type === 'ArrayPattern') {
+			for (const element of node.elements ?? []) markPattern(element);
+			return;
+		}
+		if (node?.type === 'ObjectPattern') {
+			for (const property of node.properties ?? [])
+				markPattern(property.argument ?? property.value);
+		}
+	}
+	const seen = new WeakSet();
+	function walk(node) {
+		if (node == null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (node.type === 'AssignmentExpression') {
+			markPattern(node.left);
+		} else if (node.type === 'UpdateExpression') {
+			markPattern(node.argument);
+		} else if (
+			(node.type === 'ForInStatement' || node.type === 'ForOfStatement') &&
+			node.left?.type !== 'VariableDeclaration'
+		) {
+			markPattern(node.left);
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(node[key]);
+		}
+	}
+	walk(ctx.activityModuleAst);
+	return { declarations, reassigned };
+}
+
+function autoMemoSetupHookFunctions(ctx) {
+	if (ctx.__autoMemoSetupHookFunctions !== undefined) {
+		return ctx.__autoMemoSetupHookFunctions;
+	}
+	const lexical =
+		ctx.autoMemoHookLexical ?? ctx.activityLexical ?? createLexicalAnalysis(ctx.activityModuleAst);
+	ctx.autoMemoHookLexical = lexical;
+	ctx.activityLexical ??= lexical;
+	const { declarations, reassigned } = collectAutoMemoModuleFunctions(ctx, lexical);
+	const calls = new Map();
+	const hookful = new Set(reassigned);
+	for (const [name, declaration] of declarations) {
+		const outgoing = new Set();
+		calls.set(name, outgoing);
+		const seen = new WeakSet();
+		function walk(node) {
+			if (node == null || typeof node !== 'object') return;
+			if (Array.isArray(node)) {
+				for (const child of node) walk(child);
+				return;
+			}
+			if (seen.has(node)) return;
+			seen.add(node);
+			if (
+				node !== declaration &&
+				(node.type === 'ArrowFunctionExpression' ||
+					node.type === 'FunctionExpression' ||
+					node.type === 'FunctionDeclaration')
+			) {
+				return;
+			}
+			if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
+				if (autoMemoBuiltinHookName(node, ctx) !== null) {
+					hookful.add(name);
+				} else {
+					const callee = unwrapTsExpr(node.callee);
+					if (callee?.type === 'Identifier' && declarations.has(callee.name)) {
+						const scope =
+							lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(node) ?? lexical.rootScope;
+						if (lexical.resolveBinding(scope, callee.name)?.scope === lexical.rootScope) {
+							outgoing.add(callee.name);
+						}
+					}
+				}
+			}
+			for (const key in node) {
+				if (AST_WALK_SKIP_KEYS.has(key)) continue;
+				walk(node[key]);
+			}
+		}
+		walk(declaration);
+	}
+	const callers = new Map();
+	for (const [name, outgoing] of calls) {
+		for (const target of outgoing) {
+			let incoming = callers.get(target);
+			if (incoming === undefined) callers.set(target, (incoming = new Set()));
+			incoming.add(name);
+		}
+	}
+	const queue = [...hookful];
+	for (let index = 0; index < queue.length; index++) {
+		for (const caller of callers.get(queue[index]) ?? []) {
+			if (hookful.has(caller)) continue;
+			hookful.add(caller);
+			queue.push(caller);
+		}
+	}
+	const summaries = new Map();
+	for (const name of declarations.keys()) summaries.set(name, hookful.has(name));
+	ctx.__autoMemoSetupHookFunctions = summaries;
+	return summaries;
+}
+
+// Strong asserts that USER render operations are pure; it does not turn
+// compiler-owned hook setup into a projection. Resolve direct builtins from the
+// provenance attached by applyHookDependencies, then solve same-module
+// declaration reachability by lexical binding, including function-valued module
+// variables. Reassigned module bindings are conservatively setup-bearing;
+// shadowed local assignments are not. Hook-shaped spelling alone is deliberately
+// irrelevant: an ordinary `useFormat()` helper remains eligible, while either a
+// function declaration or `const useTheme = () => useContext(...)` stays on the
+// lifecycle-aware path.
+function autoMemoCallExecutesSetupHook(call, ctx) {
+	if (autoMemoBuiltinHookName(call, ctx) !== null) return true;
+	const callee = unwrapTsExpr(call?.callee);
+	if (callee?.type !== 'Identifier') return false;
+	const name = callee.name;
+	if (!autoMemoModuleFunctions(ctx).has(name)) return false;
+	const summaries = autoMemoSetupHookFunctions(ctx);
+	if (summaries.get(name) !== true) return false;
+
+	// A component-local declaration can shadow the hookful module function with
+	// the same name. The summary graph uses this same binding resolution for its
+	// transitive edges, so cycles reach a fixed point independent of source order.
+	const lexical = ctx.autoMemoHookLexical;
+	const scope = lexical.nodeScopes.get(callee) ?? lexical.nodeScopes.get(call) ?? lexical.rootScope;
+	const binding = lexical.resolveBinding(scope, name);
+	return binding?.scope === lexical.rootScope;
+}
+
 /**
  * True when the body executes a call DURING render: CallExpression /
  * NewExpression / TaggedTemplateExpression in render-value position (holes,
@@ -4245,12 +4500,23 @@ function containsRenderCall(stmts, memoCtx = null) {
 			t === 'NewExpression' ||
 			t === 'TaggedTemplateExpression'
 		) {
-			if (memoCtx !== null && plainCalleeIsMemoizable(n, memoCtx)) {
+			if (
+				memoCtx !== null &&
+				(t === 'CallExpression' || t === 'OptionalCallExpression') &&
+				autoMemoCallExecutesSetupHook(n, memoCtx)
+			) {
+				found = true;
+				return;
+			}
+			const assumedPureOperation =
+				memoCtx?.strongMemo === true && (t === 'NewExpression' || t === 'TaggedTemplateExpression');
+			if (assumedPureOperation || (memoCtx !== null && plainCalleeIsMemoizable(n, memoCtx))) {
 				// Admitting a call never admits the expressions that resolve its
 				// callee or arguments. In compatibility mode `fmt(row.get())` still
-				// fails closed; Strong mode applies its snapshot contract to each call.
-				walk(n.callee);
-				walk(n.arguments);
+				// fails closed; Strong applies its purity assertion recursively to
+				// calls, construction, and tags throughout the operation.
+				walk(n.callee ?? n.tag);
+				walk(n.arguments ?? n.quasi?.expressions);
 				return;
 			}
 			found = true;
@@ -4272,241 +4538,13 @@ function containsRenderCall(stmts, memoCtx = null) {
 // rather than matching "any `_use`" so ordinary helpers are not mistaken for
 // hooks by spelling alone.
 //
-// Getting this wrong in the permissive direction is not a staleness bug: a
-// cache wrapped around a hook call freezes its subscription and its state cell
-// for the life of the component.
+// Compatibility-mode call proofs use this convention to avoid caching custom
+// hooks. Strong render regions deliberately do not: opting in asserts that a
+// user-authored call is a pure projection regardless of its spelling.
 const HOOK_NAME_CONVENTION_RE = /^(?:(?:unstable|UNSTABLE)_)?use(?:$|[A-Z])/;
 
 function isHookCalleeName(name) {
 	return HOOK_NAME_CONVENTION_RE.test(name);
-}
-
-const STRONG_MEMO_OPAQUE_GLOBAL_NAMES = new Set([
-	'Date',
-	'Math',
-	'performance',
-	'crypto',
-	'globalThis',
-	'window',
-	'self',
-	'global',
-]);
-
-// Strong mode may trust an opaque receiver's snapshot contract, but visible
-// callbacks must not hide hook cells behind a newly admitted method call.
-// Names are deliberately conservative across scopes: a shadowed callback name
-// only declines an optimization. Factory results passed as arguments also stay
-// opaque; they may return a callback that the method invokes synchronously.
-function containsStrongMemoCallbackValue(root, names) {
-	const seen = new WeakSet();
-	function walk(node) {
-		if (node === null || typeof node !== 'object') return false;
-		if (Array.isArray(node)) return node.some(walk);
-		if (seen.has(node)) return false;
-		seen.add(node);
-		if (isDeferredRefRead(node)) return true;
-		if (FN_TYPES.has(node.type) || node.type === 'ClassExpression') return true;
-		if (node.type === 'Identifier') return isHookCalleeName(node.name) || names.has(node.name);
-		if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
-			return true;
-		}
-		if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
-			return (
-				walk(node.object) ||
-				(node.computed
-					? walk(node.property)
-					: isHookCalleeName(node.property?.name) || names.has(node.property?.name))
-			);
-		}
-		for (const key in node) {
-			if (AST_WALK_SKIP_KEYS.has(key)) continue;
-			if (
-				key === 'key' &&
-				(node.type === 'Property' || node.type === 'ObjectProperty') &&
-				!node.computed
-			)
-				continue;
-			if (walk(node[key])) return true;
-		}
-		return false;
-	}
-	return walk(root);
-}
-
-// Build the small dependency graph once, then propagate known hook aliases.
-// Ordinary method objects stay clean; only a reference to a hook or an already
-// tainted callable poisons its containing function/value. State-hook results
-// are snapshots, not aliases of the hook that produced them.
-function collectStrongMemoHookAliases(root) {
-	const aliases = new Set();
-	const dependents = new Map();
-	const visited = new WeakMap();
-	let opaqueStateTuple = false;
-	function references(name, owners) {
-		if (isHookCalleeName(name) || STRONG_MEMO_OPAQUE_GLOBAL_NAMES.has(name)) aliases.add(name);
-		if (owners.length === 0) return;
-		let targets = dependents.get(name);
-		if (targets === undefined) dependents.set(name, (targets = new Set()));
-		for (const owner of owners) targets.add(owner);
-	}
-	function targetNames(pattern) {
-		const names = new Set();
-		collectBindings(pattern, names);
-		if (pattern?.type === 'MemberExpression' && !pattern.computed && pattern.property?.name) {
-			names.add(pattern.property.name);
-		}
-		return [...names];
-	}
-	function walk(node, owners = []) {
-		if (opaqueStateTuple || node === null || typeof node !== 'object') return;
-		// Rewrites share subtrees. Visit each node only once per owner so sharing
-		// cannot multiply work, while a new enclosing value still gets its edges.
-		let previous = visited.get(node);
-		if (previous === undefined) visited.set(node, (previous = new Set()));
-		if (owners.length === 0) {
-			if (previous.has(null)) return;
-			previous.add(null);
-		} else {
-			owners = owners.filter((name) => {
-				if (previous.has(name)) return false;
-				previous.add(name);
-				return true;
-			});
-			if (owners.length === 0) return;
-		}
-		if (Array.isArray(node)) {
-			for (const child of node) walk(child, owners);
-			return;
-		}
-		if (isDeferredRefRead(node)) {
-			for (const owner of owners) aliases.add(owner);
-			if (node.type === 'ObjectPattern') collectBindings(node, aliases);
-		}
-		if (node.type === 'Identifier') {
-			references(node.name, owners);
-			return;
-		}
-		if (node.type === 'ImportSpecifier') {
-			if (isHookCalleeName(node.imported?.name ?? node.imported?.value) && node.local?.name) {
-				aliases.add(node.local.name);
-			}
-			return;
-		}
-		if (
-			(node.type === 'FunctionDeclaration' ||
-				node.type === 'ClassDeclaration' ||
-				node.type === 'ClassExpression') &&
-			node.id?.name
-		) {
-			owners = [...owners, node.id.name];
-		} else if (
-			node.type === 'VariableDeclarator' ||
-			node.type === 'AssignmentExpression' ||
-			node.type === 'AssignmentPattern'
-		) {
-			const pattern = node.id ?? node.left;
-			const value = node.init ?? node.right;
-			const call = unwrapTsExpr(value);
-			const hook = stableHookCallName(call);
-			walk(pattern, owners);
-			if (hook === 'useState' || hook === 'useReducer' || hook === 'useLinkedState') {
-				// A retained tuple can launder its live getter through arbitrary
-				// indices and object wrappers. Keep this rare module on the existing
-				// compatibility memo path instead of guessing which element escapes.
-				if (pattern?.type !== 'ArrayPattern') {
-					opaqueStateTuple = true;
-					return;
-				}
-				collectBindings(pattern.elements[1], aliases);
-				collectBindings(pattern.elements[2], aliases);
-			}
-			// Follow a hook's supplied values, not the hook invocation itself:
-			// useState([]) is clean, but a supplied callback bag may hide hooks.
-			const callee = call?.type === 'CallExpression' ? unwrapTsExpr(call.callee) : null;
-			const calleeName =
-				hook ?? (callee?.type === 'Identifier' ? callee.name : callee?.property?.name);
-			if (calleeName !== undefined && isHookCalleeName(calleeName)) {
-				walk(call.callee, owners);
-				walk(call.arguments, [...owners, ...targetNames(pattern)]);
-			} else {
-				walk(value, [...owners, ...targetNames(pattern)]);
-			}
-			return;
-		} else if (
-			(node.type === 'Property' ||
-				node.type === 'ObjectProperty' ||
-				node.type === 'MethodDefinition' ||
-				node.type === 'PropertyDefinition' ||
-				node.type === 'ClassProperty') &&
-			(!node.computed || node.key?.type === 'Literal')
-		) {
-			const name = node.key?.name ?? node.key?.value;
-			if (typeof name === 'string') {
-				if (isHookCalleeName(name)) collectBindings(node.value, aliases);
-				walk(node.value, [...owners, name]);
-				return;
-			}
-		} else if (isJsxReturningMapCall(node)) {
-			// Returned JSX is folded to a keyed list after this pass. Carry the
-			// iterable's known hook-bearing values into the eventual item binding.
-			walk(node.callee.object, [...owners, ...targetNames(node.arguments[0].params[0])]);
-		} else if (node.type === 'JSXForExpression' || node.type === 'ForOfStatement') {
-			const pattern =
-				node.left?.type === 'VariableDeclaration' ? node.left.declarations?.[0]?.id : node.left;
-			walk(node.right, [...owners, ...targetNames(pattern)]);
-			for (const key in node) {
-				if (key === 'right' || AST_WALK_SKIP_KEYS.has(key)) continue;
-				walk(node[key], owners);
-			}
-			return;
-		}
-		for (const key in node) {
-			if (AST_WALK_SKIP_KEYS.has(key)) continue;
-			walk(node[key], owners);
-		}
-	}
-	walk(root);
-	if (opaqueStateTuple) return null;
-	const queue = [...aliases];
-	for (let index = 0; index < queue.length; index++) {
-		for (const name of dependents.get(queue[index]) ?? []) {
-			if (aliases.has(name)) continue;
-			aliases.add(name);
-			queue.push(name);
-		}
-	}
-	return aliases;
-}
-
-function strongMemberCalleeIsMemoizable(callee, ctx) {
-	if (
-		ctx?.strongMemo !== true ||
-		ctx._universalRuntimeUnit != null ||
-		callee?.type !== 'MemberExpression'
-	)
-		return false;
-	let receiver = callee;
-	while (receiver?.type === 'MemberExpression') {
-		if (
-			receiver.computed ||
-			receiver.property?.type !== 'Identifier' ||
-			receiver.property.name === 'current' ||
-			receiver.property.name === 'call' ||
-			receiver.property.name === 'apply' ||
-			receiver.property.name === 'bind' ||
-			isHookCalleeName(receiver.property.name) ||
-			ctx.strongMemoHookAliases.has(receiver.property.name)
-		)
-			return false;
-		receiver = unwrapTsExpr(receiver.object);
-	}
-	if (receiver?.type !== 'Identifier') return false;
-	if (isHookCalleeName(receiver.name) || ctx.strongMemoHookAliases.has(receiver.name)) return false;
-	// Strong does not turn clocks, randomness, or arbitrary global-object APIs
-	// into snapshot projections. Decline even a same-named local here; exact
-	// global provenance matters for diagnostics, not for this optional fast path.
-	if (STRONG_MEMO_OPAQUE_GLOBAL_NAMES.has(receiver.name)) return false;
-	return true;
 }
 
 /**
@@ -4520,9 +4558,12 @@ function strongMemberCalleeIsMemoizable(callee, ctx) {
  * the item or props, where neither the item ref nor any dep witnesses the change
  * (`header.column.getIsSorted()` flips while `header` stays the memoized
  * object). Compatibility mode therefore rejects every member callee. Strong
- * modules explicitly assert immutable snapshots and pure render calls, so their
- * production client regions can admit static non-hook receiver paths. Known
- * callbacks, refs, dynamic methods, clocks, and randomness remain opaque.
+ * modules explicitly assert that every render-time call is a pure projection
+ * of immutable snapshots and witnessed inputs. Their production client regions
+ * therefore admit every call shape without treating `use*` spelling as proof
+ * of hidden hook state. Known built-in hooks remain separate compiler operations
+ * in setup; a user call that hides a hook, ref read, clock, random value, or
+ * mutation violates the Strong contract.
  *
  * A bare identifier callee is admitted ONLY when the binding it resolves to is
  * a module-scope immutable identity:
@@ -4543,31 +4584,14 @@ function strongMemberCalleeIsMemoizable(callee, ctx) {
  * accessor result. Unbound globals fail closed for the same reason: nothing
  * witnesses what they close over.
  *
- * `new Foo()` and tagged templates stay disqualified: construction is not a
- * value projection, and a tag function receives the raw strings array.
- *
- * HOOK-shaped callees are also disqualified. `use(promise)` is a suspension
- * point and `useState`/`useLayoutEffect`/a custom `useThing()` own hook cells,
- * context subscriptions, and effect lifecycles — none of which are value
- * projections, and all of which change observable commit/retry behavior when a
- * region is skipped (a re-suspended boundary must re-run to destroy and
- * recreate its layout effects). The naming convention is the same signal React
- * and React Compiler key on, and it is what the blanket call veto was
- * incidentally covering here.
+ * `new Foo()` and tagged templates are classified by containsRenderCall rather
+ * than this call-only helper. Strong admits them under the same assertion;
+ * compatibility mode leaves them live.
  */
 function plainCalleeIsMemoizable(node, ctx, seen) {
 	if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return false;
+	if (ctx?.strongMemo === true) return true;
 	const callee = node.callee;
-	if (ctx?.strongMemo === true) {
-		const hook = node._octaneImportedHook ?? node._octaneHookRuntimeImportedHook;
-		if (
-			(hook !== undefined && isHookCalleeName(hook)) ||
-			(callee?.type === 'Identifier' && ctx.strongMemoHookAliases.has(callee.name)) ||
-			containsStrongMemoCallbackValue(node.arguments, ctx.strongMemoHookAliases)
-		)
-			return false;
-		if (strongMemberCalleeIsMemoizable(callee, ctx)) return true;
-	}
 	if (callee?.type !== 'Identifier') return false;
 	const name = callee.name;
 	if (isHookCalleeName(name)) return false;
@@ -4580,16 +4604,16 @@ function plainCalleeIsMemoizable(node, ctx, seen) {
 
 /**
  * Can a same-module `function` helper stand in for the value projection its call
- * site claims to be? Every call in its body must satisfy the same admission
- * rule as the call site, including Strong's explicitly opted-in member calls.
- * Construction and tagged templates remain opaque in both modes.
+ * site claims to be in compatibility mode? Every call in its body must satisfy
+ * the same conservative admission rule. Strong returns from
+ * plainCalleeIsMemoizable before reaching this proof. Construction and tagged
+ * templates remain opaque in compatibility mode.
  *
  * Cycles resolve to false: a recursive helper cannot be proven, and failing
  * closed is the safe direction. Nested function VALUES inside the helper are not
  * descended into for the same reason `containsRenderCall` skips them — they run
  * when invoked, not while the helper projects a value — but a helper that
- * *invokes* one through `.map(...)` fails closed in compatibility mode and keeps
- * Strong's callback-argument guard.
+ * *invokes* one through `.map(...)` fails closed.
  */
 function moduleHelperIsPureProjection(name, ctx, seen) {
 	const decl = ctx?.moduleFunctionDeclarations?.get(name);
@@ -5041,7 +5065,7 @@ function classifyStableHookfulChildCalls(moduleBody, ctx) {
 		if (
 			render === null ||
 			containsRenderCall([render], ctx) ||
-			containsAutoMemoUnsafeStructure([render]) ||
+			containsAutoMemoUnsafeStructure([render], ctx) ||
 			containsImportedMemberRead(render, ctx.importedNames)
 		) {
 			continue;
@@ -5388,7 +5412,7 @@ function collectPrivateMappedProviderComponents(body, ctx) {
 			(callback.body?.type !== 'Element' && callback.body?.type !== 'JSXElement') ||
 			mapCallbackCapturesLexicalReceiver(callback.body) ||
 			containsRenderCall([callback.body], ctx) ||
-			containsAutoMemoUnsafeStructure([callback.body]) ||
+			containsAutoMemoUnsafeStructure([callback.body], ctx) ||
 			containsImportedMemberRead(callback.body, ctx.importedNames)
 		) {
 			continue;
@@ -5483,9 +5507,11 @@ function collectPrivateMappedProviderComponents(body, ctx) {
 }
 
 // Conservative semantic boundary for compiler-owned component-region memoization.
-// The cached region assumes React Compiler's pure-render / immutable-snapshot
-// contract, but still fails closed for constructs whose commit or retry behavior
-// needs a dedicated proof. Calls are checked separately by containsRenderCall.
+// Compatibility mode proves the supported immutable shapes. Strong mode can
+// trust computed callees because the module asserts that evaluating them and
+// invoking the selected function is a pure projection; constructs with commit
+// or retry behavior still need a dedicated proof. Calls are checked separately
+// by containsRenderCall.
 function isRefCurrentMember(n) {
 	if (n?.type !== 'MemberExpression') return false;
 	return !n.computed
@@ -5713,14 +5739,14 @@ function collectAutoMemoLocalHazards(stmts, importedNames) {
 	return hazards;
 }
 
-function containsAutoMemoUnsafeStructure(stmts) {
+function containsAutoMemoUnsafeStructure(stmts, ctx = null) {
 	let found = false;
 	const seen = new WeakSet();
 	// Spread bags on HOST elements, marked admissible by the owning element's
 	// visit below. Parents walk before their attributes, so membership is
 	// decided before the spread node itself is reached.
 	const hostSpreads = new WeakSet();
-	function walk(n) {
+	function walk(n, parent = null, parentKey = null) {
 		if (found || !n) return;
 		if (Array.isArray(n)) {
 			for (const x of n) walk(x);
@@ -5792,7 +5818,11 @@ function containsAutoMemoUnsafeStructure(stmts) {
 			return;
 		}
 		if (t === 'MemberExpression') {
-			if (n.computed || isRefCurrentMember(n)) {
+			const assumedPureCallCallee =
+				ctx?.strongMemo === true &&
+				parentKey === 'callee' &&
+				(parent?.type === 'CallExpression' || parent?.type === 'OptionalCallExpression');
+			if ((n.computed || isRefCurrentMember(n)) && !assumedPureCallCallee) {
 				// Ref contents are mutable outside render; ref identity is not a complete
 				// dependency witness. Any computed access may alias `ref.current` when the
 				// property name is only known at runtime.
@@ -5852,7 +5882,7 @@ function containsAutoMemoUnsafeStructure(stmts) {
 		}
 		for (const key in n) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
-			walk(n[key]);
+			walk(n[key], n, key);
 		}
 	}
 	for (const s of stmts) walk(s);
@@ -8528,7 +8558,6 @@ function compileInternal(
 	});
 	const universalUnits =
 		options?.__universalUnits ?? rendererBoundaryPreparation?.universalUnits ?? [];
-	const strongMemoHookAliases = strongMemoEnabled ? collectStrongMemoHookAliases(ast) : null;
 	const ctx = {
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
@@ -8539,8 +8568,7 @@ function compileInternal(
 		dev: devEnabled,
 		profile: profileEnabled,
 		autoMemo: autoMemoEnabled,
-		strongMemo: strongMemoHookAliases !== null,
-		strongMemoHookAliases,
+		strongMemo: strongMemoEnabled,
 		// A split Hydrate query module is invoked as the existing server-rendered
 		// boundary body. Its sole component child must therefore keep the server's
 		// own component marker pair instead of borrowing the Hydrate block range.
@@ -8960,7 +8988,7 @@ function compileInternal(
 		let autoMemoSafe =
 			ordinaryPropsParam &&
 			!containsRenderCall(stmts, ctx) &&
-			!containsAutoMemoUnsafeStructure(stmts) &&
+			!containsAutoMemoUnsafeStructure(stmts, ctx) &&
 			!readsImportedMember();
 		const autoMemoCaptures = [];
 		const autoMemoComponentDeps = [];
@@ -20954,6 +20982,8 @@ function emitAutoMemoRegion(
 	initValue = null,
 	restoreCachedContext = false,
 	publicationWitnesses = null,
+	sameValueDependencies = false,
+	strictEqualityDependencyIndex = -1,
 ) {
 	const witnessCount = publicationWitnesses?.length ?? 0;
 	const cell = allocAutoMemoCell(ctx, dependencies.length + (contextAware ? 1 : 0) + witnessCount);
@@ -20981,7 +21011,11 @@ function emitAutoMemoRegion(
 	if (extraMiss !== null) misses.push(extraMiss);
 	misses.push(b.binary('!==', cacheAt(cell.init), b.literal(true)));
 	for (let index = 0; index < depNames.length; index++) {
-		misses.push(b.binary('!==', cacheAt(cell.base + index), b.id(depNames[index])));
+		misses.push(
+			sameValueDependencies && index !== strictEqualityDependencyIndex
+				? b.unary('!', hkObjectIs(ctx, cacheAt(cell.base + index), b.id(depNames[index])))
+				: b.binary('!==', cacheAt(cell.base + index), b.id(depNames[index])),
+		);
 	}
 	for (let index = 0; index < witnessCount; index++) {
 		misses.push(b.binary('!==', cacheAt(witnessBase + index), b.id(publicationWitnesses[index])));
@@ -22097,6 +22131,18 @@ function planJsx(
 		// arg forces the flags placeholder too (positional alignment).
 		const hasDeps = fc.depNames.length > 0;
 		const depNode = depNodeFor(fc);
+		// Whole-list projection caches use SameValue just like their nested
+		// component/item guards. A certified keyed-selection dependency is the one
+		// exception: its authored `selected === row.key` contract intentionally
+		// treats signed zero as equal. Keep only that dependency on strict equality;
+		// other captured projection inputs must still distinguish 0 from -0.
+		let strictListDependencyIndex = -1;
+		if (fc.keyedSelectionIndex >= 0 && fc.autoMemoDeps !== null) {
+			const selectionName = fc.depNames[fc.keyedSelectionIndex];
+			const selectionMemoIndex = fc.autoMemoDeps.indexOf(selectionName);
+			if (selectionMemoIndex >= 0) strictListDependencyIndex = selectionMemoIndex + 1;
+		}
+		const sameValueListDependencies = fc.keyedSelectionIndex < 0 || strictListDependencyIndex >= 0;
 		let flagsExpr = b.literal(flags || 0);
 		if (fc.itemMemoFlags !== 0) {
 			flagsExpr = b.binary(
@@ -22181,6 +22227,10 @@ function planJsx(
 					fc.autoMemoContextAware,
 					depNode,
 					b.id(nativeName),
+					false,
+					null,
+					sameValueListDependencies,
+					strictListDependencyIndex,
 				);
 				pushAfterStmt(fc.id, org, b.block([...prefix, guarded]));
 			} else {
@@ -22229,6 +22279,11 @@ function planJsx(
 				witnessMiss,
 				fc.autoMemoContextAware,
 				depNode,
+				null,
+				false,
+				null,
+				sameValueListDependencies,
+				strictListDependencyIndex,
 			);
 			pushAfterStmt(fc.id, org, b.block([b.const('_v', fc.itemsExpr), guarded]));
 		} else {
@@ -22545,6 +22600,7 @@ function planJsx(
 					null,
 					false,
 					cc.autoMemoPublicationWitnesses,
+					true,
 				),
 			);
 			continue;
@@ -26212,6 +26268,31 @@ function collectAutoMemoDependencyExpressions(nodes) {
 			coveredRoots.add(name);
 		}
 	}
+	function addDependency(node) {
+		const expression = `\0${astStructuralKey(node)}`;
+		dependencies.add(expression);
+		// Keep the AST alongside the structural key so emit embeds the authored
+		// expression directly.
+		if (!dependencyNodes.has(expression)) dependencyNodes.set(expression, node);
+		if (!dependencyOrder.has(expression)) {
+			dependencyOrder.set(expression, autoMemoDependencyOrderKey(node));
+		}
+		for (const name of collectFreeIdentifiers(node, [])) coveredRoots.add(name);
+	}
+	function walkCallable(original) {
+		const callee = unwrapTsExpr(original);
+		if (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') {
+			// A method value alone is not a complete witness: inherited `.call`,
+			// `.apply`, `.bind`, and shared prototype methods retain one identity while
+			// the callable/receiver (and therefore `this`) changes. Track both.
+			if (isAutoMemoCalculationDependency(callee)) addDependency(callee);
+			else walk(callee);
+			walk(callee.object);
+			if (callee.computed) walk(callee.property);
+			return;
+		}
+		walk(callee);
+	}
 	function walk(original) {
 		const node = unwrapTsExpr(original);
 		if (!node || typeof node !== 'object') return;
@@ -26232,21 +26313,40 @@ function collectAutoMemoDependencyExpressions(nodes) {
 			node.type === 'LogicalExpression' ||
 			node.type === 'ConditionalExpression' ||
 			node.type === 'ChainExpression' ||
-			((node.type === 'MemberExpression' || node.type === 'CallExpression') && node.optional)
+			((node.type === 'MemberExpression' ||
+				node.type === 'OptionalMemberExpression' ||
+				node.type === 'CallExpression' ||
+				node.type === 'OptionalCallExpression') &&
+				node.optional)
 		) {
 			safe = false;
 			return;
 		}
-		if (isAutoMemoCalculationDependency(node)) {
-			const expression = `\0${astStructuralKey(node)}`;
-			dependencies.add(expression);
-			// Keep the AST alongside the structural key so emit embeds the authored
-			// expression directly.
-			if (!dependencyNodes.has(expression)) dependencyNodes.set(expression, node);
-			if (!dependencyOrder.has(expression)) {
-				dependencyOrder.set(expression, autoMemoDependencyOrderKey(node));
+		if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
+			walkCallable(node.callee);
+			walk(node.arguments);
+			return;
+		}
+		if (node.type === 'NewExpression') {
+			walk(node.callee);
+			walk(node.arguments);
+			return;
+		}
+		if (node.type === 'TaggedTemplateExpression') {
+			walkCallable(node.tag);
+			walk(node.quasi?.expressions);
+			return;
+		}
+		if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+			if (isAutoMemoCalculationDependency(node)) addDependency(node);
+			else {
+				walk(node.object);
+				if (node.computed) walk(node.property);
 			}
-			for (const name of collectFreeIdentifiers(node, [])) coveredRoots.add(name);
+			return;
+		}
+		if (isAutoMemoCalculationDependency(node)) {
+			addDependency(node);
 			return;
 		}
 		if (
@@ -26505,7 +26605,7 @@ function makeCompCall(
 					callSiteOk &&
 					(ordinaryMemoSafe || stableHookful) &&
 					!containsRenderCall([node], ctx) &&
-					!containsAutoMemoUnsafeStructure([node]) &&
+					!containsAutoMemoUnsafeStructure([node], ctx) &&
 					!containsImportedMemberRead(node, ctx.importedNames)
 				) {
 					const free = collectFreeIdentifiers(node, []);
@@ -27116,10 +27216,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		const hasNestedComp = containsComponentCallOrControlFlow(subStmts);
 		// Compatibility mode keeps method calls live: an unchanged receiver can
 		// hide mutable state (`header.column.getIsSorted()` flips while `header`
-		// stays the same object). Strong production modules explicitly assert
-		// snapshot behavior and can admit static methods. Both modes still witness
-		// every capture, including callbacks that need the latest parent state;
-		// neither promise permits skipping hooks or ref reads.
+		// stays the same object). Strong production modules assert pure rendering
+		// and admit every user-authored call shape. Both modes still witness every
+		// capture, including callbacks that need the latest parent state. Actual
+		// setup hooks remain outside this item-region proof.
 		const hasRenderCall = containsRenderCall(subStmts, ctx);
 		itemMemo =
 			ctx.autoMemo === true &&
@@ -27127,7 +27227,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			hasOnlyComponentItemBoundaries(subStmts) &&
 			!hasHook &&
 			!hasRenderCall &&
-			!containsAutoMemoUnsafeStructure(subStmts) &&
+			!containsAutoMemoUnsafeStructure(subStmts, ctx) &&
 			!containsImportedMemberRead(bodyAst, ctx.importedNames);
 		if (itemMemo) {
 			itemMemoWitnesses = [
@@ -27199,8 +27299,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			!hasHook &&
 			!containsRenderCall(regionStmts, ctx) &&
 			!containsRenderCall(node.key ? [node.key] : [], ctx) &&
-			!containsAutoMemoUnsafeStructure(regionStmts) &&
-			!containsAutoMemoUnsafeStructure(node.key ? [node.key] : []) &&
+			!containsAutoMemoUnsafeStructure(regionStmts, ctx) &&
+			!containsAutoMemoUnsafeStructure(node.key ? [node.key] : [], ctx) &&
 			!containsImportedMemberRead(regionAst, ctx.importedNames);
 		const listDeps = new Set();
 		const witnesses = collectImportedComponentReferences(regionAst, ctx.importedNames);

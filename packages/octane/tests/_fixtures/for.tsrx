@@ -274,6 +274,23 @@ export function KeyedSelectionList(props: {
 	</ul>
 }
 
+export function KeyedSelectionProjectionList(props: {
+	items: SelectionRow[];
+	selected: number | null;
+	projection: number;
+}) @{
+	const selected = props.selected;
+	const projection = props.projection;
+	<ul id="keyed-selection-projection-list">
+		@for (const row of props.items; key row.id) {
+			<li
+				class={selected === row.id ? 'selected' : ''}
+				data-projection={1 / projection}
+			>{row.label as string}</li>
+		}
+	</ul>
+}
+
 export function KeyedSelectionControlledList(props: {
 	items: SelectionRow[];
 	selected: number | null;

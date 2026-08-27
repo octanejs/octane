@@ -16,6 +16,7 @@ import {
 	NestedConditionalTransition,
 	PlainCalleeList,
 	KeyedSelectionList,
+	KeyedSelectionProjectionList,
 	KeyedSelectionControlledList,
 	KeyedSelectionRenderableList,
 	KeyedSelectionTransition,
@@ -45,21 +46,29 @@ import {
 } from './_fixtures/for.tsrx';
 import {
 	CapturedSnapshotList,
-	ContextArgumentMethodList,
-	RefMethodList,
+	StrongAliasedContextRows,
+	StrongCallableDependencies,
+	StrongConstructedResultProp,
+	StrongConstCustomHookContextRows,
+	StrongCustomHookContext,
+	StrongCyclicContextReaders,
+	StrongFactoryReadProp,
+	StrongMapJoinProp,
+	StrongOptionalAliasedContextRows,
+	StrongOptionalNamespaceContextRows,
+	StrongShadowedAssignmentContextRows,
+	StrongSignedZeroConstructedProp,
+	StrongSignedZeroListProjections,
+	StrongSuspenseLayoutEffect,
+	StrongTheme,
 	SnapshotCalculation,
 	SnapshotMethodList,
 	WrappedSnapshotCalculation,
+	type StrongNumberProjectorConstructor,
+	type StrongProjectorConstructor,
 	type SnapshotRow,
 } from './_fixtures/for-strong.tsrx';
-import { ComputedHookMappedRows, SnapshotMappedList } from './_fixtures/for-strong.tsx';
-import {
-	AliasedRefMethodRows,
-	ComputedHookMethodRows,
-	DestructuredRefMethodRows,
-	RefArgumentMethodRows,
-} from './_fixtures/for-strong-hooks.tsrx';
-import { TupleGetterMethodRows } from './_fixtures/for-strong-getter.tsrx';
+import { SnapshotMappedList } from './_fixtures/for-strong.js';
 
 const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
 
@@ -343,58 +352,6 @@ describe('Strong list methods preserve snapshot and event semantics', () => {
 		}
 	});
 
-	it('keeps hooks in method arguments and ref-backed receivers live', () => {
-		const items = [row(1, 'apple'), row(2, 'banana')];
-		const context = mount(ContextArgumentMethodList, { items, prefix: 'first:' });
-		expect(labels(context)).toEqual(['first:apple', 'first:banana']);
-		context.update(ContextArgumentMethodList, { items, prefix: 'second:' });
-		expect(labels(context)).toEqual(['second:apple', 'second:banana']);
-		context.unmount();
-
-		const refItems = [{ id: 1, current: { read: () => 'first' } }];
-		const refs = mount(RefMethodList, { items: refItems });
-		expect(labels(refs)).toEqual(['first']);
-		refItems[0]!.current = { read: () => 'second' };
-		refs.update(RefMethodList, { items: refItems });
-		expect(labels(refs)).toEqual(['second']);
-		refs.unmount();
-	});
-
-	it.each([
-		['keyed templates', ComputedHookMethodRows],
-		['returned JSX', ComputedHookMappedRows],
-	])('keeps computed hook methods live in %s', (_dialect, Component) => {
-		const context = mount(Component, { value: 'first' });
-		expect(labels(context)).toEqual(['first']);
-		context.update(Component, { value: 'second' });
-		expect(labels(context)).toEqual(['second']);
-		context.update(Component, { value: 'third' });
-		expect(labels(context)).toEqual(['third']);
-		context.unmount();
-	});
-
-	it('keeps state getters inside stable method objects live', () => {
-		const getter = mount(TupleGetterMethodRows);
-		expect(labels(getter)).toEqual(['0']);
-		getter.click('#tuple-method-bump');
-		expect(labels(getter)).toEqual(['1']);
-		getter.click('#tuple-method-bump');
-		expect(labels(getter)).toEqual(['2']);
-		getter.unmount();
-	});
-
-	it.each([
-		['direct ref arguments', RefArgumentMethodRows],
-		['ref value aliases', AliasedRefMethodRows],
-		['destructured ref values', DestructuredRefMethodRows],
-	])('observes event mutations through %s', (_shape, Component) => {
-		const refs = mount(Component);
-		expect(labels(refs)).toEqual(['first']);
-		refs.click('#mutate-ref');
-		expect(labels(refs)).toEqual(['second']);
-		refs.unmount();
-	});
-
 	it.each([
 		['direct methods', SnapshotCalculation],
 		['same-module wrappers', WrappedSnapshotCalculation],
@@ -455,6 +412,353 @@ describe('Strong list methods preserve snapshot and event semantics', () => {
 		expect(selected).toEqual(['apricot']);
 		root.unmount();
 		container.remove();
+	});
+});
+
+describe('Strong memoization preserves dependency and setup semantics', () => {
+	it.each([
+		[
+			'member results after a call',
+			StrongMapJoinProp,
+			{ items: ['a', 'b'], project: (value: string) => value.toUpperCase() },
+			'#strong-map-join',
+			'A,B',
+		],
+		[
+			'method results from a factory',
+			StrongFactoryReadProp,
+			{ factory: () => ({ read: (value: string) => `read:${value}` }), value: 'a' },
+			'#strong-factory-read',
+			'read:a',
+		],
+		[
+			'properties of constructed values',
+			StrongConstructedResultProp,
+			{
+				Projector: class {
+					result: string;
+					constructor(value: string) {
+						this.result = `new:${value}`;
+					}
+				} satisfies StrongProjectorConstructor,
+				value: 'a',
+			},
+			'#strong-constructed-result',
+			'new:a',
+		],
+	] as const)(
+		'mounts component props containing %s',
+		(_label, Component, props, selector, value) => {
+			const r = mount(Component as any, props);
+			expect(r.find(selector).textContent).toBe(value);
+			r.unmount();
+		},
+	);
+
+	it('invalidates call helpers and method receivers when their immutable identities change', () => {
+		const make = function (this: { prefix: string }) {
+			const prefix = this.prefix;
+			return (value: string) => prefix + value;
+		};
+		const tag = function (this: { prefix: string }, _strings: TemplateStringsArray, value: string) {
+			return this.prefix + value;
+		};
+		const first = {
+			value: 'value',
+			format: (value: string) => `first:${value}`,
+			tagger: { prefix: 'first:', make },
+			template: { prefix: 'first:', tag },
+		};
+		const second = {
+			value: 'value',
+			format: (value: string) => `second:${value}`,
+			tagger: { prefix: 'second:', make },
+			template: { prefix: 'second:', tag },
+		};
+		const r = mount(StrongCallableDependencies, first);
+		for (const selector of [
+			'#strong-call',
+			'#strong-apply',
+			'#strong-bind',
+			'#strong-produced-callee',
+			'#strong-tag',
+		]) {
+			expect(r.find(selector).textContent).toBe('first:value');
+		}
+
+		r.update(StrongCallableDependencies, second);
+		for (const selector of [
+			'#strong-call',
+			'#strong-apply',
+			'#strong-bind',
+			'#strong-produced-callee',
+			'#strong-tag',
+		]) {
+			expect(r.find(selector).textContent).toBe('second:value');
+		}
+		r.unmount();
+	});
+
+	it.each([
+		[
+			'StrongMapJoinProp',
+			StrongMapJoinProp,
+			{ items: ['a', 'b'], project: (value: string) => value.toUpperCase() },
+			'#strong-map-join',
+			'A,B',
+		],
+		[
+			'StrongFactoryReadProp',
+			StrongFactoryReadProp,
+			{ factory: () => ({ read: (value: string) => `read:${value}` }), value: 'a' },
+			'#strong-factory-read',
+			'read:a',
+		],
+		[
+			'StrongConstructedResultProp',
+			StrongConstructedResultProp,
+			{
+				Projector: class {
+					result: string;
+					constructor(value: string) {
+						this.result = `new:${value}`;
+					}
+				} satisfies StrongProjectorConstructor,
+				value: 'a',
+			},
+			'#strong-constructed-result',
+			'new:a',
+		],
+	] as const)(
+		'hydrates %s component props without replacing the output',
+		(exportName, Component, props, selector, value) => {
+			const server = loadServerFixture('packages/octane/tests/_fixtures/for-strong.tsrx', {
+				compileOptions: { hmr: false, dev: false },
+			});
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = ServerRuntime.renderToString((server as any)[exportName], props).html;
+			const original = container.querySelector(selector);
+			const root = hydrateRoot(container, Component as any, props);
+			flushSync(() => {});
+			expect(container.querySelector(selector)).toBe(original);
+			expect(original?.textContent).toBe(value);
+			root.unmount();
+			container.remove();
+		},
+	);
+
+	it('hydrates and then invalidates changed callable and receiver identities', () => {
+		const make = function (this: { prefix: string }) {
+			const prefix = this.prefix;
+			return (value: string) => prefix + value;
+		};
+		const tag = function (this: { prefix: string }, _strings: TemplateStringsArray, value: string) {
+			return this.prefix + value;
+		};
+		const props = (prefix: string) => ({
+			value: 'value',
+			format: (value: string) => `${prefix}:${value}`,
+			tagger: { prefix: `${prefix}:`, make },
+			template: { prefix: `${prefix}:`, tag },
+		});
+		const first = props('first');
+		const second = props('second');
+		const selectors = [
+			'#strong-call',
+			'#strong-apply',
+			'#strong-bind',
+			'#strong-produced-callee',
+			'#strong-tag',
+		];
+		const server = loadServerFixture('packages/octane/tests/_fixtures/for-strong.tsrx', {
+			compileOptions: { hmr: false, dev: false },
+		});
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = ServerRuntime.renderToString(
+			server.StrongCallableDependencies,
+			first,
+		).html;
+		const original = selectors.map((selector) => container.querySelector(selector));
+		const root = hydrateRoot(container, StrongCallableDependencies, first);
+		flushSync(() => {});
+		expect(selectors.map((selector) => container.querySelector(selector))).toEqual(original);
+
+		flushSync(() => root.render(StrongCallableDependencies, second));
+		for (const selector of selectors) {
+			expect(container.querySelector(selector)?.textContent).toBe('second:value');
+		}
+		root.unmount();
+		container.remove();
+	});
+
+	it('invalidates a child whose setup custom hook reads context', () => {
+		function ContextHost(props: { value: string }): OctaneNode {
+			return createElement(
+				StrongTheme.Provider,
+				{ value: props.value },
+				createElement(StrongCustomHookContext, { context: StrongTheme }),
+			);
+		}
+		const r = mount(ContextHost, { value: 'first' });
+		expect(r.find('#strong-custom-hook-context').textContent).toBe('first');
+		r.update(ContextHost, { value: 'second' });
+		expect(r.find('#strong-custom-hook-context').textContent).toBe('second');
+		r.unmount();
+	});
+
+	it('does not skip an aliased built-in hook in keyed-row setup', () => {
+		const r = mount(StrongAliasedContextRows);
+		expect(r.findAll('.strong-aliased-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		r.click('#strong-aliased-context-update');
+		expect(r.findAll('.strong-aliased-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		r.unmount();
+	});
+
+	it('does not skip a const custom hook in keyed-row setup', () => {
+		const r = mount(StrongConstCustomHookContextRows);
+		expect(r.findAll('.strong-const-hook-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		r.click('#strong-const-hook-context-update');
+		expect(r.findAll('.strong-const-hook-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		r.unmount();
+	});
+
+	it('does not skip an optional aliased built-in hook in keyed-row setup', () => {
+		const r = mount(StrongOptionalAliasedContextRows);
+		expect(r.findAll('.strong-optional-direct-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		expect(r.findAll('.strong-optional-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		expect(r.findAll('.strong-optional-custom-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		expect(
+			r.findAll('.strong-optional-namespace-context-row').map((row) => row.textContent),
+		).toEqual(['first', 'first']);
+		r.click('#strong-optional-context-update');
+		expect(r.findAll('.strong-optional-direct-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		expect(r.findAll('.strong-optional-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		expect(r.findAll('.strong-optional-custom-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		expect(
+			r.findAll('.strong-optional-namespace-context-row').map((row) => row.textContent),
+		).toEqual(['second', 'second']);
+		r.unmount();
+	});
+
+	it('does not skip an optional namespace hook when it is the only keyed-row setup call', () => {
+		const r = mount(StrongOptionalNamespaceContextRows);
+		expect(
+			r.findAll('.strong-optional-namespace-only-context-row').map((row) => row.textContent),
+		).toEqual(['first', 'first']);
+		r.click('#strong-optional-namespace-context-update');
+		expect(
+			r.findAll('.strong-optional-namespace-only-context-row').map((row) => row.textContent),
+		).toEqual(['second', 'second']);
+		r.unmount();
+	});
+
+	it('finds setup hooks through cyclic same-module call graphs independent of declaration order', () => {
+		const r = mount(StrongCyclicContextReaders);
+		expect(r.find('#strong-cycle-reader-a').textContent).toBe('first');
+		expect(r.find('#strong-cycle-reader-c').textContent).toBe('first');
+		r.click('#strong-cycle-context-update');
+		expect(r.find('#strong-cycle-reader-a').textContent).toBe('second');
+		expect(r.find('#strong-cycle-reader-c').textContent).toBe('second');
+		r.unmount();
+	});
+
+	it('resolves shadowed assignments by binding when following same-module setup hooks', () => {
+		const r = mount(StrongShadowedAssignmentContextRows);
+		expect(r.find('.strong-shadow-context-row').textContent).toBe('first');
+		r.click('#strong-shadow-context-update');
+		expect(r.find('.strong-shadow-context-row').textContent).toBe('second');
+		r.unmount();
+	});
+
+	it('uses SameValue semantics for newly cached constructor inputs', () => {
+		const Projector = class {
+			result: string;
+			constructor(value: number) {
+				this.result = Object.is(value, -0) ? '-0' : '+0';
+			}
+		} satisfies StrongNumberProjectorConstructor;
+		const r = mount(StrongSignedZeroConstructedProp, { Projector, value: 0 });
+		expect(r.find('#strong-signed-zero-constructor').textContent).toBe('+0');
+		r.update(StrongSignedZeroConstructedProp, { Projector, value: -0 });
+		expect(r.find('#strong-signed-zero-constructor').textContent).toBe('-0');
+		r.unmount();
+	});
+
+	it('preserves signed-zero projection inputs through ordinary list caches', () => {
+		const Projector = class {
+			result: string;
+			constructor(value: number) {
+				this.result = Object.is(value, -0) ? '-0' : '+0';
+			}
+		} satisfies StrongNumberProjectorConstructor;
+		const items = [{ id: 1 }];
+		const r = mount(StrongSignedZeroListProjections, { items, Projector, value: 0 });
+		expect(r.find('.strong-signed-zero-list-child').textContent).toBe('+0');
+		expect(r.find('.strong-signed-zero-list-inline').textContent).toBe('+0');
+		r.update(StrongSignedZeroListProjections, { items, Projector, value: -0 });
+		expect(r.find('.strong-signed-zero-list-child').textContent).toBe('-0');
+		expect(r.find('.strong-signed-zero-list-inline').textContent).toBe('-0');
+		r.unmount();
+	});
+
+	it('reconnects cached-child layout effects after a Suspense reveal', async () => {
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const log: string[] = [];
+		let show!: () => void;
+		const r = mount(StrongSuspenseLayoutEffect, {
+			promise,
+			log,
+			bind: (next: () => void) => {
+				show = next;
+			},
+		});
+		await act(() => {});
+		expect(log).toEqual(['create']);
+
+		await act(() => show());
+		expect(r.find('#strong-layout-effect-pending').textContent).toBe('pending');
+		expect(log).toEqual(['create', 'destroy']);
+
+		await act(() => resolve('ready'));
+		expect(r.findAll('#strong-layout-effect-pending')).toHaveLength(0);
+		expect(r.find('#strong-async-child').textContent).toBe('ready');
+		expect(log).toEqual(['create', 'destroy', 'create']);
+		r.unmount();
 	});
 });
 
@@ -734,6 +1038,25 @@ describe('keyed list selection', () => {
 		expect(r.findAll('li.selected')).toHaveLength(0);
 		r.update(KeyedSelectionList, { items: reordered, selected: 0 });
 		expect(r.findAll('li.selected')).toEqual([originalRows[1]]);
+		r.unmount();
+	});
+
+	it('uses SameValue for other captures in a strict-equality selection list', () => {
+		const items = makeRows();
+		const r = mount(KeyedSelectionProjectionList, { items, selected: 1, projection: 0 });
+		expect(r.findAll('li').map((row) => row.getAttribute('data-projection'))).toEqual([
+			'Infinity',
+			'Infinity',
+			'Infinity',
+		]);
+
+		r.update(KeyedSelectionProjectionList, { items, selected: 1, projection: -0 });
+		expect(r.findAll('li').map((row) => row.getAttribute('data-projection'))).toEqual([
+			'-Infinity',
+			'-Infinity',
+			'-Infinity',
+		]);
+		expect(r.find('.selected').textContent).toBe('first');
 		r.unmount();
 	});
 

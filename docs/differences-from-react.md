@@ -216,32 +216,92 @@ to reproduce every React Compiler optimization. React Compiler also identifies
 APIs with interior mutability, including TanStack Table v8, as
 [incompatible with memoization](https://react.dev/reference/eslint-plugin-react-hooks/lints/incompatible-library).
 Stable function or object identity alone does not prove a result is unchanged.
+React Compiler lint classifications and option-sensitive output are useful
+comparison evidence, not Octane configuration: changing JSX outlining, adding a
+debug hook, or using React's `"use memo"` directives does not alter Octane's
+compatibility/Strong boundary.
 
 ### Strong mode and render calls
 
 A module that opts into [`"use strong"`](#optional-strong-mode) asserts a stricter
-contract: props, state, context, and method receivers represent immutable render
-snapshots. An ordinary render method must be a value projection of those inputs;
-it must not secretly read changing state behind an unchanged receiver. This lets
-production client builds memoize statically named member calls such as
-`item.format(prefix)` and the same-module helpers that wrap them. No new runtime
-cache or global behavior change is involved.
+contract: rendering is a referentially transparent projection of props, state,
+context, and immutable snapshots. Every user-authored call evaluated for render
+output must return the same value for the same witnessed inputs and must not
+perform application-visible work. That assertion covers local and imported
+functions, static and computed methods, call-produced callees, constructors,
+tagged templates, and synchronously invoked callbacks.
 
-Hooks and ref-backed receivers such as `ref.current.read()` remain live. Dynamic
-method names, callback-bearing or call-produced arguments, and known clocks and
-randomness remain conservative. Strong mode is not a whole-program purity
-proof: imported code and opaque methods still have to honor the snapshot
-contract. Keep a component using live accessors in compatibility mode, or pass an
-actual snapshot into a separate Strong component. Enabling Strong on a caller
-does not make an imported library's live object immutable.
+Production client builds can therefore condition eligible regions on their
+witnessed inputs without using `use*` spelling as a purity oracle. An ordinary
+function named `useFormat` is no less memoizable than `format`; Strong does not
+reintroduce React's Rules of Hooks through a naming heuristic. Actual hooks keep
+their compiler-owned setup semantics. The compiler recognizes built-in hooks by
+import provenance, including optional calls, and resolves same-module
+custom-hook declarations and function-valued module bindings by lexical binding.
+Transitive and cyclic paths reach a fixed point, while reassigned module bindings
+stay on the conservative setup path. Their context subscriptions, state cells,
+suspension points, and effect lifecycles remain outside ordinary projection
+caches.
+
+For an eligible operation, the cache guard witnesses the callable and its
+receiver as well as explicit arguments. A derived receiver such as
+`factory().read(input)` is represented by the factory, its receiver, and its
+arguments rather than by a transient returned-object identity. Witnesses use
+`Object.is` equality at component and ordinary-list projection boundaries, so
+repeated `NaN` is stable while `0` and `-0` invalidate separately. A certified
+keyed-selection operand retains the authored strict-equality semantics while
+other list captures still use `Object.is`. Hiding hook state, a state getter,
+`ref.current`, a clock or random
+value, mutable module state, or an external live store behind a render call
+violates the assertion because the result can change without a witnessed input
+changing.
+
+Compiler diagnostics catch a useful subset of violations, but they are not a
+whole-program proof and unknown call shapes do not fall back to compatibility
+behavior. Calling imported code from a Strong module asserts that the particular
+render use is snapshot-safe; it does not make the library's live objects
+immutable. Keep a consumer of live accessors in compatibility mode, or read an
+actual reactive snapshot and pass it into a separate Strong component.
+
+Compatibility keeps a member call live only while the render scope containing
+that call actually executes. It does not create a subscription and cannot make a
+stable live object safe across `memo`, an unchanged child boundary, or Strong
+memoization. The supported migration is to subscribe and select in compatibility
+code, then cross the Strong boundary with the selected value:
+
+```tsx
+// SelectionBridge.tsrx — compatibility mode
+function SelectionBridge({ table, row }) @{
+  <table.Subscribe
+    source={table.atoms.rowSelection}
+    selector={(selection) => !!selection[row.id]}
+  >
+    {(selected) => <StrongSelectionRow label={row.original.name} selected={selected} />}
+  </table.Subscribe>
+}
+```
+
+```tsx
+// StrongSelectionRow.tsrx
+"use strong";
+
+function StrongSelectionRow({ label, selected }) @{
+  <li data-selected={selected ? '1' : '0'}>{label}</li>
+}
+```
+
+Passing only `row`, shallow-copying an object that still contains its live
+methods, or forcing an unrelated render without selecting `selected` does not
+create a snapshot witness.
 
 ### Keyed rows and logging
 
 A key preserves a surviving row's DOM identity; it does not promise that its
 JavaScript body runs only once. In Strong production builds, diagnostic calls
-such as `console.log('row', item.id)` no longer disqualify an otherwise eligible
-row from reuse. Logging frequency is not a render or commit contract, and can
-differ in development, HMR, and profiling builds.
+such as `console.log('row', item.id)` do not disqualify an otherwise eligible
+row from reuse. Do not rely on logging, metrics, mutation, allocation, or any
+other render-time call count: evaluation can differ in production, development,
+HMR, profiling, server rendering, hydration, retries, and aborted work.
 
 A changed captured value still invalidates a row, including captures inside its
 event handlers:
@@ -261,6 +321,46 @@ onClick={() => setItems((current) => current.filter((entry) => entry.id !== item
 
 The first form remains correct and supported. Strong mode does not change its
 closure semantics or promise to skip its reevaluation.
+
+### Local mutation and retained rows
+
+Mutation of fresh render-local data is supported when it finishes before that
+data escapes. A plain JavaScript loop has normal sequential JavaScript semantics:
+
+```tsx
+function Labels({ items }) @{
+  const labels = [];
+  for (const item of items) labels.push(item.label);
+  <p>{labels.join(', ')}</p>
+}
+```
+
+A keyed `@for` body is different: every surviving key owns a retained render
+scope that may be evaluated independently. Writing a binding declared outside
+the row would make its output depend on which other rows happened to run and in
+what order. Strong reports that shape as
+`OCTANE_STRONG_RETAINED_ROW_MUTATION`:
+
+```tsx
+let position = 0;
+@for (const item of items; key item.id) {
+  position++; // Strong compile error: shared across retained rows.
+  <li>{String(position)}</li>
+}
+```
+
+Use setup to build a complete value before it escapes, keep mutable scratch data
+inside one row, or use the directive's index binding when position is the desired
+input:
+
+```tsx
+@for (const item of items; index position; key item.id) {
+  <li>{String(position + 1)}</li>
+}
+```
+
+Compatibility mode accepts a cross-row write but does not promise a retained
+row evaluation order, so it must not determine rendered output there either.
 
 ## Derived values are cached at their declaration
 
@@ -294,12 +394,13 @@ Within the same proven component, a single-token class object driven by primitiv
 state can reuse its existing per-binding change guard. Controlled `value` and
 `checked` bindings still reassert their values on every commit.
 
-Also never cached:
+Also never cached in compatibility mode:
 
-- **Hook calls.** `const s = useThing()` and `const s = unstable_useThing()`
-  keep their hook cells and subscriptions. Hooks are recognised by naming
-  convention — the same signal React and React Compiler use — so a hook named
-  outside that convention is the one shape this cannot protect.
+- **Hook-shaped calls.** `const s = useThing()` and
+  `const s = unstable_useThing()` conservatively keep their setup live. Strong
+  instead recognizes actual built-in hooks by import provenance and same-module
+  function or function-valued custom-hook setup by lexical call-graph analysis;
+  an unrelated `useFormat()` remains an ordinary pure-call assertion.
 - **Values the render tree never reads.** A calculation used only by an event
   handler pays nothing.
 
@@ -398,6 +499,13 @@ non-idempotent globals such as `Date.now()` and `Math.random()`
 (`OCTANE_STRONG_RENDER_IMPURE_CALL`). These checks follow supported aliases and
 synchronous helpers; they do not prove arbitrary method bodies or imported code
 pure. Lazy state initialization may obtain an initial timestamp or random value.
+
+The directive is also an author assertion for production memoization, not just a
+request for diagnostics. Render output must not observe changing data through a
+stable ref, state getter, module variable, external store object, or hidden hook.
+All user-authored render calls and synchronously invoked callbacks must be pure
+for their witnessed inputs. Function names—including `use*` names—do not change
+that contract or disable the optimization.
 
 Event handlers, genuinely deferred callbacks, effect cleanup, effects that
 synchronize an external system, and normal DOM or timer refs remain supported.

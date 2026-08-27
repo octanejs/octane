@@ -60,6 +60,7 @@ export const STRONG_RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 export const STRONG_EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 export const STRONG_RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
 export const STRONG_RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
+export const STRONG_RETAINED_ROW_MUTATION = 'OCTANE_STRONG_RETAINED_ROW_MUTATION';
 export const STRONG_RENDER_IMPURE_CALL = 'OCTANE_STRONG_RENDER_IMPURE_CALL';
 export const STRONG_RENDER_EFFECT_EVENT_CALL = 'OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL';
 export const STRONG_EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
@@ -149,7 +150,9 @@ function declarationOf(statement) {
 
 function nearestFunctionScope(scope) {
 	let current = scope;
-	while (current?.parent && current.kind !== 'function') current = current.parent;
+	while (current?.parent && current.kind !== 'function' && current.kind !== 'retained-row') {
+		current = current.parent;
+	}
 	return current;
 }
 
@@ -250,6 +253,13 @@ function resolve(scope, name) {
 			return OTHER_BINDING;
 		}
 		return binding;
+	}
+	return null;
+}
+
+function resolveScope(scope, name) {
+	for (let current = scope; current; current = current.parent) {
+		if (current.bindings.has(name)) return current;
 	}
 	return null;
 }
@@ -432,6 +442,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	let returnCycles = 0;
 	let currentFunctionIsAsync = false;
 	let currentFunctionChecksImpureCalls = false;
+	let currentRetainedRowScope = null;
 
 	function predeclareHoistedVars(node, scope) {
 		if (!mayHaveHoistedVars || node == null) return;
@@ -508,6 +519,42 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const member = unwrap(target);
 		if (member?.type === 'MemberExpression' && snapshotBinding(member.object, scope) !== null) {
 			reportSnapshotMutation(member);
+		}
+	}
+
+	function reportRetainedRowMutation(target, scope) {
+		if (currentRetainedRowScope === null) return;
+		const identifiers = [];
+		function collectWriteRoots(value) {
+			const node = unwrap(value);
+			if (node?.type === 'Identifier') {
+				identifiers.push(node);
+			} else if (node?.type === 'MemberExpression') {
+				collectWriteRoots(node.object);
+			} else if (node?.type === 'AssignmentPattern') {
+				collectWriteRoots(node.left);
+			} else if (node?.type === 'ArrayPattern') {
+				for (const element of node.elements ?? []) collectWriteRoots(element);
+			} else if (node?.type === 'ObjectPattern') {
+				for (const property of node.properties ?? []) {
+					collectWriteRoots(property.argument ?? property.value);
+				}
+			} else if (node?.type === 'RestElement' || node?.type === 'TSParameterProperty') {
+				collectWriteRoots(node.argument ?? node.parameter);
+			}
+		}
+		collectWriteRoots(target);
+		for (const identifier of identifiers) {
+			const owner = resolveScope(scope, identifier.name);
+			for (let outer = currentRetainedRowScope.parent; outer; outer = outer.parent) {
+				if (owner !== outer) continue;
+				report(
+					STRONG_RETAINED_ROW_MUTATION,
+					identifier,
+					'Strong mode does not allow a keyed @for row to mutate a binding declared outside that row. Build mutable data before the @for, or derive each row only from its item and witnessed snapshots.',
+				);
+				return;
+			}
 		}
 	}
 
@@ -985,6 +1032,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		let executionPhase = phase;
 		if (pattern?.type === 'TSParameterProperty') {
 			return visitPatternExpressions(pattern.parameter, scope, phase);
+		} else if (pattern?.type === 'Identifier') {
+			if (executionPhase === 'render') reportRetainedRowMutation(pattern, scope);
 		} else if (pattern?.type === 'AssignmentPattern') {
 			executionPhase = visitPatternExpressions(pattern.left, scope, executionPhase);
 			visit(pattern.right, scope, executionPhase);
@@ -1009,7 +1058,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		} else if (pattern?.type === 'MemberExpression') {
 			visit(pattern, scope, executionPhase);
 			executionPhase = phaseAfter(pattern, executionPhase, true);
-			if (executionPhase === 'render') reportSnapshotWrite(pattern, scope);
+			if (executionPhase === 'render') {
+				reportSnapshotWrite(pattern, scope);
+				reportRetainedRowMutation(pattern, scope);
+			}
 		}
 		return executionPhase;
 	}
@@ -2205,16 +2257,16 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					if (currentFunctionChecksImpureCalls && impureStandardCall(callee, scope)) {
 						reportImpureCall(callee);
 					}
-					if (
-						callee?.type === 'MemberExpression' &&
-						snapshotBinding(callee.object, scope)?.array === true &&
-						ARRAY_MUTATORS.has(
-							callee.computed
-								? staticPrimitiveValue(callee.property, scope)
-								: callee.property?.name,
-						)
-					) {
-						reportSnapshotMutation(callee);
+					if (callee?.type === 'MemberExpression') {
+						const method = callee.computed
+							? staticPrimitiveValue(callee.property, scope)
+							: callee.property?.name;
+						if (ARRAY_MUTATORS.has(method)) {
+							if (snapshotBinding(callee.object, scope)?.array === true) {
+								reportSnapshotMutation(callee);
+							}
+							reportRetainedRowMutation(callee.object, scope);
+						}
 					}
 				}
 				if (
@@ -2313,6 +2365,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				if (executionPhase === 'render') {
 					if (currentRef(node.left, scope)) reportRef(node.left);
 					reportSnapshotWrite(node.left, scope);
+					reportRetainedRowMutation(node.left, scope);
 				}
 				return;
 			}
@@ -2321,12 +2374,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				visit(node.argument, scope, phase);
 				if (phaseAfter(node.argument, phase, true) === 'render') {
 					reportSnapshotWrite(node.argument, scope);
+					reportRetainedRowMutation(node.argument, scope);
 				}
 				return;
 			case 'UnaryExpression':
 				visit(node.argument, scope, phase);
 				if (node.operator === 'delete' && phaseAfter(node.argument, phase, true) === 'render') {
 					reportSnapshotWrite(node.argument, scope);
+					reportRetainedRowMutation(node.argument, scope);
 				}
 				return;
 			case 'CatchClause': {
@@ -2360,6 +2415,33 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 				visit(node.body, loop, executionPhase);
 				visit(node.update, loop, executionPhase);
+				return;
+			}
+			case 'JSXForExpression': {
+				visit(node.right, scope, phase);
+				const executionPhase =
+					currentFunctionIsAsync &&
+					phase !== 'deferred' &&
+					(alwaysAwaits(node.right) || node.await === true)
+						? 'deferred'
+						: phase;
+				const row = createScope(scope, 'retained-row');
+				if (node.left?.type === 'VariableDeclaration') {
+					for (const declaration of node.left.declarations ?? []) {
+						addPatternNames(declaration.id, row.bindings, OTHER_BINDING);
+					}
+				}
+				addPatternNames(node.index, row.bindings, OTHER_BINDING);
+				visit(node.left, row, executionPhase);
+				const enclosingRetainedRowScope = currentRetainedRowScope;
+				currentRetainedRowScope = row;
+				try {
+					visit(node.key, row, executionPhase);
+					visit(node.body, row, executionPhase);
+				} finally {
+					currentRetainedRowScope = enclosingRetainedRowScope;
+				}
+				visit(node.empty, scope, executionPhase);
 				return;
 			}
 			case 'ForInStatement':

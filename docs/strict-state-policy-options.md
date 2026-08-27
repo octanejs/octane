@@ -31,17 +31,19 @@ The shipped contract is **compiler-owned**: Strong modules assert immutable
 render snapshots and pure render projections. The compiler rejects statically
 provable state updates during render or synchronous effect setup, render-time
 `ref.current` writes and state-snapshot mutations, and direct reads from known
-clock or randomness APIs. Production client builds may also memoize eligible
-statically named receiver methods while their snapshot inputs remain unchanged.
+clock or randomness APIs. Production client builds may condition eligible
+user-authored calls, constructors, and tagged templates on their witnessed
+inputs without treating `use*` names as a purity signal.
 State initializers, `useLinkedState` reconcilers, and its
 `sourceEqual`/`valueEqual` callbacks execute synchronously during render;
 genuinely deferred callbacks remain valid. `useLinkedState` replaces the
 originally proposed keyed-reset hook and compares sources with `Object.is` by
 default, including arrays; composite comparisons require `sourceEqual`.
 
-These diagnostics are bounded rather than a whole-program purity proof, and
-imported live accessors do not become immutable merely because their caller is
-Strong. There is no runtime execution-phase guard, strict/compat hook-cell policy,
+These diagnostics are bounded rather than a whole-program purity proof. Strong
+trusts the author assertion even when analysis cannot inspect a call, so reading
+an imported live accessor behind stable inputs violates the contract rather than
+forcing a compatibility fallback. There is no runtime execution-phase guard, strict/compat hook-cell policy,
 package-manifest state-policy field, compatibility allowlist, package approval
 flow, or policy inventory. Published Octane packages ship authored source, not
 precompiled policy-bearing artifacts. See the current [Strong-mode

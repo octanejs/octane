@@ -7,6 +7,7 @@ const RENDER_STATE_UPDATE = 'OCTANE_STRONG_RENDER_STATE_UPDATE';
 const EFFECT_STATE_UPDATE = 'OCTANE_STRONG_EFFECT_STATE_UPDATE';
 const RENDER_REF_WRITE = 'OCTANE_STRONG_RENDER_REF_WRITE';
 const RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
+const RETAINED_ROW_MUTATION = 'OCTANE_STRONG_RETAINED_ROW_MUTATION';
 const RENDER_IMPURE_CALL = 'OCTANE_STRONG_RENDER_IMPURE_CALL';
 const RENDER_EFFECT_EVENT_CALL = 'OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL';
 const EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
@@ -127,6 +128,62 @@ export function App(props) @{
     local.count++;
   }`);
 		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).not.toThrow();
+	});
+
+	it.each([
+		['scalar updates', 'let index = 0;', 'index++;'],
+		['member updates', 'const cursor = { position: 0 };', 'cursor.position++;'],
+		['destructuring writes', 'let index = 0;', '[index] = [1];'],
+		['known array mutations', 'const labels = [];', 'labels.push(item.label);'],
+		['captured helper writes', 'let index = 0; function next() { index++; }', 'next();'],
+	])(
+		'rejects %s from a keyed row to a binding owned by its outer render scope',
+		(_label, declaration, mutation) => {
+			const source = `
+export function App(props) @{
+  ${declaration}
+  <ul>
+    @for (const item of props.items; key item.id) {
+      ${mutation}
+      <li>{item.label as string}</li>
+    }
+  </ul>
+}`;
+			expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
+			const strong = `"use strong";${source}`;
+			expect(() => compile(strong, '/src/App.tsrx')).toThrow(RETAINED_ROW_MUTATION);
+			for (const options of [
+				{ mode: 'client', dev: true },
+				{ mode: 'client', dev: false },
+				{ mode: 'server', dev: true },
+				{ mode: 'server', dev: false },
+			] as const) {
+				expect(() => compile(source, '/src/App.tsrx', { ...options, strong: true })).toThrow(
+					RETAINED_ROW_MUTATION,
+				);
+			}
+			expect(compileToVolarMappings(strong, '/src/App.tsrx').diagnostics).toContainEqual(
+				expect.objectContaining({ code: RETAINED_ROW_MUTATION, severity: 'error' }),
+			);
+		},
+	);
+
+	it('allows fresh mutable data in setup and inside one keyed row', () => {
+		const source = `"use strong";
+export function App(props) @{
+  const labels = [];
+  for (const item of props.items) labels.push(item.label);
+  <ul data-labels={labels.join(',')}>
+    @for (const item of props.items; key item.id) {
+      var rowIndex = 0;
+      rowIndex++;
+      const local = { count: 0 };
+      local.count++;
+      <li>{(item.label + local.count + rowIndex) as string}</li>
+    }
+  </ul>
+}`;
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('keeps immutable event updates and local effect work legal', () => {

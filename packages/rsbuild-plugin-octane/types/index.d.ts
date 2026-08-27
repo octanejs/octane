@@ -28,8 +28,9 @@ export interface OctaneRsbuildPluginOptions {
 	/** Enable component profiling in the browser environment. */
 	profile?: boolean;
 	/**
-	 * Override `compiler.strong` for this integration. Strong mode applies to
-	 * project-owned modules; dependencies can opt in with `"use strong"`.
+	 * Override `compiler.strong` for this integration. Strong asserts pure
+	 * immutable-snapshot renders in project-owned modules; dependencies can opt
+	 * in with `"use strong"`.
 	 */
 	strong?: boolean;
 	/**

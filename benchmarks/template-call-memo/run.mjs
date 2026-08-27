@@ -123,12 +123,43 @@ function exercise(bundle, observed) {
 	const semantics = [];
 	let reads = 0;
 	let logs = 0;
+	let assumedPureCalls = 0;
+	const project = (value, suffix) => `${value}:${suffix}`;
+	const calls = {
+		computedMethod: 'format',
+		format(value, suffix) {
+			if (observed) assumedPureCalls++;
+			return project(value, suffix);
+		},
+		useFormat(value, suffix) {
+			if (observed) assumedPureCalls++;
+			return project(value, suffix);
+		},
+		makeFormat() {
+			if (observed) assumedPureCalls++;
+			return project;
+		},
+		map(values, callback) {
+			if (observed) assumedPureCalls++;
+			return values.map(callback).join('');
+		},
+		tag(_strings, value, suffix) {
+			if (observed) assumedPureCalls++;
+			return `${value}${suffix}`;
+		},
+		Projector: class {
+			constructor(value, suffix) {
+				if (observed) assumedPureCalls++;
+				this.value = project(value, suffix);
+			}
+		},
+	};
 	const originalLog = console.log;
 	console.log = () => {
 		if (observed) logs++;
 	};
 	try {
-		for (const name of ['Rows', 'LoggedRows', 'CapturedRows']) {
+		for (const name of ['Rows', 'LoggedRows', 'CapturedRows', 'AssumedPureRows']) {
 			function row(id, label = `row-${id}`) {
 				return Object.freeze({
 					id,
@@ -168,6 +199,13 @@ function exercise(bundle, observed) {
 						`${item.label}:${suffix}`,
 						`${name}: value`,
 					);
+					if (name === 'AssumedPureRows') {
+						assert.deepEqual(
+							[...node.querySelectorAll('span')].map((span) => span.textContent),
+							Array.from({ length: 7 }, () => `${item.label}:${suffix}`),
+							`${name}: every assumed-pure call shape`,
+						);
+					}
 					if (previousNodes.has(item.id))
 						assert.equal(node, previousNodes.get(item.id), `${name}: survivor identity`);
 				}
@@ -176,14 +214,14 @@ function exercise(bundle, observed) {
 
 			function render() {
 				tick++;
-				bundle.flushSync(() => root.render(bundle[name], { rows, suffix, tick, onRows }));
+				bundle.flushSync(() => root.render(bundle[name], { rows, suffix, tick, onRows, calls }));
 				check();
 			}
 
 			function phase(phaseName, operation) {
-				reads = logs = 0;
+				reads = logs = assumedPureCalls = 0;
 				operation();
-				measurements[`${name}_${phaseName}`] = { reads, logs };
+				measurements[`${name}_${phaseName}`] = { reads, logs, assumedPureCalls };
 				semantics.push({
 					name,
 					phase: phaseName,
@@ -257,6 +295,13 @@ function counts(measurements) {
 		stable_logs: measurements.LoggedRows_stable.logs,
 		captured_append_reads: measurements.CapturedRows_append.reads,
 		captured_remove_reads: measurements.CapturedRows_remove.reads,
+		assumed_pure_stable_calls: measurements.AssumedPureRows_stable.assumedPureCalls,
+		assumed_pure_insert_calls:
+			measurements.AssumedPureRows_append.assumedPureCalls +
+			measurements.AssumedPureRows_prepend.assumedPureCalls,
+		assumed_pure_snapshot_calls: measurements.AssumedPureRows_snapshot.assumedPureCalls,
+		assumed_pure_argument_calls: measurements.AssumedPureRows_argument.assumedPureCalls,
+		assumed_pure_reorder_calls: measurements.AssumedPureRows_reorder.assumedPureCalls,
 	};
 }
 
@@ -330,6 +375,11 @@ const payload = {
 					stable_logs: 1,
 					captured_append_reads: ROWS + 1,
 					captured_remove_reads: ROWS,
+					assumed_pure_stable_calls: 1,
+					assumed_pure_insert_calls: 14,
+					assumed_pure_snapshot_calls: 7,
+					assumed_pure_argument_calls: (ROWS + 2) * 7,
+					assumed_pure_reorder_calls: 1,
 				}).map(([key, value]) => [key, stat(value)]),
 			),
 		},
