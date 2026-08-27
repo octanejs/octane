@@ -3192,6 +3192,14 @@
     "note": "Removing the original row after append must preserve all 16 current survivors and their DOM identity, with no duplicate receiver reads."
   },
   {
+    "suite": "scheduler-depth",
+    "op": "flush_per_1000_components",
+    "target": "depth-2000",
+    "reference": "depth-500",
+    "maxRatio": 2,
+    "note": "A deepest-first update wave through 2,000 nested components must remain within 2x the per-component cost of the 500-component control. Both targets verify every queued update, the final checksum, and retained leaf DOM identity; repeated full ancestry walks measured about 3.6x."
+  },
+  {
     "suite": "uibench",
     "op": "table/[100,4]/render",
     "target": "octane-tsrx",

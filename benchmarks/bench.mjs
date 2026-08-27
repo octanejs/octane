@@ -361,6 +361,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Production client scheduler scaling for deepest-first state updates across
+		// a nested component chain, normalized per queued component.
+		name: 'scheduler-depth',
+		cwd: 'scheduler-depth',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Headless-Chromium production scaling for late behavior events whose
 		// distinct asynchronous adoptions settle one at a time.
 		name: 'behavior-root-events',

@@ -68,6 +68,7 @@ export const BENCHMARK_SUITES = [
 	'application-composition',
 	'scaling-curves',
 	'dev-form-diagnostics',
+	'scheduler-depth',
 	'behavior-root-events',
 	'router-dispatch',
 	'vite-client-assets',
