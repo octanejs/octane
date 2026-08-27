@@ -4267,9 +4267,9 @@ function autoMemoBuiltinHookName(call, ctx) {
 	return null;
 }
 
-function autoMemoModuleFunctionDeclarations(ctx) {
-	if (ctx.autoMemoModuleFunctionDeclarations !== undefined) {
-		return ctx.autoMemoModuleFunctionDeclarations;
+function autoMemoModuleFunctions(ctx) {
+	if (ctx.autoMemoModuleFunctions !== undefined) {
+		return ctx.autoMemoModuleFunctions;
 	}
 	const declarations = new Map();
 	for (const statement of ctx.activityModuleAst.body) {
@@ -4279,14 +4279,25 @@ function autoMemoModuleFunctionDeclarations(ctx) {
 				: statement;
 		if (declaration?.type === 'FunctionDeclaration' && declaration.id?.type === 'Identifier') {
 			declarations.set(declaration.id.name, declaration);
+		} else if (declaration?.type === 'VariableDeclaration') {
+			for (const declarator of declaration.declarations ?? []) {
+				const initializer = unwrapTsExpr(declarator.init);
+				if (
+					declarator.id?.type === 'Identifier' &&
+					(initializer?.type === 'ArrowFunctionExpression' ||
+						initializer?.type === 'FunctionExpression')
+				) {
+					declarations.set(declarator.id.name, initializer);
+				}
+			}
 		}
 	}
-	ctx.autoMemoModuleFunctionDeclarations = declarations;
+	ctx.autoMemoModuleFunctions = declarations;
 	return declarations;
 }
 
 function collectAutoMemoModuleFunctions(ctx, lexical) {
-	const declarations = autoMemoModuleFunctionDeclarations(ctx);
+	const declarations = autoMemoModuleFunctions(ctx);
 	const reassigned = new Set();
 	function markPattern(original) {
 		const node = unwrapTsExpr(original);
@@ -4423,17 +4434,18 @@ function autoMemoSetupHookFunctions(ctx) {
 // Strong asserts that USER render operations are pure; it does not turn
 // compiler-owned hook setup into a projection. Resolve direct builtins from the
 // provenance attached by applyHookDependencies, then solve same-module
-// declaration reachability by lexical binding. Reassigned module bindings are
-// conservatively setup-bearing; shadowed local assignments are not. Hook-shaped
-// spelling alone is deliberately irrelevant: an ordinary `useFormat()` helper
-// remains eligible, while `function useTheme() { return useContext(...); }` is
-// kept on the lifecycle-aware path.
+// declaration reachability by lexical binding, including function-valued module
+// variables. Reassigned module bindings are conservatively setup-bearing;
+// shadowed local assignments are not. Hook-shaped spelling alone is deliberately
+// irrelevant: an ordinary `useFormat()` helper remains eligible, while either a
+// function declaration or `const useTheme = () => useContext(...)` stays on the
+// lifecycle-aware path.
 function autoMemoCallExecutesSetupHook(call, ctx) {
 	if (autoMemoBuiltinHookName(call, ctx) !== null) return true;
 	const callee = unwrapTsExpr(call?.callee);
 	if (callee?.type !== 'Identifier') return false;
 	const name = callee.name;
-	if (!autoMemoModuleFunctionDeclarations(ctx).has(name)) return false;
+	if (!autoMemoModuleFunctions(ctx).has(name)) return false;
 	const summaries = autoMemoSetupHookFunctions(ctx);
 	if (summaries.get(name) !== true) return false;
 

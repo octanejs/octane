@@ -183,6 +183,30 @@ export function StrongAliasedContextRows() @{
 	</div>
 }
 
+const useConstStrongTheme = (context: typeof StrongTheme): string => {
+	return useConstStrongThemeInner(context);
+};
+
+const useConstStrongThemeInner = function (context: typeof StrongTheme): string {
+	return useContext(context);
+};
+
+export function StrongConstCustomHookContextRows() @{
+	const [theme, setTheme] = useState('first');
+	const [items] = useState([{ id: 1 }, { id: 2 }]);
+	<div>
+		<button id="strong-const-hook-context-update" onClick={() => setTheme('second')}>
+			update
+		</button>
+		<StrongTheme.Provider value={theme}>
+			@for (const item of items.slice(); key item.id) {
+				const value = useConstStrongTheme(StrongTheme);
+				<span class="strong-const-hook-context-row">{value as string}</span>
+			}
+		</StrongTheme.Provider>
+	</div>
+}
+
 function useOptionalStrongTheme(context: typeof StrongTheme): string {
 	return readContext?.(context) as string;
 }

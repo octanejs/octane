@@ -138,10 +138,11 @@ then reuse eligible regions and keyed rows. A `use*` name is not a purity oracle
 and does not reintroduce Rules of Hooks; actual hook calls stay in normal
 component or custom-hook setup and use compiler-assigned slots. Built-ins are
 recognized by import provenance, including optional calls, and same-module
-custom-hook declarations are resolved by lexical binding to a transitive fixed
-point, so aliases and cycles retain context, state, suspension, and effect
-lifecycle behavior. Projection guards witness a method/callable, its receiver,
-and its explicit arguments; derived receivers are witnessed through the
+custom-hook declarations or function-valued module bindings are resolved by
+lexical binding to a transitive fixed point, so aliases and cycles retain
+context, state, suspension, and effect lifecycle behavior. Projection guards
+witness a method/callable, its receiver, and its explicit arguments; derived
+receivers are witnessed through the
 operations and inputs that produce them rather than transient result identities.
 Component and ordinary-list projection witnesses use `Object.is`, distinguishing
 signed zero while stabilizing `NaN`; a certified keyed-selection operand retains

@@ -49,6 +49,7 @@ import {
 	StrongAliasedContextRows,
 	StrongCallableDependencies,
 	StrongConstructedResultProp,
+	StrongConstCustomHookContextRows,
 	StrongCustomHookContext,
 	StrongCyclicContextReaders,
 	StrongFactoryReadProp,
@@ -615,6 +616,20 @@ describe('Strong memoization preserves dependency and setup semantics', () => {
 		]);
 		r.click('#strong-aliased-context-update');
 		expect(r.findAll('.strong-aliased-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
+		r.unmount();
+	});
+
+	it('does not skip a const custom hook in keyed-row setup', () => {
+		const r = mount(StrongConstCustomHookContextRows);
+		expect(r.findAll('.strong-const-hook-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		r.click('#strong-const-hook-context-update');
+		expect(r.findAll('.strong-const-hook-context-row').map((row) => row.textContent)).toEqual([
 			'second',
 			'second',
 		]);

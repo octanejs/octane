@@ -238,10 +238,11 @@ not change this contract or reintroduce Rules of Hooks. Actual hooks still belon
 in component or custom-hook setup, where the compiler assigns their slots and
 preserves context, state, suspension, and effect lifecycles. Recognition uses
 built-in import provenance, including optional calls, and lexically resolved
-same-module custom-hook declarations, not a `use*` naming heuristic. Transitive
-and cyclic hook paths reach a fixed point. Memo guards witness a callable, its
-receiver, and explicit arguments; derived receivers are represented by their
-producing operation and inputs rather than a transient result identity. Guards
+same-module custom-hook declarations or function-valued module bindings, not a
+`use*` naming heuristic. Transitive and cyclic hook paths reach a fixed point.
+Memo guards witness a callable, its receiver, and explicit arguments; derived
+receivers are represented by their producing operation and inputs rather than a
+transient result identity. Guards
 at component and ordinary-list projection boundaries compare inputs with
 `Object.is`, distinguishing signed zero while stabilizing `NaN`; a certified
 keyed-selection operand retains authored strict equality.

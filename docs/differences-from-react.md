@@ -237,10 +237,11 @@ function named `useFormat` is no less memoizable than `format`; Strong does not
 reintroduce React's Rules of Hooks through a naming heuristic. Actual hooks keep
 their compiler-owned setup semantics. The compiler recognizes built-in hooks by
 import provenance, including optional calls, and resolves same-module
-custom-hook declarations by lexical binding. Transitive and cyclic paths reach
-a fixed point, while reassigned module bindings stay on the conservative setup
-path. Their context subscriptions, state cells, suspension points, and effect
-lifecycles remain outside ordinary projection caches.
+custom-hook declarations and function-valued module bindings by lexical binding.
+Transitive and cyclic paths reach a fixed point, while reassigned module bindings
+stay on the conservative setup path. Their context subscriptions, state cells,
+suspension points, and effect lifecycles remain outside ordinary projection
+caches.
 
 For an eligible operation, the cache guard witnesses the callable and its
 receiver as well as explicit arguments. A derived receiver such as
@@ -398,8 +399,8 @@ Also never cached in compatibility mode:
 - **Hook-shaped calls.** `const s = useThing()` and
   `const s = unstable_useThing()` conservatively keep their setup live. Strong
   instead recognizes actual built-in hooks by import provenance and same-module
-  custom-hook setup by lexical call-graph analysis; an unrelated `useFormat()`
-  remains an ordinary pure-call assertion.
+  function or function-valued custom-hook setup by lexical call-graph analysis;
+  an unrelated `useFormat()` remains an ordinary pure-call assertion.
 - **Values the render tree never reads.** A calculation used only by an event
   handler pays nothing.
 
