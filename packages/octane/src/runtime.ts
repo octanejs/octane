@@ -3551,14 +3551,6 @@ function scheduleRender(block: Block): void {
 let DRAIN_ID = 0;
 const RENDER_PHASE_UPDATE_LIMIT = 25;
 
-// Block-tree depth (root = 0), by walking the parentBlock chain. Used to drain
-// the render queue ancestors-first so cascade coalescing is order-independent.
-function blockDepth(b: Block): number {
-	let d = 0;
-	for (let p = b.parentBlock; p !== null; p = p.parentBlock) d++;
-	return d;
-}
-
 function belongsToBlockTree(block: Block, root: Block): boolean {
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
 		if (current === root) return true;
@@ -3605,10 +3597,28 @@ function drainHydrationRenderPhaseUpdates(root: Block): void {
 // ancestor of B then depth(A) < depth(B), so A renders first and its cascade can
 // clear B's `pending` (skipping B's redundant standalone render) regardless of
 // the order their setStates were queued. Depths are precomputed so the comparator
-// doesn't re-walk the chain on every compare.
+// doesn't re-walk the chain on every compare. Resolve each unknown path to its
+// nearest cached queued ancestor, retaining depths only for blocks in this wave.
 function sortWaveByDepth(wave: Block[]): Block[] {
+	const queued = new Set(wave);
 	const depth = new Map<Block, number>();
-	for (let i = 0; i < wave.length; i++) depth.set(wave[i], blockDepth(wave[i]));
+	const path: Block[] = [];
+	for (let i = 0; i < wave.length; i++) {
+		let current: Block | null = wave[i];
+		let knownDepth: number | undefined;
+		while (current !== null) {
+			knownDepth = depth.get(current);
+			if (knownDepth !== undefined) break;
+			path.push(current);
+			current = current.parentBlock;
+		}
+		let currentDepth = knownDepth ?? -1;
+		while (path.length > 0) {
+			const block = path.pop()!;
+			currentDepth++;
+			if (queued.has(block)) depth.set(block, currentDepth);
+		}
+	}
 	wave.sort((a, b) => depth.get(a)! - depth.get(b)!);
 	return wave;
 }

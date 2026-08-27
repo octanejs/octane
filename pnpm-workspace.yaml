@@ -49,6 +49,8 @@ packages:
   - benchmarks/streamdown-hosted/*
   - benchmarks/svg-dashboard
   - benchmarks/svg-dashboard/*
+  - benchmarks/uibench
+  - benchmarks/uibench/*
   - benchmarks/tauri-shell
   - benchmarks/tauri-shell/*
   - benchmarks/tanstack-start

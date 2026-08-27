@@ -393,7 +393,7 @@ export interface OctaneConfigOptions {
 	adapter?: OctaneAdapter;
 	/** @experimental Compiler-owned configuration shared by all bundler integrations. */
 	compiler?: {
-		/** Reject unsafe state updates and ref writes in application-owned modules. @default false */
+		/** Assert pure immutable-snapshot renders and reject detectable violations. @default false */
 		strong?: boolean;
 		renderers?: ExperimentalRendererConfigOptions;
 	};

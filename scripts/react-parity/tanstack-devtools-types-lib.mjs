@@ -458,7 +458,7 @@ function listCompilerProgramFiles(root, projectPath, sourceRoot) {
 		.sort();
 }
 
-function verifyProgramMembership(config, root, upstreamFiles, adaptedFiles) {
+function verifyProgramMembership(config, upstreamFiles, adaptedFiles) {
 	const mappedUpstream = config.fileMap
 		.map(function upstreamPath(entry) {
 			return entry.upstream;
@@ -498,7 +498,7 @@ function buildSourceInventories(root, config) {
 	const adaptedProject = config.lanes.adapted.project;
 	const upstreamFiles = listCompilerProgramFiles(root, pristineProject, config.upstreamRoot);
 	const adaptedFiles = listCompilerProgramFiles(root, adaptedProject, config.adaptedRoot);
-	verifyProgramMembership(config, root, upstreamFiles, adaptedFiles);
+	verifyProgramMembership(config, upstreamFiles, adaptedFiles);
 
 	const upstreamRoot = resolve(root, config.upstreamRoot);
 	const adaptedRoot = resolve(root, config.adaptedRoot);

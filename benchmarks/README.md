@@ -193,6 +193,7 @@ internally, get their own baseline and guard namespace.
 | `chat-stream` | chat-stream | Octane + reference frameworks | deterministic token streaming + conversation switches |
 | `streamdown-hosted` | streamdown-hosted | React Streamdown + React-hosted Octane binding | React-hosted compatibility boundary: static mount/replace, fine/coarse Markdown streaming, semantic DOM parity, lifecycle diagnostic, and production bytes |
 | `svg-dashboard` | svg-dashboard | octane-tsrx, react, solid, svelte | hand-rolled SVG observability dashboard: path-d/transform churn, keyed reconcile inside `<svg>`, foreignObject labels, portal tooltip overlay, createElement icon de-opt; byte-exact Node-replay + cross-flavor DOM-parity gates |
+| `uibench` | uibench | octane-tsrx, react, preact, solid | fresh implementation of UIbench's 96-case desktop matrix: table/sparse-style updates, flat and nested keyed tree transforms, historical worst cases, large no-change diffs, and semantic/identity gates |
 | `dbmon` | dbmon | Octane + reference frameworks | per-cell update churn |
 | `recursive-context` | recursive-context | Octane + reference frameworks | context fan-out |
 | `spa-navigation` | spa-navigation | octane-tsrx, octane-jsx, react, solid, vue-vapor | full-page routed-subtree teardown/mount with shell/layout identity and production-work gates |
@@ -203,6 +204,7 @@ internally, get their own baseline and guard namespace.
 | `lifecycle-memory` | lifecycle-memory | none (builds) | 1,000+ effectful mount/update/unmount cycles, real listener/subscription/timer cleanup, post-teardown event probes, and explicitly collected Chromium heap across all six frameworks |
 | `controlled-form` | controlled-form | none (builds) | 512 controlled fields, real typing, DOM identity, focus and caret, validation cancellation, complete submit/reset, and native select/checkbox/radio correctness |
 | `dev-form-diagnostics` | dev-form-diagnostics | none (Node/jsdom) | development-only controlled-form diagnostic commit scaling at 4,000 and 32,000 hosts |
+| `scheduler-depth` | scheduler-depth | none (Node/jsdom) | production client scheduler ordering across 500 and 2,000 deeply nested queued components |
 | `external-store-fanout` | external-store-fanout | none (builds) | 512 subscribers, narrow and broad writes, rapid-write tearing checks, deterministic 100-notification work guards, and balanced subscription removal |
 | `external-store-integrations` | external-store-integrations | none (builds) | real Zustand stores, Jotai atoms, and TanStack Query caches with selector fan-out, query invalidation, and six-framework cleanup gates |
 | `store-selector-fanout` | store-selector-fanout | none (builds) | 512 subscribers reading one store through a `with-selector`-shaped selector, 20 unrelated parent re-renders with the store untouched, and deterministic selector-invocation counts beside render and snapshot counts |
@@ -214,6 +216,8 @@ internally, get their own baseline and guard namespace.
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
 | `router-dispatch` | router-dispatch | none (Node-only) | app-core static, wrong-method, and dynamic matching across 1,000-route tables |
+| `manifest-cache-invalidation` | manifest-cache-invalidation | none (Node-only) | shared-compiler source invalidation across 129 and 5,001 cached nearest-manifest decisions, plus a required manifest-scan control |
+| `vite-client-assets` | vite-client-assets | none (Node-only) | route asset mapping across 100 and 1,000 entries sharing a 500-chunk manifest graph, plus a shallow control |
 | `effectful-list` | effectful-list | Octane + reference frameworks | effect/ref cleanup churn |
 | `activity` | activity | none (builds) | same-source Octane/React Activity lifecycle, hidden/nested work, retained state/effects/DOM, cold-vs-used ordinary-ref controls, and optional-runtime bundle reachability |
 | `list-clear` | list-clear | Octane-only | keyed-list bulk clear by parent shape — the only coverage of the shared-parent path |
@@ -241,6 +245,7 @@ internally, get their own baseline and guard namespace.
 | `template-call-memo` | template-call-memo | none (Node-only) | production Strong/compatibility receiver-call counts, immutable keyed rows, real dependency changes, current event captures, and survivor identity |
 | `compiler-throughput` | compiler-throughput | none (Node-only) | six real production compiler pipelines, cold/warm/incremental transformations, 10/100/1,000 components, and heap diagnostics |
 | `tsrx-component-graph` | tsrx-component-graph | none (Node-only) | 2,400-component live-import propagation with dependent-first vs dependency-first declarations |
+| `tsrx-jsx-return-branches` | tsrx-jsx-return-branches | none (Node-only) | client/server compile and bundler classification for 120/480 conditional-return components, with lowering/export controls and a same-sized ineligible parse/print control |
 | `tsrx-nesting-diagnostics` | tsrx-nesting-diagnostics | none (Node-only) | development TSRX compilation at 500 and 2,000 invalid HTML sites, with parsed diagnostic count/order controls and a per-diagnostic scaling guard |
 | `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, and weather-app, normalized minify, raw/gzip/brotli |
 | `bundle-reachability` | bundle-size | none (builds and executes in jsdom) | isolated public feature imports, exact production-bundle behavior, forbidden-module reachability, and committed raw/gzip/brotli budgets |

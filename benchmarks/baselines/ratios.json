@@ -480,6 +480,30 @@
     "note": "Same-process lowercase method misses through 1,000 server routes, normalized per candidate. Re-normalizing the request method for every route measured at 0.31x the dynamic control; one dispatch-level normalization measured at 0.07x. The 0.2 ceiling leaves timing headroom while catching repeated method normalization."
   },
   {
+    "suite": "vite-client-assets",
+    "op": "asset_map",
+    "target": "routes-1000-deep",
+    "reference": "routes-100-deep",
+    "maxRatio": 6,
+    "note": "Same-process Vite asset mapping over route entries that share one 500-chunk graph and produce the same one-file CSS result. Rewalking the graph for every route measured at 10.16x for 1,000 versus 100 routes; bounded complete-result caching measured at 3.24x. The 6x ceiling leaves timing headroom while catching restoration of the route-count times graph-size traversal."
+  },
+  {
+    "suite": "manifest-cache-invalidation",
+    "op": "invalidate",
+    "target": "ordinary-large-cache",
+    "reference": "ordinary-small-cache",
+    "maxRatio": 1.5,
+    "note": "Same-process shared-compiler source invalidation after 129 versus 5,001 nearest-manifest decisions. The original whole-cache scan measured 34.8x at the large size, while rejecting non-manifest paths before cache traversal measured 1.00x. The 1.5 ceiling leaves timing headroom while catching cache-size-dependent ordinary invalidation."
+  },
+  {
+    "suite": "manifest-cache-invalidation",
+    "op": "invalidate",
+    "target": "ordinary-large-cache",
+    "reference": "manifest-large-cache",
+    "maxRatio": 0.2,
+    "note": "Same-process invalidation across 5,001 cached manifest decisions with identical cache-preservation checks. The original ordinary path measured at parity with the required package-manifest scan, while the manifest-name gate measured at 0.01x. The 0.2 ceiling preserves more than 10x timing headroom while catching loss of the ordinary-source fast path."
+  },
+  {
     "suite": "external-store-fanout",
     "op": "broad_write",
     "target": "octane-tsrx",
@@ -3120,6 +3144,38 @@
     "note": "A 2,400-component chain ending at an opaque component must stay within 8% of the same graph declared leaf-first. Both orders verify all 2,400 warm plans; whole-module warm-reachability rescans exceeded this ceiling on current main."
   },
   {
+    "suite": "tsrx-jsx-return-branches",
+    "op": "client_compile_per_100_components",
+    "target": "eligible-480",
+    "reference": "eligible-120",
+    "maxRatio": 1.5,
+    "note": "Same-process production client compilation with every conditional-return lowering counted. Exact main measured 2.89x per component from 120 to 480 components; one module-scoped use index measured 1.01x."
+  },
+  {
+    "suite": "tsrx-jsx-return-branches",
+    "op": "server_compile_per_100_components",
+    "target": "eligible-480",
+    "reference": "eligible-120",
+    "maxRatio": 1.5,
+    "note": "Same-process production server compilation with every SSR control lowering counted. Exact main measured 3.23x per component from 120 to 480 components; one module-scoped use index measured 0.92x."
+  },
+  {
+    "suite": "tsrx-jsx-return-branches",
+    "op": "bundler_classify",
+    "target": "eligible-480",
+    "reference": "ineligible-480",
+    "maxRatio": 1.5,
+    "note": "Same-sized bundler classification with exact void-export controls. Exact main made the eligible module 5.53x slower than the parse/branch-analysis control; one module-scoped use index measured 1.03x."
+  },
+  {
+    "suite": "text-type-roots",
+    "op": "snapshot",
+    "target": "large-root",
+    "reference": "small-root",
+    "maxRatio": 1.5,
+    "note": "Warm TypeScript text-fact snapshots with 20,002 configured roots must stay within 50% of the identical 34-root control. Both variants return the same string-child evidence and alternate measurement order; rebuilding configured-root membership made the large project about 13x slower."
+  },
+  {
     "suite": "template-call-memo",
     "op": "stable_reads",
     "target": "strong",
@@ -3182,5 +3238,278 @@
     "reference": "work-model",
     "maxRatio": 1,
     "note": "Removing the original row after append must preserve all 16 current survivors and their DOM identity, with no duplicate receiver reads."
+  },
+  {
+    "suite": "scheduler-depth",
+    "op": "flush_per_1000_components",
+    "target": "depth-2000",
+    "reference": "depth-500",
+    "maxRatio": 2,
+    "note": "A deepest-first update wave through 2,000 nested components must remain within 2x the per-component cost of the 500-component control. Both targets verify every queued update, the final checksum, and retained leaf DOM identity; repeated full ancestry walks measured about 3.6x."
+  },
+  {
+    "suite": "uibench",
+    "op": "table/[100,4]/render",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 2.2,
+    "note": "UIbench's largest table mount creates 100 keyed rows with five cells each. Observed 1.38x on the 10-sample introduction run (2026-08-26); the loose ceiling catches a template-clone or row-mount cliff without overfitting a sub-millisecond browser timing."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/render",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.9,
+    "note": "Deep binary mount creates 2,046 keyed nodes across ten recursive levels. Observed 1.21x on the 10-sample introduction run (2026-08-26); this is the mount-path guard with enough same-run headroom for browser noise."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[50,10]/[reverse]",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.5,
+    "note": "Reverses 50 keyed containers while preserving their 500 keyed children and every surviving DOM node. Observed 0.88x on the 10-sample introduction run (2026-08-26); the guard protects the common nested-list reorder path."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[500]/[kivi_worst_case]",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.8,
+    "note": "Historical UIbench adversarial case removes both ends and reverses 498 surviving keyed nodes. Observed 0.35x on the 10-sample introduction run (2026-08-26); a move toward 0.8x signals a keyed-reconcile cliff."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[10,10,10,10]/no_change",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.7,
+    "note": "Publishes a fresh but value-identical 11,110-node tree to measure diff/prev-guard overhead. Normal and quick introduction runs ranged from 0.93x to 1.34x (2026-08-26); 1.7x retains noise headroom while guarding the full-tree walk."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/no_change",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.4,
+    "note": "Publishes a fresh but value-identical ten-level binary tree. Observed 0.70x on the 10-sample introduction run and 0.78x quick (2026-08-26); the guard isolates recursive no-change diff cost at a smaller shape."
+  },
+  {
+    "suite": "uibench",
+    "op": "cases",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: both fixtures must pass and publish all 96 desktop cases. Every endpoint is independently serialized against the model before timings are accepted."
+  },
+  {
+    "suite": "uibench",
+    "op": "elements_largest",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: the largest endpoint contains exactly 23,331 visible elements in both fixtures; missing work cannot look like a performance win."
+  },
+  {
+    "suite": "uibench",
+    "op": "identity_shared",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: all 32,543 keyed survivors observed across the matrix retain DOM identity in both fixtures. A replacement is a correctness failure before this count is emitted."
+  },
+  {
+    "suite": "uibench",
+    "op": "table/[100,4]/render",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.1,
+    "note": "UIbench's largest table mount creates 100 keyed rows with five cells each. Octane measured 0.59x Solid on the 10-sample Solid introduction run and 0.62x quick (2026-08-26); the ceiling retains broad sub-millisecond noise headroom while catching a mount-path regression."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/render",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 0.9,
+    "note": "Deep binary mount creates 2,046 keyed nodes across ten recursive levels. Octane measured 0.55x Solid on the 10-sample Solid introduction run and 0.54x quick (2026-08-26); this guards recursive mount cost without overfitting either run."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[50,10]/[reverse]",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1.2,
+    "note": "Reverses 50 keyed containers while preserving their 500 keyed children and every surviving DOM node. Octane measured 0.65x Solid on the 10-sample Solid introduction run and 0.64x quick (2026-08-26); the loose ceiling protects nested-list reorder performance."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[500]/[kivi_worst_case]",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 0.8,
+    "note": "Historical UIbench adversarial case removes both ends and reverses 498 surviving keyed nodes. Octane measured 0.35x Solid on both Solid introduction runs (2026-08-26); a move toward 0.8x signals a keyed-reconcile cliff."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[10,10,10,10]/no_change",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1,
+    "note": "Publishes a fresh but value-identical 11,110-node tree to compare full-tree prev guards with Solid's keyed store reconciliation. Octane measured 0.56x Solid on the 10-sample introduction run and 0.62x quick (2026-08-26)."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/no_change",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "maxRatio": 1,
+    "note": "Publishes a fresh but value-identical ten-level binary tree. Octane measured 0.60x Solid on the 10-sample introduction run and 0.66x quick (2026-08-26); the ceiling isolates recursive no-change diff cost at the smaller shape."
+  },
+  {
+    "suite": "uibench",
+    "op": "cases",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: Octane and Solid must pass and publish all 96 desktop cases. Every endpoint is independently serialized against the model before timings are accepted."
+  },
+  {
+    "suite": "uibench",
+    "op": "elements_largest",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: the largest endpoint contains exactly 23,331 visible elements in Octane and Solid; missing work cannot look like a performance win."
+  },
+  {
+    "suite": "uibench",
+    "op": "identity_shared",
+    "target": "octane-tsrx",
+    "reference": "solid",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: all 32,543 keyed survivors observed across the matrix retain DOM identity in Octane and Solid. A replacement is a correctness failure before this count is emitted."
+  },
+  {
+    "suite": "uibench",
+    "op": "table/[100,4]/render",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 2.1,
+    "note": "UIbench's largest table mount creates 100 keyed rows with five cells each. Octane measured 1.36x Preact on both the 10-sample and quick Preact introduction runs (2026-08-26); the ceiling catches a mount-path cliff while retaining broad sub-millisecond noise headroom."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/render",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 1.9,
+    "note": "Deep binary mount creates 2,046 keyed nodes across ten recursive levels. Octane measured 1.24x Preact on the 10-sample introduction run and 1.37x quick (2026-08-26); this is the recursive mount guard with same-run browser-noise headroom."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[50,10]/[reverse]",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 0.8,
+    "note": "Reverses 50 keyed containers while preserving their 500 keyed children and every surviving DOM node. Octane measured 0.22x Preact on the 10-sample introduction run and 0.24x quick (2026-08-26); the ceiling protects the nested-list reorder path."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[500]/[kivi_worst_case]",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 0.6,
+    "note": "Historical UIbench adversarial case removes both ends and reverses 498 surviving keyed nodes. Octane measured 0.17x Preact on the 10-sample introduction run and 0.18x quick (2026-08-26); a move toward 0.6x signals a keyed-reconcile cliff."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[10,10,10,10]/no_change",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 1.5,
+    "note": "Publishes a fresh but value-identical 11,110-node tree while Preact's native queued commit remains inside the timed interval. Octane measured 0.96x Preact on the 10-sample introduction run and 1.04x quick (2026-08-26)."
+  },
+  {
+    "suite": "uibench",
+    "op": "tree/[2,2,2,2,2,2,2,2,2,2]/no_change",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "maxRatio": 1.5,
+    "note": "Publishes a fresh but value-identical ten-level binary tree. Octane measured 0.90x Preact on the 10-sample introduction run and 1.08x quick (2026-08-26); the ceiling isolates recursive no-change diff cost at the smaller shape."
+  },
+  {
+    "suite": "uibench",
+    "op": "cases",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: Octane and Preact must pass and publish all 96 desktop cases. Every endpoint is independently serialized against the model before timings are accepted."
+  },
+  {
+    "suite": "uibench",
+    "op": "elements_largest",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: the largest endpoint contains exactly 23,331 visible elements in Octane and Preact; missing work cannot look like a performance win."
+  },
+  {
+    "suite": "uibench",
+    "op": "identity_shared",
+    "target": "octane-tsrx",
+    "reference": "preact",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control: all 32,543 keyed survivors observed across the matrix retain DOM identity in Octane and Preact. A replacement is a correctness failure before this count is emitted."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_stable_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "Strong mode is an author assertion of render purity. Stable rows must reuse hook-shaped ordinary functions, local and computed callees, call-produced callees, constructors, tagged templates, and callback-bearing projections without relying on React's hook naming convention."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_insert_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Appending and prepending one Strong row may execute the seven author-asserted pure call shapes only for each inserted snapshot."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_snapshot_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Replacing one immutable Strong row snapshot must execute its seven assumed-pure projections and update that row's retained DOM node."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_argument_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Changing a captured argument must invalidate all 18 Strong rows and execute every assumed-pure call shape, proving the optimization remains conditioned on real inputs."
+  },
+  {
+    "suite": "template-call-memo",
+    "op": "assumed_pure_reorder_calls",
+    "target": "strong",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "Reordering index-independent Strong rows must preserve output and DOM identity without repeating any author-asserted pure call shape."
   }
 ]
