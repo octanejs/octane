@@ -78,6 +78,18 @@ describe('built Start server', () => {
 		const { response, html } = await get('/');
 		expect(response.status).toBe(200);
 		expect(response.headers.get('content-type')).toMatch(/^text\/html\b/);
+		const websiteData = Array.from(
+			html.matchAll(/<script(?=[^>]*\btype="application\/ld\+json")[^>]*>([\s\S]*?)<\/script>/g),
+		)
+			.map((match) => JSON.parse(match[1]!))
+			.find((data) => data['@type'] === 'WebSite');
+		expect(websiteData).toEqual({
+			'@context': 'https://schema.org',
+			'@type': 'WebSite',
+			name: 'Octane',
+			alternateName: ['OctaneJS', 'octanejs.dev'],
+			url: 'https://octanejs.dev/',
+		});
 		expect(html).toContain('<main');
 		expect(classCount(html, 'home')).toBeGreaterThan(0);
 		// The complete explorer is deterministic server markup: no-JS, hydration,
