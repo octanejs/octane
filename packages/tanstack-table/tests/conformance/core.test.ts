@@ -5,7 +5,12 @@
  * (markup render, stable api, rowModel) and adds the state-wiring matrix the
  * upstream suite doesn't cover.
  */
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeEach } from 'vitest';
+import * as OctaneRuntime from 'octane';
+import { compile } from 'octane/compiler';
+import * as InternalClientRuntime from 'octane/internal/client';
+import * as TanStackTable from '../../src/index.js';
 import { mount, nextPaint } from '../_helpers';
 import {
 	BasicTable,
@@ -18,6 +23,69 @@ import {
 	defaultData,
 	altData,
 } from '../_fixtures/table-basic.tsrx';
+import { StrongTableBoundaries } from '../_fixtures/strong-table-boundaries.tsrx';
+
+const STRONG_BOUNDARY_FIXTURE =
+	'packages/tanstack-table/tests/_fixtures/strong-table-boundaries.tsrx';
+const STRONG_SNAPSHOT_FIXTURE =
+	'packages/tanstack-table/tests/_fixtures/strong-table-snapshot.tsrx';
+
+type FixtureModule = Record<string, any>;
+
+// This evaluator is deliberately client-only and accepts only the named-import
+// and export shapes used by these two fixtures. Keeping the production compile
+// here avoids coupling this package's typecheck to Octane's broader SSR fixture
+// harness.
+function loadProductionFixture<T extends FixtureModule>(
+	path: string,
+	runtimeModules: Readonly<Record<string, FixtureModule>> = {},
+): T {
+	let { code } = compile(readFileSync(path, 'utf8'), path, {
+		mode: 'client',
+		hmr: false,
+		dev: false,
+	});
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane['"];?/g,
+		(_match: string, names: string) =>
+			`const {${names.replace(/\s+as\s+/g, ': ')}} = __octaneRuntime;`,
+	);
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/internal\/client['"];?/g,
+		(_match: string, names: string) =>
+			`const {${names.replace(/\s+as\s+/g, ': ')}} = __internalClientRuntime;`,
+	);
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"];?/g,
+		(match: string, names: string, request: string) =>
+			Object.hasOwn(runtimeModules, request)
+				? `const {${names.replace(/\s+as\s+/g, ': ')}} = __runtimeModules[${JSON.stringify(request)}];`
+				: match,
+	);
+	code = code.replace(
+		/export\s+(const|let|var)\s+(\w+)\s*=/g,
+		(_match: string, kind: string, name: string) => `${kind} ${name} = __exports.${name} =`,
+	);
+	if (/^\s*(?:import|export)\s/m.test(code)) {
+		throw new Error(`Production fixture ${path} contains an unsupported module shape.`);
+	}
+	const evaluate = new Function(
+		'__octaneRuntime',
+		'__internalClientRuntime',
+		'__runtimeModules',
+		'__exports',
+		`'use strict';\n${code}\n//# sourceURL=${path}?production-fixture\nreturn __exports;`,
+	);
+	return evaluate(OctaneRuntime, InternalClientRuntime, runtimeModules, {}) as T;
+}
+
+function productionStrongTableBoundaries() {
+	const snapshot = loadProductionFixture(STRONG_SNAPSHOT_FIXTURE);
+	return loadProductionFixture(STRONG_BOUNDARY_FIXTURE, {
+		'@octanejs/tanstack-table': TanStackTable,
+		'./strong-table-snapshot.tsrx': snapshot,
+	}).StrongTableBoundaries;
+}
 
 async function flush() {
 	for (let i = 0; i < 4; i++) {
@@ -178,6 +246,52 @@ describe('state wiring', () => {
 		r.click('#s-th-firstName');
 		await flush();
 		expect(renders.sorting).toBe(base + 1);
+		r.unmount();
+	});
+});
+
+describe('Strong snapshot boundaries for the pinned TanStack Table v9 adapter', () => {
+	it.each([
+		['development', StrongTableBoundaries],
+		['production', productionStrongTableBoundaries()],
+	])('updates inline map, keyed @for, and extracted consumers in %s', async (_mode, Component) => {
+		const r = mount(Component, {});
+		await flush();
+		const lists = ['strong-table-inline', 'strong-table-for', 'strong-table-extracted'];
+		const rows = (list: string) => r.findAll(`#${list} > .strong-table-snapshot`);
+		const rowIds = (list: string) => rows(list).map((row) => row.getAttribute('data-row'));
+		const selectedRow = (list: string) => {
+			const row = rows(list).find((candidate) => candidate.getAttribute('data-row') === '0');
+			if (row === undefined) throw new Error(`missing row 0 in ${list}`);
+			return row;
+		};
+		const original = lists.map(selectedRow);
+
+		for (const list of lists) {
+			expect(rowIds(list)).toEqual(['0', '1', '2']);
+			expect(selectedRow(list).getAttribute('data-selected')).toBe('0');
+			expect(selectedRow(list).getAttribute('data-sort')).toBe('none');
+		}
+
+		r.click('#strong-table-select');
+		await flush();
+		for (let index = 0; index < lists.length; index++) {
+			const row = selectedRow(lists[index]!);
+			expect(row).toBe(original[index]);
+			expect(row.getAttribute('data-selected')).toBe('1');
+			expect(row.textContent).toContain(':selected:none');
+		}
+
+		r.click('#strong-table-sort');
+		await flush();
+		for (let index = 0; index < lists.length; index++) {
+			const list = lists[index]!;
+			const row = selectedRow(list);
+			expect(rowIds(list)).toEqual(['1', '2', '0']);
+			expect(row).toBe(original[index]);
+			expect(row.getAttribute('data-selected')).toBe('1');
+			expect(row.getAttribute('data-sort')).toBe('desc');
+		}
 		r.unmount();
 	});
 });

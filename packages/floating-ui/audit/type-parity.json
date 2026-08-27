@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "pristineInventory": "packages/floating-ui/audit/pristine-types.json",
+  "adaptedInventory": "packages/floating-ui/audit/adapted-types.json",
+  "lanes": {
+    "pristine": {
+      "compiler": "typescript@5.4.2",
+      "project": "packages/floating-ui/typetests/tsconfig.pristine.json"
+    },
+    "adapted": {
+      "compiler": "tsrx-tsc",
+      "project": "packages/floating-ui/typetests/tsconfig.adapted.json"
+    }
+  },
+  "mappings": [
+    {
+      "pristine": "packages/floating-ui/upstream/packages/react/test/index.test-d.tsx",
+      "adapted": "packages/floating-ui/tests/upstream/react/index.test-d.tsx",
+      "pristineSha256": "3ef728075100677da49cc5e7a572ff7c4df4aed58ebbc7b2a9f47af504c2209a",
+      "adaptedSha256": "c1fb8158a88493d839136eeecb7bb6995b275414712a110247807dd0427aff25"
+    },
+    {
+      "pristine": "packages/floating-ui/upstream/packages/react-dom/test/index.test-d.tsx",
+      "adapted": "packages/floating-ui/tests/upstream/react-dom/index.test-d.tsx",
+      "pristineSha256": "1e049b30a4e50ba6a1bd8da2243e0f71a5d8405aaccab6fbe524e7fcee230830",
+      "adaptedSha256": "f641911340e4bdae6b820af066b804437adc9d7074940c6dd5205701e9a385a3"
+    }
+  ],
+  "permittedTransformations": [
+    "React imports and JSX runtime become Octane imports and JSX runtime.",
+    "Relative upstream package imports become the @octanejs/floating-ui source entry point.",
+    "React forwardRef/ref-channel types become Octane ref-as-prop types.",
+    "Octane useRef includes null explicitly in the generic argument.",
+    "The combined Octane package records the @floating-ui/react-dom-only reference narrowing as an expected type divergence."
+  ]
+}

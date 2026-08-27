@@ -193,6 +193,7 @@ internally, get their own baseline and guard namespace.
 | `chat-stream` | chat-stream | Octane + reference frameworks | deterministic token streaming + conversation switches |
 | `streamdown-hosted` | streamdown-hosted | React Streamdown + React-hosted Octane binding | React-hosted compatibility boundary: static mount/replace, fine/coarse Markdown streaming, semantic DOM parity, lifecycle diagnostic, and production bytes |
 | `svg-dashboard` | svg-dashboard | octane-tsrx, react, solid, svelte | hand-rolled SVG observability dashboard: path-d/transform churn, keyed reconcile inside `<svg>`, foreignObject labels, portal tooltip overlay, createElement icon de-opt; byte-exact Node-replay + cross-flavor DOM-parity gates |
+| `uibench` | uibench | octane-tsrx, react, preact, solid | fresh implementation of UIbench's 96-case desktop matrix: table/sparse-style updates, flat and nested keyed tree transforms, historical worst cases, large no-change diffs, and semantic/identity gates |
 | `dbmon` | dbmon | Octane + reference frameworks | per-cell update churn |
 | `recursive-context` | recursive-context | Octane + reference frameworks | context fan-out |
 | `spa-navigation` | spa-navigation | octane-tsrx, octane-jsx, react, solid, vue-vapor | full-page routed-subtree teardown/mount with shell/layout identity and production-work gates |
@@ -215,6 +216,7 @@ internally, get their own baseline and guard namespace.
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
 | `router-dispatch` | router-dispatch | none (Node-only) | app-core static, wrong-method, and dynamic matching across 1,000-route tables |
+| `vite-client-assets` | vite-client-assets | none (Node-only) | route asset mapping across 100 and 1,000 entries sharing a 500-chunk manifest graph, plus a shallow control |
 | `effectful-list` | effectful-list | Octane + reference frameworks | effect/ref cleanup churn |
 | `activity` | activity | none (builds) | same-source Octane/React Activity lifecycle, hidden/nested work, retained state/effects/DOM, cold-vs-used ordinary-ref controls, and optional-runtime bundle reachability |
 | `list-clear` | list-clear | Octane-only | keyed-list bulk clear by parent shape — the only coverage of the shared-parent path |

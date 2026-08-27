@@ -5,11 +5,12 @@
 // This replaces the per-package scripts/run-pristine-upstream.mjs wrappers,
 // which were byte-identical apart from these two strings.
 import { resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 export const runners = new Map([
 	['alien-signals', { module: './alien-signals-pristine-runtime.mjs', label: 'Alien Signals' }],
 	['draggable', { module: './react-draggable-pristine-runtime.mjs', label: 'react-draggable' }],
+	['floating-ui', { module: './floating-ui-pristine-runtime.mjs', label: '@floating-ui/react' }],
 	['livestore', { module: './livestore-pristine-runtime.mjs', label: 'LiveStore' }],
 	[
 		'monaco-editor',

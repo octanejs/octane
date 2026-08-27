@@ -138,8 +138,9 @@ export interface OctaneRspackLoaderOptions {
 	/** Emit client profiling metadata and enable the profiling runtime. Default `false`. */
 	profile?: boolean;
 	/**
-	 * Enable Strong-mode compiler rules for project-owned modules. Dependencies
-	 * remain compatible unless their own module begins with `"use strong"`.
+	 * Assert pure immutable-snapshot renders and enable Strong-mode compiler
+	 * checks for project-owned modules. Dependencies remain compatible unless
+	 * their own module begins with `"use strong"`.
 	 * @default false
 	 */
 	strong?: boolean;

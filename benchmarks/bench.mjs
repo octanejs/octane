@@ -191,6 +191,22 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Fresh implementation of localvoid/UIbench's complete 96-case desktop
+		// matrix: tables, sparse animation updates, keyed flat/deep tree
+		// transforms, historical worst cases, and large no-change diffs. Every
+		// endpoint and surviving node identity is correctness-gated before timing.
+		name: 'uibench',
+		cwd: 'uibench',
+		servers: [
+			{ filter: 'octane-tsrx-uibench-bench', port: 5315 },
+			{ filter: 'react-uibench-bench', port: 5316 },
+			{ filter: 'solid-uibench-bench', port: 5317 },
+			{ filter: 'preact-uibench-bench', port: 5318 },
+		],
+		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		name: 'dbmon',
 		cwd: 'dbmon',
 		servers: [
@@ -367,6 +383,15 @@ const SUITES = [
 		// and dynamic route tables with cost normalized per candidate route.
 		name: 'router-dispatch',
 		cwd: 'router-dispatch',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Node-only Vite manifest traversal across many routes that converge on
+		// one deep shared chunk graph, plus a shallow-graph control.
+		name: 'vite-client-assets',
+		cwd: 'vite-client-assets',
 		servers: [],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -763,6 +788,15 @@ const SUITES = [
 		cwd: 'tsrx-component-graph',
 		servers: [],
 		iter: { normal: 8, quick: 4 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Optional TypeScript text-inference scaling: repeated warm snapshots of
+		// one target with either 32 or 20,000 unrelated configured roots.
+		name: 'text-type-roots',
+		cwd: 'text-type-roots',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
