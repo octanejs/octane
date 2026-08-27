@@ -19,10 +19,10 @@ a cached read, memoized on the **selector's identity**, wrapped in
 `useSyncExternalStore`. That is the shape a selector argument's identity
 actually matters in — a selector reallocated on every render throws the cache
 away, so each subscriber redoes a selection whose inputs never moved. Solid,
-Inferno evaluates the same selector during its native class render and uses a
-subscription state update to schedule store writes. Solid, Svelte, and Vue have
-no render pass to redo, so their subscribers express the same thing as a
-`createMemo` / `$derived` / `computed` over a snapshot signal.
+Inferno caches the selected total in native class state and recomputes it only
+from its store subscription. Solid, Svelte, and Vue have no render pass to redo,
+so their subscribers express the same thing as a `createMemo` / `$derived` /
+`computed` over a snapshot signal.
 
 The store publishes an **immutable snapshot** whose identity changes only on a
 write, which is what lets a selection be reused across renders at all. The

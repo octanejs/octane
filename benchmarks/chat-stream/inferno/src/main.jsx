@@ -1,15 +1,19 @@
-import { Component, render } from 'inferno';
+import { Component, render, rerender } from 'inferno';
 import { initialConversations, nextReply, userMessage, segText } from './data.js';
 
 // Native Inferno streaming-chat fixture — shared DOM/API contract with the sibling
 // apps (see ../../README.md). Same immutable streaming model: the streaming
 // message is replaced with an advanced `done` per `window.__pump(k)`; state
-// class updates commit synchronously so the harness's timed window captures the work.
+// class updates are explicitly drained so the harness's timed window captures the work.
 
 // Keep benchmark instrumentation outside the component body so the harness
 // receives stable entry points into the current class instance.
 function exposeBenchmarkHook(name, handler) {
-	window[name] = handler;
+	window[name] = (...args) => {
+		const result = handler(...args);
+		rerender();
+		return result;
+	};
 }
 
 class ChatApp extends Component {

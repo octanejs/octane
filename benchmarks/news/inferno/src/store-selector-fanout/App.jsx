@@ -24,7 +24,7 @@ class StoreSubscriber extends Component {
 	}
 
 	render() {
-		const total = selectTotal(this.store.getSnapshot().values);
+		const { total } = this.state;
 		markSubscriberRender();
 		return (
 			<output data-subscriber-index={this.props.index} data-generation={this.props.generation}>
