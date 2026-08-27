@@ -99,6 +99,7 @@ export const BENCHMARK_SUITES = [
 	'template-call-memo',
 	'compiler-throughput',
 	'tsrx-component-graph',
+	'text-type-roots',
 	'tsrx-nesting-diagnostics',
 	'bundle-size',
 	'bundle-reachability',

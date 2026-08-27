@@ -8,9 +8,9 @@ roots changes.
 The synthetic roots intentionally do not exist. TypeScript still presents them
 to the language-service host, which isolates root membership and root-list
 bookkeeping without adding parse or bind work to the timed interval. Each sample
-performs 100 cached snapshots and reports per-snapshot latency. The harness
-checks stable fact identity, the inferred child, and a cross-variant fact
-checksum before accepting timing samples.
+times 500 cached production snapshots and reports per-snapshot latency. The
+harness checks the inferred child and a cross-variant fact checksum before
+sampling, then checks the final fact identity outside the measured interval.
 
 ```bash
 node benchmarks/bench.mjs --quick --ratios text-type-roots

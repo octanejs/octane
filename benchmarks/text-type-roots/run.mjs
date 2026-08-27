@@ -16,7 +16,7 @@ const { createTextTypeProject } = await import(
 
 const SMALL_ROOTS = 32;
 const LARGE_ROOTS = 20_000;
-const SNAPSHOTS_PER_SAMPLE = 100;
+const SNAPSHOTS_PER_SAMPLE = 500;
 const TARGET_SOURCE =
 	'export function Target(props: { label: string }) { return <p>{props.label}</p>; }\n';
 const iterations = Number.parseInt(process.argv[2] ?? '9', 10);
@@ -96,15 +96,14 @@ function validateFixture(fixture) {
 }
 
 function sampleFixture(fixture) {
+	let facts;
 	const started = performance.now();
 	for (let index = 0; index < SNAPSHOTS_PER_SAMPLE; index++) {
-		assert.strictEqual(
-			fixture.project.snapshot(fixture.target),
-			fixture.facts,
-			`${fixture.name} failed to reuse stable facts`,
-		);
+		facts = fixture.project.snapshot(fixture.target);
 	}
-	return (performance.now() - started) / SNAPSHOTS_PER_SAMPLE;
+	const elapsed = performance.now() - started;
+	assert.strictEqual(facts, fixture.facts, `${fixture.name} failed to reuse stable facts`);
+	return elapsed / SNAPSHOTS_PER_SAMPLE;
 }
 
 let failure;
