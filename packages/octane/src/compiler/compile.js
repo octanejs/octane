@@ -4936,25 +4936,52 @@ function classifySameModuleWarmPotential(ctx) {
 	// Propagate async reachability through forward references and recursive
 	// same-module chains. An all-synchronous cycle stays false; one opaque or
 	// async descendant makes every component that can reach it conservative.
-	let changed = true;
-	while (changed) {
-		changed = false;
-		for (const [, info] of ctx.componentInfo) {
-			if (info.warmPotential) continue;
-			for (const dependency of info.warmDependencies) {
-				const target = ctx.componentInfo.get(tagBindingName(dependency));
-				if (
-					target?.warmPotential !== false ||
-					!warmCallsiteOwnsRequiredProps(
-						target,
-						dependency.openingElement?.attributes ?? dependency.attributes,
-					)
-				) {
-					info.warmPotential = true;
-					changed = true;
-					break;
-				}
+	// Resolve seeds and declaration-order-friendly chains first. All-synchronous
+	// graphs return before reverse-graph allocation, and already-linear graphs
+	// leave that graph empty.
+	const queue = [];
+	for (const [, info] of ctx.componentInfo) {
+		if (info.warmPotential) {
+			queue.push(info);
+			continue;
+		}
+		for (const dependency of info.warmDependencies) {
+			const target = ctx.componentInfo.get(tagBindingName(dependency));
+			if (
+				target?.warmPotential !== false ||
+				!warmCallsiteOwnsRequiredProps(
+					target,
+					dependency.openingElement?.attributes ?? dependency.attributes,
+				)
+			) {
+				info.warmPotential = true;
+				queue.push(info);
+				break;
 			}
+		}
+	}
+	if (queue.length === 0) return;
+
+	const dependents = new Map();
+	for (const [, info] of ctx.componentInfo) {
+		if (info.warmPotential) continue;
+		for (const dependency of info.warmDependencies) {
+			const target = ctx.componentInfo.get(tagBindingName(dependency));
+			if (target === undefined) continue;
+			let targetDependents = dependents.get(target);
+			if (targetDependents === undefined) dependents.set(target, (targetDependents = []));
+			targetDependents.push(info);
+		}
+	}
+	if (dependents.size === 0) return;
+
+	for (let index = 0; index < queue.length; index++) {
+		const targetDependents = dependents.get(queue[index]);
+		if (targetDependents === undefined) continue;
+		for (const info of targetDependents) {
+			if (info.warmPotential) continue;
+			info.warmPotential = true;
+			queue.push(info);
 		}
 	}
 }

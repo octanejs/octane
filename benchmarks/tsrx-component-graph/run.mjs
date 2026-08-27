@@ -19,33 +19,71 @@ if (!Number.isSafeInteger(iterations) || iterations < 1) {
 	throw new Error('TSrX component graph iterations must be a positive integer');
 }
 
-function sourceFor(reverse) {
+function sourceFor(reverse, opaqueLeaf) {
 	const declarations = Array.from({ length: COMPONENTS }, (_, index) => {
-		const body = index === COMPONENTS - 1 ? '{live as string}' : `<Component${index + 1} />`;
+		const body =
+			index === COMPONENTS - 1
+				? opaqueLeaf
+					? '<Opaque />'
+					: '{live as string}'
+				: `<Component${index + 1} />`;
 		return `${index === 0 ? 'export ' : ''}function Component${index}() @{ <div>${body}</div> }`;
 	});
 	if (reverse) declarations.reverse();
-	return `import { live } from './live';\n${declarations.join('\n')}`;
+	const imported = opaqueLeaf ? 'Opaque' : 'live';
+	return `import { ${imported} } from './live';\n${declarations.join('\n')}`;
 }
 
 const variants = [
-	{ name: 'dependent-first', source: sourceFor(false), samples: [] },
-	{ name: 'dependency-first', source: sourceFor(true), samples: [] },
+	{ name: 'dependent-first', source: sourceFor(false, false), samples: [] },
+	{ name: 'dependency-first', source: sourceFor(true, false), samples: [] },
+	{ name: 'warm-dependent-first', source: sourceFor(false, true), samples: [] },
+	{ name: 'warm-dependency-first', source: sourceFor(true, true), samples: [] },
 ];
+
+function warmPlanCount(code) {
+	return code.match(/\b__warm:\s*\(/g)?.length ?? 0;
+}
+
+function assertCycleControls() {
+	const syncCycle = compile(
+		'export function CycleA() @{ <CycleB /> }\nfunction CycleB() @{ <CycleA /> }',
+		'synchronous-cycle.tsrx',
+		options,
+	);
+	assert.equal(syncCycle.diagnostics.length, 0, 'synchronous cycle emitted compiler diagnostics');
+	assert.equal(warmPlanCount(syncCycle.code), 0, 'synchronous cycle gained a warm plan');
+
+	const seededCycle = compile(
+		"import { Opaque } from './opaque';\nexport function CycleA() @{ <><CycleB /><Opaque /></> }\nfunction CycleB() @{ <CycleA /> }",
+		'opaque-cycle.tsrx',
+		options,
+	);
+	assert.equal(seededCycle.diagnostics.length, 0, 'opaque cycle emitted compiler diagnostics');
+	assert.equal(warmPlanCount(seededCycle.code), 2, 'opaque cycle lost warm reachability');
+}
 
 function compileVariant(variant) {
 	const started = performance.now();
 	const result = compile(variant.source, `${variant.name}.tsrx`, options);
 	const elapsed = performance.now() - started;
 	const witnesses = result.code.match(/const __memoDep[\w$]* = live;/g)?.length ?? 0;
+	const warmPlans = warmPlanCount(result.code);
 	const hoistedDeclarations =
 		result.code.match(/^(?:export )?function Component\d+\(/gm)?.length ?? 0;
-	const expectedHoistedDeclarations = variant.name === 'dependent-first' ? COMPONENTS - 1 : 0;
+	const dependentFirst = variant.name.endsWith('dependent-first');
+	const warm = variant.name.startsWith('warm-');
+	const expectedHoistedDeclarations = dependentFirst ? COMPONENTS - 1 : 0;
 	assert.equal(result.diagnostics.length, 0, `${variant.name} emitted compiler diagnostics`);
 	assert.equal(
 		witnesses,
-		COMPONENTS - 1,
+		warm ? 0 : COMPONENTS - 1,
 		`${variant.name} did not preserve every transitive live-binding witness`,
+	);
+	assert.equal(
+		warmPlans,
+		warm ? COMPONENTS : 0,
+		`${variant.name} changed same-module warm-plan reachability`,
 	);
 	assert.equal(
 		hoistedDeclarations,
@@ -56,6 +94,7 @@ function compileVariant(variant) {
 		components: COMPONENTS,
 		callEdges: COMPONENTS - 1,
 		liveBindingWitnesses: witnesses,
+		warmPlans,
 		hoistedDeclarations,
 		sourceBytes: Buffer.byteLength(variant.source),
 		outputBytes: Buffer.byteLength(result.code),
@@ -68,6 +107,7 @@ let failure;
 const rows = [];
 
 try {
+	assertCycleControls();
 	for (let warmup = 0; warmup < 2; warmup++) {
 		for (const variant of warmup % 2 === 0 ? variants : variants.toReversed()) {
 			compileVariant(variant);
