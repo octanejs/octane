@@ -937,6 +937,29 @@ export default interface ErasedShape { value: string }
 		}
 	});
 
+	it('keeps mixed conditional-return reference positions conservatively classified', () => {
+		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
+		const source =
+			"import { lazy as defer, memo as cache } from 'octane';\n" +
+			'export function Allowed(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'export const AllowedMemo = cache(Allowed);\n' +
+			'const AllowedLazy = defer(Allowed);\n' +
+			'export function Direct(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'export function PropValue(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'export function Receiver(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'export function Ambiguous(p) { if (p.flip) return <main>yes</main>; return <aside>no</aside>; }\n' +
+			'function shadow(Ambiguous) { return Ambiguous; }\n' +
+			'function Sink(p) { return <div>{p.item}</div>; }\n' +
+			'export function Host(p) { const called = Direct(p); const kind = Receiver.kind; return <section data-kind={kind}><Allowed flip={p.flip} /><AllowedLazy flip={p.flip} /><Sink item={PropValue} />{called}</section>; }\n';
+
+		const result = compiler.transform(source, '/project/src/Mixed.tsrx', {
+			collectVoidComponentExports: true,
+		});
+
+		expect(result?.voidComponentExports).toEqual(['Allowed', 'AllowedMemo']);
+		expect(result?.code.match(/_\$ifBlock\(/g)).toHaveLength(1);
+	});
+
 	it('lowers statically compilable ErrorBoundary JSX without retaining the builtin', () => {
 		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
 		const source = `

@@ -3120,6 +3120,30 @@
     "note": "A 2,400-component live-import chain declared root-first must stay within 25% of the same graph declared leaf-first. Both orders verify every transitive witness and alternate measurement order; whole-module fixed-point rescans were about 2x slower."
   },
   {
+    "suite": "tsrx-jsx-return-branches",
+    "op": "client_compile_per_100_components",
+    "target": "eligible-480",
+    "reference": "eligible-120",
+    "maxRatio": 1.5,
+    "note": "Same-process production client compilation with every conditional-return lowering counted. Exact main measured 2.89x per component from 120 to 480 components; one module-scoped use index measured 1.01x."
+  },
+  {
+    "suite": "tsrx-jsx-return-branches",
+    "op": "server_compile_per_100_components",
+    "target": "eligible-480",
+    "reference": "eligible-120",
+    "maxRatio": 1.5,
+    "note": "Same-process production server compilation with every SSR control lowering counted. Exact main measured 3.23x per component from 120 to 480 components; one module-scoped use index measured 0.92x."
+  },
+  {
+    "suite": "tsrx-jsx-return-branches",
+    "op": "bundler_classify",
+    "target": "eligible-480",
+    "reference": "ineligible-480",
+    "maxRatio": 1.5,
+    "note": "Same-sized bundler classification with exact void-export controls. Exact main made the eligible module 5.53x slower than the parse/branch-analysis control; one module-scoped use index measured 1.03x."
+  },
+  {
     "suite": "text-type-roots",
     "op": "snapshot",
     "target": "large-root",

@@ -791,6 +791,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Conditional JSX return analysis at two component counts plus a
+		// same-sized structurally ineligible parse/print control.
+		name: 'tsrx-jsx-return-branches',
+		cwd: 'tsrx-jsx-return-branches',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Optional TypeScript text-inference scaling: repeated warm snapshots of
 		// one target with either 32 or 20,000 unrelated configured roots.
 		name: 'text-type-roots',

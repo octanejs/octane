@@ -17,7 +17,7 @@ import { parseModule } from '@tsrx/core';
 import {
 	compile,
 	compileForBundler,
-	hasLowerableJsxReturnBranches,
+	createJsxReturnBranchClassifier,
 	hasOnlyLowerableNullishExits,
 	isVoidJsxCodeBlockFunction,
 } from './compile.js';
@@ -254,13 +254,14 @@ export function findVoidComponentExports(source, id) {
 	}
 
 	const voidBindings = new Set();
+	const hasLowerableJsxReturnBranches = createJsxReturnBranchClassifier(ast.body || []);
 	// Mirrors the compile-time lowering decisions exactly (nullish-guard @{}
 	// bodies AND React-style conditional JSX returns), so cross-module call-site
 	// classification agrees with what each module actually compiled to.
 	const isVoidFunction = (node) =>
 		isVoidJsxCodeBlockFunction(node) ||
 		hasOnlyLowerableNullishExits(node) ||
-		hasLowerableJsxReturnBranches(node, ast.body || []);
+		hasLowerableJsxReturnBranches(node);
 	for (const declaration of declarations) {
 		if (declaration.type === 'FunctionDeclaration' && declaration.id?.name) {
 			if (isVoidFunction(declaration)) voidBindings.add(declaration.id.name);

@@ -28012,16 +28012,17 @@ function collectOctaneComponentWrapperLocals(moduleBody) {
 	return names;
 }
 
-// Whether the module references `name` only in component positions: JSX tags
-// (JSXIdentifier / TSRX Element `id`), export clauses, or a bare argument to
-// octane's `memo`/`lazy`. Any other Identifier reference — a direct call, a
-// prop value, a member-expression object — means callers rely on the value ABI.
-function moduleOnlyRendersComponent(moduleBody, name) {
+// Identifier names referenced outside component positions. JSX tags
+// (JSXIdentifier / TSRX Element `id`), export clauses, and bare arguments to
+// octane's `memo`/`lazy` stay excluded. Everything collected here — a direct
+// call, a prop value, a member-expression object — means callers may rely on
+// that binding's value ABI.
+function collectDisqualifyingComponentUses(moduleBody) {
 	const wrapperLocals = collectOctaneComponentWrapperLocals(moduleBody);
-	let ok = true;
+	const names = new Set();
 	const seen = new WeakSet();
 	const walk = (value) => {
-		if (!ok || value == null || typeof value !== 'object') return;
+		if (value == null || typeof value !== 'object') return;
 		if (Array.isArray(value)) {
 			for (const child of value) walk(child);
 			return;
@@ -28030,7 +28031,7 @@ function moduleOnlyRendersComponent(moduleBody, name) {
 		seen.add(value);
 		const t = value.type;
 		if (t === 'Identifier') {
-			if (value.name === name) ok = false;
+			names.add(value.name);
 			return;
 		}
 		if (t === 'ExportSpecifier') return; // export { Name } / { Name as default }
@@ -28075,12 +28076,32 @@ function moduleOnlyRendersComponent(moduleBody, name) {
 		}
 	};
 	walk(moduleBody);
-	return ok;
+	return names;
+}
+
+// One short-lived analysis record belongs to one module pass. Its expensive
+// facts initialize only after a candidate reaches the gate that needs them.
+function createJsxReturnBranchModuleAnalysis() {
+	return { moduleBindings: null, disqualifyingComponentUses: null };
+}
+
+function moduleBindingsForJsxReturnBranches(moduleBody, moduleAnalysis) {
+	if (moduleAnalysis === null) return collectModuleLevelBindings(moduleBody);
+	return (moduleAnalysis.moduleBindings ??= collectModuleLevelBindings(moduleBody));
+}
+
+function moduleOnlyRendersComponent(moduleBody, name, moduleAnalysis) {
+	const disqualifyingUses =
+		moduleAnalysis === null
+			? collectDisqualifyingComponentUses(moduleBody)
+			: (moduleAnalysis.disqualifyingComponentUses ??=
+					collectDisqualifyingComponentUses(moduleBody));
+	return !disqualifyingUses.has(name);
 }
 
 // Rebuild one candidate function as a JSXCodeBlock (setup + render), or return
 // null when it must keep the generic value ABI.
-function lowerJsxReturnBranchesOf(node, moduleBody) {
+function lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis = null) {
 	if (
 		node == null ||
 		(node.type !== 'FunctionDeclaration' && node.type !== 'FunctionExpression') ||
@@ -28116,7 +28137,7 @@ function lowerJsxReturnBranchesOf(node, moduleBody) {
 			if (root.name === node.id.name) return null;
 			// Body-local component bindings are runtime-chosen values; only
 			// module-level components have the stable identity the arm needs.
-			moduleBindings ??= collectModuleLevelBindings(moduleBody);
+			moduleBindings ??= moduleBindingsForJsxReturnBranches(moduleBody, moduleAnalysis);
 			if (!moduleBindings.has(root.name)) return null;
 		}
 		for (let j = i + 1; j < state.roots.length; j++) {
@@ -28126,7 +28147,7 @@ function lowerJsxReturnBranchesOf(node, moduleBody) {
 	const list = result.list;
 	const render = list.length > 0 ? list[list.length - 1] : null;
 	if (render == null || !isJsxNode(render)) return null;
-	if (!moduleOnlyRendersComponent(moduleBody, node.id.name)) return null;
+	if (!moduleOnlyRendersComponent(moduleBody, node.id.name, moduleAnalysis)) return null;
 	return {
 		...node,
 		body: { ...node.body, type: 'JSXCodeBlock', body: list.slice(0, -1), render },
@@ -28138,8 +28159,15 @@ export function hasLowerableJsxReturnBranches(node, moduleBody) {
 	return lowerJsxReturnBranchesOf(node, moduleBody) !== null;
 }
 
+/** Bundler classifier that shares one lazy analysis across a module. */
+export function createJsxReturnBranchClassifier(moduleBody) {
+	const moduleAnalysis = createJsxReturnBranchModuleAnalysis();
+	return (node) => lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis) !== null;
+}
+
 function lowerJsxReturnBranchComponents(ast) {
 	const statements = ast.body || [];
+	const moduleAnalysis = createJsxReturnBranchModuleAnalysis();
 	let out = null;
 	for (let i = 0; i < statements.length; i++) {
 		const statement = statements[i];
@@ -28147,7 +28175,7 @@ function lowerJsxReturnBranchComponents(ast) {
 		const isExport =
 			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration';
 		const node = isExport ? statement.declaration : statement;
-		const lowered = lowerJsxReturnBranchesOf(node, statements);
+		const lowered = lowerJsxReturnBranchesOf(node, statements, moduleAnalysis);
 		if (lowered !== null) replacement = isExport ? { ...statement, declaration: lowered } : lowered;
 		if (out === null && replacement !== statement) out = statements.slice(0, i);
 		if (out !== null) out.push(replacement);
