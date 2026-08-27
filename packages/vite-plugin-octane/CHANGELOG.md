@@ -1,5 +1,24 @@
 # @octanejs/vite-plugin
 
+## 0.1.48
+
+### Patch Changes
+
+- bba4cd0: Cache small complete CSS results while mapping routes through a shared Vite
+  manifest graph. Expose the accompanying client-asset benchmark through the
+  Octane MCP benchmark tool.
+- Updated dependencies [3ca30fc]
+- Updated dependencies [efdc8cb]
+- Updated dependencies [922df8c]
+- Updated dependencies [9dda682]
+- Updated dependencies [8a8afd8]
+- Updated dependencies [37a8ca1]
+- Updated dependencies [c84edbb]
+- Updated dependencies [d5175ca]
+- Updated dependencies [4a4996e]
+  - octane@0.1.48
+  - @octanejs/app-core@0.0.44
+
 ## 0.1.47
 
 ### Patch Changes
