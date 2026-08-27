@@ -9,6 +9,7 @@ const target = document.getElementById('main');
 if (!target) throw new Error('missing #main root');
 
 let dispose = null;
+let preparedCase = null;
 
 window.__mount = () => {
 	dispose = render(() => <App />, target);
@@ -18,16 +19,26 @@ window.__mount = () => {
 window.__reset = () => {
 	if (dispose !== null) dispose();
 	dispose = null;
+	preparedCase = null;
 	clearSetter();
 	while (target.firstChild) target.removeChild(target.firstChild);
 };
 
 window.__prepare = (name) => {
-	commit(caseByName(name).before);
+	const entry = caseByName(name);
+	// Solid's reconcile owns its input; prepare private endpoints outside the timer.
+	preparedCase = {
+		name,
+		after: structuredClone(entry.after),
+	};
+	commit(structuredClone(entry.before));
 	flush();
 };
 window.__run = (name) => {
-	commit(caseByName(name).after);
+	const after =
+		preparedCase?.name === name ? preparedCase.after : structuredClone(caseByName(name).after);
+	preparedCase = null;
+	commit(after);
 	flush();
 };
 window.__ready = true;

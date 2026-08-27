@@ -37,10 +37,12 @@ are fresh Octane repository code under this repository's license.
 
 ## Correctness boundary
 
-Timing starts only after every case passes three gates:
+Timing starts only after every case passes three gates across two complete
+matrix passes, revisiting every `before`/`after` transition after all other
+cases have run:
 
-1. The live DOM is serialized into a semantic table/animation/tree signature
-   and compared with the deterministic model endpoint.
+1. The live DOM is serialized at both endpoints into a semantic
+   table/animation/tree signature and compared with the deterministic model.
 2. Every keyed row, box, and tree node that survives a transition must retain
    its DOM identity.
 3. Octane, React, Preact, and Solid must report the same signatures and element
@@ -48,8 +50,9 @@ Timing starts only after every case passes three gates:
    in the oracle and cannot make a target pass with missing visible output.
 
 `cases`, `elements_largest`, and `identity_shared` are emitted as deterministic
-operations for exact same-run ratio guards. A gate failure writes a failed JSON
-payload and exits non-zero.
+operations for exact same-run ratio guards. A gate failure or browser error
+raised during setup, warmup, or timing writes a failed JSON payload and exits
+non-zero.
 
 ## Measurement
 
@@ -65,8 +68,10 @@ fixture uses React 19, `flushSync`, and the repository's production React
 Compiler integration. The Preact fixture uses native Preact hooks and keyed
 JSX; its queued microtask commit is awaited inside the timing window. The Solid
 fixture uses the repository's pinned Solid 2 beta production renderer, keyed
-`createStore`/`reconcile`, and `flush()`. The Octane fixture uses the production
-`.tsrx` compiler and `flushSync`. All four previews send COOP/COEP headers, and
+`createStore`/`reconcile`, and `flush()`; private copies of both Solid endpoints
+are prepared outside the timer so reconciliation cannot mutate shared workload
+snapshots. The Octane fixture uses the production `.tsrx` compiler and
+`flushSync`. All four previews send COOP/COEP headers, and
 the harness rejects a page that is not cross-origin isolated, so sub-millisecond
 cases retain the browser's high-resolution timer rather than collapsing to 0.1
 ms buckets.

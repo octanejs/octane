@@ -3,8 +3,8 @@
 // implementations because upstream does not ship usable license text.
 //
 // Correctness is a precondition for every timing:
-//   - all 96 case endpoints are serialized from the live DOM and compared with
-//     the independent shared model;
+//   - every before/after endpoint is serialized from the live DOM and compared
+//     with the independent shared model across two complete matrix passes;
 //   - keyed survivors must retain DOM identity for every transition;
 //   - Octane, React, Preact, and Solid must render the same semantic signatures and
 //     element counts (framework marker comments are deliberately outside the
@@ -23,6 +23,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { CASES, elementCount, modelSignature } from './shared/workloads.js';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 import { deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
@@ -57,8 +58,14 @@ const EXPECTED = new Map(
 	CASES.map((entry) => [
 		entry.name,
 		{
-			signature: modelSignature(entry.after),
-			elements: elementCount(entry.after),
+			before: {
+				signature: modelSignature(entry.before),
+				elements: elementCount(entry.before),
+			},
+			after: {
+				signature: modelSignature(entry.after),
+				elements: elementCount(entry.after),
+			},
 		},
 	]),
 );
@@ -137,34 +144,55 @@ async function gateTarget(page) {
 			};
 
 			const results = [];
-			for (const name of names) {
-				const prepared = window.__prepare(name);
-				if (prepared && typeof prepared.then === 'function') await prepared;
-				const before = new Map(semanticItems().map((element) => [element.dataset.id, element]));
-				const committed = window.__run(name);
-				if (committed && typeof committed.then === 'function') await committed;
-				const after = semanticItems();
-				let identityShared = 0;
-				let identityBroken = 0;
-				for (const element of after) {
-					const previous = before.get(element.dataset.id);
-					if (previous === undefined) continue;
-					identityShared++;
-					if (previous !== element) identityBroken++;
+			for (let cycle = 0; cycle < 2; cycle++) {
+				for (const name of names) {
+					const prepared = window.__prepare(name);
+					if (prepared && typeof prepared.then === 'function') await prepared;
+					const beforeItems = semanticItems();
+					const before = new Map(beforeItems.map((element) => [element.dataset.id, element]));
+					const beforeView = root.firstElementChild;
+					const beforeResult = {
+						signature: signature(),
+						elements: beforeView === null ? 0 : 1 + beforeView.querySelectorAll('*').length,
+					};
+
+					const committed = window.__run(name);
+					if (committed && typeof committed.then === 'function') await committed;
+					const afterItems = semanticItems();
+					let identityShared = 0;
+					let identityBroken = 0;
+					for (const element of afterItems) {
+						const previous = before.get(element.dataset.id);
+						if (previous === undefined) continue;
+						identityShared++;
+						if (previous !== element) identityBroken++;
+					}
+					const afterView = root.firstElementChild;
+					results.push({
+						name,
+						cycle,
+						before: beforeResult,
+						after: {
+							signature: signature(),
+							elements: afterView === null ? 0 : 1 + afterView.querySelectorAll('*').length,
+						},
+						identityShared,
+						identityBroken,
+					});
 				}
-				const view = root.firstElementChild;
-				results.push({
-					name,
-					signature: signature(),
-					elements: view === null ? 0 : 1 + view.querySelectorAll('*').length,
-					identityShared,
-					identityBroken,
-				});
 			}
 			return results;
 		},
 		CASES.map((entry) => entry.name),
 	);
+}
+
+async function throwBrowserErrors(page, browserErrors, targetName, phase) {
+	// Let pageerror/console events queued by the preceding evaluation reach Playwright.
+	await page.evaluate(() => new Promise((resolvePromise) => setTimeout(resolvePromise, 0)));
+	if (browserErrors.length > 0) {
+		throw new Error(`${targetName} browser errors during ${phase}: ${browserErrors.join(' | ')}`);
+	}
 }
 
 async function timeCase(page, name) {
@@ -211,7 +239,11 @@ async function timeCase(page, name) {
 	);
 }
 
-async function runTarget(browser, target) {
+export async function runTarget(
+	browser,
+	target,
+	{ gateTargetFn = gateTarget, timeCaseFn = timeCase } = {},
+) {
 	const context = await browser.newContext();
 	const page = await context.newPage();
 	const browserErrors = [];
@@ -229,35 +261,38 @@ async function runTarget(browser, target) {
 		await seedRandom(page);
 		await page.evaluate(() => window.__mount());
 
-		const gates = await gateTarget(page);
+		const gates = await gateTargetFn(page);
 		let identityShared = 0;
 		let maxElements = 0;
 		for (const result of gates) {
 			const expected = EXPECTED.get(result.name);
-			if (result.signature !== expected.signature) {
-				throw new Error(`${target.name} semantic mismatch in ${result.name}`);
-			}
-			if (result.elements !== expected.elements) {
-				throw new Error(
-					`${target.name} element mismatch in ${result.name}: ${result.elements} != ${expected.elements}`,
-				);
+			for (const endpoint of ['before', 'after']) {
+				if (result[endpoint].signature !== expected[endpoint].signature) {
+					throw new Error(
+						`${target.name} semantic mismatch in ${result.name} ${endpoint} (cycle ${result.cycle + 1})`,
+					);
+				}
+				if (result[endpoint].elements !== expected[endpoint].elements) {
+					throw new Error(
+						`${target.name} element mismatch in ${result.name} ${endpoint} (cycle ${result.cycle + 1}): ${result[endpoint].elements} != ${expected[endpoint].elements}`,
+					);
+				}
+				maxElements = Math.max(maxElements, result[endpoint].elements);
 			}
 			if (result.identityBroken !== 0) {
 				throw new Error(
-					`${target.name} replaced ${result.identityBroken}/${result.identityShared} keyed survivors in ${result.name}`,
+					`${target.name} replaced ${result.identityBroken}/${result.identityShared} keyed survivors in ${result.name} (cycle ${result.cycle + 1})`,
 				);
 			}
-			identityShared += result.identityShared;
-			maxElements = Math.max(maxElements, result.elements);
+			if (result.cycle === 0) identityShared += result.identityShared;
 		}
 
-		if (browserErrors.length > 0) {
-			throw new Error(`${target.name} browser errors: ${browserErrors.join(' | ')}`);
-		}
+		await throwBrowserErrors(page, browserErrors, target.name, 'the correctness gate');
 
 		const ops = {};
 		for (const entry of CASES) {
-			const samples = await timeCase(page, entry.name);
+			const samples = await timeCaseFn(page, entry.name);
+			await throwBrowserErrors(page, browserErrors, target.name, `timing ${entry.name}`);
 			ops[entry.name] = timingStatForJson(summarizeSamples(samples));
 		}
 		ops.cases = deterministicStatForJson(deterministicCount(CASES.length));
@@ -299,21 +334,27 @@ function printResults(targets) {
 	console.table(rows);
 }
 
-let browser;
-try {
-	browser = await chromium.launch({
-		headless: true,
-		args: ['--js-flags=--expose-gc'],
-	});
-	const results = [];
-	for (const target of TARGETS) results.push(await runTarget(browser, target));
-	printResults(results);
-	writePayload({ suite: 'uibench', iterations: ITERATIONS, targets: results });
-} catch (error) {
-	const message = error instanceof Error ? error.stack || error.message : String(error);
-	console.error(message);
-	writePayload({ suite: 'uibench', iterations: ITERATIONS, targets: [], failed: message });
-	process.exitCode = 1;
-} finally {
-	if (browser) await browser.close();
+export async function main() {
+	let browser;
+	try {
+		browser = await chromium.launch({
+			headless: true,
+			args: ['--js-flags=--expose-gc'],
+		});
+		const results = [];
+		for (const target of TARGETS) results.push(await runTarget(browser, target));
+		printResults(results);
+		writePayload({ suite: 'uibench', iterations: ITERATIONS, targets: results });
+	} catch (error) {
+		const message = error instanceof Error ? error.stack || error.message : String(error);
+		console.error(message);
+		writePayload({ suite: 'uibench', iterations: ITERATIONS, targets: [], failed: message });
+		process.exitCode = 1;
+	} finally {
+		if (browser) await browser.close();
+	}
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+	await main();
 }
