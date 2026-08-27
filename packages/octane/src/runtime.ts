@@ -10561,6 +10561,10 @@ function createNativeScopedResolver<T>(read: () => T): () => T {
 
 	return (): T => {
 		const scope = CURRENT_SCOPE;
+		// Reusing an invocation scope needs no restoration token, but its reads
+		// still belong to the render. Only an inspection without an owner is
+		// imperative and must be recomputed when the record later renders.
+		const collecting = scope !== null && CURRENT_BLOCK !== null;
 		const token = beginNativeReadScope(undefined);
 		let completed = false;
 		try {
@@ -10574,7 +10578,7 @@ function createNativeScopedResolver<T>(read: () => T): () => T {
 				!resolved ||
 				scopedReadsChanged(resolvedReads) ||
 				(resolvedReads !== null && !sameScope) ||
-				(token >= 0 && resolvedWitness === undefined) ||
+				(collecting && resolvedWitness === undefined) ||
 				!validateNativeReadWitness(resolvedWitness)
 			) {
 				const previousTracking = SCOPED_READ_TRACKING;
@@ -10599,12 +10603,12 @@ function createNativeScopedResolver<T>(read: () => T): () => T {
 				resolvedReads = nextReads;
 				// An imperative inspection stays untracked. Recompute once inside a
 				// real render before trusting it as native evidence for this record.
-				resolvedWitness = token < 0 ? undefined : nextWitness;
+				resolvedWitness = collecting ? nextWitness : undefined;
 				resolvedValue = next;
 				resolved = true;
 			} else {
 				resolvedScope = scope;
-				if (token >= 0) replayNativeReadWitness(resolvedWitness);
+				if (collecting) replayNativeReadWitness(resolvedWitness);
 			}
 			completed = true;
 			return resolvedValue;

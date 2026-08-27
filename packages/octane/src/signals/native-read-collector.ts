@@ -1,6 +1,7 @@
 import {
 	beginNativeWriteGuard,
 	endNativeWriteGuard,
+	getNativeReadObserver,
 	isNativeWriteGuarded,
 	setNativeReadObserver,
 	type NativeReadObserver,
@@ -100,6 +101,16 @@ export function createNativeReadCollector(
 			return detachedWitness;
 		},
 		beginScope(next: object): number {
+			// Invocation collection already owns the compiled body in this case.
+			// Graph computations can temporarily replace the observer without
+			// changing the owner, so identity alone cannot skip restoration.
+			if (
+				next === owner &&
+				!detachedWitness &&
+				getNativeReadObserver() === observe &&
+				isNativeWriteGuarded()
+			)
+				return -1;
 			// A warmed computation may call a compiler-instrumented JSX helper.
 			// Its nested scopes still belong to the detached witness, never to the
 			// component that happened to request the warm plan.

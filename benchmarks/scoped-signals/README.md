@@ -235,11 +235,52 @@ direct collector cases are empty collection, repeated reads, distinct reads,
 four nested witnesses, and replay. They supplement the compiled renderer cases;
 they do not establish browser layout, paint, frame, or hydration cost.
 
+Before those measurements, `native-collector-controls.mjs` verifies restoration
+of an enclosing observer and writable region. It uses separate untimed bundles,
+so these controls do not change the measured collector's exports or loop.
+
 A hook-bearing `use(make$(a, b, c, d, e))` control separately records one factory
 call on mount, zero calls for 32 cache hits, and one call for each of 32 misses.
 These source-factory counts are deterministic work, not V8 allocation counts.
 They have ratio guards in the benchmark registry. Overlapping timing intervals
 remain inconclusive; this runner adds no wall-clock pass threshold.
+
+## Focused compiled prop updates
+
+`run-native-props.mjs` isolates the `@{}` prop-update cases when the mixed
+mount/update/server workload is too noisy. It uses the same authored fixture,
+production compiler options, public renderer controls, and bundle export sets.
+There are five cases: unread with collection disabled or enabled, one read,
+16 repeated reads, and 16 distinct reads. Ordinary return-JSX cases are excluded.
+
+```bash
+BENCH_JSON=/private/tmp/scoped-native-props-01.json node benchmarks/scoped-signals/run-native-props.mjs \
+  --tooling-root=/absolute/path/to/compiler-tooling-package \
+  --baseline-root=/absolute/path/to/extracted-baseline \
+  --baseline-ref=<git-commit> --samples=25 --updates=10000
+```
+
+The defaults are 25 paired rounds and 10,000 updates per block. Each version
+keeps one mounted root and preallocated props, warms for eight complete update
+blocks, then runs twice per pair in seeded ABBA or BAAB order. Case order is
+shuffled with the same recorded seed. Public output, host identity, and native
+updates are checked outside each timed block. Mounting, signal-update timing,
+and SSR remain in the full runner.
+
+Every wall sample is retained. Results include absolute means and uncertainty,
+the full paired-ratio distribution, and the geometric mean with a Student-t
+95% interval on log ratios. CPU counters and GC overlaps are separate
+diagnostics; they neither replace wall timing nor justify dropping samples.
+Wide intervals remain inconclusive. Repeat with a fresh output filename in a
+new process; the focused runner refuses to overwrite evidence.
+
+Use `--current-root` with `--current-ref` to compare two immutable archives.
+Every consumed archived source must match Git, and rebuilt `cd9ed337` and
+`422c2c93` renderer bundles must also match their retained consolidation hashes.
+The [performance follow-up](results/2026-08-27/parity-performance.md) records
+the original temporary harness separately from this reproducible runner,
+including helper/loop equivalence, exact bundle hashes, and all noisy or rejected
+runs. It does not establish a wall-time speedup or zero overhead.
 
 ## Retained foreign success after a branch change
 

@@ -40,6 +40,40 @@ export function ConditionalReader(props: CollectionProps & { enabled: boolean })
 	</p>
 }
 
+function SwitchableChild({
+	source$,
+	enabled,
+	label,
+	value = enabled ? source$.get() : null,
+}: {
+	source$: SignalHandle<number>;
+	enabled: boolean;
+	label: string;
+	value?: number | null;
+}) @{
+	const body =
+		enabled ? source$.get() : null;
+	<output data-collection-child={label}>
+		{enabled ? value + ':' + body : 'idle'}
+	</output>
+}
+
+export function CollectionPanel(props: {
+	parent$: SignalHandle<number>;
+	left$: SignalHandle<number>;
+	right$: SignalHandle<number>;
+	leftEnabled: boolean;
+	rightEnabled: boolean;
+	tick: number;
+}) @{
+	const value = props.parent$.get();
+	<section data-tick={props.tick}>
+		<output data-collection-parent>{String(value)}</output>
+		<SwitchableChild source$={props.left$} enabled={props.leftEnabled} label="left" />
+		<SwitchableChild source$={props.right$} enabled={props.rightEnabled} label="right" />
+	</section>
+}
+
 export function PendingDefault({
 	value$,
 	value = value$.get(),

@@ -11,14 +11,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync, brotliCompressSync, constants as zlib } from 'node:zlib';
-import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
-import { runNativeCollectorControls } from './native-collector-controls.mjs';
+import { summarizeSamples, timingStatForJson } from '/private/tmp/octane-tsrx-parity-422c-DGLjhq/baseline/benchmarks/lib/stats.mjs';
 
-const HERE = import.meta.dirname;
+const HERE = "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals";
 const REPO = path.resolve(HERE, '../..');
 const options = new Map();
 const allowed = new Set([
 	'baseline-root',
+	'current-root',
+	'current-ref',
 	'baseline-ref',
 	'tooling-root',
 	'samples',
@@ -48,7 +49,7 @@ const updates = integer('updates', quick ? 200 : 2000);
 const mounts = integer('mounts', quick ? 8 : 64);
 const ssrRenders = integer('ssr', quick ? 100 : 1000);
 const collectorCycles = integer('collector', quick ? 2000 : 100000);
-const warmups = 2;
+const warmups = 8;
 const hash = (data) => createHash('sha256').update(data).digest('hex');
 const hashFile = (file) => hash(fs.readFileSync(file));
 const git = (...args) =>
@@ -56,7 +57,7 @@ const git = (...args) =>
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-native-costs-'));
 const fixtureFile = path.join(HERE, 'native-costs.tsrx');
 const fixture = fs.readFileSync(fixtureFile, 'utf8');
-const roots = [{ label: 'current', root: REPO }];
+const roots = [{ label: 'current', root: options.has('current-root') ? fs.realpathSync(path.resolve(options.get('current-root'))) : REPO }];
 if (options.has('baseline-root')) {
 	assert.ok(options.has('baseline-ref'), '--baseline-root requires an immutable --baseline-ref');
 	roots.unshift({
@@ -442,334 +443,182 @@ function checkElement(container, expected, tick, host) {
 	return output;
 }
 
-function measureClient(entry) {
-	const { api } = entry;
-	const data = dataFor(entry);
-	const mounted = Array.from({ length: mounts }, () => {
-		const container = document.createElement('div');
-		document.body.appendChild(container);
-		return { container, root: api.createRoot(container) };
-	});
-	let start = performance.now();
-	for (const { root } of mounted) root.render(api.Component, data.props);
-	const mountUs = ((performance.now() - start) * 1000) / mounts;
-	for (const { container } of mounted) checkElement(container, data.value(), 0);
-	start = performance.now();
-	for (const { root } of mounted) root.unmount();
-	const unmountUs = ((performance.now() - start) * 1000) / mounts;
-	for (const { container } of mounted) {
-		assert.equal(container.textContent, '');
-		container.remove();
-	}
-	const container = document.createElement('div');
-	document.body.appendChild(container);
-	const root = api.createRoot(container);
-	root.render(api.Component, data.props);
-	const host = checkElement(container, data.value(), 0);
-	const props = Array.from({ length: updates }, (_, tick) => ({ ...data.props, tick: tick + 1 }));
-	start = performance.now();
-	for (const value of props) api.flushSync(() => root.render(api.Component, value));
-	const propUpdateUs = ((performance.now() - start) * 1000) / updates;
-	checkElement(container, data.value(), updates, host);
-	let signalUpdateUs;
-	if (data.update !== null) {
-		start = performance.now();
-		for (let index = 0; index < updates; index++) api.flushSync(() => data.update(8 + index));
-		signalUpdateUs = ((performance.now() - start) * 1000) / updates;
-		checkElement(container, data.value(), updates, host);
-	}
-	root.unmount();
-	assert.equal(container.textContent, '');
-	data.update?.(updates + 9);
-	assert.equal(container.textContent, '', 'A live producer must not revive a retired renderer');
-	container.remove();
-	data.dispose();
-	return {
-		mount_us: mountUs,
-		prop_update_us: propUpdateUs,
-		unmount_us: unmountUs,
-		...(signalUpdateUs === undefined ? {} : { signal_update_us: signalUpdateUs }),
-	};
-}
 
-function serverText(result) {
-	assert.equal(typeof result.html, 'string');
-	const match = /<output(?:\s[^>]*)?>([\s\S]*?)<\/output>/.exec(result.html);
-	assert.ok(match, 'SSR must contain the output element');
-	return match[1].replace(/<!--[\s\S]*?-->/g, '');
-}
-
-function measureServer(entry) {
-	const data = dataFor(entry);
-	assert.equal(serverText(entry.api.renderToString(entry.api.Component, data.props)), data.value());
-	const props = Array.from({ length: ssrRenders }, (_, tick) => ({ ...data.props, tick }));
-	let last;
-	const start = performance.now();
-	for (const value of props) last = entry.api.renderToString(entry.api.Component, value);
-	const renderUs = ((performance.now() - start) * 1000) / ssrRenders;
-	assert.equal(serverText(last), data.value());
-	if (data.update !== null) {
-		data.update(11);
-		assert.equal(
-			serverText(entry.api.renderToString(entry.api.Component, data.props)),
-			data.value(),
-		);
-	}
-	data.dispose();
-	return { render_us: renderUs };
-}
-
-function measureCollector(entry) {
-	const { api } = entry;
-	let calls = 0;
-	const owner = {};
-	const collector = api.createNativeReadCollector((observed) => {
-		if (observed !== owner) throw new Error('Collector changed the read owner');
-		calls++;
-	});
-	const sources = Array.from({ length: 16 }, () => ({
-		version: 1,
-		getVersion() {
-			return this.version;
-		},
-		subscribe() {
-			return () => {};
-		},
-	}));
-	let lastWitness;
-	let replayWitness;
-	if (entry.scenario.name === 'replay') {
-		const frame = collector.beginScope(owner);
-		const witness = collector.beginWitness();
-		for (const source of sources) api.reportNativeRead(source, 1);
-		replayWitness = collector.finishWitness(witness, true);
-		collector.endScope(frame);
-		calls = 0;
-	}
-	const start = performance.now();
-	for (let cycle = 0; cycle < collectorCycles; cycle++) {
-		// The current driver collects parameters before this compiled body;
-		// the baseline ignores the optional owner argument until beginScope.
-		// Reads occur inside both scopes so their semantic work is identical.
-		const render = collector.beginRender(owner);
-		const scope = collector.beginScope(owner);
-		switch (entry.scenario.name) {
-			case 'empty':
-				break;
-			case 'repeated':
-				for (let index = 0; index < 16; index++) api.reportNativeRead(sources[0], 1);
-				break;
-			case 'distinct':
-				for (const source of sources) api.reportNativeRead(source, 1);
-				break;
-			case 'nested-witness': {
-				const a = collector.beginWitness();
-				const b = collector.beginWitness();
-				const c = collector.beginWitness();
-				const d = collector.beginWitness();
-				for (const source of sources) api.reportNativeRead(source, 1);
-				collector.finishWitness(d, true);
-				collector.finishWitness(c, true);
-				collector.finishWitness(b, true);
-				lastWitness = collector.finishWitness(a, true);
-				break;
-			}
-			case 'replay':
-				collector.replay(replayWitness);
-				break;
-			default:
-				throw new Error('Unknown collector scenario');
-		}
-		collector.endScope(scope);
-		collector.endRender(render);
-	}
-	const elapsed = performance.now() - start;
-	assert.equal(calls, entry.scenario.name === 'empty' ? 0 : collectorCycles * 16);
-	assert.equal(api.getNativeReadObserver(), null, 'Collector must restore the prior observer');
-	assert.equal(api.isNativeWriteGuarded(), false, 'Collector must restore the prior write guard');
-	const witness = lastWitness ?? replayWitness;
-	if (witness) {
-		assert.equal(witness.reads.size, 16);
-		assert.ok(api.validateNativeReadWitness(witness));
-		sources[0].version++;
-		assert.equal(
-			api.validateNativeReadWitness(witness),
-			false,
-			'Changed source invalidates a captured witness',
-		);
-	}
-	return { collection_us: (elapsed * 1000) / collectorCycles };
-}
-
-function fiveDependencies(entry) {
-	const { api } = entry;
-	const container = document.createElement('div');
-	document.body.appendChild(container);
-	const root = api.createRoot(container);
-	let props = { a: 1, b: 2, c: 3, d: 4, e: 5, tick: 0 };
-	const render = () => {
-		api.flushSync(() => root.render(api.Component, props));
-		checkElement(container, [props.a, props.b, props.c, props.d, props.e].join(':'), props.tick);
-	};
-	api.resetFactoryCalls();
-	render();
-	const mountedCalls = api.factoryCalls();
-	api.resetFactoryCalls();
-	for (let index = 0; index < 32; index++) {
-		props = { ...props, tick: index + 1 };
-		render();
-	}
-	const hitCalls = api.factoryCalls();
-	api.resetFactoryCalls();
-	for (let index = 0; index < 32; index++) {
-		const key = ['a', 'b', 'c', 'd', 'e'][index % 5];
-		props = { ...props, [key]: props[key] + 1, tick: index + 33 };
-		render();
-	}
-	const missCalls = api.factoryCalls();
-	const output = container.textContent;
-	root.unmount();
-	assert.equal(container.textContent, '');
-	container.remove();
-	assert.equal(mountedCalls, 1, 'One initial use() factory per owner');
-	assert.equal(hitCalls, 0, 'Stable five-dependency use() creation is cached');
-	assert.equal(missCalls, 32, 'Each changed dependency refreshes use() creation once');
-	return {
-		target: entry.target,
-		nativeReads: entry.nativeReads,
-		mountedCalls,
-		hitCalls,
-		missCalls,
-		output,
-	};
-}
-
+const { PerformanceObserver } = await import('node:perf_hooks');
+const { setImmediate: nextTurn } = await import('node:timers/promises');
+assert.equal(quick, false, 'Focused comparisons use explicit full settings');
+assert.ok(options.has('baseline-root') && options.has('baseline-ref'));
+if (options.has('current-root')) assert.ok(options.has('current-ref'));
+const referenceFile = path.join(REPO, 'benchmarks/scoped-signals/results/2026-08-27/consolidation-native-costs.json');
+const reference = JSON.parse(fs.readFileSync(referenceFile, 'utf8'));
+const referenceLabelByRef = new Map([['cd9ed33754bfc3eeb144ba256dc9b437614e3e92', 'baseline'], ['422c2c937784af835c64d6fae5a39162143c7a44', 'current']]);
+const sourceRefs = {
+  baseline: payload.environment.baselineRef,
+  current: options.has('current-ref') ? git('rev-parse', '--verify', options.get('current-ref') + '^{commit}').trim() : null,
+};
+const gcEvents = [];
+const observer = new PerformanceObserver((list) => {
+  for (const event of list.getEntries()) gcEvents.push({ startTime: event.startTime, duration: event.duration, kind: event.detail?.kind, flags: event.detail?.flags });
+});
+observer.observe({ entryTypes: ['gc'] });
+let randomState = 0x422c2c93;
+const nextRandom = () => { randomState ^= randomState << 13; randomState ^= randomState >>> 17; randomState ^= randomState << 5; return randomState >>> 0; };
+const shuffled = (values) => { const result=[...values]; for(let i=result.length-1;i>0;i--){const j=nextRandom()%(i+1);[result[i],result[j]]=[result[j],result[i]];} return result; };
 const window = setupDom();
+const cases = [];
+const samplesByCase = new Map();
 let failure;
-try {
-	for (const target of roots) {
-		target.compilerInputs = compilerSnapshot(target.root);
-		if (target.label === 'baseline') {
-			const ref = payload.environment.baselineRef;
-			for (const file of target.compilerInputs)
-				assert.equal(
-					file.sha256,
-					hash(git('show', ref + ':' + file.path)),
-					'Baseline compiler differs from Git: ' + file.path,
-				);
-		}
-	}
-	payload.compilerInputs = roots.map(({ label, compilerInputs }) => ({
-		label,
-		inputs: compilerInputs,
-	}));
-	payload.collectorControls = [];
-	for (const target of roots)
-		payload.collectorControls.push(
-			await runNativeCollectorControls(target, { build, readInput, hash, repo: REPO, scratch }),
-		);
-	const entries = [];
-	for (const target of roots) {
-		entries.push(...(await buildCollector(target)));
-		for (const scenario of CASES) {
-			for (const nativeReads of scenario.reads ? [true] : [false, true]) {
-				for (const mode of ['client', 'server'])
-					entries.push(await buildCase(target, scenario, nativeReads, mode));
-			}
-		}
-		for (const nativeReads of [false, true])
-			deterministic.push(
-				fiveDependencies(
-					await buildCase(
-						target,
-						{ name: 'five-dependencies', component: 'FiveDependencyUse', reads: 0 },
-						nativeReads,
-						'client',
-					),
-				),
-			);
-	}
-	const raw = new Map(entries.map((entry) => [entry.name, []]));
-	for (let sample = -warmups; sample < samples; sample++) {
-		const ordered = sample % 2 === 0 ? entries : [...entries].reverse();
-		for (const entry of ordered) {
-			const measurement =
-				entry.mode === 'client'
-					? measureClient(entry)
-					: entry.mode === 'server'
-						? measureServer(entry)
-						: measureCollector(entry);
-			if (sample >= 0) raw.get(entry.name).push(measurement);
-		}
-		console.log(
-			`Native collection ${sample < 0 ? 'warmup ' + (sample + warmups + 1) : 'sample ' + (sample + 1)} complete; semantic controls passed.`,
-		);
-	}
-	for (const entry of entries) {
-		const rawSamples = raw.get(entry.name);
-		const ops = Object.fromEntries(
-			Object.keys(rawSamples[0]).map((operation) => [
-				operation,
-				timingStatForJson(
-					summarizeSamples(
-						rawSamples.map((sample) => sample[operation]),
-						{ scoreMode: 'mean' },
-					),
-				),
-			]),
-		);
-		timings.push({
-			name: entry.name,
-			target: entry.target,
-			nativeReads: entry.nativeReads,
-			mode: entry.mode,
-			scenario: entry.scenario.name,
-			rawSamples,
-			ops,
-		});
-	}
-	for (const [file, contents] of snapshotInputs)
-		assert.equal(hashFile(file), hash(contents), 'Source changed during measurement: ' + file);
-	for (const target of roots.filter((item) => item.label === 'baseline')) {
-		for (const [file, contents] of snapshotInputs) {
-			if (!file.startsWith(path.join(target.root, 'packages/octane') + path.sep)) continue;
-			const relative = path.relative(target.root, file).replaceAll('\\', '/');
-			assert.equal(
-				hash(contents),
-				hash(git('show', payload.environment.baselineRef + ':' + relative)),
-				'Baseline source differs from Git: ' + relative,
-			);
-		}
-	}
-	payload.sourceUnchanged = true;
-} catch (error) {
-	failure = error instanceof Error ? error.stack : String(error);
-	console.error(failure);
-} finally {
-	await window.happyDOM.close();
-	payload.finishedAt = new Date().toISOString();
-	payload.sourceInputs = [...snapshotInputs].map(([file, contents]) => ({
-		file,
-		sha256: hash(contents),
-	}));
-	const stat = (value) => ({ score: value, median: value, min: value, samples: 1 });
-	payload.targets = [
-		...timings.map(({ name, ops }) => ({ name, ops })),
-		...deterministic.map((row) => ({
-			name: row.target + (row.nativeReads ? ':native' : ':ordinary'),
-			ops: {
-				five_dependency_hit_calls: stat(row.hitCalls),
-				five_dependency_miss_calls: stat(row.missCalls),
-			},
-		})),
-		{
-			name: 'work-model',
-			ops: { five_dependency_hit_calls: stat(1), five_dependency_miss_calls: stat(32) },
-		},
-	];
-	if (failure) payload.failed = failure;
-	if (process.env.BENCH_JSON)
-		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, 2) + '\n');
-	fs.rmSync(scratch, { recursive: true, force: true });
+let pairIndex = 0;
+Object.assign(payload, {
+  suite: 'scoped-native-reads-focused-props',
+  mode: process.execArgv.some((arg) => arg.startsWith('--cpu-prof')) ? 'profile-diagnostic-not-primary-timing' : 'focused-paired-timing',
+  limits: [
+    'Synchronous production source renderer updates in happy-dom; no layout, paint, browser frame, mount, SSR, hydration, or async timing.',
+    'Compile and bundle times, source hashing, public semantic checks, CPU counter calls, GC event delivery, and teardown verification are outside measured update intervals.',
+    'The selected supplemental source toolchain is unchanged; this is not a locked workspace or CI gate.',
+    'All measured wall samples, including samples overlapping GC or host scheduling delays, remain in the primary results.',
+    'A wide paired uncertainty interval is inconclusive; no wall-clock pass threshold or outlier filter is introduced.',
+  ],
+  method: 'Use the unchanged production buildCase/dataFor/checkElement helpers and authored TSRX fixture; keep one live root per case/version, preallocate props, warm each version eight full update blocks, then time seeded ABBA/BAAB blocks with randomized case order. Public output/identity and native signal updates are verified outside each timed block. All timing samples are retained.',
+  configuration: { pairs: samples, updatesPerBlock: updates, warmupBlocksPerVersion: warmups, seed: '0x422c2c93', cases: ['unread-block/native-off','unread-block/native-on','single-block/native-on','repeated-block/native-on','distinct-block/native-on'], pairOrder: 'Seeded ABBA or BAAB; both versions run twice per pair', lifecycle: 'Roots live across the focused update measurement; mounting and SSR remain in the separate unchanged full harness.' },
+  sourceRefs,
+  sourceRoots: roots.map(({label,root})=>({label,root,immutableRef:sourceRefs[label]})),
+  diagnosticsPolicy: "Process CPU, main-thread CPU and GC overlaps are separate diagnostics and never replace primary wall timing or justify removing samples.",
+  invocationParity: "Every version uses the same measure function, same loop body, one flushSync callback per update, preallocated props arrays of equal length and identical public output/identity checks. No per-version wrapper or special-case timed path.",
+  referenceEvidence: { file: referenceFile, sha256: hashFile(referenceFile), role: 'Require exact bundle bytes when rebuilding archived cd9/422c; final candidate records hashes without claiming equality.' },
+  preservedOriginalRunnerSha256: '93e81cbecb25551c5afa02db25a81f3af73d4ae872e2886755f8b3f71e2374c0',
+  scratch,
+  warmupRecords: [],
+  pairs: [],
+  summaries: [],
+  outlierPolicy: 'Retain every sample and GC event. Report arithmetic absolute timings, paired ratio distribution, geometric mean ratio and Student-t95% interval on log ratios. Never drop outliers or infer parity from a wide interval.',
+  hostBefore: { loadAverage: os.loadavg(), freeMemory: os.freemem(), resourceUsage: process.resourceUsage() },
+});
+const totalCpu = (value) => value.user + value.system;
+function prepare(entry) {
+  const data = dataFor(entry);
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = entry.api.createRoot(container);
+  root.render(entry.api.Component, data.props);
+  const host = checkElement(container, data.value(), 0);
+  const props = Array.from({length:updates},(_,tick)=>({...data.props,tick:tick+1}));
+  return { entry, data, container, root, host, props };
 }
-if (failure) process.exitCode = 1;
+function measure(prepared) {
+  const { entry, root, props } = prepared;
+  const cpuBefore = process.cpuUsage();
+  const threadBefore = typeof process.threadCpuUsage === 'function' ? process.threadCpuUsage() : null;
+  const start = performance.now();
+  for (const value of props) entry.api.flushSync(() => root.render(entry.api.Component, value));
+  const end = performance.now();
+  const cpu = process.cpuUsage(cpuBefore);
+  const thread = threadBefore === null ? null : process.threadCpuUsage(threadBefore);
+  checkElement(prepared.container, prepared.data.value(), updates, prepared.host);
+  return { target:entry.target, start, end, wall_us:(end-start)*1000/updates, cpu_us:totalCpu(cpu)/updates, main_thread_cpu_us:thread===null?null:totalCpu(thread)/updates };
+}
+function verifySignal(prepared, value) {
+  if (prepared.data.update === null) return;
+  prepared.entry.api.flushSync(() => prepared.data.update(value));
+  checkElement(prepared.container, prepared.data.value(), updates, prepared.host);
+}
+function ratioSummary(values) {
+  const sorted=[...values].sort((a,b)=>a-b);
+  const logs=values.map(Math.log);
+  const stats=summarizeSamples(logs,{scoreMode:'mean'});
+  const q=(p)=>sorted[Math.min(sorted.length-1,Math.floor(sorted.length*p))];
+  return { samples:values.length, arithmeticMean:values.reduce((a,b)=>a+b,0)/values.length, geometricMean:Math.exp(stats.mean), geometricCi95:[Math.exp(stats.mean-stats.moe),Math.exp(stats.mean+stats.moe)], min:sorted[0], p10:q(.1), p25:q(.25), median:q(.5), p75:q(.75), p90:q(.9), max:sorted.at(-1), raw:values };
+}
+try {
+  for (const target of roots) {
+    const refs=sourceRefs[target.label];
+    target.compilerInputs=compilerSnapshot(target.root);
+    if(refs!==null)for(const input of target.compilerInputs)assert.equal(input.sha256,hash(git('show',refs+':'+input.path)),'Archived compiler differs from Git');
+  }
+  payload.compilerInputs=roots.map(({label,compilerInputs})=>({label,inputs:compilerInputs}));
+  for(const scenario of CASES.filter((item)=>item.name.endsWith('-block'))){
+    for(const enabled of scenario.reads?[true]:[false,true]){
+      const pair=[];
+      for(const target of roots){
+        const entry=await buildCase(target,scenario,enabled,'client');
+        const record=compiled.at(-1);
+        if(sourceRefs[target.label]!==null){
+          const expectedLabel=referenceLabelByRef.get(sourceRefs[target.label]);
+          assert.ok(expectedLabel, "Missing frozen bundle reference for immutable source");
+          const expectedName=expectedLabel+record.name.slice(record.name.indexOf(":"));
+          const old=reference.compiled.find((item)=>item.name===expectedName);
+          assert.ok(old);
+          assert.equal(record.bundleSha256,old.bundleSha256,'Frozen source must produce the exact existing measured bundle');
+          record.matchesExistingBundle=true;
+        }
+        pair.push(prepare(entry));
+      }
+      assert.deepEqual(pair.map((entry)=>entry.entry.target),['baseline','current']);
+      const name=scenario.name+(enabled?':native':':ordinary');
+      cases.push({name,pair});samplesByCase.set(name,[]);
+    }
+  }
+  for(let warmup=0;warmup<warmups;warmup++){
+    for(const scenario of shuffled(cases)){
+      const order=warmup%2===0?[0,1]:[1,0];
+      const records=order.map((side)=>measure(scenario.pair[side]));
+      payload.warmupRecords.push({warmup,case:scenario.name,records});
+    }
+    await nextTurn();
+    console.log('Focused TSRX warmup '+(warmup+1)+'/'+warmups+' complete; output and identity controls passed.');
+  }
+  for(let round=0;round<samples;round++){
+    for(const scenario of shuffled(cases)){
+      const order=nextRandom()%2===0?[0,1,1,0]:[1,0,0,1];
+      const records=order.map((side)=>measure(scenario.pair[side]));
+      const byTarget=(target,metric)=>records.filter((row)=>row.target===target).reduce((sum,row)=>sum+row[metric],0)/2;
+      const row={index:pairIndex++,round,case:scenario.name,order:order.map((side)=>side===0?'baseline':'current'),records,ratio:{}};
+      for(const metric of ['wall_us','cpu_us','main_thread_cpu_us']){
+        if(records.some((record)=>record[metric]===null))continue;
+        row.ratio[metric]=byTarget('current',metric)/byTarget('baseline',metric);
+      }
+      payload.pairs.push(row);samplesByCase.get(scenario.name).push(row);
+      for(const prepared of scenario.pair){verifySignal(prepared,round+8);verifySignal(prepared,7);}
+      await nextTurn();
+    }
+    if((round+1)%5===0||round===samples-1)console.log('Focused TSRX pair round '+(round+1)+'/'+samples+' complete; native signal controls passed.');
+  }
+  for(const scenario of cases){
+    const rows=samplesByCase.get(scenario.name);
+    const summary={case:scenario.name,pairs:rows.length,ratios:{},absolute:{}};
+    for(const metric of ['wall_us','cpu_us','main_thread_cpu_us']){
+      if(rows.some(row=>row.ratio[metric]===undefined))continue;
+      summary.ratios[metric]=ratioSummary(rows.map((row)=>row.ratio[metric]));
+      summary.absolute[metric]={};
+      for(const target of ['baseline','current'])summary.absolute[metric][target]=timingStatForJson(summarizeSamples(rows.flatMap(row=>row.records.filter(record=>record.target===target).map(record=>record[metric])),{scoreMode:'mean'}));
+    }
+    payload.summaries.push(summary);
+  }
+  for(const scenario of cases)for(const prepared of scenario.pair){
+    prepared.root.unmount();assert.equal(prepared.container.textContent,'');
+    prepared.data.update?.(999);
+    assert.equal(prepared.container.textContent,'','A live producer must not revive a retired root');
+    prepared.container.remove();prepared.data.dispose();
+  }
+  await nextTurn();
+  for(const row of payload.pairs)for(const record of row.records){
+    const events=gcEvents.filter((event)=>event.startTime<record.end&&event.startTime+event.duration>record.start);
+    record.gcEvents=events.length;record.gcWallMs=events.reduce((sum,event)=>sum+Math.min(record.end,event.startTime+event.duration)-Math.max(record.start,event.startTime),0);
+  }
+  assert.equal(hashFile(fixtureFile),hash(fixture),'Authored fixture changed during focused measurement');
+  for(const[file,contents]of snapshotInputs)assert.equal(hashFile(file),hash(contents),'Source changed during focused measurement: '+file);
+  for(const target of roots){const ref=sourceRefs[target.label];if(ref===null)continue;for(const[file,contents]of snapshotInputs){if(!file.startsWith(path.join(target.root,'packages/octane')+path.sep))continue;const relative=path.relative(target.root,file).replaceAll('\\','/');assert.equal(hash(contents),hash(git('show',ref+':'+relative)),'Archived package bytes differ from Git');}}
+  payload.sourceUnchanged=true;payload.status='passed';
+}catch(error){failure=error instanceof Error?error.stack:String(error);payload.failed=failure;console.error(failure);}
+finally{
+  observer.disconnect();
+  payload.gcEvents=gcEvents;
+  payload.finishedAt=new Date().toISOString();
+  payload.hostAfter={loadAverage:os.loadavg(),freeMemory:os.freemem(),resourceUsage:process.resourceUsage()};
+  payload.sourceInputs=[...snapshotInputs].map(([file,contents])=>({file,sha256:hash(contents)}));
+  await window.happyDOM.close();
+  assert.ok(process.env.BENCH_JSON,'Focused evidence requires a fresh BENCH_JSON path');
+  assert.equal(fs.existsSync(process.env.BENCH_JSON),false,'Never overwrite focused evidence');
+  fs.writeFileSync(process.env.BENCH_JSON,JSON.stringify(payload,null,2)+'\n');
+}
+if(failure)process.exitCode=1;

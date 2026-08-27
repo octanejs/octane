@@ -320,7 +320,8 @@ export function createNativeReadDriver(host: NativeReadHost) {
 			const frame = frames[depth - 1];
 			// An empty successful render replaces its prior dependencies. A Scope
 			// that has never read a native source needs no consumer or read map.
-			if (consumers.has(scope)) getCandidate(frame, scope);
+			// The Block's own candidate was already prepared by beginRender.
+			if (scope !== block && consumers.has(scope)) getCandidate(frame, scope);
 			return collector.beginScope(scope);
 		},
 		endScope(token: number): void {
