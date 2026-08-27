@@ -108,9 +108,9 @@ export function createNativeReadCollector(
 		endScope(token: number): void {
 			leave(token, true);
 		},
-		/** Keep purity through a renderer's returned-output normalization too. */
-		beginRender(): number {
-			const token = enter(null, true);
+		/** Own parameters, the component body, and returned-output normalization. */
+		beginRender(next: object | null = null): number {
+			const token = enter(next, true);
 			witnessBase = witnessDepth;
 			return token;
 		},

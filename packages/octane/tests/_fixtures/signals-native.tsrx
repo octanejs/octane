@@ -1,4 +1,12 @@
-import { Activity, ErrorBoundary, memo, Suspense, useEffect, useLayoutEffect, useRef } from 'octane';
+import {
+	Activity,
+	ErrorBoundary,
+	memo,
+	Suspense,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+} from 'octane';
 import { createScope, query } from 'octane/signals';
 import { formatCounter$ } from './signals-native-readers';
 
@@ -77,10 +85,12 @@ export function EventWrites(props: CounterFixture & { log: (entry: string) => vo
 			props.log('parent:' + props.scope.get(props.count$));
 		}}
 	>
-		<button onClick={() => {
-			props.scope.set(props.count$, 2);
-			props.log('child:' + props.scope.get(props.count$));
-		}}>{String(props.scope.get(props.count$))}</button>
+		<button
+			onClick={() => {
+				props.scope.set(props.count$, 2);
+				props.log('child:' + props.scope.get(props.count$));
+			}}
+		>{String(props.scope.get(props.count$))}</button>
 	</section>
 }
 
@@ -124,6 +134,73 @@ export function NativeHeldBoundary(props: ResourceFixture) @{
 	</section>
 }
 
+function NativeHeldCount(props: Pick<ResourceFixture, 'scope' | 'count$'> & {
+	log: (entry: string) => void;
+}) @{
+	const value = props.scope.get(props.count$);
+	useLayoutEffect(() => {
+		props.log('layout:' + value);
+		return () => props.log('cleanup:' + value);
+	}, [value]);
+	<button
+		class="count"
+		ref={(node: HTMLButtonElement | null) => {
+			props.log('ref:' + value + ':' + (node === null ? 'detach' : 'attach'));
+		}}
+	>{String(value)}</button>
+}
+
+export function NativeHeldSiblings(props: ResourceFixture & { log: (entry: string) => void }) @{
+	<section>
+		@try {
+			<div class="panel">
+				<NativeHeldCount {...props} />
+				<NativeAsyncValue {...props} />
+			</div>
+		} @pending {
+			<p class="pending">{'loading'}</p>
+		}
+	</section>
+}
+
+export function NativeHeldIsolation(props: ResourceFixture & {
+	outside: CounterFixture;
+	log: (entry: string) => void;
+}) @{
+	<main>
+		<aside class="outside">
+			<NativeHeldCount {...props.outside} log={(entry) => props.log('outside:' + entry)} />
+		</aside>
+		<NativeHeldSiblings {...props} />
+	</main>
+}
+
+function NativeHeldAsyncLayer(props: ResourceFixture) @{
+	const host = useRef<HTMLDivElement | null>(null);
+	<div ref={host}>
+		<NativeAsyncValue {...props} />
+	</div>
+}
+
+export function NativeNestedHeldSiblings(props: ResourceFixture & {
+	log: (entry: string) => void;
+}) @{
+	<section>
+		@try {
+			<div class="panel">
+				@try {
+					<NativeHeldCount {...props} />
+				} @pending {
+					<p class="inner-pending">{'inner loading'}</p>
+				}
+				<NativeHeldAsyncLayer {...props} />
+			</div>
+		} @pending {
+			<p class="pending">{'loading'}</p>
+		}
+	</section>
+}
+
 export function NativeActivity(props: CounterFixture & { hidden: boolean }) @{
 	<Activity mode={props.hidden ? 'hidden' : 'visible'}>
 		<SignalReader {...props} />
@@ -141,31 +218,42 @@ export function NativeErrorBoundary(props: ResourceFixture) @{
 }
 
 function DeletionWriter(props: CounterFixture & { deleted?: () => void }) @{
-	useLayoutEffect(() => () => {
-		props.scope.set(props.count$, 1);
-		props.deleted?.();
-	}, []);
+	useLayoutEffect(
+		() => () => {
+			props.scope.set(props.count$, 1);
+			props.deleted?.();
+		},
+		[],
+	);
 	<i class="deleted">{'delete me'}</i>
 }
 
-export function NativeDeletionRace(
-	props: CounterFixture & { show: boolean; log: (entry: string) => void; deleted?: () => void },
-) @{
+export function NativeDeletionRace(props: CounterFixture & {
+	show: boolean;
+	log: (entry: string) => void;
+	deleted?: () => void;
+}) @{
 	const value = props.scope.get(props.count$);
 	const output = useRef<HTMLOutputElement | null>(null);
 	useLayoutEffect(() => {
-		props.log('commit:' + value + ':' + output.current?.textContent + ':live:' + props.scope.get(props.count$));
+		props.log(
+			'commit:' + value + ':' + output.current?.textContent + ':live:' +
+				props.scope.get(props.count$),
+		);
 	}, [value, props.show]);
 	<section>
-		@if (props.show) { <DeletionWriter {...props} /> }
+		@if (props.show) {
+			<DeletionWriter {...props} />
+		}
 		<output ref={output}>{String(value)}</output>
 	</section>
 }
 
-type NativeFallbackProps = ResourceFixture & {
-	log: (entry: string) => void;
-	hostRef?: (node: HTMLParagraphElement | null) => void;
-};
+type NativeFallbackProps =
+	ResourceFixture & {
+		log: (entry: string) => void;
+		hostRef?: (node: HTMLParagraphElement | null) => void;
+	};
 
 function NativeFallbackSample(props: NativeFallbackProps) @{
 	const value = props.scope.get(props.count$);
@@ -223,15 +311,23 @@ export function NativeSupersessionReader(props: CounterFixture & {
 		props.log('layout-second:' + props.label + ':' + value);
 	}, [props.label, value]);
 	<section>
-		<span ref={(node) => {
-			if (node === null) return;
-			props.log('ref-first:' + props.label + ':' + value);
-			if (props.phase === 'ref' && props.label === 'A') props.replace();
-			if (props.phase === 'write' && value === 1) props.scope.set(props.count$, 2);
-		}}>{props.label + ':' + value}</span>
-		<span ref={(node) => {
-			if (node !== null) props.log('ref-second:' + props.label + ':' + value);
-		}}>{props.label + ':' + value}</span>
+		<span
+			ref={(node: HTMLSpanElement | null) => {
+				if (node === null) return;
+				props.log('ref-first:' + props.label + ':' + value);
+				if (props.phase === 'ref' && props.label === 'A') props.replace();
+				if (props.phase === 'write' && value === 1) props.scope.set(props.count$, 2);
+			}}
+		>
+			{props.label + ':' + value}
+		</span>
+		<span
+			ref={(node: HTMLSpanElement | null) => {
+				if (node !== null) props.log('ref-second:' + props.label + ':' + value);
+			}}
+		>
+			{props.label + ':' + value}
+		</span>
 	</section>
 }
 
@@ -247,9 +343,13 @@ export function NativeStablePublication(props: CounterFixture & {
 		return () => props.log('cleanup:' + props.label);
 	}, [123]);
 	<section>
-		<span ref={(node) => {
-			if (node !== null && props.label === 'A') props.replace();
-		}}>{props.label + ':' + value}</span>
+		<span
+			ref={(node: HTMLSpanElement | null) => {
+				if (node !== null && props.label === 'A') props.replace();
+			}}
+		>
+			{props.label + ':' + value}
+		</span>
 		<span class="stable-ref" ref={props.stableRef}>{props.label + ':' + value}</span>
 	</section>
 }

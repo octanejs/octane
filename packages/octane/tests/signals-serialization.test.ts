@@ -157,6 +157,70 @@ describe('scoped signal serialization and adoption', () => {
 		expect(() => value$.latest()).toThrow(ScopeDisposedError);
 	});
 
+	it.each([false, true])(
+		'owns copied historical values through the adopting scope and its leases (wireRoundTrip=%s)',
+		(wireRoundTrip) => {
+			const data = createScope({ scopeKey: 'original-data' });
+			const view = createScope({ scopeKey: 'adopting-view' });
+			const source$ = data.signal$('source', 'presented text');
+			const card$ = view.derived$('card', () => ({ title: source$.get() }));
+			const serialized = view.serialize();
+			const seed = wireRoundTrip ? JSON.parse(JSON.stringify(serialized)) : serialized;
+			const frame = view.beginAdoption(seed);
+			const retained = frame.retain();
+			try {
+				data.dispose();
+				expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
+				expect(frame.run(() => card$.latest(null))).toEqual({ title: 'presented text' });
+				frame.release();
+				expect(() => frame.run(() => card$.latest(null))).toThrow(SignalFrameError);
+				expect(retained.run(() => card$.latest(null))).toEqual({ title: 'presented text' });
+				view.dispose();
+				expect(retained.released).toBe(true);
+				expect(() => retained.run(() => card$.latest(null))).toThrow(ScopeDisposedError);
+			} finally {
+				data.dispose();
+				view.dispose();
+			}
+		},
+	);
+
+	it.each(['ready', 'retained'] as const)(
+		'does not serialize a %s foreign value from the retiring owner cancellation callback',
+		(mode) => {
+			const data = createScope({ scopeKey: 'retiring-data' });
+			const view = createScope({ scopeKey: 'serializing-view' });
+			const value$ = data.signal$('value', 'private text');
+			const blocked$ = view.signal$('blocked', false);
+			const card$ = view.derived$('card', () => {
+				if (blocked$.get()) throw new Error('view unavailable');
+				return { title: value$.get() };
+			});
+			const observed: unknown[] = [];
+			const load = query('serialization-during-retirement', (_argument: undefined, { signal }) => {
+				signal.addEventListener('abort', () => {
+					try {
+						observed.push(view.serialize());
+					} catch (error) {
+						observed.push(error);
+					}
+				});
+				return new Promise<void>(() => {});
+			});
+			data.asyncSignal$('work', () => load(undefined));
+			try {
+				expect(card$.get()).toEqual({ title: 'private text' });
+				if (mode === 'retained') blocked$.set(true);
+				expect(card$.latest(null)).toEqual({ title: 'private text' });
+				data.dispose();
+				expect(observed).toEqual([expect.any(ScopeDisposedError)]);
+			} finally {
+				data.dispose();
+				view.dispose();
+			}
+		},
+	);
+
 	it('retains the whole old resource result and its argument while a new selection is pending', async () => {
 		const one = deferred<{ name: string }>();
 		const two = deferred<{ name: string }>();

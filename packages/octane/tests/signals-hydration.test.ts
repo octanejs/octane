@@ -38,14 +38,14 @@ describe('native signal server output and adoption', () => {
 		flushEffects();
 	});
 
-	function state(scopeKey: string, initial = 'server') {
+	function state$(scopeKey: string, initial = 'server') {
 		const scope = createScope({ scopeKey });
 		scopes.push(scope);
 		return { scope, value$: scope.signal$('value', initial) };
 	}
 
 	it('adopts the server value without rewinding live state or replacing focused hosts', () => {
-		const model = state('native-hydration-ready');
+		const model = state$('native-hydration-ready');
 		container.innerHTML = renderToString(server.SignalHydration, model).html;
 		const output = container.querySelector('output')!;
 		const input = container.querySelector('input')!;
@@ -73,7 +73,7 @@ describe('native signal server output and adoption', () => {
 
 	for (const deferredIsland of [false, true]) {
 		it(`preserves an early controlled-input edit during ${deferredIsland ? 'island' : 'root'} adoption`, async () => {
-			const model = state('native-controlled-' + deferredIsland, 'server value');
+			const model = state$('native-controlled-' + deferredIsland, 'server value');
 			const when = condition(false);
 			const Server = deferredIsland
 				? server.DeferredControlledSignalHydration
@@ -108,7 +108,7 @@ describe('native signal server output and adoption', () => {
 	}
 
 	it('keeps strict and snapshot read channels of one node coherent during adoption', () => {
-		const model = state('native-hydration-channels', 'one');
+		const model = state$('native-hydration-channels', 'one');
 		container.innerHTML = renderToString(server.ChannelsHydration, model).html;
 		model.scope.set(model.value$, 'two');
 		flushSync(() => {
@@ -119,8 +119,8 @@ describe('native signal server output and adoption', () => {
 	});
 
 	it('rejects distinct server scope owners with the same key and equal values', () => {
-		const first = state('native-hydration-duplicate-owner', 'equal');
-		const second = state('native-hydration-duplicate-owner', 'equal');
+		const first = state$('native-hydration-duplicate-owner', 'equal');
+		const second = state$('native-hydration-duplicate-owner', 'equal');
 		expect(() => renderToString(server.DuplicateOwnerHydration, { first, second })).toThrow(
 			'Multiple data scopes claim native server key',
 		);
@@ -128,7 +128,7 @@ describe('native signal server output and adoption', () => {
 
 	it('keeps closing-script strings inert in the native seed sidecar', () => {
 		const payload = '</script><script>globalThis.nativeSeedInjection = true</script><!--<script>';
-		const model = state('native-hydration-script-payload', payload);
+		const model = state$('native-hydration-script-payload', payload);
 		container.innerHTML = renderToString(server.SignalHydration, model).html;
 		expect(container.querySelectorAll('script:not([type="application/json"])')).toHaveLength(0);
 		model.scope.set(model.value$, 'live');
@@ -141,7 +141,7 @@ describe('native signal server output and adoption', () => {
 	});
 
 	it('replays retained latest data while the strict resource read is pending', async () => {
-		const model = state('native-hydration-latest', 'a');
+		const model = state$('native-hydration-latest', 'a');
 		const pending = deferred<string>();
 		const load = query('native-hydration-latest-query', (key: string) =>
 			key === 'a' ? Promise.resolve('ready-a') : pending.promise,
@@ -164,7 +164,7 @@ describe('native signal server output and adoption', () => {
 	});
 
 	it('replays the authored latest fallback when the server had no retained value', async () => {
-		const model = state('native-hydration-empty-latest');
+		const model = state$('native-hydration-empty-latest');
 		const pending = deferred<string>();
 		const load = query('native-hydration-empty-latest-query', () => pending.promise);
 		const resource$ = model.scope.asyncSignal$('resource', () => load(undefined));
@@ -179,7 +179,7 @@ describe('native signal server output and adoption', () => {
 	});
 
 	it('rejects a completed nonready snapshot instead of inventing a ready seed', () => {
-		const model = state('native-hydration-pending-snapshot');
+		const model = state$('native-hydration-pending-snapshot');
 		const load = query(
 			'native-hydration-pending-snapshot-query',
 			() => new Promise<string>(() => {}),
@@ -191,7 +191,7 @@ describe('native signal server output and adoption', () => {
 	});
 
 	it('freshly mounts a pending native arm without replacing its adopted sibling', async () => {
-		const model = state('native-hydration-pending-arm', 'a');
+		const model = state$('native-hydration-pending-arm', 'a');
 		const old = deferred<string>();
 		const load = query('native-hydration-pending-arm-query', (key: string) =>
 			key === 'a' ? old.promise : Promise.resolve('ready-b'),
@@ -216,7 +216,7 @@ describe('native signal server output and adoption', () => {
 	});
 
 	it('retains an island historical frame until that island activates', async () => {
-		const model = state('native-hydration-island');
+		const model = state$('native-hydration-island');
 		const blocked = condition(false);
 		const observations: string[] = [];
 		const props = { ...model, when: blocked, log: (value: string) => observations.push(value) };
@@ -239,7 +239,7 @@ describe('native signal server output and adoption', () => {
 	});
 
 	it('scopes streamed ready values separately from shell data and live client demand', async () => {
-		const model = state('native-hydration-stream', 'a');
+		const model = state$('native-hydration-stream', 'a');
 		const first = deferred<string>();
 		const next = deferred<string>();
 		const load = query('native-hydration-stream-query', (key: string) =>

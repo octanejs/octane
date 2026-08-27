@@ -41,13 +41,19 @@ test('engine fixtures run only under Node, without a DOM/compiler plugin', () =>
 	assert.equal(project.plugins, undefined);
 });
 
-test('mounting and hydration fixtures exercise both enabled compiler modes', () => {
+test('mounting and hydration fixtures exercise development, production, and Strong compilation', () => {
 	for (const file of [
 		'packages/octane/tests/signals-rendering.test.ts',
+		'packages/octane/tests/signals-memos.test.ts',
+		'packages/octane/tests/signals-native-collection.test.ts',
 		'packages/octane/tests/signals-ownership.test.tsrx',
 		'packages/octane/tests/hydration/signals-hydrate.test.ts',
 	]) {
-		assert.deepEqual(selected(file), ['octane-signals', 'octane-signals-prod']);
+		assert.deepEqual(selected(file), [
+			'octane-signals',
+			'octane-signals-prod',
+			'octane-signals-strong',
+		]);
 		assert.ok(
 			signalsRuntimeTests.some((pattern) => matchesGlob(file, pattern)),
 			'default controls must exclude native fixtures',
@@ -59,6 +65,12 @@ test('mounting and hydration fixtures exercise both enabled compiler modes', () 
 		hmr: false,
 	});
 	assert.equal(byName.get('octane-signals-prod').test.env.OCTANE_TEST_COMPILE_MODE, 'prod');
+	assert.deepEqual(byName.get('octane-signals-strong').plugins[0].options, {
+		nativeReads: true,
+		hmr: false,
+		strong: true,
+	});
+	assert.equal(byName.get('octane-signals-strong').test.env.OCTANE_TEST_COMPILE_MODE, 'prod');
 });
 
 test('native DevTools fixtures run only with profiling and native reads enabled', () => {

@@ -6,6 +6,7 @@ import {
 	SignalWriteError,
 	type Scope,
 } from 'octane/signals';
+import { deferred } from './_fixtures/signals-async-controls';
 
 const owners: Scope[] = [];
 function owner(key = `state-${owners.length}`): Scope {
@@ -137,6 +138,75 @@ describe('scoped synchronous signals', () => {
 		expect(values).toEqual([2, 3, 4]);
 	});
 
+	it.each([
+		{ edit: 'new text', stored: 'older saved text', expectedSource: 'input' },
+		{ edit: '', stored: 'older saved text', expectedSource: 'input' },
+		{ edit: undefined, stored: '', expectedSource: 'storage' },
+	])(
+		'applies a delayed draft only when its captured edit revision is current: $edit',
+		async ({ edit, stored, expectedSource }) => {
+			const scope = owner('draft');
+			const text$ = scope.signal$('text', 'initial text');
+			const revision$ = scope.signal$('revision', 0);
+			const source$ = scope.signal$('source', 'initial');
+			const draft$ = scope.derived$('draft', () => ({ text: text$.get(), source: source$.get() }));
+			const observed: { text: string; source: string }[] = [];
+			draft$.subscribe(() => observed.push(draft$.get()));
+			const storage = deferred<string>();
+			const applyStored = scope.action((text: string, revision: number) => {
+				if (revision$.get() !== revision) return;
+				text$.set(text);
+				source$.set('storage');
+			});
+			const restore = async () => {
+				const epoch = scope.epoch;
+				const revision = revision$.get();
+				const text = await storage.promise;
+				if (!scope.retired && scope.epoch === epoch) applyStored(text, revision);
+			};
+			const restoration = restore();
+			if (edit !== undefined) {
+				const applyInput = scope.action((text: string) => {
+					revision$.set((revision) => revision + 1);
+					text$.set(text);
+					source$.set('input');
+				});
+				applyInput(edit);
+			}
+			storage.resolve(stored);
+			await restoration;
+			const expected = { text: edit ?? stored, source: expectedSource };
+			expect(draft$.get()).toEqual(expected);
+			expect(observed).toEqual([expected]);
+			expect(revision$.get()).toBe(edit === undefined ? 0 : 1);
+		},
+	);
+
+	it('hands a draft snapshot to a new owner without transferring the old restore operation', async () => {
+		const original = owner('draft-owner');
+		const original$ = original.signal$('draft', { text: 'current edit', revision: 3 });
+		const storage = deferred<string>();
+		const restore = async () => {
+			const epoch = original.epoch;
+			const revision = original$.get().revision;
+			const text = await storage.promise;
+			if (original.retired || original.epoch !== epoch) return;
+			original.batch(() => {
+				if (original$.get().revision === revision) original$.set({ text, revision });
+			});
+		};
+		const restoration = restore();
+		const replacement = owner('draft-owner');
+		const replacement$ = replacement.signal$('draft', original$.get());
+		original.dispose();
+		replacement$.set({ text: 'new owner edit', revision: 4 });
+		storage.resolve('obsolete storage');
+		await restoration;
+		expect(replacement$.get()).toEqual({ text: 'new owner edit', revision: 4 });
+		expect(() => original$.set({ text: 'late write', revision: 5 })).toThrow(ScopeDisposedError);
+		expect(replacement$.get()).toEqual({ text: 'new owner edit', revision: 4 });
+	});
+
 	it('keeps actions tracked when used to group a pure read', () => {
 		const scope = owner();
 		const count$ = scope.signal$('count', 1);
@@ -236,6 +306,110 @@ describe('scoped synchronous signals', () => {
 		const card$ = view.derived$('card', () => ({ value: secret$.get() }));
 		expect(card$.get()).toEqual({ value: 'old account' });
 		shared.dispose();
+		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
+	});
+
+	it.each([
+		{ blocked: 'pending', indirect: false },
+		{ blocked: 'error', indirect: false },
+		{ blocked: 'pending', indirect: true },
+		{ blocked: 'error', indirect: true },
+	] as const)(
+		'revokes a retained foreign value after a $blocked branch stops reading it (indirect=$indirect)',
+		({ blocked, indirect }) => {
+			const shared = owner('private-data');
+			const intermediate = owner('intermediate');
+			const view = owner('view');
+			const secret$ = shared.signal$('secret', 'old account');
+			const source$ = indirect ? intermediate.derived$('source', () => secret$.get()) : secret$;
+			const unavailable$ = view.signal$('unavailable', false);
+			const failure =
+				blocked === 'pending' ? new Promise<never>(() => {}) : new Error('not available');
+			const card$ = view.derived$('card', () => {
+				if (unavailable$.get()) throw failure;
+				return { value: source$.get() };
+			});
+			const observed: unknown[] = [];
+			card$.subscribe(() => {
+				const snapshot = card$.snapshot();
+				observed.push(snapshot.status === 'error' ? snapshot.error : snapshot.status);
+			});
+			expect(card$.get()).toEqual({ value: 'old account' });
+			unavailable$.set(true);
+			expect(card$.snapshot().status).toBe(blocked);
+			expect(card$.latest(null)).toEqual({ value: 'old account' });
+
+			shared.dispose();
+
+			expect(observed.at(-1)).toBeInstanceOf(ScopeDisposedError);
+			expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
+			expect(card$.snapshot()).toMatchObject({
+				status: 'error',
+				error: expect.any(ScopeDisposedError),
+			});
+		},
+	);
+
+	it('releases an old foreign lifetime after a whole replacement succeeds', () => {
+		const previous = owner('previous');
+		const replacement = owner('replacement');
+		const view = owner('view');
+		const previous$ = previous.signal$('label', 'old account');
+		const replacement$ = replacement.signal$('label', 'new account');
+		const selectReplacement$ = view.signal$('replacement', false);
+		const unavailable$ = view.signal$('unavailable', false);
+		const card$ = view.derived$('card', () => {
+			if (unavailable$.get()) throw new Error('waiting for replacement');
+			return { value: selectReplacement$.get() ? replacement$.get() : previous$.get() };
+		});
+		expect(card$.get()).toEqual({ value: 'old account' });
+		unavailable$.set(true);
+		expect(card$.latest(null)).toEqual({ value: 'old account' });
+		view.batch(() => {
+			selectReplacement$.set(true);
+			unavailable$.set(false);
+		});
+		expect(card$.get()).toEqual({ value: 'new account' });
+		previous.dispose();
+		expect(card$.latest(null)).toEqual({ value: 'new account' });
+		replacement$.set('updated account');
+		expect(card$.get()).toEqual({ value: 'updated account' });
+	});
+
+	it('updates foreign lifetime ownership even when a replacement value compares equal', () => {
+		const previous = owner('previous-equal');
+		const replacement = owner('replacement-equal');
+		const view = owner('view-equal');
+		const previous$ = previous.signal$('label', 'same text');
+		const replacement$ = replacement.signal$('label', 'same text');
+		const selectReplacement$ = view.signal$('replacement', false);
+		const label$ = view.derived$('label', () =>
+			selectReplacement$.get() ? replacement$.get() : previous$.get(),
+		);
+		expect(label$.get()).toBe('same text');
+		selectReplacement$.set(true);
+		expect(label$.get()).toBe('same text');
+		previous.dispose();
+		expect(label$.latest(null)).toBe('same text');
+		replacement.dispose();
+		expect(() => label$.latest(null)).toThrow(ScopeDisposedError);
+	});
+
+	it('carries revocation through a ready projection that samples a retained foreign value', () => {
+		const data = owner('data');
+		const presentation = owner('presentation');
+		const consumer = owner('consumer');
+		const value$ = data.signal$('value', 'private value');
+		const unavailable$ = presentation.signal$('unavailable', false);
+		const held$ = presentation.derived$('held', () => {
+			if (unavailable$.get()) throw new Error('unavailable');
+			return value$.get();
+		});
+		const card$ = consumer.derived$('card', () => ({ title: held$.latest('loading') }));
+		expect(card$.get()).toEqual({ title: 'private value' });
+		unavailable$.set(true);
+		expect(card$.get()).toEqual({ title: 'private value' });
+		data.dispose();
 		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
 	});
 

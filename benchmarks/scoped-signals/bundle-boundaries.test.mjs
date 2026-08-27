@@ -52,6 +52,36 @@ test('ordinary entries allow protocol seams but reject both scoped and raw engin
 	);
 });
 
+for (const id of ['ordinary-client', 'ordinary-server']) {
+	test(`${id} tree-shakes concrete native adapters and requires emitted-byte evidence`, () => {
+		const ordinary = [source(id === 'ordinary-client' ? 'runtime.ts' : 'runtime.server.ts')];
+		const adapters = ['client', 'server', 'collector', 'inspection', 'retry'].map((name) => ({
+			...source(`signals/native-read-${name}.ts`),
+			bytesInOutput: 0,
+		}));
+		verifyBundleInputs(scenario(id), [...ordinary, ...adapters]);
+		for (const adapter of adapters) {
+			assert.throws(
+				() => verifyBundleInputs(scenario(id), [...ordinary, { ...adapter, bytesInOutput: 1 }]),
+				/ordinary entry retained native adapter/,
+			);
+		}
+		assert.throws(
+			() =>
+				verifyBundleInputs(scenario(id), [...ordinary, source('signals/native-read-client.ts')]),
+			/missing emitted-byte evidence/,
+		);
+		// The event/read protocol and the server's empty seed-map seam are not
+		// the optional driver factory; their costs remain visible in the report.
+		verifyBundleInputs(scenario(id), [
+			...ordinary,
+			{ ...source('signals/read-protocol.ts'), bytesInOutput: 1 },
+			{ ...source('signals/native-read-events.ts'), bytesInOutput: 1 },
+			{ ...source('signals/native-read-seeds.ts'), bytesInOutput: 36 },
+		]);
+	});
+}
+
 test('independent engine rejects rendering, compiler, DevTools, and the old Alien version', () => {
 	const independent = [source('signals/index.ts'), source('signals/graph.ts'), alien()];
 	verifyBundleInputs(scenario('engine'), independent);

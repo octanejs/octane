@@ -334,9 +334,12 @@ export class ScopeImpl implements Scope, GraphOwner {
 		) {
 			throw current.error;
 		}
-		const snapshot = (
-			read === 'latest' && node.state?.snapshot.status !== 'ready' ? node.lastState : node.state
-		)?.snapshot;
+		const presented =
+			read === 'latest' && node.state?.snapshot.status !== 'ready' ? node.lastState : node.state;
+		// A producer's cancellation callback may serialize before graph teardown.
+		// Only still-live inputs may be copied into a new historical handoff.
+		if (presented?.owners) for (const owner of presented.owners) assertAlive(owner);
+		const snapshot = presented?.snapshot;
 		if (snapshot?.status !== 'ready') {
 			if (read !== 'latest') return undefined;
 			return {

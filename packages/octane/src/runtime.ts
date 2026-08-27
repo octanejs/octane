@@ -371,7 +371,9 @@ function ensureHooks(scope: Scope): Map<HookSlot, any> {
 // preserving these entries without adding a field to every Scope.
 function registerHookCleanup(scope: Scope, cleanup: Cleanup): void {
 	if (process.env.NODE_ENV !== 'production') {
-		if ((scope.block.body as any)[HMR] !== undefined) {
+		// A lightweight child uses a host proxy without a component body. Its
+		// cleanup belongs to that child; refreshing the parent disposes it.
+		if ((scope.block.body as any)?.[HMR] !== undefined) {
 			(cleanup as Cleanup & { [HMR]?: true })[HMR] = true;
 		}
 	}
@@ -385,6 +387,12 @@ let NATIVE_READ_DRIVER: NativeReadDriver | null = null;
 let NATIVE_BLOCK_RETRIES: WeakMap<Block, NativeReadRetry> | null = null;
 let NATIVE_ADOPTION_RELEASES: NativeAdoptionState[] | null = null;
 
+/** @internal Enable invocation collection before an opted-in module renders. */
+export function enableNativeReadCollection(abi = 1): void {
+	if (abi !== 1) throw new Error('Unsupported native-read compiler/runtime version.');
+	ensureNativeReadDriver();
+}
+
 /** @internal Compiler/runtime native-read capability version 1. */
 export function beginNativeReadScope(scope: Scope | undefined, abi = 1): number {
 	if (abi !== 1) throw new Error('Unsupported native-read compiler/runtime version.');
@@ -392,6 +400,13 @@ export function beginNativeReadScope(scope: Scope | undefined, abi = 1): number 
 	const owner = scope ?? CURRENT_SCOPE;
 	if (block === null || owner === null) return -1;
 	return ensureNativeReadDriver().beginScope(owner, block);
+}
+
+// Renderer calls have already checked the driver. Keep them separate from the
+// initializing compiler ABI so ordinary entries can discard the native adapter.
+function beginActiveNativeReadScope(scope: Scope): number {
+	const block = CURRENT_BLOCK;
+	return block === null ? -1 : NATIVE_READ_DRIVER!.beginScope(scope, block);
 }
 
 function ensureNativeReadDriver(): NativeReadDriver {
@@ -3958,11 +3973,12 @@ function sortWaveByDepth(wave: Block[]): Block[] {
 	return wave;
 }
 
-// Hidden-owner scheduling is optional: roots without Suspense or hidden
+// Visibility-owner scheduling is optional: roots without Suspense or hidden
 // Activity must not retain either feature's concrete reveal implementation.
 interface ScheduledVisibilityDriver {
-	find: typeof findHiddenRenderOwner;
+	find: typeof findScheduledVisibilityOwner;
 	reveal: typeof attemptHiddenReveal;
+	visible: typeof renderVisibleTry;
 	rehide: typeof rehideActivityAfterDescendantRender;
 	retryActivity: typeof renderHiddenActivity;
 }
@@ -3971,8 +3987,9 @@ let SCHEDULED_VISIBILITY_DRIVER: ScheduledVisibilityDriver | null = null;
 
 function ensureScheduledVisibilityDriver(): void {
 	SCHEDULED_VISIBILITY_DRIVER ??= {
-		find: findHiddenRenderOwner,
+		find: findScheduledVisibilityOwner,
 		reveal: attemptHiddenReveal,
+		visible: renderVisibleTry,
 		rehide: rehideActivityAfterDescendantRender,
 		retryActivity: renderHiddenActivity,
 	};
@@ -4024,12 +4041,18 @@ function drainQueue(): { err: any } | null {
 		const crossRenderUpdate = block.crossRenderUpdate;
 		block.crossRenderUpdate = false;
 		const visibilityDriver = SCHEDULED_VISIBILITY_DRIVER;
-		const hiddenOwner = visibilityDriver === null ? null : visibilityDriver.find(block, true);
+		const visibilityOwner =
+			visibilityDriver === null
+				? null
+				: visibilityDriver.find(block, true, block.pendingMode ?? 'urgent');
 		let hiddenActivity: ActivitySlot | null = null;
 		let hiddenTry: TrySlot | null = null;
-		if (hiddenOwner !== null) {
-			if (hiddenOwner.__kind === 'trySlotSlot') hiddenTry = hiddenOwner;
-			else hiddenActivity = hiddenOwner;
+		let visibleTry: TrySlot | null = null;
+		if (visibilityOwner !== null) {
+			if (visibilityOwner.__kind === 'trySlotSlot') {
+				if (visibilityOwner.hiddenDom === null) visibleTry = visibilityOwner;
+				else hiddenTry = visibilityOwner;
+			} else hiddenActivity = visibilityOwner;
 		}
 		const rootFrame = beginRootRender(block.idState.renderOwner);
 		let attempt: TransitionAttempt | null = null;
@@ -4075,6 +4098,7 @@ function drainQueue(): { err: any } | null {
 			attempt = transitionSwap === null ? null : transitionSwap.begin(block);
 			try {
 				if (hiddenActivity !== null) visibilityDriver!.retryActivity(hiddenActivity, false, block);
+				else if (visibleTry !== null) visibilityDriver!.visible(visibleTry, block);
 				else {
 					const owner = block.idState.renderOwner;
 					if (owner !== undefined && owner.current === block && owner.request !== null) {
@@ -6682,6 +6706,7 @@ export function componentSlotLite<P>(
 			: null;
 	let profileDidThrow = false;
 	let profileThrown: unknown;
+	const nativeToken = NATIVE_READ_DRIVER === null ? -1 : beginActiveNativeReadScope(scope);
 	try {
 		comp(props, scope, undefined);
 		if (!scope.mounted) scope.mounted = true;
@@ -6690,6 +6715,7 @@ export function componentSlotLite<P>(
 		profileThrown = error;
 		throw error;
 	} finally {
+		if (nativeToken >= 0) NATIVE_READ_DRIVER!.endScope(nativeToken);
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
 		ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
@@ -7245,10 +7271,11 @@ type LinkedStateTuple<Value> = [Value, StateSetter<Value>, () => Value];
 // A sibling may finish before another sibling suspends their shared boundary.
 // Keep linked-state publication and caught-error reports with their hidden owner
 // (Suspense or Activity): completed bodies may bail when that owner reveals.
-let HIDDEN_REVEAL_ACTIONS: WeakMap<HiddenRenderOwner, EffectEventCommitAction[]> | null = null;
+let HIDDEN_REVEAL_ACTIONS: WeakMap<ScheduledVisibilityOwner, EffectEventCommitAction[]> | null =
+	null;
 
 function deferHiddenRevealAction(
-	boundary: HiddenRenderOwner,
+	boundary: ScheduledVisibilityOwner,
 	action: EffectEventCommitAction,
 ): void {
 	const deferred = (HIDDEN_REVEAL_ACTIONS ??= new WeakMap());
@@ -7257,7 +7284,7 @@ function deferHiddenRevealAction(
 	else actions.push(action);
 }
 
-function publishHiddenRevealActions(boundary: HiddenRenderOwner): void {
+function publishHiddenRevealActions(boundary: ScheduledVisibilityOwner): void {
 	const actions = HIDDEN_REVEAL_ACTIONS?.get(boundary);
 	if (actions === undefined) return;
 	if (boundary.__kind === 'activityBlockSlot') {
@@ -24354,7 +24381,7 @@ function releaseSuspenseRetryBatch(root: Block, batch: SuspenseRetryBatch): void
 	SUSPENSE_RETRIES.delete(root);
 	// No extra root walk on ordinary scheduled renders once the last pending
 	// retry commits or is canceled. The existing visibility driver owns the hook.
-	if (SUSPENSE_RETRIES.size === 0) SCHEDULED_VISIBILITY_DRIVER!.find = findHiddenRenderOwner;
+	if (SUSPENSE_RETRIES.size === 0) SCHEDULED_VISIBILITY_DRIVER!.find = findScheduledVisibilityOwner;
 }
 
 function cancelSuspenseRetry(state: TrySlot): void {
@@ -24404,11 +24431,13 @@ function findHiddenOwnerWithSuspenseRetries(
 function findHiddenOwnerWithSuspenseRetries(
 	block: Block | null,
 	includeActivity: true,
-): HiddenRenderOwner | null;
+	visibleMode?: 'urgent' | 'transition',
+): ScheduledVisibilityOwner | null;
 function findHiddenOwnerWithSuspenseRetries(
 	block: Block | null,
 	includeActivity: boolean,
-): HiddenRenderOwner | null {
+	visibleMode?: 'urgent' | 'transition',
+): ScheduledVisibilityOwner | null {
 	if (block !== null) {
 		const root = suspenseRetryRoot(block);
 		const batch = SUSPENSE_RETRIES.get(root);
@@ -24417,7 +24446,9 @@ function findHiddenOwnerWithSuspenseRetries(
 		// the most recent visibility change; independent roots keep their timer.
 		if (batch !== undefined) scheduleSuspenseRetryBatch(root, batch);
 	}
-	return includeActivity ? findHiddenRenderOwner(block, true) : findHiddenRenderOwner(block, false);
+	return includeActivity
+		? findScheduledVisibilityOwner(block, true, visibleMode)
+		: findScheduledVisibilityOwner(block, false);
 }
 
 function recordSuspenseCommit(state: TrySlot): void {
@@ -25256,7 +25287,10 @@ export function tryBlock(
 	// urgent branch replacements as transitions use: probe the replacement before
 	// disposing browser-owned state, then either commit it or show @pending while
 	// the old arm stays connected and hidden.
-	if (pendingBody !== null) ensureTransitionSwapDriver();
+	if (pendingBody !== null) {
+		ensureTransitionSwapDriver();
+		ensureScheduledVisibilityDriver();
+	}
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	let state = parentScope.slots[slotKey] as TrySlot | undefined;
@@ -25354,45 +25388,67 @@ export function tryBlock(
 		// the obsolete hydration promise.
 		mountTry(s);
 	} else if (s.branch === 1 && s.tryBlock) {
-		// Try body is currently visible — re-render in place so we don't tear
-		// down its DOM. If the re-render suspends, handleSuspense decides
-		// whether to preserve the DOM (keep) or swap to pending (default).
-		s.tryBlock.body = s.tryBody;
-		s.tryBlock.extra = s.env;
-		// Everything this body patches is undoable until it either commits or
-		// suspends into a hold, so the boundary can never be left half-updated.
-		const journalCheckpoint = armTransitionJournal(s);
-		try {
-			renderBlock(s.tryBlock);
-			// Successful commit — this supersedes any in-flight transition
-			// suspended on this slot. Release the held transition counter and
-			// invalidate the pending retry so the eventual .then callback no-ops.
-			// Matches React's "urgent setState while transition is suspended
-			// discards the transition" semantics (ReactUse-test.js:1631).
-			// A cue re-render under a held sync transition re-renders this body
-			// with the reverted (old) cells and succeeds — that is the held screen
-			// re-asserting itself, not an urgent supersede. Keep holding; the
-			// promotion on settle is what ends this hold.
-			if (!heldSyncCellsIntact(s)) {
-				releaseHeldTransition(s);
-				s.pendingThenable = null;
-			}
-		} catch (err) {
-			// §6.3 control signal — never an application failure: pass it through
-			// so the renderer-region owner (handleRenderError) receives it; a
-			// local catch arm must not render a hosted context handshake.
-			if (isHostContextRequest(err)) throw err;
-			if (isSuspenseException(err)) {
-				if (s.propagateSuspense) throw err;
-				handleSuspense(s, err.thenable, s.tryBlock, journalCheckpoint);
-			} else switchToCatch(s, err, true);
-		} finally {
-			disarmTransitionJournal(journalCheckpoint);
-		}
+		renderVisibleTry(s);
 	} else {
 		mountTry(s);
 	}
 	return s.reset;
+}
+
+/** A visible primary accepts its DOM and captured work as one boundary. */
+function renderVisibleTry(state: TrySlot, source?: Block): void {
+	const block = state.tryBlock!;
+	block.body = state.tryBody;
+	block.extra = state.env;
+	if (source !== undefined) {
+		// Independent descendants otherwise bypass tryBlock's rollback window.
+		// Preserve an already queued urgent update, and invalidate only the path
+		// to this primary so unrelated sibling boundaries retain their bailouts.
+		if (block.pendingMode !== 'urgent') block.pendingMode = source.pendingMode ?? 'urgent';
+		block.pendingDeferred = source.pendingDeferred;
+		invalidateRender(source, block);
+	}
+	const journalCheckpoint = armTransitionJournal(state);
+	const previousCapture = WIP_CAPTURE;
+	const capture = journalCheckpoint < 0 ? null : createOffscreenCapture();
+	const effectDeps = capture === null ? null : snapshotSubtreeEffectDeps(block);
+	const refDetachCheckpoint = refDetachQueue.length;
+	let didThrow = false;
+	let renderError: unknown;
+	if (capture !== null) WIP_CAPTURE = capture;
+	try {
+		renderBlock(block);
+	} catch (error) {
+		didThrow = true;
+		renderError = error;
+	} finally {
+		WIP_CAPTURE = previousCapture;
+	}
+	try {
+		if (didThrow) {
+			if (capture !== null) {
+				refDetachQueue.splice(refDetachCheckpoint);
+				restoreSubtreeEffectDeps(block, effectDeps!);
+				discardOffscreenCapture(capture);
+			}
+			if (isHostContextRequest(renderError) || renderError instanceof NativeAdoptionMiss)
+				throw renderError;
+			if (isSuspenseException(renderError)) {
+				if (state.propagateSuspense) throw renderError;
+				handleSuspense(state, renderError.thenable, block, journalCheckpoint);
+			} else switchToCatch(state, renderError, true);
+		} else {
+			if (capture !== null) spliceOffscreenCapture(capture);
+			// Ready content supersedes the old wakeable. A cue render using held
+			// driving cells is still the prior screen and must retain its hold.
+			if (!heldSyncCellsIntact(state)) {
+				releaseHeldTransition(state);
+				state.pendingThenable = null;
+			}
+		}
+	} finally {
+		disarmTransitionJournal(journalCheckpoint);
+	}
 }
 
 function createTryBody(state: TrySlot, start: Node, end: Node): Block {
@@ -26349,28 +26405,31 @@ function commitResumeInner(state: TrySlot): void {
 	}
 }
 
-type HiddenRenderOwner = TrySlot | ActivitySlot;
+type ScheduledVisibilityOwner = TrySlot | ActivitySlot;
 
-function findHiddenRenderOwner(block: Block | null, includeActivity: false): TrySlot | null;
-function findHiddenRenderOwner(
+function findScheduledVisibilityOwner(block: Block | null, includeActivity: false): TrySlot | null;
+function findScheduledVisibilityOwner(
 	block: Block | null,
 	includeActivity: true,
-): HiddenRenderOwner | null;
+	visibleMode?: 'urgent' | 'transition',
+): ScheduledVisibilityOwner | null;
 /**
- * Find the boundary that owns an independently scheduled render under hidden
- * content. A SUSPENSE-HIDDEN boundary owns the whole retry transaction and
- * therefore wins over Activity and reapplies any Activity ownership around its
- * own retry transaction. The scheduler's common path stays one allocation-free
- * ancestor walk.
+ * Find the visibility boundary that owns an independently scheduled render.
+ * Hidden Suspense owns the whole retry transaction and wins over Activity.
+ * Passing the queued priority also includes visible primaries that can hold
+ * their prior output. Callers inspecting only hidden ownership omit that mode.
+ * All cases share one allocation-free ancestor walk.
  *
  * The pending arm's own block also carries `__trySlot`, but only the TRY block
  * matches `slot.tryBlock === p`, so updates inside the fallback render normally.
  */
-function findHiddenRenderOwner(
+function findScheduledVisibilityOwner(
 	block: Block | null,
 	includeActivity: boolean,
-): HiddenRenderOwner | null {
+	visibleMode: 'urgent' | 'transition' | null = null,
+): ScheduledVisibilityOwner | null {
 	let activity: ActivitySlot | null = null;
+	let visible: TrySlot | null = null;
 	for (let p: Block | null = block; p !== null; p = p.parentBlock) {
 		if (includeActivity && activity === null && p.inactive) {
 			const candidate = (p as any).__activitySlot as ActivitySlot | undefined;
@@ -26379,14 +26438,27 @@ function findHiddenRenderOwner(
 			}
 		}
 		const slot = (p as any).__trySlot as TrySlot | undefined;
-		if (slot !== undefined && slot.tryBlock === p && slot.hiddenDom !== null) return slot;
+		if (slot === undefined || slot.tryBlock !== p) continue;
+		if (slot.hiddenDom !== null) return slot;
+		if (
+			visibleMode !== null &&
+			!slot.propagateSuspense &&
+			slot.hasResolved &&
+			slot.branch === 1 &&
+			(slot.transitionHeld || visibleMode === 'transition')
+		)
+			visible = slot;
 	}
-	return activity;
+	// Hidden ownership wins. A transition starts at the outermost resolved
+	// primary so earlier inner success can still be undone if a later sibling
+	// suspends the outer boundary. During an urgent retry only existing holds
+	// qualify; unrelated visible boundaries retain their direct update path.
+	return activity ?? visible;
 }
 
 /** Nearest enclosing SUSPENSE-HIDDEN boundary, if one owns this render. */
 function findSuspenseHiddenTry(block: Block | null): TrySlot | null {
-	return findHiddenRenderOwner(block, false);
+	return findScheduledVisibilityOwner(block, false);
 }
 
 /** Nearest hidden Activity that owns connected DOM in this block's ancestry. */
@@ -30231,17 +30303,19 @@ function tryUpdateKeyedSelection<T>(
 	return true;
 }
 
-/** Keep certified direct row calls while journaling the row's own binding bag. */
+/** Keep direct row calls while preserving their scope for native reads and journals. */
 function renderLiteListItem(block: Block, body: ComponentBody, env: any[] | undefined): void {
-	if (TRANSITION_JOURNAL === null) {
+	if (TRANSITION_JOURNAL === null && NATIVE_READ_DRIVER === null) {
 		body(block.props, block, env);
 		return;
 	}
 	const previousScope = CURRENT_SCOPE;
 	CURRENT_SCOPE = block;
+	const nativeToken = NATIVE_READ_DRIVER === null ? -1 : beginActiveNativeReadScope(block);
 	try {
 		body(block.props, block, env);
 	} finally {
+		if (nativeToken >= 0) NATIVE_READ_DRIVER!.endScope(nativeToken);
 		CURRENT_SCOPE = previousScope;
 	}
 }
@@ -31885,8 +31959,8 @@ interface InlineCaughtErrorReport {
 }
 
 /** Retained catches belong to the reveal even while its retry temporarily shows DOM. */
-function inlineCaughtErrorOwner(block: Block): HiddenRenderOwner | null {
-	const hidden = findHiddenRenderOwner(block, true);
+function inlineCaughtErrorOwner(block: Block): ScheduledVisibilityOwner | null {
+	const hidden = findScheduledVisibilityOwner(block, true);
 	if (hidden !== null) return hidden;
 	// A reconnecting primary is temporarily visible during speculative render.
 	// Keep its catch with that owner until reveal, even if a later sibling suspends.
@@ -31920,15 +31994,15 @@ function enqueueInlineCaughtError(state: TrySlot | ErrorSlot): void {
 	const handler = rootErrorHandlersFor(block)?.onCaughtError;
 	if (handler === undefined) return;
 	const error = state.err;
-	let parkedOwner: HiddenRenderOwner | null = null;
+	let parkedOwner: ScheduledVisibilityOwner | null = null;
 	let cleanupRegistered = false;
 	// Reuse render/WIP rollback: a later sibling can still abandon this catch.
 	// The returned record belongs to one commit's local list, so a nested commit
 	// during another action cannot publish it before this fallback's refs/layout.
-	const action = (owner?: HiddenRenderOwner): InlineCaughtErrorReport | void => {
+	const action = (owner?: ScheduledVisibilityOwner): InlineCaughtErrorReport | void => {
 		parkedOwner = null;
 		if (block.disposed || state.block !== block) return;
-		const hidden = owner ?? findHiddenRenderOwner(block, true);
+		const hidden = owner ?? findScheduledVisibilityOwner(block, true);
 		if (hidden !== null) {
 			parkedOwner = hidden;
 			if (!cleanupRegistered) {
@@ -31965,7 +32039,7 @@ function publishInlineCaughtErrorReports(reports: InlineCaughtErrorReport[]): vo
 	for (let i = 0; i < reports.length; i++) {
 		const report = reports[i];
 		if (report.block.disposed || report.state.block !== report.block) continue;
-		const hidden = findHiddenRenderOwner(report.block, true);
+		const hidden = findScheduledVisibilityOwner(report.block, true);
 		if (hidden !== null) {
 			report.resume();
 			continue;

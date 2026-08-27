@@ -42,6 +42,7 @@ export interface PlainHookFixtureSourceOptions {
 	id: string;
 	inlineHookMemo: boolean;
 	manualSlots?: boolean;
+	nativeReads?: boolean;
 }
 
 export function loadCompiledFixtureSource<T extends CompiledFixtureModule = CompiledFixtureModule>(
@@ -68,6 +69,7 @@ export function loadPlainHookFixtureSource<T extends CompiledFixtureModule = Com
 		profile: false,
 		inlineHookMemo: options.inlineHookMemo,
 		manualSlots: options.manualSlots,
+		nativeReads: options.nativeReads,
 	});
 	// The plain path deliberately leaves TypeScript to its host toolchain.
 	// Strip it here exactly once, then use the same evaluation boundary as the
@@ -135,14 +137,14 @@ function evaluateCompiledFixtureCode<T extends CompiledFixtureModule>(
 	// reassignment of the binding.
 	const functionExports: string[] = [];
 	code = code.replace(
-		/export\s+(async\s+)?function\s+(\w+)/g,
+		/export\s+(async\s+)?function\s+([\w$]+)/g,
 		(_match: string, asyncKeyword: string | undefined, name: string) => {
 			functionExports.push(name);
 			return `${asyncKeyword ?? ''}function ${name}`;
 		},
 	);
 	code = code.replace(
-		/export\s+(const|let|var)\s+(\w+)\s*=/g,
+		/export\s+(const|let|var)\s+([\w$]+)\s*=/g,
 		(_match: string, kind: string, name: string) => `${kind} ${name} = __exports.${name} =`,
 	);
 	code = code.replace(/export\s+default\s+/g, '__exports.default = ');

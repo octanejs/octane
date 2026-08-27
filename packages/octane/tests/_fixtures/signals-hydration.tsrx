@@ -27,7 +27,8 @@ export function LatestHydration(props: { resource$: Resource<string>; fallback: 
 export function ChannelsHydration(props: NativeHydrationState) @{
 	const value = props.scope.get(props.value$);
 	const snapshot = props.value$.snapshot();
-	const snapshotValue = snapshot.status === 'ready' ? snapshot.value : snapshot.status;
+	const snapshotValue =
+		snapshot.status === 'ready' ? snapshot.value : snapshot.status;
 	<output>{value + '/' + snapshotValue}</output>
 }
 
@@ -45,9 +46,14 @@ export function SnapshotHydration(props: { resource$: Resource<string> }) @{
 	<output>{props.resource$.snapshot().status}</output>
 }
 
-function NativeResourceHydration(props: { resource$: Resource<string>; log?: (value: string) => void }) @{
+function NativeResourceHydration(props: {
+	resource$: Resource<string>;
+	log?: (value: string) => void;
+}) @{
 	const value = props.resource$.get();
-	useLayoutEffect(() => { props.log?.('resource:' + value); }, [value, props.log]);
+	useLayoutEffect(() => {
+		props.log?.('resource:' + value);
+	}, [value, props.log]);
 	<output class="resource">{value}</output>
 }
 
@@ -78,12 +84,17 @@ export function DeferredNativeHydration(props: NativeHydrationState & { when: Hy
 
 export function ControlledSignalHydration(props: NativeHydrationState) @{
 	const value = props.scope.get(props.value$);
-	<input value={value} onInput={(event) => {
-		props.scope.set(props.value$, (event.currentTarget as HTMLInputElement).value);
-	}} />
+	<input
+		value={value}
+		onInput={(event: Event) => {
+			props.scope.set(props.value$, (event.currentTarget as HTMLInputElement).value);
+		}}
+	/>
 }
 
-export function DeferredControlledSignalHydration(props: NativeHydrationState & { when: HydrateWhen }) @{
+export function DeferredControlledSignalHydration(props: NativeHydrationState & {
+	when: HydrateWhen;
+}) @{
 	<Hydrate when={props.when} split={false}>
 		<ControlledSignalHydration scope={props.scope} value$={props.value$} />
 	</Hydrate>

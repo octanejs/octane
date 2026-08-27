@@ -204,12 +204,25 @@ let NATIVE_SERVER_READS: NativeSeedReads | null = null;
 let NATIVE_SERVER_FAILURES = 0;
 let NATIVE_LOCAL_HOOK_DISPOSES: Array<() => void> | null = null;
 
+/** @internal Enable invocation collection before an opted-in module renders. */
+export function enableNativeReadCollection(abi = 1): void {
+	if (abi !== 1) throw new Error('Unsupported native-read compiler/runtime version.');
+	ensureNativeServerReadCollector();
+}
+
 /** @internal Compiler/runtime native-read capability version 1. */
 export function beginNativeReadScope(scope: SSRScope | undefined, abi = 1): number {
 	if (abi !== 1) throw new Error('Unsupported native-read compiler/runtime version.');
 	const owner = scope ?? CURRENT_SCOPE;
 	if (owner === null) return -1;
-	const collector = ensureNativeServerReadCollector();
+	ensureNativeServerReadCollector();
+	return beginActiveNativeReadScope(owner);
+}
+
+// Internal invocation scopes must not retain the collector factory in ordinary
+// server entries. Late activation still needs the same pass/detached handling.
+function beginActiveNativeReadScope(owner: SSRScope): number {
+	const collector = NATIVE_READ_COLLECTOR!;
 	if (NATIVE_SERVER_PASS < 0 && !collector.isDetached()) NATIVE_SERVER_PASS = collector.beginPass();
 	return collector.beginScope(owner);
 }
@@ -3618,6 +3631,8 @@ function renderComponentFramed(
 	CURRENT_PROPS = props;
 	CURRENT_PARENT_SCOPE = parentScope;
 	ASYNC_SCOPE = frame.asyncScope;
+	const nativeToken = NATIVE_READ_COLLECTOR === null ? -1 : beginActiveNativeReadScope(scope);
+	let nativeCompleted = false;
 	try {
 		// The compiled body normally returns its HTML string, but a component that
 		// early-returns non-template JSX (the de-opt path — e.g. a `.tsx` `if (…)
@@ -3662,10 +3677,12 @@ function renderComponentFramed(
 		// `renderToStaticMarkup` sets MARKERS=false — no hydration, so no markers.
 		// An inherit-range site (M3) skips the wrap: the parent's own pair bounds
 		// this output, and the client borrows it instead of adopting.
+		nativeCompleted = true;
 		return MARKERS && !inherit ? BLOCK_OPEN + inner + BLOCK_CLOSE : inner;
 	} catch (error) {
 		throw normalizeThrownServerThenable(error);
 	} finally {
+		if (nativeToken >= 0) NATIVE_READ_COLLECTOR!.endScope(nativeToken, nativeCompleted);
 		CURRENT_SCOPE = prevScope;
 		FRAME = prevFrame;
 		CURRENT_COMP = prevComp;
@@ -6380,6 +6397,7 @@ function runFullFramedPass(
 	let rootSuspended = false;
 	let signals: NativeSignalManifest | undefined;
 	let nativePassCompleted = false;
+	const nativeToken = NATIVE_READ_COLLECTOR === null ? -1 : beginActiveNativeReadScope(root);
 	try {
 		// Normalize the root's return the same way ssrComponent normalizes child
 		// components: a compiled component returns its HTML string, but a plain
@@ -6398,6 +6416,7 @@ function runFullFramedPass(
 	} finally {
 		vtCandidates = VT_SSR_HAS_CANDIDATES;
 		try {
+			if (nativeToken >= 0) NATIVE_READ_COLLECTOR!.endScope(nativeToken, nativePassCompleted);
 			if (markers && nativePassCompleted)
 				signals = NATIVE_READ_COLLECTOR?.serialize(NATIVE_SERVER_READS);
 		} finally {

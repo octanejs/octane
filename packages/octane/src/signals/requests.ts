@@ -10,6 +10,7 @@ import {
 	pure,
 	readyState,
 	refreshNode,
+	releaseRetention,
 	signalBatch,
 	untrack,
 	type GraphOwner,
@@ -436,9 +437,7 @@ export class ResourceBinding<T = any> {
 					this.retainedRequest.kind !== request.definition.kind)
 			) {
 				this.retainedRequest = undefined;
-				this.node.last = undefined;
-				this.node.lastState = undefined;
-				this.node.hasLast = false;
+				releaseRetention(this.node);
 			}
 			let entry = this.owner.requests.get(request.identity);
 			let start = false;
@@ -483,6 +482,7 @@ export class ResourceBinding<T = any> {
 			this.pendingPromise,
 			entry.state.snapshot.connection,
 			entry.request.identity,
+			this.resolvePending,
 		);
 	}
 

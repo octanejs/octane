@@ -28,6 +28,8 @@ const knownOptions = new Set([
 	'rounds',
 	'snapshots',
 	'tooling-root',
+	'source-root',
+	'source-ref',
 ]);
 const options = new Map();
 let positional;
@@ -57,6 +59,21 @@ function sizes(value, label, minimum = 1) {
 }
 
 const quick = args.includes('--quick');
+const sourceRoot = options.has('source-root')
+	? fs.realpathSync(path.resolve(options.get('source-root')))
+	: REPO;
+if (options.has('source-root')) {
+	assert.ok(
+		options.has('source-ref'),
+		'An archived source root requires --source-ref=<git commit>',
+	);
+}
+const sourceRef = options.has('source-ref')
+	? execFileSync('git', ['rev-parse', '--verify', options.get('source-ref') + '^{commit}'], {
+			cwd: REPO,
+			encoding: 'utf8',
+		}).trim()
+	: null;
 const heap = args.includes('--heap');
 const iterations = integer(positional ?? (quick ? '3' : '9'), 'iterations');
 const scales = sizes(options.get('sizes') ?? (quick ? '100,1000' : '100,1000,10000'), 'sizes');
@@ -117,7 +134,7 @@ async function loadApi(request, label) {
 		absWorkingDir: REPO,
 		stdin: {
 			contents: entrySource,
-			resolveDir: path.join(REPO, 'packages/octane'),
+			resolveDir: path.join(sourceRoot, 'packages/octane'),
 			sourcefile: entryName,
 		},
 		bundle: true,
@@ -179,6 +196,23 @@ async function loadApi(request, label) {
 		);
 	}
 	const code = result.outputFiles[0].text;
+	if (sourceRef !== null) {
+		for (const input of inputs) {
+			if (path.basename(input) === entryName) continue;
+			const file = path.resolve(REPO, input);
+			if (!file.startsWith(path.join(sourceRoot, 'packages/octane') + path.sep)) continue;
+			const relative = path.relative(sourceRoot, file).replaceAll('\\', '/');
+			const expected = execFileSync('git', ['show', sourceRef + ':' + relative], {
+				cwd: REPO,
+				maxBuffer: 32 * 1024 * 1024,
+			});
+			assert.equal(
+				hashFile(file),
+				createHash('sha256').update(expected).digest('hex'),
+				'Archived source differs from Git: ' + relative,
+			);
+		}
+	}
 	return {
 		api: await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`),
 		bundle: {
@@ -202,7 +236,7 @@ let failure;
 let environment;
 try {
 	assert.equal(typeof globalThis.document, 'undefined', 'engine benchmark must run without a DOM');
-	const requireOctane = createRequire(path.join(REPO, 'packages/octane/package.json'));
+	const requireOctane = createRequire(path.join(sourceRoot, 'packages/octane/package.json'));
 	toolingRoot = options.has('tooling-root')
 		? fs.realpathSync(path.resolve(options.get('tooling-root')))
 		: null;
@@ -243,14 +277,25 @@ try {
 	const adapters = [alienAdapter(raw.api), scopedAdapter(scoped.api)];
 	const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO, encoding: 'utf8' }).trim();
 	environment = {
-		commit,
+		commit: sourceRef ?? commit,
+		runnerCommit: commit,
+		sourceRoot,
+		sourceRef,
+		sourceArchive: fs.existsSync(path.join(sourceRoot, 'source.tar'))
+			? {
+					path: path.join(sourceRoot, 'source.tar'),
+					sha256: hashFile(path.join(sourceRoot, 'source.tar')),
+				}
+			: null,
 		dirty:
 			execFileSync('git', ['status', '--porcelain'], { cwd: REPO, encoding: 'utf8' }).trim() !== '',
 		node: process.version,
+		execArgv: process.execArgv,
+		command: [process.execPath, ...process.execArgv, ...process.argv.slice(1)],
 		platform: process.platform,
 		architecture: process.arch,
 		cpu: os.cpus()[0]?.model,
-		lockfileSha256: hashFile(path.join(REPO, 'pnpm-lock.yaml')),
+		lockfileSha256: hashFile(path.join(sourceRoot, 'pnpm-lock.yaml')),
 		fixtureSha256: hashFile(path.join(HERE, 'workloads.mjs')),
 		runnerSha256: hashFile(import.meta.filename),
 		alienVersion: alienPackage.version,
@@ -401,6 +446,20 @@ try {
 			`PASS scoped-signals/continuous/${unrelated}: ${cycles} consecutive cycles per owner lifetime`,
 		);
 	}
+	for (const artifact of [raw.bundle, scoped.bundle]) {
+		for (const [input, expected] of Object.entries(artifact.inputSha256)) {
+			if (
+				['alien-benchmark-entry.mjs', 'scoped-benchmark-entry.mjs'].includes(path.basename(input))
+			)
+				continue;
+			assert.equal(
+				hashFile(path.resolve(REPO, input)),
+				expected,
+				'Source changed during benchmark: ' + input,
+			);
+		}
+	}
+	environment.sourceUnchanged = true;
 } catch (error) {
 	failure = error instanceof Error ? (error.stack ?? error.message) : String(error);
 	console.error(`FAIL scoped-signals: ${failure}`);

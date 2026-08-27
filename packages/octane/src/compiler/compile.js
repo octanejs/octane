@@ -1124,6 +1124,7 @@ const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 	'memoPublishAlways',
 ]);
 const NATIVE_READ_RUNTIME_HELPERS = new Set([
+	'enableNativeReadCollection',
 	'beginNativeReadScope',
 	'endNativeReadScope',
 	'beginNativeReadWitness',
@@ -8655,6 +8656,7 @@ function compileInternal(
 	let hookDepHelperNeeded = false;
 	ast = applyHookDependencies(ast, {
 		filename,
+		nativeReads: options?.nativeReads === true,
 		hookRuntimeModules: hookRuntimeModulesForCompile(
 			options,
 			rendererBoundaryPreparation?.universalUnits,
@@ -8734,6 +8736,7 @@ function compileInternal(
 		autoMemo: autoMemoEnabled,
 		strongMemo: strongMemoEnabled,
 		nativeReads: options?.nativeReads === true,
+		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
 		// A split Hydrate query module is invoked as the existing server-rendered
 		// boundary body. Its sole component child must therefore keep the server's
 		// own component marker pair instead of borrowing the Hydrate block range.
@@ -9853,6 +9856,7 @@ function compileInternal(
 	// is minted only by DOM-client hook slotting, so mixed renderer modules never
 	// accidentally import DOM memo helpers for a universal renderer's scope.
 	let moduleBody = [
+		...nativeReadActivationNodes(ctx, moduleOrigin),
 		...vtHintNodes,
 		...delegateNodes,
 		...styleNodes,
@@ -10013,6 +10017,7 @@ function compileServer(
 	let hookDepHelperNeeded = false;
 	ast = applyHookDependencies(ast, {
 		filename,
+		nativeReads: options?.nativeReads === true,
 		hookRuntimeModules: hookRuntimeModulesForCompile(options),
 		onRuntimeHelper: () => {
 			hookDepHelperNeeded = true;
@@ -10024,6 +10029,7 @@ function compileServer(
 		compilerNameSuffixes: null,
 		mode: 'server',
 		nativeReads: options?.nativeReads === true,
+		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
 		hmr: false, // SSR never hot-swaps in place; client/server production slot shapes stay aligned
 		dev: !!(options && options.dev),
 		// SSR MIRROR of the parallel-`use()` pipeline (docs/suspense-parallel-use-
@@ -10137,14 +10143,26 @@ function compileServer(
 		} else if (node.type === 'ExportNamedDeclaration' && isComponentFunction(node.declaration)) {
 			bodyNodes.push(...compileServerComponent({ ...node.declaration, export: true }, ctx));
 		} else if (isReturnJsxFunction(node)) {
+			if (ctx.nativeReads) {
+				bodyNodes.push(...compileReturnJsxFunction(node, ctx).nodes);
+				continue;
+			}
 			// A `function C() { return <jsx> }` form (no `@{}`). SSR it through the same
 			// component path as `@{}` so its host element + directives emit server markup
 			// (the client folds it; the two must agree for hydration).
 			bodyNodes.push(...compileServerComponent(node, ctx));
 		} else if (node.type === 'ExportNamedDeclaration' && isReturnJsxFunction(node.declaration)) {
-			bodyNodes.push(...compileServerComponent({ ...node.declaration, export: true }, ctx));
+			bodyNodes.push(
+				...(ctx.nativeReads
+					? compileReturnJsxFunction(node.declaration, ctx, { export: true }).nodes
+					: compileServerComponent({ ...node.declaration, export: true }, ctx)),
+			);
 		} else if (node.type === 'ExportDefaultDeclaration' && isReturnJsxFunction(node.declaration)) {
-			bodyNodes.push(...compileServerComponent({ ...node.declaration, default: true }, ctx));
+			bodyNodes.push(
+				...(ctx.nativeReads
+					? compileReturnJsxFunction(node.declaration, ctx, { default: true }).nodes
+					: compileServerComponent({ ...node.declaration, default: true }, ctx)),
+			);
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
 			// User imports from 'octane' resolve to the server runtime instead.
 			addUserImportSpecifiers(ctx, node);
@@ -10170,12 +10188,13 @@ function compileServer(
 	// Assign deferred (server-only) slot ids BEFORE the import list is built:
 	// the flush may register `hookSlots` as a needed runtime import.
 	flushTailHookSymbols(ctx);
+	const nativeActivation = nativeReadActivationNodes(ctx, ctx._moduleOrigin);
 	const runtimeImportNodes = buildRuntimeImportNodes(ctx, 'octane/server', ctx._moduleOrigin);
 	const helperNodes = hoistedHelperNodes(ctx);
 	const program = {
 		type: 'Program',
 		sourceType: 'module',
-		body: [...runtimeImportNodes, ...helperNodes, ...bodyNodes],
+		body: [...runtimeImportNodes, ...nativeActivation, ...helperNodes, ...bodyNodes],
 		metadata: { path: [] },
 		start: ast.start,
 		end: ast.end,
@@ -12950,6 +12969,17 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
  * concatenated (`.red.tsrx-abc`) so the matched element only needs the
  * hash on its `class` attribute.
  */
+function hasModuleStyleMaps(body) {
+	return body.some((statement) => {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		return (
+			declaration?.type === 'VariableDeclaration' &&
+			declaration.declarations.some((declarator) => declarator.init?.type === 'JSXStyleElement')
+		);
+	});
+}
+
 // Copy-on-write: returns the (possibly rebuilt) statement; the input is never
 // modified. The core analyze/prepare pipeline mutates the sheet it is given,
 // so it runs over a clone of the (bounded) StyleSheet subtree.
@@ -17256,6 +17286,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					(isBuiltin || isServerUse);
 				const forceSymbol = !numericSlot;
 				const getterHelper = stateGetterMarks.get(n) ? STATE_GETTER_HELPERS[name] : null;
+				const nativeMemo = ctx.nativeReads && n._octaneNativeInferredMemo === true;
 				// A builtin hook call site is USER code (the user's own identifier), so
 				// its import stays bare — EXCEPT compiler-inserted calls (auto-callback's
 				// `useCallback`), whose callee is renamed to the `_$` alias below so a
@@ -17266,6 +17297,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 						ctx.userRuntimeNames.add(localName === name ? name : `${name} as ${localName}`);
 					}
 					if (getterHelper !== null) requireRuntimeForContext(ctx, getterHelper);
+					if (nativeMemo) requireRuntimeForContext(ctx, 'nativePuMemo');
 				}
 				if (isServerUse)
 					ctx.userRuntimeNames.add(localName === name ? 'use' : `use as ${localName}`);
@@ -17332,8 +17364,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				return {
 					...n,
 					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
-					callee:
-						getterHelper !== null
+					callee: nativeMemo
+						? b.id(runtimeAliasForContext(ctx, 'nativePuMemo'))
+						: getterHelper !== null
 							? b.id(runtimeAliasForContext(ctx, getterHelper))
 							: n.callee._octaneGenerated
 								? b.id(runtimeAliasForContext(ctx, name))
@@ -17373,7 +17406,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				const annotatedOwner = ctx.profile ? ctx.profileOwnerMarks?.get(n) : null;
 				const profileOwner = annotatedOwner?.name || componentName;
 				const getterHelper = stateGetterMarks.get(n) ? STATE_GETTER_HELPERS[name] : null;
+				const nativeMemo = ctx.nativeReads && n._octaneNativeInferredMemo === true;
 				if (getterHelper !== null) requireRuntimeForContext(ctx, getterHelper);
+				if (nativeMemo) requireRuntimeForContext(ctx, 'nativePuMemo');
 				const numericSlot =
 					!ctx.hmr &&
 					!ctx.profile &&
@@ -17405,8 +17440,11 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				return {
 					...n,
 					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
-					callee:
-						getterHelper !== null ? b.id(runtimeAliasForContext(ctx, getterHelper)) : n.callee,
+					callee: nativeMemo
+						? b.id(runtimeAliasForContext(ctx, 'nativePuMemo'))
+						: getterHelper !== null
+							? b.id(runtimeAliasForContext(ctx, getterHelper))
+							: n.callee,
 					arguments: explicitMemoSlot
 						? args
 						: appendHookSlotArgument(name, args, slot, numericSlot, n),
@@ -17467,9 +17505,16 @@ function compileReturnJsxFunction(node, ctx, options) {
 	const name = node.id.name;
 	const hookMemoOpaqueOwner = ctx.inlineHookMemo && hasInlineMemoOpaqueDirective(node);
 	recordProfileComponent(ctx, node, name);
+	const beforeCss = ctx.cssInjections.length;
 	const scoping = applyCssScoping(node, ctx);
 	node = scoping.node;
 	const cssHash = scoping.cssHash;
+	const cssEntries =
+		ctx.mode === 'server'
+			? [...ctx.moduleCssInjections, ...ctx.cssInjections.slice(beforeCss)].sort(
+					(a, b) => a.order - b.order,
+				)
+			: [];
 	// A folded directive's branch helper functions (`__then$N`/`__else$N`) are
 	// collected here so they're emitted INSIDE this component function — preserving
 	// their closure over setup locals/props — and only their values + the control
@@ -17477,14 +17522,17 @@ function compileReturnJsxFunction(node, ctx, options) {
 	const compInlinedSubs = [];
 	// Fold a directive found at value position into a hoisted renderer owned by THIS
 	// body — the same fold the `@{}` body and the server emitter build.
-	const lowerBodyValueDirective = (directive) =>
-		lowerHostFragment(
-			setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
-			ctx,
-			compInlinedSubs,
-			'opaque',
-			cssHash,
-		);
+	const lowerBodyValueDirective =
+		ctx.mode === 'server'
+			? serverValueDirectiveFold(ctx, name, compInlinedSubs, cssHash)
+			: (directive) =>
+					lowerHostFragment(
+						setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
+						ctx,
+						compInlinedSubs,
+						'opaque',
+						cssHash,
+					);
 	// A `return <jsx>` body owns its returned JSX just as much as a `@{}` body owns
 	// its render output, so an attribute value or expression-container child in it
 	// can hold a directive this body must fold. Publishing the fold here is what
@@ -17565,6 +17613,24 @@ function compileReturnJsxFunction(node, ctx, options) {
 			// The `return <jsx>` output → a compiled-fragment descriptor (reconcile path),
 			// not the host-string de-opt (rebuild). Other JSX in setup keeps value-lowering.
 			if (h.type === 'ReturnStatement' && h.argument && isJsxNode(h.argument)) {
+				// An ordinary function can return an element for later rendering or
+				// inspection. Native reads in that record must be sampled under its
+				// represented render scope, not captured into fragment props while
+				// the factory runs. Reuse value lowering in both emitters so its
+				// public type/props and deferred children also stay inspectable.
+				if (ctx.nativeReads) {
+					return {
+						...h,
+						argument: nativeReturnedJsxValue(
+							h.argument,
+							ctx,
+							name,
+							compInlinedSubs,
+							cssHash,
+							cssEntries,
+						),
+					};
+				}
 				if (autoCalculatedDeclarations !== null) {
 					// Unlike a JSXCodeBlock, a returned-JSX body's statement list also
 					// contains its output. Do not mistake that owned return for a setup
@@ -17629,6 +17695,18 @@ function compileReturnJsxFunction(node, ctx, options) {
 		...compInlinedSubs,
 		...newStatements,
 	];
+	if (cssEntries.length > 0) {
+		ctx.runtimeNeeded.add('injectStyle');
+		returnBody.unshift(
+			...cssEntries.map((entry) => {
+				const origin = claimCssOrigins(ctx, entry) ?? node;
+				return inheritOriginLoc(
+					b.stmt(ssrCall('injectStyle', [b.literal(entry.hash), b.literal(entry.css)], origin)),
+					origin,
+				);
+			}),
+		);
+	}
 	const emittedFunction = b.function_declaration(
 		node.id,
 		node.params,
@@ -17670,6 +17748,78 @@ function compileReturnJsxFunction(node, ctx, options) {
 	}
 	if (options && options.export) return { nodes: [inheritOriginLoc(b.export(fn), node)] };
 	return { nodes: [fn] };
+}
+
+function nativeReturnedJsxValue(node, ctx, name, inlinedSubs, cssHash, cssEntries) {
+	let value;
+	if (requiresTemplateNormalization(node, 'html', true, ctx)) {
+		// Head resources, directive roots and other compiler-only syntax keep
+		// their existing fragment ABI. Defer its record so extracted expressions
+		// are read only when the stored subtree is interpreted. Return roots keep
+		// their established head namespace; nested components remain opaque.
+		const fragment =
+			ctx.mode === 'server'
+				? serverValueDirectiveFold(ctx, name, inlinedSubs, cssHash, false, 'html')(node)
+				: lowerReturnJsx(node, ctx, inlinedSubs, cssHash);
+		value = inheritOriginLoc(
+			b.call(requireRuntimeForContext(ctx, 'nativeCreateScopedValue'), b.arrow([], fragment)),
+			node,
+		);
+	} else {
+		value = rewriteJsxValues(node, ctx);
+	}
+	// A stored styled value may be constructed outside an SSR render. Its CSS
+	// enters the request collector when interpreted, not a global pending queue.
+	if (cssHash === null && !ctx.nativeModuleStyles) return value;
+	const scopedElement = runtimeAliasForContext(ctx, 'nativeCreateScopedElement');
+	const scopedValue = runtimeAliasForContext(ctx, 'nativeCreateScopedValue');
+	// A static styled fragment needs a reader too, even when it only owns a
+	// :global stylesheet and has no element children. Keep this shape aligned in
+	// both emitters; unstyled static fragment arrays remain unchanged.
+	if (
+		(node.type === 'Fragment' || node.type === 'JSXFragment') &&
+		value.callee?.name === rtAlias('positionalChildren')
+	) {
+		ctx.runtimeNeeded.add('Fragment');
+		value = inheritOriginLoc(
+			b.call(
+				requireRuntimeForContext(ctx, 'nativeCreateScopedElement'),
+				b.id(rtAlias('Fragment')),
+				b.object([]),
+				b.arrow([], value),
+			),
+			node,
+		);
+	}
+	if (cssEntries.length === 0) return value;
+	ctx.runtimeNeeded.add('injectStyle');
+	const css = cssEntries.map((entry) => {
+		const origin = claimCssOrigins(ctx, entry) ?? node;
+		return inheritOriginLoc(
+			b.stmt(ssrCall('injectStyle', [b.literal(entry.hash), b.literal(entry.css)], origin)),
+			origin,
+		);
+	});
+	const readerIndex =
+		value.callee?.name === scopedValue ? 0 : value.callee?.name === scopedElement ? 2 : -1;
+	if (readerIndex === -1) {
+		return inheritOriginLoc(
+			b.call(
+				requireRuntimeForContext(ctx, 'nativeCreateScopedValue'),
+				b.arrow([], b.block([...css, b.return(value)])),
+			),
+			node,
+		);
+	}
+	const args = value.arguments.slice();
+	const reader = args[readerIndex];
+	const statements =
+		reader.body.type === 'BlockStatement' ? reader.body.body : [b.return(reader.body)];
+	args[readerIndex] = inheritOriginLoc(
+		b.arrow(reader.params, b.block([...css, ...statements])),
+		reader,
+	);
+	return { ...value, arguments: args };
 }
 
 function hasJsxAttribute(node, name) {
@@ -18662,7 +18812,7 @@ function setupDirectiveFragment(directive) {
 	return inheritOriginLoc(b.jsx_fragment([directive]), directive);
 }
 
-function prepareSetupValueDirective(directive, ctx, componentName) {
+function prepareSetupValueDirective(directive, ctx, componentName, parentNs = 'opaque') {
 	// These descriptor-backed directives become synthetic branch bodies after the
 	// owning component's render-tree pass has already run. Give eligible @if/@try
 	// arms Pass A now (the walk deliberately retains its @for/@switch v1 exclusions)
@@ -18677,7 +18827,7 @@ function prepareSetupValueDirective(directive, ctx, componentName) {
 		// A first-class descriptor can be inserted under HTML, SVG, or MathML.
 		// Preserve that runtime namespace decision for ambiguous descendants such
 		// as <title>, exactly like returned descriptor-backed fragments do.
-		const opaque = rewriteOpaqueTitles(prepared, ctx, 'opaque');
+		const opaque = rewriteOpaqueTitles(prepared, ctx, parentNs);
 		if (opaque.type !== 'JSXCodeBlock') return opaque;
 		// Normalize child blocks now so the server does not mistake the code-block
 		// node for another setup value and recurse indefinitely. Render-only blocks
@@ -18805,7 +18955,14 @@ function liftDirectiveControl(ctx, directive) {
 // own list so the sub can close over setup values; module-level statements pass
 // the hoisted-helper list, where a module-level directive's only possible
 // references already live.
-function serverValueDirectiveFold(ctx, name, inlinedSubs, cssHash, freezeControl = false) {
+function serverValueDirectiveFold(
+	ctx,
+	name,
+	inlinedSubs,
+	cssHash,
+	freezeControl = false,
+	parentNs = 'opaque',
+) {
 	return (rawDirective) => {
 		// A module-level value is computed ONCE, where it is written. The client gets
 		// that for free — its fold lifts the control expression out as a hole
@@ -18815,7 +18972,7 @@ function serverValueDirectiveFold(ctx, name, inlinedSubs, cssHash, freezeControl
 		// a plain `const v = cond ? <A/> : <B/>` and React's module-level elements.
 		const frozen = freezeControl ? liftDirectiveControl(ctx, rawDirective) : null;
 		const directive = frozen === null ? rawDirective : frozen.directive;
-		const preparedDirective = prepareSetupValueDirective(directive, ctx, name);
+		const preparedDirective = prepareSetupValueDirective(directive, ctx, name, parentNs);
 		const wrapperName = allocCompilerName(ctx, `_sfrag$${ctx.nextFragId++}`);
 		// The sub is declared in the OWNING body, so it closes over that body's values
 		// lexically. A name introduced by an enclosing callback is not in scope there
@@ -21264,6 +21421,19 @@ function stripTsOnlyWrappers(node) {
 		}
 	}
 	return out ?? node;
+}
+
+function nativeReadActivationNodes(ctx, origin) {
+	// Install the graph-free driver before any authored root invocation, not
+	// after parameter evaluation inside a syntactically recognized component.
+	// Plain data modules do not pass through this renderer compilation path.
+	if (!ctx.nativeReads) return [];
+	return [
+		inheritOriginLoc(
+			b.stmt(b.call(requireRuntimeForContext(ctx, 'enableNativeReadCollection'), b.literal(1))),
+			origin,
+		),
+	];
 }
 
 function nativeReadNames(ctx) {

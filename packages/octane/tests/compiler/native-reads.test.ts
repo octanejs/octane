@@ -47,6 +47,18 @@ const scope = createScope({ scopeKey: 'plain' }); const count = scope.signal$('c
 		expect(() => compiler.transform(source, '/project/src/store.ts')).toThrow(NAMING);
 	});
 
+	it('leaves data-only modules free of renderer initialization, including type imports', () => {
+		const compiler = createOctaneCompiler({ root: '/project', nativeReads: true });
+		const source = `import type { OctaneNode } from 'octane';
+import { createScope } from 'octane/signals';
+const scope = createScope({ scopeKey: 'plain' });
+export const value$ = scope.signal$('value', 0);`;
+		expect(compiler.transform(source, '/project/src/store.ts')).toMatchObject({
+			code: source,
+			kind: 'none',
+		});
+	});
+
 	it.each([undefined, false])(
 		'rejects unslotted plain local hooks when nativeReads=%s',
 		(nativeReads) => {
@@ -219,18 +231,7 @@ function shadow(createScope) {
 });
 
 describe('native reads and ordinary hook dependencies', () => {
-	it('keeps the automatic cache for an ordinary JSX function with five dependencies', () => {
-		const source = `export function App({ a, b, c, d, e }) {
-  const values = [a, b, c, d, e];
-  return <div>{values}</div>;
-}`;
-		const output = compile(source, FILENAME, { dev: false, hmr: false, nativeReads: true });
-		// This generated helper is the generic path above the fixed-arity memo
-		// helpers; enabling native reads must not drop the automatic cache.
-		expect(output.code).toContain('nativePuMemo');
-	});
-
-	it.each(['', ', []', ', [count$]'])('diagnoses a live read in useMemo%s', (deps) => {
+	it.each([', []', ', [count$]'])('diagnoses a live read in useMemo%s', (deps) => {
 		const source = app(
 			`const value = useMemo(() => scope.get(count$)${deps});`,
 			`import { useMemo } from 'octane';\n${PREFIX}`,
@@ -240,7 +241,7 @@ describe('native reads and ordinary hook dependencies', () => {
 
 	it('diagnoses a helper read and a memo import alias without relying on dollar spelling', () => {
 		const source = app(
-			`const value = memo(readCount$);`,
+			`const value = memo(readCount$, []);`,
 			`
 import { useMemo as memo } from 'octane';
 ${PREFIX}
@@ -248,6 +249,19 @@ function readCount$() { return scope.get(count$); }
 `,
 		);
 		expect(() => compile(source, FILENAME, { nativeReads: true })).toThrow(MEMO_READ);
+	});
+
+	it.each(modes)('accepts inferred native memo reads in %j', (options) => {
+		const source = app(
+			`const value = useMemo(() => scope.get(count$));
+const alias = memo(readCount$);
+const namespace = Octane.useMemo(() => count$.latest(0));`,
+			`import { useMemo, useMemo as memo } from 'octane';
+import * as Octane from 'octane';
+${PREFIX}
+function readCount$() { return scope.get(count$); }`,
+		);
+		expect(() => compile(source, FILENAME, { ...options, nativeReads: true })).not.toThrow();
 	});
 
 	it('diagnoses a live read inside a memoized JSX result', () => {

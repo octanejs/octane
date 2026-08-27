@@ -169,15 +169,10 @@ scope.batch(() => { value$.set(4); value$.set(5); });
 assert.equal(doubled$.get(), 10);
 assert.equal(notifications, 1);
 let escaped;
-function Component(_props, rendererScope) {
-  const token = internalServer.beginNativeReadScope(rendererScope, 1);
-  let completed = false;
-  try {
-    escaped = serverHooks.useSignal$(2);
-    const html = '<p>' + doubled$.get() + ':' + escaped.get() + '</p>';
-    completed = true;
-    return html;
-  } finally { internalServer.endNativeReadScope(token, completed); }
+internalServer.enableNativeReadCollection(1);
+function Component({ value = doubled$.get() } = {}) {
+  escaped = serverHooks.useSignal$(2);
+  return '<p>' + value + ':' + escaped.get() + '</p>';
 }
 const output = server.renderToString(Component);
 assert.ok(output.html.includes('<p>10:2</p>'));
@@ -186,10 +181,11 @@ assert.deepEqual(output.signals?.scopes.map(normalizeSeed), [normalizeSeed(scope
 assert.throws(() => escaped.get(), signals.ScopeDisposedError);
 assert.equal(typeof clientHooks.useSignal$, 'function');
 assert.equal(typeof client.createRoot, 'function');
+assert.equal(typeof internalClient.enableNativeReadCollection, 'function');
 assert.equal(typeof internalClient.beginNativeReadScope, 'function');
 stop();
 scope.dispose();
-process.stdout.write(JSON.stringify({html: true, seed: true, localRetired: true, notifications}));
+process.stdout.write(JSON.stringify({html: true, seed: true, invocationCollector: true, localRetired: true, notifications}));
 `;
 const namespaces = {
 	client: 'octane',
@@ -268,7 +264,7 @@ const report = {
 	scratch,
 	status: 'passed',
 	scope:
-		'Targeted per-file ESM/CommonJS public imports, native SSR protocol identity, local hook retirement, and declaration consumer. Compiler/Volar build and full package tarball not verified.',
+		'Targeted per-file ESM/CommonJS public imports, native SSR invocation/parameter collection and protocol identity, local hook retirement, and declaration consumer. Compiler/Volar build and full package tarball not verified.',
 	commonjsEntries,
 	commonjsModules: commonjs.modules,
 	declarationEntries,

@@ -71,6 +71,37 @@ describe('scoped promise resources', () => {
 		expect(() => resource$.get()).toThrow(ScopeDisposedError);
 	});
 
+	it('rejects cached foreign reads before cancellation callbacks finish owner retirement', () => {
+		const data = owner('retiring-data');
+		const view = owner('surviving-view');
+		const value$ = data.signal$('value', 'private value');
+		const card$ = view.derived$('card', () => ({ title: value$.get() }));
+		const observed: unknown[] = [];
+		const load = query('retirement-observer', (_argument: undefined, { signal }) => {
+			signal.addEventListener('abort', () => {
+				for (const read of [() => card$.get(), () => card$.latest(null), () => card$.snapshot()]) {
+					try {
+						observed.push(read());
+					} catch (error) {
+						observed.push(error);
+					}
+				}
+			});
+			return new Promise<void>(() => {});
+		});
+		data.asyncSignal$('work', () => load(undefined));
+		expect(card$.get()).toEqual({ title: 'private value' });
+
+		data.dispose();
+
+		expect(observed).toEqual([
+			expect.any(ScopeDisposedError),
+			expect.any(ScopeDisposedError),
+			expect.any(ScopeDisposedError),
+		]);
+		expect(() => card$.latest(null)).toThrow(ScopeDisposedError);
+	});
+
 	it('preserves a nested retry started by cancellation without orphaning its producer', async () => {
 		const scope = owner('retry-in-abort');
 		const attempts: { signal: AbortSignal; completion: Deferred<string> }[] = [];
@@ -559,6 +590,175 @@ describe('scoped promise resources', () => {
 			expect([first$.get(), second$.get()]).toEqual(['refreshed', 'refreshed']);
 		},
 	);
+
+	it('checks the availability of fallback projections separately from request activity', async () => {
+		const scope = owner('availability');
+		const attempts: Deferred<string>[] = [];
+		const load = query('availability', () => {
+			const attempt = deferred<string>();
+			attempts.push(attempt);
+			return attempt.promise;
+		});
+		const result$ = scope.asyncSignal$('result', () => load(undefined));
+		const label$ = scope.derived$('label', () => result$.latest('waiting'));
+		expect(scope.isPending(() => result$.get())).toBe(true);
+		expect(scope.isPending(() => result$.latest('waiting'))).toBe(false);
+		expect(label$.get()).toBe('waiting');
+		expect(scope.isPending(() => label$.get())).toBe(false);
+
+		attempts[0].resolve('first result');
+		await drainProducers();
+		result$.retry();
+		expect(result$.snapshot()).toMatchObject({
+			status: 'ready',
+			refreshing: true,
+			complete: false,
+		});
+		expect(scope.isPending(() => result$.get())).toBe(false);
+		expect(scope.isPending(() => label$.get())).toBe(false);
+
+		result$.retry({ pending: true });
+		expect(scope.isPending(() => result$.get())).toBe(true);
+		expect(label$.get()).toBe('first result');
+		expect(scope.isPending(() => label$.get())).toBe(false);
+		const failure = new Error('new answer failed');
+		attempts[2].reject(failure);
+		await drainProducers();
+		expect(() => scope.isPending(() => result$.get())).toThrow(failure);
+		expect(label$.get()).toBe('first result');
+		expect(scope.isPending(() => label$.get())).toBe(false);
+	});
+
+	it('loads a fresh answer when returning to a request no resource still owns', async () => {
+		const scope = owner('no-idle-cache');
+		const selected$ = scope.signal$('selected', 'a');
+		const attempts: { id: string; result: Deferred<string> }[] = [];
+		const load = query('revisit', (id: string) => {
+			const result = deferred<string>();
+			attempts.push({ id, result });
+			return result.promise;
+		});
+		const result$ = scope.asyncSignal$('result', () => load(selected$.get()));
+		attempts[0].result.resolve('first a');
+		await drainProducers();
+		expect(result$.get()).toBe('first a');
+		selected$.set('b');
+		expect(result$.latest(null)).toBe('first a');
+		attempts[1].result.resolve('current b');
+		await drainProducers();
+		expect(result$.get()).toBe('current b');
+
+		selected$.set('a');
+
+		expect(scope.isPending(() => result$.get())).toBe(true);
+		expect(result$.latest(null)).toBe('current b');
+		expect(attempts.at(-1)?.id).toBe('a');
+		attempts.at(-1)!.result.resolve('fresh a');
+		await drainProducers();
+		expect(result$.get()).toBe('fresh a');
+	});
+
+	it('retains the displayed identity and action with the whole successful card', async () => {
+		const scope = owner('card-actions');
+		const selected$ = scope.signal$('selected', 'a');
+		const attempts = new Map<string, Deferred<{ id: string; title: string }>>();
+		const actedOn: string[] = [];
+		const load = query('card', (id: string) => {
+			const result = deferred<{ id: string; title: string }>();
+			attempts.set(id, result);
+			return result.promise;
+		});
+		const record$ = scope.asyncSignal$('record', () => load(selected$.get()));
+		const card$ = scope.derived$('card', () => {
+			const record = record$.get();
+			return { ...record, activate: () => actedOn.push(record.id) };
+		});
+		attempts.get('a')!.resolve({ id: 'a', title: 'First card' });
+		await drainProducers();
+		expect(card$.get()).toMatchObject({ id: 'a', title: 'First card' });
+		selected$.set('b');
+		const held = card$.latest(null)!;
+		expect(selected$.get()).toBe('b');
+		expect(held).toMatchObject({ id: 'a', title: 'First card' });
+		held.activate();
+		expect(actedOn).toEqual(['a']);
+		attempts.get('b')!.resolve({ id: 'b', title: 'Second card' });
+		await drainProducers();
+		const current = card$.get();
+		expect(current).toMatchObject({ id: 'b', title: 'Second card' });
+		current.activate();
+		expect(actedOn).toEqual(['a', 'b']);
+	});
+
+	it('revokes an old foreign result without canceling a valid replacement request', async () => {
+		const previous = owner('previous-account');
+		const replacement = owner('replacement-account');
+		const view = owner('account-view');
+		const previousId$ = previous.signal$('id', 'a');
+		const replacementId$ = replacement.signal$('id', 'b');
+		const selectReplacement$ = view.signal$('replacement', false);
+		const attempts: { id: string; signal: AbortSignal; result: Deferred<string> }[] = [];
+		const load = query('owned-result', (id: string, { signal }) => {
+			const result = deferred<string>();
+			attempts.push({ id, signal, result });
+			return result.promise;
+		});
+		const result$ = view.asyncSignal$('result', () =>
+			load(selectReplacement$.get() ? replacementId$.get() : previousId$.get()),
+		);
+		attempts[0].result.resolve('private a');
+		await drainProducers();
+		expect(result$.get()).toBe('private a');
+		selectReplacement$.set(true);
+		expect(result$.latest(null)).toBe('private a');
+		const pending = capturePending$(() => result$.get());
+		let awakened = false;
+		void Promise.resolve(pending).then(() => {
+			awakened = true;
+		});
+
+		previous.dispose();
+		await drainProducers();
+
+		expect(awakened).toBe(true);
+		expect(() => result$.latest(null)).toThrow(ScopeDisposedError);
+		expect(attempts[1].signal.aborted).toBe(false);
+		attempts[1].result.resolve('current b');
+		await drainProducers();
+		expect(result$.get()).toBe('current b');
+		replacement.dispose();
+		expect(() => result$.latest(null)).toThrow(ScopeDisposedError);
+	});
+
+	it('releases retained ownership when switching to a different query family', async () => {
+		const previous = owner('old-query-owner');
+		const view = owner('query-view');
+		const id$ = previous.signal$('id', 'a');
+		const phase$ = view.signal$<'first' | 'blocked' | 'different'>('phase', 'first');
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const originalQuery = query('original', (_id: string) => first.promise);
+		const replacementQuery = query('different', () => second.promise);
+		const result$ = view.asyncSignal$('result', () => {
+			const phase = phase$.get();
+			if (phase === 'blocked') throw new Error('selection unavailable');
+			return phase === 'first' ? originalQuery(id$.get()) : replacementQuery(undefined);
+		});
+		first.resolve('old private result');
+		await drainProducers();
+		expect(result$.get()).toBe('old private result');
+		phase$.set('blocked');
+		expect(result$.latest(null)).toBe('old private result');
+		phase$.set('different');
+		expect(result$.latest(null)).toBeNull();
+
+		previous.dispose();
+
+		expect(view.isPending(() => result$.get())).toBe(true);
+		second.resolve('different result');
+		await drainProducers();
+		expect(result$.get()).toBe('different result');
+	});
 
 	it('keeps a shared request alive until the last resource selects another identity', async () => {
 		const scope = owner();

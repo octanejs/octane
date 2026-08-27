@@ -100,6 +100,36 @@ const OCTANE_PLATFORM = {
 };
 
 const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
+const octaneTransformWithAuthoredSuspense = createJsxTransform({
+	...OCTANE_PLATFORM,
+	hooks: {
+		createPendingBoundary(_content, _fallback, context) {
+			// Reuse the authored value binding without replacing its mapped import.
+			// Returning null keeps the shared boundary lowering; only its redundant
+			// helper import is suppressed. Other directive imports remain unchanged.
+			context.needs_suspense = false;
+			return null;
+		},
+	},
+});
+
+/** @param {import('@tsrx/core/types').AST.Program} ast */
+function selectOctaneTransform(ast) {
+	const hasSuspenseImport = ast.body.some(
+		(statement) =>
+			statement.type === 'ImportDeclaration' &&
+			statement.importKind !== 'type' &&
+			statement.source.value === OCTANE_PLATFORM.imports.suspense &&
+			statement.specifiers.some(
+				(specifier) =>
+					specifier.type === 'ImportSpecifier' &&
+					specifier.importKind !== 'type' &&
+					specifier.local.name === 'Suspense' &&
+					(specifier.imported.name ?? specifier.imported.value) === 'Suspense',
+			),
+	);
+	return hasSuspenseImport ? octaneTransformWithAuthoredSuspense : octaneTransform;
+}
 
 /**
  * Does the parsed file carry an authored `@jsxImportSource` pragma in its
@@ -253,7 +283,8 @@ export function compileToVolarMappings(source, filename, options) {
 	// @tsrx/core: `ast` (passed below as `ast_from_source`) stays the
 	// original parse, and replacement nodes keep authored locations so
 	// mappings/hover still work.
-	const transformed = octaneTransform(ast, source, filename, {
+	const transform = selectOctaneTransform(ast);
+	const transformed = transform(ast, source, filename, {
 		collect: true,
 		loose: !!options?.loose,
 		// @tsrx/core routes `typeOnly: true` to its TSX esrap language with
@@ -491,7 +522,8 @@ export function compileTypesInspection(source, filename, options) {
 	const rendererPragma = hasAuthoredLeadingPragma(ast, comments)
 		? null
 		: createRendererTypePragma(renderer, ast);
-	const transformed = octaneTransform(ast, source, filename, {
+	const transform = selectOctaneTransform(ast);
+	const transformed = transform(ast, source, filename, {
 		collect: true,
 		loose: true,
 		typeOnly: true,

@@ -6,6 +6,7 @@ import { builders as b, clone_ast_node as cloneAstNode } from '@tsrx/core';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { METHOD_DEP_IMPORT } from './hook-deps.js';
+import { nativeReadActivationIndex } from './native-read-codegen.js';
 import {
 	hasInlineMemoDirectEval,
 	inheritHookMemoOrigin,
@@ -157,6 +158,9 @@ function slotBaseHooks(ast, state, options) {
 		if (options.getterCalls.has(node) && options.stateGetterHelpers[imported]) {
 			callee = b.id(requireHelper(state, options.stateGetterHelpers[imported], 'octane'), node);
 		}
+		if (node._octaneNativeInferredMemo === true) {
+			callee = b.id(requireHelper(state, 'nativePuMemo'), node);
+		}
 		return { ...mapped, callee, arguments: args };
 	}
 	return visit(ast);
@@ -240,6 +244,12 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 	if (lowered.lowered === 0) return null;
 	transformed = lowered.ast;
 	const origin = ast.body[0] ?? ast;
+	const activation = options.nativeReadActivation
+		? inheritHookMemoOrigin(
+				b.stmt(b.call(requireHelper(state, 'enableNativeReadCollection'), b.literal(1))),
+				origin,
+			)
+		: null;
 	const trailing = [];
 	if (state.slotDeclarations.length > 0) {
 		const hookSlots = requireHelper(state, 'hookSlots', 'octane');
@@ -260,7 +270,20 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 	const imports = [...byRequest].map(([request, specifiers]) =>
 		inheritHookMemoOrigin(b.import_declaration(specifiers, request), origin),
 	);
-	const program = { ...transformed, body: [...transformed.body, ...imports, ...trailing] };
+	const start = nativeReadActivationIndex(transformed.body);
+	const program = {
+		...transformed,
+		body:
+			activation === null
+				? [...transformed.body, ...imports, ...trailing]
+				: [
+						...transformed.body.slice(0, start),
+						...imports,
+						...trailing,
+						activation,
+						...transformed.body.slice(start),
+					],
+	};
 	// One TS-preserving print, with real mappings. Never feed this generated code
 	// back through the surgical pass or parse it into a second compiler pipeline.
 	try {

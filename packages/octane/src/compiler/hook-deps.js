@@ -1444,8 +1444,8 @@ export function analyzeHookDependencies(ast, options = {}) {
  * Untouched subtrees stay shared with the input by reference. Returns the
  * rebuilt module plus the inference map re-keyed to the rebuilt call nodes.
  */
-/** @param {any} ast @param {any} analysis @param {Map<any, any>} inferred @param {boolean} insertDeps */
-function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps) {
+/** @param {any} ast @param {any} analysis @param {Map<any, any>} inferred @param {boolean} insertDeps @param {boolean} nativeReads */
+function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps, nativeReads = false) {
 	const annotations = analysis.callAnnotations;
 	const rekeyedInferred = new Map();
 	/** @param {any} node @returns {any} */
@@ -1475,6 +1475,9 @@ function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps) {
 			if (out === null) out = { ...node };
 			if (props !== undefined) Object.assign(out, props);
 			if (result !== undefined) {
+				// Only an authored omission grants this capability. Explicit arrays,
+				// null, and dependency arguments forwarded by wrappers stay ordinary.
+				if (nativeReads && result.name === 'useMemo') out._octaneNativeInferredMemo = true;
 				if (insertDeps) {
 					const args = out.arguments.slice();
 					// The synthesized array maps to the hook call it belongs to; each
@@ -1505,10 +1508,10 @@ function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps) {
  * keyed by the rebuilt calls. Dependency arrays are NOT inserted — that pass
  * edits source text from the inference results instead of reprinting the tree.
  */
-/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, inferDependencies?: boolean }} [options] */
+/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, inferDependencies?: boolean, nativeReads?: boolean }} [options] */
 export function annotateHookCalls(ast, options = {}) {
 	const { analysis, inferred } = analyzeInternal(ast, options);
-	return rebuildWithHookMetadata(ast, analysis, inferred, false);
+	return rebuildWithHookMetadata(ast, analysis, inferred, false, options.nativeReads === true);
 }
 
 /**
@@ -1516,7 +1519,7 @@ export function annotateHookCalls(ast, options = {}) {
  * dependency arrays inserted at each candidate call. Copy-on-write — the input
  * AST is never modified; callers must use the returned module.
  */
-/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, onRuntimeHelper?: (name: string) => void }} [options] */
+/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, onRuntimeHelper?: (name: string) => void, nativeReads?: boolean }} [options] */
 export function applyHookDependencies(ast, options = {}) {
 	const { analysis, inferred } = analyzeInternal(ast, options);
 	// The inserted `_$__methodDep(...)` calls need their aliased runtime import;
@@ -1533,5 +1536,5 @@ export function applyHookDependencies(ast, options = {}) {
 			}
 		}
 	}
-	return rebuildWithHookMetadata(ast, analysis, inferred, true).ast;
+	return rebuildWithHookMetadata(ast, analysis, inferred, true, options.nativeReads === true).ast;
 }

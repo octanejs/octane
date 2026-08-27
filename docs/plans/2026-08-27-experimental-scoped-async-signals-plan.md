@@ -11,9 +11,28 @@ base: c84edbb271c19488922f3d9941e374f022ead516
 
 Build an opt-in implementation of [RFC 2](https://github.com/octanejs/RFCs/discussions/2) over Alien Signals, then measure whether its ownership, async coordination, and native Octane integration remain correct and economical as graph size, consumer count, and application lifetime grow.
 
-The plan was accepted for implementation on 2026-08-27. Work is isolated in the worktree below and will be submitted as a draft PR. The API remains experimental; source changes and partial isolated checks do not establish that the full compiler, browser, package, or performance gates have passed.
+The plan was accepted for implementation on 2026-08-27. Work is isolated in the worktree below and is published in [draft PR 877](https://github.com/octanejs/octane/pull/877). The API remains experimental; source changes and supplemental checks do not establish that every compiler, browser, package, or performance gate has passed.
 
-After final measurements, upstream `69a56855c21b71f824bdf1064d03e86b0a203eb9` added unrelated Inferno benchmark targets and was incorporated. It does not change the measured sources; the evidence report preserves the original benchmark inputs.
+The first prototype incorporated upstream `69a56855c21b71f824bdf1064d03e86b0a203eb9`, which added unrelated Inferno benchmark targets. The consolidation later incorporated `f036bad8d1e0e095694b8bbc71e95d13e01a7330`, which changes only the website homepage and its smoke test. Neither integration changes the measured runtime/compiler sources; reports preserve their original inputs.
+
+## Contract consolidation, 2026-08-27
+
+This consolidation starts from `cd9ed33754bfc3eeb144ba256dc9b437614e3e92`. These decisions refine the original plan; the current [evidence report](../experimental-scoped-signals-evidence.md) distinguishes implemented behavior from validation gates that remain unmet.
+
+- Preserve branded `$` handles, explicit data owners, canonical copied request arguments, and sharing only while a resource selects a request. No idle request cache is added.
+- `isPending(read)` asks whether the authored synchronous expression can return a usable value. A strict pending read returns true; a successful `latest(fallback)` or fallback projection returns false. Errors still propagate. Background refresh and stream activity belong to snapshots.
+- `latest` retains one complete successful result. Identity, content, and commands that must agree belong in the same derived record. Retirement of any contributing owner revokes that retained result, even when the current branch no longer depends on that owner.
+- Serialized seeds are copied data owned by the adopting scope and its frame leases. They do not transport live foreign-owner identities; an already copied seed is not retroactively revoked when its original producer retires.
+- Activate native collection before runtime component invocation, covering parameter/default evaluation and functions whose returned value is not syntactically direct JSX. Existing component cleanup, block scheduling, committed subscriptions, rollback, and read witnesses remain authoritative.
+- Activation is a capability of the shared DOM runtime instance. An opted-in rendered module activates it; memo-bearing application modules must be compiled consistently with `nativeReads: true`. Engine-only data modules must not acquire a renderer import. Unused/default builds keep the inactive driver path.
+- In opted-in modules, an omitted `useMemo` dependency argument retains ordinary lexical inference and additionally validates and replays native reads observed in the memo. Explicit dependency arrays and `null` retain their existing contracts. Known live reads inside fixed-dependency callbacks remain diagnosed; effects and event callbacks remain imperative.
+- Keep local `useSignal$`, naming diagnostics, DevTools, and automatic ready-state SSR manifests. Mutation confirmation, local derived/async hooks, pending producer transport, and a general application persistence policy remain excluded.
+
+Regression evidence must cover parameter plus body reads, indirect returns, nested scopes, failed and suspended attempts, memo reuse and dependency switching, SSR replay and hydration, foreign-owner retirement, late restoration after an edit, and stream replacement. New tests must fail on the prior behavior or a representative broken guard. The compiler cases run in development, production, Strong, and server modes when the locked toolchain is available; manual ABI probes remain explicitly supplemental.
+
+The affected hot paths are component invocation, memo hits/misses, and retained cross-owner computations. Record matched baseline/candidate timing and bundle inputs, including an enabled component that reads no signals, and rerun retention after the final source changes. Missing compiler/browser dependencies remain an unmet gate, never an inferred pass.
+
+Primary acceptance and cost reporting focus on compiled `@{}` TSRX components; ordinary return-element syntax remains secondary compatibility coverage. The consolidated source has supplemental public tagged-source compiler evidence: 210 engine, 155 compiler/diagnostic, 279 native development/production/strong, two ordinary opt-out, and four real Chromium assertions pass. The final 650-case command passed with approved execution outside the sandbox for Chromium. The report retains the earlier sandbox launch failure separately. This is not the locked npm toolchain, a full workspace check, or current-head CI. Source and dependency hashes, controlled faults, costs, and the remaining boundaries are recorded separately rather than inferred from these counts.
 
 ## Baseline and authority
 
@@ -28,7 +47,7 @@ After final measurements, upstream `69a56855c21b71f824bdf1064d03e86b0a203eb9` ad
 | Runtime/toolchain          | Repository requires Node >=22.22.2 and pnpm 11.15.1; local Node observed as 22.22.3. Benchmark CI uses Node 24. Record the actual selected environment for each run.                                                              |
 | Implementation base        | Fast-forwarded to upstream `ba9abbfb634786a1b081852f6eb51845f3d588fc` before implementation; the primary checkout remains unchanged.                                                                                              |
 | Final upstream integration | Merged `97b42683ff64e561638fcc7580ba324e76458244` before final validation; original measurement provenance is preserved.                                                                                                          |
-| Experiment status          | Prototype committed with isolated correctness, scale, and retention evidence. Full compiler/browser validation and application comparisons remain blocked; see the [evidence report](../experimental-scoped-signals-evidence.md). |
+| Experiment status          | Draft prototype with supplemental compiler, runtime, browser, and ownership evidence. Locked workspace checks and broader application comparisons remain unmet; see the [evidence report](../experimental-scoped-signals-evidence.md). |
 
 Live user instructions outrank this plan. Current source and observable tests outrank summaries. Recheck the RFC and upstream base before implementation; retain the exact baseline revision and inputs used for measurements.
 

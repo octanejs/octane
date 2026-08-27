@@ -64,6 +64,9 @@ type ReactiveFlags = AlienReactiveFlags;
 export interface NodeState<T = unknown> {
 	readonly snapshot: SignalSnapshot<T>;
 	readonly waiting?: PromiseLike<unknown>;
+	readonly resolveWaiting?: () => void;
+	/** Foreign lifetimes sampled by this result, independent of its current dependencies. */
+	readonly owners?: ReadonlySet<GraphOwner>;
 }
 
 interface Wakeup {
@@ -73,7 +76,8 @@ interface Wakeup {
 
 type Work = ScopedNode | SignalObserver | (() => void);
 
-let activeNode: ReactiveNode | undefined;
+let activeNode: ScopedNode | undefined;
+let activeOwners: Set<GraphOwner> | undefined;
 let trackingCycle = 0;
 let executionDepth = 0;
 let pureDepth = 0;
@@ -84,6 +88,8 @@ let historicalReader:
 	((node: ScopedNode, read: SignalReadMode) => NodeState | undefined) | undefined;
 const queued = new Set<Work>();
 const noActivity = {};
+const retainedOwners = new WeakMap<ScopedNode, ReadonlySet<GraphOwner>>();
+const retainedNodes = new WeakMap<GraphOwner, Set<ScopedNode>>();
 
 const graph = createReactiveSystem({
 	update(node) {
@@ -95,9 +101,8 @@ const graph = createReactiveSystem({
 			node.wakeup?.resolve();
 			node.wakeup = undefined;
 			if (retirementError) {
-				node.last = undefined;
-				node.lastState = undefined;
-				node.hasLast = false;
+				releaseRetention(node);
+				node.state?.resolveWaiting?.();
 				node.state = errorState(retirementError);
 				node.flags |= ReactiveFlags.Dirty;
 			}
@@ -241,6 +246,7 @@ export function pendingState(
 	waiting: PromiseLike<unknown>,
 	connection: ConnectionState = 'none',
 	requestKey?: string,
+	resolveWaiting?: () => void,
 ): NodeState<never> {
 	return {
 		snapshot: {
@@ -251,7 +257,15 @@ export function pendingState(
 			...(requestKey === undefined ? {} : { requestKey }),
 		},
 		waiting,
+		...(resolveWaiting ? { resolveWaiting } : {}),
 	};
+}
+
+function sameOwners(a: NodeState, b: NodeState): boolean {
+	if (a.owners === b.owners) return true;
+	if ((a.owners?.size ?? 0) !== (b.owners?.size ?? 0)) return false;
+	if (a.owners) for (const owner of a.owners) if (!b.owners?.has(owner)) return false;
+	return true;
 }
 
 export function sameState(a: NodeState | undefined, b: NodeState): boolean {
@@ -268,12 +282,80 @@ export function sameState(a: NodeState | undefined, b: NodeState): boolean {
 		return false;
 	}
 	if (left.status === 'ready' && right.status === 'ready') {
-		return Object.is(left.value, right.value);
+		return Object.is(left.value, right.value) && sameOwners(a, b);
 	}
 	if (left.status === 'error' && right.status === 'error') {
-		return Object.is(left.error, right.error);
+		return Object.is(left.error, right.error) && sameOwners(a, b);
 	}
-	return a.waiting === b.waiting;
+	return a.waiting === b.waiting && sameOwners(a, b);
+}
+
+function withOwners<T>(
+	state: NodeState<T>,
+	owners: ReadonlySet<GraphOwner> | undefined,
+): NodeState<T> {
+	return owners?.size ? { ...state, owners } : state;
+}
+
+function recordOwners(node: ScopedNode, state: NodeState): void {
+	const consumer = activeNode;
+	if (!consumer) return;
+	if (node.owner !== consumer.owner) (activeOwners ??= new Set()).add(node.owner);
+	if (state.owners) {
+		for (const owner of state.owners) {
+			if (owner !== consumer.owner) (activeOwners ??= new Set()).add(owner);
+		}
+	}
+}
+
+function releaseRetainedOwners(node: ScopedNode): void {
+	const owners = retainedOwners.get(node);
+	if (!owners) return;
+	retainedOwners.delete(node);
+	for (const owner of owners) {
+		const nodes = retainedNodes.get(owner);
+		nodes?.delete(node);
+		if (!nodes?.size) retainedNodes.delete(owner);
+	}
+}
+
+export function releaseRetention(node: ScopedNode): void {
+	if (node.lastState?.owners) releaseRetainedOwners(node);
+	node.last = undefined;
+	node.lastState = undefined;
+	node.hasLast = false;
+}
+
+function retainOwners(node: ScopedNode): void {
+	const owners = node.lastState?.owners;
+	if (!owners || retainedOwners.get(node) === owners) return;
+	releaseRetainedOwners(node);
+	retainedOwners.set(node, owners);
+	for (const owner of owners) {
+		let nodes = retainedNodes.get(owner);
+		if (!nodes) retainedNodes.set(owner, (nodes = new Set()));
+		nodes.add(node);
+	}
+}
+
+function revokeRetainedValues(owner: GraphOwner, error: ScopeDisposedError): void {
+	const nodes = retainedNodes.get(owner);
+	if (!nodes) return;
+	for (const node of nodes) {
+		const origins = node.state?.owners;
+		let surviving: Set<GraphOwner> | undefined;
+		if (origins) {
+			for (const origin of origins) {
+				if (!origin.retired) (surviving ??= new Set()).add(origin);
+			}
+		}
+		commitState(node, withOwners(errorState(error), surviving));
+		if (node.subs) {
+			graph.propagate(node.subs, executionDepth !== 0);
+			graph.shallowPropagate(node.subs);
+		}
+	}
+	retainedNodes.delete(owner);
 }
 
 function createWakeup(): Wakeup {
@@ -406,6 +488,8 @@ export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value')
 		if (frame) return frame.run(() => readNode(node, read));
 	}
 	const state = refreshNode(node);
+	const observed =
+		read === 'latest' && state.snapshot.status !== 'ready' ? (node.lastState ?? state) : state;
 	if (activeNode) graph.link(node, activeNode, trackingCycle);
 	if (getNativeReadObserver()) {
 		const field =
@@ -426,7 +510,11 @@ export function readNode<T>(node: ScopedNode<T>, read: SignalReadMode = 'value')
 		});
 		reportNativeRead(source, node.revision);
 	}
-	return read === 'latest' && state.snapshot.status !== 'ready' ? (node.lastState ?? state) : state;
+	// Retirement marks the owner before invoking user cancellation callbacks.
+	// A reentrant read must not expose its old value before graph teardown runs.
+	if (observed.owners) for (const owner of observed.owners) assertAlive(owner);
+	if (activeNode) recordOwners(node, observed);
+	return observed;
 }
 
 export function strictValue<T>(state: NodeState<T>): T {
@@ -473,14 +561,17 @@ function evaluate(node: ScopedNode): boolean {
 		return true;
 	}
 	const previousNode = activeNode;
+	const previousOwners = activeOwners;
 	const previousObserver = setNativeReadObserver(null);
 	node.depsTail = undefined;
 	node.flags = ReactiveFlags.Mutable | ReactiveFlags.Watching | ReactiveFlags.RecursedCheck;
 	node.evaluating = true;
 	activeNode = node;
+	activeOwners = undefined;
 	trackingCycle++;
 	executionDepth++;
 	let next: NodeState;
+	let owners: Set<GraphOwner> | undefined;
 	try {
 		next = node.compute();
 	} catch (error) {
@@ -494,6 +585,8 @@ function evaluate(node: ScopedNode): boolean {
 		}
 	} finally {
 		executionDepth--;
+		owners = activeOwners;
+		activeOwners = previousOwners;
 		activeNode = previousNode;
 		setNativeReadObserver(previousObserver);
 		node.evaluating = false;
@@ -502,15 +595,28 @@ function evaluate(node: ScopedNode): boolean {
 		let obsolete = tail ? tail.nextDep : node.deps;
 		while (obsolete) obsolete = graph.unlink(obsolete, node);
 	}
+	next = withOwners(next, owners);
+	// A pending/error branch cannot make a revoked retained value usable again.
+	// A complete new computation can replace it and establish new provenance.
+	if (
+		next.snapshot.status !== 'ready' &&
+		node.state?.snapshot.status === 'error' &&
+		node.state.snapshot.error instanceof ScopeDisposedError
+	) {
+		next = withOwners(errorState(node.state.snapshot.error), next.owners);
+	}
 	if (sameState(node.state, next)) return false;
 	commitState(node, next);
 	return true;
 }
 
 function commitState<T>(node: ScopedNode<T>, next: NodeState<T>): void {
+	const previous = node.state;
 	node.state = next;
 	node.revision++;
 	if (next.snapshot.status === 'ready') {
+		if (previous?.snapshot.status !== 'ready' && node.lastState?.owners)
+			releaseRetainedOwners(node);
 		node.last = next.snapshot.value;
 		node.lastState = next;
 		node.hasLast = true;
@@ -520,17 +626,19 @@ function commitState<T>(node: ScopedNode<T>, next: NodeState<T>): void {
 			next.snapshot.error instanceof SignalFrameError ||
 			next.snapshot.error instanceof NativeAdoptionMiss)
 	) {
-		node.last = undefined;
-		node.lastState = undefined;
-		node.hasLast = false;
+		releaseRetention(node);
+	} else if (node.lastState?.owners) {
+		retainOwners(node);
 	}
 	if (next.snapshot.status !== 'pending') {
+		previous?.resolveWaiting?.();
 		node.wakeup?.resolve();
 		node.wakeup = undefined;
 	}
 }
 
 export function publishNode<T>(node: ScopedNode<T>, next: NodeState<T>): void {
+	if (node.kind === 'async' && node.state?.owners) next = withOwners(next, node.state.owners);
 	if (sameState(node.state, next)) return;
 	commitState(node, next);
 	if (node.subs) {
@@ -627,15 +735,15 @@ export function retireGraph(owner: GraphOwner, nodes: Iterable<ScopedNode>): voi
 			if (observer.native && observer.notify) queued.add(observer.notify);
 			stopObserver(observer);
 		}
+		revokeRetainedValues(owner, retirementError);
 		for (const node of nodes) {
 			queued.delete(node);
 			node.wakeup?.resolve();
 			node.wakeup = undefined;
 			node.revision++;
+			node.state?.resolveWaiting?.();
 			node.state = errorState(retirementError);
-			node.last = undefined;
-			node.lastState = undefined;
-			node.hasLast = false;
+			releaseRetention(node);
 			node.compute = undefined;
 			if (node.kind === 'async') node.retry = ScopedNode.prototype.retry;
 			if (node.subs) {

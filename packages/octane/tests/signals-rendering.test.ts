@@ -21,6 +21,9 @@ import {
 	NativeDetachedErrorCleanup,
 	NativeErrorBoundary,
 	NativeHeldBoundary,
+	NativeHeldIsolation,
+	NativeHeldSiblings,
+	NativeNestedHeldSiblings,
 	NativeRows,
 	NativeStablePublication,
 	NativeSupersessionReader,
@@ -286,6 +289,104 @@ describe('native signal rendering', () => {
 		} finally {
 			rendered.unmount();
 			state.scope.dispose();
+		}
+	});
+
+	for (const [label, Reader] of [
+		['sibling', NativeHeldSiblings],
+		['nested sibling', NativeNestedHeldSiblings],
+	] as const)
+		it(`holds an independently scheduled ${label} and publishes only completed refs and effects`, async () => {
+			const first = deferred<string>();
+			const second = deferred<string>();
+			const state = createResource$('held-' + label, (key) =>
+				key === 'a' ? first.promise : second.promise,
+			);
+			const log = createLog();
+			const rendered = mount(Reader, { ...state, log: log.push });
+			try {
+				await act(() => first.resolve('old'));
+				const panel = rendered.find('.panel');
+				const button = rendered.find('.count') as HTMLButtonElement;
+				button.focus();
+				log.clear();
+				await act(() =>
+					startTransition(() =>
+						state.scope.batch(() => {
+							state.count$.set(1);
+							state.key$.set('b');
+						}),
+					),
+				);
+				expect(rendered.find('.panel')).toBe(panel);
+				expect(rendered.find('.count')).toBe(button);
+				expect(button.textContent).toBe('0');
+				expect(rendered.find('.async-value').textContent).toBe('old');
+				expect(log.drain()).toEqual([]);
+				await act(() => state.count$.set(2));
+				expect(button.textContent).toBe('0');
+				expect(log.drain()).toEqual([]);
+				await act(() => second.resolve('new'));
+				expect(rendered.find('.panel')).toBe(panel);
+				expect(rendered.find('.count')).toBe(button);
+				expect(document.activeElement).toBe(button);
+				expect(button.textContent).toBe('2');
+				expect(rendered.find('.async-value').textContent).toBe('new');
+				const accepted = log.drain();
+				expect(accepted.filter((entry) => entry.startsWith('layout:'))).toEqual(['layout:2']);
+				expect(accepted).toContain('ref:2:attach');
+				expect(accepted).toContain('cleanup:0');
+			} finally {
+				rendered.unmount();
+				expect(state.scope.inspect().nodes.find((node) => node.key === 'count')?.subscribers).toBe(
+					0,
+				);
+				state.scope.dispose();
+			}
+		});
+
+	it('keeps unrelated urgent updates live while a native primary holds a transition', async () => {
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const state = createResource$('held-isolation', (key) =>
+			key === 'a' ? first.promise : second.promise,
+		);
+		const outside = createCounter$('held-outside');
+		const log = createLog();
+		const rendered = mount(NativeHeldIsolation, { ...state, outside, log: log.push });
+		try {
+			await act(() => first.resolve('old'));
+			const panel = rendered.find('.panel');
+			log.clear();
+			await act(() => {
+				startTransition(() =>
+					state.scope.batch(() => {
+						state.count$.set(1);
+						state.key$.set('b');
+					}),
+				);
+				outside.count$.set(1);
+			});
+			expect(rendered.find('.panel')).toBe(panel);
+			expect(rendered.find('.panel .count').textContent).toBe('0');
+			expect(rendered.find('.outside .count').textContent).toBe('1');
+			expect(log.drain().filter((entry) => !entry.startsWith('outside:'))).toEqual([]);
+			await act(() => {
+				outside.count$.set(2);
+				state.count$.set(2);
+			});
+			expect(rendered.find('.panel .count').textContent).toBe('0');
+			expect(rendered.find('.outside .count').textContent).toBe('2');
+			expect(log.drain().filter((entry) => !entry.startsWith('outside:'))).toEqual([]);
+			await act(() => second.resolve('new'));
+			expect(rendered.find('.panel')).toBe(panel);
+			expect(rendered.find('.panel .count').textContent).toBe('2');
+			expect(rendered.find('.async-value').textContent).toBe('new');
+			expect(rendered.find('.outside .count').textContent).toBe('2');
+		} finally {
+			rendered.unmount();
+			state.scope.dispose();
+			outside.scope.dispose();
 		}
 	});
 

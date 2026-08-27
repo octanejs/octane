@@ -182,7 +182,7 @@ const structurallySimilar = { get() { return 1; }, latest() { return 1; }, snaps
 		expect(result.diagnostics).toEqual([]);
 	});
 
-	it('diagnoses known typed memo reads while preserving explicit null and sampled dependencies', () => {
+	it('diagnoses fixed memo reads while accepting inferred reads, explicit null, and sampled dependencies', () => {
 		const result = fixture(`${PRELUDE}
 import { useMemo as memo } from 'octane';
 const first = memo(() => task$.get(), []);
@@ -195,8 +195,18 @@ const sampled = memo(() => sample, [sample]);
 		expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
 			'OCTANE_NATIVE_MEMO_READ',
 			'OCTANE_NATIVE_MEMO_READ',
-			'OCTANE_NATIVE_MEMO_READ',
 		]);
+	});
+
+	it('accepts inferred native memo reads through named, aliased, and namespace imports', () => {
+		const result = fixture(`${PRELUDE}
+import { useMemo, useMemo as memo } from 'octane';
+import * as Octane from 'octane';
+const direct = useMemo(() => task$.get());
+const alias = memo(() => task$.latest(0));
+const namespace = Octane.useMemo(() => task$.snapshot());
+`);
+		expect(result.diagnostics).toEqual([]);
 	});
 
 	it('follows an imported accessor body without labeling its sampled result', () => {

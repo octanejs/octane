@@ -1228,6 +1228,7 @@ class OctaneBundlerCompiler {
 			const nativeHookImport = /from\s*['"]octane\/signals\/(?:client|server)['"]/.test(code);
 			if (
 				!/from\s*['"]octane['"]/.test(code) &&
+				!(nativeReads && /from\s*['"]octane\/server['"]/.test(code)) &&
 				!nativeHookImport &&
 				!(nativeReads && /from\s*['"]octane\/signals['"]/.test(code))
 			)
@@ -1266,7 +1267,7 @@ class OctaneBundlerCompiler {
 						strong,
 					});
 				}
-				return passThrough();
+				if (!nativeReads) return passThrough();
 			}
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const specializeVoidRoot =

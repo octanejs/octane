@@ -304,13 +304,14 @@ export function validateNativeSignalNames(program, file) {
 				declaration &&
 				memoSignatures.has(declaration) &&
 				node.arguments[0] &&
+				node.arguments.length > 1 &&
 				node.arguments[1]?.kind !== ts.SyntaxKind.NullKeyword &&
 				functionsOf(node.arguments[0]).some((fn) => readsLive(fn))
 			) {
 				report(
 					NATIVE_MEMO_READ,
 					node,
-					'A live native signal read inside useMemo can outlive its value under the ordinary hook dependency contract. Read the signal during render, then pass that sampled value and its chosen dependency array to useMemo. Explicit and inferred dependencies are not rewritten.',
+					'A live native signal read inside useMemo is not represented by an explicit dependency array. Omit the array to track native reads, or sample the signal during render and pass that value in the array. Explicit arrays are never rewritten; null runs the callback on every render.',
 				);
 			}
 		}

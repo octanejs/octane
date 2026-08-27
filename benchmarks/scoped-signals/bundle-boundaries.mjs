@@ -51,8 +51,10 @@ export function gitBlobHash(contents, algorithm = 'sha1') {
 	return createHash(algorithm).update(`blob ${contents.length}\0`).update(contents).digest('hex');
 }
 
-// Inspect the complete resolved graph, including modules that tree shaking
-// removes. A zero-byte graph dependency is still an accidental engine import.
+// Engine boundaries inspect the complete resolved graph, including modules
+// that tree shaking removes. A zero-byte engine dependency is still a defect.
+// Runtime exports can resolve their optional native adapters, but an ordinary
+// entry must tree-shake every byte of those concrete implementations.
 export function verifyBundleInputs(scenario, inputs) {
 	const names = inputs.map((input) => input.path.replaceAll('\\', '/'));
 	const alien = inputs.filter((input) => input.package?.name === 'alien-signals');
@@ -66,6 +68,22 @@ export function verifyBundleInputs(scenario, inputs) {
 	if (scenario.id.startsWith('ordinary-')) {
 		assert.deepEqual(alien, [], `${scenario.id}: ordinary imports reached Alien Signals`);
 		assert.deepEqual(engine, [], `${scenario.id}: ordinary imports reached the scoped engine`);
+		const adapters = inputs.filter((input) =>
+			/\/src\/signals\/native-read-(?:client|server|collector|inspection|retry)\.[jt]s$/.test(
+				input.path.replaceAll('\\', '/'),
+			),
+		);
+		for (const input of adapters) {
+			assert.ok(
+				Number.isSafeInteger(input.bytesInOutput) && input.bytesInOutput >= 0,
+				`${scenario.id}: missing emitted-byte evidence for ${input.path}`,
+			);
+			assert.equal(
+				input.bytesInOutput,
+				0,
+				`${scenario.id}: ordinary entry retained native adapter ${input.path}`,
+			);
+		}
 	} else {
 		assert.ok(alien.length > 0, `${scenario.id}: selected engine dependency is missing`);
 		for (const input of alien) {

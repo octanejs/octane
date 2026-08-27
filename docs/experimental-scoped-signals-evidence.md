@@ -1,242 +1,249 @@
 # Experimental scoped signals: implementation evidence
 
-This is an implementation experiment, not a release or a merge recommendation.
-The [API guide](experimental-scoped-signals.md) describes the implemented
-contract; the [accepted plan](plans/2026-08-27-experimental-scoped-async-signals-plan.md)
-also describes gates that remain unmet. The pull request stays in draft as
-requested. Skipped draft CI jobs are not validation.
+This remains an implementation experiment and a draft pull request, not a
+release or merge recommendation. The [API guide](experimental-scoped-signals.md)
+describes the consolidated contract; the
+[accepted plan](plans/2026-08-27-experimental-scoped-async-signals-plan.md)
+records the broader acceptance gates. Required checks skipped because the PR is
+a draft are not validation. No packages have been published.
 
-The worktree contains upstream `97b42683ff64e561638fcc7580ba324e76458244`,
-the Version Packages commit integrated before final validation. Implementation
-began at `ba9abbfb634786a1b081852f6eb51845f3d588fc`; planning originally inspected
-`c84edbb271c19488922f3d9941e374f022ead516`. Earlier measurements retain their
-original inputs. The final package, runtime-probe, bundle, and engine reports
-record the tested source hashes. Existing primary-checkout work was not changed.
-No packages have been published.
+The consolidation baseline is `cd9ed33754bfc3eeb144ba256dc9b437614e3e92`, the
+previous head of this experiment. New reports use the `consolidation-` prefix
+and record their tested source hashes. Earlier reports, including files named
+`*-final`, describe that previous implementation and are retained as historical
+evidence. Their timings and expanded model runs are not silently attributed to
+the changed source. The primary checkout was not modified.
 
-Before opening the draft, the branch also incorporated
-`69a56855c21b71f824bdf1064d03e86b0a203eb9` (Inferno benchmark targets). That update
-changes unrelated benchmark and workspace metadata, not any measured engine,
-runtime, compiler, package-builder, or workload source. Source hashes were
-verified again after integration. Measurement records keep their original
-revision, baseline, and lockfile hash rather than claiming a different run.
+After measurement, upstream `f036bad8d1e0e095694b8bbc71e95d13e01a7330` was
+incorporated. It changes only the website homepage and its smoke test. Measured
+runtime, compiler, dependency, and workload hashes remain unchanged.
 
-## Implemented surface and explicit limits
+## Consolidated contract
 
-The data engine uses the public `alien-signals/system` API at exactly 3.2.0.
-It adds explicit data ownership, synchronous writable and derived state,
-revocable async attempts, stream resources, retained whole computations,
-ready-state serialization, historical adoption leases, and opt-in metadata
-traces. The existing `@octanejs/alien-signals` binding and its 1.0.4 dependency
-are unchanged.
+The engine still uses the public `alien-signals/system` API at exactly 3.2.0.
+It keeps explicit data owners, branded `$` handles, immediate synchronous
+writes, copied canonical query arguments, revocable async attempts, and removal
+of request entries after their last selector leaves. The existing
+`@octanejs/alien-signals` binding and its separate 1.0.4 dependency are unchanged.
 
-The compiler option is `nativeReads: true`. Its runtime adapter uses existing
-Octane cleanup scopes, schedulable blocks, render captures, acceptance, and
-Suspense/hydration paths. Compiler memoization and deferred values carry native
-read evidence. Ordinary inferred and explicit hook dependencies retain their
-existing semantics. Known live reads hidden in fixed/inferred `useMemo`
-callbacks are diagnosed instead of silently rewriting their dependencies.
+Opted-in renderer modules now activate a versioned private capability before
+authored rendering can begin. Runtime collection surrounds the actual component
+invocation, including parameter defaults, body setup, and returned-output
+normalization. Existing compiler body brackets join that collection. Native
+inferred `useMemo` callbacks retain lexical dependency inference and additionally
+validate and replay their native read evidence. Explicit arrays and `null`
+keep their existing contracts; effects and events remain imperative.
 
-The compiler does not cover every JavaScript component shape. Parameter-default
-reads, setup reads behind indirect JSX returns, and arbitrary local aliases of
-native hooks remain known gaps, as described in the API guide. Compiler
-execution, generated-code checks, and wrapper integration tests remain blocked.
+`isPending` tests whether its expression can produce a value, not whether an
+owner has background activity. A successful `latest` fallback is available.
+Snapshots expose refresh and stream activity separately. `latest` retains a
+whole successful calculation, including the identity and commands belonging to
+that result. Retiring a contributing live owner invalidates the retained value,
+even after a pending or failed branch has dropped its old dependencies. Pending
+consumers wake on retirement, and equal replacement values replace their
+ownership provenance. Serialization rejects revoked live origins, including
+inside reentrant cancellation callbacks.
 
-`useSignal$` is the only local hook in this experiment. `useDerived$` failed the
-design gate for speculative closure isolation: a stable facade and staged node
-do not invalidate transitive live graph caches or memoized child witnesses
-safely. It is not exported or registered as a partially working hook.
-`scope.derived$` remains supported. Local async hooks, deep stores, mutation
-journals, remote mutation reconciliation, pending server-producer transport,
-and cross-root atomic reveal remain outside scope.
+An already serialized seed is copied data owned by its adopting scope and frame
+leases, not a cross-process reference to a live foreign owner. Ready-state
+transport, historical adoption, local `useSignal$`, and metadata-only inspection
+remain supported. Local `useDerived$` and local async hooks remain deferred
+because speculative closure staging is unresolved. Mutation journals, remote
+write reconciliation, deep stores, pending producer transport, non-DOM hosts,
+and cross-root atomic reveal remain outside this experiment.
 
-Historical reads do not rewrite live values or seed live derived caches. Strict
-value, retained `latest`, and ready snapshot reads are distinct channels. A
-completed output that directly samples a nonready snapshot or converts pending
-demand into an `isPending` result is not supported by the ready-state transport.
-Pending/catch boundary ranges recover with a fresh client render. Unexpected
-missing channels cause hydration recovery, not an application error or a mix of
-historical and live data.
-
-## Validation environment and blocker
+## Validation environment
 
 The local environment is macOS arm64, Node 26.4.0, and pnpm 11.15.1. The
-configured registry returned HTTP 403 for the locked `@tsrx` packages during
-the workspace install, including the approved retry outside the sandbox.
-A later lockfile resolution attempt also could not resolve the locked Ripple
-range. No locked versions were changed to make those attempts pass.
+configured registry denied the locked `@tsrx` npm payloads with HTTP 403,
+including the approved retry outside the sandbox. Locked package versions were
+not changed to make installation pass. The previously recorded frozen offline
+lockfile check proves lockfile consistency, not a complete workspace install.
 
-An isolated tooling installation supplied real Alien Signals 3.2.0,
-esbuild 0.28.1, TypeScript 5.9.3, Vitest 4.1.10, jsdom 30.0.1, and devalue 5.8.2.
-The source under test still comes from this worktree. These are targeted
-engine/type/runtime checks, not substitutes for the actual `.tsrx` compiler.
-Direct runtime probes call the compiler ABI explicitly and are identified as
-such; they do not prove emitted code is correct.
+The new compiler evidence uses the public `tsrx-org/tsrx` tag
+`@tsrx/core@0.1.61`, verified to commit
+`7cb01278dff7aebfd25cbf5abcd2d47c6da7d81a`, plus this repository's existing
+segments patch. The actual Octane compiler, Vite plugin, runtime, and authored
+fixtures come from the experimental worktree. The harness enables frozen parser
+AST and generated-location assertions. Dependency manifests and observed Node
+module loads are hashed, and runtime/compiler/test inputs are snapshotted before
+and after each audited run.
 
-The lockfile additions use the exact leaf dependency metadata generated by
-pnpm for the isolated installation. The repository's
-`pnpm install --lockfile-only --frozen-lockfile --offline --ignore-scripts`
-passed, including the supply-chain policy check. That proves lockfile
-consistency; it does not prove the complete workspace can be installed.
+This is supplemental public tagged-source validation. It does not establish
+npm tarball integrity, an SRI match, or a complete locked workspace. The
+[source validation report](../benchmarks/scoped-signals/results/2026-08-27/consolidation-source-validation.json)
+contains provenance, exact local harness hashes, its configuration and resolver
+text with path placeholders, assertion names, and raw report hashes. Repeating
+that supplemental setup elsewhere requires equivalent staging; ordinary
+repository commands remain the intended acceptance gates.
 
-The actual `pnpm sync` was run with pnpm's documented dependency-check mode set
-to `warn`, so it could execute without automatically retrying the blocked full
-install. Version generation, Playwright fixture generation, parity lockfile
-fingerprints, binding status/gaps, and package inventory ran. Sync stopped at
-CLI data generation because the configured Prettier plugin
-`@tsrx/prettier-plugin` was missing. Generated lockfile fingerprints are included
-in the diff. Full sync and formatting remain unmet gates.
+The actual `pnpm sync` was attempted with
+`pnpm_config_verify_deps_before_run=warn pnpm sync`, using pnpm's dependency
+verification setting to avoid another automatic full install. Version
+artifacts, Playwright fixtures, parity fingerprints, binding status/gaps, and
+package inventory ran. CLI data generation stopped because
+`@tsrx/prettier-plugin` was unavailable to its Prettier resolver. Generated
+changes are included. Complete sync and canonical repository checks remain
+unmet; the supplemental formatter is recorded separately.
 
-## Correctness evidence
+## Current correctness evidence
 
-The isolated engine suite currently passes 189 tests across state, async
-resources, streams, serialization, inspection, and seeded operation models.
-The models execute 100 actions for each of 50 seeds, including selection,
-retry, obsolete completion, errors, conditional dependencies, frame leases,
-batching, and owner disposal. The public API and a separate state oracle are
-the observation boundary; graph fields and scheduler counts are not the
-correctness oracle.
+The primary integration path is authored TSRX `@{}` components and their compiled templates. Ordinary returned-element syntax is secondary compatibility coverage. The final audited source run covers these assertions:
 
-The final [expanded model run](../benchmarks/scoped-signals/results/2026-08-27/engine-models-final.json)
-also passed 20 root seeds, each with 50 cases of 100 actions: 1,000 cases and
-100,000 operations. It records each seed, exact source hashes, and hashes of the
-local raw Vitest reports. The earlier expanded run is preserved separately.
+| Lane | Passed | Observation boundary |
+| --- | ---: | --- |
+| Data engine | 210 | Public state, async, streams, serialization, inspection, and operation models |
+| Compiler and nominal diagnostics | 155 | Actual emitted code, inferred/explicit memo contracts, frozen ASTs, and diagnostics |
+| Native development | 93 | Compiled fixtures, DOM, SSR, hydration, local lifetime, and Suspense |
+| Native production | 93 | The same contracts under production compilation |
+| Native strong mode | 93 | The same contracts under strong compilation |
+| Ordinary opt-out controls | 2 | Native handle reads do not subscribe ordinary components |
+| Real Chromium | 4 | Native and ordinary applications in development and production |
 
-The engine suite covers immediate reads and batching, dynamic dependency
-replacement, purity and write guards, ownership retirement, in-flight query
-sharing and canonical arguments, cancellation-ignoring producers, quiet and
-blocking retries, stream closure/error paths, retained results, immutable
-historical frames, duplicate keys, and bounded inspection. Strict TypeScript
-checking passes for the engine and those tests. The public declaration
-consumer is checked separately by the package smoke harness.
+All 650 assertions passed in one final run after the ordinary-bundle reachability
+fix. That command ran with approved execution outside the sandbox so Chromium
+could launch. Its before/after source snapshots match the final working source.
+The report separately records the earlier sandbox launch failure and its retry;
+those are not substituted for this final run.
 
-Representative protections were deliberately removed and observed to fail:
+The native suites cover parameter defaults, imported helper and indirect-return
+reads, first-render activation in plain modules, inferred memo reuse and branch
+replacement, explicit dependency controls, shared owners, cancellation,
+serialization, and historical adoption. They also preserve keyed host identity,
+local-hook retirement, and accepted output when later work suspends. The real
+browser cases verify focus, selection, input values, surviving host nodes, and
+unmount/remount while the shared data owner remains live. Happy DOM supplies the
+other DOM suites; those timings are not browser layout or paint measurements.
 
-- Allowing inner batches to flush exposed intermediate notifications.
-- Removing both attempt revocation and current-entry validation let an obsolete
-  same-key request publish. The same fault in an isolated copy also failed 38 of
-  the 50 operation-model cases; the real worktree was not mutated for that run.
-- Removing native memo-witness validation reused a stale warmed result; removing
-  witness replay lost its SSR seed.
-- Removing discarded warm-memo retention created a second request on a native
-  root retry.
+A separately scheduled descendant could bypass its visible Suspense
+boundary's rollback window. The runtime now routes a transition through the
+owning visible primary and uses the existing DOM journal and captured work.
+A later suspension discards provisional reads, refs, and effects as well as DOM
+patches. No second scheduler or graph was introduced. The final ordinary boundary audit
+passes 140 of 141 cases in each development and production run, with unchanged
+before/after source manifests. Its remaining nested-portal ref-detach failure
+also reproduces in a focused run against the exact baseline. It is not recorded
+as a green full boundary suite.
 
-Additional tests failed on real defects before their fixes: cached derived
-preflight escaped the write guard, retry did not reevaluate a failed request
-description, throwing stream result accessors escaped resource error handling,
-serialized request metadata was mutable through an output seed, historical
-`latest` lost its retained value, malformed cyclic seed input overflowed, and
-inspection exposed mutable stored trace records.
+Secondary compatibility tests exposed an ordinary return-element defect inside
+`.tsrx` files: eager client fragment lowering and raw server HTML broke stored
+value inspection and rendering. That path now uses existing element descriptors,
+with deferred normalization for compiler-only syntax. Stored styles enter the
+current server request, including static and empty styled fragments, and
+metadata stays in the head. Its 14 cases pass in each native mode. This does not
+replace the compiled template path used by `@{}` TSRX components.
 
-Seven more regressions failed before the cancellation fix: abort or iterator
-cleanup could start work after retirement, overwrite a nested retry (including
-an immediately failed attempt), or capture producer callback reads as request
-dependencies. Retry now validates its generation and owner after cancellation;
-abort callbacks run untracked, and selection rechecks ownership before attaching.
+The [controlled-fault report](../benchmarks/scoped-signals/results/2026-08-27/consolidation-faults.json)
+records meaningful negative controls. Nine new ownership regressions fail on
+the unchanged baseline. Eight isolated engine faults are detected, including
+lost retirement provenance, idle request reuse, partial retained calculations,
+and conflating activity with availability. Five isolated compiler faults fail
+relevant assertions when eager client folding, raw server output, factory-only
+style registration, styled fragment arrays, or skipped template normalization
+are restored. These runs modify isolated copies or loader input, not the
+working source.
 
-The final [27-case DOM/SSR ABI run](../benchmarks/scoped-signals/results/2026-08-27/native-dom-abi-final.json)
-covers shared roots, unmount, native event batching,
-seeded hydration, early controlled-input edits, delayed adoption, missing-channel
-recovery, retained/fallback `latest`, per-channel serialization, safe script
-embedding, duplicate owner keys, local hook lifetime, warm/deferred memo reuse,
-supersession, and old wakeable settlement. Their canonical `.tsrx` fixtures and
-tests are checked in but have not run with the blocked compiler. These probes
-do not establish full dev/prod, browser, Activity, or transition conformance.
+Strict TypeScript checking of the plain engine and its tests passes. The
+[scoped typecheck report](../benchmarks/scoped-signals/results/2026-08-27/consolidation-typecheck.json)
+records an actual `tsrx-tsc --noEmit` pass for the new native fixtures through a
+consumer-selected wrapper that only forwards `nativeReads: true` to the real
+Volar compiler. The tagged TypeScript plugin itself does not forward that
+option, so this does not establish the canonical workspace typecheck. No
+diagnostics are suppressed. A duplicate generated `Suspense` value import was
+fixed in the owning Volar transform; both new regression cases fail on the
+baseline and pass on the candidate. The nearby Volar/AST run passes 31 of 33
+cases; two supplemental dependency/type-resolution failures remain explicit.
 
-Separate checks pass 13 nominal TypeScript-diagnostic cases, eight runtime
-DevTools-hook tests, one native-driver inspection test, eleven real TanStack
-bridge/client tests, and two direct-runtime profile probes. They cover metadata
-inspection, scheduled-owner linkage, selected-detail refresh, retirement
-clearing, and avoiding lazy computation evaluation or native resource values in
-native-read payloads. Removing selected-detail refresh caused the bridge
-regression to fail; restoring it returned all eleven bridge/client tests to
-green. The compiled `.tsrx` profile fixtures and Components tab UI regression
-remain unrun. These checks do not establish DevTools retention or UI performance.
-The app and renderer configuration suites pass 37 tests, including seven new
-`nativeReads` option cases; a default-on mutation fails the opt-in regression.
+The current [publication smoke report](../benchmarks/scoped-signals/results/2026-08-27/consolidation-package-smoke.json)
+passes per-file ESM and CommonJS public imports, native activation before
+server parameter evaluation, SSR seed capture, local-hook retirement, and a
+strict declaration consumer with type-error controls. It uses the real package
+builders in a temporary package. It does not build the complete compiler/Volar
+graph or produce a complete publishable tarball.
 
-The independent project-routing, bundle-boundary, retention-scanner, and
-benchmark-workload checks pass 23 Node tests, including intentionally broken
-semantic controls. The final broader repository CI-workflow test command passed
-69 of 72 tests in the isolated setup. Three fail because the workspace cannot
-import `@vitejs/plugin-react` or spawn the unlinked Prettier executable. This
-is not recorded as a passing repository CI gate.
-
-The final [targeted publication report](../benchmarks/scoped-signals/results/2026-08-27/package-smoke-final.json)
-passes actual per-file ESM and CommonJS public imports, native SSR seed capture,
-local-hook retirement, and a declaration consumer with type-error controls.
-It found and fixed a split between CommonJS public runtime imports and compiler
-ABI imports that fell through to ESM. That split silently lost native SSR
-seeds. Both private compiler ABI subpaths now have matching CommonJS targets.
-The harness stages source in a temporary package and uses the real package
-builders; it does not build the compiler/Volar graph or produce a complete
-publishable tarball.
+Earlier DevTools, wrapper configuration, direct-runtime ABI, and expanded model
+reports remain useful historical evidence but are not reruns of the current
+implementation. The current engine lane does rerun its 50 seeded operation
+models with 100 actions each. The earlier 100,000-operation expanded run retains
+its original source hashes and is not counted as current coverage.
 
 ## Performance and retention evidence
 
-The [engine measurement report](../benchmarks/scoped-signals/results/2026-08-27/README.md)
-contains commands, raw results, source hashes, warmups, sample counts, and
-variance. The final frozen-source run and two earlier synchronous engine runs
-passed every semantic control for five graph shapes at sizes 100, 1,000, and
-10,000. Each matched final scenario uses nine samples and 32 update rounds.
-Continuous ownership workloads passed 1,000 cycles with zero, 100, and 1,000
-unrelated owners. The raw Alien bundle and workload source are identical across
-those runs; the final scoped bundle also matches the final async retention run.
+The [current performance report](../benchmarks/scoped-signals/results/2026-08-27/consolidation-performance.md)
+starts with authored `.tsrx` compiled `@{}` components. The matched baseline and
+candidate use two warmups and nine samples, with separate runtime bundles for
+each enabled/disabled case. Output, surviving host identity, updates, teardown,
+and five-dependency `use()` factory work pass their controls. Compilation and
+bundling are outside the timings. These are synchronous Happy DOM and SSR
+costs, not browser layout, paint, or hydration timing.
 
-The final engine takes about 2.1–3.3 times the raw Alien graph time for broad
-updates at 10,000 rows. Construction costs 4.7–17.5 times as much and disposal
-3.8–5.7 times as much, with higher variance in those phases. Continuous scoped
-cost is 96.91, 94.16, and 94.00 microseconds per cycle as unrelated owners
-increase, compared with 17.52, 17.93, and 17.39 for raw Alien. Cost stays roughly
-flat with unrelated owners, but the ownership layer is materially more
-expensive. These measurements do not justify a speed claim against ordinary
-Octane hooks, React, or native UI rendering.
+Most compiled TSRX comparisons overlap their reported uncertainty intervals.
+The prop update reading one signal rises from 1.591 to 2.045 microseconds (+28.6%, about
+0.454 microseconds), with narrowly separated intervals. The unread enabled prop
+update is 1.351 versus 1.356 microseconds; its intervals overlap, as do the
+mount, signal update, and SSR cases with one read and the cases with repeated
+or distinct reads. This does not establish zero overhead. The report separately discloses
+collector microcosts and the larger cost of ordinary return-element syntax as
+secondary compatibility coverage.
 
-Separate first-version GC and heap-snapshot runs found only the intentionally
-live shared data owner strongly retained at checkpoints 0, 100, and 1,000, and
-none after it retired. The scanner includes a positive control and excludes
-weak edges. RSS grew despite bounded live JS heap, so allocation pressure is
-still a concern. This evidence is for the recorded synchronous workload; it
-does not establish retention behavior for native DOM, historical frames, or
-DevTools. Raw heap snapshots remain local because they can contain process values.
+The first bundle run found that runtime invocation hooks accidentally retained
+native adapter factories in ordinary entries. Collection through an already active driver keeps
+activation explicit. The strengthened
+[boundary control](../benchmarks/scoped-signals/results/2026-08-27/consolidation-bundle-boundary-red.json)
+fails on both earlier candidate metafiles and passes the baseline. Final
+ordinary entries emit zero bytes from the concrete native adapters, collector,
+inspection, and retry implementations, and still exclude the scoped engine and
+Alien. Compared with the previous draft, the ordinary client entry grows by
+130 gzip bytes (44,004 to 44,134); SSR grows by 94 (12,246 to 12,340).
+These are named public-export bundles, not incremental application sizes.
 
-A separate [async retention diagnostic](../benchmarks/scoped-signals/results/2026-08-27/async-retention.md)
-externally retains never-settling promise, iterator `next()`, and iterator
-`return()` results. It found an iterator retained through a rejection closure's
-shared context. Moving that handler to module scope removed the path: after
-1,000 disposal cycles and retirement of the live positive control, no workload
-owners, nodes, request entries, or iterators remained while 3,003 producer
-promises were still reachable. Tiny revoked attempt records remain until those
-producer promises are released; they contain no owner, controller, or iterator.
-This does not establish historical-frame, native DOM, or DevTools retention.
+Both matched graph runs pass five shapes at scales 100, 1,000, and 10,000 and
+1,000 ownership cycles with zero, 100, and 1,000 unrelated owners. The initial
+run using the default stack failed in the raw Alien comparator's 10,000-deep chain
+teardown; its failure is preserved. Both complete comparisons use the same
+explicit 8 MiB Node stack. At the largest scale, the scoped chain batch score
+rises from 1.274 to 1.514 milliseconds (+18.8%) versus the previous draft.
+The current scoped engine takes about 2.3–4.0 times raw Alien's broad batch
+update score, 7.8–16.7 times its construction score, and 4.8–6.8 times its
+disposal score. These use the harness's shared score from its last sample window; raw samples
+and uncertainty remain in the reports. Measured cycle cost does not grow with
+unrelated owners, but the ownership layer is materially more expensive.
 
-Later source refinements are not silently covered by earlier timings. A final
-candidate report must match its recorded source hashes. The final
-[public-entry bundle report](../benchmarks/scoped-signals/results/2026-08-27/bundles-final.json)
-passes seven boundary and namespace-export checks against upstream `97b42683f`.
-The ordinary client entry grows by 1,219 gzip bytes (42,785 to 44,004); SSR grows
-by 393 (11,853 to 12,246). Neither ordinary entry retains the scoped engine or
-Alien Signals. These are source-entry bundles, not compiled application deltas
-or native UI performance measurements.
+The current diagnostic of retained foreign values observes zero retired owners or nodes
+after 100 and 1,000 consumer lifetimes while a producer remains live. Retiring
+the live control and producer leaves zero workload scopes and nodes. Removing
+one backlink deletion in an isolated bundle retains 1,000 disposed consumers,
+then 1,001 after retiring the control, until the producer retires. The scanner
+handles WeakMap values only when their key and table are live. This is evidence
+for that ownership workload, not async attempts, historical frames, DOM, or
+DevTools. The normal heap bundle matches the measured engine bundle. All 30
+separate routing, workload, bundle boundary, and scanner checks pass.
+
+Published report JSON is formatted after capture without changing parsed
+values. Exact original bytes remain local; hashes of raw logs and original inputs
+keep that meaning, and source and bundle hashes remain unchanged.
+
+The [earlier engine report](../benchmarks/scoped-signals/results/2026-08-27/README.md),
+[async retention diagnostic](../benchmarks/scoped-signals/results/2026-08-27/async-retention.md),
+and `*-final` JSON reports remain historical. A current claim must use the
+matching consolidation report and its source hashes. Raw heap snapshots remain
+local because they can contain process values. Retention diagnostics establish
+only the measured workloads, not the absence of every leak.
 
 ## Unmet acceptance gates
 
-- Full workspace installation, successful complete `pnpm sync`, and repository
-  formatting/typechecking/testing with the locked compiler and plugins.
-- Execution of the compiler fixtures and native dev/prod/profile/browser lanes,
-  including the relevant existing memo, Suspense, Activity, hydration, and
-  parallel-use suites. This includes generated-code, frozen-AST and source-map
-  regressions, supported local-hook import forms, and `nativeReads` validation,
-  forwarding, and configuration-reload matrices for core Vite, app Vite, Rspack,
-  and Rsbuild. Dedicated wrapper matrices have not been added or executed.
-- Existing application benchmark comparisons against the pinned baseline, and
-  a compiled native Todo/dashboard fixture and UI scaling/continuous lifetime
-  experiments with DevTools off and on.
-- Historical-frame, native DOM, and DevTools retainer snapshots beyond the
-  measured synchronous and cancellation-ignoring producer workloads.
-- Complete package build, bundled Volar compiler, and actual package-tarball
-  verification, beyond targeted entrypoint/declaration checks.
-- Successful required and relevant CI on the current pushed head. Draft-skipped
-  jobs cannot satisfy this gate.
-
-The experiment should remain in draft while these results are unavailable.
+- Complete locked workspace installation and successful canonical `pnpm sync`,
+  formatting, typechecking, testing, and package builds.
+- Remaining compiler/profile/DevTools and existing repository suites, beyond
+  the explicitly recorded supplemental cases. Native option forwarding and
+  configuration reload matrices for app Vite, Rspack, and Rsbuild are not a
+  completed wrapper acceptance gate.
+- Native option forwarding in the canonical `tsrx-tsc` integration, complete
+  compiler/Volar package output, and an actual publishable tarball.
+- Existing application benchmarks and larger native Todo/dashboard scaling and
+  continuous lifetimes with DevTools off and on. The focused compiled cost
+  fixture does not replace those workloads or measure browser paint.
+- Historical-frame, native DOM, and DevTools heap diagnostics beyond the
+  recorded engine ownership and cancellation-ignoring producer workloads.
+- Successful required and relevant CI on the current pushed head. The PR
+  remains draft as requested; skipped jobs cannot satisfy this gate.

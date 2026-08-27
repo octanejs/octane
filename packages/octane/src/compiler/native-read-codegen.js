@@ -1,5 +1,20 @@
 import { builders as b } from '@tsrx/core';
 
+// Keep authored directive prologues first, but initialize a renderer capability
+// and compiler slots before an authored top-level root can invoke local code.
+export function nativeReadActivationIndex(body) {
+	let index = 0;
+	while (
+		index < body.length &&
+		body[index].type === 'ExpressionStatement' &&
+		(body[index].expression?.type === 'Literal' ||
+			body[index].expression?.type === 'StringLiteral') &&
+		typeof body[index].expression.value === 'string'
+	)
+		index++;
+	return index;
+}
+
 // The runtime owns collectors, subscriptions and attempt publication. These
 // helpers only bracket compiled execution, without wrapping user code in a
 // closure or changing its return/arguments/this semantics. Runtime imports and

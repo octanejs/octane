@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { sha256 } from './bundle-boundaries.mjs';
+import { traceHeapReachability } from './heap-reachability.mjs';
 
 // The graph traversal is extracted from the earlier synchronous retainer
 // diagnostic. It runs only after the measured worker has exited. Raw heap
 // strings never become report content; only known workload labels are emitted.
-export function inspectAsyncRetainers(filename) {
+export function inspectAsyncRetainers(
+	filename,
+	{ liveScopeKeys = ['async-retention/control-live'] } = {},
+) {
 	const contents = fs.readFileSync(filename);
 	const heap = JSON.parse(contents);
 	const meta = heap.snapshot.meta;
@@ -16,12 +20,9 @@ export function inspectAsyncRetainers(filename) {
 	const nodeTypes = meta.node_types[n.type];
 	const edgeTypes = meta.edge_types[e.type];
 	const nodeCount = heap.nodes.length / nodeWidth;
-	const edgeStarts = new Uint32Array(nodeCount + 1);
-	for (let node = 0; node < nodeCount; node++) {
-		edgeStarts[node + 1] =
-			edgeStarts[node] + heap.nodes[node * nodeWidth + n.edge_count] * edgeWidth;
-	}
-	assert.equal(edgeStarts[nodeCount], heap.edges.length);
+	const { edgeStarts, parent, parentEdge, ephemeronPairCount, ephemeronPromotions } =
+		traceHeapReachability(heap);
+	const liveScopes = new Set(liveScopeKeys);
 	const target = (edge) => heap.edges[edge + e.to_node] / nodeWidth;
 	const edgeType = (edge) => edgeTypes[heap.edges[edge + e.type]];
 	const edgeName = (edge) => heap.strings[heap.edges[edge + e.name_or_index]];
@@ -53,23 +54,6 @@ export function inspectAsyncRetainers(filename) {
 			prototypes.signal.add(node);
 		if (hasProperties(node, ['start', 'deliver', 'stopAttempt', 'remove', 'active']))
 			prototypes.request.add(node);
-	}
-	const parent = new Int32Array(nodeCount).fill(-1);
-	const parentEdge = new Int32Array(nodeCount).fill(-1);
-	const queue = new Uint32Array(nodeCount);
-	let head = 0;
-	let tail = 1;
-	parent[0] = 0;
-	while (head < tail) {
-		const node = queue[head++];
-		for (let edge = edgeStarts[node]; edge < edgeStarts[node + 1]; edge += edgeWidth) {
-			if (edgeType(edge) === 'weak') continue;
-			const next = target(edge);
-			if (parent[next] !== -1) continue;
-			parent[next] = node;
-			parentEdge[next] = edge;
-			queue[tail++] = next;
-		}
 	}
 	function rootPath(node) {
 		const result = [];
@@ -150,9 +134,7 @@ export function inspectAsyncRetainers(filename) {
 		return value !== undefined && nodeType(value) === 'object';
 	};
 	const scopeRows = [...scopes].map(([node, scopeKey]) => ({ scopeKey, ...sample(node) }));
-	const retiredScopes = scopeRows.filter(
-		(scope) => scope.scopeKey !== 'async-retention/control-live',
-	);
+	const retiredScopes = scopeRows.filter((scope) => !liveScopes.has(scope.scopeKey));
 	const producerCounts = { promise: 0, 'stream-next': 0, 'stream-return': 0 };
 	for (const { kind } of producers.values()) {
 		assert.ok(Object.hasOwn(producerCounts, kind), `Unknown producer marker: ${kind}`);
@@ -161,21 +143,20 @@ export function inspectAsyncRetainers(filename) {
 	return {
 		snapshotSha256: sha256(contents),
 		snapshotBytes: contents.length,
+		ephemeronPairCount,
+		ephemeronPromotions,
 		strongScopeCount: scopes.size,
 		retiredCycleScopeCount: retiredScopes.length,
 		scopeSamples: scopeRows.slice(0, 8),
 		retiredCycleScopeSamples: retiredScopes.slice(0, 8),
 		strongSignalCount: signals.length,
-		retiredCycleSignalCount: signalOwners.filter(
-			(entry) => entry.scopeKey !== 'async-retention/control-live',
-		).length,
+		retiredCycleSignalCount: signalOwners.filter((entry) => !liveScopes.has(entry.scopeKey)).length,
 		signalSamples: signalOwners
 			.slice(0, 8)
 			.map(({ node, scopeKey }) => ({ scopeKey, ...sample(node) })),
 		strongRequestCount: requests.length,
-		retiredCycleRequestCount: requestOwners.filter(
-			(entry) => entry.scopeKey !== 'async-retention/control-live',
-		).length,
+		retiredCycleRequestCount: requestOwners.filter((entry) => !liveScopes.has(entry.scopeKey))
+			.length,
 		requestSamples: requestOwners
 			.slice(0, 5)
 			.map(({ node, scopeKey }) => ({ scopeKey, ...sample(node) })),

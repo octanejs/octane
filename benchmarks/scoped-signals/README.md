@@ -145,7 +145,11 @@ Boundary assertions inspect the complete resolved graph, including inputs
 removed by tree shaking: ordinary entries must not import Alien or the scoped
 engine; the independent engine must not import a renderer, compiler, React,
 or DevTools; native hook entries must include the correct runtime and Alien
-3.2.0. All exported functions must load, the empty server render must agree,
+3.2.0. Ordinary runtime exports can resolve their optional native adapters, but
+the emitted-byte check requires all client/server adapter, collector, inspection,
+and retry implementations to tree-shake to zero bytes. The read/event protocol
+and empty server seed map remain separate, measured seams. All exported
+functions must load, the empty server render must agree,
 and a small engine write/subscription/disposal smoke must pass. These checks do
 not establish DOM or native rendering behavior. The runner reuses exact input
 bytes across builds and fails if those files change during the run.
@@ -197,3 +201,72 @@ reports contain metadata and retainer paths only. This workload creates no
 historical frames and does not establish native DOM, browser, or DevTools
 retention. The separate `native-dom-smoke.mjs` lane is supplemental source ABI
 evidence, not compiled `.tsrx`, browser, CI, or heap evidence.
+
+## Native collection and compiled rendering costs
+
+`run-native-costs.mjs` compiles one public `.tsrx` fixture with the archived and
+current compiler. It measures production synchronous mount, prop update, signal
+update, unmount, and server-render work. The two unread controls compile with
+native reads both disabled and enabled, without importing the signal engine.
+Read cases cover one source, 16 reads of one source, and 16 distinct sources.
+Both `@{}` output and ordinary return-JSX output are included. Each case has its
+own bundled runtime so enabling collection cannot affect a disabled control.
+
+```bash
+BENCH_JSON=/private/tmp/scoped-native-costs.json node benchmarks/scoped-signals/run-native-costs.mjs \
+  --tooling-root=/absolute/path/to/compiler-tooling-package \
+  --baseline-root=/absolute/path/to/extracted-baseline \
+  --baseline-ref=<git-commit>
+```
+
+The baseline must contain `packages/octane/src`, its package manifest, and the
+source from the stated revision. As in the graph runner, every consumed
+baseline source is checked against its Git blob. `run.mjs` accepts the analogous
+`--source-root` and `--source-ref` options for measuring an archived engine.
+Neither runner installs or reconstructs a workspace dependency. A separately
+authorized source compiler may require a Node preload; record that command and
+provenance explicitly rather than treating it as a locked package or CI result.
+
+The default native run uses two warmups, nine samples, 64 mounts, 2,000 updates,
+1,000 server renders, and 100,000 collector cycles. Case order reverses on
+alternate samples. Output, host identity, continued producer writes after
+unmount, and observer restoration are checked outside measured intervals. The
+direct collector cases are empty collection, repeated reads, distinct reads,
+four nested witnesses, and replay. They supplement the compiled renderer cases;
+they do not establish browser layout, paint, frame, or hydration cost.
+
+A hook-bearing `use(make$(a, b, c, d, e))` control separately records one factory
+call on mount, zero calls for 32 cache hits, and one call for each of 32 misses.
+These source-factory counts are deterministic work, not V8 allocation counts.
+They have ratio guards in the benchmark registry. Overlapping timing intervals
+remain inconclusive; this runner adds no wall-clock pass threshold.
+
+## Retained foreign success after a branch change
+
+`run-foreign-retention.mjs` keeps one producer scope alive while 1,000 consumer
+scopes first read its value, switch to a failing branch that no longer reads the
+producer, retain the last success, and then dispose. A live failed consumer is
+the positive control. The worker snapshots at cycle 0, 100, and 1,000, then
+after retiring the control and finally the producer. It uses the public signal
+API and no renderer, async attempt, historical frame, or DevTools integration.
+
+```bash
+BENCH_JSON=/private/tmp/scoped-foreign-retention.json node benchmarks/scoped-signals/run-foreign-retention.mjs \
+  --tooling-root=/absolute/path/to/tooling-package --cycles=1000
+BENCH_JSON=/private/tmp/scoped-foreign-retention-fault.json node benchmarks/scoped-signals/run-foreign-retention.mjs \
+  --tooling-root=/absolute/path/to/tooling-package --cycles=1000 --fault-leave-backlinks
+```
+
+The deliberate fault leaves the unique foreign-owner backlink in place when a
+consumer retires. Only the isolated bundle input is changed; repository source
+must remain byte-identical. The fault run must detect growing retained consumer
+owners and nodes, then their release when the producer retires. A normal run
+must detect zero retired consumers at every checkpoint. All snapshots remain
+outside the repository, including when `--snapshots` specifies their directory.
+
+The offline scanner excludes weak edges. V8 also emits conditional WeakMap
+edges: a value is counted as reachable only after both the key and backing table
+are reachable. `heap-reachability.mjs` implements that rule, with synthetic
+controls in `inspect-async-retainers.test.mjs`. Reports preserve known scope
+labels, object counts, paths, snapshot hashes, and the source/toolchain inputs.
+Heap-byte deltas are diagnostic only and are not a leak criterion.

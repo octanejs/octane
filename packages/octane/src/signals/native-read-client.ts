@@ -279,8 +279,12 @@ export function createNativeReadDriver(host: NativeReadHost) {
 		beginRender(block: Block): void {
 			const frame = (frames[depth++] ??= { block: null, collectorToken: -1, candidates: null });
 			frame.block = block;
-			frame.collectorToken = collector.beginRender();
+			frame.collectorToken = collector.beginRender(block);
 			frame.candidates = null;
+			// Parameters precede compiler body scopes. Start with the actual Block
+			// owner, and retire prior reads even when this invocation no longer
+			// enters an instrumented body or reads a native source.
+			if (consumers.has(block)) getCandidate(frame, block);
 		},
 		endRender(block: Block, completed: boolean, suspended: boolean): void {
 			const frame = frames[depth - 1];

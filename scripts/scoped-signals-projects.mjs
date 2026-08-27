@@ -30,17 +30,23 @@ export function scopedSignalsProjects(octane, defaultExclude = []) {
 				globals: false,
 			},
 		},
-		...['dev', 'prod'].map((mode) => ({
+		...['dev', 'prod', 'strong'].map((mode) => ({
 			test: {
-				name: mode === 'prod' ? 'octane-signals-prod' : 'octane-signals',
+				name: mode === 'dev' ? 'octane-signals' : `octane-signals-${mode}`,
 				include: signalsRuntimeTests,
 				exclude: [...defaultExclude, ...signalsNodeTests, ...signalsProfileTests],
 				environment: 'jsdom',
 				setupFiles: ['packages/octane/tests/_per-test-setup.ts'],
 				globals: false,
-				...(mode === 'prod' ? { env: { OCTANE_TEST_COMPILE_MODE: 'prod' } } : {}),
+				...(mode !== 'dev' ? { env: { OCTANE_TEST_COMPILE_MODE: 'prod' } } : {}),
 			},
-			plugins: [octane({ nativeReads: true, ...(mode === 'prod' ? { hmr: false } : {}) })],
+			plugins: [
+				octane({
+					nativeReads: true,
+					...(mode !== 'dev' ? { hmr: false } : {}),
+					...(mode === 'strong' ? { strong: true } : {}),
+				}),
+			],
 		})),
 		{
 			test: {

@@ -330,6 +330,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	'./internal/client': [
 		'queueOwnRefDetach',
 		'replaceRef',
+		'enableNativeReadCollection',
 		'beginNativeReadScope',
 		'endNativeReadScope',
 		'beginNativeReadWitness',
@@ -349,6 +350,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	],
 	'./internal/server': [
 		'ssrSpreadContent',
+		'enableNativeReadCollection',
 		'beginNativeReadScope',
 		'endNativeReadScope',
 		'beginNativeReadWitness',
