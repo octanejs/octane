@@ -11,12 +11,16 @@ built streaming render APIs directly:
 | `preact`      | `renderToPipeableStream` from `preact-render-to-string`     |
 | `solid`       | `renderToStream` from `@solidjs/web` (Solid 2.0)            |
 | `ripple`      | `render(App, { stream })` + `create_ssr_stream()` (Ripple)  |
+| `inferno`     | `streamQueueAsString` from `inferno-server`                 |
 
-All five **do stream** (ripple 0.3.86 gained a stream-mode `render`; see the
+All six **do stream** (ripple 0.3.86 gained a stream-mode `render`; see the
 caveat below). Chunks are collected via each API's natural destination — a
 plain `{ write, end }` object (octane, solid), a minimal Node `Writable`
 (React and Preact use one), or a web-stream reader loop (ripple) — timestamped
 with `performance.now()` as they land in the harness callback.
+
+Inferno's ordered queue stream flushes the synchronous prefix, then resumes
+async class components through their native `getInitialProps()` lifecycle.
 
 Svelte 5 is explicitly **N/A** here: its public server API returns buffered
 `{ body, head }` output and exposes no component streaming renderer. Wrapping
@@ -83,7 +87,7 @@ represent application token-streaming latency or a cross-framework comparison.
   plus one full re-pass and segment flush. Separately resolving boundaries
   legitimately require more waves. The controlled CPU cases make the cost of
   those waves and boundary-count scaling measurable without the 1ms data floor.
-- **React / Preact / Solid / Ripple** — reference engines measured on the same
+- **React / Preact / Solid / Ripple / Inferno** — reference engines measured on the same
   clock; their scheduling and flush policies can differ. Compare the output
   gates and observed chunk counts alongside timing.
 
@@ -91,7 +95,7 @@ represent application token-streaming latency or a cross-framework comparison.
 
 - Same DOM shape, same data schedule, promises created at render start for
   every target; the suspending read lives in a child component of the
-  boundary in all five fixtures.
+  boundary in all six fixtures.
 - **octane**: per-wave full re-passes (documented divergence from React Fizz
   in `runtime.server.ts`) — batches boundaries that resolve in the same
   event-loop wave into one chunk, and re-renders the whole page each wave. Resolved

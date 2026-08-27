@@ -14,6 +14,7 @@ const TARGETS = process.env.TARGETS
 	: [
 			{ name: 'octane-tsrx', url: 'http://localhost:5282/' },
 			{ name: 'react', url: 'http://localhost:5284/' },
+			{ name: 'inferno', url: 'http://localhost:5334/' },
 		];
 const LAZY_CHUNK_DELAY_MS = 35;
 

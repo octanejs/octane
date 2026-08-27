@@ -1,8 +1,8 @@
 # Store selector fan-out
 
 512 independently rendered subscribers read one external store **through a
-selector**, in production-built Octane, React, Preact, Solid 2, Svelte, and Vue
-Vapor applications. The measured operation is the one a selector layer is
+selector**, in production-built Octane, React, Preact, Solid 2, Svelte, Vue
+Vapor, and Inferno applications. The measured operation is the one a selector layer is
 supposed to make free: **unrelated parent re-renders while the store is
 untouched**.
 
@@ -19,8 +19,10 @@ a cached read, memoized on the **selector's identity**, wrapped in
 `useSyncExternalStore`. That is the shape a selector argument's identity
 actually matters in — a selector reallocated on every render throws the cache
 away, so each subscriber redoes a selection whose inputs never moved. Solid,
-Svelte, and Vue have no render pass to redo, so their subscribers express the
-same thing as a `createMemo` / `$derived` / `computed` over a snapshot signal.
+Inferno caches the selected total in native class state and recomputes it only
+from its store subscription. Solid, Svelte, and Vue have no render pass to redo,
+so their subscribers express the same thing as a `createMemo` / `$derived` /
+`computed` over a snapshot signal.
 
 The store publishes an **immutable snapshot** whose identity changes only on a
 write, which is what lets a selection be reused across renders at all. The

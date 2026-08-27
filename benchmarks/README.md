@@ -10,8 +10,10 @@ Each suite has its own `README.md` describing what it measures and which octane
 subsystem a bad number points at. This file documents the **runner and the
 result contract**.
 
-The comparative suites include native Preact and Svelte 5 fixtures alongside
-the existing React, Solid, Ripple, and Vue Vapor references. Preact fixtures use
+The comparative suites include native Inferno 9, Preact, and Svelte 5 fixtures
+alongside the existing React, Solid, Ripple, and Vue Vapor references. Inferno
+fixtures use `inferno`, `inferno-server`, `inferno-hydrate`, and
+`babel-plugin-inferno` directly rather than a React compatibility layer. Preact fixtures use
 `preact`/`preact/hooks` directly, including native scheduler timing, with
 `preact/compat` only for React-shaped APIs that core does not expose, such as
 portals, Suspense, `memo`, and `useSyncExternalStore`; Svelte fixtures use runes,
@@ -20,6 +22,32 @@ capability gaps stay explicit: Svelte's public server renderer is buffered, so
 `streaming-ssr` reports no Svelte target rather than wrapping buffered HTML in a
 fake stream. `codegen-size`, `dbmon-deopt`, and `js-framework-deopt` remain
 Octane-only by design.
+
+### Inferno coverage
+
+Inferno is included in every framework-comparative benchmark whose contract can
+be implemented through Inferno's public browser or Node APIs:
+
+- browser workloads: js-framework (including reorder), TodoMVC, weather and
+  Lighthouse, chat-stream, SVG dashboard, UIbench, dbmon, recursive context,
+  SPA navigation, signal-favoring, effectful-list, portal-swarm, async waterfall,
+  and async composition;
+- the shared news fixture: SSR/hydration, hydration interactivity and stress,
+  lifecycle memory, controlled forms, external-store fan-out and integrations,
+  selector fan-out, scheduler responsiveness, suspense recovery, event
+  delegation, application composition, and scaling curves;
+- server and build workloads: SSR throughput, streaming SSR, HTTP streaming,
+  streaming backpressure, compiler throughput, and bundle size; and
+- the real Tauri desktop shell.
+
+Capability exclusions stay explicit. `memo-wall` records Inferno as N/A because
+Inferno 9 only exposes legacy context, whose consumers cannot observe an update
+through an ancestor that returns `false` from `shouldComponentUpdate`.
+`activity` requires React/Octane Activity semantics, and `ssr-workerd` requires a
+Web Streams/Worker renderer while Inferno exposes a Node stream. React-hosted,
+binding-specific, metaframework, Three, Lynx, universal-driver, compiler-deopt,
+and Octane-internal suites are not general framework matrices, so they do not
+gain an artificial Inferno row.
 
 ### React Compiler
 
@@ -188,29 +216,29 @@ internally, get their own baseline and guard namespace.
 | `js-framework` | js-framework | Octane + reference frameworks | krausest ops incl. `add` |
 | `js-framework-reorder` | js-framework | same fixtures | keyed reorder matrix (LIS vs lastPlacedIndex) |
 | `todomvc` | todomvc | Octane + reference frameworks | Speedometer-style TodoMVC interactions |
-| `weather-app` | weather-app | octane-tsrx, react, preact, solid, svelte, vue | upstream weather UI: cold ready, keyed forecast churn, async search/error/recovery |
-| `weather-app-lighthouse` | weather-app | octane-tsrx, react, preact, solid, svelte, vue | desktop Lighthouse categories plus FCP/LCP/Speed Index/TBT/CLS |
+| `weather-app` | weather-app | octane-tsrx, react, preact, solid, svelte, vue, inferno | upstream weather UI: cold ready, keyed forecast churn, async search/error/recovery |
+| `weather-app-lighthouse` | weather-app | octane-tsrx, react, preact, solid, svelte, vue, inferno | desktop Lighthouse categories plus FCP/LCP/Speed Index/TBT/CLS |
 | `chat-stream` | chat-stream | Octane + reference frameworks | deterministic token streaming + conversation switches |
 | `streamdown-hosted` | streamdown-hosted | React Streamdown + React-hosted Octane binding | React-hosted compatibility boundary: static mount/replace, fine/coarse Markdown streaming, semantic DOM parity, lifecycle diagnostic, and production bytes |
-| `svg-dashboard` | svg-dashboard | octane-tsrx, react, solid, svelte | hand-rolled SVG observability dashboard: path-d/transform churn, keyed reconcile inside `<svg>`, foreignObject labels, portal tooltip overlay, createElement icon de-opt; byte-exact Node-replay + cross-flavor DOM-parity gates |
-| `uibench` | uibench | octane-tsrx, react, preact, solid | fresh implementation of UIbench's 96-case desktop matrix: table/sparse-style updates, flat and nested keyed tree transforms, historical worst cases, large no-change diffs, and semantic/identity gates |
+| `svg-dashboard` | svg-dashboard | octane-tsrx, react, solid, svelte, inferno | hand-rolled SVG observability dashboard: path-d/transform churn, keyed reconcile inside `<svg>`, foreignObject labels, portal tooltip overlay, createElement icon de-opt; byte-exact Node-replay + cross-flavor DOM-parity gates |
+| `uibench` | uibench | octane-tsrx, react, preact, solid, inferno | fresh implementation of UIbench's 96-case desktop matrix: table/sparse-style updates, flat and nested keyed tree transforms, historical worst cases, large no-change diffs, and semantic/identity gates |
 | `dbmon` | dbmon | Octane + reference frameworks | per-cell update churn |
 | `recursive-context` | recursive-context | Octane + reference frameworks | context fan-out |
-| `spa-navigation` | spa-navigation | octane-tsrx, octane-jsx, react, solid, vue-vapor | full-page routed-subtree teardown/mount with shell/layout identity and production-work gates |
+| `spa-navigation` | spa-navigation | octane-tsrx, octane-jsx, react, solid, vue-vapor, inferno | full-page routed-subtree teardown/mount with shell/layout identity and production-work gates |
 | `signal-favoring` | signal-favoring | Octane + reference frameworks | cascade vs targeted |
 | `news` | news | none (builds) | SSR + hydration, per-target |
-| `hydration-interactivity` | hydration-interactivity | none (builds) | real pre-hydration typing, controlled inputs, native event replay, and 1×/6× Chromium CPU throttling across Octane, React, Preact, Solid 2, Svelte, and Vue Vapor |
+| `hydration-interactivity` | hydration-interactivity | none (builds) | real pre-hydration typing, controlled inputs, native event replay, and 1×/6× Chromium CPU throttling across Octane, React, Preact, Solid 2, Svelte, Vue Vapor, and Inferno |
 | `hydration-stress` | hydration-stress | none (builds) | withheld-chunk hydration, keyboard and pointer Send delivery, DOM adoption, and explicit replay/drop diagnostics at 6× CPU throttling |
-| `lifecycle-memory` | lifecycle-memory | none (builds) | 1,000+ effectful mount/update/unmount cycles, real listener/subscription/timer cleanup, post-teardown event probes, and explicitly collected Chromium heap across all six frameworks |
+| `lifecycle-memory` | lifecycle-memory | none (builds) | 1,000+ effectful mount/update/unmount cycles, real listener/subscription/timer cleanup, post-teardown event probes, and explicitly collected Chromium heap across all seven frameworks |
 | `controlled-form` | controlled-form | none (builds) | 512 controlled fields, real typing, DOM identity, focus and caret, validation cancellation, complete submit/reset, and native select/checkbox/radio correctness |
 | `dev-form-diagnostics` | dev-form-diagnostics | none (Node/jsdom) | development-only controlled-form diagnostic commit scaling at 4,000 and 32,000 hosts |
 | `scheduler-depth` | scheduler-depth | none (Node/jsdom) | production client scheduler ordering across 500 and 2,000 deeply nested queued components |
 | `external-store-fanout` | external-store-fanout | none (builds) | 512 subscribers, narrow and broad writes, rapid-write tearing checks, deterministic 100-notification work guards, and balanced subscription removal |
-| `external-store-integrations` | external-store-integrations | none (builds) | real Zustand stores, Jotai atoms, and TanStack Query caches with selector fan-out, query invalidation, and six-framework cleanup gates |
+| `external-store-integrations` | external-store-integrations | none (builds) | real Zustand stores, Jotai atoms, and TanStack Query caches with selector fan-out, query invalidation, and seven-framework cleanup gates |
 | `store-selector-fanout` | store-selector-fanout | none (builds) | 512 subscribers reading one store through a `with-selector`-shaped selector, 20 unrelated parent re-renders with the store untouched, and deterministic selector-invocation counts beside render and snapshot counts |
 | `hook-store-composition` | hook-store-composition | none (builds) | matched direct/nested callbacks and actual Octane Zustand traditional/MobX bindings; separate production timings, named-work counts, and observable identity/update/cleanup controls |
 | `scheduler-responsiveness` | scheduler-responsiveness | none (builds) | real controlled typing during eight 512-subscriber store updates at 6× CPU throttling, with focus, caret, frame, and notification gates |
-| `suspense-recovery` | suspense-recovery | none (builds) | six-framework visible async pending, rejection, retry, cancellation, and stale-response correctness |
+| `suspense-recovery` | suspense-recovery | none (builds) | seven-framework visible async pending, rejection, retry, cancellation, and stale-response correctness |
 | `event-delegation` | event-delegation | none (builds) | 128 real native input events, 512 event-bearing hosts, capture/bubble accounting, and every controlled output |
 | `behavior-root-events` | behavior-root-events | none (headless Chromium) | queued events across 1,000 and 8,000 distinct async behavior adoptions, with FIFO/exactly-once gates |
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
@@ -223,16 +251,16 @@ internally, get their own baseline and guard namespace.
 | `list-clear` | list-clear | Octane-only | keyed-list bulk clear by parent shape — the only coverage of the shared-parent path |
 | `memo-wall` | memo-wall | Octane + reference frameworks | memo bail + context walk |
 | `portal-swarm` | portal-swarm | Octane + reference frameworks | portal render/dispatch |
-| `ssr-throughput` | ssr-throughput | none (Node-only) | comparative news SSR + Octane-only stress fixtures |
-| `streaming-ssr` | streaming-ssr | none (Node-only) | streaming targets incl. Preact; Svelte N/A |
-| `ssr-http` | ssr-http | none (boots its own node:http hosts) | raw streaming API over real HTTP: fresh-process import cost, cold spawn→listen→first-byte, warm shell/total/throughput (octane vs React Fizz, streaming-ssr fixtures) |
+| `ssr-throughput` | ssr-throughput | none (Node-only) | comparative news SSR including Inferno + Octane-only stress fixtures |
+| `streaming-ssr` | streaming-ssr | none (Node-only) | streaming targets incl. Inferno and Preact; Svelte N/A |
+| `ssr-http` | ssr-http | none (boots its own node:http hosts) | raw streaming API over real HTTP: fresh-process import cost, cold spawn→listen→first-byte, warm shell/total/throughput across the streaming-ssr fixtures |
 | `streaming-backpressure` | streaming-backpressure | none (builds) | real one-byte Node Writable pressure, delayed drains, three concurrent destinations, and public-stream abort across supported renderers |
 | `ssr-workerd` | ssr-workerd | none (boots workerd via miniflare) | streaming SSR inside the real Cloudflare Workers runtime: cold isolate→first-byte, warm shell/total, worker-script bytes (octane vs Fizz edge, plus the vite-plugin + adapter-cloudflare deployment shape) |
 | `tanstack-start` | tanstack-start | none (boots its own production servers) | the real Start app pair, correctness-gated: cold TTFB + warm per-route TTFB/stream/throughput across react, octane-minimal, octane-nitro |
 | `dbmon-deopt` | dbmon | octane-tsrx + octane-deopt | tuned vs plain-.ts cliff |
 | `js-framework-deopt` | js-framework | octane-tsrx + naive triplet | tuned vs naive-authoring cliff |
-| `async-waterfall` | async-waterfall | octane-tsrx, react, preact, solid, svelte, ripple | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
-| `async-composition` | async-composition | octane-tsrx, react | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
+| `async-waterfall` | async-waterfall | octane-tsrx, react, preact, solid, svelte, ripple, inferno | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
+| `async-composition` | async-composition | octane-tsrx, react, inferno | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
 | `lynx-list` | lynx-list | none (Node-only) | deterministic 1,000-row native-list physical allocation, reuse, and teardown through a fake Element PAPI |
 | `universal-leaf-update` | universal-leaf-update | none (Node-only) | universal update locality beside 0–4,000 unrelated component siblings through the compiler and native object driver: plain leaf `setState`, keyed `@for` item state, a leaf under an idle `@try`, a structural (insert/remove) update, and compact-row list selection |
 | `universal-external-store` | universal-external-store | none (Node-only) | 128 native universal store subscribers, getter/subscribe identity controls, notification bursts, and deterministic subscription-lifetime and state-projection guards |
@@ -243,7 +271,7 @@ internally, get their own baseline and guard namespace.
 | `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
 | `hook-memo` | hook-memo | none (Node-only) | production hook-memo compiler on/off, clean semantic controls, deterministic function/array creation events, and compiled/bundled bytes |
 | `template-call-memo` | template-call-memo | none (Node-only) | production Strong/compatibility receiver-call counts, immutable keyed rows, real dependency changes, current event captures, and survivor identity |
-| `compiler-throughput` | compiler-throughput | none (Node-only) | six real production compiler pipelines, cold/warm/incremental transformations, 10/100/1,000 components, and heap diagnostics |
+| `compiler-throughput` | compiler-throughput | none (Node-only) | seven real production compiler pipelines, cold/warm/incremental transformations, 10/100/1,000 components, and heap diagnostics |
 | `tsrx-component-graph` | tsrx-component-graph | none (Node-only) | 2,400-component live-import propagation with dependent-first vs dependency-first declarations |
 | `tsrx-jsx-return-branches` | tsrx-jsx-return-branches | none (Node-only) | client/server compile and bundler classification for 120/480 conditional-return components, with lowering/export controls and a same-sized ineligible parse/print control |
 | `tsrx-nesting-diagnostics` | tsrx-nesting-diagnostics | none (Node-only) | development TSRX compilation at 500 and 2,000 invalid HTML sites, with parsed diagnostic count/order controls and a per-diagnostic scaling guard |

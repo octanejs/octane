@@ -1,6 +1,6 @@
 # Hydration interactivity benchmark
 
-A production-built, six-framework comparison of what users can actually do with
+A production-built, seven-framework comparison of what users can actually do with
 server-rendered HTML while client-side hydration is still blocked. Playwright
 types into a real Chromium search input, clicks Send before the hydration chunk
 is released, and verifies DOM adoption, preserved text, focus, caret position,
@@ -15,8 +15,9 @@ actually delivered exactly once.
 | `solid` | Solid 2.0 beta, `@solidjs/web`, and the real Solid hydration script |
 | `svelte` | Svelte 5 server rendering, runes, and strict public hydration |
 | `vue-vapor` | Vue 3.6 Vapor, the existing Vapor-inclusive client shim, and server-rendered Vapor SFCs |
+| `inferno` | Inferno 9 `inferno-server`, `inferno-hydrate`, and native delegated events |
 
-All six apps render the same 180 server-rendered articles and the same editor,
+All seven apps render the same 180 server-rendered articles and the same editor,
 button, visible component-state outputs, and native `input` handler. The
 benchmark reuses each target's established production `benchmarks/news`
 toolchain without modifying the existing news workload or adding dependencies.
@@ -58,10 +59,10 @@ uses a sleep as a hydration gate.
   replay, overwritten query text, and an incorrect submitted value are recorded
   explicitly as user-experience correctness failures. React's interaction-led
   hydration is credited as a delivered click, not mislabeled as deferred replay.
-  All six targets must preserve the query; Octane additionally fails the suite
+  All seven targets must preserve the query; Octane additionally fails the suite
   if it loses the Send intent.
 
-The unified runner prints a six-framework UX correctness table after the
+The unified runner prints a seven-framework UX correctness table after the
 timings. Each framework receives an explicit `PASS` or `FAIL`, together with
 the measured fractions of handled Send clicks, preserved search queries, and
 exactly-once deliveries. The individual target results additionally distinguish
@@ -117,6 +118,7 @@ node benchmarks/hydration-interactivity/run.mjs preact 5
 node benchmarks/hydration-interactivity/run.mjs solid 5
 node benchmarks/hydration-interactivity/run.mjs svelte 5
 node benchmarks/hydration-interactivity/run.mjs vue-vapor 5
+node benchmarks/hydration-interactivity/run.mjs inferno 5
 ```
 
 Pass `--no-build` after an initial run to reuse the existing production assets.

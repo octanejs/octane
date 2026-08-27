@@ -76,6 +76,7 @@ const CARD_COUNT = 10;
 const TARGETS = [
 	{ name: 'octane-tsrx', dir: 'octane' },
 	{ name: 'react', dir: 'react' },
+	{ name: 'inferno', dir: 'inferno' },
 ];
 const TARGET_FILTER = process.env.TARGETS
 	? process.env.TARGETS.split(',')

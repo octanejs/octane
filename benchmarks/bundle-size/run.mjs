@@ -50,22 +50,49 @@ const SETS = [
 	{
 		root: JS_FRAMEWORK,
 		prefix: '',
-		targets: ['octane-tsrx', 'octane-jsx', 'react', 'preact', 'ripple', 'solid', 'svelte'],
+		targets: [
+			'octane-tsrx',
+			'octane-jsx',
+			'react',
+			'preact',
+			'ripple',
+			'solid',
+			'svelte',
+			'inferno',
+		],
 	},
 	{
 		root: TODOMVC,
 		prefix: 'todo_',
-		targets: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'ripple', 'vue-vapor'],
+		targets: [
+			'octane-tsrx',
+			'react',
+			'preact',
+			'solid',
+			'svelte',
+			'ripple',
+			'vue-vapor',
+			'inferno',
+		],
 	},
 	{
 		root: CHAT_STREAM,
 		prefix: 'chat_',
-		targets: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'ripple', 'vue-vapor'],
+		targets: [
+			'octane-tsrx',
+			'react',
+			'preact',
+			'solid',
+			'svelte',
+			'ripple',
+			'vue-vapor',
+			'inferno',
+		],
 	},
 	{
 		root: WEATHER_APP,
 		prefix: 'weather_',
-		targets: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue'],
+		targets: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue', 'inferno'],
 	},
 ];
 const APP_BUDGETS = JSON.parse(fs.readFileSync(path.join(__dirname, 'app-budgets.json'), 'utf8'));

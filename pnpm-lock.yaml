@@ -562,6 +562,9 @@ catalogs:
     astro:
       specifier: ^5.16.0
       version: 5.18.2
+    babel-plugin-inferno:
+      specifier: 6.8.5
+      version: 6.8.5
     babel-plugin-react-compiler:
       specifier: 1.0.0
       version: 1.0.0
@@ -685,6 +688,18 @@ catalogs:
     i18next:
       specifier: 26.3.6
       version: 26.3.6
+    inferno:
+      specifier: 9.1.0
+      version: 9.1.0
+    inferno-create-element:
+      specifier: 9.1.0
+      version: 9.1.0
+    inferno-hydrate:
+      specifier: 9.1.0
+      version: 9.1.0
+    inferno-server:
+      specifier: 9.1.0
+      version: 9.1.0
     internmap:
       specifier: 2.0.3
       version: 2.0.3
@@ -1258,6 +1273,9 @@ importers:
       '@vitest/browser-playwright':
         specifier: 4.1.10
         version: 4.1.10(bufferutil@4.1.0)(playwright@1.61.1)(utf-8-validate@5.0.10)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(vitest@4.1.10)
+      babel-plugin-inferno:
+        specifier: catalog:default
+        version: 6.8.5(@babel/core@7.29.7(supports-color@10.2.2))
       babel-plugin-react-compiler:
         specifier: catalog:default
         version: 1.0.0
@@ -1304,6 +1322,16 @@ importers:
         specifier: ^1.61.1
         version: 1.61.1
 
+  benchmarks/async-composition/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+
   benchmarks/async-composition/octane-tsrx:
     dependencies:
       octane:
@@ -1335,6 +1363,16 @@ importers:
       playwright:
         specifier: ^1.61.1
         version: 1.61.1
+
+  benchmarks/async-waterfall/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
   benchmarks/async-waterfall/octane-tsrx:
     dependencies:
@@ -1461,6 +1499,19 @@ importers:
       playwright:
         specifier: ^1.61.1
         version: 1.61.1
+
+  benchmarks/chat-stream/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.49.0
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
   benchmarks/chat-stream/octane-tsrx:
     dependencies:
@@ -1604,6 +1655,16 @@ importers:
         specifier: ^1.61.1
         version: 1.61.1
 
+  benchmarks/dbmon/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+
   benchmarks/dbmon/octane-deopt:
     dependencies:
       octane:
@@ -1745,6 +1806,19 @@ importers:
         specifier: ^1.61.1
         version: 1.61.1
 
+  benchmarks/effectful-list/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.49.0
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+
   benchmarks/effectful-list/octane-jsx:
     dependencies:
       octane:
@@ -1884,6 +1958,19 @@ importers:
       playwright:
         specifier: ^1.61.1
         version: 1.61.1
+
+  benchmarks/js-framework/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.49.0
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
   benchmarks/js-framework/octane-jsx:
     dependencies:
@@ -2269,6 +2356,25 @@ importers:
         specifier: catalog:default
         version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  benchmarks/news/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+      inferno-create-element:
+        specifier: catalog:default
+        version: 9.1.0
+      inferno-hydrate:
+        specifier: catalog:default
+        version: 9.1.0
+      inferno-server:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+
   benchmarks/news/octane-jsx:
     dependencies:
       octane:
@@ -2396,6 +2502,22 @@ importers:
       playwright:
         specifier: ^1.61.1
         version: 1.61.1
+
+  benchmarks/portal-swarm/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+      inferno-create-element:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.49.0
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
   benchmarks/portal-swarm/octane-tsrx:
     dependencies:
@@ -2542,6 +2664,16 @@ importers:
         specifier: ^1.61.1
         version: 1.61.1
 
+  benchmarks/recursive-context/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+
   benchmarks/recursive-context/octane-jsx:
     dependencies:
       octane:
@@ -2661,6 +2793,16 @@ importers:
         specifier: ^1.61.1
         version: 1.61.1
 
+  benchmarks/signal-favoring/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+
   benchmarks/signal-favoring/octane-jsx:
     dependencies:
       octane:
@@ -2779,6 +2921,16 @@ importers:
       playwright:
         specifier: ^1.61.1
         version: 1.61.1
+
+  benchmarks/spa-navigation/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
   benchmarks/spa-navigation/octane-jsx:
     dependencies:
@@ -3058,6 +3210,22 @@ importers:
         specifier: catalog:default
         version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  benchmarks/streaming-ssr/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+      inferno-create-element:
+        specifier: catalog:default
+        version: 9.1.0
+      inferno-server:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+
   benchmarks/streaming-ssr/octane:
     dependencies:
       octane:
@@ -3143,6 +3311,22 @@ importers:
       playwright:
         specifier: ^1.61.1
         version: 1.61.1
+
+  benchmarks/svg-dashboard/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+      inferno-create-element:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.49.0
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
   benchmarks/svg-dashboard/octane-tsrx:
     dependencies:
@@ -3646,6 +3830,25 @@ importers:
 
   benchmarks/tauri-shell: {}
 
+  benchmarks/tauri-shell/inferno:
+    dependencies:
+      '@benchmarks/tauri-shell-harness':
+        specifier: workspace:*
+        version: link:../shared
+      '@tauri-apps/api':
+        specifier: catalog:default
+        version: 2.11.1
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.49.0
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+
   benchmarks/tauri-shell/octane-tsrx:
     dependencies:
       '@benchmarks/tauri-shell-harness':
@@ -3735,6 +3938,19 @@ importers:
       playwright:
         specifier: ^1.61.1
         version: 1.61.1
+
+  benchmarks/todomvc/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.49.0
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
   benchmarks/todomvc/octane-tsrx:
     dependencies:
@@ -3860,6 +4076,19 @@ importers:
         specifier: ^1.61.1
         version: 1.61.1
 
+  benchmarks/uibench/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      terser:
+        specifier: catalog:default
+        version: 5.49.0
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
+
   benchmarks/uibench/octane-tsrx:
     dependencies:
       octane:
@@ -3935,6 +4164,16 @@ importers:
       playwright:
         specifier: ^1.61.1
         version: 1.61.1
+
+  benchmarks/weather-app/inferno:
+    dependencies:
+      inferno:
+        specifier: catalog:default
+        version: 9.1.0
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
   benchmarks/weather-app/octane-tsrx:
     dependencies:
@@ -20647,6 +20886,10 @@ packages:
   babel-plugin-dynamic-import-node@2.3.3:
     resolution: {integrity: sha512-jZVI+s9Zg3IqA/kdi0i6UDCybUI3aSBLnglhYbSSjKlV7yF1F/5LWv8MakQmvYpnbJDS6fcBL2KzHSxNCMtWSQ==}
 
+  babel-plugin-inferno@6.8.5:
+    resolution: {integrity: sha512-dYIex2Uig0aBLfMF1zIV+eDVfQvSYZ/IsjMBEgwEmqG07lXy4r9RZ41TKw2wAuOTqIe19RxWvg8pxguHO2ljDA==}
+    engines: {node: '>=18'}
+
   babel-plugin-istanbul@6.1.1:
     resolution: {integrity: sha512-Y1IQok9821cC9onCx5otgFfRm7Lm+I+wwxOx738M/WLPZ9Q42m4IG5W0FNX8WLL2gYMZo3JkuXIH2DOpWM+qwA==}
     engines: {node: '>=8'}
@@ -23730,6 +23973,22 @@ packages:
     resolution: {integrity: sha512-m6FAo/spmsW2Ab2fU35JTYwtOKa2yAwXSwgjSv1TJzh4Mh7mC3lzAOVLBprb72XsTrgkEIsl7YrFNAiDiRhIGg==}
     engines: {node: '>=12'}
 
+  inferno-create-element@9.1.0:
+    resolution: {integrity: sha512-CobApGEDHKlz2LuYNoagklXzCxShz/6bXS4EZqMzppOKnUGut/9FDM8cdJ+ZvtQcbcYcnKhogVDnwsPQSWERMQ==}
+
+  inferno-hydrate@9.1.0:
+    resolution: {integrity: sha512-JJAww5XbZBvGKM6j1j1o7L7eVMpcojKZ7gl9GUtTOzVhHq0hbsVe73gGF3ucgve+NZAfrz0UNw1f/acNUJQ4Aw==}
+
+  inferno-server@9.1.0:
+    resolution: {integrity: sha512-TYjwFYNvn/68rjhLxVf+2xSvdjU6BCPVzFkussnbLQRi5BJmcxW2mwfIuBwdvaYQ8YmEnGBoo/xLbsiV8IsURQ==}
+    engines: {node: '>=8'}
+
+  inferno-vnode-flags@9.1.0:
+    resolution: {integrity: sha512-pyM4YQbYGiKS/YHgXUBsrrG6VHDZCqtas4Ba3OQqxZE6UMNWDO9Sz9q3y2hLHO7Ue1e4gcBV9S1BCr5gnUuQ8A==}
+
+  inferno@9.1.0:
+    resolution: {integrity: sha512-Cw7iu5Yn//PDZKZPZGy2+7b7hCaVhbKuPP1ikyyOvXILZno1faIfcQOyfQkNKh4h6LSQ6VhImaG7sxvS0IrhuA==}
+
   inflight@1.0.6:
     resolution: {integrity: sha512-k92I/b08q4wvFscXCLvqfsHCrjrF7yiXsQuIVvVE7N82W3+aqpzuUdBbfhWcy/FZR3/4IgflMgKLOsvPDrGCJA==}
     deprecated: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
@@ -26128,7 +26387,7 @@ packages:
     resolution: {integrity: sha512-kNNnkkVQup/QDvmTz8Q84wc2ntiyoVHDxa6eHWKt5qdGAmFRBIxy83rxgCYEjW0x06UJ9E3P6VgM2yY4rOBH4w==}
 
   octane@0.1.47:
-    resolution: {integrity: sha512-m00fxW2Wiu5tilK84U97kIi1o8Rrc8KmoxLSCzzJCjnnxaqYmuX/7eaul82pRLpXxt6OUhKjaxFbQgRxGaq4RA==}
+    resolution: {integrity: sha512-dNlyO6kU5jmWv2QEtUP4ZaF00gb+kKey/ISGkjix9t3G3yquV8oZitPE+yzxVB+LiBTmAvj1eweNzFeHVpAFTg==}
     engines: {node: '>=22.22.2'}
     peerDependencies:
       react: ^19.0.0
@@ -26219,6 +26478,10 @@ packages:
 
   openapi-typescript-helpers@0.0.15:
     resolution: {integrity: sha512-opyTPaunsklCBpTK8JGef6mfPhLSnyy5a0IN9vKtx3+4aExf+KxEqYwIy3hqkedXIB97u357uLMJsOnm3GVjsw==}
+
+  opencollective-postinstall@2.0.3:
+    resolution: {integrity: sha512-8AV/sCtuzUeTo8gQK5qDZzARrulB3egtLzFgteqB2tcT4Mw7B8Kt7JcDHmltjz6FOAHsvTevk70gZEbhM4ZS9Q==}
+    hasBin: true
 
   opener@1.5.2:
     resolution: {integrity: sha512-ur5UIdyw5Y7yEj9wLzhqXiy6GZ3Mwx0yGI+5sMn2r0N0v3cKJvUmFH5yPP+WXh9e0xfyzyJX95D8l088DNFj7A==}
@@ -47440,6 +47703,13 @@ snapshots:
     dependencies:
       object.assign: 4.1.7
 
+  babel-plugin-inferno@6.8.5(@babel/core@7.29.7(supports-color@10.2.2)):
+    dependencies:
+      '@babel/plugin-syntax-jsx': 7.29.7(@babel/core@7.29.7(supports-color@10.2.2))
+      '@babel/types': 7.29.7
+    transitivePeerDependencies:
+      - '@babel/core'
+
   babel-plugin-istanbul@6.1.1(supports-color@10.2.2):
     dependencies:
       '@babel/helper-plugin-utils': 7.29.7
@@ -48422,6 +48692,10 @@ snapshots:
       postcss: 8.5.20
       postcss-selector-parser: 7.1.4
 
+  css-declaration-sorter@7.4.0(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+
   css-declaration-sorter@7.4.0(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -48465,9 +48739,9 @@ snapshots:
   css-minimizer-webpack-plugin@5.0.1(clean-css@5.3.3)(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
-      cssnano: 6.1.2(postcss@8.5.20)
+      cssnano: 6.1.2(postcss@8.4.29)
       jest-worker: 29.7.0
-      postcss: 8.5.20
+      postcss: 8.4.29
       schema-utils: 4.3.3
       serialize-javascript: 6.0.2
       webpack: 5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@6.1.2(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)
@@ -48548,6 +48822,40 @@ snapshots:
       postcss-reduce-idents: 6.0.3(postcss@8.5.20)
       postcss-zindex: 6.0.2(postcss@8.5.20)
 
+  cssnano-preset-default@6.1.2(postcss@8.4.29):
+    dependencies:
+      browserslist: 4.28.6
+      css-declaration-sorter: 7.4.0(postcss@8.4.29)
+      cssnano-utils: 4.0.2(postcss@8.4.29)
+      postcss: 8.4.29
+      postcss-calc: 9.0.1(postcss@8.4.29)
+      postcss-colormin: 6.1.0(postcss@8.4.29)
+      postcss-convert-values: 6.1.0(postcss@8.4.29)
+      postcss-discard-comments: 6.0.2(postcss@8.4.29)
+      postcss-discard-duplicates: 6.0.3(postcss@8.4.29)
+      postcss-discard-empty: 6.0.3(postcss@8.4.29)
+      postcss-discard-overridden: 6.0.2(postcss@8.4.29)
+      postcss-merge-longhand: 6.0.5(postcss@8.4.29)
+      postcss-merge-rules: 6.1.1(postcss@8.4.29)
+      postcss-minify-font-values: 6.1.0(postcss@8.4.29)
+      postcss-minify-gradients: 6.0.3(postcss@8.4.29)
+      postcss-minify-params: 6.1.0(postcss@8.4.29)
+      postcss-minify-selectors: 6.0.4(postcss@8.4.29)
+      postcss-normalize-charset: 6.0.2(postcss@8.4.29)
+      postcss-normalize-display-values: 6.0.2(postcss@8.4.29)
+      postcss-normalize-positions: 6.0.2(postcss@8.4.29)
+      postcss-normalize-repeat-style: 6.0.2(postcss@8.4.29)
+      postcss-normalize-string: 6.0.2(postcss@8.4.29)
+      postcss-normalize-timing-functions: 6.0.2(postcss@8.4.29)
+      postcss-normalize-unicode: 6.1.0(postcss@8.4.29)
+      postcss-normalize-url: 6.0.2(postcss@8.4.29)
+      postcss-normalize-whitespace: 6.0.2(postcss@8.4.29)
+      postcss-ordered-values: 6.0.2(postcss@8.4.29)
+      postcss-reduce-initial: 6.1.0(postcss@8.4.29)
+      postcss-reduce-transforms: 6.0.2(postcss@8.4.29)
+      postcss-svgo: 6.0.3(postcss@8.4.29)
+      postcss-unique-selectors: 6.0.4(postcss@8.4.29)
+
   cssnano-preset-default@6.1.2(postcss@8.5.20):
     dependencies:
       browserslist: 4.28.6
@@ -48616,6 +48924,10 @@ snapshots:
       postcss-svgo: 7.1.3(postcss@8.5.20)
       postcss-unique-selectors: 7.0.7(postcss@8.5.20)
 
+  cssnano-utils@4.0.2(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+
   cssnano-utils@4.0.2(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -48623,6 +48935,12 @@ snapshots:
   cssnano-utils@5.0.3(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
+
+  cssnano@6.1.2(postcss@8.4.29):
+    dependencies:
+      cssnano-preset-default: 6.1.2(postcss@8.4.29)
+      lilconfig: 3.1.3
+      postcss: 8.4.29
 
   cssnano@6.1.2(postcss@8.5.20):
     dependencies:
@@ -51090,6 +51408,26 @@ snapshots:
   indent-string@4.0.0: {}
 
   indent-string@5.0.0: {}
+
+  inferno-create-element@9.1.0:
+    dependencies:
+      inferno: 9.1.0
+
+  inferno-hydrate@9.1.0:
+    dependencies:
+      inferno: 9.1.0
+
+  inferno-server@9.1.0:
+    dependencies:
+      inferno: 9.1.0
+
+  inferno-vnode-flags@9.1.0: {}
+
+  inferno@9.1.0:
+    dependencies:
+      csstype: 3.2.3
+      inferno-vnode-flags: 9.1.0
+      opencollective-postinstall: 2.0.3
 
   inflight@1.0.6:
     dependencies:
@@ -54881,6 +55219,8 @@ snapshots:
 
   openapi-typescript-helpers@0.0.15: {}
 
+  opencollective-postinstall@2.0.3: {}
+
   opener@1.5.2: {}
 
   optimism@0.18.1:
@@ -55620,6 +55960,12 @@ snapshots:
       postcss-selector-parser: 7.1.4
       postcss-value-parser: 4.2.0
 
+  postcss-calc@9.0.1(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+      postcss-selector-parser: 6.1.4
+      postcss-value-parser: 4.2.0
+
   postcss-calc@9.0.1(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -55652,6 +55998,14 @@ snapshots:
       postcss: 8.5.20
       postcss-value-parser: 4.2.0
 
+  postcss-colormin@6.1.0(postcss@8.4.29):
+    dependencies:
+      browserslist: 4.28.6
+      caniuse-api: 3.0.0
+      colord: 2.9.3
+      postcss: 8.4.29
+      postcss-value-parser: 4.2.0
+
   postcss-colormin@6.1.0(postcss@8.5.20):
     dependencies:
       browserslist: 4.28.6
@@ -55666,6 +56020,12 @@ snapshots:
       browserslist: 4.28.6
       caniuse-api: 3.0.0
       postcss: 8.5.20
+      postcss-value-parser: 4.2.0
+
+  postcss-convert-values@6.1.0(postcss@8.4.29):
+    dependencies:
+      browserslist: 4.28.6
+      postcss: 8.4.29
       postcss-value-parser: 4.2.0
 
   postcss-convert-values@6.1.0(postcss@8.5.20):
@@ -55710,6 +56070,10 @@ snapshots:
       postcss: 8.5.20
       postcss-selector-parser: 7.1.4
 
+  postcss-discard-comments@6.0.2(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+
   postcss-discard-comments@6.0.2(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -55719,6 +56083,10 @@ snapshots:
       postcss: 8.5.20
       postcss-selector-parser: 7.1.4
 
+  postcss-discard-duplicates@6.0.3(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+
   postcss-discard-duplicates@6.0.3(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -55727,6 +56095,10 @@ snapshots:
     dependencies:
       postcss: 8.5.20
 
+  postcss-discard-empty@6.0.3(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+
   postcss-discard-empty@6.0.3(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -55734,6 +56106,10 @@ snapshots:
   postcss-discard-empty@7.0.3(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
+
+  postcss-discard-overridden@6.0.2(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
 
   postcss-discard-overridden@6.0.2(postcss@8.5.20):
     dependencies:
@@ -55828,6 +56204,12 @@ snapshots:
       postcss: 8.5.20
       postcss-value-parser: 4.2.0
 
+  postcss-merge-longhand@6.0.5(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+      postcss-value-parser: 4.2.0
+      stylehacks: 6.1.1(postcss@8.4.29)
+
   postcss-merge-longhand@6.0.5(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -55839,6 +56221,14 @@ snapshots:
       postcss: 8.5.20
       postcss-value-parser: 4.2.0
       stylehacks: 7.0.11(postcss@8.5.20)
+
+  postcss-merge-rules@6.1.1(postcss@8.4.29):
+    dependencies:
+      browserslist: 4.28.6
+      caniuse-api: 3.0.0
+      cssnano-utils: 4.0.2(postcss@8.4.29)
+      postcss: 8.4.29
+      postcss-selector-parser: 6.1.4
 
   postcss-merge-rules@6.1.1(postcss@8.5.20):
     dependencies:
@@ -55856,6 +56246,11 @@ snapshots:
       postcss: 8.5.20
       postcss-selector-parser: 7.1.4
 
+  postcss-minify-font-values@6.1.0(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+      postcss-value-parser: 4.2.0
+
   postcss-minify-font-values@6.1.0(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -55864,6 +56259,13 @@ snapshots:
   postcss-minify-font-values@7.0.3(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
+      postcss-value-parser: 4.2.0
+
+  postcss-minify-gradients@6.0.3(postcss@8.4.29):
+    dependencies:
+      colord: 2.9.3
+      cssnano-utils: 4.0.2(postcss@8.4.29)
+      postcss: 8.4.29
       postcss-value-parser: 4.2.0
 
   postcss-minify-gradients@6.0.3(postcss@8.5.20):
@@ -55880,6 +56282,13 @@ snapshots:
       postcss: 8.5.20
       postcss-value-parser: 4.2.0
 
+  postcss-minify-params@6.1.0(postcss@8.4.29):
+    dependencies:
+      browserslist: 4.28.6
+      cssnano-utils: 4.0.2(postcss@8.4.29)
+      postcss: 8.4.29
+      postcss-value-parser: 4.2.0
+
   postcss-minify-params@6.1.0(postcss@8.5.20):
     dependencies:
       browserslist: 4.28.6
@@ -55893,6 +56302,11 @@ snapshots:
       cssnano-utils: 5.0.3(postcss@8.5.20)
       postcss: 8.5.20
       postcss-value-parser: 4.2.0
+
+  postcss-minify-selectors@6.0.4(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+      postcss-selector-parser: 6.1.4
 
   postcss-minify-selectors@6.0.4(postcss@8.5.20):
     dependencies:
@@ -55940,6 +56354,10 @@ snapshots:
       postcss: 8.5.20
       postcss-selector-parser: 7.1.4
 
+  postcss-normalize-charset@6.0.2(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+
   postcss-normalize-charset@6.0.2(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -55947,6 +56365,11 @@ snapshots:
   postcss-normalize-charset@7.0.3(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
+
+  postcss-normalize-display-values@6.0.2(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+      postcss-value-parser: 4.2.0
 
   postcss-normalize-display-values@6.0.2(postcss@8.5.20):
     dependencies:
@@ -55956,6 +56379,11 @@ snapshots:
   postcss-normalize-display-values@7.0.3(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
+      postcss-value-parser: 4.2.0
+
+  postcss-normalize-positions@6.0.2(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
       postcss-value-parser: 4.2.0
 
   postcss-normalize-positions@6.0.2(postcss@8.5.20):
@@ -55968,6 +56396,11 @@ snapshots:
       postcss: 8.5.20
       postcss-value-parser: 4.2.0
 
+  postcss-normalize-repeat-style@6.0.2(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+      postcss-value-parser: 4.2.0
+
   postcss-normalize-repeat-style@6.0.2(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -55976,6 +56409,11 @@ snapshots:
   postcss-normalize-repeat-style@7.0.4(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
+      postcss-value-parser: 4.2.0
+
+  postcss-normalize-string@6.0.2(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
       postcss-value-parser: 4.2.0
 
   postcss-normalize-string@6.0.2(postcss@8.5.20):
@@ -55988,6 +56426,11 @@ snapshots:
       postcss: 8.5.20
       postcss-value-parser: 4.2.0
 
+  postcss-normalize-timing-functions@6.0.2(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+      postcss-value-parser: 4.2.0
+
   postcss-normalize-timing-functions@6.0.2(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -55996,6 +56439,12 @@ snapshots:
   postcss-normalize-timing-functions@7.0.3(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
+      postcss-value-parser: 4.2.0
+
+  postcss-normalize-unicode@6.1.0(postcss@8.4.29):
+    dependencies:
+      browserslist: 4.28.6
+      postcss: 8.4.29
       postcss-value-parser: 4.2.0
 
   postcss-normalize-unicode@6.1.0(postcss@8.5.20):
@@ -56010,6 +56459,11 @@ snapshots:
       postcss: 8.5.20
       postcss-value-parser: 4.2.0
 
+  postcss-normalize-url@6.0.2(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+      postcss-value-parser: 4.2.0
+
   postcss-normalize-url@6.0.2(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -56018,6 +56472,11 @@ snapshots:
   postcss-normalize-url@7.0.3(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
+      postcss-value-parser: 4.2.0
+
+  postcss-normalize-whitespace@6.0.2(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
       postcss-value-parser: 4.2.0
 
   postcss-normalize-whitespace@6.0.2(postcss@8.5.20):
@@ -56033,6 +56492,12 @@ snapshots:
   postcss-opacity-percentage@3.0.0(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
+
+  postcss-ordered-values@6.0.2(postcss@8.4.29):
+    dependencies:
+      cssnano-utils: 4.0.2(postcss@8.4.29)
+      postcss: 8.4.29
+      postcss-value-parser: 4.2.0
 
   postcss-ordered-values@6.0.2(postcss@8.5.20):
     dependencies:
@@ -56145,6 +56610,12 @@ snapshots:
       postcss: 8.5.20
       postcss-value-parser: 4.2.0
 
+  postcss-reduce-initial@6.1.0(postcss@8.4.29):
+    dependencies:
+      browserslist: 4.28.6
+      caniuse-api: 3.0.0
+      postcss: 8.4.29
+
   postcss-reduce-initial@6.1.0(postcss@8.5.20):
     dependencies:
       browserslist: 4.28.6
@@ -56156,6 +56627,11 @@ snapshots:
       browserslist: 4.28.6
       caniuse-api: 3.0.0
       postcss: 8.5.20
+
+  postcss-reduce-transforms@6.0.2(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+      postcss-value-parser: 4.2.0
 
   postcss-reduce-transforms@6.0.2(postcss@8.5.20):
     dependencies:
@@ -56196,6 +56672,12 @@ snapshots:
       postcss: 8.5.20
       sort-css-media-queries: 2.2.0
 
+  postcss-svgo@6.0.3(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+      postcss-value-parser: 4.2.0
+      svgo: 3.3.4
+
   postcss-svgo@6.0.3(postcss@8.5.20):
     dependencies:
       postcss: 8.5.20
@@ -56207,6 +56689,11 @@ snapshots:
       postcss: 8.5.20
       postcss-value-parser: 4.2.0
       svgo: 4.0.2
+
+  postcss-unique-selectors@6.0.4(postcss@8.4.29):
+    dependencies:
+      postcss: 8.4.29
+      postcss-selector-parser: 6.1.4
 
   postcss-unique-selectors@6.0.4(postcss@8.5.20):
     dependencies:
@@ -58663,6 +59150,12 @@ snapshots:
       react: 18.2.0
     optionalDependencies:
       '@babel/core': 7.29.7(supports-color@10.2.2)
+
+  stylehacks@6.1.1(postcss@8.4.29):
+    dependencies:
+      browserslist: 4.28.6
+      postcss: 8.4.29
+      postcss-selector-parser: 6.1.4
 
   stylehacks@6.1.1(postcss@8.5.20):
     dependencies:

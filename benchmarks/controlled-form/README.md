@@ -1,8 +1,8 @@
 # Large controlled forms
 
 This benchmark drives the same production-built, 512-field controlled form in
-Octane, React, Preact, Solid 2, Svelte, and Vue Vapor with real Playwright mouse
-and keyboard input.
+Octane, React, Preact, Solid 2, Svelte, Vue Vapor, and Inferno with real
+Playwright mouse and keyboard input.
 
 Correctness checks preserve the original input, focus, caret, typed value, and
 rendered output. They also exercise checkbox, radio, select, conditional

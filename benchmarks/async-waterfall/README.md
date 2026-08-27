@@ -44,6 +44,10 @@ toward per-level rounds fails loudly) and ≤1.5× solid/ripple on init+update
   suspends before creating its child, so the nested tree serializes honestly.
 - **Svelte 5** uses stable `#await` blocks around each value while rendering the
   recursive child outside the block, starting all independent levels together.
+- **Inferno 9** has no Suspense or hooks API. Its native class lifecycle renders
+  the recursive child immediately and starts each level's request on mount, so
+  the same independent requests begin in one parallel wave; updates repeat that
+  lifecycle-driven parallel shape.
 
 ## Running
 

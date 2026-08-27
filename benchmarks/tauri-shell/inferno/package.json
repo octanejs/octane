@@ -1,0 +1,19 @@
+{
+  "name": "inferno-tauri-shell",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Inferno 9 column of the Tauri desktop-shell benchmark.",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@benchmarks/tauri-shell-harness": "workspace:*",
+    "@tauri-apps/api": "catalog:default",
+    "inferno": "catalog:default"
+  },
+  "devDependencies": {
+    "terser": "catalog:default",
+    "vite": "catalog:default"
+  }
+}
