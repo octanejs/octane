@@ -1,0 +1,76 @@
+{
+  "suite": "vite-client-assets",
+  "iterations": 8,
+  "targets": [
+    {
+      "name": "routes-100-deep",
+      "ops": {
+        "asset_map": {
+          "score": 0.24115833000000006,
+          "median": 0.22342919999999963,
+          "min": 0.19553334999999947,
+          "mean": 0.23791536250000006,
+          "p95": 0.3150624999999991,
+          "sd": 0.04920871937004462,
+          "rme": 17.294409122814045,
+          "scoreRme": 30.5914271969539,
+          "warmupRatio": 0.9875047650230454,
+          "samples": 8
+        }
+      },
+      "meta": {
+        "routes": 100,
+        "sharedDepth": 500,
+        "mapsPerSample": 20,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "routes-1000-deep",
+      "ops": {
+        "asset_map": {
+          "score": 0.7162795800000007,
+          "median": 0.7177271000000018,
+          "min": 0.6514937500000002,
+          "mean": 0.7465312437500004,
+          "p95": 0.9524249999999995,
+          "sd": 0.09452217961750081,
+          "rme": 10.586975077013314,
+          "scoreRme": 6.071560392592182,
+          "warmupRatio": 1.0533555486811437,
+          "samples": 8
+        }
+      },
+      "meta": {
+        "routes": 1000,
+        "sharedDepth": 500,
+        "mapsPerSample": 20,
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "routes-1000-shallow",
+      "ops": {
+        "asset_map": {
+          "score": 0.6400841700000006,
+          "median": 0.5237937500000015,
+          "min": 0.44573125,
+          "mean": 0.5907512937500004,
+          "p95": 1.1788312499999989,
+          "sd": 0.2422670419603853,
+          "rme": 34.290657053654506,
+          "scoreRme": 59.548645577776824,
+          "warmupRatio": 0.9842930500843335,
+          "samples": 8
+        }
+      },
+      "meta": {
+        "routes": 1000,
+        "sharedDepth": 1,
+        "mapsPerSample": 20,
+        "correctness": "pass"
+      }
+    }
+  ],
+  "harnessExit": 0
+}

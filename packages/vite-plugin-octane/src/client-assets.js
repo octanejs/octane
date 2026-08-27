@@ -39,6 +39,14 @@ export function createClientAssetMap(manifest, moduleIds, entryFiles = {}) {
 	const manifestKeysByFile = new Map(
 		Object.entries(manifest).map(([key, entry]) => [entry.file, key]),
 	);
+	// Route entries usually converge on the same shared chunks. Cache only small,
+	// complete transitive CSS results for this immutable manifest build so a large
+	// shared JavaScript graph is walked once without retaining quadratic CSS lists.
+	const MAX_CACHED_CSS_FILES = 64;
+	/** @type {Map<string, string[]>} */
+	const cssCache = new Map();
+	let traversalVersion = 0;
+	let traversalDepth = 0;
 
 	/**
 	 * @param {string} key
@@ -48,11 +56,22 @@ export function createClientAssetMap(manifest, moduleIds, entryFiles = {}) {
 	 */
 	function collectCss(key, deferredHydrationBranch, visited) {
 		const visitKey = `${deferredHydrationBranch ? 'deferred' : 'eager'}:${key}`;
-		if (visited.has(visitKey)) return [];
+		if (visited.has(visitKey)) {
+			// This result is complete for the current route because the earlier path
+			// already supplied the subtree. It is not safe to reuse as a standalone
+			// result for another route; the version change prevents its active callers
+			// from caching their now-context-dependent results.
+			traversalVersion++;
+			return [];
+		}
 		visited.add(visitKey);
+		const cached = cssCache.get(visitKey);
+		if (cached !== undefined) return cached;
 		const entry = manifest[key];
 		if (!entry) return [];
 
+		const version = traversalVersion;
+		traversalDepth++;
 		const css = [...(entry.css || [])];
 		for (const imported of entry.imports || []) {
 			css.push(...collectCss(imported, deferredHydrationBranch, visited));
@@ -66,6 +85,11 @@ export function createClientAssetMap(manifest, moduleIds, entryFiles = {}) {
 			if (entersDeferredHydration) {
 				css.push(...collectCss(imported, true, visited));
 			}
+		}
+		traversalDepth--;
+		// Top-level route entries are consumed once; caching them only grows the map.
+		if (traversalDepth > 0 && traversalVersion === version && css.length <= MAX_CACHED_CSS_FILES) {
+			cssCache.set(visitKey, css);
 		}
 		return css;
 	}
@@ -83,9 +107,11 @@ export function createClientAssetMap(manifest, moduleIds, entryFiles = {}) {
 			: manifestKeysByFile.get(entryFiles[moduleId]);
 		if (!manifestKey) continue;
 		const entry = manifest[manifestKey];
+		const visited = new Set();
+		traversalVersion = 0;
 		assets[moduleId] = {
 			js: entry.file,
-			css: [...new Set(collectCss(manifestKey, false, new Set()))],
+			css: [...new Set(collectCss(manifestKey, false, visited))],
 		};
 	}
 	return assets;

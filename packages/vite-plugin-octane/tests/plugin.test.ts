@@ -96,6 +96,43 @@ describe('production client assets', () => {
 			},
 		});
 	});
+
+	it('preserves route-local CSS order when manifest imports form a cycle', () => {
+		const assets = createClientAssetMap(
+			{
+				'src/Alpha.tsrx': {
+					file: 'assets/Alpha.js',
+					imports: ['_cycle-a.js'],
+				},
+				'src/Beta.tsrx': {
+					file: 'assets/Beta.js',
+					imports: ['_cycle-b.js'],
+				},
+				'_cycle-a.js': {
+					file: 'assets/cycle-a.js',
+					css: ['assets/a.css'],
+					imports: ['_cycle-b.js'],
+				},
+				'_cycle-b.js': {
+					file: 'assets/cycle-b.js',
+					css: ['assets/b.css'],
+					imports: ['_cycle-a.js'],
+				},
+			},
+			['/src/Alpha.tsrx', '/src/Beta.tsrx'],
+		);
+
+		expect(assets).toEqual({
+			'/src/Alpha.tsrx': {
+				js: 'assets/Alpha.js',
+				css: ['assets/a.css', 'assets/b.css'],
+			},
+			'/src/Beta.tsrx': {
+				js: 'assets/Beta.js',
+				css: ['assets/b.css', 'assets/a.css'],
+			},
+		});
+	});
 });
 
 describe('isViteOwnedUrl', () => {

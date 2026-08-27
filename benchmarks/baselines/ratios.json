@@ -480,6 +480,14 @@
     "note": "Same-process lowercase method misses through 1,000 server routes, normalized per candidate. Re-normalizing the request method for every route measured at 0.31x the dynamic control; one dispatch-level normalization measured at 0.07x. The 0.2 ceiling leaves timing headroom while catching repeated method normalization."
   },
   {
+    "suite": "vite-client-assets",
+    "op": "asset_map",
+    "target": "routes-1000-deep",
+    "reference": "routes-100-deep",
+    "maxRatio": 6,
+    "note": "Same-process Vite asset mapping over route entries that share one 500-chunk graph and produce the same one-file CSS result. Rewalking the graph for every route measured at 10.16x for 1,000 versus 100 routes; bounded complete-result caching measured at 3.24x. The 6x ceiling leaves timing headroom while catching restoration of the route-count times graph-size traversal."
+  },
+  {
     "suite": "external-store-fanout",
     "op": "broad_write",
     "target": "octane-tsrx",
