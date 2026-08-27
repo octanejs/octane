@@ -4912,8 +4912,9 @@ function classifySameModuleWarmPotential(ctx) {
 	// Propagate async reachability through forward references and recursive
 	// same-module chains. An all-synchronous cycle stays false; one opaque or
 	// async descendant makes every component that can reach it conservative.
-	// Resolve seeds and declaration-order-forward chains before allocating the
-	// reverse graph so all-synchronous and already-linear graphs retain one scan.
+	// Resolve seeds and declaration-order-friendly chains first. All-synchronous
+	// graphs return before reverse-graph allocation, and already-linear graphs
+	// leave that graph empty.
 	const queue = [];
 	for (const [, info] of ctx.componentInfo) {
 		if (info.warmPotential) {
@@ -4948,9 +4949,12 @@ function classifySameModuleWarmPotential(ctx) {
 			targetDependents.push(info);
 		}
 	}
+	if (dependents.size === 0) return;
 
 	for (let index = 0; index < queue.length; index++) {
-		for (const info of dependents.get(queue[index]) ?? []) {
+		const targetDependents = dependents.get(queue[index]);
+		if (targetDependents === undefined) continue;
+		for (const info of targetDependents) {
 			if (info.warmPotential) continue;
 			info.warmPotential = true;
 			queue.push(info);
