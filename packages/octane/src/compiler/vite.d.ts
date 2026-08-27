@@ -81,9 +81,9 @@ export interface OctaneVitePluginOptions {
 	 */
 	profile?: boolean | 'auto';
 	/**
-	 * Reject state updates during render, synchronous effect state updates, and
-	 * render-time ref writes in application-owned modules. Individual modules
-	 * can opt in with a top-level `"use strong"` directive.
+	 * Assert pure immutable-snapshot renders and reject detectable state, ref,
+	 * snapshot, and nondeterministic violations in application-owned modules.
+	 * Individual modules can opt in with a top-level `"use strong"` directive.
 	 * @default false
 	 */
 	strong?: boolean;

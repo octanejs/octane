@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "target": "esnext",
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "noErrorTruncation": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "baseUrl": "..",
+    "paths": {
+      "react": ["node_modules/@types/react/index.d.ts"],
+      "react/*": ["node_modules/@types/react/*"],
+      "react-dom": ["node_modules/@types/react-dom/index.d.ts"],
+      "react-dom/*": ["node_modules/@types/react-dom/*"],
+      "@floating-ui/core": ["upstream/packages/core/src/index.ts"],
+      "@floating-ui/dom": ["upstream/packages/dom/src/index.ts"],
+      "@floating-ui/react": ["upstream/packages/react/src/index.ts"],
+      "@floating-ui/react/utils": ["upstream/packages/react/src/utils.ts"],
+      "@floating-ui/react-dom": ["upstream/packages/react-dom/src/index.ts"],
+      "@floating-ui/utils": ["upstream/packages/utils/src/index.ts"],
+      "@floating-ui/utils/dom": ["upstream/packages/utils/src/dom.ts"]
+    }
+  },
+  "include": [
+    "./upstream-globals.d.ts",
+    "../upstream/packages/react/test/index.test-d.tsx",
+    "../upstream/packages/react-dom/test/index.test-d.tsx"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

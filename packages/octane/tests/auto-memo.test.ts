@@ -28,7 +28,7 @@ function expectCompilerRegion(code: string): void {
 	// Dependencies are snapshotted into temporaries once per render; the guard
 	// compares and publishes those exact values.
 	expect(code).toMatch(/const __memoDep[\w$]* = \(?[^;]+\)?;/);
-	expect(code).toMatch(/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*/);
+	expect(code).toMatch(/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)/);
 	expect(code).toMatch(
 		/if \(__memoCache[\w$]* === __memoCommitted[\w$]*\) __memoCache[\w$]* = __memoCache[\w$]*\.slice\(\);/,
 	);
@@ -4656,10 +4656,10 @@ describe('compiler-owned component-region memoization', () => {
 		expect(defaultBuild).toMatch(/const __memoDep[\w$]* = \(?props\.label\)?;/);
 		expect(defaultBuild).not.toMatch(/const __memoDep[\w$]* = \(?props\)?;/);
 		expect(defaultBuild).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlotVoid\([^;]*, Rows,/,
+			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlotVoid\([^;]*, Rows,/,
 		);
 		expect(defaultBuild).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot\([^;]*, Returned,/,
+			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot\([^;]*, Returned,/,
 		);
 		expectNoCompilerRegion(optedOut);
 		expectNoCompilerRegion(hmrBuild);
@@ -4677,7 +4677,7 @@ describe('compiler-owned component-region memoization', () => {
 		expectCompilerRegion(typed);
 		expect(typed).toContain('componentSlotVoid as');
 		expect(typed).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlotVoid\([^;]*, Child,/,
+			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlotVoid\([^;]*, Child,/,
 		);
 		expect(typed).not.toMatch(/const __memoDep[\w$]* = \(?Foo\)?;/);
 
@@ -4706,7 +4706,7 @@ describe('compiler-owned component-region memoization', () => {
 		expect(nestedDefaultMemo).toContain('componentSlotVoid as');
 		expect(nestedDefaultMemo).toContain('compilerCacheContext as');
 		expect(nestedDefaultMemo).toMatch(
-			/if \([^{}]*__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlotVoid\([^;]*, Rows,/,
+			/if \([^{}]*!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlotVoid\([^;]*, Rows,/,
 		);
 
 		const nestedCustomMemo = compile(
@@ -4778,7 +4778,9 @@ describe('compiler-owned component-region memoization', () => {
 				{ hmr: false, autoMemo: true },
 			).code;
 			expectCompilerRegion(code);
-			expect(code).toMatch(/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot/);
+			expect(code).toMatch(
+				/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot/,
+			);
 		}
 
 		// Patterns that evaluate expressions of their own (defaults, computed
@@ -4823,7 +4825,7 @@ describe('compiler-owned component-region memoization', () => {
 		).code;
 		expectCompilerRegion(unrelatedRefRead);
 		expect(unrelatedRefRead).toMatch(
-			/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot[\w$]*\([^;]*, Child,/,
+			/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot[\w$]*\([^;]*, Child,/,
 		);
 
 		// Laundering the read through locals — directly, transitively, or via a
@@ -4950,7 +4952,7 @@ describe('compiler-owned component-region memoization', () => {
 			{ hmr: false, autoMemo: true },
 		).code;
 		expect(tsxCode).toContain('__memoCommitted');
-		expect(tsxCode).toMatch(/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*/);
+		expect(tsxCode).toMatch(/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)/);
 
 		const rejected = [
 			// A component-tag spread nested in the callee body…
@@ -5102,13 +5104,13 @@ describe('compiler-owned component-region memoization', () => {
 				autoMemo: true,
 			}).code;
 			expect(
-				/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot[A-Za-z]*\([^;]*, Clean,/.test(
+				/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot[A-Za-z]*\([^;]*, Clean,/.test(
 					code,
 				),
 				`${order}: the component reading no import should memoize`,
 			).toBe(true);
 			expect(
-				/__memoCache[\w$]*\[\d+\] !== __memoDep[\w$]*\) \{\s*_\$componentSlot[A-Za-z]*\([^;]*, Dirty,/.test(
+				/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)\) \{\s*_\$componentSlot[A-Za-z]*\([^;]*, Dirty,/.test(
 					code,
 				),
 				`${order}: the component reading an imported member should not memoize`,

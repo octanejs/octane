@@ -297,8 +297,8 @@ reading the latest value inside an async or delayed callback.
 
 <h3 id="strong-mode">Enforce render snapshots with Strong mode</h3>
 
-Strong mode is an optional immutable render-snapshot contract with compiler
-checks. Add `"use strong"` before a module's
+Strong mode is an optional immutable render-snapshot and pure-render contract
+with compiler checks. Add `"use strong"` before a module's
 imports to try it one file at a time, or set `compiler: { strong: true }` in
 `octane.config.ts` to cover your application.
 
@@ -322,10 +322,18 @@ remain supported, and other explicit dependency lists keep their existing meanin
 
 Strong also rejects detectable state-snapshot mutations and direct clock or
 random reads during render. Lazy state initialization may still obtain an
-initial value. Production client builds can memoize statically named render
-methods under the snapshot contract; imported methods with hidden mutable state
-must stay in a compatibility-mode consumer. See
+initial value. Production client builds assume every user-authored render
+operation is pure, regardless of whether its callee is local, imported, a
+static or computed member, produced by another call, constructor-like, tagged,
+or receives callbacks. `use*` spelling is not a memoization veto or a Rules of
+Hooks check. Unknown calls that the compiler cannot inspect remain the author's
+responsibility; they do not make a Strong region fall back. See
 [Strong mode and memoization](/docs/differences-from-react#strong-mode).
+
+Do not hide ref contents, a state getter, mutable module or global data, a live
+external store, a clock, randomness, mutation, or another changing source behind
+a stable function or receiver. Keep that consumer in compatibility mode, or pass
+an actual snapshot into a separate Strong component.
 
 Event handlers can still update state. Genuinely deferred callbacks, effect
 cleanup, effects that synchronize external systems, and refs for DOM nodes or

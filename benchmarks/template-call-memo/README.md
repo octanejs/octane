@@ -22,6 +22,14 @@ appending a row, clicking the original row's remove button must keep the new
 row. This is a deliberate invalidation workload: every survivor has a changed
 event capture, even though its own row snapshot is unchanged.
 
+The Strong-only purity-contract fixture covers the call shapes that syntax or a
+React hook-name convention cannot prove: a hook-shaped ordinary method, a
+component-local helper, a computed method, a call-produced callee, a
+constructor, a tagged template, and a callback-bearing method. Strong mode
+treats all seven as author-asserted pure projections and conditions their rows
+only on the item and captured inputs. Compatibility mode continues to execute
+them conservatively.
+
 Every render checks all visible labels, ordering, and the identity of every
 surviving keyed DOM node. Changed snapshots retain the same key and DOM node.
 The remove handler runs through a native click; unmount must empty the root.
@@ -34,9 +42,10 @@ outside the compiled source.
 The `work-model` reference supplies fixed count ceilings. Positive references
 allow exact zero guards for stable rows and reorders. Insertions and changed
 snapshots should call only newly needed rows; changed real arguments and
-captured event data must still update the correct output. Per-fixture counters
-remain in result metadata. Minified compiler bytes and bundle gzip bytes expose
-code-size cost separately; neither includes the runner or its counters.
+captured event data must still update the correct output. The assumed-pure
+fixture separately guards all seven shapes. Per-fixture counters remain in
+result metadata. Minified compiler bytes and bundle gzip bytes expose code-size
+cost separately; neither includes the runner or its counters.
 
 `OCTANE_TEMPLATE_CALL_ROOT` can select a baseline checkout with its dependencies
 installed, while `OCTANE_TEMPLATE_CALL_DEPS` can select the dependency tree used
