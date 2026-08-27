@@ -150,7 +150,7 @@
         {
           "path": "scripts/react-parity/intersection-observer-runtime-inventory.mjs",
           "role": "support",
-          "sha256": "405e1507c5b693e7c18bc647c0530520d00a07d2e0d54ea2416dd38db6b9116c"
+          "sha256": "23693a2796f25953de5b805812ec503551d4bbf1fecce645a0aa9c3b809ca465"
         },
         {
           "path": "scripts/react-parity/intersection-observer-upstream-lib.mjs",
@@ -245,7 +245,7 @@
         {
           "path": "scripts/react-parity/intersection-observer-runtime-inventory.mjs",
           "role": "support",
-          "sha256": "405e1507c5b693e7c18bc647c0530520d00a07d2e0d54ea2416dd38db6b9116c"
+          "sha256": "23693a2796f25953de5b805812ec503551d4bbf1fecce645a0aa9c3b809ca465"
         },
         {
           "path": "packages/intersection-observer/audit/upstream.lock.json",

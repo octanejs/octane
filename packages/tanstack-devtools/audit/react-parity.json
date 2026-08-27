@@ -187,7 +187,7 @@
         {
           "path": "scripts/react-parity/tanstack-devtools-types-lib.mjs",
           "role": "support",
-          "sha256": "3438d53cb85480845332c5843e6f7161022a1471d0bc527b8f03ec1f0c4bea7c"
+          "sha256": "dd86b533341395de7a347f8c05c7887e09abf0188a7be66880f96c9c5f0539db"
         },
         {
           "path": "scripts/react-parity/tanstack-devtools-types-lib.test.mjs",

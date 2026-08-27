@@ -5,7 +5,7 @@
 // This replaces the per-package scripts/run-pristine-upstream.mjs wrappers,
 // which were byte-identical apart from these two strings.
 import { resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 export const runners = new Map([
 	['alien-signals', { module: './alien-signals-pristine-runtime.mjs', label: 'Alien Signals' }],

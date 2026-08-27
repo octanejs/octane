@@ -157,7 +157,7 @@ function expandContract(contract) {
 	return expanded;
 }
 
-function callTitle(node, sourceFile) {
+function callTitle(node) {
 	if (!ts.isCallExpression(node)) return null;
 	if (!ts.isIdentifier(node.expression)) return null;
 	if (node.expression.text !== 'it' && node.expression.text !== 'test') return null;
@@ -253,7 +253,7 @@ export function extractPristineCaseLines(source, fileName = 'pristine.ts') {
 	);
 	const byTitle = new Map();
 	function visit(node) {
-		const titled = callTitle(node, sourceFile);
+		const titled = callTitle(node);
 		if (titled !== null) {
 			const line =
 				sourceFile.getLineAndCharacterOfPosition(titled.node.getStart(sourceFile)).line + 1;
@@ -276,7 +276,7 @@ export function extractCaseAssertionContracts(source, fileName = 'suite.ts') {
 	);
 	const cases = [];
 	function visit(node) {
-		const titled = callTitle(node, sourceFile);
+		const titled = callTitle(node);
 		if (titled !== null && titled.body) {
 			const contracts = [];
 			function visitAssertions(assertionNode) {
@@ -966,24 +966,6 @@ function collectHookReturnedSetterNames(fnBody) {
 	return setters;
 }
 
-function expressionCallsNamedCallee(expression, names) {
-	let found = false;
-	function visit(node) {
-		if (found) return;
-		const call = callExpressionOf(node);
-		if (call !== null) {
-			const root = calleeRootIdentifier(call.expression);
-			if (root !== null && names.has(root)) {
-				found = true;
-				return;
-			}
-		}
-		ts.forEachChild(node, visit);
-	}
-	visit(expression);
-	return found;
-}
-
 function normalizeUpdateShape(expression, sourceFile) {
 	if (expression === undefined || expression === null) return 'none';
 	const fn = functionLikeOf(expression);
@@ -1406,7 +1388,7 @@ export function extractCaseTransitionStructure(
 	);
 	const cases = [];
 	function visit(node) {
-		const titled = callTitle(node, sourceFile);
+		const titled = callTitle(node);
 		if (titled !== null && titled.body) {
 			const signalBindings = new Set();
 			const hookAliases = new Set();

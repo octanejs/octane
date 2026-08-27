@@ -10,7 +10,6 @@ import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
 import { verifyReactTransitionGroupUpstream } from './react-transition-group-upstream-lib.mjs';
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const upstreamRoot = resolve(root, 'packages/transition-group/upstream');
 const report = join(tmpdir(), `octane-react-transition-group-pristine-${process.pid}.json`);
 const destination = resolve(root, 'packages/transition-group/audit/pristine-runtime.json');
 const jestBin = createRequire(resolve(root, 'packages/transition-group/package.json')).resolve(

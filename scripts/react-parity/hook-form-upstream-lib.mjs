@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 
