@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
 import { compile, compileToVolarMappings } from 'octane/compiler';
+import { createTextTypeProject } from 'octane/compiler/typescript';
 import {
 	createTextTypeFixture,
 	stringChildren,
@@ -207,6 +208,36 @@ export function Imported(props: { label: Label }) @{
 		const strict = consumer.project.snapshot(filename);
 		expect(stringChildren(source, strict)).toContain('props.value');
 		expect(strict.projectVersion).not.toBe(loose.projectVersion);
+	});
+
+	it('deduplicates roots when an extra file becomes configured', () => {
+		const configured = `export function Configured() @{ <p>configured</p> }`;
+		const promoted = `export function Promoted(props: { label: string }) @{ <p>{props.label}</p> }`;
+		const consumer = fixture({
+			'Configured.tsrx': configured,
+			'Promoted.tsrx': promoted,
+		});
+		const config = JSON.parse(readFileSync(consumer.tsconfig, 'utf8'));
+		config.include = ['Configured.tsrx'];
+		writeFileSync(consumer.tsconfig, JSON.stringify(config));
+		consumer.project.invalidate();
+
+		const filename = consumer.file('Promoted.tsrx');
+		const extra = consumer.project.snapshot(filename);
+		expect(stringChildren(promoted, extra)).toEqual(['props.label']);
+
+		config.include = ['*.tsrx'];
+		writeFileSync(consumer.tsconfig, JSON.stringify(config));
+		consumer.project.invalidate();
+		const promotedToConfig = consumer.project.snapshot(filename);
+		const fresh = createTextTypeProject({ tsconfig: consumer.tsconfig });
+		try {
+			const freshFacts = fresh.snapshot(filename);
+			expect(stringChildren(promoted, promotedToConfig)).toEqual(['props.label']);
+			expect(promotedToConfig.projectVersion).toBe(freshFacts.projectVersion);
+		} finally {
+			fresh.dispose();
+		}
 	});
 
 	it('retains source overlays until invalidated and releases the project explicitly', () => {
