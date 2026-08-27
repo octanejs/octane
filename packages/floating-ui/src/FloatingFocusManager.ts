@@ -6,7 +6,7 @@
 // are returned as an ARRAY (octane renders it like a React fragment).
 import { getNodeName, isHTMLElement, isShadowRoot } from '@floating-ui/utils/dom';
 import { focusable, isTabbable, tabbable } from 'tabbable';
-import { createElement, useEffect, useMemo, useRef } from 'octane';
+import { createElement, Fragment, useEffect, useMemo, useRef } from 'octane';
 import type { OctaneNode } from 'octane';
 
 import { FocusGuard, usePortalContext } from './FloatingPortal';
@@ -171,7 +171,7 @@ function applyAttributeToOthers(
 		}
 	};
 }
-function markOthers(avoidElements: any[], ariaHidden = false, inert = false): () => void {
+export function markOthers(avoidElements: any[], ariaHidden = false, inert = false): () => void {
 	const body = getDocument(avoidElements[0]).body;
 	return applyAttributeToOthers(
 		avoidElements.concat(Array.from(body.querySelectorAll('[aria-live],[role="status"],output'))),
@@ -849,6 +849,7 @@ export function FloatingFocusManager(props: FloatingFocusManagerProps): OctaneNo
 			return null;
 		}
 		return createElement(VisuallyHiddenDismiss, {
+			key: `dismiss-${location}`,
 			ref: location === 'start' ? startDismissButtonRef : endDismissButtonRef,
 			onClick: (event: MouseEvent) => onOpenChange(false, event),
 			children: typeof visuallyHiddenDismiss === 'string' ? visuallyHiddenDismiss : 'Dismiss',
@@ -861,54 +862,60 @@ export function FloatingFocusManager(props: FloatingFocusManagerProps): OctaneNo
 		(modal ? !isUntrappedTypeableCombobox : true) &&
 		(isInsidePortal || modal);
 
+	// Octane reconciles array children as keyed lists. Keep every conditional slot
+	// stable so changing guard/dismiss visibility cannot remount consumer content.
 	return [
-		shouldRenderGuards &&
-			createElement(FocusGuard, {
-				'data-type': 'inside',
-				ref: mergedBeforeGuardRef,
-				onFocus: (event: FocusEvent) => {
-					if (modal) {
-						const els = getTabbableElements();
-						enqueueFocus(order[0] === 'reference' ? els[0] : els[els.length - 1]);
-					} else if (
-						portalContext != null &&
-						portalContext.preserveTabOrder &&
-						portalContext.portalNode
-					) {
-						preventReturnFocusRef.current = false;
-						if (isOutsideEvent(event, portalContext.portalNode)) {
-							getNextTabbable(domReference)?.focus();
-						} else {
-							portalContext.beforeOutsideRef.current?.focus();
+		shouldRenderGuards
+			? createElement(FocusGuard, {
+					key: 'guard-inside-before',
+					'data-type': 'inside',
+					ref: mergedBeforeGuardRef,
+					onFocus: (event: FocusEvent) => {
+						if (modal) {
+							const els = getTabbableElements();
+							enqueueFocus(order[0] === 'reference' ? els[0] : els[els.length - 1]);
+						} else if (
+							portalContext != null &&
+							portalContext.preserveTabOrder &&
+							portalContext.portalNode
+						) {
+							preventReturnFocusRef.current = false;
+							if (isOutsideEvent(event, portalContext.portalNode)) {
+								getNextTabbable(domReference)?.focus();
+							} else {
+								portalContext.beforeOutsideRef.current?.focus();
+							}
 						}
-					}
-				},
-			}),
+					},
+				})
+			: null,
 		!isUntrappedTypeableCombobox && renderDismissButton('start'),
-		children,
+		createElement(Fragment, { key: 'children', children }),
 		renderDismissButton('end'),
-		shouldRenderGuards &&
-			createElement(FocusGuard, {
-				'data-type': 'inside',
-				ref: mergedAfterGuardRef,
-				onFocus: (event: FocusEvent) => {
-					if (modal) {
-						enqueueFocus(getTabbableElements()[0]);
-					} else if (
-						portalContext != null &&
-						portalContext.preserveTabOrder &&
-						portalContext.portalNode
-					) {
-						if (closeOnFocusOut) {
-							preventReturnFocusRef.current = true;
+		shouldRenderGuards
+			? createElement(FocusGuard, {
+					key: 'guard-inside-after',
+					'data-type': 'inside',
+					ref: mergedAfterGuardRef,
+					onFocus: (event: FocusEvent) => {
+						if (modal) {
+							enqueueFocus(getTabbableElements()[0]);
+						} else if (
+							portalContext != null &&
+							portalContext.preserveTabOrder &&
+							portalContext.portalNode
+						) {
+							if (closeOnFocusOut) {
+								preventReturnFocusRef.current = true;
+							}
+							if (isOutsideEvent(event, portalContext.portalNode)) {
+								getPreviousTabbable(domReference)?.focus();
+							} else {
+								portalContext.afterOutsideRef.current?.focus();
+							}
 						}
-						if (isOutsideEvent(event, portalContext.portalNode)) {
-							getPreviousTabbable(domReference)?.focus();
-						} else {
-							portalContext.afterOutsideRef.current?.focus();
-						}
-					}
-				},
-			}),
+					},
+				})
+			: null,
 	];
 }

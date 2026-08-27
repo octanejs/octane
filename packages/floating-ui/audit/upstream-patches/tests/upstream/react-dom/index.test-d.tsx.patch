@@ -1,0 +1,27 @@
+diff --git a/tests/upstream/react-dom/index.test-d.tsx b/tests/upstream/react-dom/index.test-d.tsx
+--- a/tests/upstream/react-dom/index.test-d.tsx
++++ b/tests/upstream/react-dom/index.test-d.tsx
+@@ -17,7 +17,8 @@ function App() {
+       {
+         name: 'test',
+         async fn({elements}) {
+-          // @ts-expect-error - should not be allowed with strong typing
++		  // @ts-ignore OCTANE DIVERGENCE[floating-ui-middleware-element-type]:
++		  // Octane's combined binding receives the DOM middleware element type here.
+           elements.floating.style = '';
+           return {};
+         },
+@@ -80,8 +81,11 @@ function NarrowRefType() {
+ 
+   // @ts-expect-error
+   floating1.refs.reference.current?.contains(document.body);
+-  floating2.refs.reference.current?.contains(document.body);
+-  floating3.refs.reference.current?.contains(document.body);
++	  // @ts-expect-error OCTANE DIVERGENCE[floating-ui-react-dom-entrypoint]:
++	  // The combined binding exposes the interaction ref union at its public entry point.
++	  floating2.refs.reference.current?.contains(document.body);
++	  // @ts-expect-error OCTANE DIVERGENCE[floating-ui-react-dom-entrypoint]
++	  floating3.refs.reference.current?.contains(document.body);
+   return (
+     <>
+       <button ref={floating1.refs.setReference} />

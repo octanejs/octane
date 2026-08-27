@@ -1,7 +1,12 @@
 import { FloatingFocusManager, useFloating } from '@octanejs/floating-ui';
+import type { FloatingContext } from '@octanejs/floating-ui';
 import { useState } from 'octane';
 
-function DialogPanel(props) {
+function DialogPanel(props: {
+	context: FloatingContext;
+	setFloating: (node: HTMLElement | null) => void;
+	onClose: () => void;
+}) {
 	return (
 		<FloatingFocusManager context={props.context} modal={true}>
 			<div class="dialog" ref={props.setFloating} role="dialog">
