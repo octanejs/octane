@@ -210,8 +210,8 @@ export function Imported(props: { label: Label }) @{
 		expect(strict.projectVersion).not.toBe(loose.projectVersion);
 	});
 
-	it('deduplicates roots when an extra file becomes configured', () => {
-		const configured = `export function Configured() @{ <p>configured</p> }`;
+	it('keeps extra roots current and deduplicates them when configured', () => {
+		const configured = `export function Configured(props: { label: string }) @{ <p>{props.label}</p> }`;
 		const promoted = `export function Promoted(props: { label: string }) @{ <p>{props.label}</p> }`;
 		const consumer = fixture({
 			'Configured.tsrx': configured,
@@ -222,9 +222,12 @@ export function Imported(props: { label: Label }) @{
 		writeFileSync(consumer.tsconfig, JSON.stringify(config));
 		consumer.project.invalidate();
 
+		const configuredFacts = consumer.project.snapshot(consumer.file('Configured.tsrx'));
+		expect(stringChildren(configured, configuredFacts)).toEqual(['props.label']);
 		const filename = consumer.file('Promoted.tsrx');
 		const extra = consumer.project.snapshot(filename);
 		expect(stringChildren(promoted, extra)).toEqual(['props.label']);
+		expect(consumer.project.snapshot(filename)).toEqual(extra);
 
 		config.include = ['*.tsrx'];
 		writeFileSync(consumer.tsconfig, JSON.stringify(config));
