@@ -57,6 +57,8 @@ export interface CompileOptions {
 	dev?: boolean;
 	/** Assert pure immutable-snapshot renders, enable bounded checks, and trust production call memoization. */
 	strong?: boolean;
+	/** Experimental native signal reads in DOM client/server render scopes. */
+	nativeReads?: boolean;
 	profile?: boolean;
 	profileFilename?: string;
 	/** Include out-of-band source-origin inspection data. */
@@ -217,7 +219,7 @@ export function compile(source: string, filename: string, options?: CompileOptio
 export function compileToVolarMappings(
 	source: string,
 	filename?: string,
-	options?: { loose?: boolean; renderers?: unknown; strong?: boolean },
+	options?: { loose?: boolean; renderers?: unknown; strong?: boolean; nativeReads?: boolean },
 ): VolarCompileResult;
 
 /** @internal Shared authored-JSX diagnostic analysis for compiler integrations. */

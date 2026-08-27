@@ -44,6 +44,9 @@
     "./behavior": "./src/behavior-root.ts",
     "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
+    "./signals": "./src/signals/index.ts",
+    "./signals/client": "./src/signals/client.ts",
+    "./signals/server": "./src/signals/server.ts",
     "./internal/client": "./src/internal/client.ts",
     "./internal/server": "./src/internal/server.ts",
     "./static": "./src/static/index.ts",
@@ -123,14 +126,34 @@
         "require": "./dist/cjs/server/index.cjs",
         "default": "./dist/server/index.js"
       },
+      "./signals": {
+        "types": "./dist/signals/index.d.ts",
+        "import": "./dist/signals/index.js",
+        "require": "./dist/cjs/signals/index.cjs",
+        "default": "./dist/signals/index.js"
+      },
+      "./signals/client": {
+        "types": "./dist/signals/client.d.ts",
+        "import": "./dist/signals/client.js",
+        "require": "./dist/cjs/signals/client.cjs",
+        "default": "./dist/signals/client.js"
+      },
+      "./signals/server": {
+        "types": "./dist/signals/server.d.ts",
+        "import": "./dist/signals/server.js",
+        "require": "./dist/cjs/signals/server.cjs",
+        "default": "./dist/signals/server.js"
+      },
       "./internal/client": {
         "types": "./dist/internal/client.d.ts",
         "import": "./dist/internal/client.js",
+        "require": "./dist/cjs/internal/client.cjs",
         "default": "./dist/internal/client.js"
       },
       "./internal/server": {
         "types": "./dist/internal/server.d.ts",
         "import": "./dist/internal/server.js",
+        "require": "./dist/cjs/internal/server.cjs",
         "default": "./dist/internal/server.js"
       },
       "./static": {
@@ -186,6 +209,7 @@
     "@types/react": "catalog:default",
     "@volar/language-core": "catalog:default",
     "@volar/typescript": "catalog:default",
+    "alien-signals": "3.2.0",
     "devalue": "catalog:default",
     "es-module-lexer": "catalog:default",
     "esrap": "catalog:default",

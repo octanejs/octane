@@ -23,6 +23,8 @@ import {
 	RepeatedPanelsHost,
 	ManyRepeatedPanelsHost,
 	SetupValueParallelHost,
+	DriftedWarmParent,
+	DriftedWarmBoundary,
 } from './_fixtures/parallel-use.tsrx';
 
 // Runtime behavior of the compiler's unconditional parallel-use pipeline.
@@ -40,6 +42,34 @@ function deferred<T>(): Deferred<T> {
 	});
 	return { promise, resolve, reject };
 }
+
+describe('parallel use() — discarded first-mount creations', () => {
+	it.each([
+		['root', DriftedWarmParent],
+		['boundary', DriftedWarmBoundary],
+	] as const)('retains a refreshed warmed request through a %s retry', async (_kind, Parent) => {
+		const parent = deferred<string>();
+		const record = { version: 1 };
+		const requests: Array<{ version: number } & Deferred<string>> = [];
+		const load = (version: number) => {
+			const request = { version, ...deferred<string>() };
+			requests.push(request);
+			return request.promise;
+		};
+		const rendered = mount(Parent, { gate: parent.promise, record, load });
+		try {
+			expect(requests.map((request) => request.version)).toEqual([1]);
+			record.version = 2;
+			await act(() => parent.resolve('parent'));
+			expect(requests.map((request) => request.version)).toEqual([1, 2]);
+			await act(() => requests[1].resolve('current'));
+			expect(rendered.find('.drifted-warm-value').textContent).toBe('current');
+			expect(requests.map((request) => request.version)).toEqual([1, 2]);
+		} finally {
+			rendered.unmount();
+		}
+	});
+});
 
 // One deferred per (level, version) key, with a call log — the chain tests
 // assert WHEN each fetch started, which is the whole point of warming.

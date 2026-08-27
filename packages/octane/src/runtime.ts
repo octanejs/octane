@@ -81,6 +81,7 @@ import {
 	__profileResolveHook,
 	__profileSchedule,
 	__profileTrackComponent,
+	__profileGetComponent,
 	type ProfileFrame,
 } from './profiling.js';
 import {
@@ -88,6 +89,8 @@ import {
 	__devtoolsUnregisterRoot,
 	__devtoolsNotifyFlush,
 	__devtoolsSetNameResolver,
+	__devtoolsSetChildWalker,
+	__devtoolsSetNativeReadInspector,
 	__devtoolsSetTransitionCount,
 	__devtoolsSetBoundaryState,
 	__devtoolsClearBoundary,
@@ -140,8 +143,29 @@ import {
 	rendererRangeClose,
 } from './stream-protocol.js';
 import { isRendererContext, registerClientRendererBridge } from './renderer-bridge.js';
+import { createNativeReadDriver, type NativeReadDriver } from './signals/native-read-client.js';
+import {
+	validateNativeReadWitness,
+	type NativeReadWitness,
+} from './signals/native-read-collector.js';
+import { createNativeReadRetry, type NativeReadRetry } from './signals/native-read-retry.js';
+import {
+	NativeAdoptionMiss,
+	runNativeBatch,
+	setNativeAdoptionResolver,
+} from './signals/read-protocol.js';
+import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
+import {
+	createNativeAdoptionState,
+	NATIVE_SIGNAL_SEED_ATTR,
+	NATIVE_SIGNAL_FRESH_COMMENT,
+	parseNativeSignalManifest,
+	type NativeAdoptionState,
+	type NativeSignalManifest,
+} from './signals/native-read-seeds.js';
 
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY };
+export { validateNativeReadWitness };
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -352,6 +376,255 @@ function registerHookCleanup(scope: Scope, cleanup: Cleanup): void {
 		}
 	}
 	(scope.cleanups ??= []).push(cleanup);
+}
+
+// Native reads are a compiler-selected capability. Ordinary applications keep
+// only null checks at renderer boundaries; no Alien graph, consumer maps,
+// callbacks, or per-Scope fields are allocated by the default runtime.
+let NATIVE_READ_DRIVER: NativeReadDriver | null = null;
+let NATIVE_BLOCK_RETRIES: WeakMap<Block, NativeReadRetry> | null = null;
+let NATIVE_ADOPTION_RELEASES: NativeAdoptionState[] | null = null;
+
+/** @internal Compiler/runtime native-read capability version 1. */
+export function beginNativeReadScope(scope: Scope | undefined, abi = 1): number {
+	if (abi !== 1) throw new Error('Unsupported native-read compiler/runtime version.');
+	const block = CURRENT_BLOCK;
+	const owner = scope ?? CURRENT_SCOPE;
+	if (block === null || owner === null) return -1;
+	return ensureNativeReadDriver().beginScope(owner, block);
+}
+
+function ensureNativeReadDriver(): NativeReadDriver {
+	if (NATIVE_READ_DRIVER !== null) return NATIVE_READ_DRIVER;
+	NATIVE_READ_DRIVER = createNativeReadDriver({
+		capture: () => WIP_CAPTURE,
+		cleanup: registerHookCleanup,
+		schedule: (target) => {
+			// A lightweight Scope's block is a proxy. The adapter records the
+			// actual CURRENT_BLOCK separately and only schedules that real owner.
+			invalidateRender(target, target);
+			scheduleRender(target);
+		},
+		suspended: retainNativeRetryReads,
+		replayRefs: (capture, owner) =>
+			replayNativeUnpublishedRefs(capture as OffscreenCapture, owner as RootRenderOwner),
+		refDisposed: (entry) => blockSubtreeDisposed((entry as RefAttach).block),
+	});
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__devtoolsSetNativeReadInspector(inspectNativeReadScope);
+	return NATIVE_READ_DRIVER;
+}
+
+function inspectNativeReadScope(
+	scope: import('./devtools-hook.js').DevtoolsScopeLike,
+): import('./devtools-hook.js').DevtoolsNativeReadInspection | null {
+	const current = scope as Scope;
+	const inspection = NATIVE_READ_DRIVER?.inspectScope(current);
+	const block = inspection?.block ?? current.block;
+	const retry =
+		NATIVE_BLOCK_RETRIES?.get(block)?.inspect() ??
+		(block.idState.renderOwner?.current === block
+			? block.idState.renderOwner.nativeRetry?.inspect()
+			: undefined) ??
+		[];
+	if (inspection == null && retry.length === 0) return null;
+	return {
+		block,
+		committed: inspection?.committed ?? null,
+		pending: inspection?.pending ?? [],
+		retry,
+	};
+}
+
+function inspectDevtoolsChildScopes(
+	scope: import('./devtools-hook.js').DevtoolsScopeLike,
+	visit: (child: import('./devtools-hook.js').DevtoolsScopeLike) => void,
+): void {
+	forEachSubtreeChild(scope as Scope, visit);
+}
+
+function inspectDevtoolsName(scope: import('./devtools-hook.js').DevtoolsScopeLike): string {
+	const component = __profileGetComponent(scope);
+	if (component !== undefined) return componentName({ body: component } as Block);
+	return scope.body === undefined ? 'Unknown' : componentName(scope as Block);
+}
+
+/** Native receipts survive source writes but not an explicit root replacement. */
+function acceptNativeCapture(
+	capture: OffscreenCapture,
+	owner: RootRenderOwner | undefined,
+	replayRootRefs = false,
+): void {
+	const driver = NATIVE_READ_DRIVER;
+	if (driver === null) return;
+	const native = driver.acceptCapture(capture);
+	if (owner === undefined) return;
+	const replays = replayRootRefs && driver.replayDeferredRefs(capture, owner);
+	if (native || replays || driver.hasPublication(owner)) {
+		driver.stampPublication(owner, [
+			capture.effects[INSERTION],
+			capture.effects[LAYOUT],
+			capture.effects[PASSIVE],
+			capture.events,
+			capture.refs,
+		]);
+	}
+}
+
+/** Only canceled native ref publication pays for a walk of the surviving tree. */
+function replayNativeUnpublishedRefs(capture: OffscreenCapture, owner: RootRenderOwner): boolean {
+	const driver = NATIVE_READ_DRIVER!;
+	const pending = driver.deferredRefEntries(owner);
+	if (pending === undefined || owner.current === null || owner.disposed) return false;
+	const queued = new Set(capture.refs.map((entry) => entry.el));
+	const current: SuspenseRefEntry[] = [];
+	collectVisibleSubtreeRefs(owner.current, current);
+	for (const entry of current) {
+		const skipped = pending.get(entry.el) as RefAttach | undefined;
+		if (skipped === undefined || queued.has(entry.el) || blockSubtreeDisposed(entry.scope.block))
+			continue;
+		capture.refs.push({
+			ref: skipped.ref === attachLiveFragmentRef ? attachLiveFragmentRef : entry.ref,
+			el: entry.el,
+			block: entry.scope.block,
+		});
+		queued.add(entry.el);
+	}
+	for (const [target, receipt] of pending) {
+		if (blockSubtreeDisposed((receipt as RefAttach).block)) driver.forgetUnpublishedRef(target);
+	}
+	return true;
+}
+
+/** @internal Called from a compiler-generated synchronous finally block. */
+export function endNativeReadScope(token: number, _completed: boolean): void {
+	if (token >= 0) NATIVE_READ_DRIVER!.endScope(token);
+}
+
+/** @internal Automatic caches preserve read evidence without changing useMemo. */
+export function beginNativeReadWitness(detached = false): number {
+	return detached
+		? ensureNativeReadDriver().beginWitness(true)
+		: (NATIVE_READ_DRIVER?.beginWitness() ?? -1);
+}
+
+/** @internal A failed computation cannot become a reusable cache witness. */
+export function finishNativeReadWitness(
+	token: number,
+	completed: boolean,
+): NativeReadWitness | null {
+	return token < 0 ? null : NATIVE_READ_DRIVER!.finishWitness(token, completed);
+}
+
+/** @internal A cache hit reattaches its native dependencies to this attempt. */
+export function replayNativeReadWitness(witness: NativeReadWitness | null | undefined): void {
+	NATIVE_READ_DRIVER?.replay(witness);
+}
+
+function retainNativeRetryReads(block: Block, reads: NativeReadWitness): void {
+	// An existing Suspense/hidden Activity owner survives its unsuccessful body.
+	// Retain a minimal retry lease there, not in the discarded child Scope.
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		if ((current as any).__suspenseHandler) {
+			const retries = (NATIVE_BLOCK_RETRIES ??= new WeakMap());
+			let retry = retries.get(current);
+			if (retry === undefined) {
+				const owner = current;
+				retry = createNativeReadRetry(() => {
+					if (!owner.disposed) {
+						invalidateRender(owner, owner);
+						scheduleRender(owner);
+					}
+				});
+				retries.set(owner, retry);
+				const owned = retry;
+				registerHookCleanup(owner, () => {
+					owned.clear();
+					retries.delete(owner);
+				});
+			}
+			retry.track(reads);
+			return;
+		}
+	}
+	const owner = block.idState.renderOwner;
+	if (owner === undefined || owner.disposed) return;
+	let retry = owner.nativeRetry;
+	if (retry === undefined) {
+		const next = createNativeReadRetry(() => {
+			const generation = next.generation;
+			queueMicrotask(() => {
+				if (
+					owner.disposed ||
+					owner.nativeRetry !== next ||
+					next.generation !== generation ||
+					owner.wakeable === null
+				)
+					return;
+				owner.wakeable = null;
+				owner.generation++;
+				if (owner.transition === undefined || !TRANSITION_SWAP_DRIVER!.retryRoot(owner))
+					owner.retry();
+			});
+		});
+		owner.nativeRetry = retry = next;
+	}
+	retry.track(reads);
+}
+
+function ownNativeAdoption(
+	scope: Scope,
+	manifest: NativeSignalManifest,
+	consume?: () => void,
+): NativeAdoptionState {
+	const adoption = createNativeAdoptionState(manifest);
+	registerHookCleanup(scope, () => {
+		adoption.release();
+		if (!ROOT_RENDER_ROLLBACK || scope.block.idState.renderOwner?.disposed) consume?.();
+	});
+	const finish = (discarded: boolean): void => {
+		if (discarded) adoption.release();
+		else {
+			// Keep historical reads alive through the accepted ref/layout callbacks.
+			// Release then schedules ordinary live reconciliation as the next render.
+			(NATIVE_ADOPTION_RELEASES ??= []).push(adoption);
+			consume?.();
+		}
+	};
+	if (WIP_CAPTURE === null) finish(false);
+	else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
+	return adoption;
+}
+
+function releaseNativeAdoptions(): void {
+	const pending = NATIVE_ADOPTION_RELEASES;
+	if (pending === null) return;
+	NATIVE_ADOPTION_RELEASES = null;
+	for (const adoption of pending) adoption.release();
+}
+
+/** Only the renderer-owned arm is replaced; surrounding adopted hosts survive. */
+function takeNativeFreshArm(
+	hydration: HydrationCapability | null,
+	cursor: Node | null,
+	end: Node,
+	ids: RootIdState,
+): RootIdState | null {
+	if (hydration === null || cursor?.nodeType !== 8) return null;
+	const value = (cursor as Comment).data;
+	if (!value.startsWith(NATIVE_SIGNAL_FRESH_COMMENT)) return null;
+	const rawCount = value.slice(NATIVE_SIGNAL_FRESH_COMMENT.length);
+	if (!/^(?:0|[1-9]\d*)$/.test(rawCount)) return null;
+	const count = Number(rawCount);
+	if (!Number.isSafeInteger(count)) return null;
+	reserveHydrationIds(ids, count);
+	removeRange(cursor, end);
+	hydration.node = end;
+	return {
+		prefix: ids.prefix + 'n' + (nextClientRootId++).toString(36) + '-',
+		next: 0,
+		renderOwner: ids.renderOwner,
+	};
 }
 
 // Production helper/custom-hook ABI: reserve a disjoint numeric range for each
@@ -889,9 +1162,11 @@ let EFFECT_EVENT_LIFECYCLE_DEPTH = 0;
 
 function runEffectLifecycleCallback(callback: Cleanup): void {
 	EFFECT_EVENT_LIFECYCLE_DEPTH++;
+	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
 	try {
 		callback();
 	} finally {
+		if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
 		EFFECT_EVENT_LIFECYCLE_DEPTH--;
 	}
 }
@@ -1238,6 +1513,7 @@ interface WarmHarvestEntry {
 	deps: any[];
 	value: any;
 	taken: boolean;
+	nativeWitness?: NativeReadWitness | null;
 }
 
 /** The same single-origin staged cells as P1, owned by a root rather than a TrySlot. */
@@ -1307,7 +1583,14 @@ function harvestTransitionWarmValues(
 				for (let i = 0; i < list.length; i++) {
 					const entry = list[i];
 					if (entry.available) {
-						(warmHarvest ??= []).push({ slot, deps: entry.deps, value: entry.value, taken: false });
+						const harvested: WarmHarvestEntry = {
+							slot,
+							deps: entry.deps,
+							value: entry.value,
+							taken: false,
+						};
+						if (entry.nativeWitness !== undefined) harvested.nativeWitness = entry.nativeWitness;
+						(warmHarvest ??= []).push(harvested);
 					}
 				}
 			}
@@ -1738,6 +2021,8 @@ interface RootRenderOwner {
 	wakeable: PromiseLike<unknown> | null;
 	/** Lazily allocated only by adapters carrying metadata across fresh retry scopes. */
 	retryKey: object | null;
+	/** Only native suspended readers allocate a retry lease outside their discarded Scopes. */
+	nativeRetry?: NativeReadRetry;
 	transaction: RootRenderTransaction | null;
 	/** Installed only when a single-origin transition suspends at this root. */
 	transition?: RootTransitionHold;
@@ -1796,6 +2081,7 @@ function beginRootRender(owner: RootRenderOwner | undefined): RootRenderFrame | 
 		return null;
 	let transaction = owner.transaction;
 	if (transaction === null) {
+		owner.nativeRetry?.clear();
 		const capture = createOffscreenCapture();
 		capture.rootTransaction = true;
 		transaction = {
@@ -2033,6 +2319,7 @@ function deferRootUnmount(block: Block, detachDom: boolean): boolean {
 			restoreRootNodes(parent, nodes, anchor);
 		}
 	});
+	const suppressedRefs = REF_DETACH_SUPPRESSION;
 	(transaction.commit ??= []).push(() => {
 		if (cancelled || block.disposed) return;
 		// Deletion cleanups retain their connected-DOM observation. The old
@@ -2041,7 +2328,13 @@ function deferRootUnmount(block: Block, detachDom: boolean): boolean {
 			const anchor = after?.parentNode === parent ? after : null;
 			for (const node of nodes) if (node.parentNode !== parent) parent.insertBefore(node, anchor);
 		}
-		unmountBlock(block, false);
+		const previousSuppression = REF_DETACH_SUPPRESSION;
+		REF_DETACH_SUPPRESSION = suppressedRefs;
+		try {
+			unmountBlock(block, false);
+		} finally {
+			REF_DETACH_SUPPRESSION = previousSuppression;
+		}
 		if (parent !== null)
 			for (const node of nodes) if (node.parentNode === parent) parent.removeChild(node);
 	});
@@ -2104,11 +2397,25 @@ function commitRootRenders(): void {
 	ROOT_RENDER_TRANSACTIONS = [];
 	for (const transaction of transactions) {
 		const owner = transaction.owner;
-		if (owner.transaction === transaction) owner.transaction = null;
 		if (transaction.aborted || owner.disposed) {
+			if (owner.transaction === transaction) owner.transaction = null;
 			if (owner.transition !== undefined) TRANSITION_SWAP_DRIVER!.commitRoot(owner, transaction);
 			continue;
 		}
+		// This is the native acceptance point. Validate before any deletion,
+		// ref, or effect callback can observe the candidate. A later callback
+		// write starts another transaction and does not revoke this snapshot.
+		if (NATIVE_READ_DRIVER !== null && !NATIVE_READ_DRIVER.validateCapture(transaction.capture)) {
+			rollbackRootRender(transaction);
+			if (owner.transaction === transaction) owner.transaction = null;
+			if (!owner.disposed) {
+				owner.wakeable = null;
+				owner.generation++;
+				owner.retry();
+			}
+			continue;
+		}
+		if (owner.transaction === transaction) owner.transaction = null;
 		if (
 			transaction.rootRequest &&
 			(owner.transition === undefined || !TRANSITION_SWAP_DRIVER!.keepsRoot(owner))
@@ -2116,12 +2423,32 @@ function commitRootRenders(): void {
 			owner.wakeable = null;
 			owner.generation++;
 		}
-		if (owner.wakeable === null) owner.retryKey = null;
+		if (owner.wakeable === null) {
+			owner.retryKey = null;
+			owner.nativeRetry?.clear();
+		}
+		acceptNativeCapture(transaction.capture, owner, true);
+		const acceptedGeneration = owner.generation;
 		// Irreversible deletions precede the incoming ref/layout publication.
 		const commits = transaction.commit;
-		if (commits !== null) for (const commit of commits) commit();
+		if (commits !== null) {
+			for (const commit of commits) {
+				if (owner.disposed || owner.generation !== acceptedGeneration) break;
+				commit();
+			}
+		}
 		const parked = transaction.parked;
-		if (parked !== null) for (const item of parked) unmountParkedItem(item);
+		if (parked !== null) {
+			for (const item of parked) {
+				if (owner.disposed || owner.generation !== acceptedGeneration) break;
+				unmountParkedItem(item);
+			}
+		}
+		NATIVE_READ_DRIVER?.pruneDeferredRefs(owner);
+		if (owner.disposed || owner.generation !== acceptedGeneration) {
+			discardOffscreenCapture(transaction.capture);
+			continue;
+		}
 		spliceOffscreenCapture(transaction.capture);
 		// Outgoing cleanup may have removed the state origin of a held root
 		// transition. Inspect its lifetime after those deletions have completed.
@@ -2142,6 +2469,14 @@ function suspendRootRender(
 		TRANSITION_SWAP_DRIVER === null ||
 		!TRANSITION_SWAP_DRIVER.holdRoot(owner, transaction, attempt)
 	) {
+		if (WARM_EVER && transaction.created !== null) {
+			// Only fresh subtrees are destroyed by this rollback. Their warm
+			// occurrences remain owned by the root's continuing retry token.
+			for (const created of transaction.created) {
+				if (created.parentBlock === null || !transaction.created.has(created.parentBlock))
+					retainDiscardedWarmMemos(created);
+			}
+		}
 		rollbackRootRender(transaction);
 	}
 	owner.wakeable = wakeable;
@@ -4499,7 +4834,7 @@ export function flushSync<T>(fn: () => T): T {
 	// rendering: run the callback and let the AMBIENT flush drain whatever it
 	// schedules — drainQueue picks up mid-pass appends, and the microtask
 	// scheduler backstops work queued after the render pass (see `inFlush`).
-	if (inFlush) return fn();
+	if (inFlush) return runNativeBatch(fn);
 	// flushSync mid-view-transition skips the animation (React's rule): the
 	// sync drain below applies everything now; the pending update callback
 	// later drains an empty queue.
@@ -4507,7 +4842,7 @@ export function flushSync<T>(fn: () => T): T {
 	const prevSync = syncFlush;
 	syncFlush = true;
 	try {
-		const result = fn();
+		const result = runNativeBatch(fn);
 		// `inFlush` guards only the DRAIN below, not fn(): a nested flushSync
 		// inside fn still flushes inline (React isn't "rendering" during the
 		// callback), while one landing inside the drain defers (guard above).
@@ -4602,11 +4937,16 @@ const LAYOUT_CASCADE_LIMIT = 50;
  */
 export function queueRefAttach(scope: Scope, ref: any, el: Element | FragmentInstance): void {
 	activityRefCreated?.(scope.block, el);
-	(WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue).push({
+	const entry: RefAttach = {
 		ref,
 		el,
 		block: scope.block,
-	});
+	};
+	(WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue).push(entry);
+	if (WIP_CAPTURE === null && NATIVE_READ_DRIVER !== null) {
+		const owner = scope.block.idState.renderOwner;
+		if (owner !== undefined) NATIVE_READ_DRIVER.stampQueuedPublication(owner, entry);
+	}
 }
 
 /**
@@ -4634,6 +4974,10 @@ const refDetachQueue: any[] = [];
  */
 export function queueRefDetach(ref: any, el: Element | FragmentInstance | null): void {
 	if (ref == null || isRefDetachSuppressed(el)) return;
+	if (el !== null && NATIVE_READ_DRIVER?.unpublishedRef(el, ref)) {
+		NATIVE_READ_DRIVER.forgetUnpublishedRef(el);
+		return;
+	}
 	const activity = el === null ? undefined : activityRefState?.get(el);
 	if (activity?.hidden && activity.connected !== ref) return;
 	// Capture the active teardown boundary (if we're inside an unmount walk) so a
@@ -4741,12 +5085,21 @@ function drainRefAttaches(): void {
 		// re-run on a torn-down node — firing a callback ref on a dead element and
 		// resurrecting an object ref the cleanup just nulled.
 		if (blockSubtreeDisposed(r.block)) continue;
+		if (NATIVE_READ_DRIVER !== null && !NATIVE_READ_DRIVER.publicationCurrent(r)) {
+			NATIVE_READ_DRIVER.deferRef(
+				r,
+				r.el,
+				r.ref === attachLiveFragmentRef ? (r.el as FragmentInstance)._currentRef : r.ref,
+			);
+			continue;
+		}
 		const activity = activityRefState?.get(r.el);
 		if (activity !== undefined && findHiddenActivity(r.block) !== null) {
 			activity.hidden = true;
 			continue;
 		}
 		try {
+			NATIVE_READ_DRIVER?.forgetUnpublishedRef(r.el);
 			REF_CALLBACK_DEPTH++;
 			try {
 				attachRef(r.ref, r.el);
@@ -4840,6 +5193,7 @@ function commitEffects(): void {
 		refDetachQueue.length === 0 &&
 		refAttachQueue.length === 0 &&
 		storeSyncQueue.length === 0 &&
+		NATIVE_ADOPTION_RELEASES === null &&
 		activeFragments.size === 0 &&
 		!hasControlledSyncs()
 	) {
@@ -4851,43 +5205,49 @@ function commitEffects(): void {
 		}
 		return;
 	}
-	// React publishes every Effect Event body before any insertion/layout effect
-	// can call an already-registered wrapper. Entries from failed or suspended
-	// renders are filtered by their block's completed render version.
-	drainEffectEventUpdates();
-	// Activity visible→hidden work is transactionally deferred until the event
-	// bodies above publish. Its layout cleanup therefore sees the fresh body while
-	// the preserved DOM range is still connected, then the action hides that range.
-	const caughtReports = drainEffectEventCommitActions();
-	// Controlled-form commit work FIRST: select projections must see the
-	// options this render just built, and the dev missing-onInput check must
-	// see the element's full listener set (see drainControlledSyncs).
-	drainControlledSyncs();
-	// Mutation phase (React's commitMutationEffects): a per-scope walk over the
-	// merged insertion+layout queues — each scope's insertion destroys, insertion
-	// bodies, then its layout DESTROYS. Layout bodies wait for the layout phase
-	// below; the returned batch carries them across the ref work.
-	const mutationBatch = drainMutationEffects();
-	// Teardown ref detaches fire before this commit's attaches (mutation → layout),
-	// so a ref moving between elements cycles null → new-node in one commit.
-	drainRefDetaches();
-	drainRefAttaches();
-	reapplyFragmentBindings();
-	// Layout phase (React's commitLayoutEffects): bodies only — every layout
-	// cleanup already fired in the mutation walk, ref attaches just landed, so a
-	// layout body sees populated refs and connected DOM.
-	if (mutationBatch !== null) runLayoutEffects(mutationBatch);
-	if (caughtReports !== null) publishInlineCaughtErrorReports(caughtReports);
-	// After layout effects (so a sibling layout effect that mutates+notifies the
-	// store has already run), reconcile each uSES consumer's committed snapshot
-	// against the store and re-render any that tore. Mirrors React draining its
-	// store-consistency checks right after commitLayoutEffects.
-	drainStoreSyncs();
-	if (
-		(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
-		!passiveScheduled
-	) {
-		schedulePassiveFlush();
+	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
+	try {
+		// React publishes every Effect Event body before any insertion/layout effect
+		// can call an already-registered wrapper. Entries from failed or suspended
+		// renders are filtered by their block's completed render version.
+		drainEffectEventUpdates();
+		// Activity visible→hidden work is transactionally deferred until the event
+		// bodies above publish. Its layout cleanup therefore sees the fresh body while
+		// the preserved DOM range is still connected, then the action hides that range.
+		const caughtReports = drainEffectEventCommitActions();
+		// Controlled-form commit work FIRST: select projections must see the
+		// options this render just built, and the dev missing-onInput check must
+		// see the element's full listener set (see drainControlledSyncs).
+		drainControlledSyncs();
+		// Mutation phase (React's commitMutationEffects): a per-scope walk over the
+		// merged insertion+layout queues — each scope's insertion destroys, insertion
+		// bodies, then its layout DESTROYS. Layout bodies wait for the layout phase
+		// below; the returned batch carries them across the ref work.
+		const mutationBatch = drainMutationEffects();
+		// Teardown ref detaches fire before this commit's attaches (mutation → layout),
+		// so a ref moving between elements cycles null → new-node in one commit.
+		drainRefDetaches();
+		drainRefAttaches();
+		reapplyFragmentBindings();
+		// Layout phase (React's commitLayoutEffects): bodies only — every layout
+		// cleanup already fired in the mutation walk, ref attaches just landed, so a
+		// layout body sees populated refs and connected DOM.
+		if (mutationBatch !== null) runLayoutEffects(mutationBatch);
+		if (caughtReports !== null) publishInlineCaughtErrorReports(caughtReports);
+		releaseNativeAdoptions();
+		// After layout effects (so a sibling layout effect that mutates+notifies the
+		// store has already run), reconcile each uSES consumer's committed snapshot
+		// against the store and re-render any that tore. Mirrors React draining its
+		// store-consistency checks right after commitLayoutEffects.
+		drainStoreSyncs();
+		if (
+			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
+			!passiveScheduled
+		) {
+			schedulePassiveFlush();
+		}
+	} finally {
+		if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
 	}
 }
 
@@ -4935,6 +5295,7 @@ export function hasPendingWork(): boolean {
 		effectQueues[PASSIVE].length > 0 ||
 		pendingPassiveUnmounts.length > 0 ||
 		storeSyncQueue.length > 0 ||
+		NATIVE_ADOPTION_RELEASES !== null ||
 		hasControlledSyncs()
 	);
 }
@@ -4947,6 +5308,7 @@ function drainEffectEventUpdates(): void {
 		const block = entry.block;
 		if (
 			!entry.cell.active ||
+			NATIVE_READ_DRIVER?.publicationCurrent(entry) === false ||
 			blockSubtreeDisposed(block) ||
 			// Independently scheduled siblings may complete before another child
 			// suspends their shared boundary. That boundary hides the try
@@ -5110,6 +5472,7 @@ function reportEffectError(block: Block, error: unknown): void {
 function fireEffectCleanup(e: PendingEffect): void {
 	const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
 	if (slot === undefined || slot.revision !== e.revision) return;
+	if (!nativeEffectPublicationCurrent(e, slot)) return;
 	const disconnect = e.fn === null;
 	const cleanup = slot.cleanup;
 	if (disconnect) {
@@ -5137,6 +5500,7 @@ function runEffectBody(e: PendingEffect): void {
 	let cleanup: void | Cleanup;
 	const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
 	if (slot === undefined || slot.revision !== e.revision) return;
+	if (!nativeEffectPublicationCurrent(e, slot)) return;
 	slot.connectedFn = e.fn;
 	slot.connectedArgs = e.args;
 	slot.disconnected = false;
@@ -5162,6 +5526,17 @@ function runEffectBody(e: PendingEffect): void {
 		// stale cleanup can never replay at teardown.
 		slot.cleanup = cleanup;
 	}
+}
+
+function nativeEffectPublicationCurrent(entry: PendingEffect, slot: EffectSlot): boolean {
+	if (NATIVE_READ_DRIVER?.publicationCurrent(entry) !== false) return true;
+	// A skipped setup still belongs to the next render, even with an unchanged
+	// explicit dependency array or a memoized parent. Preserve any connected
+	// cleanup until that render decides whether the call site remains present.
+	slot.deps = undefined;
+	slot.active = slot.connectedFn !== null;
+	invalidateRender(entry.scope.block, entry.scope.block);
+	return false;
 }
 
 /**
@@ -5814,6 +6189,8 @@ function renderBlockInner(block: Block): void {
 	let profileDidThrow = false;
 	let profileThrown: unknown;
 	let renderCompleted = false;
+	NATIVE_READ_DRIVER?.beginRender(block);
+	NATIVE_BLOCK_RETRIES?.get(block)?.clear();
 	try {
 		const out = (block.body as (p: any, s: Scope, e: any) => unknown)(
 			block.props,
@@ -5886,6 +6263,7 @@ function renderBlockInner(block: Block): void {
 		CURRENT_EFFECT_REACHED = prevEffectReached;
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
+		NATIVE_READ_DRIVER?.endRender(block, renderCompleted, isSuspenseException(profileThrown));
 	}
 }
 
@@ -6384,6 +6762,12 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 
 function unmountBlockInner(block: Block, detachDom: boolean): void {
 	block.disposed = true;
+	if (
+		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
+		__OCTANE_PROFILE_ENABLED__ &&
+		block.kind === 'root'
+	)
+		__devtoolsUnregisterRoot(block);
 	const owner = block.idState.renderOwner;
 	if (owner?.current === block) {
 		owner.generation++;
@@ -6422,6 +6806,7 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 				block.startMarker.parentNode !== null));
 	// Depth-first cleanup of all scopes reachable from this block.
 	unmountScope(block, detachDom && !removesOwnDom);
+	if (owner?.current === block) NATIVE_READ_DRIVER?.clearDeferredRefs(owner);
 	if (!detachDom) return;
 	// Remove DOM range.
 	if (block.startMarker && block.endMarker) {
@@ -6702,6 +7087,26 @@ function resolveSlot(slot: HookSlot | undefined): HookSlot | undefined {
 	return typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__
 		? __profileResolveHook(resolved, typeof slot === 'symbol' ? slot : undefined)
 		: resolved;
+}
+
+/** @internal Optional native hooks use the existing compiler slot and Scope lifetime. */
+export function nativeLocalHook<T>(
+	name: string,
+	initialize: () => T,
+	dispose: (value: T) => void,
+	slot?: HookSlot,
+): T {
+	slot = resolveSlot(slot);
+	if (slot === undefined || CURRENT_SCOPE === null) missingSlot(name);
+	const scope = CURRENT_SCOPE!;
+	let cell = scope.hooks?.get(slot) as { nativeValue: T } | undefined;
+	if (cell === undefined) {
+		cell = { nativeValue: initialize() };
+		ensureHooks(scope).set(slot, cell);
+		const value = cell.nativeValue;
+		registerHookCleanup(scope, () => dispose(value));
+	}
+	return cell.nativeValue;
 }
 
 interface StateSlot<T> {
@@ -7458,6 +7863,10 @@ interface MemoHookEntry<T = any> {
 	deps: any[] | undefined;
 	value: T;
 	warmEpisode?: number;
+	/** A consumed warm occurrence can return only when this scope is discarded. */
+	warmRecord?: WarmEntry;
+	/** Present only on compiler-owned native-read creation caches. */
+	nativeWitness?: NativeReadWitness | null;
 }
 
 function memoEntryHit<T>(slot: HookSlot, entry: MemoHookEntry<T>): MemoHookEntry<T> {
@@ -7471,15 +7880,16 @@ function memoEntryHit<T>(slot: HookSlot, entry: MemoHookEntry<T>): MemoHookEntry
 }
 
 function adoptMemoEntry<T>(scope: Scope, slot: HookSlot, deps: any[]): MemoHookEntry<T> | null {
-	const adopted = adoptWarmValue(slot, deps);
+	const adopted = adoptWarmEntry(slot, deps);
 	if (adopted === WARM_MISS) return null;
 	const entry: MemoHookEntry<T> = {
 		deps,
-		value: adopted as T,
+		value: adopted.value as T,
 		warmEpisode: CURRENT_WARM_EPISODE,
 	};
 	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalMemoEntry(scope, slot, entry);
 	ensureHooks(scope).set(slot, entry);
+	claimWarmMemoRecord(adopted, entry);
 	return entry;
 }
 
@@ -7501,8 +7911,15 @@ function readMemoEntry<T>(
 	return WARM_EVER && deps !== undefined ? adoptMemoEntry(scope, slot, deps) : null;
 }
 
-function publishMemoEntry<T>(scope: Scope, slot: HookSlot, deps: any[] | undefined, value: T): T {
+function publishMemoEntry<T>(
+	scope: Scope,
+	slot: HookSlot,
+	deps: any[] | undefined,
+	value: T,
+	nativeWitness?: NativeReadWitness | null,
+): T {
 	const entry: MemoHookEntry<T> = { deps, value };
+	if (nativeWitness !== undefined) entry.nativeWitness = nativeWitness;
 	// The attempt records the replacement both ways: the cue re-render must
 	// dep-hit the old entry (never re-create old-version requests), and the
 	// promoted render must dep-hit this one (never create twice).
@@ -8477,6 +8894,8 @@ interface HydrateSlot {
 	delegatedDynamicIntent: boolean;
 	serverPreserved: boolean;
 	seedRaw: string | null;
+	/** Ready native values are scoped to this independently activated island. */
+	nativeSeedRaw?: string;
 	idState: RootIdState;
 	/** One-shot result of the client-only function form of `when`. */
 	dynamicStrategy: HydrationStrategy | null;
@@ -9190,9 +9609,12 @@ function installHydrateBoundary(state: HydrateSlot): () => void {
 	return () => teardownHydrateBoundary(state);
 }
 
-function findHydrateSeedSidecar(wrapper: Element): HTMLScriptElement | null {
+function findHydrateSeedSidecar(
+	wrapper: Element,
+	attribute = HYDRATE_SEED_ATTR,
+): HTMLScriptElement | null {
 	for (let node = wrapper.firstElementChild; node !== null; node = node.nextElementSibling) {
-		if (node.localName === 'script' && node.hasAttribute(HYDRATE_SEED_ATTR)) {
+		if (node.localName === 'script' && node.hasAttribute(attribute)) {
 			return node as HTMLScriptElement;
 		}
 	}
@@ -9220,6 +9642,7 @@ function createHydrateSlot(
 	let start: Comment;
 	let end: Comment;
 	let seedRaw: string | null = null;
+	let nativeSeedRaw: string | null = null;
 	let idState = parentBlock.idState;
 	if (serverPreserved && hydration!.isOpen(wrapper.firstChild)) {
 		start = wrapper.firstChild as Comment;
@@ -9242,6 +9665,11 @@ function createHydrateSlot(
 		if (seed !== null) {
 			seedRaw = seed.textContent || '[]';
 			seed.remove();
+		}
+		const nativeSeed = findHydrateSeedSidecar(wrapper, NATIVE_SIGNAL_SEED_ATTR);
+		if (nativeSeed !== null) {
+			nativeSeedRaw = nativeSeed.textContent || '';
+			nativeSeed.remove();
 		}
 	} else {
 		// An adopted wrapper without the boundary's own marker range is not safe to
@@ -9306,6 +9734,7 @@ function createHydrateSlot(
 		error: undefined,
 		replays: [],
 	};
+	if (nativeSeedRaw !== null) state.nativeSeedRaw = nativeSeedRaw;
 	scope.slots[0] = state;
 	registerSlot(scope, state);
 	registerHydrationIntentBoundary(wrapper, intentBoundary);
@@ -9344,8 +9773,20 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	const capture = preserved?.capture ?? createOffscreenCapture();
 	currentHydration = hydration;
 	WIP_CAPTURE = capture;
+	const previousNative = setNativeAdoptionResolver(hydration.nativeAdoption?.resolve ?? null);
 	let completed = false;
+	let nativeRecovery: NativeAdoptionMiss | undefined;
 	try {
+		if (preserved === undefined && state.nativeSeedRaw !== undefined) {
+			hydration.nativeAdoption = ownNativeAdoption(
+				block,
+				parseNativeSignalManifest(state.nativeSeedRaw),
+				() => {
+					state.nativeSeedRaw = undefined;
+				},
+			);
+			setNativeAdoptionResolver(hydration.nativeAdoption.resolve);
+		}
 		if (preserved?.source !== null && preserved?.source !== undefined) {
 			// Existing component slots do not re-enter their own adopted server
 			// ranges on an ordinary parent replay. Complete the actually suspended
@@ -9386,10 +9827,47 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		preservedHydrateActivations?.delete(state);
 		discardOffscreenCapture(capture);
 		state.block.mounted = false;
-		throw error;
+		if (error instanceof NativeAdoptionMiss) nativeRecovery = error;
+		else throw error;
 	} finally {
+		setNativeAdoptionResolver(previousNative);
 		WIP_CAPTURE = previousCapture;
 		currentHydration = previousHydration;
+	}
+	if (nativeRecovery !== undefined) {
+		// The exact historical demand changed between server output and island
+		// activation. Roll back every uncommitted child before mounting this one
+		// island live; an application @catch must never receive this control flow.
+		noteRecoverableHydrationError(() => nativeRecovery!, block);
+		state.serverPreserved = false;
+		state.serverActivationStarted = false;
+		state.seedRaw = null;
+		state.nativeSeedRaw = undefined;
+		state.hydrated = false;
+		state.idState = block.idState = {
+			prefix: state.idState.prefix + 'n' + (nextClientRootId++).toString(36) + '-',
+			next: 0,
+			renderOwner: state.idState.renderOwner,
+		};
+		const recoveryCapture = createOffscreenCapture();
+		const recoveryHydration = currentHydration;
+		const recoveryNative = setNativeAdoptionResolver(null);
+		currentHydration = null;
+		WIP_CAPTURE = recoveryCapture;
+		try {
+			resetScopeChildren(block);
+			block.deoptNode = null;
+			renderBlock(block);
+		} catch (error) {
+			discardOffscreenCapture(recoveryCapture);
+			throw error;
+		} finally {
+			WIP_CAPTURE = previousCapture;
+			currentHydration = recoveryHydration;
+			setNativeAdoptionResolver(recoveryNative);
+		}
+		spliceOffscreenCapture(recoveryCapture);
+		return;
 	}
 	if (completed) {
 		preservedHydrateActivations?.delete(state);
@@ -10044,6 +10522,71 @@ function createScopedResolver<T>(read: () => T): () => T {
 	};
 }
 
+// The native compiler selects this resolver explicitly. It keeps the same
+// context/preview handoff as ordinary scoped JSX, while the current resolving
+// Scope owns native reads even when the authored component body has returned.
+function createNativeScopedResolver<T>(read: () => T): () => T {
+	let resolved = false;
+	let resolvedScope: Scope | null = null;
+	let resolvedReads: Map<Context<any>, number> | null = null;
+	let resolvedWitness: NativeReadWitness | null | undefined;
+	let resolvedValue: T;
+
+	return (): T => {
+		const scope = CURRENT_SCOPE;
+		const token = beginNativeReadScope(undefined);
+		let completed = false;
+		try {
+			const sameScope =
+				resolvedScope === scope ||
+				(resolvedScope !== null &&
+					scope !== null &&
+					scope.block.parentBlock === resolvedScope.block &&
+					scope.$$ctxValues === null);
+			if (
+				!resolved ||
+				scopedReadsChanged(resolvedReads) ||
+				(resolvedReads !== null && !sameScope) ||
+				(token >= 0 && resolvedWitness === undefined) ||
+				!validateNativeReadWitness(resolvedWitness)
+			) {
+				const previousTracking = SCOPED_READ_TRACKING;
+				const previousReads = SCOPED_READS;
+				SCOPED_READ_TRACKING = true;
+				SCOPED_READS = null;
+				const witnessToken = beginNativeReadWitness();
+				let readCompleted = false;
+				let next: T;
+				let nextReads: Map<Context<any>, number> | null;
+				let nextWitness: NativeReadWitness | null;
+				try {
+					next = read();
+					readCompleted = true;
+				} finally {
+					nextReads = SCOPED_READS;
+					SCOPED_READ_TRACKING = previousTracking;
+					SCOPED_READS = previousReads;
+					nextWitness = finishNativeReadWitness(witnessToken, readCompleted);
+				}
+				resolvedScope = scope;
+				resolvedReads = nextReads;
+				// An imperative inspection stays untracked. Recompute once inside a
+				// real render before trusting it as native evidence for this record.
+				resolvedWitness = token < 0 ? undefined : nextWitness;
+				resolvedValue = next;
+				resolved = true;
+			} else {
+				resolvedScope = scope;
+				if (token >= 0) replayNativeReadWitness(resolvedWitness);
+			}
+			completed = true;
+			return resolvedValue;
+		} finally {
+			endNativeReadScope(token, completed);
+		}
+	};
+}
+
 function readContextFrom<T>(reader: Scope | null, block: Block | null, context: Context<T>): T {
 	// One boolean test per context read; the map is allocated only for a
 	// descriptor that reads context while resolving.
@@ -10489,10 +11032,19 @@ interface WarmEntry {
 	deps: any[];
 	value: any;
 	/** Real memo cell represented by an unavailable entry, when applicable. */
-	source?: object;
+	source?: MemoHookEntry;
 	/** A warmed value may be adopted once; the retained tombstone still prevents
 	 * a later dependency stratum from speculatively creating it again. */
 	available: boolean;
+	nativeWitness?: NativeReadWitness | null;
+}
+
+type WarmMemoEvidence = MemoHookEntry | WarmEntry | WarmHarvestEntry;
+type WarmMemoAccept = (entry: WarmMemoEvidence) => boolean;
+
+interface NativeWarmMemoMode {
+	accept: WarmMemoAccept;
+	create: (compute: () => any, deps: any[]) => WarmEntry;
 }
 let CURRENT_WARM: Map<HookSlot, WarmEntry[]> | null = null;
 let CURRENT_WARM_CLAIMS: Set<object> | null = null;
@@ -10505,6 +11057,16 @@ const WARM_DEPTH_CAP = 64;
 // repeated component instance to a later instance's value. The whole cache is
 // invalidated when the next ordinary render starts a new suspend episode.
 const WARM_MISS = Symbol('octane.warm.miss');
+/** Root retry tokens survive discarded first mounts without retaining a Scope. */
+let ROOT_WARM_RETRIES: WeakMap<object, Map<HookSlot, WarmEntry[]>> | null = null;
+
+function rootWarmRetryKey(block: Block): object | null {
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		// Scoped Suspense/Activity already retain their own ancestor warm cache.
+		if ((current as any).__suspenseHandler) return null;
+	}
+	return getRootRenderRetryKey(block);
+}
 
 function warmCacheForOwner(owner: Block): Map<HookSlot, WarmEntry[]> {
 	for (let block: Block | null = owner; block !== null; block = block.parentBlock) {
@@ -10512,7 +11074,12 @@ function warmCacheForOwner(owner: Block): Map<HookSlot, WarmEntry[]> {
 		const existing = (block as any).__warmCache as Map<HookSlot, WarmEntry[]> | undefined;
 		if (existing !== undefined) return existing;
 	}
-	const cache = new Map<HookSlot, WarmEntry[]>();
+	const retryKey = rootWarmRetryKey(owner);
+	let cache = retryKey === null ? undefined : ROOT_WARM_RETRIES?.get(retryKey);
+	if (cache === undefined) {
+		cache = new Map<HookSlot, WarmEntry[]>();
+		if (retryKey !== null) (ROOT_WARM_RETRIES ??= new WeakMap()).set(retryKey, cache);
+	}
 	(owner as any).__warmCache = cache;
 	(owner as any).__warmCacheEpisode = CURRENT_WARM_EPISODE;
 	return cache;
@@ -10523,7 +11090,7 @@ function warmCacheForOwner(owner: Block): Map<HookSlot, WarmEntry[]> {
 // so a later sibling's suspension does not speculatively refetch it. Repeated
 // same-site instances intentionally append repeated entries; a warm walk claims
 // them in traversal order.
-function recordRealWarmMemo(slot: HookSlot, deps: any[], source: object): boolean {
+function recordRealWarmMemo(slot: HookSlot, deps: any[], source: MemoHookEntry): boolean {
 	const block = CURRENT_BLOCK;
 	if (block === null) return false;
 	let owner: Block | null = null;
@@ -10540,9 +11107,40 @@ function recordRealWarmMemo(slot: HookSlot, deps: any[], source: object): boolea
 		list = [];
 		cache.set(slot, list);
 	}
-	list.push({ deps, value: undefined, available: false, source });
+	const entry: WarmEntry = { deps, value: undefined, available: false, source };
+	list.push(entry);
+	source.warmRecord = entry;
 	WARM_EVER = true;
 	return true;
+}
+
+function claimWarmMemoRecord(adopted: WarmEntry | WarmHarvestEntry, source: MemoHookEntry): void {
+	if (!('available' in adopted)) return;
+	adopted.source = source;
+	adopted.value = undefined;
+	source.warmRecord = adopted;
+}
+
+/**
+ * The first-mount list/root discard drops hook scopes before they can replay.
+ * Return only those concrete occurrences to their existing warm queue. Live
+ * siblings retain consumed records; ordinary unmount never calls this helper.
+ */
+function retainDiscardedWarmMemos(scope: Scope): void {
+	if (!WARM_EVER) return;
+	if (scope.hooks !== null) {
+		for (const candidate of scope.hooks.values()) {
+			const memo = candidate as MemoHookEntry | null;
+			const record = memo?.warmRecord;
+			if (record === undefined || record.source !== memo) continue;
+			record.source = undefined;
+			record.value = memo.value;
+			record.available = true;
+			if (memo.nativeWitness !== undefined) record.nativeWitness = memo.nativeWitness;
+			memo.warmRecord = undefined;
+		}
+	}
+	forEachSubtreeChild(scope, retainDiscardedWarmMemos);
 }
 
 function runWarm(fn: () => void, owner: Block = CURRENT_BLOCK!): void {
@@ -10613,14 +11211,19 @@ function runActiveWarmPlans(local?: () => void): void {
 	}, owner);
 }
 
-function activeMemoMatch(slot: HookSlot, deps: any[]): object | null {
+function activeMemoMatch(
+	slot: HookSlot,
+	deps: any[],
+	accept?: WarmMemoAccept,
+): MemoHookEntry | null {
 	for (let block: Block | null = CURRENT_BLOCK; block !== null; block = block.parentBlock) {
-		const entry = block.hooks?.get(slot) as { deps?: any[] } | undefined;
+		const entry = block.hooks?.get(slot) as MemoHookEntry | undefined;
 		if (
 			entry !== undefined &&
 			entry.deps !== undefined &&
 			!depsChanged(entry.deps, deps) &&
-			!CURRENT_WARM_CLAIMS?.has(entry)
+			!CURRENT_WARM_CLAIMS?.has(entry) &&
+			(accept === undefined || accept(entry))
 		) {
 			return entry;
 		}
@@ -10635,14 +11238,24 @@ function activeMemoMatch(slot: HookSlot, deps: any[]): object | null {
  * The value is status-tagged immediately so the real use() unwrap reads it
  * directly.
  */
-export function warmMemo(compute: () => any, deps: any[], slot: HookSlot): void {
+export function warmMemo(
+	compute: () => any,
+	deps: any[],
+	slot: HookSlot,
+	native?: NativeWarmMemoMode,
+): void {
 	const cache = CURRENT_WARM;
 	if (cache === null) return;
 	let list = cache.get(slot);
 	if (list !== undefined) {
 		for (let i = 0; i < list.length; i++) {
 			const entry = list[i];
-			if (depsChanged(entry.deps, deps) || CURRENT_WARM_CLAIMS?.has(entry)) continue;
+			if (
+				depsChanged(entry.deps, deps) ||
+				CURRENT_WARM_CLAIMS?.has(entry) ||
+				(native !== undefined && !native.accept(entry))
+			)
+				continue;
 			CURRENT_WARM_CLAIMS?.add(entry);
 			if (entry.source !== undefined) CURRENT_WARM_CLAIMS?.add(entry.source);
 			return; // this concrete occurrence already ran or warmed
@@ -10652,7 +11265,7 @@ export function warmMemo(compute: () => any, deps: any[], slot: HookSlot): void 
 	// created this value before its batch discovered suspension. Record a consumed
 	// tombstone instead of duplicating that creation; later strata then remain
 	// deduped even after the active component has returned.
-	const activeMemo = activeMemoMatch(slot, deps);
+	const activeMemo = activeMemoMatch(slot, deps, native?.accept);
 	if (activeMemo !== null) {
 		CURRENT_WARM_CLAIMS?.add(activeMemo);
 		if (list === undefined) {
@@ -10661,6 +11274,7 @@ export function warmMemo(compute: () => any, deps: any[], slot: HookSlot): void 
 		}
 		const entry = { deps, value: undefined, available: false, source: activeMemo };
 		list.push(entry);
+		activeMemo.warmRecord = entry;
 		CURRENT_WARM_CLAIMS?.add(entry);
 		return;
 	}
@@ -10680,27 +11294,67 @@ export function warmMemo(compute: () => any, deps: any[], slot: HookSlot): void 
 	) {
 		for (let i = 0; i < harvest.length; i++) {
 			const entry = harvest[i];
-			if (entry.slot !== slot || depsChanged(entry.deps, deps) || CURRENT_WARM_CLAIMS?.has(entry)) {
+			if (
+				entry.slot !== slot ||
+				depsChanged(entry.deps, deps) ||
+				CURRENT_WARM_CLAIMS?.has(entry) ||
+				(native !== undefined && !native.accept(entry))
+			) {
 				continue;
 			}
 			CURRENT_WARM_CLAIMS?.add(entry);
 			return;
 		}
 	}
-	let value: any;
+	let entry: WarmEntry;
 	try {
-		value = compute();
+		entry =
+			native === undefined
+				? { deps, value: compute(), available: true }
+				: native.create(compute, deps);
 	} catch {
 		return; // speculative — a throwing creation is simply not warmed
 	}
+	const value = entry.value;
 	if (value != null && typeof value.then === 'function') trackThenable(value);
 	if (list === undefined) {
 		list = [];
 		cache.set(slot, list);
 	}
-	const entry = { deps, value, available: true };
 	list.push(entry);
 	CURRENT_WARM_CLAIMS?.add(entry);
+}
+
+function nativeMemoEvidenceValid(entry: WarmMemoEvidence): boolean {
+	const source = 'source' in entry && entry.source !== undefined ? entry.source : entry;
+	const witness = source.nativeWitness;
+	// Undefined means this entry predates the native compiler capability. Null
+	// is the intentional witness for a successful computation with no reads.
+	return witness !== undefined && validateNativeReadWitness(witness);
+}
+
+function createNativeWarmEntry(compute: () => any, deps: any[]): WarmEntry {
+	const token = beginNativeReadWitness(true);
+	let completed = false;
+	let value: any;
+	let nativeWitness: NativeReadWitness | null;
+	try {
+		value = compute();
+		completed = true;
+	} finally {
+		nativeWitness = finishNativeReadWitness(token, completed);
+	}
+	return { deps, value, available: true, nativeWitness };
+}
+
+const NATIVE_WARM_MEMO_MODE: NativeWarmMemoMode = {
+	accept: nativeMemoEvidenceValid,
+	create: createNativeWarmEntry,
+};
+
+/** @internal Speculation collects evidence without subscribing its ancestor. */
+export function nativeWarmMemo(compute: () => any, deps: any[], slot: HookSlot): void {
+	warmMemo(compute, deps, slot, NATIVE_WARM_MEMO_MODE);
 }
 
 /**
@@ -10737,23 +11391,25 @@ export function warmChild(comp: any, props: any): void {
 /** Adoption lookup for useMemo: nearest ancestor warm cache entry for this
  * slot with matching deps. The value is consumed once; its tombstone remains
  * to dedup later warm passes without being adoptable by another instance. */
-function adoptWarmValue(slot: HookSlot, deps: any[]): any {
+function adoptWarmEntry(
+	slot: HookSlot,
+	deps: any[],
+	accept?: WarmMemoAccept,
+): WarmEntry | WarmHarvestEntry | typeof WARM_MISS {
 	let b: Block | null = CURRENT_BLOCK;
 	while (b !== null) {
 		const cache: Map<HookSlot, WarmEntry[]> | undefined = (b as any).__warmCache;
 		if ((b as any).__warmCacheEpisode === CURRENT_WARM_EPISODE && cache !== undefined) {
-			const list = cache.get(slot);
-			if (list !== undefined) {
-				for (let i = 0; i < list.length; i++) {
-					if (!depsChanged(list[i].deps, deps)) {
-						if (!list[i].available) continue;
-						list[i].available = false;
-						return list[i].value;
-					}
-				}
-			}
+			const entry = adoptWarmCacheEntry(cache, slot, deps, accept);
+			if (entry !== WARM_MISS) return entry;
 		}
 		b = b.parentBlock;
+	}
+	const retryKey = CURRENT_BLOCK?.idState.renderOwner?.retryKey;
+	const retryCache = retryKey == null ? undefined : ROOT_WARM_RETRIES?.get(retryKey);
+	if (retryCache !== undefined) {
+		const entry = adoptWarmCacheEntry(retryCache, slot, deps, accept);
+		if (entry !== WARM_MISS) return entry;
 	}
 	// Held-transition fallback: the attempt's harvest is episode-agnostic, so a
 	// later round's render (whatever episode it minted) still adopts the fetch
@@ -10768,9 +11424,36 @@ function adoptWarmValue(slot: HookSlot, deps: any[]): any {
 	if (harvestList !== null && harvestList !== undefined) {
 		for (let i = 0; i < harvestList.length; i++) {
 			const entry = harvestList[i];
-			if (!entry.taken && entry.slot === slot && !depsChanged(entry.deps, deps)) {
+			if (
+				!entry.taken &&
+				entry.slot === slot &&
+				!depsChanged(entry.deps, deps) &&
+				(accept === undefined || accept(entry))
+			) {
 				entry.taken = true;
-				return entry.value;
+				return entry;
+			}
+		}
+	}
+	return WARM_MISS;
+}
+
+function adoptWarmCacheEntry(
+	cache: Map<HookSlot, WarmEntry[]>,
+	slot: HookSlot,
+	deps: any[],
+	accept?: WarmMemoAccept,
+): WarmEntry | typeof WARM_MISS {
+	const list = cache.get(slot);
+	if (list !== undefined) {
+		for (const entry of list) {
+			if (
+				entry.available &&
+				!depsChanged(entry.deps, deps) &&
+				(accept === undefined || accept(entry))
+			) {
+				entry.available = false;
+				return entry;
 			}
 		}
 	}
@@ -10877,6 +11560,183 @@ export function puTake4(slot: HookSlot, d0: any, d1: any, d2: any, d3: any): any
 
 export function puPub(slot: HookSlot, value: any, ...deps: any[]): any {
 	return publishMemoEntry(CURRENT_SCOPE!, slot, deps, value);
+}
+
+function nativeMemoEntryHit(slot: HookSlot, entry: MemoHookEntry): any {
+	replayNativeReadWitness(entry.nativeWitness);
+	return memoEntryHit(slot, entry).value;
+}
+
+function adoptNativeMemoEntry(scope: Scope, slot: HookSlot, deps: any[]): MemoHookEntry | null {
+	const adopted = adoptWarmEntry(slot, deps, nativeMemoEvidenceValid);
+	if (adopted === WARM_MISS) return null;
+	const entry: MemoHookEntry = {
+		deps,
+		value: adopted.value,
+		warmEpisode: CURRENT_WARM_EPISODE,
+		nativeWitness: adopted.nativeWitness,
+	};
+	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalMemoEntry(scope, slot, entry);
+	ensureHooks(scope).set(slot, entry);
+	claimWarmMemoRecord(adopted, entry);
+	replayNativeReadWitness(entry.nativeWitness);
+	return entry;
+}
+
+function nativePuAdopt(slot: HookSlot, deps: any[]): any {
+	const entry = adoptNativeMemoEntry(CURRENT_SCOPE!, slot, deps);
+	return entry === null ? puMiss : entry.value;
+}
+
+function publishNativeMemoEntry<T>(
+	scope: Scope,
+	slot: HookSlot,
+	deps: any[] | undefined,
+	value: T,
+	witness: NativeReadWitness | null,
+): T {
+	publishMemoEntry(scope, slot, deps, value, witness);
+	// A native creation can suspend on its own, without any descendant warm
+	// plan. Opted-in first mounts use the same occurrence queue as warming;
+	// ordinary useMemo and already-mounted scopes allocate nothing here.
+	const entry = scope.hooks!.get(slot) as MemoHookEntry;
+	if (!scope.mounted && deps !== undefined && entry.warmRecord === undefined) {
+		let owner = CURRENT_BLOCK!;
+		while (!(owner as any).__suspenseHandler && owner.parentBlock !== null)
+			owner = owner.parentBlock;
+		const cache = warmCacheForOwner(owner);
+		let list = cache.get(slot);
+		if (list === undefined) cache.set(slot, (list = []));
+		const record: WarmEntry = { deps, value: undefined, available: false, source: entry };
+		list.push(record);
+		entry.warmRecord = record;
+		entry.warmEpisode = CURRENT_WARM_EPISODE;
+		WARM_EVER = true;
+	}
+	return value;
+}
+
+/** @internal Native creation caches retain the existing promise and warm ABI. */
+export function nativePuMemo<T>(
+	compute: (...deps: any[]) => T,
+	deps: any[] | undefined,
+	slot?: HookSlot,
+): T {
+	const [d, s] = resolveHookArgs('useMemo', deps, slot);
+	const scope = CURRENT_SCOPE!;
+	const previous = scope.hooks?.get(s) as MemoHookEntry | undefined;
+	if (
+		previous !== undefined &&
+		d !== undefined &&
+		!depsChanged(previous.deps, d) &&
+		nativeMemoEvidenceValid(previous)
+	)
+		return nativeMemoEntryHit(s, previous);
+	if (WARM_EVER && d !== undefined) {
+		const adopted = adoptNativeMemoEntry(scope, s, d);
+		if (adopted !== null) return adopted.value;
+	}
+	const token = beginNativeReadWitness();
+	let completed = false;
+	let value: T;
+	let nativeWitness: NativeReadWitness | null;
+	try {
+		// Preserve useMemo's positional dependency arguments for generated sites.
+		// eslint-disable-next-line prefer-spread
+		value = compute.apply(null, (d ?? []) as []);
+		completed = true;
+	} finally {
+		nativeWitness = finishNativeReadWitness(token, completed);
+	}
+	return publishNativeMemoEntry(scope, s, d, value, nativeWitness);
+}
+
+export function nativePuTake0(slot: HookSlot): any {
+	const previous = CURRENT_SCOPE!.hooks?.get(slot) as MemoHookEntry | undefined;
+	if (
+		previous !== undefined &&
+		previous.deps !== undefined &&
+		previous.deps.length === 0 &&
+		nativeMemoEvidenceValid(previous)
+	)
+		return nativeMemoEntryHit(slot, previous);
+	return WARM_EVER ? nativePuAdopt(slot, []) : puMiss;
+}
+
+export function nativePuTake1(slot: HookSlot, d0: any): any {
+	const previous = CURRENT_SCOPE!.hooks?.get(slot) as MemoHookEntry | undefined;
+	if (previous !== undefined) {
+		const deps = previous.deps;
+		if (
+			deps !== undefined &&
+			deps.length === 1 &&
+			Object.is(deps[0], d0) &&
+			nativeMemoEvidenceValid(previous)
+		)
+			return nativeMemoEntryHit(slot, previous);
+	}
+	return WARM_EVER ? nativePuAdopt(slot, [d0]) : puMiss;
+}
+
+export function nativePuTake2(slot: HookSlot, d0: any, d1: any): any {
+	const previous = CURRENT_SCOPE!.hooks?.get(slot) as MemoHookEntry | undefined;
+	if (previous !== undefined) {
+		const deps = previous.deps;
+		if (
+			deps !== undefined &&
+			deps.length === 2 &&
+			Object.is(deps[0], d0) &&
+			Object.is(deps[1], d1) &&
+			nativeMemoEvidenceValid(previous)
+		)
+			return nativeMemoEntryHit(slot, previous);
+	}
+	return WARM_EVER ? nativePuAdopt(slot, [d0, d1]) : puMiss;
+}
+
+export function nativePuTake3(slot: HookSlot, d0: any, d1: any, d2: any): any {
+	const previous = CURRENT_SCOPE!.hooks?.get(slot) as MemoHookEntry | undefined;
+	if (previous !== undefined) {
+		const deps = previous.deps;
+		if (
+			deps !== undefined &&
+			deps.length === 3 &&
+			Object.is(deps[0], d0) &&
+			Object.is(deps[1], d1) &&
+			Object.is(deps[2], d2) &&
+			nativeMemoEvidenceValid(previous)
+		)
+			return nativeMemoEntryHit(slot, previous);
+	}
+	return WARM_EVER ? nativePuAdopt(slot, [d0, d1, d2]) : puMiss;
+}
+
+export function nativePuTake4(slot: HookSlot, d0: any, d1: any, d2: any, d3: any): any {
+	const previous = CURRENT_SCOPE!.hooks?.get(slot) as MemoHookEntry | undefined;
+	if (previous !== undefined) {
+		const deps = previous.deps;
+		if (
+			deps !== undefined &&
+			deps.length === 4 &&
+			Object.is(deps[0], d0) &&
+			Object.is(deps[1], d1) &&
+			Object.is(deps[2], d2) &&
+			Object.is(deps[3], d3) &&
+			nativeMemoEvidenceValid(previous)
+		)
+			return nativeMemoEntryHit(slot, previous);
+	}
+	return WARM_EVER ? nativePuAdopt(slot, [d0, d1, d2, d3]) : puMiss;
+}
+
+/** @internal Publish the result and its evidence together after computation succeeds. */
+export function nativePuPub(
+	slot: HookSlot,
+	value: any,
+	witness: NativeReadWitness | null,
+	...deps: any[]
+): any {
+	return publishNativeMemoEntry(CURRENT_SCOPE!, slot, deps, value, witness);
 }
 
 // General closure-free memo ABI for authored helpers/custom hooks. Resolve the
@@ -11488,6 +12348,7 @@ class HydrationCapability {
 	private readonly textWarnings = new Map<Text, PendingHydrationTextWarning>();
 	/** Skip component-frame adoption until the declared container owner. */
 	passthroughRanges = false;
+	nativeAdoption?: NativeAdoptionState;
 
 	constructor(
 		readonly rootBlock: Block,
@@ -11508,9 +12369,11 @@ class HydrationCapability {
 
 	suspend<T>(fn: () => T): T {
 		this.depth++;
+		const previousNative = setNativeAdoptionResolver(null);
 		try {
 			return fn();
 		} finally {
+			setNativeAdoptionResolver(previousNative);
 			this.depth--;
 		}
 	}
@@ -15755,6 +16618,7 @@ function dispatchDelegated(event: Event): void {
 	if (submitRec !== null) ACTIVE_SUBMIT_DISPATCH = submitRec;
 	const discrete = DISCRETE_EVENTS.has(event.type);
 	if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH++;
+	const nativeBatch = beginNativeEventBatch(event);
 	try {
 		// CAPTURE_DELEGATED types have BOTH dispatchers attached as capture-phase
 		// listeners on the same root, so same-node registration ORDER — not phase —
@@ -15798,6 +16662,11 @@ function dispatchDelegated(event: Event): void {
 			publishManualFormPending(submitRec);
 		}
 		clearCurrentTarget(event);
+		try {
+			endNativeEventBatch(event, nativeBatch, false, reportListenerError);
+		} catch (error) {
+			reportListenerError(error);
+		}
 		if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH--;
 		_dispatchDepth--;
 		maybeFlushDiscrete(event.type);
@@ -15825,6 +16694,7 @@ function dispatchDelegatedCapture(event: Event): void {
 	_dispatchDepth++;
 	const discrete = DISCRETE_EVENTS.has(event.type);
 	if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH++;
+	const nativeBatch = beginNativeEventBatch(event);
 	try {
 		for (let i = CAPTURE_PATH.length - 1; i >= pathBase; i--) {
 			const slot = CAPTURE_PATH[i][key] as EventSlot;
@@ -15839,6 +16709,19 @@ function dispatchDelegatedCapture(event: Event): void {
 		// Nested dispatch appends its own frame and restores the outer traversal.
 		CAPTURE_PATH.length = pathBase;
 		clearCurrentTarget(event);
+		try {
+			endNativeEventBatch(
+				event,
+				nativeBatch,
+				event.bubbles &&
+					!event.cancelBubble &&
+					_delegated.has(event.type) &&
+					(event as any)[DELEGATED_DISPATCHED] !== true,
+				reportListenerError,
+			);
+		} catch (error) {
+			reportListenerError(error);
+		}
 		if (discrete) ACTIVE_DISCRETE_EVENT_DEPTH--;
 		_dispatchDepth--;
 		finishCaptureDispatch(event);
@@ -18005,8 +18888,17 @@ type ScopedValueDescriptor<P> = ElementDescriptor<P> & {
 export function createScopedValue<P>(
 	readElement: () => ElementDescriptor<P>,
 ): ElementDescriptor<P> {
-	const resolve = createScopedResolver(readElement);
+	return scopedValueDescriptor(createScopedResolver(readElement));
+}
 
+/** @internal Native deferred JSX preserves its complete descriptor contract. */
+export function nativeCreateScopedValue<P>(
+	readElement: () => ElementDescriptor<P>,
+): ElementDescriptor<P> {
+	return scopedValueDescriptor(createNativeScopedResolver(readElement));
+}
+
+function scopedValueDescriptor<P>(resolve: () => ElementDescriptor<P>): ElementDescriptor<P> {
 	const descriptor: ElementDescriptor<P> = {
 		$$kind: ELEMENT_TAG,
 		get type() {
@@ -18050,13 +18942,29 @@ export function createScopedElement<P>(
 	props: P | undefined,
 	readChildren: () => unknown,
 ): ElementDescriptor<P> {
+	return scopedElementDescriptor(type, props, createScopedResolver(readChildren));
+}
+
+/** @internal Resolve native children in their represented render Scope. */
+export function nativeCreateScopedElement<P>(
+	type: ComponentBody<P> | string | typeof Fragment,
+	props: P | undefined,
+	readChildren: () => unknown,
+): ElementDescriptor<P> {
+	return scopedElementDescriptor(type, props, createNativeScopedResolver(readChildren));
+}
+
+function scopedElementDescriptor<P>(
+	type: ComponentBody<P> | string | typeof Fragment,
+	props: P | undefined,
+	children: () => unknown,
+): ElementDescriptor<P> {
 	const src = (props ?? null) as any;
 	const hasKey = hasElementConfigKey(src);
 	const key = hasKey ? '' + src.key : null;
 	const copiedProps = copyElementConfig(src);
 	applyElementDefaultProps(type, copiedProps);
 
-	const children = createScopedResolver(readChildren);
 	const childProperty = { configurable: true, enumerable: true, get: children };
 	Object.defineProperty(copiedProps, 'children', childProperty);
 	SCOPED_ELEMENT_PROPS.add(copiedProps);
@@ -19334,6 +20242,7 @@ function renderOffscreen(
 // (which adopt the WIP's markers in place, so no DOM move is needed).
 
 function spliceOffscreenCapture(capture: OffscreenCapture): void {
+	NATIVE_READ_DRIVER?.spliceCapture(capture, WIP_CAPTURE);
 	const rendered = capture.renderedBlocks;
 	capture.renderedBlocks = null;
 	capture.renderRoot = null;
@@ -19387,6 +20296,7 @@ function spliceWipCapture(wip: OffscreenWip): void {
 /** Drop captured commit work that never became visible. */
 function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	if (capture === null) return;
+	NATIVE_READ_DRIVER?.discardCapture(capture);
 	const rendered = capture.renderedBlocks;
 	const owner = capture.renderRoot;
 	capture.renderedBlocks = null;
@@ -23583,6 +24493,7 @@ interface HiddenText {
 interface SuspenseHiddenDom {
 	displays: Set<HTMLElement>;
 	texts: Set<Text>;
+	active: boolean;
 }
 
 // Activity and nested Suspense boundaries can own the same physical host
@@ -23894,6 +24805,30 @@ function teardownErrorSlot(state: ErrorSlot, detachDom: boolean): void {
 	setTryBranch(state, -1);
 }
 
+/** Detached retry/error callbacks still publish through the owning root journal. */
+function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFrame | null {
+	const frame =
+		WIP_CAPTURE === null ? beginRootRender(state.parentBlock.idState.renderOwner) : null;
+	if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK) {
+		if (state.start.parentNode === state.domParent && state.end.parentNode === state.domParent)
+			journalRootSlot(state, state.domParent, state.start, state.end);
+		else journalObjectOnce(state);
+	}
+	return frame;
+}
+
+function endDetachedBoundaryRender(frame: RootRenderFrame | null): void {
+	if (frame === null) return;
+	endRootRender(frame);
+	if (!inFlush && ROOT_RENDER_TRANSACTION === null) commitRootRenders();
+	// A timeout or passive error can enter without any scheduled Block. Its
+	// captured ref/effect work still needs the existing commit drain to run.
+	if (!syncFlush && !scheduled) {
+		scheduled = true;
+		queueMicrotask(flush);
+	}
+}
+
 // Single mutation point for boundary branches. The bare assignment is the hot
 // path; the devtools probe is fully behind the profile gate (dead-code
 // eliminated in non-profile builds), so this adds only a boolean-guarded call
@@ -23923,6 +24858,7 @@ function clearPassthroughTry(state: TrySlot): void {
 }
 
 function mountPassthroughCatch(state: TrySlot, error: unknown, reportInline = false): void {
+	if (error instanceof NativeAdoptionMiss) throw error;
 	clearPassthroughTry(state);
 	state.pendingThenable = null;
 	setTryBranch(state, 0);
@@ -24117,7 +25053,12 @@ export function errorBlock(
 		try {
 			renderBlock(current);
 		} catch (error) {
-			if (isHostContextRequest(error) || isSuspenseException(error)) throw error;
+			if (
+				isHostContextRequest(error) ||
+				isSuspenseException(error) ||
+				error instanceof NativeAdoptionMiss
+			)
+				throw error;
 			switchErrorToCatch(state, error, true);
 		}
 		return state.reset;
@@ -24132,8 +25073,15 @@ export function errorBlock(
 	setTryBranch(state, 1);
 	let start: Node | null = null;
 	let end: Node | null = null;
+	let freshBoundary = false;
 	if (!state.passthrough) {
-		const cursor = state.start.nextSibling;
+		let cursor = state.start.nextSibling;
+		const freshIds = takeNativeFreshArm(hydration, cursor, state.end, state.idState);
+		if (freshIds !== null) {
+			state.idState = freshIds;
+			freshBoundary = true;
+			cursor = state.end;
+		}
 		if (hydration !== null && hydration.isOpen(cursor)) {
 			start = cursor;
 			end = hydration.close(cursor);
@@ -24165,11 +25113,18 @@ export function errorBlock(
 		return state!.block;
 	};
 	state.block = body;
+	const previousNative = freshBoundary ? setNativeAdoptionResolver(null) : undefined;
+	if (freshBoundary) hydration!.depth++;
 	try {
 		renderBlock(body);
 		state.hasResolved = true;
 	} catch (error) {
-		if (isHostContextRequest(error) || isSuspenseException(error)) throw error;
+		if (
+			isHostContextRequest(error) ||
+			isSuspenseException(error) ||
+			error instanceof NativeAdoptionMiss
+		)
+			throw error;
 		const adoptServerCatch = hydration?.isRejection(error) === true;
 		switchErrorToCatch(
 			state,
@@ -24178,6 +25133,9 @@ export function errorBlock(
 			adoptServerCatch && start !== null ? start : undefined,
 			adoptServerCatch && end !== null ? end : undefined,
 		);
+	} finally {
+		if (freshBoundary) hydration!.depth--;
+		if (previousNative !== undefined) setNativeAdoptionResolver(previousNative);
 	}
 	return state.reset;
 }
@@ -24186,6 +25144,25 @@ function switchErrorToCatch(
 	state: ErrorSlot,
 	error: any,
 	reportInline = false,
+	adoptedStart?: Node,
+	adoptedEnd?: Node,
+): void {
+	if (error instanceof NativeAdoptionMiss) throw error;
+	const frame = beginDetachedBoundaryRender(state);
+	try {
+		switchErrorToCatchInner(state, error, reportInline, adoptedStart, adoptedEnd);
+	} catch (failure) {
+		if (frame !== null) rollbackRootRender(frame.transaction);
+		throw failure;
+	} finally {
+		endDetachedBoundaryRender(frame);
+	}
+}
+
+function switchErrorToCatchInner(
+	state: ErrorSlot,
+	error: any,
+	reportInline: boolean,
 	adoptedStart?: Node,
 	adoptedEnd?: Node,
 ): void {
@@ -24509,7 +25486,9 @@ function mountTry(state: TrySlot): void {
 	// depth-first synchronous render), restoring the outer scope after — nested
 	// streamed boundaries push again naturally.
 	let scopedSeeds: unknown[] | null = null;
+	let scopedNativeRaw: string | undefined;
 	let hasScopedBoundary = false;
+	let freshBoundary = false;
 	let adoptCursor = state.start.nextSibling;
 	let streamedBoundaryId: string | null = null;
 	if (
@@ -24523,6 +25502,8 @@ function mountTry(state: TrySlot): void {
 		const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
 		const raw = stash !== undefined ? stash[streamedBoundaryId] : undefined;
 		if (typeof raw === 'string') scopedSeeds = hydration.parseSeeds(raw);
+		const nativeRaw = stash?.[streamedBoundaryId + '$signals'];
+		if (typeof nativeRaw === 'string') scopedNativeRaw = nativeRaw;
 		adoptCursor = adoptCursor.nextSibling;
 	} else if (
 		// A shell hydrated before its streamed segment swaps still has the
@@ -24538,6 +25519,7 @@ function mountTry(state: TrySlot): void {
 		isRendererStreamBoundaryTemplate(adoptCursor as Element)
 	) {
 		hasScopedBoundary = true;
+		freshBoundary = true;
 		streamedBoundaryId = (adoptCursor as Element).getAttribute(STREAM_BOUNDARY_ATTR);
 		let stale: Node | null = adoptCursor;
 		while (stale !== null && stale !== state.end) {
@@ -24554,6 +25536,14 @@ function mountTry(state: TrySlot): void {
 			next: 0,
 			renderOwner: state.parentBlock.idState.renderOwner,
 		};
+	}
+	const freshIds = takeNativeFreshArm(hydration, adoptCursor, state.end, state.idState);
+	if (freshIds !== null) {
+		state.idState = freshIds;
+		freshBoundary = true;
+		adoptCursor = state.end;
+		scopedSeeds = null;
+		scopedNativeRaw = undefined;
 	}
 	if (hydration !== null && hydration.isOpen(adoptCursor)) {
 		// ADOPT the server's inner arm range (no inserted markers — byte-for-byte;
@@ -24575,6 +25565,17 @@ function mountTry(state: TrySlot): void {
 	}
 	const b = createTryBody(state, bStart, bEnd);
 	state.block = b;
+	let nativeAdoption: NativeAdoptionState | undefined;
+	if (scopedNativeRaw !== undefined && !freshBoundary) {
+		const boundaryId = streamedBoundaryId!;
+		nativeAdoption = ownNativeAdoption(b, parseNativeSignalManifest(scopedNativeRaw), () => {
+			const stash = typeof window !== 'undefined' ? (window as any).$OCTS : undefined;
+			if (stash !== undefined) {
+				delete stash[boundaryId + '$signals'];
+				delete stash[boundaryId];
+			}
+		});
+	}
 	// Install this boundary's streamed seed scope (if any) for the subtree render.
 	const prevSeeds = hydration?.seeds ?? null;
 	const prevSeedCursor = hydration?.seedCursor ?? 0;
@@ -24582,6 +25583,13 @@ function mountTry(state: TrySlot): void {
 		hydration!.seeds = scopedSeeds;
 		hydration!.seedCursor = 0;
 	}
+	const previousNative =
+		hasScopedBoundary || freshBoundary
+			? setNativeAdoptionResolver(nativeAdoption?.resolve ?? null)
+			: undefined;
+	// The entire newly mounted arm, including its pending/catch path, is outside
+	// adoption. A live child must not borrow an ancestor's historical data.
+	if (freshBoundary) hydration!.depth++;
 	try {
 		renderBlock(b);
 		state.hasResolved = true;
@@ -24589,7 +25597,7 @@ function mountTry(state: TrySlot): void {
 	} catch (err) {
 		// §6.3 control signal — bypass the local boundary (see the try-body
 		// re-render catch above); the renderer-region owner handles it.
-		if (isHostContextRequest(err)) throw err;
+		if (isHostContextRequest(err) || err instanceof NativeAdoptionMiss) throw err;
 		if (isSuspenseException(err)) {
 			if (state.propagateSuspense) throw err;
 			handleSuspense(state, err.thenable, b);
@@ -24612,6 +25620,8 @@ function mountTry(state: TrySlot): void {
 			);
 		}
 	} finally {
+		if (freshBoundary) hydration!.depth--;
+		if (previousNative !== undefined) setNativeAdoptionResolver(previousNative);
 		if (hasScopedBoundary) {
 			hydration!.seeds = prevSeeds;
 			hydration!.seedCursor = prevSeedCursor;
@@ -24667,8 +25677,18 @@ function hideTryBlock(state: TrySlot): void {
 	const hidden: SuspenseHiddenDom = {
 		displays: new Set(),
 		texts: new Set(),
+		active: true,
 	};
 	state.hiddenDom = hidden;
+	if (TRANSITION_JOURNAL !== null) {
+		journalUndo(() => {
+			if (state.hiddenDom === hidden) state.hiddenDom = null;
+			if (!hidden.active) return;
+			hidden.active = false;
+			for (const el of hidden.displays) releaseHiddenDisplay(el, true);
+			for (const text of hidden.texts) releaseHiddenText(text);
+		});
+	}
 	hideBlockHostRange(block, hidden);
 	hideSuspensePortalRanges(block, hidden);
 }
@@ -24678,6 +25698,20 @@ function showTryBlock(state: TrySlot): void {
 	const hidden = state.hiddenDom;
 	if (hidden === null) return;
 	state.hiddenDom = null;
+	if (TRANSITION_JOURNAL !== null) {
+		journalUndo(() => {
+			state.hiddenDom = hidden;
+			if (hidden.active) return;
+			hidden.active = true;
+			for (const el of hidden.displays) retainHiddenDisplay(el, true);
+			for (const text of hidden.texts) {
+				retainHiddenText(text);
+				enforceHiddenText(text);
+			}
+		});
+	}
+	if (!hidden.active) return;
+	hidden.active = false;
 	for (const el of hidden.displays) {
 		releaseHiddenDisplay(el, true);
 	}
@@ -24911,6 +25945,21 @@ function hideTryContentAndMountPending(
 	state: TrySlot,
 	resumeThenable?: TrackedThenable<any>,
 ): boolean {
+	const frame = beginDetachedBoundaryRender(state);
+	try {
+		return hideTryContentAndMountPendingInner(state, resumeThenable);
+	} catch (failure) {
+		if (frame !== null) rollbackRootRender(frame.transaction);
+		throw failure;
+	} finally {
+		endDetachedBoundaryRender(frame);
+	}
+}
+
+function hideTryContentAndMountPendingInner(
+	state: TrySlot,
+	resumeThenable?: TrackedThenable<any>,
+): boolean {
 	const wasPending = state.branch === 2;
 	const hydration = activeHydration();
 	if (hydration !== null && !state.hasResolved && state.tryBlock !== null) {
@@ -24948,31 +25997,14 @@ function hideTryContentAndMountPending(
 		// committed, without retaining a witness for every callback ref in the app.
 		const uncommittedRefs = discardSubtreeRefAttaches(persistent);
 		invalidatePendingSuspenseEffects(persistent);
-		deactivateScope(persistent, false);
-		// Effect cleanups are user code and may synchronously replace/unmount this
-		// root. Never continue a half-finished fallback commit into detached markers.
-		if (state.parentBlock.disposed || persistent.disposed || state.tryBlock !== persistent) {
-			return false;
-		}
-		if (state.detachedRefs === null) {
-			state.detachedRefs = [];
-			// Nested boundaries may already have detached their hidden primary refs.
-			// Visit only each nested boundary's visible arm here so an outer hide
-			// cannot detach the preserved inner primary a second time. The canceled
-			// pair index excludes refs that only reached the queue before this
-			// suspension; reveal attaches the current manifests.
-			detachSubtreeRefs(persistent, state.detachedRefs, true, false, uncommittedRefs);
-		}
-		// Callback refs (and React-19 ref cleanups) are user code too. In particular,
-		// ref(null) may synchronously unmount an independent or owning root.
-		if (state.parentBlock.disposed || persistent.disposed || state.tryBlock !== persistent) {
-			return false;
-		}
-		// Ref callbacks can synchronously render. Any fresh attaches they queued for
-		// this still-hidden primary are uncommitted work too; do not publish them at
-		// the fallback commit.
-		discardSubtreeRefAttaches(persistent, uncommittedRefs);
+		journalRootProperty(persistent, 'inactive');
 		persistent.inactive = true;
+		// The fallback's native reads must be accepted before an outgoing cleanup
+		// can write. Its sampled callbacks retain that accepted value; a cleanup
+		// write schedules the next transaction. The capture also drops this action
+		// if an enclosing render is abandoned before any lifecycle work runs.
+		const action = () => deactivateSuspensePrimary(state, persistent, uncommittedRefs);
+		(WIP_CAPTURE?.eventActions ?? effectEventCommitActions).push(action);
 	}
 	if (!mountPendingBody(state)) return false;
 	if (state.parentBlock.disposed || state.branch !== 2) return false;
@@ -24981,6 +26013,41 @@ function hideTryContentAndMountPending(
 	// only after the pending arm is coherent, then re-check for reentrant teardown.
 	if (resumeThenable !== undefined) attachResume(state, resumeThenable);
 	return !state.parentBlock.disposed && state.branch === 2;
+}
+
+function deactivateSuspensePrimary(
+	state: TrySlot,
+	persistent: Block,
+	uncommittedRefs: UncommittedRefAttaches,
+): void {
+	if (blockSubtreeDisposed(persistent) || state.tryBlock !== persistent || state.branch !== 2)
+		return;
+	const owner = state.parentBlock.idState.renderOwner;
+	const generation = owner?.generation;
+	deactivateScope(persistent, false);
+	// Cleanup/ref callbacks can replace the root without synchronously disposing
+	// this Block. A public replacement cancels the remainder of this publication.
+	if (
+		blockSubtreeDisposed(persistent) ||
+		state.tryBlock !== persistent ||
+		state.branch !== 2 ||
+		owner?.generation !== generation
+	)
+		return;
+	if (state.detachedRefs === null) {
+		state.detachedRefs = [];
+		// Nested hidden primaries already own their detach. Current visible arms
+		// and the canceled-attach index prevent double detaches or phantom refs.
+		detachSubtreeRefs(persistent, state.detachedRefs, true, false, uncommittedRefs);
+	}
+	if (
+		blockSubtreeDisposed(persistent) ||
+		state.tryBlock !== persistent ||
+		owner?.generation !== generation
+	)
+		return;
+	// A ref callback may have synchronously rendered this hidden primary again.
+	discardSubtreeRefAttaches(persistent, uncommittedRefs);
 }
 
 /** Mount the current @pending helper without changing the preserved try body. */
@@ -25089,9 +26156,32 @@ function commitResume(state: TrySlot): void {
 
 function commitResumeInner(state: TrySlot): void {
 	if (state.parentBlock.disposed) return;
+	if (NATIVE_READ_DRIVER !== null && state.hiddenDom !== null) {
+		const staged = state.stagedCapture;
+		if (staged === null || !NATIVE_READ_DRIVER.validateCapture(staged)) {
+			// Keep the fallback until the next candidate has actually passed native
+			// validation. The existing hidden-render path already stages its DOM,
+			// effects and refs without deleting that fallback first.
+			const previousReplay = RESUME_REPLAY;
+			RESUME_REPLAY = true;
+			if (state.transitionHeld && state.tryBlock !== null)
+				state.tryBlock.pendingMode = 'transition';
+			try {
+				// This retry has already reached its commit window. Preserve its render
+				// priority above, but do not stage it through the same reveal timer again.
+				attemptHiddenReveal(state, 'urgent');
+				if (!deferringStagedRevealEffects) commitEffects();
+			} finally {
+				RESUME_REPLAY = previousReplay;
+			}
+			return;
+		}
+		if (WIP_CAPTURE === null) acceptNativeCapture(staged, state.parentBlock.idState.renderOwner);
+	}
 	const wasPending = state.branch === 2;
 	const hiddenActivity = findHiddenActivity(state.parentBlock);
 	const wasHeld = state.transitionHeld;
+	let releaseHeld = wasHeld;
 	if (wasHeld) state.transitionHeld = false;
 	// Leave the coordination sets — this boundary is committing now (a re-suspend
 	// during the re-render re-adds it via handleSuspense → enterHeldTransition).
@@ -25164,11 +26254,17 @@ function commitResumeInner(state: TrySlot): void {
 				WIP_CAPTURE = resumeCapture;
 				let didThrow = false;
 				let renderError: unknown = null;
+				let invalidNativeReads = false;
 				try {
 					if (reconnectEffects) {
 						renderWithEffectReconnect(tryBlock, resumeCapture);
 					} else {
 						renderBlock(tryBlock);
+					}
+					if (NATIVE_READ_DRIVER !== null) {
+						invalidNativeReads = !NATIVE_READ_DRIVER.validateCapture(resumeCapture);
+						if (!invalidNativeReads && previousCapture === null)
+							acceptNativeCapture(resumeCapture, state.parentBlock.idState.renderOwner);
 					}
 				} catch (err) {
 					didThrow = true;
@@ -25179,7 +26275,26 @@ function commitResumeInner(state: TrySlot): void {
 					// A completed replay has nothing to undo, so close its window here
 					// where the unwind is already guaranteed. A suspended one keeps it
 					// open: handleSuspense below is what replays it.
-					if (!didThrow) disarmTransitionJournal(journalCheckpoint);
+					if (!didThrow && !invalidNativeReads) disarmTransitionJournal(journalCheckpoint);
+				}
+				if (invalidNativeReads) {
+					try {
+						rollbackTransitionJournal(journalCheckpoint, tryBlock);
+						refDetachQueue.splice(refDetachCheckpoint);
+						restoreSubtreeEffectDeps(tryBlock, effectDeps);
+						discardOffscreenCapture(resumeCapture);
+						if (wasHeld) {
+							state.transitionHeld = true;
+							HELD_TRANSITIONS.add(state);
+							// This candidate never accepted or released the old hold.
+							releaseHeld = false;
+						}
+						invalidateRender(tryBlock, tryBlock);
+						scheduleRender(tryBlock);
+					} finally {
+						disarmTransitionJournal(journalCheckpoint);
+					}
+					return;
 				}
 				if (!didThrow) {
 					if (state.detachedRefs !== null) {
@@ -25230,7 +26345,7 @@ function commitResumeInner(state: TrySlot): void {
 		if (!deferringStagedRevealEffects) commitEffects();
 	} finally {
 		if (hiddenActivity !== null) rehideActivityAfterDescendantRender(hiddenActivity);
-		if (wasHeld) tickTransitionCount(-1);
+		if (releaseHeld) tickTransitionCount(-1);
 	}
 }
 
@@ -25665,6 +26780,19 @@ function attemptHiddenRevealInner(
 			queueSuspenseRetry(state);
 		}
 		return;
+	}
+	if (NATIVE_READ_DRIVER !== null) {
+		if (!NATIVE_READ_DRIVER.validateCapture(hiddenCapture)) {
+			restoreSubtreeEffectDeps(tryBlock, effectDeps);
+			discardOffscreenCapture(hiddenCapture);
+			hideTryBlock(state);
+			tryBlock.inactive = true;
+			invalidateRender(tryBlock, tryBlock);
+			scheduleRender(tryBlock);
+			return;
+		}
+		if (WIP_CAPTURE === null)
+			acceptNativeCapture(hiddenCapture, state.parentBlock.idState.renderOwner);
 	}
 	try {
 		// Success — reveal without the suspending promise ever resolving.
@@ -26502,6 +27630,25 @@ function switchToCatch(
 	adoptedStart?: Node,
 	adoptedEnd?: Node,
 ): void {
+	if (err instanceof NativeAdoptionMiss) throw err;
+	const frame = beginDetachedBoundaryRender(state);
+	try {
+		switchToCatchInner(state, err, reportInline, adoptedStart, adoptedEnd);
+	} catch (failure) {
+		if (frame !== null) rollbackRootRender(frame.transaction);
+		throw failure;
+	} finally {
+		endDetachedBoundaryRender(frame);
+	}
+}
+
+function switchToCatchInner(
+	state: TrySlot,
+	err: any,
+	reportInline: boolean,
+	adoptedStart?: Node,
+	adoptedEnd?: Node,
+): void {
 	cancelSuspenseRetry(state);
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	const hydration = activeHydration();
@@ -26694,6 +27841,7 @@ function findTryHandler(block: Block | null): TryHandler | null {
  * its client root; an unclaimed application error is rethrown to the caller.
  */
 function handleRenderError(block: Block, err: any, attempt: TransitionAttempt | null = null): void {
+	if (err instanceof NativeAdoptionMiss) throw err;
 	// §6.3 HostContextRequest: a foreign-context read the owner could not
 	// satisfy synchronously. This is a hosted-root control signal, NOT an
 	// application failure — it must bypass the island's own @catch/@pending
@@ -27469,7 +28617,7 @@ interface ActivitySlot {
 	portals: Set<Block> | null;
 }
 
-interface ActivityHiddenDom extends SuspenseHiddenDom {
+interface ActivityHiddenDom extends Omit<SuspenseHiddenDom, 'active'> {
 	nextDisplays: Set<HTMLElement>;
 	nextTexts: Set<Text>;
 }
@@ -29278,6 +30426,7 @@ function mountItemsLinear<T>(
 		for (let i = mounted.length - 1; i >= 0; i--) {
 			const block = mounted[i];
 			oldItems.delete(block.key);
+			if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
 			unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
 		}
 		state.head = null;
@@ -30094,6 +31243,7 @@ function mountItem<T>(
 		// The caller cannot receive/register a Block whose initial render threw.
 		// Remove its owned range and hook scopes now; a Suspense retry will mount
 		// it afresh as part of the list transaction.
+		if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
 		unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
 		throw error;
 	}
@@ -31201,7 +32351,8 @@ function makeRoot(
 			registerRootErrorHandlers(rootBlock, errorOptions);
 			registerRootDisposer(rootBlock);
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-				__devtoolsSetNameResolver(componentName);
+				__devtoolsSetNameResolver(inspectDevtoolsName);
+				__devtoolsSetChildWalker(inspectDevtoolsChildScopes);
 				__devtoolsRegisterRoot(
 					rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike,
 				);
@@ -31332,6 +32483,7 @@ function makeRoot(
 				renderOwner.generation++;
 				renderOwner.wakeable = null;
 			}
+			renderOwner.nativeRetry?.clear();
 			renderOwner.retryKey = null;
 			renderOwner.request = null;
 			if (renderOwner.transaction?.aborted === true) renderOwner.transaction = null;
@@ -31364,6 +32516,8 @@ function makeRoot(
 			}
 			unmounted = true;
 			renderOwner.disposed = true;
+			renderOwner.nativeRetry?.clear();
+			renderOwner.retry = noop;
 			if (renderOwner.transition !== undefined) TRANSITION_SWAP_DRIVER!.discardRoot(renderOwner);
 			renderOwner.generation++;
 			renderOwner.wakeable = null;
@@ -31395,6 +32549,7 @@ function makeRoot(
 			} finally {
 				// An unresolved wakeable may retain its ping indefinitely. Leave it
 				// only the disposed owner token, not a tree, hydration closure or props.
+				NATIVE_READ_DRIVER?.clearDeferredRefs(renderOwner);
 				renderOwner.current = null;
 				renderOwner.retry = noop;
 				renderOwner.adopt = undefined;
@@ -31518,6 +32673,10 @@ export function hydrateRoot(
 		body = ROOT_RENDERABLE_BODY;
 		props = bodyOrElement;
 	}
+	const nativeSidecar = findHydrateSeedSidecar(container, NATIVE_SIGNAL_SEED_ATTR);
+	const nativeManifest =
+		nativeSidecar === null ? undefined : parseNativeSignalManifest(nativeSidecar.textContent || '');
+	nativeSidecar?.remove();
 	const ownerToken = claimRootContainer(container);
 	registerDelegationTarget(container);
 	let rootBlock = createBlock(
@@ -31534,7 +32693,8 @@ export function hydrateRoot(
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(rootBlock, body);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-		__devtoolsSetNameResolver(componentName);
+		__devtoolsSetNameResolver(inspectDevtoolsName);
+		__devtoolsSetChildWalker(inspectDevtoolsChildScopes);
 		__devtoolsRegisterRoot(rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike);
 	}
 	const idState: RootIdState = {
@@ -31603,13 +32763,17 @@ export function hydrateRoot(
 		while (firstNode !== null && isRendererHydrationStyle(firstNode))
 			firstNode = firstNode.nextSibling;
 		const hydration = new HydrationCapability(rootBlock, firstNode, seeds);
+		if (nativeManifest !== undefined)
+			hydration.nativeAdoption = ownNativeAdoption(rootBlock, nativeManifest);
 		hydration.passthroughRanges =
 			(body as ComponentBody & { [HYDRATION_RANGE_BOUNDARY]?: 'passthrough' | 'owner' })[
 				HYDRATION_RANGE_BOUNDARY
 			] === 'passthrough';
 		const previousHydration = currentHydration;
 		currentHydration = hydration;
+		const previousNative = setNativeAdoptionResolver(hydration.nativeAdoption?.resolve ?? null);
 		let completed = false;
+		let nativeRecovery: NativeAdoptionMiss | undefined;
 		try {
 			renderBlock(rootBlock);
 			drainHydrationRenderPhaseUpdates(rootBlock);
@@ -31624,23 +32788,37 @@ export function hydrateRoot(
 			hydration.finishRoot();
 			completed = true;
 		} catch (error) {
-			try {
-				handleRenderError(rootBlock, error);
-			} catch (unhandled) {
+			if (error instanceof NativeAdoptionMiss) {
+				nativeRecovery = error;
 				rollbackRootRender(owner.transaction!);
 				unmountBlock(rootBlock, false);
-				container.textContent = '';
-				if (!reportUncaughtError(rootBlock, unhandled)) throw unhandled;
-				return;
+			} else {
+				try {
+					handleRenderError(rootBlock, error);
+				} catch (unhandled) {
+					rollbackRootRender(owner.transaction!);
+					unmountBlock(rootBlock, false);
+					container.textContent = '';
+					if (!reportUncaughtError(rootBlock, unhandled)) throw unhandled;
+					return;
+				}
+				// An unowned root keeps the server screen while its wakeable is
+				// pending. A hosted root still belongs to the external renderer's
+				// retry protocol and must release its claim/delegation registration.
+				if (owner.wakeable === null) root.unmount();
 			}
-			// An unowned root keeps the server screen while its wakeable is
-			// pending. A hosted root still belongs to the external renderer's
-			// retry protocol and must release its claim/delegation registration.
-			if (owner.wakeable === null) root.unmount();
 		} finally {
+			setNativeAdoptionResolver(previousNative);
 			currentHydration = previousHydration;
 			endRootRender(frame);
 			if (!inFlush && ROOT_RENDER_TRANSACTION === null) commitRootRenders();
+		}
+		if (nativeRecovery !== undefined && !owner.disposed) {
+			noteRecoverableHydrationError(() => nativeRecovery!, rootBlock);
+			idState.next = 0;
+			if (isElementDescriptor(bodyOrElement)) root.render(bodyOrElement);
+			else root.render(body, props);
+			return;
 		}
 		if (!completed) return;
 		if (hydration.hasAdjacentRangePair) hydration.coalesce();

@@ -24,6 +24,8 @@ export interface ServerFixtureOptions {
 	id?: string;
 	/** Additional public compiler options; `mode: 'server'` is always enforced. */
 	compileOptions?: Record<string, unknown>;
+	/** Real optional runtime entrypoints used by the authored fixture. */
+	runtimeModules?: Readonly<Record<string, CompiledFixtureModule>>;
 }
 
 export interface CompiledFixtureSourceOptions {
@@ -176,5 +178,6 @@ export function loadServerFixture<T extends CompiledFixtureModule = CompiledFixt
 		id: options.id ?? defaultId,
 		mode: 'server',
 		compileOptions: options.compileOptions,
+		runtimeModules: options.runtimeModules,
 	});
 }

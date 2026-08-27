@@ -132,7 +132,11 @@ function slotBaseHooks(ast, state, options) {
 	function visit(node) {
 		if (node === null || typeof node !== 'object') return node;
 		if (Array.isArray(node)) return mapChildren(node, visit);
-		const imported = node.type === 'CallExpression' ? node._octaneImportedHook : undefined;
+		const imported =
+			node.type === 'CallExpression'
+				? (node._octaneImportedHook ??
+					(options.nativeReads ? node._octaneHookRuntimeImportedHook : undefined))
+				: undefined;
 		if (imported === undefined || !options.hookNames.has(imported)) {
 			return mapChildren(node, visit);
 		}

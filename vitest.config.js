@@ -14,6 +14,11 @@ import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.t
 import { inkRenderers as INK_RENDERERS } from './packages/ink/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
 import { ensureMaterializedUpstream } from './scripts/react-port/ensure-materialized.mjs';
+import {
+	scopedSignalsProjects,
+	signalsBrowserTests,
+	signalsRuntimeTests,
+} from './scripts/scoped-signals-projects.mjs';
 
 // Lock-pinned packages regenerate their adapted tests/upstream suites from the
 // committed pristine tree plus audit/upstream-patches/. Test-file globs resolve
@@ -437,6 +442,7 @@ export default defineConfig({
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
 					exclude: [
 						...configDefaults.exclude,
+						...signalsRuntimeTests,
 						'packages/octane/tests/profiling-runtime.test.tsrx',
 						'packages/octane/tests/devtools-runtime.test.tsrx',
 						'packages/octane/tests/devtools-transitions.test.tsrx',
@@ -516,6 +522,7 @@ export default defineConfig({
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
 					exclude: [
 						...configDefaults.exclude,
+						...signalsRuntimeTests,
 						// tests/compiler/ holds the suites that never mount a component: they
 						// hand the compiler a source string and their own options, so the
 						// plugin config and OCTANE_TEST_COMPILE_MODE above cannot reach them
@@ -587,6 +594,7 @@ export default defineConfig({
 				test: {
 					name: 'octane-events-browser',
 					include: ['packages/octane/tests/browser/**/*.test.ts'],
+					exclude: [...configDefaults.exclude, ...signalsBrowserTests],
 					environment: 'node',
 					globals: false,
 					testTimeout: 60_000,
@@ -612,6 +620,7 @@ export default defineConfig({
 				},
 				plugins: [octane({ hmr: false, profile: true })],
 			},
+			...scopedSignalsProjects(octane, configDefaults.exclude),
 			{
 				// All zustand conformance (including the unstable-selector divergence)
 				// stays in ordinary shards; only differential parity.test.ts is

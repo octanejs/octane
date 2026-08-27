@@ -258,6 +258,15 @@ const SUITES = [
 		],
 	},
 	{
+		// Renderer-free Alien 3.2.0 versus scoped-engine graphs, plus one
+		// uninterrupted ownership lifetime with repeated partial disposal.
+		name: 'scoped-signals',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n, quick) => [String(n), ...(quick ? ['--quick'] : [])] }],
+	},
+	{
 		name: 'signal-favoring',
 		cwd: 'signal-favoring',
 		servers: [
