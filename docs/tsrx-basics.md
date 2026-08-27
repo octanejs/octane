@@ -441,6 +441,9 @@ These patterns become compile errors:
 - Mutating a provable state snapshot during render, including supported aliases
   and array mutations on state initialized with an array literal
   (`OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION`).
+- Mutating a binding declared outside a retained keyed `@for` row from that row
+  (`OCTANE_STRONG_RETAINED_ROW_MUTATION`). Fresh scratch data built in ordinary
+  setup or owned entirely by one row remains valid.
 - Calling unshadowed `Date.now()`, `Math.random()`, `performance.now()`, `Date()`,
   or `new Date()` without arguments during render
   (`OCTANE_STRONG_RENDER_IMPURE_CALL`).

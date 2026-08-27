@@ -216,6 +216,10 @@ to reproduce every React Compiler optimization. React Compiler also identifies
 APIs with interior mutability, including TanStack Table v8, as
 [incompatible with memoization](https://react.dev/reference/eslint-plugin-react-hooks/lints/incompatible-library).
 Stable function or object identity alone does not prove a result is unchanged.
+React Compiler lint classifications and option-sensitive output are useful
+comparison evidence, not Octane configuration: changing JSX outlining, adding a
+debug hook, or using React's `"use memo"` directives does not alter Octane's
+compatibility/Strong boundary.
 
 ### Strong mode and render calls
 
@@ -258,6 +262,37 @@ render use is snapshot-safe; it does not make the library's live objects
 immutable. Keep a consumer of live accessors in compatibility mode, or read an
 actual reactive snapshot and pass it into a separate Strong component.
 
+Compatibility keeps a member call live only while the render scope containing
+that call actually executes. It does not create a subscription and cannot make a
+stable live object safe across `memo`, an unchanged child boundary, or Strong
+memoization. The supported migration is to subscribe and select in compatibility
+code, then cross the Strong boundary with the selected value:
+
+```tsx
+// SelectionBridge.tsrx — compatibility mode
+function SelectionBridge({ table, row }) @{
+  <table.Subscribe
+    source={table.atoms.rowSelection}
+    selector={(selection) => !!selection[row.id]}
+  >
+    {(selected) => <StrongSelectionRow label={row.original.name} selected={selected} />}
+  </table.Subscribe>
+}
+```
+
+```tsx
+// StrongSelectionRow.tsrx
+"use strong";
+
+function StrongSelectionRow({ label, selected }) @{
+  <li data-selected={selected ? '1' : '0'}>{label}</li>
+}
+```
+
+Passing only `row`, shallow-copying an object that still contains its live
+methods, or forcing an unrelated render without selecting `selected` does not
+create a snapshot witness.
+
 ### Keyed rows and logging
 
 A key preserves a surviving row's DOM identity; it does not promise that its
@@ -285,6 +320,46 @@ onClick={() => setItems((current) => current.filter((entry) => entry.id !== item
 
 The first form remains correct and supported. Strong mode does not change its
 closure semantics or promise to skip its reevaluation.
+
+### Local mutation and retained rows
+
+Mutation of fresh render-local data is supported when it finishes before that
+data escapes. A plain JavaScript loop has normal sequential JavaScript semantics:
+
+```tsx
+function Labels({ items }) @{
+  const labels = [];
+  for (const item of items) labels.push(item.label);
+  <p>{labels.join(', ')}</p>
+}
+```
+
+A keyed `@for` body is different: every surviving key owns a retained render
+scope that may be evaluated independently. Writing a binding declared outside
+the row would make its output depend on which other rows happened to run and in
+what order. Strong reports that shape as
+`OCTANE_STRONG_RETAINED_ROW_MUTATION`:
+
+```tsx
+let position = 0;
+@for (const item of items; key item.id) {
+  position++; // Strong compile error: shared across retained rows.
+  <li>{String(position)}</li>
+}
+```
+
+Use setup to build a complete value before it escapes, keep mutable scratch data
+inside one row, or use the directive's index binding when position is the desired
+input:
+
+```tsx
+@for (const item of items; index position; key item.id) {
+  <li>{String(position + 1)}</li>
+}
+```
+
+Compatibility mode accepts a cross-row write but does not promise a retained
+row evaluation order, so it must not determine rendered output there either.
 
 ## Derived values are cached at their declaration
 
@@ -318,12 +393,13 @@ Within the same proven component, a single-token class object driven by primitiv
 state can reuse its existing per-binding change guard. Controlled `value` and
 `checked` bindings still reassert their values on every commit.
 
-Also never cached:
+Also never cached in compatibility mode:
 
-- **Hook calls.** `const s = useThing()` and `const s = unstable_useThing()`
-  keep their hook cells and subscriptions. Hooks are recognised by naming
-  convention — the same signal React and React Compiler use — so a hook named
-  outside that convention is the one shape this cannot protect.
+- **Hook-shaped calls.** `const s = useThing()` and
+  `const s = unstable_useThing()` conservatively keep their setup live. Strong
+  instead recognizes actual built-in hooks by import provenance and same-module
+  custom-hook setup by lexical call-graph analysis; an unrelated `useFormat()`
+  remains an ordinary pure-call assertion.
 - **Values the render tree never reads.** A calculation used only by an event
   handler pays nothing.
 
