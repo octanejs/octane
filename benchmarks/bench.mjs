@@ -757,6 +757,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Optional TypeScript text-inference scaling: repeated warm snapshots of
+		// one target with either 32 or 20,000 unrelated configured roots.
+		name: 'text-type-roots',
+		cwd: 'text-type-roots',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Development TSRX compiler scaling: distinct authored HTML-nesting
 		// diagnostics at two sizes, normalized per invalid site in one process.
 		name: 'tsrx-nesting-diagnostics',
