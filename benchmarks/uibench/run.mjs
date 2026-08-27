@@ -6,15 +6,17 @@
 //   - every before/after endpoint is serialized from the live DOM and compared
 //     with the independent shared model across two complete matrix passes;
 //   - keyed survivors must retain DOM identity for every transition;
-//   - Octane, React, Preact, and Solid must render the same semantic signatures and
-//     element counts (framework marker comments are deliberately outside the
-//     oracle).
+//   - every target must render the same semantic signatures and element counts
+//     (framework marker comments are deliberately outside the oracle).
 //
 // Servers must be running first (production preview recommended):
 //   pnpm --filter octane-tsrx-uibench-bench preview  # :5315
 //   pnpm --filter react-uibench-bench preview        # :5316
 //   pnpm --filter solid-uibench-bench preview        # :5317
 //   pnpm --filter preact-uibench-bench preview       # :5318
+//   pnpm --filter vue-vapor-uibench-bench preview    # :5319
+//   pnpm --filter ripple-uibench-bench preview       # :5322
+//   pnpm --filter inferno-uibench-bench preview      # :5325
 //
 // Usage: node run.mjs [iterations]
 // Env: TARGETS='[{"name":"octane-tsrx","url":"http://localhost:5315/"}]'
@@ -52,6 +54,8 @@ const TARGETS = process.env.TARGETS
 			{ name: 'react', url: 'http://localhost:5316/' },
 			{ name: 'solid', url: 'http://localhost:5317/' },
 			{ name: 'preact', url: 'http://localhost:5318/' },
+			{ name: 'vue-vapor', url: 'http://localhost:5319/' },
+			{ name: 'ripple', url: 'http://localhost:5322/' },
 			{ name: 'inferno', url: 'http://localhost:5325/' },
 		];
 
@@ -76,6 +80,18 @@ function writePayload(payload) {
 	const file = resolve(process.env.BENCH_JSON);
 	mkdirSync(dirname(file), { recursive: true });
 	writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function firstSignatureDifference(actual, expected) {
+	const actualLines = actual.split('\n');
+	const expectedLines = expected.split('\n');
+	const lineCount = Math.max(actualLines.length, expectedLines.length);
+	for (let index = 0; index < lineCount; index++) {
+		if (actualLines[index] !== expectedLines[index]) {
+			return `line ${index + 1}: ${JSON.stringify(actualLines[index])} != ${JSON.stringify(expectedLines[index])}`;
+		}
+	}
+	return 'signatures differ without a line-level mismatch';
 }
 
 async function seedRandom(page) {
@@ -269,8 +285,12 @@ export async function runTarget(
 			const expected = EXPECTED.get(result.name);
 			for (const endpoint of ['before', 'after']) {
 				if (result[endpoint].signature !== expected[endpoint].signature) {
+					const difference = firstSignatureDifference(
+						result[endpoint].signature,
+						expected[endpoint].signature,
+					);
 					throw new Error(
-						`${target.name} semantic mismatch in ${result.name} ${endpoint} (cycle ${result.cycle + 1})`,
+						`${target.name} semantic mismatch in ${result.name} ${endpoint} (cycle ${result.cycle + 1}); ${difference}`,
 					);
 				}
 				if (result[endpoint].elements !== expected[endpoint].elements) {

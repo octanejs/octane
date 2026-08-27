@@ -6,21 +6,21 @@
       "name": "octane-min",
       "ops": {
         "js_raw": {
-          "score": 866967,
-          "median": 866967,
-          "min": 866967,
+          "score": 867915,
+          "median": 867915,
+          "min": 867915,
           "samples": 1
         },
         "js_gzip": {
-          "score": 194117,
-          "median": 194117,
-          "min": 194117,
+          "score": 194362,
+          "median": 194362,
+          "min": 194362,
           "samples": 1
         },
         "js_brotli": {
-          "score": 158974,
-          "median": 158974,
-          "min": 158974,
+          "score": 159222,
+          "median": 159222,
+          "min": 159222,
           "samples": 1
         }
       },
@@ -38,21 +38,21 @@
       "name": "octane-full",
       "ops": {
         "js_raw": {
-          "score": 1147269,
-          "median": 1147269,
-          "min": 1147269,
+          "score": 1148217,
+          "median": 1148217,
+          "min": 1148217,
           "samples": 1
         },
         "js_gzip": {
-          "score": 255905,
-          "median": 255905,
-          "min": 255905,
+          "score": 256129,
+          "median": 256129,
+          "min": 256129,
           "samples": 1
         },
         "js_brotli": {
-          "score": 206689,
-          "median": 206689,
-          "min": 206689,
+          "score": 206939,
+          "median": 206939,
+          "min": 206939,
           "samples": 1
         }
       },
