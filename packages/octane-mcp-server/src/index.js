@@ -69,6 +69,7 @@ export const BENCHMARK_SUITES = [
 	'dev-form-diagnostics',
 	'behavior-root-events',
 	'router-dispatch',
+	'manifest-cache-invalidation',
 	'vite-client-assets',
 	'store-selector-fanout',
 	'hook-store-composition',
