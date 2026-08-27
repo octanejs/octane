@@ -39,6 +39,7 @@ const TARGET_PORTS = {
 	ripple: 5194,
 	svelte: 5281,
 	'vue-vapor': 5222,
+	inferno: 5336,
 };
 const args = process.argv.slice(2);
 const noBuild = args.includes('--no-build');

@@ -122,6 +122,7 @@
     "@types/node": "catalog:default",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitejs/plugin-react": "catalog:default",
+    "babel-plugin-inferno": "catalog:default",
     "babel-plugin-react-compiler": "catalog:default",
     "prettier": "catalog:default",
     "prettier-plugin-svelte": "catalog:default",
