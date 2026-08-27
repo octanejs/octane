@@ -4280,6 +4280,16 @@ function autoMemoModuleFunctionDeclarations(ctx) {
 		if (declaration?.type === 'FunctionDeclaration' && declaration.id?.type === 'Identifier') {
 			declarations.set(declaration.id.name, declaration);
 		}
+		if (declaration?.type === 'VariableDeclaration') {
+			for (const declarator of declaration.declarations) {
+				if (declarator.id?.type === 'Identifier') {
+					const init = unwrapTsExpr(declarator.init);
+					if (init?.type === 'ArrowFunctionExpression' || init?.type === 'FunctionExpression') {
+						declarations.set(declarator.id.name, init);
+					}
+				}
+			}
+		}
 	}
 	ctx.autoMemoModuleFunctionDeclarations = declarations;
 	return declarations;

@@ -264,6 +264,24 @@ export function StrongCyclicContextReaders() @{
 	</div>
 }
 
+const useConstTheme = (context: typeof StrongTheme): string => useContext(context);
+
+export function StrongConstHookContextRows() @{
+	const [theme, setTheme] = useState('first');
+	const [items] = useState([{ id: 1 }, { id: 2 }]);
+	<div>
+		<button id="strong-const-hook-context-update" onClick={() => setTheme('second')}>
+			update
+		</button>
+		<StrongTheme.Provider value={theme}>
+			@for (const item of items.slice(); key item.id) {
+				const value = useConstTheme(StrongTheme);
+				<span class="strong-const-hook-context-row">{value as string}</span>
+			}
+		</StrongTheme.Provider>
+	</div>
+}
+
 function useShadowedTheme(context: typeof StrongTheme): string {
 	return useContext(context);
 }

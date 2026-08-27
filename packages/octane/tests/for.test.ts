@@ -48,6 +48,7 @@ import {
 	CapturedSnapshotList,
 	StrongAliasedContextRows,
 	StrongCallableDependencies,
+	StrongConstHookContextRows,
 	StrongConstructedResultProp,
 	StrongCustomHookContext,
 	StrongCyclicContextReaders,
@@ -684,6 +685,20 @@ describe('Strong memoization preserves dependency and setup semantics', () => {
 		expect(r.find('.strong-shadow-context-row').textContent).toBe('first');
 		r.click('#strong-shadow-context-update');
 		expect(r.find('.strong-shadow-context-row').textContent).toBe('second');
+		r.unmount();
+	});
+
+	it('tracks const-declared function-expression hooks as setup-bearing in keyed rows', () => {
+		const r = mount(StrongConstHookContextRows);
+		expect(r.findAll('.strong-const-hook-context-row').map((row) => row.textContent)).toEqual([
+			'first',
+			'first',
+		]);
+		r.click('#strong-const-hook-context-update');
+		expect(r.findAll('.strong-const-hook-context-row').map((row) => row.textContent)).toEqual([
+			'second',
+			'second',
+		]);
 		r.unmount();
 	});
 
