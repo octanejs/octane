@@ -89,10 +89,11 @@ describe('compiler AST emit architecture', () => {
 		expect(violations).toEqual([]);
 	});
 
-	it('has no retired generated-text or source-map compatibility layer', () => {
+	it('has no retired AST emit compatibility layer', () => {
 		const retiredNames = [
 			'addSourceMapNeedles',
 			'applyMappedReplacements',
+			'buildSourceMap',
 			'composeSourceMaps',
 			'expandDomRendererRegions',
 			'generatedText',
@@ -101,6 +102,11 @@ describe('compiler AST emit architecture', () => {
 			'retargetRuntimeImport',
 			'sourceMapFromOrigins',
 		];
+		const retiredDefinitionsByFile = new Map([
+			// Renderer-boundary and hydrate transforms still own live walkers with
+			// this name. Universal lowering has no copy-on-write rewrite pass left.
+			['compile-universal.js', ['mapAstCow']],
+		]);
 		const retiredProperties = [
 			'__styleRemap',
 			'__universalValidationRemap',
@@ -111,9 +117,17 @@ describe('compiler AST emit architecture', () => {
 		const violations: string[] = [];
 
 		for (const { code, path } of sources) {
+			const relativePath = displayPath(path);
 			for (const name of retiredNames) {
 				violations.push(
 					...locations(path, code, new RegExp(`\\b${name}\\s*\\(`, 'g')).map(
+						(location) => `${location}: ${name}`,
+					),
+				);
+			}
+			for (const name of retiredDefinitionsByFile.get(relativePath) ?? []) {
+				violations.push(
+					...locations(path, code, new RegExp(`\\bfunction\\s+${name}\\s*\\(`, 'g')).map(
 						(location) => `${location}: ${name}`,
 					),
 				);

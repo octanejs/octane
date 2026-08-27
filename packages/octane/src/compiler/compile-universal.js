@@ -422,31 +422,6 @@ function inheritGeneratedOrigin(root, origin) {
 	return root;
 }
 
-function mapAstCow(value, replace) {
-	if (!value || typeof value !== 'object') return value;
-	if (Array.isArray(value)) {
-		let output = null;
-		for (let index = 0; index < value.length; index++) {
-			const mapped = mapAstCow(value[index], replace);
-			if (output === null && mapped !== value[index]) output = value.slice(0, index);
-			if (output !== null && mapped !== null) output.push(mapped);
-		}
-		return output ?? value;
-	}
-	const replacement = replace(value);
-	if (replacement !== undefined) return replacement;
-	let output = null;
-	for (const [key, child] of Object.entries(value)) {
-		if (AST_SKIP_KEYS.has(key)) continue;
-		const mapped = mapAstCow(child, replace);
-		if (mapped !== child) {
-			if (output === null) output = { ...value };
-			output[key] = mapped;
-		}
-	}
-	return output ?? value;
-}
-
 function jsonValueToAst(value, origin) {
 	const valueOrigin =
 		value && typeof value === 'object' && value[PLAN_ORIGIN] ? value[PLAN_ORIGIN] : origin;

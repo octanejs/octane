@@ -7550,53 +7550,6 @@ function encodeMappings(decodedLines) {
 	return groups.join(';');
 }
 
-function buildSourceMap(source, sourceName, segments) {
-	const byLine = new Map();
-	let maxLine = -1;
-	for (const s of segments) {
-		if (s.genLine < 0) continue;
-		let arr = byLine.get(s.genLine);
-		if (!arr) byLine.set(s.genLine, (arr = []));
-		arr.push(s);
-		if (s.genLine > maxLine) maxLine = s.genLine;
-	}
-	let prevSrcLine = 0;
-	let prevSrcCol = 0;
-	const groups = [];
-	for (let line = 0; line <= maxLine; line++) {
-		const arr = byLine.get(line);
-		if (!arr) {
-			groups.push('');
-			continue;
-		}
-		// Sort by generated column and drop duplicates at the same column.
-		arr.sort((a, b) => a.genCol - b.genCol);
-		let prevGenCol = 0;
-		let lastGenCol = -1;
-		let group = '';
-		for (const s of arr) {
-			if (s.genCol === lastGenCol) continue;
-			lastGenCol = s.genCol;
-			// Fields: [genColumn, sourceIndex, sourceLine, sourceColumn] as deltas.
-			// genColumn resets per line; sourceIndex is always 0 (single source).
-			group +=
-				(group ? ',' : '') +
-				encodeVlq([s.genCol - prevGenCol, 0, s.srcLine0 - prevSrcLine, s.srcCol0 - prevSrcCol]);
-			prevGenCol = s.genCol;
-			prevSrcLine = s.srcLine0;
-			prevSrcCol = s.srcCol0;
-		}
-		groups.push(group);
-	}
-	return {
-		version: 3,
-		sources: [sourceName],
-		sourcesContent: [source],
-		names: [],
-		mappings: groups.join(';'),
-	};
-}
-
 /**
  * Dev-only source location for a construct, as a `[line, column]` pair (1-based line,
  * 0-based column — matches the AST). Returns `undefined` when not in dev OR the node has
