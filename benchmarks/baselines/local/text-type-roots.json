@@ -1,0 +1,59 @@
+{
+  "suite": "text-type-roots",
+  "iterations": 9,
+  "targets": [
+    {
+      "name": "small-root",
+      "ops": {
+        "snapshot": {
+          "score": 0.0020296668000000864,
+          "median": 0.0019282499999999346,
+          "min": 0.0018945840000001227,
+          "mean": 0.0020273428888889005,
+          "p95": 0.0025520000000001345,
+          "sd": 0.00021671291776012038,
+          "rme": 8.21666611164994,
+          "scoreRme": 17.86139442823394,
+          "warmupRatio": 0.984628215823343,
+          "samples": 9,
+          "p99": 0.0025520000000001345
+        }
+      },
+      "meta": {
+        "rootCount": 34,
+        "snapshotsPerSample": 500,
+        "factChecksum": "2e073d5dfc13cbfc0571d7c6c46d045d794c2de41358349a86d966e8d742ce40",
+        "projectVersion": "22451:113a32efefb62ad9",
+        "stringChildren": ["props.label"],
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "large-root",
+      "ops": {
+        "snapshot": {
+          "score": 0.002092300000000068,
+          "median": 0.0019985820000001696,
+          "min": 0.0019213340000001154,
+          "mean": 0.0020378982222221866,
+          "p95": 0.0025284160000001066,
+          "sd": 0.0001902623034246976,
+          "rme": 7.176427604235829,
+          "scoreRme": 14.87910118362489,
+          "warmupRatio": 0.9381383166848843,
+          "samples": 9,
+          "p99": 0.0025284160000001066
+        }
+      },
+      "meta": {
+        "rootCount": 20002,
+        "snapshotsPerSample": 500,
+        "factChecksum": "2e073d5dfc13cbfc0571d7c6c46d045d794c2de41358349a86d966e8d742ce40",
+        "projectVersion": "2258867:59c19eb7507a6d36",
+        "stringChildren": ["props.label"],
+        "correctness": "pass"
+      }
+    }
+  ],
+  "harnessExit": 0
+}

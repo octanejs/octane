@@ -3112,6 +3112,14 @@
     "note": "A 2,400-component live-import chain declared root-first must stay within 25% of the same graph declared leaf-first. Both orders verify every transitive witness and alternate measurement order; whole-module fixed-point rescans were about 2x slower."
   },
   {
+    "suite": "text-type-roots",
+    "op": "snapshot",
+    "target": "large-root",
+    "reference": "small-root",
+    "maxRatio": 1.5,
+    "note": "Warm TypeScript text-fact snapshots with 20,002 configured roots must stay within 50% of the identical 34-root control. Both variants return the same string-child evidence and alternate measurement order; rebuilding configured-root membership made the large project about 13x slower."
+  },
+  {
     "suite": "template-call-memo",
     "op": "stable_reads",
     "target": "strong",
