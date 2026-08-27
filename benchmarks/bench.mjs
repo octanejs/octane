@@ -363,6 +363,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Node-only Vite manifest traversal across many routes that converge on
+		// one deep shared chunk graph, plus a shallow-graph control.
+		name: 'vite-client-assets',
+		cwd: 'vite-client-assets',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Selector-based fan-out: 512 subscribers read one store through a
 		// selector, then the parent re-renders 20 times with the store untouched.
 		// Reuses the news per-target toolchains with its own page, so the shared
