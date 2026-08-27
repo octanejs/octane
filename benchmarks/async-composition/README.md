@@ -32,6 +32,10 @@ waves / 100ms, not one.
 - `octane-tsrx` compiles the shared Octane source with the always-on
   waterfall-elimination pipeline.
 - `react` is the equivalent React 19 application.
+- `inferno` uses native class lifecycles and explicit Promise orchestration:
+  seven independent requests start together, the owner starts after project,
+  and the complete result is committed atomically because Inferno has no
+  Suspense resource primitive.
 
 `init` measures a cold mount. `update` performs a transition-wrapped version
 bump on the same page, requires the initial fallback to stay hidden, and records

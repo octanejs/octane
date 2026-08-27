@@ -13,13 +13,13 @@ results. The workload kept only those producer promises and one intentional
 live scope externally reachable. It did not retain disposed scopes, signal
 handles, or closures over them.
 
-| Checkpoint | External pending promises | Live scopes | Signal nodes | Request entries | Iterators before fix | Iterators after fix |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Cycle 0, control live | 2 | 1 | 4 | 2 | 1 | 1 |
-| Cycle 100, 200 owners disposed | 302 | 1 | 4 | 2 | 101 | 1 |
-| Cycle 1,000, 2,000 owners disposed | 3,002 | 1 | 4 | 2 | 1,001 | 1 |
-| Control retired and dropped | 3,003 | 0 | 0 | 0 | 1,001 | 0 |
-| External promises released | 0 | 0 | 0 | 0 | 0 | 0 |
+| Checkpoint                         | External pending promises | Live scopes | Signal nodes | Request entries | Iterators before fix | Iterators after fix |
+| ---------------------------------- | ------------------------: | ----------: | -----------: | --------------: | -------------------: | ------------------: |
+| Cycle 0, control live              |                         2 |           1 |            4 |               2 |                    1 |                   1 |
+| Cycle 100, 200 owners disposed     |                       302 |           1 |            4 |               2 |                  101 |                   1 |
+| Cycle 1,000, 2,000 owners disposed |                     3,002 |           1 |            4 |               2 |                1,001 |                   1 |
+| Control retired and dropped        |                     3,003 |           0 |            0 |               0 |                1,001 |                   0 |
+| External promises released         |                         0 |           0 |            0 |               0 |                    0 |                   0 |
 
 The scope/node/request counts were the same before and after the fix: only
 the positive control survived, then none remained after it was dropped. The

@@ -7,15 +7,15 @@ during the run. This replaces the baseline used for final comparison; the
 earlier `ba9abbfb634786a1b081852f6eb51845f3d588fc` measurements remain unchanged.
 The two baselines happen to produce identical ordinary-entry byte totals.
 
-| Public entry | Raw bytes | Gzip bytes | Brotli bytes |
-| --- | ---: | ---: | ---: |
-| Main baseline `octane` / `createRoot` | 132,788 | 42,785 | 37,608 |
-| Candidate `octane` / `createRoot` | 136,080 | 44,004 | 38,566 |
-| Main baseline `octane/server` / `renderToString` | 33,167 | 11,853 | 10,736 |
-| Candidate `octane/server` / `renderToString` | 34,222 | 12,246 | 11,066 |
-| Candidate `octane/signals` / `createScope`, `query` | 28,792 | 9,193 | 8,339 |
-| Candidate `octane/signals/client` / `useSignal$` | 30,464 | 10,057 | 9,086 |
-| Candidate `octane/signals/server` / `useSignal$` | 29,556 | 9,562 | 8,688 |
+| Public entry                                        | Raw bytes | Gzip bytes | Brotli bytes |
+| --------------------------------------------------- | --------: | ---------: | -----------: |
+| Main baseline `octane` / `createRoot`               |   132,788 |     42,785 |       37,608 |
+| Candidate `octane` / `createRoot`                   |   136,080 |     44,004 |       38,566 |
+| Main baseline `octane/server` / `renderToString`    |    33,167 |     11,853 |       10,736 |
+| Candidate `octane/server` / `renderToString`        |    34,222 |     12,246 |       11,066 |
+| Candidate `octane/signals` / `createScope`, `query` |    28,792 |      9,193 |        8,339 |
+| Candidate `octane/signals/client` / `useSignal$`    |    30,464 |     10,057 |        9,086 |
+| Candidate `octane/signals/server` / `useSignal$`    |    29,556 |      9,562 |        8,688 |
 
 The ordinary client increase is 3,292 raw bytes, 1,219 gzip bytes (2.85%), and
 958 Brotli bytes. The ordinary server increase is 1,055 raw bytes, 393 gzip

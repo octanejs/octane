@@ -35,4 +35,4 @@ allocation volume or scaling, and the DOM observer excludes detached staging. Th
 runner fails on semantic or bounded-work violations, writes source/toolchain/asset
 hashes with its counts, and keeps build artifacts under ignored `dist/root-work/`.
 Without `BENCH_JSON`, the result is `dist/root-work/result.json`. This standalone
-control does not change the six-framework async-status suite above.
+control does not change the seven-framework async-status suite above.

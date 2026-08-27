@@ -41,6 +41,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'solid', url: 'http://localhost:5295/' },
 			{ name: 'svelte', url: 'http://localhost:5296/' },
 			{ name: 'vue', url: 'http://localhost:5297/' },
+			{ name: 'inferno', url: 'http://localhost:5335/' },
 		];
 
 function assert(condition, message) {

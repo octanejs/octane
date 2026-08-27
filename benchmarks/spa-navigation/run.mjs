@@ -52,6 +52,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'react', url: 'http://localhost:5312/' },
 			{ name: 'solid', url: 'http://localhost:5313/' },
 			{ name: 'vue-vapor', url: 'http://localhost:5314/' },
+			{ name: 'inferno', url: 'http://localhost:5328/' },
 		];
 
 const NAVS = [

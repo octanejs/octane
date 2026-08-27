@@ -63,6 +63,7 @@ const TARGETS = [
 	{ name: 'preact', dir: 'preact' },
 	{ name: 'solid', dir: 'solid' },
 	{ name: 'ripple', dir: 'ripple' },
+	{ name: 'inferno', dir: 'inferno' },
 ];
 const SCENARIOS = ['staggered', 'all-fast'];
 const CPU_SCENARIOS = [

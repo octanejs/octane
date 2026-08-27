@@ -80,7 +80,16 @@ const CONFIG_FILTER = process.env.CONFIGS
 			.filter(Boolean)
 	: null;
 
-const NEWS_TARGETS = ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'ripple', 'vue-vapor'];
+const NEWS_TARGETS = [
+	'octane-tsrx',
+	'react',
+	'preact',
+	'solid',
+	'svelte',
+	'ripple',
+	'vue-vapor',
+	'inferno',
+];
 const CARD_COUNTS = quick ? [50] : [50, 500];
 const WATERFALL_DEPTHS = quick ? [1, 2] : [1, 2, 4];
 // parallel-k*: K INDEPENDENT ~4ms fetches in one body (Parallel.tsrx). The SSR

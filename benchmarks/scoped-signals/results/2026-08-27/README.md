@@ -16,6 +16,12 @@ live upstream revision. Earlier runs below use
 evidence. Public-entry bytes happened to be identical between those two
 baselines; the final report still records the new archive and exact Git blobs.
 
+The draft subsequently incorporates upstream
+`69a56855c21b71f824bdf1064d03e86b0a203eb9`, adding unrelated Inferno benchmark
+targets and workspace metadata. No measured source changed; its hashes were
+checked again after integration. The recorded measurement revision, baseline,
+and lockfile hash below remain the actual inputs to the run.
+
 ## Final engine timing
 
 [engine-final.json](engine-final.json) and [engine-final.log](engine-final.log)
@@ -32,21 +38,21 @@ rows or links; actual source/derived-node counts differ by shape and are
 recorded in JSON. RME is the relative margin of error for the mean, not a
 confidence interval for a median or ratio.
 
-| Graph | Raw broad update | Scoped broad update | Scoped / raw | Raw / scoped RME |
-| --- | ---: | ---: | ---: | ---: |
-| Independent | 0.980 | 3.267 | 3.33× | 5.8% / 5.2% |
-| Fanout | 0.808 | 2.362 | 2.92× | 5.4% / 6.1% |
-| Chain | 0.389 | 0.800 | 2.06× | 8.9% / 5.3% |
-| Diamond | 1.974 | 5.442 | 2.76× | 13.8% / 9.8% |
-| Dynamic dependencies | 1.031 | 2.487 | 2.41× | 9.9% / 10.2% |
+| Graph                | Raw broad update | Scoped broad update | Scoped / raw | Raw / scoped RME |
+| -------------------- | ---------------: | ------------------: | -----------: | ---------------: |
+| Independent          |            0.980 |               3.267 |        3.33× |      5.8% / 5.2% |
+| Fanout               |            0.808 |               2.362 |        2.92× |      5.4% / 6.1% |
+| Chain                |            0.389 |               0.800 |        2.06× |      8.9% / 5.3% |
+| Diamond              |            1.974 |               5.442 |        2.76× |     13.8% / 9.8% |
+| Dynamic dependencies |            1.031 |               2.487 |        2.41× |     9.9% / 10.2% |
 
 | Graph at size 10,000 | Construction ratio | Construction RME, raw / scoped | Disposal ratio | Disposal RME, raw / scoped |
-| --- | ---: | ---: | ---: | ---: |
-| Independent | 13.84× | 18.2% / 8.0% | 3.83× | 19.0% / 14.8% |
-| Fanout | 9.28× | 23.5% / 6.2% | 4.28× | 13.4% / 6.3% |
-| Chain | 17.50× | 2.3% / 9.3% | 4.55× | 5.9% / 15.6% |
-| Diamond | 10.69× | 7.0% / 8.0% | 5.72× | 25.3% / 17.5% |
-| Dynamic dependencies | 4.65× | 36.4% / 6.6% | 5.58× | 18.1% / 38.2% |
+| -------------------- | -----------------: | -----------------------------: | -------------: | -------------------------: |
+| Independent          |             13.84× |                   18.2% / 8.0% |          3.83× |              19.0% / 14.8% |
+| Fanout               |              9.28× |                   23.5% / 6.2% |          4.28× |               13.4% / 6.3% |
+| Chain                |             17.50× |                    2.3% / 9.3% |          4.55× |               5.9% / 15.6% |
+| Diamond              |             10.69× |                    7.0% / 8.0% |          5.72× |              25.3% / 17.5% |
+| Dynamic dependencies |              4.65× |                   36.4% / 6.6% |          5.58× |              18.1% / 38.2% |
 
 The ownership layer has a clear cost relative to the raw graph API. Several
 construction, disposal, and tiny-operation measurements have substantial
@@ -56,10 +62,10 @@ cannot be attributed entirely to source changes. No timing threshold or
 performance-win claim is introduced by this experiment.
 
 | Unrelated owners | Raw median µs/cycle | Scoped median µs/cycle | Scoped / raw | Raw / scoped RME |
-| --- | ---: | ---: | ---: | ---: |
-| 0 | 17.52 | 96.91 | 5.53× | 6.2% / 3.2% |
-| 100 | 17.93 | 94.16 | 5.25× | 6.5% / 1.9% |
-| 1,000 | 17.39 | 94.00 | 5.40× | 7.3% / 1.8% |
+| ---------------- | ------------------: | ---------------------: | -----------: | ---------------: |
+| 0                |               17.52 |                  96.91 |        5.53× |      6.2% / 3.2% |
+| 100              |               17.93 |                  94.16 |        5.25× |      6.5% / 1.9% |
+| 1,000            |               17.39 |                  94.00 |        5.40× |      7.3% / 1.8% |
 
 Each cycle creates two owners with 32 derived consumers each, updates the
 shared producer, retires each owner in turn, and verifies surviving consumers
@@ -93,13 +99,13 @@ and export-loading checks pass. The ordinary entries resolve neither Alien
 nor the scoped engine; the independent engine resolves no renderer, compiler,
 React, or DevTools. Optional hook entries use the pinned Alien 3.2.0 package.
 
-| Public entry | Baseline raw / gzip / Brotli | Candidate raw / gzip / Brotli | Gzip change |
-| --- | ---: | ---: | ---: |
-| `createRoot` from `octane` | 132,788 / 42,785 / 37,608 | 136,080 / 44,004 / 38,566 | +1,219 (2.85%) |
-| `renderToString` from `octane/server` | 33,167 / 11,853 / 10,736 | 34,222 / 12,246 / 11,066 | +393 (3.32%) |
-| `createScope`, `query` from `octane/signals` | — | 28,792 / 9,193 / 8,339 | — |
-| `useSignal$` from `octane/signals/client` | — | 30,464 / 10,057 / 9,086 | — |
-| `useSignal$` from `octane/signals/server` | — | 29,556 / 9,562 / 8,688 | — |
+| Public entry                                 | Baseline raw / gzip / Brotli | Candidate raw / gzip / Brotli |    Gzip change |
+| -------------------------------------------- | ---------------------------: | ----------------------------: | -------------: |
+| `createRoot` from `octane`                   |    132,788 / 42,785 / 37,608 |     136,080 / 44,004 / 38,566 | +1,219 (2.85%) |
+| `renderToString` from `octane/server`        |     33,167 / 11,853 / 10,736 |      34,222 / 12,246 / 11,066 |   +393 (3.32%) |
+| `createScope`, `query` from `octane/signals` |                            — |        28,792 / 9,193 / 8,339 |              — |
+| `useSignal$` from `octane/signals/client`    |                            — |       30,464 / 10,057 / 9,086 |              — |
+| `useSignal$` from `octane/signals/server`    |                            — |        29,556 / 9,562 / 8,688 |              — |
 
 The archive, manifests, Git-blob checks, and all exact source hashes are in
 the report. The source hashes include client runtime
@@ -162,13 +168,13 @@ checks run outside the timed region after every operation. Times below are
 medians in milliseconds at size 10,000. RME is the runner's relative margin of
 error for the mean, not a confidence interval on the median ratio.
 
-| Graph | Raw broad update | Scoped broad update | Scoped / raw | Raw / scoped RME |
-| --- | ---: | ---: | ---: | ---: |
-| Independent | 0.722 | 2.713 | 3.76× | 4.0% / 5.8% |
-| Fanout | 0.606 | 2.003 | 3.31× | 19.6% / 4.5% |
-| Chain | 0.279 | 0.643 | 2.30× | 5.4% / 10.1% |
-| Diamond | 1.449 | 4.542 | 3.13× | 19.4% / 8.5% |
-| Dynamic dependencies | 0.735 | 2.197 | 2.99× | 8.4% / 3.2% |
+| Graph                | Raw broad update | Scoped broad update | Scoped / raw | Raw / scoped RME |
+| -------------------- | ---------------: | ------------------: | -----------: | ---------------: |
+| Independent          |            0.722 |               2.713 |        3.76× |      4.0% / 5.8% |
+| Fanout               |            0.606 |               2.003 |        3.31× |     19.6% / 4.5% |
+| Chain                |            0.279 |               0.643 |        2.30× |     5.4% / 10.1% |
+| Diamond              |            1.449 |               4.542 |        3.13× |     19.4% / 8.5% |
+| Dynamic dependencies |            0.735 |               2.197 |        2.99× |      8.4% / 3.2% |
 
 The size parameter denotes rows or links, not equal node counts across shapes.
 The JSON reports include actual node/output counts and all other operations,
@@ -176,12 +182,12 @@ including sparse writes, cached reads, equal writes, dependency switches,
 construction, and disposal.
 
 | Graph at size 10,000 | First construction ratio | Refined construction ratio | First disposal ratio | Refined disposal ratio |
-| --- | ---: | ---: | ---: | ---: |
-| Independent | 15.59× | 14.77× | 5.93× | 4.42× |
-| Fanout | 8.54× | 8.89× | 5.45× | 3.64× |
-| Chain | 16.55× | 16.87× | 8.84× | 4.42× |
-| Diamond | 9.90× | 10.68× | 11.69× | 5.84× |
-| Dynamic dependencies | 7.00× | 4.14× | 5.16× | 4.48× |
+| -------------------- | -----------------------: | -------------------------: | -------------------: | ---------------------: |
+| Independent          |                   15.59× |                     14.77× |                5.93× |                  4.42× |
+| Fanout               |                    8.54× |                      8.89× |                5.45× |                  3.64× |
+| Chain                |                   16.55× |                     16.87× |                8.84× |                  4.42× |
+| Diamond              |                    9.90× |                     10.68× |               11.69× |                  5.84× |
+| Dynamic dependencies |                    7.00× |                      4.14× |                5.16× |                  4.48× |
 
 Construction remains a clear cost of the ownership layer. The reduced disposal
 ratios are promising, but the raw control also became faster between processes.
@@ -195,10 +201,10 @@ and writes again. The shared owner remains alive between cycles. Verification,
 checkpoint work, and repeated idempotence checks are outside the timer.
 
 | Unrelated owners | Raw median µs/cycle | Scoped median µs/cycle | Scoped / raw | Raw / scoped RME |
-| --- | ---: | ---: | ---: | ---: |
-| 0 | 14.10 | 77.19 | 5.48× | 11.6% / 2.1% |
-| 100 | 14.87 | 78.32 | 5.27× | 4.9% / 1.3% |
-| 1,000 | 14.33 | 78.28 | 5.46× | 6.1% / 0.9% |
+| ---------------- | ------------------: | ---------------------: | -----------: | ---------------: |
+| 0                |               14.10 |                  77.19 |        5.48× |     11.6% / 2.1% |
+| 100              |               14.87 |                  78.32 |        5.27× |      4.9% / 1.3% |
+| 1,000            |               14.33 |                  78.28 |        5.46× |      6.1% / 0.9% |
 
 No disposed consumer received a later notification, no unrelated graph was
 notified, and surviving consumers remained current. A 10,000-link chain
@@ -229,12 +235,12 @@ every snapshot would fail. For this recorded source revision it uses the stored
 key behind the `scopeKey` getter to distinguish workload owners; that field is
 not a correctness assertion in the public test suites.
 
-| Checkpoint | Disposed cycle owners so far | Strongly retained Scope instances |
-| --- | ---: | ---: |
-| Cycle 0, shared owner alive | 0 | 1: shared owner |
-| Cycle 100, shared owner alive | 200 | 1: shared owner |
-| Cycle 1,000, shared owner alive | 2,000 | 1: shared owner |
-| After shared-owner retirement | 2,000 | 0 |
+| Checkpoint                      | Disposed cycle owners so far | Strongly retained Scope instances |
+| ------------------------------- | ---------------------------: | --------------------------------: |
+| Cycle 0, shared owner alive     |                            0 |                   1: shared owner |
+| Cycle 100, shared owner alive   |                          200 |                   1: shared owner |
+| Cycle 1,000, shared owner alive |                        2,000 |                   1: shared owner |
+| After shared-owner retirement   |                        2,000 |                                 0 |
 
 This supports bounded owner retention for this synchronous workload. It does
 not prove cleanup of unresolved async producers, historical frames, DOM,

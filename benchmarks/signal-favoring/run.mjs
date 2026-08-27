@@ -51,6 +51,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'vue-vapor', url: 'http://localhost:5183/' },
 			{ name: 'preact', url: 'http://localhost:5265/' },
 			{ name: 'svelte', url: 'http://localhost:5276/' },
+			{ name: 'inferno', url: 'http://localhost:5329/' },
 		];
 
 const YIELD_MS = 5; // breathe between samples: let paint settle, don't block the page

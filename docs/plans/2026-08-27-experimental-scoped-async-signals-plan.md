@@ -13,6 +13,8 @@ Build an opt-in implementation of [RFC 2](https://github.com/octanejs/RFCs/discu
 
 The plan was accepted for implementation on 2026-08-27. Work is isolated in the worktree below and will be submitted as a draft PR. The API remains experimental; source changes and partial isolated checks do not establish that the full compiler, browser, package, or performance gates have passed.
 
+After final measurements, upstream `69a56855c21b71f824bdf1064d03e86b0a203eb9` added unrelated Inferno benchmark targets and was incorporated. It does not change the measured sources; the evidence report preserves the original benchmark inputs.
+
 ## Baseline and authority
 
 | Item                       | Recorded state                                                                                                                                                                                                                    |

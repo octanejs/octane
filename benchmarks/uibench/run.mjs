@@ -52,6 +52,7 @@ const TARGETS = process.env.TARGETS
 			{ name: 'react', url: 'http://localhost:5316/' },
 			{ name: 'solid', url: 'http://localhost:5317/' },
 			{ name: 'preact', url: 'http://localhost:5318/' },
+			{ name: 'inferno', url: 'http://localhost:5325/' },
 		];
 
 const EXPECTED = new Map(

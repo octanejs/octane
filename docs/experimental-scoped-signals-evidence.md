@@ -14,6 +14,13 @@ original inputs. The final package, runtime-probe, bundle, and engine reports
 record the tested source hashes. Existing primary-checkout work was not changed.
 No packages have been published.
 
+Before opening the draft, the branch also incorporated
+`69a56855c21b71f824bdf1064d03e86b0a203eb9` (Inferno benchmark targets). That update
+changes unrelated benchmark and workspace metadata, not any measured engine,
+runtime, compiler, package-builder, or workload source. Source hashes were
+verified again after integration. Measurement records keep their original
+revision, baseline, and lockfile hash rather than claiming a different run.
+
 ## Implemented surface and explicit limits
 
 The data engine uses the public `alien-signals/system` API at exactly 3.2.0.
