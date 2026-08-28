@@ -243,6 +243,7 @@ internally, get their own baseline and guard namespace.
 | `behavior-root-events` | behavior-root-events | none (headless Chromium) | queued events across 1,000 and 8,000 distinct async behavior adoptions, with FIFO/exactly-once gates |
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
+| `radix-collection-order` | radix-collection-order | none (Node-only) | production Radix collection ordering versus the prior comparator at 16, 64, 256, and 4,096 items, with missing-ref and stable-order controls |
 | `router-dispatch` | router-dispatch | none (Node-only) | app-core static, wrong-method, and dynamic matching across 1,000-route tables |
 | `manifest-cache-invalidation` | manifest-cache-invalidation | none (Node-only) | shared-compiler source invalidation across 129 and 5,001 cached nearest-manifest decisions, plus a required manifest-scan control |
 | `vite-client-assets` | vite-client-assets | none (Node-only) | route asset mapping across 100 and 1,000 entries sharing a 500-chunk manifest graph, plus a shallow control |

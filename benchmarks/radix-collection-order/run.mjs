@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { sortCollectionItemsByDomOrder } from '../../packages/radix/src/collection-order.ts';
+import {
+	COLLECTION_ORDER_INDEX_THRESHOLD,
+	sortCollectionItemsByDomOrder,
+} from '../../packages/radix/src/collection-order.ts';
 import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const iterations = Number.parseInt(process.argv[2] ?? '8', 10);
 const sizes = [16, 64, 256, 4_096];
+
+assert.equal(COLLECTION_ORDER_INDEX_THRESHOLD, 256);
 
 if (!Number.isSafeInteger(iterations) || iterations < 1) {
 	throw new Error('Radix collection ordering iterations must be a positive integer');
@@ -62,14 +67,14 @@ function verifyEdgeCases(sortProduction) {
 }
 
 function sample(sort, scenario) {
-	let checksum = 0;
+	let ordered;
 	const started = performance.now();
 	for (let order = 0; order < scenario.ordersPerSample; order++) {
-		checksum += checksumOrder(sort(scenario.orderedNodes, [...scenario.items]));
+		ordered = sort(scenario.orderedNodes, [...scenario.items]);
 	}
 	return {
 		elapsed: performance.now() - started,
-		checksum,
+		checksum: checksumOrder(ordered) * scenario.ordersPerSample,
 	};
 }
 
@@ -120,6 +125,10 @@ for (const scenario of scenarios) {
 			ops: { order },
 			meta: {
 				items: scenario.size,
+				algorithm:
+					implementation.name === 'production' && scenario.size >= COLLECTION_ORDER_INDEX_THRESHOLD
+						? 'indexed'
+						: 'index-of',
 				ordersPerSample: scenario.ordersPerSample,
 				checksum: scenario.checksum,
 				correctness: 'pass',
