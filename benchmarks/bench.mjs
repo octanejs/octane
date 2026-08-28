@@ -886,6 +886,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Ordered filename-to-renderer classification with one retained normalized
+		// config versus equivalent raw revalidation in the same process.
+		name: 'tsrx-renderer-selection',
+		cwd: 'tsrx-renderer-selection',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Native onChange analysis on hostless TSRX at two sizes, paired with an
 		// AST-identical large source whose ignored marker conservatively forces the scan.
 		name: 'tsrx-native-change-analysis',

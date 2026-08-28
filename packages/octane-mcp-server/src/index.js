@@ -109,6 +109,7 @@ export const BENCHMARK_SUITES = [
 	'tsrx-jsx-return-branches',
 	'text-type-roots',
 	'tsrx-nesting-diagnostics',
+	'tsrx-renderer-selection',
 	'tsrx-native-change-analysis',
 	'bundle-size',
 	'bundle-reachability',
