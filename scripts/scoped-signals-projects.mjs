@@ -62,9 +62,9 @@ export function scopedSignalsProjects(octane, defaultExclude = []) {
 		{
 			testExecution: {
 				group: 'heavy-browser',
-				// Use the actual directory for heavy-lane discovery, not the literal
-				// prefix before signals*, which is not itself a fixture directory.
-				include: ['packages/octane/tests/browser'],
+				// The shared browser glob supplies a real discovery root and excludes
+				// this project's files from the ordinary unit shards.
+				include: ['packages/octane/tests/browser/**/*.test.ts'],
 			},
 			test: {
 				name: 'octane-signals-browser',

@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';

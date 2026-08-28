@@ -93,7 +93,7 @@ test('native browser fixtures remain in the real-browser CI group', () => {
 	const browser = byName.get('octane-signals-browser');
 	assert.equal(browser.test.environment, 'node');
 	assert.equal(browser.testExecution.group, 'heavy-browser');
-	assert.deepEqual(browser.testExecution.include, ['packages/octane/tests/browser']);
+	assert.deepEqual(browser.testExecution.include, ['packages/octane/tests/browser/**/*.test.ts']);
 });
 
 test('existing runtime/compiler/browser controls are not claimed by an enabled lane', () => {
