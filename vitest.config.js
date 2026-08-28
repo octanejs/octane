@@ -19,6 +19,7 @@ import {
 	signalsBrowserTests,
 	signalsRuntimeTests,
 } from './scripts/scoped-signals-projects.mjs';
+import { reactCompatSpikeProjects } from './experiments/react-compat/vitest.config.js';
 
 // Lock-pinned packages regenerate their adapted tests/upstream suites from the
 // committed pristine tree plus audit/upstream-patches/. Test-file globs resolve
@@ -436,6 +437,7 @@ export default defineConfig({
 		// `--silent=passed-only` overrides this default.
 		silent: true,
 		projects: [
+			...reactCompatSpikeProjects,
 			{
 				test: {
 					name: 'octane',
@@ -447,6 +449,7 @@ export default defineConfig({
 						'packages/octane/tests/devtools-runtime.test.tsrx',
 						'packages/octane/tests/devtools-transitions.test.tsrx',
 						'packages/octane/tests/browser/**/*.test.ts',
+						'packages/octane/tests/react-compat-spike/**',
 					],
 					environment: 'jsdom',
 					// Precompiles every fixture through @tsrx/react + esbuild before any
@@ -533,6 +536,7 @@ export default defineConfig({
 						'packages/octane/tests/devtools-runtime.test.tsrx',
 						'packages/octane/tests/devtools-transitions.test.tsrx',
 						'packages/octane/tests/browser/**/*.test.ts',
+						'packages/octane/tests/react-compat-spike/**',
 					],
 					environment: 'jsdom',
 					globalSetup: ['packages/octane/tests/differential/_setup.ts'],
