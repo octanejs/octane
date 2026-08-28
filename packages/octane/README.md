@@ -43,6 +43,43 @@ taking ownership of the existing markup. See the
 For the full story, see the
 [main README](https://github.com/octanejs/octane#readme).
 
+## React interoperability
+
+`octane/react` exports both hosting directions: `ReactCompat` runs real React
+components inside Octane, and `OctaneCompat` runs compiled Octane components
+inside React 19. `ReactCompat` needs matching React and React DOM versions,
+19.2 or newer in the React 19 series.
+
+```tsrx
+// App.tsrx — compiled by Octane.
+import { ReactCompat } from 'octane/react';
+import { Counter } from './Counter.react';
+
+export function App() @{
+	<ReactCompat><Counter start={3} /></ReactCompat>
+}
+```
+
+`Counter.react.tsx` stays an ordinary React module, using hooks from `react` and
+React's JSX transform with `/** @jsxImportSource react */`. Native `.tsrx`
+components stay with Octane. In a mixed build, use `requireDirective: true` with
+both compilers and mark Octane-owned `.tsx` and hook helper modules with
+`/** @jsxImportSource octane */`. Do not alias React to Octane.
+
+React retains its own state, events, refs, and component types, including class,
+`memo`, `lazy`, and `forwardRef` components. Use
+`bridgeReactContext(OctaneContext, ReactContext)` and `ReactCompat`'s `contexts`
+prop to map native context into React. Within `OctaneCompat`, Octane's `use` or
+`useContext` can read a real React context directly.
+
+Both server implementations are exported from `octane/react/server`. Octane's
+server compiler selects that entry automatically; React-owned server entries
+that bypass it must select it explicitly. Each renderer commits its own work:
+Octane transitions and `flushSync()` do not synchronously commit a
+React root. The [React interoperability guide](https://octanejs.dev/docs/react-compat)
+and [full ReactCompat reference](https://github.com/octanejs/octane/blob/main/docs/react-compat.md)
+cover setup, pending updates, SSR buffering, hydration, and nesting limits.
+
 ## Browser compatibility
 
 See the [browser support guide](https://octanejs.dev/docs/browser-support) for

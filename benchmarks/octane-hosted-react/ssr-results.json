@@ -1,0 +1,661 @@
+{
+  "suite": "octane-hosted-react-native-ssr",
+  "createdAt": "2026-08-28T22:45:28.628Z",
+  "command": "node benchmarks/octane-hosted-react/ssr-run.mjs",
+  "baseline": "96c86fcd97f4fe8a158e360a6c6af6b4411ed32c",
+  "candidateHead": "5e84da7edb0da4b02b8272a4013eb5b2c6a33e66",
+  "dirty": "",
+  "parameters": {
+    "iterations": 20000,
+    "warmup": 10000,
+    "rounds": 7,
+    "rows": 20,
+    "unit": "microseconds per render"
+  },
+  "build": {
+    "entry": "export { renderToString } from 'octane/server';\nexport { prerender } from 'octane/static';",
+    "format": "esm",
+    "platform": "node",
+    "target": "node22",
+    "minify": true,
+    "treeShaking": true,
+    "define": {
+      "process.env.NODE_ENV": "\"production\""
+    },
+    "gzipLevel": "zlib default",
+    "brotliQuality": 11,
+    "runnerSha256": "f28fe2be9f5bc01f5aff1ca1b137d8c885581c002f81515086e96f4d6e822032"
+  },
+  "environment": {
+    "node": "v26.4.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpus": "Apple M5 Max",
+    "logicalCpus": 18,
+    "esbuild": "0.28.1",
+    "loadAverageAtStart": [8.88427734375, 9.3994140625, 9.69970703125],
+    "machineIsolation": "none; shared local machine"
+  },
+  "semantic": {
+    "htmlSha256": "169613ee3a3fd73e26cb30506c94d2fbb13b61cf33a31db8ce89dbc073ecb56a",
+    "htmlBytes": 263,
+    "correctness": "pass: identical 20-row HTML and empty CSS before timings and after every batch"
+  },
+  "bundles": {
+    "baseline": {
+      "name": "baseline",
+      "raw": 37326,
+      "gzip": 13256,
+      "brotli": 12005,
+      "sha256": "72bce84ad0fe90ecaaaa9f92482af1257cdba07fb75bed12113b0f38d99cec90",
+      "sourceSha256": "952ea4193f1f2fd9d97a3559fac42eb137a88a2503c478438c1d7ab31af7416d",
+      "sources": [
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+          "0e7da1121acb03d39b45ab700e950e6174d5f6393f7da4c95fd78b4e18680d22"
+        ],
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/base64.js",
+          "2e86558c043cf82d9e2000ac1f2dc00fcc63902a385ed70355a57cc90a46f338"
+        ],
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/constants.js",
+          "caefdf560562338ffdcb9ee1ba41c604e3d37861317cc6c00eb1a724b18920d8"
+        ],
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/parse.js",
+          "ab6565f71a21b61d2d8c297d8b27f9494c7a101e293bbbc4bd51e553d5e8ac74"
+        ],
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/stringify.js",
+          "d6367f755c0b16f31194c0304f40cc4ffa963af68b17a8a229b043c401eea2dc"
+        ],
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/uneval.js",
+          "a4480d4100c439a1ae6cd5200f0d55d66e5ed1a5ab33b5707f39b7770c0d3434"
+        ],
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/utils.js",
+          "9ab6212801b4c7fa291436174f45049307d0b754ca4e47faf2cd0ca1433ba78a"
+        ],
+        [
+          "packages/octane/native-ssr-entry.ts",
+          "98f2c3aa803900f7ece64a0adb6d6c183eb918fa609366a7ceb13f1fb848d93c"
+        ],
+        [
+          "packages/octane/src/aria-diagnostics.ts",
+          "9d75c09635c4e91967e983a3908ec2385529fe08849cf1b0221bab7594678f48"
+        ],
+        [
+          "packages/octane/src/component-flags.ts",
+          "e2296fc2e0a73c0c19036196a606093964698ee3d9a2e1d38593b2947e97928a"
+        ],
+        [
+          "packages/octane/src/constants.ts",
+          "9a6359ac09aa20a2eebb66c568704ca9c34d42919ee6d70333d408f7e43347d7"
+        ],
+        [
+          "packages/octane/src/css.ts",
+          "4f0c3b53920e9d20f25b758937e138530bdd16a4c8ba716bd6a29d32465d4b57"
+        ],
+        [
+          "packages/octane/src/dom-tables.js",
+          "88473658e4aba5b2fec1cd2171e0f0d26b7e7ddb4aa1288daea4bc25364fa70d"
+        ],
+        [
+          "packages/octane/src/error-codes.server.generated.ts",
+          "1b9a7236728144615c9fc38febe8acb633425c18cc69b461314ce43ca809573f"
+        ],
+        [
+          "packages/octane/src/error-message.ts",
+          "b6fba9d3c159ec826a81657ea162399f8e9e2ed369728c675c80b2cb7f240936"
+        ],
+        [
+          "packages/octane/src/form-diagnostics.ts",
+          "b6c72c5f2def715eaf30520b8f5185db91952e604e4b51f7632e7e1fba859e54"
+        ],
+        [
+          "packages/octane/src/has-own.ts",
+          "2dff73a400a6ee3df5893f9bb81f71ee71c3d767b0fc69ecf65170833a3f99a2"
+        ],
+        [
+          "packages/octane/src/head-ownership.ts",
+          "44835d0cfe9ac7bb9180e7a9e6b3108df57ad814d2c990dc12d54e0b16e0e493"
+        ],
+        [
+          "packages/octane/src/host-property-diagnostics.ts",
+          "884d1c1b14e0a30b9598368e19b3693ca19d1b7b4a074edb6c7c357fc82dd7b0"
+        ],
+        [
+          "packages/octane/src/html-tree-validation.ts",
+          "65880d9fb34763005fa1a75e2bb48c449997dcc39efea84293163e1e357361b6"
+        ],
+        [
+          "packages/octane/src/method-dep.ts",
+          "4a9f35fdabd13fc43b01442c4bab936547d129ee8f19817cda8c4dcef8f50a6f"
+        ],
+        [
+          "packages/octane/src/renderer-bridge.ts",
+          "ce7610fba826c76d37e786cce6f1a5068c8373672fb5adcbbd5122b6120f0824"
+        ],
+        [
+          "packages/octane/src/resource-hint-diagnostics.ts",
+          "2316e693515639a15f7007e4e1f33a600a46748e52365579a1bb3936b0945915"
+        ],
+        [
+          "packages/octane/src/runtime.server.ts",
+          "948b04feb9773d784425f4af3b99dffb3f16753636a154b4bacadce85e0e1394"
+        ],
+        [
+          "packages/octane/src/sanitize-url.js",
+          "83913b5c641ce8498ff349be46b05a9eafcb7c6a2eebc344235ae609d97b3dc7"
+        ],
+        [
+          "packages/octane/src/server/index.ts",
+          "349d0f1543b59852a2c677b06335f4032d71188d3692eb51354587958edf4ae1"
+        ],
+        [
+          "packages/octane/src/server/rpc.ts",
+          "641fc3832cf6f2dc2a352b5fb37543cd45c04115719761c407dc8b0385c2ed23"
+        ],
+        [
+          "packages/octane/src/shared-value-helpers.ts",
+          "e5d9d2e2ad03c6b2d0ca1274f28a132f0dfe7a55f2062772aa46457a7e766908"
+        ],
+        [
+          "packages/octane/src/signals/native-read-collector.ts",
+          "070c54d2fa80dd79f49124f0e1a652c67a9dc73fad0711bab9b3a45835c7f0c3"
+        ],
+        [
+          "packages/octane/src/signals/native-read-seeds.ts",
+          "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8"
+        ],
+        [
+          "packages/octane/src/signals/native-read-server.ts",
+          "23c8b3abf7ba919dfd1ba8b1e30671d5cbf1f3a5179389292abece436d4fb614"
+        ],
+        [
+          "packages/octane/src/signals/read-protocol.ts",
+          "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417"
+        ],
+        [
+          "packages/octane/src/static/index.ts",
+          "d2060d6064eca67ff5eb102dc3fe2822b0854c64b751d29c749259801d907468"
+        ],
+        [
+          "packages/octane/src/stream-protocol.ts",
+          "46b0203730446a853af63f848546de26a3b8a4bb2442990f4b5e2f16fae397ce"
+        ],
+        [
+          "packages/octane/src/sub-slot.ts",
+          "9d81f691d524c1938c86c5342096e53b853e8a03b79b33afd860f8b4d84d98db"
+        ]
+      ],
+      "modules": [
+        {
+          "module": "packages/octane/src/has-own.ts",
+          "bytes": 38
+        },
+        {
+          "module": "packages/octane/src/dom-tables.js",
+          "bytes": 5801
+        },
+        {
+          "module": "packages/octane/src/constants.ts",
+          "bytes": 349
+        },
+        {
+          "module": "packages/octane/src/head-ownership.ts",
+          "bytes": 444
+        },
+        {
+          "module": "packages/octane/src/shared-value-helpers.ts",
+          "bytes": 162
+        },
+        {
+          "module": "packages/octane/src/css.ts",
+          "bytes": 385
+        },
+        {
+          "module": "packages/octane/src/sanitize-url.js",
+          "bytes": 742
+        },
+        {
+          "module": "packages/octane/src/component-flags.ts",
+          "bytes": 123
+        },
+        {
+          "module": "packages/octane/src/error-message.ts",
+          "bytes": 374
+        },
+        {
+          "module": "packages/octane/src/error-codes.server.generated.ts",
+          "bytes": 34
+        },
+        {
+          "module": "packages/octane/src/signals/native-read-seeds.ts",
+          "bytes": 36
+        },
+        {
+          "module": "packages/octane/src/runtime.server.ts",
+          "bytes": 28792
+        }
+      ],
+      "imports": []
+    },
+    "candidate": {
+      "name": "candidate",
+      "raw": 37664,
+      "gzip": 13368,
+      "brotli": 12077,
+      "sha256": "bf96eb98de2463d88aada18dd3bff931e48b1b951925afe184b727036a60b6c3",
+      "sourceSha256": "a9d47a8e36c75f4c05e3913a01a15d4db1aa879ec3e0cc07eddb60c04bc2ab88",
+      "sources": [
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/index.js",
+          "0e7da1121acb03d39b45ab700e950e6174d5f6393f7da4c95fd78b4e18680d22"
+        ],
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/base64.js",
+          "2e86558c043cf82d9e2000ac1f2dc00fcc63902a385ed70355a57cc90a46f338"
+        ],
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/constants.js",
+          "caefdf560562338ffdcb9ee1ba41c604e3d37861317cc6c00eb1a724b18920d8"
+        ],
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/parse.js",
+          "ab6565f71a21b61d2d8c297d8b27f9494c7a101e293bbbc4bd51e553d5e8ac74"
+        ],
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/stringify.js",
+          "d6367f755c0b16f31194c0304f40cc4ffa963af68b17a8a229b043c401eea2dc"
+        ],
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/uneval.js",
+          "a4480d4100c439a1ae6cd5200f0d55d66e5ed1a5ab33b5707f39b7770c0d3434"
+        ],
+        [
+          "node_modules/.pnpm/devalue@5.8.2/node_modules/devalue/src/utils.js",
+          "9ab6212801b4c7fa291436174f45049307d0b754ca4e47faf2cd0ca1433ba78a"
+        ],
+        [
+          "packages/octane/native-ssr-entry.ts",
+          "98f2c3aa803900f7ece64a0adb6d6c183eb918fa609366a7ceb13f1fb848d93c"
+        ],
+        [
+          "packages/octane/src/aria-diagnostics.ts",
+          "9d75c09635c4e91967e983a3908ec2385529fe08849cf1b0221bab7594678f48"
+        ],
+        [
+          "packages/octane/src/component-flags.ts",
+          "e2296fc2e0a73c0c19036196a606093964698ee3d9a2e1d38593b2947e97928a"
+        ],
+        [
+          "packages/octane/src/constants.ts",
+          "9a6359ac09aa20a2eebb66c568704ca9c34d42919ee6d70333d408f7e43347d7"
+        ],
+        [
+          "packages/octane/src/css.ts",
+          "4f0c3b53920e9d20f25b758937e138530bdd16a4c8ba716bd6a29d32465d4b57"
+        ],
+        [
+          "packages/octane/src/dom-tables.js",
+          "88473658e4aba5b2fec1cd2171e0f0d26b7e7ddb4aa1288daea4bc25364fa70d"
+        ],
+        [
+          "packages/octane/src/error-codes.server.generated.ts",
+          "1b9a7236728144615c9fc38febe8acb633425c18cc69b461314ce43ca809573f"
+        ],
+        [
+          "packages/octane/src/error-message.ts",
+          "b6fba9d3c159ec826a81657ea162399f8e9e2ed369728c675c80b2cb7f240936"
+        ],
+        [
+          "packages/octane/src/form-diagnostics.ts",
+          "b6c72c5f2def715eaf30520b8f5185db91952e604e4b51f7632e7e1fba859e54"
+        ],
+        [
+          "packages/octane/src/has-own.ts",
+          "2dff73a400a6ee3df5893f9bb81f71ee71c3d767b0fc69ecf65170833a3f99a2"
+        ],
+        [
+          "packages/octane/src/head-ownership.ts",
+          "44835d0cfe9ac7bb9180e7a9e6b3108df57ad814d2c990dc12d54e0b16e0e493"
+        ],
+        [
+          "packages/octane/src/host-property-diagnostics.ts",
+          "884d1c1b14e0a30b9598368e19b3693ca19d1b7b4a074edb6c7c357fc82dd7b0"
+        ],
+        [
+          "packages/octane/src/html-tree-validation.ts",
+          "65880d9fb34763005fa1a75e2bb48c449997dcc39efea84293163e1e357361b6"
+        ],
+        [
+          "packages/octane/src/method-dep.ts",
+          "4a9f35fdabd13fc43b01442c4bab936547d129ee8f19817cda8c4dcef8f50a6f"
+        ],
+        [
+          "packages/octane/src/renderer-bridge.ts",
+          "ce7610fba826c76d37e786cce6f1a5068c8373672fb5adcbbd5122b6120f0824"
+        ],
+        [
+          "packages/octane/src/resource-hint-diagnostics.ts",
+          "2316e693515639a15f7007e4e1f33a600a46748e52365579a1bb3936b0945915"
+        ],
+        [
+          "packages/octane/src/runtime.server.ts",
+          "a46115d82dc2ad98f0721f87cb646028a369c67d92f6876a20d8fb48da2dcf72"
+        ],
+        [
+          "packages/octane/src/sanitize-url.js",
+          "83913b5c641ce8498ff349be46b05a9eafcb7c6a2eebc344235ae609d97b3dc7"
+        ],
+        [
+          "packages/octane/src/server/index.ts",
+          "349d0f1543b59852a2c677b06335f4032d71188d3692eb51354587958edf4ae1"
+        ],
+        [
+          "packages/octane/src/server/rpc.ts",
+          "641fc3832cf6f2dc2a352b5fb37543cd45c04115719761c407dc8b0385c2ed23"
+        ],
+        [
+          "packages/octane/src/shared-value-helpers.ts",
+          "e5d9d2e2ad03c6b2d0ca1274f28a132f0dfe7a55f2062772aa46457a7e766908"
+        ],
+        [
+          "packages/octane/src/signals/native-read-collector.ts",
+          "070c54d2fa80dd79f49124f0e1a652c67a9dc73fad0711bab9b3a45835c7f0c3"
+        ],
+        [
+          "packages/octane/src/signals/native-read-seeds.ts",
+          "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8"
+        ],
+        [
+          "packages/octane/src/signals/native-read-server.ts",
+          "23c8b3abf7ba919dfd1ba8b1e30671d5cbf1f3a5179389292abece436d4fb614"
+        ],
+        [
+          "packages/octane/src/signals/read-protocol.ts",
+          "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417"
+        ],
+        [
+          "packages/octane/src/static/index.ts",
+          "d2060d6064eca67ff5eb102dc3fe2822b0854c64b751d29c749259801d907468"
+        ],
+        [
+          "packages/octane/src/stream-protocol.ts",
+          "46b0203730446a853af63f848546de26a3b8a4bb2442990f4b5e2f16fae397ce"
+        ],
+        [
+          "packages/octane/src/sub-slot.ts",
+          "9d81f691d524c1938c86c5342096e53b853e8a03b79b33afd860f8b4d84d98db"
+        ]
+      ],
+      "modules": [
+        {
+          "module": "packages/octane/src/has-own.ts",
+          "bytes": 38
+        },
+        {
+          "module": "packages/octane/src/dom-tables.js",
+          "bytes": 5801
+        },
+        {
+          "module": "packages/octane/src/constants.ts",
+          "bytes": 349
+        },
+        {
+          "module": "packages/octane/src/head-ownership.ts",
+          "bytes": 444
+        },
+        {
+          "module": "packages/octane/src/shared-value-helpers.ts",
+          "bytes": 162
+        },
+        {
+          "module": "packages/octane/src/css.ts",
+          "bytes": 385
+        },
+        {
+          "module": "packages/octane/src/sanitize-url.js",
+          "bytes": 742
+        },
+        {
+          "module": "packages/octane/src/component-flags.ts",
+          "bytes": 123
+        },
+        {
+          "module": "packages/octane/src/error-message.ts",
+          "bytes": 374
+        },
+        {
+          "module": "packages/octane/src/error-codes.server.generated.ts",
+          "bytes": 34
+        },
+        {
+          "module": "packages/octane/src/signals/native-read-seeds.ts",
+          "bytes": 36
+        },
+        {
+          "module": "packages/octane/src/runtime.server.ts",
+          "bytes": 29130
+        }
+      ],
+      "imports": []
+    }
+  },
+  "operations": {
+    "renderToString": {
+      "stats": {
+        "baseline": {
+          "score": 0.3585699571428588,
+          "median": 0.3485917000000086,
+          "min": 0.34034584999999995,
+          "mean": 0.3585699571428588,
+          "p95": 0.4012646000000018,
+          "sd": 0.022388944569518645,
+          "rme": 5.774902698191871,
+          "scoreRme": 5.774902698191871,
+          "warmupRatio": 1,
+          "samples": 7,
+          "p99": 0.4012646000000018
+        },
+        "candidate": {
+          "score": 0.3697535642857125,
+          "median": 0.3569874999999968,
+          "min": 0.3480603999999971,
+          "mean": 0.3697535642857125,
+          "p95": 0.42401664999999866,
+          "sd": 0.02757478030419639,
+          "rme": 6.897387747187804,
+          "scoreRme": 6.897387747187804,
+          "warmupRatio": 1,
+          "samples": 7,
+          "p99": 0.42401664999999866
+        }
+      },
+      "candidateOverBaselineMean": 1.0311894706181366,
+      "candidateOverBaselineMedian": 1.0240849107996202,
+      "order": [
+        ["baseline", "candidate"],
+        ["candidate", "baseline"],
+        ["baseline", "candidate"],
+        ["candidate", "baseline"],
+        ["baseline", "candidate"],
+        ["candidate", "baseline"],
+        ["baseline", "candidate"]
+      ],
+      "rawSamples": {
+        "baseline": [
+          {
+            "elapsedMs": 8.025292000000036,
+            "microsecondsPerRender": 0.4012646000000018
+          },
+          {
+            "elapsedMs": 6.8069169999999986,
+            "microsecondsPerRender": 0.34034584999999995
+          },
+          {
+            "elapsedMs": 7.1336670000000595,
+            "microsecondsPerRender": 0.35668335000000295
+          },
+          {
+            "elapsedMs": 7.511833999999908,
+            "microsecondsPerRender": 0.3755916999999954
+          },
+          {
+            "elapsedMs": 6.810500000000047,
+            "microsecondsPerRender": 0.34052500000000235
+          },
+          {
+            "elapsedMs": 6.971834000000172,
+            "microsecondsPerRender": 0.3485917000000086
+          },
+          {
+            "elapsedMs": 6.939750000000004,
+            "microsecondsPerRender": 0.34698750000000017
+          }
+        ],
+        "candidate": [
+          {
+            "elapsedMs": 8.480332999999973,
+            "microsecondsPerRender": 0.42401664999999866
+          },
+          {
+            "elapsedMs": 7.139749999999935,
+            "microsecondsPerRender": 0.3569874999999968
+          },
+          {
+            "elapsedMs": 7.095708000000059,
+            "microsecondsPerRender": 0.3547854000000029
+          },
+          {
+            "elapsedMs": 7.7982909999998355,
+            "microsecondsPerRender": 0.38991454999999176
+          },
+          {
+            "elapsedMs": 7.235916999999972,
+            "microsecondsPerRender": 0.3617958499999986
+          },
+          {
+            "elapsedMs": 7.054292000000032,
+            "microsecondsPerRender": 0.3527146000000016
+          },
+          {
+            "elapsedMs": 6.961207999999942,
+            "microsecondsPerRender": 0.3480603999999971
+          }
+        ]
+      }
+    },
+    "prerender": {
+      "stats": {
+        "baseline": {
+          "score": 0.4284883857142859,
+          "median": 0.424087499999996,
+          "min": 0.41179584999999863,
+          "mean": 0.4284883857142859,
+          "p95": 0.45818540000000213,
+          "sd": 0.017026126629482368,
+          "rme": 3.675037319650957,
+          "scoreRme": 3.675037319650957,
+          "warmupRatio": 1,
+          "samples": 7,
+          "p99": 0.45818540000000213
+        },
+        "candidate": {
+          "score": 0.4408333357142851,
+          "median": 0.4417291499999919,
+          "min": 0.4278187499999945,
+          "mean": 0.4408333357142851,
+          "p95": 0.46103335000000245,
+          "sd": 0.01300845075398823,
+          "rme": 2.729204622616218,
+          "scoreRme": 2.729204622616218,
+          "warmupRatio": 1,
+          "samples": 7,
+          "p99": 0.46103335000000245
+        }
+      },
+      "candidateOverBaselineMean": 1.0288104658412627,
+      "candidateOverBaselineMedian": 1.0415990803784503,
+      "order": [
+        ["baseline", "candidate"],
+        ["candidate", "baseline"],
+        ["baseline", "candidate"],
+        ["candidate", "baseline"],
+        ["baseline", "candidate"],
+        ["candidate", "baseline"],
+        ["baseline", "candidate"]
+      ],
+      "rawSamples": {
+        "baseline": [
+          {
+            "elapsedMs": 8.860041000000138,
+            "microsecondsPerRender": 0.44300205000000686
+          },
+          {
+            "elapsedMs": 9.163708000000042,
+            "microsecondsPerRender": 0.45818540000000213
+          },
+          {
+            "elapsedMs": 8.48174999999992,
+            "microsecondsPerRender": 0.424087499999996
+          },
+          {
+            "elapsedMs": 8.621499999999969,
+            "microsecondsPerRender": 0.43107499999999843
+          },
+          {
+            "elapsedMs": 8.361167000000023,
+            "microsecondsPerRender": 0.41805835000000113
+          },
+          {
+            "elapsedMs": 8.264290999999957,
+            "microsecondsPerRender": 0.41321454999999785
+          },
+          {
+            "elapsedMs": 8.235916999999972,
+            "microsecondsPerRender": 0.41179584999999863
+          }
+        ],
+        "candidate": [
+          {
+            "elapsedMs": 9.220667000000049,
+            "microsecondsPerRender": 0.46103335000000245
+          },
+          {
+            "elapsedMs": 9.057332999999971,
+            "microsecondsPerRender": 0.4528666499999986
+          },
+          {
+            "elapsedMs": 8.834582999999839,
+            "microsecondsPerRender": 0.4417291499999919
+          },
+          {
+            "elapsedMs": 8.887459000000035,
+            "microsecondsPerRender": 0.44437295000000177
+          },
+          {
+            "elapsedMs": 8.578958000000057,
+            "microsecondsPerRender": 0.4289479000000028
+          },
+          {
+            "elapsedMs": 8.556374999999889,
+            "microsecondsPerRender": 0.4278187499999945
+          },
+          {
+            "elapsedMs": 8.581292000000076,
+            "microsecondsPerRender": 0.4290646000000038
+          }
+        ]
+      }
+    }
+  },
+  "bundleDelta": {
+    "raw": 338,
+    "gzip": 112,
+    "brotli": 72
+  }
+}

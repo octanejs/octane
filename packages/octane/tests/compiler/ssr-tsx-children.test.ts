@@ -166,6 +166,34 @@ describe('.tsx return-form component children — server matches client (descrip
 });
 
 describe('descriptorChildren component marker', () => {
+	it('recognizes public ReactCompat and an import alias without bundler metadata', () => {
+		for (const imported of ['ReactCompat', 'ReactCompat as Island']) {
+			const name = imported.endsWith('Island') ? 'Island' : 'ReactCompat';
+			const source = `import { ${imported} } from 'octane/react';
+				import Counter from './Counter.react.tsx';
+				export function App() @{ <${name}><Counter start={3}/></${name}> }`;
+			for (const code of [clientCode(source), serverCode(source)]) {
+				expect(elementDescriptorCalls(code, 'Counter')).toHaveLength(1);
+				expect(runtimeImports(code, ['markChildrenBlock']).size).toBe(0);
+			}
+			const server = parseModule(serverCode(source), 'compiled.js');
+			expect(
+				server.body.some(
+					(node: any) =>
+						node.type === 'ImportDeclaration' && node.source.value === 'octane/react/server',
+				),
+			).toBe(true);
+		}
+	});
+
+	it('does not special-case an unrelated component named ReactCompat', () => {
+		const source = `import { ReactCompat } from './ordinary.tsrx';
+			export function App() @{ <ReactCompat><button>child</button></ReactCompat> }`;
+		for (const code of [clientCode(source), serverCode(source)]) {
+			expect(runtimeImports(code, ['markChildrenBlock']).size).toBe(1);
+		}
+	});
+
 	const SOURCE = `
 		import { descriptorChildren } from 'octane';
 		function Inspector(props) @{ <section>{props.children}</section> }

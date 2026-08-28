@@ -28,15 +28,24 @@ see [Bindings](/docs/bindings).
 <FrameworkIntegrationsDirectory />
 
 <aside className="doc-callout note">
-	<p className="doc-callout-title">Already have a React app?</p>
+	<p className="doc-callout-title">Mixing React and Octane?</p>
 	<p>
-		{
-			'React isn’t in the list above because it’s a UI library, not a full app framework. If you already have a React 19 app, '
-		}
+		{'React isn’t in the list above because it’s a UI library, not a full app framework. '}
+		<code>OctaneCompat</code>
+		{' hosts compiled Octane components inside React, and '}
+		<code>ReactCompat</code>
+		{' hosts real React components inside Octane. Both come from '}
 		<code>octane/react</code>
-		{' lets you add compiled Octane components one at a time. '}
+		{'. '}
 		<a href="/docs/react-compat">Read the React compatibility guide</a>
 		{'.'}
+	</p>
+	<p>
+		{'In the '}
+		<a href="/playground">Playground</a>
+		{
+			', choose “OctaneCompat in React (multi-file)” or “ReactCompat in Octane (multi-file)” to try each direction.'
+		}
 	</p>
 </aside>
 

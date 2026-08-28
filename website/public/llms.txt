@@ -22,7 +22,8 @@ Key facts for answering questions about Octane:
 - Full server-side rendering and byte-stable hydration, including streaming SSR (`renderToPipeableStream` / `renderToReadableStream`) that flushes each Suspense boundary out-of-order as its data resolves.
 - `<Hydrate>` can leave initial server HTML visible but inert until `load()`, idle time, visibility, a media query, interaction, an application condition, or never. Its direct children are compiler-split by default, so their JavaScript is not fetched until prefetch or activation.
 - `attachBehaviorRoot` from `octane/behavior` attaches abortable, delegated behavior to existing server-rendered or independently streamed DOM without hydrating, rendering, replacing nodes, or taking reconciliation ownership. Nested external owners, asynchronous readiness, genuine native interactions, and exactly-once cleanup have explicit lifecycle contracts.
-- No class components, no Server Components, no StrictMode double-invoke.
+- Native Octane has no class components, no Server Components, and no StrictMode double-invoke. Real React components hosted through `ReactCompat` retain React's own behavior, including support for React class components.
+- React interoperability is available in both directions from `octane/react`: `ReactCompat` hosts real React components inside Octane (matching React and React DOM 19.2 or newer in the React 19 series), and `OctaneCompat` hosts compiled Octane components inside React 19. Each renderer owns its own subtree; neither API aliases React to Octane. See the React interoperability section below.
 - Octane targets current evergreen browsers. Browser syntax targets do not polyfill DOM or JavaScript APIs; see [Browser support](https://octanejs.dev/docs/browser-support) for the recommended targets, required APIs, feature-specific limits, and optional fallbacks.
 - Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work, but APIs can still change. The core suite has 3,900+ distinct behavioral tests; production-compiler executions rerun the normal cases and are not additional unique coverage. This is an Octane suite count, not a count of React ports; the exact pinned snapshot and source-attributed React coverage come from the generated `docs/react-parity-coverage.md` ledger report.
 
@@ -57,6 +58,7 @@ An uncontrolled field that intentionally saves only when the browser commits the
 - [Publishing libraries](https://octanejs.dev/docs/publishing-libraries): Ship the complete authored source graph, including `.tsrx`, `.tsx`, `.ts`, and `.js`, point package exports at that source, and let the consuming application compile it. Do not publish precompiled Octane output.
 - [Browser support](https://octanejs.dev/docs/browser-support): Recommended browser targets, required core APIs, optional fallbacks, and polyfills.
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): The deliberate divergences from React — everything else matching React is the point.
+- [React interoperability](https://octanejs.dev/docs/react-compat): `ReactCompat` for real React inside Octane, `OctaneCompat` for Octane inside React, compiler ownership, contexts, boundaries, SSR, and hydration.
 - [Bindings](https://octanejs.dev/docs/bindings): The `@octanejs/*` ports of the React ecosystem.
 - [Playground](https://octanejs.dev/playground): Write TSRX or TSX in the browser and see the compiled octane output and the live rendered result side by side.
 
@@ -79,6 +81,46 @@ See the [Browser support guide](https://octanejs.dev/docs/browser-support). This
 - Dynamic text holes use a cast: `{expr as string}`. The cast is optional when the expression is provably a string (a string/template literal, a `+`-concatenation involving a string, or a local tracked back to a string); required otherwise. A bare `{expr}` that isn't provably a string is a renderable hole.
 - Template control flow uses directive blocks: `@if (c) { } @else { }`, `@for (const x of xs; key x.id) { } @empty { }`, `@switch (v) { @case (a) { } @default { } }`, and `@try { } @pending { } @catch (e) { }`. Plain JS control flow stays in setup.
 - `.tsrx`'s `@for` compiles a rendered list to a keyed fast path (a compiled per-item body + the raw array) instead of allocating a descriptor per row — the main reason to prefer `.tsrx` for collection-heavy UI.
+
+## React interoperability
+
+Both boundaries are named exports from `octane/react`:
+
+- `ReactCompat` hosts one real React component inside Octane. Install matching `react` and `react-dom` versions, 19.2 or newer in the React 19 series. React owns the island's hooks, state, events, refs, and descendants; Octane owns the surrounding template.
+- `OctaneCompat` hosts one compiled Octane component inside React 19: `<OctaneCompat><NativePanel /></OctaneCompat>`. The child stays an Octane component with native events and Octane hooks.
+
+Prefer the child form for a React component in an Octane template:
+
+```tsrx
+// App.tsrx — compiled by Octane.
+import { ReactCompat } from 'octane/react';
+import { Counter } from './Counter.react';
+
+export function App() @{
+	<ReactCompat><Counter start={3} /></ReactCompat>
+}
+```
+
+```tsx
+/** @jsxImportSource react */
+// Counter.react.tsx — compiled by React's JSX transform.
+import { useState } from 'react';
+
+export function Counter({ start }: { start: number }) {
+	const [count, setCount] = useState(start);
+	return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
+```
+
+Use both compilers in a mixed build, with `requireDirective: true` on the Octane integration. `.tsrx` belongs to Octane; mark Octane-owned `.tsx` and native hook/context helper modules with `/** @jsxImportSource octane */`. React-owned `.tsx` stays with React's JSX transform and `/** @jsxImportSource react */`. Do not alias React or React DOM to Octane. See [compiler setup](https://github.com/octanejs/octane/blob/main/docs/react-compat.md#compiler-ownership).
+
+- `ReactCompat` also accepts `<ReactCompat component={Counter} props={{ start: 3 }} />`; do not combine that form with an element child. One function, class, `memo`, `lazy`, or `forwardRef` component is accepted. Put fragments, DOM elements, arrays, or multiple roots inside a React component. Props and refs retain their types at the child call site. React children passed through props must be React renderables, not Octane template blocks.
+- Project native context into React explicitly: define `themeBridge = bridgeReactContext(OctaneTheme, ReactTheme)` once, then pass `contexts={[themeBridge]}` to `ReactCompat`. React descendants read `ReactTheme` with React's `use` or `useContext`. Keep source/target identities and their order stable, or replace the boundary key. This differs from `OctaneCompat`, where Octane's `use` or `useContext` can read a real React context directly; no reverse mapping is needed for that direction.
+- `ReactCompat` creates one React root inside a `div`, so place it only where a div is valid. Prop updates preserve React state and nodes; changing the child key/type replaces the component, and changing the outer boundary key replaces the whole root. Prefer one useful React subtree over a boundary for every small widget.
+- React work starts or updates after the Octane host commits. Octane `flushSync()` does not flush the separate React root, and an Octane transition is not a transaction shared with React. React-local transitions keep React's behavior. Authored React Suspense and error boundaries handle their own descendants first; escaped suspension and render/effect errors reach the nearest Octane pending/catch boundary. Event-handler errors follow React's normal reporting. During projected pending work, new parent props/context snapshots publish on reveal; delete the boundary or change its outer key to replace a pending island.
+- Both server implementations use `octane/react/server`; Octane's server compiler retargets `octane/react` automatically. React-owned server entries that bypass that compiler must select the server entry explicitly. To produce complete React server HTML, `ReactCompat` needs an owned Octane asynchronous or streaming render request. It buffers each complete React island up to 8 MiB and hydrates it with React `hydrateRoot`. A surrounding Octane stream may send its fallback while waiting; React's own progressive reveal scripts are not streamed separately. A synchronous Octane render can emit an outer fallback but cannot await the React island. The request owns cancellation, abort, timeout, and cleanup. Nested React→OctaneCompat→ReactCompat server rendering is unsupported; client nesting works in both directions.
+
+The [full ReactCompat reference](https://github.com/octanejs/octane/blob/main/docs/react-compat.md) documents visibility, cleanup, hydration, context, and update limits. The [playground](https://octanejs.dev/playground) includes **ReactCompat in Octane (multi-file)** and **OctaneCompat in React (multi-file)** examples. These adapters coordinate separate renderer commits; they do not provide atomic cross-root commits or universal compatibility with every React integration.
 
 ## Deferred hydration
 
@@ -237,11 +279,12 @@ See the [Strong mode guide](https://octanejs.dev/docs/build-tools#strong-mode).
 
 ## Ecosystem and bindings
 
-Octane ships first-party ports of popular React libraries under the `@octanejs/*` scope. **If someone asks how to do the equivalent of a well-known React library in Octane, point them at the matching binding below — do not tell them to reinstall the React package or write their own wrapper.** Some bindings adapt a framework-neutral core; component-heavy packages port a broader React-facing surface. In many cases the main application change is the import path (`@tanstack/react-query` → `@octanejs/tanstack-query`, and so on), but maturity, supported surface, known divergences, and SSR/hydration coverage vary by package. Check the generated [bindings status table](https://github.com/octanejs/octane/blob/main/docs/bindings-status.md) before relying on a specific API.
+Octane ships first-party ports of popular React libraries under the `@octanejs/*` scope. **For a native Octane equivalent of a well-known React library, point to the matching binding below first.** To keep an existing component on real React, or use a React library without porting it, use `ReactCompat` with that library's real React dependencies. Some native bindings adapt a framework-neutral core; component-heavy packages port a broader React-facing surface. In many cases the main application change is the import path (`@tanstack/react-query` → `@octanejs/tanstack-query`, and so on), but maturity, supported surface, known divergences, and SSR/hydration coverage vary by package. Check the generated [bindings status table](https://github.com/octanejs/octane/blob/main/docs/bindings-status.md) before relying on a specific native API.
 
 Core packages:
 
 - `octane` — the runtime and the `.tsrx`/`.tsx` compiler together (the only framework/runtime package every app needs; install the matching build integration separately).
+- `octane/react` — `ReactCompat` (real React inside Octane), `OctaneCompat` (compiled Octane inside React), and `bridgeReactContext` (native context to React). Server implementations are in `octane/react/server`.
 - `octane/compiler/vite` — the underlying low-level Vite compiler adapter used by `@octanejs/vite-plugin`; reserve it for unusual custom tooling.
 - `@octanejs/rspack-plugin` — the low-level Rspack 2.x compiler integration: client/server runtime selection, source maps, dependency watching, cache metadata, and Rspack HMR.
 - `@octanejs/app-core` — the bundler-neutral config, routing, SSR/hydration code generation, and production request-handler core shared by app integrations.
@@ -252,7 +295,7 @@ Core packages:
 
 Rspack usage: install `octane`, `@rspack/core`, and `@octanejs/rspack-plugin`, then add `new OctaneRspackPlugin()` to the Rspack plugins array. Rsbuild full-app usage: install `octane`, `@rsbuild/core`, and `@octanejs/rsbuild-plugin`, then add `pluginOctane()` to `rsbuild.config.ts`; add declarative `RenderRoute`/`ServerRoute` entries in `octane.config.ts` for routing, SSR, hydration, RPC, production builds, and preview.
 
-Mixed toolchains: by default Octane owns every project `.tsrx`/`.tsx` module. In a codebase where another framework's toolchain also compiles `.tsx` (e.g. a React app hosting Octane islands via `octane/react`), pass `requireDirective: true` to the Vite, Rspack, or Rsbuild integration. The rule is two lines: a project `.tsrx` is Octane's by extension (no marker needed — nothing else compiles the syntax); a project `.tsx`/`.ts`/`.js` is Octane's only when it opens with a leading `/** @jsxImportSource octane */` pragma comment — full compilation for `.tsx`, octane hook slotting for `.ts`/`.js` (the shape for custom octane hooks shared across islands). In a `.tsx` the pragma is the same comment TypeScript reads for per-file JSX typing, so one marker both types the file and routes it; in a JSX-less `.ts`/`.js` module TypeScript ignores it, so there it acts purely as the Octane ownership marker. A pragma naming a registered renderer's intrinsics module (e.g. `@octanejs/three/intrinsics`) claims the file the same way; a pragma pointing at a foreign source (`react`, `@emotion/react`, …) claims nothing, and unmarked project modules pass through to the host framework's own pipeline (with a warning when they import from `octane` — usually a forgotten pragma). A project routing some `.tsrx` through another tsrx compiler (such as `@tsrx/react`) lists those paths in the integration's `exclude` option — excluded paths are never Octane's; installed packages keep their package-manifest decision (hook slotting included) so bindings need no pragmas.
+Mixed toolchains: by default Octane owns every project `.tsrx`/`.tsx` module. In a codebase where another framework's toolchain also compiles `.tsx` (including either `ReactCompat` or `OctaneCompat` from `octane/react`), pass `requireDirective: true` to the Vite, Rspack, or Rsbuild integration. The rule is two lines: a project `.tsrx` is Octane's by extension (no marker needed — nothing else compiles the syntax); a project `.tsx`/`.ts`/`.js` is Octane's only when it opens with a leading `/** @jsxImportSource octane */` pragma comment — full compilation for `.tsx`, octane hook slotting for `.ts`/`.js` (the shape for custom octane hooks shared across islands). In a `.tsx` the pragma is the same comment TypeScript reads for per-file JSX typing, so one marker both types the file and routes it; in a JSX-less `.ts`/`.js` module TypeScript ignores it, so there it acts purely as the Octane ownership marker. A pragma naming a registered renderer's intrinsics module (e.g. `@octanejs/three/intrinsics`) claims the file the same way; a pragma pointing at a foreign source (`react`, `@emotion/react`, …) claims nothing, and unmarked project modules pass through to the host framework's own pipeline (with a warning when they import from `octane` — usually a forgotten pragma). A project routing some `.tsrx` through another tsrx compiler (such as `@tsrx/react`) lists those paths in the integration's `exclude` option — excluded paths are never Octane's; installed packages keep their package-manifest decision (hook slotting included) so bindings need no pragmas.
 
 Profiling usage: pass `profile: true` to `octane()` for Vite, `new OctaneRspackPlugin()` for Rspack, or `pluginOctane()` for Rsbuild. When using `@octanejs/mdx`, pass the same value to `octaneMdx()`. Profiling is client-only and independent of HMR/dev metadata. Profile builds add bounded component events, schedule-to-render delay, and Chrome custom tracks; normal builds omit compiler metadata and specialize the runtime with profiling disabled. Use `globalThis.__OCTANE_PROFILER__` in DevTools, or import `profiler` from `octane/profiling` in profiling-only application tooling, for summaries, recent render causes, raw events, and Chrome Trace Event export. An explicit `octane/profiling` import keeps the recorder module in that build even when `profile` is false. Octane's duration is component render plus synchronous DOM work; inclusive time contains descendants and self time subtracts nested component spans. Raw props/state/actions/DOM values and absolute paths are not retained by default.
 
@@ -271,7 +314,7 @@ Bindings — reach for these when asked about the React equivalent:
 
 Many bindings have differential fixtures that drive the Octane and React implementations through the same interactions and compare their output. Others are verified through their framework-neutral cores, focused behavioral and SSR suites, or public-surface and type checks. The generated status table records the evidence and remaining gaps package by package.
 
-Ports are held to a pinned-release standard rather than written from upstream documentation: a binding targets one immutable upstream release, works from that release's React-facing source kept beside the Octane implementation (so the two read together and the next upgrade is a reviewable diff), accounts for every upstream export as ported, reused verbatim from a framework-neutral core, a divergence, or an explicit gap, runs that release's own test suite where it ships one (framework-neutral suites unmodified, React-binding suites ported case by case) rather than only tests written around the port, and records whatever parity cannot reach as a divergence with a behavioral test. Older bindings are being brought up to that bar package by package, so the generated status table remains the place to check a specific package's covered surface and known divergences. Bridging a package that has no binding yet works the same way: pin the version, copy that release's React source into your repository next to your port, and go module by module.
+Ports are held to a pinned-release standard rather than written from upstream documentation: a binding targets one immutable upstream release, works from that release's React-facing source kept beside the Octane implementation (so the two read together and the next upgrade is a reviewable diff), accounts for every upstream export as ported, reused verbatim from a framework-neutral core, a divergence, or an explicit gap, runs that release's own test suite where it ships one (framework-neutral suites unmodified, React-binding suites ported case by case) rather than only tests written around the port, and records whatever parity cannot reach as a divergence with a behavioral test. Older bindings are being brought up to that bar package by package, so the generated status table remains the place to check a specific package's covered surface and known divergences. Creating a native binding for a package that has none follows that same porting workflow. Hosting its existing React component with `ReactCompat` does not require a native port.
 
 ## Source
 

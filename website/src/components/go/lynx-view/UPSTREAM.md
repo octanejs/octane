@@ -20,10 +20,16 @@ Licensed under the Apache License, Version 2.0.
 
 `@lynx-js/go-web` publishes its `<Go>` component as React source. Its peer
 dependencies are `react`, `react-dom`, `@douyinfe/semi-ui`, `swr` and
-`qrcode.react`; this website is an Octane application with no React in it, and
-`octane/react` only lets React host Octane, not the reverse. The package's one
-React-free entry point, `@lynx-js/go-web/embed`, resolves `embed.html` relative
-to its own module URL, so it needs go-web's own built site to be served
+`qrcode.react`. This website is an Octane application.
+[`ReactCompat`](https://octanejs.dev/docs/react-compat) can host React DOM
+components inside it, but embedding the full `<Go>` component would still add
+those dependencies and go-web's own UI. The DOM bridge does not provide the
+ReactLynx renderer or native Lynx runtime for the application being previewed.
+This adaptation keeps the embedding controller framework-neutral and the
+surrounding UI native to this site.
+
+The package's React-free entry point, `@lynx-js/go-web/embed`, resolves `embed.html`
+relative to its own module URL, so it needs go-web's own built site to be served
 alongside it — and the URL its README documents,
 `https://go.lynxjs.org/embed.js`, currently 404s.
 

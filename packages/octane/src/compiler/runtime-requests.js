@@ -26,7 +26,9 @@ export function rewriteServerRuntimeRequests(source, id) {
 				? 'octane/server'
 				: request.n === 'octane/signals/client'
 					? 'octane/signals/server'
-					: null;
+					: request.n === 'octane/react'
+						? 'octane/react/server'
+						: null;
 		if (target === null) continue;
 		if (request.d === -1) {
 			code = code.slice(0, request.s) + target + code.slice(request.e);

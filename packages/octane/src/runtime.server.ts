@@ -671,7 +671,7 @@ interface ElementDescriptor {
 	// A server ComponentBody (component-value form, e.g. `{<Comp/>}`) OR a host tag
 	// string (`'li'`), produced when host JSX appears at a VALUE position (a
 	// `.map(...)` callback, a render-prop arrow body, an array literal).
-	type: ServerComponent | string | typeof Fragment | typeof Activity;
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity;
 	props: any;
 	// React-style `key`, lifted out of props (consulted by the client's de-opt list
 	// path on hydration; the server only renders it into markup).
@@ -811,7 +811,7 @@ function scopedValueDescriptor(resolve: () => ElementDescriptor): ElementDescrip
 
 /** Server twin of the compiler-only scope-preserving JSX descriptor factory. */
 export function createScopedElement(
-	type: ServerComponent | string | typeof Fragment | typeof Activity,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props: any,
 	readChildren: () => unknown,
 ): ElementDescriptor {
@@ -838,7 +838,7 @@ export function createScopedElement(
 
 /** @internal Native child deferral with evidence on every resolving scope. */
 export function nativeCreateScopedElement(
-	type: ServerComponent | string | typeof Fragment | typeof Activity,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props: any,
 	readChildren: () => unknown,
 ): ElementDescriptor {
@@ -855,7 +855,7 @@ export function nativeCreateScopedElement(
 }
 
 function scopedElementDescriptor(
-	type: ServerComponent | string | typeof Fragment | typeof Activity,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	copiedProps: any,
 	key: string | null,
 	children: () => unknown,
@@ -881,7 +881,7 @@ function scopedElementDescriptor(
 // literal) to this call in BOTH modes, so the same lowered call resolves to the
 // client-or-server `createElement` per build, and `ssrChild` renders the result.
 export function createElement(
-	type: ServerComponent | string | typeof Fragment | typeof Activity,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
@@ -6142,6 +6142,10 @@ type SuspenseOutcome = SuspenseResult & {
 //              can't know the unwraps' string keys, but puMemo makes instance
 //              identity stable across passes);
 type ResolvedMap = Map<string, SuspenseOutcome> & {
+	/** Undefined for externally hosted passes whose request lifetime is not owned here. */
+	resourceOptions?: RenderOptions | null;
+	/** Optional renderer resources; allocated only by a participating adapter. */
+	resources?: ServerRenderResources;
 	/** Render-local stable ids for non-primitive and long string control/list keys. */
 	asyncIdentities: Map<unknown, number>;
 	/** Cross-pass fallback ids for transient object keys at one lexical position. */
@@ -6172,13 +6176,82 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 		touched?: Set<PromiseLike<unknown>>;
 	};
 };
-function newResolvedMap(): ResolvedMap {
+function newResolvedMap(resourceOptions?: RenderOptions | null): ResolvedMap {
 	const m = new Map() as ResolvedMap;
+	if (resourceOptions !== undefined) m.resourceOptions = resourceOptions;
 	m.asyncIdentities = new Map();
 	m.asyncPositionIdentities = new Map();
 	m.nextAsyncIdentity = 0;
 	m.pu = { created: new Map(), resolvedT: new Map(), warm: new Map() };
 	return m;
+}
+
+/** @internal Request lifetime for an optional renderer's asynchronous server work. */
+export interface ServerRenderResourceContext {
+	readonly signal: AbortSignal | undefined;
+	readonly nonce: string | undefined;
+	readonly timeoutMs: number;
+	/** Release unfinished work on success, failure, cancellation, or a synchronous shell return. */
+	registerCleanup(cleanup: () => void): () => void;
+}
+
+interface ServerRenderResources extends ServerRenderResourceContext {
+	finished: boolean;
+	cleanups: Map<() => void, () => void>;
+}
+
+/**
+ * Only an owned Octane request can retain foreign work between server passes.
+ * A hosted pass has no authority to observe its external renderer's completion
+ * or cancellation; return null so its adapter can reject before starting work.
+ */
+export function getServerRenderResourceContext(): ServerRenderResourceContext | null {
+	const resolved = RESOLVED;
+	if (resolved === null || resolved.resourceOptions === undefined) return null;
+	if (resolved.resources !== undefined) return resolved.resources;
+	const options = resolved.resourceOptions;
+	const resources: ServerRenderResources = {
+		signal: options?.signal,
+		nonce: options?.nonce,
+		timeoutMs: options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS,
+		finished: false,
+		cleanups: new Map(),
+		registerCleanup(cleanup) {
+			if (resources.finished) {
+				cleanup();
+				return NOOP;
+			}
+			// Registration identity, not callback identity, owns the resource.
+			// Two islands may intentionally use the same cleanup function.
+			const release = () => {
+				resources.cleanups.delete(release);
+			};
+			resources.cleanups.set(release, cleanup);
+			return release;
+		},
+	};
+	resolved.resources = resources;
+	return resources;
+}
+
+function releaseServerRenderResources(resolved: ResolvedMap): void {
+	const resources = resolved.resources;
+	// Native thenable settlement callbacks can retain this cache after an abort.
+	// They must not also keep a completed request's options or foreign resources.
+	resolved.resourceOptions = undefined;
+	if (resources !== undefined) resolved.resources = undefined;
+	if (resources === undefined || resources.finished) return;
+	resources.finished = true;
+	let failure: { error: unknown } | undefined;
+	for (const [release, cleanup] of resources.cleanups) {
+		resources.cleanups.delete(release);
+		try {
+			cleanup();
+		} catch (error) {
+			failure ??= { error };
+		}
+	}
+	if (failure !== undefined) throw failure.error;
 }
 
 interface FullPassResult {
@@ -6806,13 +6879,11 @@ async function runBuffered(
 	props: any,
 	options: RenderOptions | undefined,
 	nonceAttr: string,
+	resolved: ResolvedMap,
 ): Promise<FullPassResult> {
 	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
 	const signal = options?.signal;
 	const identifierPrefix = options?.identifierPrefix ?? '';
-	// The suspense cache persists across this render's passes; it is render-local
-	// (never a module global) so concurrent renders can't share it.
-	const resolved: ResolvedMap = newResolvedMap();
 	let attempt = 0;
 	let lastSettled: SuspendedList | null = null;
 	for (;;) {
@@ -6907,11 +6978,16 @@ export async function prerender(
 ): Promise<RenderResult> {
 	const component = entryComponent as ServerComponent;
 	const nonceAttr = nonceAttrOf(options);
-	return passToResult(
-		await runBuffered(component, props, options, nonceAttr),
-		nonceAttr,
-		options?.headChannel === 'separate',
-	);
+	const resolved = newResolvedMap(options ?? null);
+	try {
+		return passToResult(
+			await runBuffered(component, props, options, nonceAttr, resolved),
+			nonceAttr,
+			options?.headChannel === 'separate',
+		);
+	} finally {
+		releaseServerRenderResources(resolved);
+	}
 }
 
 /**
@@ -7109,7 +7185,7 @@ export function renderToString(
 	const component = entryComponent as ServerComponent;
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
-	const resolved: ResolvedMap = newResolvedMap();
+	const resolved: ResolvedMap = newResolvedMap(options ?? null);
 	let pass: FullPassResult;
 	try {
 		pass = withStream(null, () =>
@@ -7118,6 +7194,8 @@ export function renderToString(
 	} catch (err) {
 		options?.onError?.(err);
 		throw err;
+	} finally {
+		releaseServerRenderResources(resolved);
 	}
 	return passToResult(pass, nonceAttr, options?.headChannel === 'separate');
 }
@@ -7135,7 +7213,7 @@ export function renderToStaticMarkup(
 	const component = entryComponent as ServerComponent;
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
-	const resolved: ResolvedMap = newResolvedMap();
+	const resolved: ResolvedMap = newResolvedMap(options ?? null);
 	let pass: FullPassResult;
 	try {
 		pass = withStream(null, () =>
@@ -7151,6 +7229,8 @@ export function renderToStaticMarkup(
 	} catch (err) {
 		options?.onError?.(err);
 		throw err;
+	} finally {
+		releaseServerRenderResources(resolved);
 	}
 	// No seeds (non-hydratable). Head is folded in without adoption markers, or
 	// handed over on its own under `headChannel: 'separate'`.
@@ -8147,12 +8227,12 @@ async function runStream(
 	props: any,
 	options: StreamOptions | undefined,
 	sink: StreamSink,
+	resolved: ResolvedMap,
 ): Promise<void> {
 	const timeoutMs = options?.timeoutMs ?? SUSPENSE_TIMEOUT_MS;
 	const signal = options?.signal;
 	const nonceAttr = nonceAttrOf(options);
 	const identifierPrefix = options?.identifierPrefix ?? '';
-	const resolved: ResolvedMap = newResolvedMap();
 	const stream: StreamState = {
 		boundaries: new Map(),
 		boundaryOwnerKeys: new Set(),
@@ -8832,10 +8912,12 @@ export function renderToPipeableStream(
 	const startRender = (): void => {
 		if (started) return;
 		started = true;
+		const renderOptions = { ...options, signal: controller.signal };
+		const resolved = newResolvedMap(renderOptions);
 		void runStream(
 			component,
 			props,
-			{ ...options, signal: controller.signal },
+			renderOptions,
 			{
 				write(chunk, terminal) {
 					return queueWrite(chunk, terminal);
@@ -8844,14 +8926,17 @@ export function renderToPipeableStream(
 					options?.onShellReady?.();
 				},
 				shellError(err) {
+					releaseServerRenderResources(resolved);
 					options?.onShellError?.(err);
 					flushEnd();
 				},
 				allReady() {
+					releaseServerRenderResources(resolved);
 					options?.onAllReady?.();
 					flushEnd();
 				},
 				fatal() {
+					releaseServerRenderResources(resolved);
 					// Once the shell exists, abort/error degradation is a terminal
 					// completion of the pipeable request. Fizz fires onAllReady after its
 					// recovery instructions have been accepted even though onError also
@@ -8861,7 +8946,9 @@ export function renderToPipeableStream(
 					flushEnd();
 				},
 			},
+			resolved,
 		).catch((err) => {
+			releaseServerRenderResources(resolved);
 			options?.onError?.(err);
 			flushEnd();
 		});
@@ -9031,10 +9118,12 @@ export function renderToReadableStream(
 			}
 		};
 
+		const renderOptions = { ...options, signal: renderController.signal };
+		const resolved = newResolvedMap(renderOptions);
 		runStream(
 			component,
 			props,
-			{ ...options, signal: renderController.signal },
+			renderOptions,
 			{
 				write(chunk, terminal) {
 					return writeReadable(chunk, terminal);
@@ -9045,22 +9134,27 @@ export function renderToReadableStream(
 					resolveShell(stream);
 				},
 				shellError(err) {
+					releaseServerRenderResources(resolved);
 					options?.onShellError?.(err);
 					if (!shellDone) rejectShell(err);
 					allReadyReject(err);
 					closeReadable();
 				},
 				allReady() {
+					releaseServerRenderResources(resolved);
 					options?.onAllReady?.();
 					allReadyResolve();
 					closeReadable();
 				},
 				fatal(err) {
+					releaseServerRenderResources(resolved);
 					allReadyReject(err);
 					closeReadable();
 				},
 			},
+			resolved,
 		).catch((err) => {
+			releaseServerRenderResources(resolved);
 			options?.onError?.(err);
 			if (!shellDone) rejectShell(err);
 			allReadyReject(err);
