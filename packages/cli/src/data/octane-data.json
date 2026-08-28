@@ -1909,6 +1909,16 @@
       "message": "prerenderToNodeStream requires a Node.js runtime with process.getBuiltinModule; use prerender() in non-Node environments.",
       "runtime": ["server"],
       "status": "active"
+    },
+    "58": {
+      "message": "Unsupported native-read compiler/runtime version.",
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "59": {
+      "message": "%s requires an active server component.",
+      "runtime": ["server"],
+      "status": "active"
     }
   }
 }

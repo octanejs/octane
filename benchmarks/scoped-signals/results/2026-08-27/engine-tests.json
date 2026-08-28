@@ -1,0 +1,1975 @@
+{
+  "numTotalTestSuites": 12,
+  "numPassedTestSuites": 12,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 189,
+  "numPassedTests": 189,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1787842795932,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources does not track cancellation callback reads as request-description dependencies",
+          "status": "passed",
+          "title": "does not track cancellation callback reads as request-description dependencies",
+          "duration": 4.5267080000000135,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources does not start replacement work after an abort callback retires the owner",
+          "status": "passed",
+          "title": "does not start replacement work after an abort callback retires the owner",
+          "duration": 1.0362079999999878,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources preserves a nested retry started by cancellation without orphaning its producer",
+          "status": "passed",
+          "title": "preserves a nested retry started by cancellation without orphaning its producer",
+          "duration": 0.7612499999999898,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources does not replace a nested retry that failed synchronously during cancellation",
+          "status": "passed",
+          "title": "does not replace a nested retry that failed synchronously during cancellation",
+          "duration": 0.3931660000000079,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources distinguishes pending from the ready value undefined",
+          "status": "passed",
+          "title": "distinguishes pending from the ready value undefined",
+          "duration": 0.7722919999999931,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources distinguishes pending from the ready value null",
+          "status": "passed",
+          "title": "distinguishes pending from the ready value null",
+          "duration": 0.32195899999999256,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources distinguishes pending from the ready value \"\"",
+          "status": "passed",
+          "title": "distinguishes pending from the ready value \"\"",
+          "duration": 0.29187500000000455,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources distinguishes pending from the ready value false",
+          "status": "passed",
+          "title": "distinguishes pending from the ready value false",
+          "duration": 0.284417000000019,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources distinguishes pending from the ready value 0",
+          "status": "passed",
+          "title": "distinguishes pending from the ready value 0",
+          "duration": 0.2362500000000125,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources accepts synchronous loader results and failures through the same public states",
+          "status": "passed",
+          "title": "accepts synchronous loader results and failures through the same public states",
+          "duration": 0.4175000000000182,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources shares equivalent canonical arguments within the owning scope",
+          "status": "passed",
+          "title": "shares equivalent canonical arguments within the owning scope",
+          "duration": 0.3691249999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources does not collide distinct serializable arguments",
+          "status": "passed",
+          "title": "does not collide distinct serializable arguments",
+          "duration": 1.0887909999999863,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources captures immutable argument data when a request is described",
+          "status": "passed",
+          "title": "captures immutable argument data when a request is described",
+          "duration": 0.36779200000000856,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects NaN arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects NaN arguments without calling the loader",
+          "duration": 0.174082999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects infinity arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects infinity arguments without calling the loader",
+          "duration": 0.07041699999999196,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects negative infinity arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects negative infinity arguments without calling the loader",
+          "duration": 0.07916599999998652,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects bigint arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects bigint arguments without calling the loader",
+          "duration": 0.06537499999998886,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects symbol arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects symbol arguments without calling the loader",
+          "duration": 0.05525000000000091,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects function arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects function arguments without calling the loader",
+          "duration": 0.23233300000001122,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects date arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects date arguments without calling the loader",
+          "duration": 0.9120420000000138,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects promise arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects promise arguments without calling the loader",
+          "duration": 0.14970800000000395,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects sparse array arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects sparse array arguments without calling the loader",
+          "duration": 0.102958000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects cyclic object arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects cyclic object arguments without calling the loader",
+          "duration": 0.09691700000001902,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects symbol property arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects symbol property arguments without calling the loader",
+          "duration": 0.08204200000000128,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects non-enumerable property arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects non-enumerable property arguments without calling the loader",
+          "duration": 0.0801670000000172,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects accessor property arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects accessor property arguments without calling the loader",
+          "duration": 0.07633399999997437,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects extra array property arguments without calling the loader",
+          "status": "passed",
+          "title": "rejects extra array property arguments without calling the loader",
+          "duration": 0.09133299999999167,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources does not share requests across different owners with the same durable key",
+          "status": "passed",
+          "title": "does not share requests across different owners with the same durable key",
+          "duration": 0.39562499999999545,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects incompatible query definitions without replacing a valid resource",
+          "status": "passed",
+          "title": "rejects incompatible query definitions without replacing a valid resource",
+          "duration": 0.5538329999999974,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources tracks request descriptions while excluding the loader synchronous prefix",
+          "status": "passed",
+          "title": "tracks request descriptions while excluding the loader synchronous prefix",
+          "duration": 0.3526249999999891,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources rejects writes in request descriptions and restores later write permissions",
+          "status": "passed",
+          "title": "rejects writes in request descriptions and restores later write permissions",
+          "duration": 0.2593750000000057,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources reruns a failed request description on retry and starts exactly one recovered attempt",
+          "status": "passed",
+          "title": "reruns a failed request description on retry and starts exactly one recovered attempt",
+          "duration": 0.43962499999997817,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources does not let an untracked loader bypass a derived write guard with a cached projection=false",
+          "status": "passed",
+          "title": "does not let an untracked loader bypass a derived write guard with a cached projection=false",
+          "duration": 0.3805409999999938,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources does not let an untracked loader bypass a derived write guard with a cached projection=true",
+          "status": "passed",
+          "title": "does not let an untracked loader bypass a derived write guard with a cached projection=true",
+          "duration": 0.2271250000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources converges after an imperative loader changes its own selection synchronously",
+          "status": "passed",
+          "title": "converges after an imperative loader changes its own selection synchronously",
+          "duration": 0.41387500000001864,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources publishes only the selected A→B→A attempt in completion order 0,1,2",
+          "status": "passed",
+          "title": "publishes only the selected A→B→A attempt in completion order 0,1,2",
+          "duration": 1.4158749999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources publishes only the selected A→B→A attempt in completion order 0,2,1",
+          "status": "passed",
+          "title": "publishes only the selected A→B→A attempt in completion order 0,2,1",
+          "duration": 0.8893750000000011,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources publishes only the selected A→B→A attempt in completion order 1,0,2",
+          "status": "passed",
+          "title": "publishes only the selected A→B→A attempt in completion order 1,0,2",
+          "duration": 1.583250000000021,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources publishes only the selected A→B→A attempt in completion order 1,2,0",
+          "status": "passed",
+          "title": "publishes only the selected A→B→A attempt in completion order 1,2,0",
+          "duration": 1.5402919999999938,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources publishes only the selected A→B→A attempt in completion order 2,0,1",
+          "status": "passed",
+          "title": "publishes only the selected A→B→A attempt in completion order 2,0,1",
+          "duration": 1.1121249999999918,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources publishes only the selected A→B→A attempt in completion order 2,1,0",
+          "status": "passed",
+          "title": "publishes only the selected A→B→A attempt in completion order 2,1,0",
+          "duration": 0.6568750000000136,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources ignores both late rejection and resolution from superseded same-key retries",
+          "status": "passed",
+          "title": "ignores both late rejection and resolution from superseded same-key retries",
+          "duration": 0.7312909999999988,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources applies shared retries to every selector with pending=false",
+          "status": "passed",
+          "title": "applies shared retries to every selector with pending=false",
+          "duration": 0.7852080000000115,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources applies shared retries to every selector with pending=true",
+          "status": "passed",
+          "title": "applies shared retries to every selector with pending=true",
+          "duration": 0.7704580000000192,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources keeps a shared request alive until the last resource selects another identity",
+          "status": "passed",
+          "title": "keeps a shared request alive until the last resource selects another identity",
+          "duration": 0.52962500000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources retains a whole successful projection across partial replacement and failure",
+          "status": "passed",
+          "title": "retains a whole successful projection across partial replacement and failure",
+          "duration": 1.9817910000000154,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources retains complete results while independent promises resolve in order 0,1,2",
+          "status": "passed",
+          "title": "retains complete results while independent promises resolve in order 0,1,2",
+          "duration": 2.003374999999977,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources retains complete results while independent promises resolve in order 0,2,1",
+          "status": "passed",
+          "title": "retains complete results while independent promises resolve in order 0,2,1",
+          "duration": 0.5265420000000063,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources retains complete results while independent promises resolve in order 1,0,2",
+          "status": "passed",
+          "title": "retains complete results while independent promises resolve in order 1,0,2",
+          "duration": 0.5795420000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources retains complete results while independent promises resolve in order 1,2,0",
+          "status": "passed",
+          "title": "retains complete results while independent promises resolve in order 1,2,0",
+          "duration": 0.537666999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources retains complete results while independent promises resolve in order 2,0,1",
+          "status": "passed",
+          "title": "retains complete results while independent promises resolve in order 2,0,1",
+          "duration": 0.8250419999999963,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources retains complete results while independent promises resolve in order 2,1,0",
+          "status": "passed",
+          "title": "retains complete results while independent promises resolve in order 2,1,0",
+          "duration": 0.40287499999999454,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources keeps refresh errors separate from retained data and requires an explicit retry",
+          "status": "passed",
+          "title": "keeps refresh errors separate from retained data and requires an explicit retry",
+          "duration": 0.5859170000000233,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources retires owned producers and ignores a late resolve even when abort is ignored",
+          "status": "passed",
+          "title": "retires owned producers and ignores a late resolve even when abort is ignored",
+          "duration": 0.7661669999999958,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped promise resources"],
+          "fullName": "scoped promise resources retires owned producers and ignores a late reject even when abort is ignored",
+          "status": "passed",
+          "title": "retires owned producers and ignores a late reject even when abort is ignored",
+          "duration": 0.5176249999999811,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1787842797588,
+      "endTime": 1787842797623.5176,
+      "status": "passed",
+      "message": "",
+      "name": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/signals-async.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["scoped signal inspection"],
+          "fullName": "scoped signal inspection reports unevaluated nodes without running their computations",
+          "status": "passed",
+          "title": "reports unevaluated nodes without running their computations",
+          "duration": 3.3515840000000026,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal inspection"],
+          "fullName": "scoped signal inspection reports current dependency owners after a branch changes",
+          "status": "passed",
+          "title": "reports current dependency owners after a branch changes",
+          "duration": 0.7542079999999771,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal inspection"],
+          "fullName": "scoped signal inspection keeps tracing explicitly opt-in and bounded without retaining values or callbacks",
+          "status": "passed",
+          "title": "keeps tracing explicitly opt-in and bounded without retaining values or callbacks",
+          "duration": 0.9326250000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal inspection"],
+          "fullName": "scoped signal inspection reports request activity and independent historical leases through retirement",
+          "status": "passed",
+          "title": "reports request activity and independent historical leases through retirement",
+          "duration": 2.1729159999999865,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal inspection"],
+          "fullName": "scoped signal inspection does not expose mutable trace records to an inspection consumer",
+          "status": "passed",
+          "title": "does not expose mutable trace records to an inspection consumer",
+          "duration": 0.23974999999998658,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal inspection"],
+          "fullName": "scoped signal inspection reports stream activity and retained quiet refresh without exposing payloads",
+          "status": "passed",
+          "title": "reports stream activity and retained quiet refresh without exposing payloads",
+          "duration": 2.1354589999999973,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal inspection"],
+          "fullName": "scoped signal inspection releases subscription accounting after repeated cleanup and owner disposal",
+          "status": "passed",
+          "title": "releases subscription accounting after repeated cleanup and owner disposal",
+          "duration": 0.39120900000000347,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal inspection"],
+          "fullName": "scoped signal inspection rejects an invalid trace budget -1",
+          "status": "passed",
+          "title": "rejects an invalid trace budget -1",
+          "duration": 0.242541000000017,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal inspection"],
+          "fullName": "scoped signal inspection rejects an invalid trace budget 0.5",
+          "status": "passed",
+          "title": "rejects an invalid trace budget 0.5",
+          "duration": 0.1097910000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal inspection"],
+          "fullName": "scoped signal inspection rejects an invalid trace budget 10001",
+          "status": "passed",
+          "title": "rejects an invalid trace budget 10001",
+          "duration": 0.09266700000000583,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal inspection"],
+          "fullName": "scoped signal inspection rejects an invalid trace budget NaN",
+          "status": "passed",
+          "title": "rejects an invalid trace budget NaN",
+          "duration": 0.05854099999999107,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1787842798560,
+      "endTime": 1787842798571.1099,
+      "status": "passed",
+      "message": "",
+      "name": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/signals-inspection.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence +0 (seed 1671194371)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence +0 (seed 1671194371)",
+          "duration": 48.04462499999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 1 (seed 1659704449)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 1 (seed 1659704449)",
+          "duration": 16.79116700000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 2 (seed 2459582093)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 2 (seed 2459582093)",
+          "duration": 14.704958000000033,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 3 (seed 1140782293)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 3 (seed 1140782293)",
+          "duration": 16.828374999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 4 (seed 4177749973)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 4 (seed 4177749973)",
+          "duration": 21.563541000000043,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 5 (seed 2157054581)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 5 (seed 2157054581)",
+          "duration": 18.918999999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 6 (seed 4159346349)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 6 (seed 4159346349)",
+          "duration": 21.17079099999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 7 (seed 1734309157)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 7 (seed 1734309157)",
+          "duration": 23.92195899999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 8 (seed 2878243654)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 8 (seed 2878243654)",
+          "duration": 17.754999999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 9 (seed 1448537035)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 9 (seed 1448537035)",
+          "duration": 14.889208999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 10 (seed 2649009310)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 10 (seed 2649009310)",
+          "duration": 23.007374999999968,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 11 (seed 1353857219)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 11 (seed 1353857219)",
+          "duration": 23.454541000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 12 (seed 2891479782)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 12 (seed 2891479782)",
+          "duration": 16.26633400000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 13 (seed 3500343996)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 13 (seed 3500343996)",
+          "duration": 31.14483299999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 14 (seed 163274345)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 14 (seed 163274345)",
+          "duration": 36.937625000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 15 (seed 797132477)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 15 (seed 797132477)",
+          "duration": 22.78049999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 16 (seed 557971545)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 16 (seed 557971545)",
+          "duration": 31.48154199999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 17 (seed 3884603694)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 17 (seed 3884603694)",
+          "duration": 21.616459000000077,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 18 (seed 1570904763)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 18 (seed 1570904763)",
+          "duration": 19.867124999999987,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 19 (seed 3002080470)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 19 (seed 3002080470)",
+          "duration": 12.656375000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 20 (seed 1283766468)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 20 (seed 1283766468)",
+          "duration": 21.70550000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 21 (seed 1755457300)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 21 (seed 1755457300)",
+          "duration": 15.081958999999983,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 22 (seed 2310240085)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 22 (seed 2310240085)",
+          "duration": 17.44616599999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 23 (seed 2994158067)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 23 (seed 2994158067)",
+          "duration": 22.37912499999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 24 (seed 2762790597)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 24 (seed 2762790597)",
+          "duration": 15.677999999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 25 (seed 513919543)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 25 (seed 513919543)",
+          "duration": 76.01045799999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 26 (seed 2703856734)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 26 (seed 2703856734)",
+          "duration": 40.66191600000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 27 (seed 318923687)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 27 (seed 318923687)",
+          "duration": 22.126957999999945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 28 (seed 1561864918)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 28 (seed 1561864918)",
+          "duration": 21.613207999999986,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 29 (seed 3737463547)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 29 (seed 3737463547)",
+          "duration": 14.907750000000078,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 30 (seed 54627098)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 30 (seed 54627098)",
+          "duration": 23.150125000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 31 (seed 1557349893)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 31 (seed 1557349893)",
+          "duration": 19.021542000000068,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 32 (seed 193945746)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 32 (seed 193945746)",
+          "duration": 20.3944580000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 33 (seed 2679123887)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 33 (seed 2679123887)",
+          "duration": 17.949583000000075,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 34 (seed 3907657975)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 34 (seed 3907657975)",
+          "duration": 20.532292000000098,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 35 (seed 1101993623)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 35 (seed 1101993623)",
+          "duration": 22.461915999999974,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 36 (seed 3119914076)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 36 (seed 3119914076)",
+          "duration": 20.094792000000098,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 37 (seed 3147312186)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 37 (seed 3147312186)",
+          "duration": 17.423457999999982,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 38 (seed 2914215069)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 38 (seed 2914215069)",
+          "duration": 14.323750000000018,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 39 (seed 2407527128)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 39 (seed 2407527128)",
+          "duration": 19.315416999999798,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 40 (seed 587178699)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 40 (seed 587178699)",
+          "duration": 21.54037500000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 41 (seed 4127348477)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 41 (seed 4127348477)",
+          "duration": 41.88862500000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 42 (seed 1520170958)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 42 (seed 1520170958)",
+          "duration": 33.50475000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 43 (seed 3642984937)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 43 (seed 3642984937)",
+          "duration": 18.466916999999967,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 44 (seed 288161537)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 44 (seed 288161537)",
+          "duration": 41.712167000000136,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 45 (seed 2910256018)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 45 (seed 2910256018)",
+          "duration": 13.97787500000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 46 (seed 4267378404)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 46 (seed 4267378404)",
+          "duration": 21.08404100000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 47 (seed 2900893673)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 47 (seed 2900893673)",
+          "duration": 14.037582999999813,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 48 (seed 102205017)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 48 (seed 102205017)",
+          "duration": 16.549792000000025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signals against an independent operation model"],
+          "fullName": "scoped signals against an independent operation model preserves observable state through generated sequence 49 (seed 3880809237)",
+          "status": "passed",
+          "title": "preserves observable state through generated sequence 49 (seed 3880809237)",
+          "duration": 15.424207999999908,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1787842796222,
+      "endTime": 1787842797378.4243,
+      "status": "passed",
+      "message": "",
+      "name": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/signals-model.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption does not expose retained request metadata through an editable serialized seed",
+          "status": "passed",
+          "title": "does not expose retained request metadata through an editable serialized seed",
+          "duration": 5.8805830000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption round-trips plain data without losing undefined, negative zero, or property names",
+          "status": "passed",
+          "title": "round-trips plain data without losing undefined, negative zero, or property names",
+          "duration": 0.9247500000000173,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption reads presented derived values without rewinding live inputs or poisoning live caches",
+          "status": "passed",
+          "title": "reads presented derived values without rewinding live inputs or poisoning live caches",
+          "duration": 1.628582999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption does not initialize a live derived cache with an older seed after an early edit",
+          "status": "passed",
+          "title": "does not initialize a live derived cache with an older seed after an early edit",
+          "duration": 2.581209000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption keeps independent frame leases usable until each lease is released",
+          "status": "passed",
+          "title": "keeps independent frame leases usable until each lease is released",
+          "duration": 0.5877089999999896,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption rejects writes, allocation, and retirement during historical reads",
+          "status": "passed",
+          "title": "rejects writes, allocation, and retirement during historical reads",
+          "duration": 0.34470799999999713,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption requires every owner in a historical read to have an explicit frame",
+          "status": "passed",
+          "title": "requires every owner in a historical read to have an explicit frame",
+          "duration": 0.41637499999998795,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption revokes all historical and retained reads when the data owner is retired",
+          "status": "passed",
+          "title": "revokes all historical and retained reads when the data owner is retired",
+          "duration": 0.3059999999999832,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption retains the whole old resource result and its argument while a new selection is pending",
+          "status": "passed",
+          "title": "retains the whole old resource result and its argument while a new selection is pending",
+          "duration": 0.6387079999999798,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption preserves an unavailable latest projection after the live request becomes ready",
+          "status": "passed",
+          "title": "preserves an unavailable latest projection after the live request becomes ready",
+          "duration": 0.36366700000002083,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption preserves a retained derived computation as a whole during a pending refresh",
+          "status": "passed",
+          "title": "preserves a retained derived computation as a whole during a pending refresh",
+          "duration": 0.6375830000000065,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption preserves ready snapshot activity without transporting a pending producer",
+          "status": "passed",
+          "title": "preserves ready snapshot activity without transporting a pending producer",
+          "duration": 0.871832999999981,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption uses a matching completed request seed without starting the client loader",
+          "status": "passed",
+          "title": "uses a matching completed request seed without starting the client loader",
+          "duration": 0.34133299999999167,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption never serves a request seed as the strict value of a changed argument",
+          "status": "passed",
+          "title": "never serves a request seed as the strict value of a changed argument",
+          "duration": 0.4919579999999826,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption rejects seeds for a different scope, duplicate read channels, and incompatible node kinds",
+          "status": "passed",
+          "title": "rejects seeds for a different scope, duplicate read channels, and incompatible node kinds",
+          "duration": 0.2727079999999944,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption rejects cyclic and malformed encoded data without executing accessors",
+          "status": "passed",
+          "title": "rejects cyclic and malformed encoded data without executing accessors",
+          "duration": 0.48654100000001677,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped signal serialization and adoption"],
+          "fullName": "scoped signal serialization and adoption rejects nonserializable live values without changing the live graph",
+          "status": "passed",
+          "title": "rejects nonserializable live values without changing the live graph",
+          "duration": 0.14020800000000122,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1787842798038,
+      "endTime": 1787842798055.4866,
+      "status": "passed",
+      "message": "",
+      "name": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/signals-serialization.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals returns immutable snapshots that remain stable after later writes",
+          "status": "passed",
+          "title": "returns immutable snapshots that remain stable after later writes",
+          "duration": 2.834541999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals reads writes immediately, including through derived values inside a batch",
+          "status": "passed",
+          "title": "reads writes immediately, including through derived values inside a batch",
+          "duration": 1.0039170000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals keeps diamond projections coherent and switches conditional dependencies",
+          "status": "passed",
+          "title": "keeps diamond projections coherent and switches conditional dependencies",
+          "duration": 0.5341249999999889,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals uses Object.is equality for NaN and signed zero",
+          "status": "passed",
+          "title": "uses Object.is equality for NaN and signed zero",
+          "duration": 0.7734169999999949,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals does not turn undefined, null, empty text, or false into pending",
+          "status": "passed",
+          "title": "does not turn undefined, null, empty text, or false into pending",
+          "duration": 0.4975000000000023,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals groups nested actions, preserves this and arguments, and does not roll back on throw",
+          "status": "passed",
+          "title": "groups nested actions, preserves this and arguments, and does not roll back on throw",
+          "duration": 0.5395420000000115,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals ends an action batch at its synchronous boundary, not across await",
+          "status": "passed",
+          "title": "ends an action batch at its synchronous boundary, not across await",
+          "duration": 0.1737500000000125,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals keeps actions tracked when used to group a pure read",
+          "status": "passed",
+          "title": "keeps actions tracked when used to group a pure read",
+          "duration": 0.11754200000001447,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals rejects writes from derived and updater functions and restores the guard after errors",
+          "status": "passed",
+          "title": "rejects writes from derived and updater functions and restores the guard after errors",
+          "duration": 0.35916699999998514,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals restores dependency tracking after a thrown computation and can recover through an input",
+          "status": "passed",
+          "title": "restores dependency tracking after a thrown computation and can recover through an input",
+          "duration": 0.2749589999999955,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals retains a whole successful result through errors but exposes the error separately",
+          "status": "passed",
+          "title": "retains a whole successful result through errors but exposes the error separately",
+          "duration": 0.3101249999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals shares only by actual scope instance and rejects wrong-owner access",
+          "status": "passed",
+          "title": "shares only by actual scope instance and rejects wrong-owner access",
+          "duration": 0.5954590000000053,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals supports cross-scope dependencies without giving a consumer ownership of its producer",
+          "status": "passed",
+          "title": "supports cross-scope dependencies without giving a consumer ownership of its producer",
+          "duration": 0.1600830000000144,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals does not let a retained result hide a dependency owner retiring",
+          "status": "passed",
+          "title": "does not let a retained result hide a dependency owner retiring",
+          "duration": 0.1390829999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals ends public subscriptions silently and makes cleanup and retirement idempotent",
+          "status": "passed",
+          "title": "ends public subscriptions silently and makes cleanup and retirement idempotent",
+          "duration": 0.19958299999998985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals delivers accepted updates to remaining subscribers when one callback throws",
+          "status": "passed",
+          "title": "delivers accepted updates to remaining subscribers when one callback throws",
+          "duration": 0.15987499999999955,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals accepts a reentrant subscriber update as the next observable update",
+          "status": "passed",
+          "title": "accepts a reentrant subscriber update as the next observable update",
+          "duration": 0.12062500000001819,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals reports cycles and rejects async derived callbacks without corrupting later reads",
+          "status": "passed",
+          "title": "reports cycles and rejects async derived callbacks without corrupting later reads",
+          "duration": 0.3448330000000226,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped synchronous signals"],
+          "fullName": "scoped synchronous signals rejects duplicate and empty keys instead of merging unrelated nodes",
+          "status": "passed",
+          "title": "rejects duplicate and empty keys instead of merging unrelated nodes",
+          "duration": 0.21649999999999636,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1787842798381,
+      "endTime": 1787842798391.2166,
+      "status": "passed",
+      "message": "",
+      "name": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/signals-state.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources does not start more work when iterator cleanup retires its owner during retry",
+          "status": "passed",
+          "title": "does not start more work when iterator cleanup retires its owner during retry",
+          "duration": 5.157458999999989,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources does not start more work when iterator cleanup retires its owner during selection",
+          "status": "passed",
+          "title": "does not start more work when iterator cleanup retires its owner during selection",
+          "duration": 1.0268750000000182,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources keeps the nested retry selected when iterator cleanup retries synchronously",
+          "status": "passed",
+          "title": "keeps the nested retry selected when iterator cleanup retries synchronously",
+          "duration": 1.0976670000000013,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources separates connection, readiness, successive values, and normal completion",
+          "status": "passed",
+          "title": "separates connection, readiness, successive values, and normal completion",
+          "duration": 0.8396670000000199,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources treats a yielded undefined as a usable value",
+          "status": "passed",
+          "title": "treats a yielded undefined as a usable value",
+          "duration": 0.4687080000000208,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources treats a yielded null as a usable value",
+          "status": "passed",
+          "title": "treats a yielded null as a usable value",
+          "duration": 0.40787499999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources treats a yielded \"\" as a usable value",
+          "status": "passed",
+          "title": "treats a yielded \"\" as a usable value",
+          "duration": 0.2933749999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources treats a yielded false as a usable value",
+          "status": "passed",
+          "title": "treats a yielded false as a usable value",
+          "duration": 0.2815829999999835,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources treats a yielded 0 as a usable value",
+          "status": "passed",
+          "title": "treats a yielded 0 as a usable value",
+          "duration": 0.3015829999999937,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources reports empty completion as an error rather than inventing a ready value",
+          "status": "passed",
+          "title": "reports empty completion as an error rather than inventing a ready value",
+          "duration": 1.0896669999999915,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources keeps a producer failure visible after an earlier yield=false",
+          "status": "passed",
+          "title": "keeps a producer failure visible after an earlier yield=false",
+          "duration": 0.6786250000000109,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources keeps a producer failure visible after an earlier yield=true",
+          "status": "passed",
+          "title": "keeps a producer failure visible after an earlier yield=true",
+          "duration": 0.36095900000000825,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources closes a replaced stream and ignores its late yield",
+          "status": "passed",
+          "title": "closes a replaced stream and ignores its late yield",
+          "duration": 2.8870419999999797,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources closes a replaced stream and ignores its late reject",
+          "status": "passed",
+          "title": "closes a replaced stream and ignores its late reject",
+          "duration": 1.125708000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources closes a replaced stream and ignores its late end",
+          "status": "passed",
+          "title": "closes a replaced stream and ignores its late end",
+          "duration": 0.43754099999998175,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources retries a live stream with pending=false without accepting obsolete yields",
+          "status": "passed",
+          "title": "retries a live stream with pending=false without accepting obsolete yields",
+          "duration": 0.6138750000000073,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources retries a live stream with pending=true without accepting obsolete yields",
+          "status": "passed",
+          "title": "retries a live stream with pending=true without accepting obsolete yields",
+          "duration": 0.46791600000000244,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources does not count an old retained value as a yield from an empty retry",
+          "status": "passed",
+          "title": "does not count an old retained value as a yield from an empty retry",
+          "duration": 0.5358329999999967,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources shares one stream until its last resource changes selection",
+          "status": "passed",
+          "title": "shares one stream until its last resource changes selection",
+          "duration": 0.5897919999999885,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources does not cancel a data-owned stream when its last public subscription stops",
+          "status": "passed",
+          "title": "does not cancel a data-owned stream when its last public subscription stops",
+          "duration": 0.3185000000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources retires a stream silently before an abort-ignoring producer can yield",
+          "status": "passed",
+          "title": "retires a stream silently before an abort-ignoring producer can yield",
+          "duration": 0.46333400000000324,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources retires a stream silently before an abort-ignoring producer can reject",
+          "status": "passed",
+          "title": "retires a stream silently before an abort-ignoring producer can reject",
+          "duration": 0.30595800000000395,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources retires a stream silently before an abort-ignoring producer can end",
+          "status": "passed",
+          "title": "retires a stream silently before an abort-ignoring producer can end",
+          "duration": 0.2954160000000172,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources does not acquire a stream whose asynchronous factory resolves after retirement",
+          "status": "passed",
+          "title": "does not acquire a stream whose asynchronous factory resolves after retirement",
+          "duration": 0.3942079999999919,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources keeps a new selection usable when iterator cleanup can throw",
+          "status": "passed",
+          "title": "keeps a new selection usable when iterator cleanup can throw",
+          "duration": 0.627207999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources keeps a new selection usable when iterator cleanup can reject",
+          "status": "passed",
+          "title": "keeps a new selection usable when iterator cleanup can reject",
+          "duration": 0.36062499999999886,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources reports a stream failure when its factory throws",
+          "status": "passed",
+          "title": "reports a stream failure when its factory throws",
+          "duration": 0.3236660000000029,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources reports a stream failure when its factory rejects",
+          "status": "passed",
+          "title": "reports a stream failure when its factory rejects",
+          "duration": 0.17520899999999529,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources reports a stream failure when its iterator factory throws",
+          "status": "passed",
+          "title": "reports a stream failure when its iterator factory throws",
+          "duration": 0.5016660000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources reports a stream failure when its next throws",
+          "status": "passed",
+          "title": "reports a stream failure when its next throws",
+          "duration": 0.28908400000000256,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources reports malformed producers as errors: not iterable",
+          "status": "passed",
+          "title": "reports malformed producers as errors: not iterable",
+          "duration": 0.24295899999998483,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources reports malformed producers as errors: invalid iterator",
+          "status": "passed",
+          "title": "reports malformed producers as errors: invalid iterator",
+          "duration": 0.1373749999999916,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources reports malformed producers as errors: invalid next result",
+          "status": "passed",
+          "title": "reports malformed producers as errors: invalid next result",
+          "duration": 0.15941599999999312,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources reports a throwing iteration-result done getter through the resource",
+          "status": "passed",
+          "title": "reports a throwing iteration-result done getter through the resource",
+          "duration": 0.4042080000000112,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources reports a throwing iteration-result value getter through the resource",
+          "status": "passed",
+          "title": "reports a throwing iteration-result value getter through the resource",
+          "duration": 0.3716670000000022,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources accepts a reentrant selection from iterator next without publishing the old value",
+          "status": "passed",
+          "title": "accepts a reentrant selection from iterator next without publishing the old value",
+          "duration": 0.6644170000000145,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scoped stream resources"],
+          "fullName": "scoped stream resources accepts a reentrant selection from iterator cleanup without reviving the replaced request",
+          "status": "passed",
+          "title": "accepts a reentrant selection from iterator cleanup without reviving the replaced request",
+          "duration": 0.46283299999998917,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1787842797820,
+      "endTime": 1787842797845.463,
+      "status": "passed",
+      "message": "",
+      "name": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/signals-streams.test.ts"
+    }
+  ]
+}

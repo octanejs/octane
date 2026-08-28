@@ -1,4 +1,4 @@
-import { use, useTransition, useSyncExternalStore } from 'octane';
+import { use, useState, useTransition, useSyncExternalStore } from 'octane';
 
 // ---------------------------------------------------------------------------
 // Repro fixtures for: a transition-HELD Suspense/@try boundary must keep the
@@ -49,6 +49,30 @@ export function HeldUrgentResuspend(props) @{
 			<Child promiseFor={props.promiseFor} store={props.store} bindStart={props.bindStart} />
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
+		}
+	</div>
+}
+
+interface HeldStateProps {
+	promiseFor: (value: number) => PromiseLike<number>;
+	bindSetters: (transition: (value: number) => void, urgent: (value: number) => void) => void;
+}
+
+function StateChild(props: HeldStateProps) @{
+	const [value, setValue] = useState(1);
+	const [, start] = useTransition();
+	props.bindSetters((next) => start(() => setValue(next)), setValue);
+	const resolved = use(props.promiseFor(value));
+	<span id="content">{'content-' + resolved as string}</span>
+}
+
+export function HeldStateUrgentResuspend(props: HeldStateProps) @{
+	<div>
+		<PendingProbe />
+		@try {
+			<StateChild promiseFor={props.promiseFor} bindSetters={props.bindSetters} />
+		} @pending {
+			<span id="fallback">fallback</span>
 		}
 	</div>
 }

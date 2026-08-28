@@ -4,6 +4,7 @@ import { setTransitionFallbackTimeout, getTransitionFallbackTimeout } from '../s
 import {
 	HeldUrgentResuspend,
 	HeldUrgentBodyResuspend,
+	HeldStateUrgentResuspend,
 	FreshUrgentSuspend,
 } from './_fixtures/transition-held-urgent-resuspend.tsrx';
 
@@ -66,6 +67,43 @@ function makeRegistry() {
 // ============================================================================
 
 describe('transition-held boundary keeps prior content across an URGENT re-suspend (React parity)', () => {
+	it.each([2, 3])(
+		'reveals the latest urgent child state when request %i settles first',
+		async (first) => {
+			const { promiseFor, d2, d3 } = makeRegistry();
+			let transition!: (value: number) => void;
+			let urgent!: (value: number) => void;
+			const root = mount(HeldStateUrgentResuspend, {
+				promiseFor,
+				bindSetters: (nextTransition, nextUrgent) => {
+					transition = nextTransition;
+					urgent = nextUrgent;
+				},
+			});
+			const content = root.find('#content');
+			try {
+				expect(content.textContent).toBe('content-1');
+				await act(() => transition(2));
+				await act(() => urgent(3));
+				expect(root.find('#content')).toBe(content);
+				expect(content.textContent).toBe('content-1');
+				expect(root.findAll('#fallback')).toHaveLength(0);
+				expect(root.find('#pending').textContent).toBe('pending');
+
+				await act(() => (first === 2 ? d2 : d3).resolve(first));
+				expect(content.textContent).toBe(first === 2 ? 'content-1' : 'content-3');
+				expect(root.findAll('#fallback')).toHaveLength(0);
+				await act(() => (first === 2 ? d3 : d2).resolve(first === 2 ? 3 : 2));
+				expect(root.find('#content')).toBe(content);
+				expect(content.textContent).toBe('content-3');
+				expect(root.findAll('#fallback')).toHaveLength(0);
+				expect(root.find('#pending').textContent).toBe('idle');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
 	it('DESCENDANT re-suspends urgently while held → old content stays, NO fallback flash, isPending true throughout', async () => {
 		const { promiseFor, d2, d3 } = makeRegistry();
 		const store = makeStore(1);

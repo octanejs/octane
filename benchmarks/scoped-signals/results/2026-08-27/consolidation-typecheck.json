@@ -1,0 +1,796 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-27T20:42:55.734Z",
+  "evidenceKind": "Supplemental public-source compiler, typecheck, and boundary correctness evidence",
+  "scope": "Authored Suspense import reuse in virtual TypeScript, native fixture typechecking, and final default boundary correctness after separating active native-read collection from lazy initialization.",
+  "status": "Final scoped typecheck passes; final default boundary runs each pass 140/141, retaining the same individually reproduced baseline portal failure. The requested Volar regression passes; named nearby toolchain gaps remain.",
+  "limitations": [
+    "Not a full workspace typecheck, locked-package validation, CI result, or performance measurement.",
+    "The configured registry returned 403 for locked TSRX npm payloads after an approved retry. The compiler and authoring tools here use verified public tagged source plus the repository parser patch; npm tarball SRI and a complete locked install are not established.",
+    "The final scoped typecheck and default boundary runs capture exact invocations, raw logs, Vitest JSON where applicable, source snapshots before and after, and dependency-load records. Older Volar, directive, and historical boundary commands returned console results without equivalent complete per-invocation manifests; the final snapshot is not retrospective proof for those runs.",
+    "Legacy typecheck and default-boundary commands predate the forced dependency resolver. Historical harness hashes identify the older configuration; final runs use the later recorded dependency resolver.",
+    "Both final 141-case candidate boundary runs have the same one portal failure. Only that failing case was reproduced in development on the immutable baseline; the entire baseline 141-case suite and the baseline production case were not run.",
+    "Commands and raw evidence references retain exact local staging paths. Reproduction elsewhere requires recreating that public-source toolchain and its path configuration.",
+    "This artifact contains only Octane/public dependency metadata and observed correctness outcomes. No private comparison code, credentials, raw heap snapshots, or unpublished external data are included."
+  ],
+  "environment": {
+    "node": "v26.4.0",
+    "os": "Darwin",
+    "architecture": "arm64",
+    "workingDirectory": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+    "toolingRoot": "/private/tmp/octane-native-source-compiler-NVcMdO"
+  },
+  "provenance": {
+    "manifestSha256": "c2a7a3413da743b296371698a87160f184869767d4dd568540445fd055b86e09",
+    "publicRepository": "https://github.com/tsrx-org/tsrx",
+    "publicTag": "@tsrx/core@0.1.61",
+    "publicCommit": "7cb01278dff7aebfd25cbf5abcd2d47c6da7d81a",
+    "publicArchiveSha256": "66d08d6bafb99a03143c548fdc31356cc52880ba21918ff8fa0c287b2f08524a",
+    "repositoryPatchSha256": "ea262e9df859e27aaa504e0a45ab0696431b437c41e2be4c5d9ad8ec4dd7214d",
+    "patchedSegmentsSha256": "fbe1e4562a61051014c52c8d99f8e1b86ae7ec6ff727e9f17f3c7075879cf6d7",
+    "authoringToolsArchiveSha256": "b65b399be3e3c66127056c8947afb49ac46cef45bffd2c80047a038a39d7ca1a",
+    "dependencies": [
+      {
+        "name": "@jridgewell/sourcemap-codec",
+        "version": "1.5.5",
+        "manifestSha256": "398fc774628ec1592c794e8c14ecdc0096206a2521545e527e5a06429dac6006"
+      },
+      {
+        "name": "@noble/hashes",
+        "version": "2.2.0",
+        "manifestSha256": "df2580ed1896b0deffc07437c6a8d83fcf233e4c4c1e77c12e491563222c4719"
+      },
+      {
+        "name": "@sveltejs/acorn-typescript",
+        "version": "1.0.13",
+        "manifestSha256": "d1be2f75d35f925c5bdbbcf9a3760e05bdc442399621e2b3fb16f6066252f64c"
+      },
+      {
+        "name": "@tsrx/core",
+        "version": "0.1.61",
+        "manifestSha256": "b465034e98de9dd9bf314444a6050ec5b7c537b8dd25a1982455a519306d2955"
+      },
+      {
+        "name": "@tsrx/react",
+        "version": "0.2.61",
+        "manifestSha256": "36871bb3c2a25bed4a1dd5ba1663958ea200a18388847d34056670690ea7994b"
+      },
+      {
+        "name": "@tsrx/runtime",
+        "version": "0.1.1",
+        "manifestSha256": "fb83d22a5a858548d7a9edd2036ea05b25162c793516e3554cb978f6c11db4b3"
+      },
+      {
+        "name": "@types/estree",
+        "version": "1.0.9",
+        "manifestSha256": "3537a6a503f57901111d8a29df81962887653deb199b9a795c7fb50bbfdd1bdc"
+      },
+      {
+        "name": "@types/estree-jsx",
+        "version": "1.0.5",
+        "manifestSha256": "ba60d7c597e351e26bf117d99b6e25981ad8ea4d4f7fae5f936ebb16396fa972"
+      },
+      {
+        "name": "@types/react",
+        "version": "19.2.17",
+        "manifestSha256": "36496fc09a9dcf31b0ca969ce5677c9ce9ebb5c89da9bd6212e0c89b6fae3f88"
+      },
+      {
+        "name": "@volar/language-core",
+        "version": "2.4.28",
+        "manifestSha256": "e5fc0a4599a91dbd2ffc18050f5a4d85f92c0a0b58964fdcff54ba2c1b83d23c"
+      },
+      {
+        "name": "@volar/typescript",
+        "version": "2.4.28",
+        "manifestSha256": "b7325a337e30f0f37873c038f21efa0d6eda7553e5985c6f679f590b023ff744"
+      },
+      {
+        "name": "acorn",
+        "version": "8.17.0",
+        "manifestSha256": "fa3612cc9493702b7520947eec276d7b4a73001dafd68c4a9dcb58791a4145c6"
+      },
+      {
+        "name": "alien-signals",
+        "version": "3.2.0",
+        "manifestSha256": "246a6dc2e0b031c5a274df8fdd6f84d7880aa11d8d945a3579a6214a1afe8831"
+      },
+      {
+        "name": "devalue",
+        "version": "5.8.2",
+        "manifestSha256": "c0daca7e15257524b897c873d45855fab9f576583e4436f7ec6ca5b0f211d569"
+      },
+      {
+        "name": "es-module-lexer",
+        "version": "1.7.0",
+        "manifestSha256": "de68b22f72517f94d53290ecdbaf975f5e79ca26d8757768b07c5b466749c494"
+      },
+      {
+        "name": "esbuild",
+        "version": "0.28.1",
+        "manifestSha256": "d55d1d19fcc5b6079e4a71dd4111340c79c682bc36835ac7058a0c364c7db58a"
+      },
+      {
+        "name": "esrap",
+        "version": "2.3.2",
+        "manifestSha256": "b48eec3fd9649a3f30d68d9d2c74476c56cd37dbd94c165b04bbc4d5b3686f0f"
+      },
+      {
+        "name": "happy-dom",
+        "version": "20.11.0",
+        "manifestSha256": "fcc98e6ad00b1d74e8b13dae5dd408587c7e062517a231c568136864434f7f94"
+      },
+      {
+        "name": "is-reference",
+        "version": "3.0.3",
+        "manifestSha256": "5ab4c14eb3e5726b0704c624ee6649e8026dc8a14471e7cdc4c7d55699162ec7"
+      },
+      {
+        "name": "jsdom",
+        "version": "30.0.1",
+        "manifestSha256": "e87940b12f720a5b735a5df82108b634a238b8c6ebced71050a346a1675575b9"
+      },
+      {
+        "name": "magic-string",
+        "version": "0.30.21",
+        "manifestSha256": "86814aaf7dacba9d31fbf361c3285981f1cbbda0a87108caa4131d297bd9eba2"
+      },
+      {
+        "name": "oxc-tsrx",
+        "version": "0.5.0",
+        "manifestSha256": "65177f6c9c60d7c6379e7dbae7373d53434536a8cbbb45dcb14ec54a7ad7e4f3"
+      },
+      {
+        "name": "react",
+        "version": "19.2.8",
+        "manifestSha256": "e40c3ed9b633c9ecf188e09a4be309780a1ea0a9c068278a30ff6a27e7b2dbb6"
+      },
+      {
+        "name": "react-dom",
+        "version": "19.2.8",
+        "manifestSha256": "7c82f0967114d4b5d38b1f07e543af87c9919e8d3243f9604004819319cb2200"
+      },
+      {
+        "name": "typescript",
+        "version": "5.9.3",
+        "manifestSha256": "822ef7ca6452205657b6288b066481ecf508bfbf43455d715cf7d3ec457561e6"
+      },
+      {
+        "name": "vite",
+        "version": "8.1.5",
+        "manifestSha256": "2f482c846a1c5b9e5883b458b3e54a171a320c2e8d9b924c7383c4baef607b09"
+      },
+      {
+        "name": "vitest",
+        "version": "4.1.10",
+        "manifestSha256": "caa41f04799bd42f3cfd100c4282e630d77ffc7deb1e7e4927794fcb7f137f34"
+      },
+      {
+        "name": "zimmerframe",
+        "version": "1.1.4",
+        "manifestSha256": "10408ce3a6d802f7466c89335cffa34bfbce0d0066d9ec0503794aa935f39399"
+      },
+      {
+        "name": "playwright",
+        "version": "1.61.1",
+        "manifestSha256": "6b840268612656f0639fb7d68782e8353bdf11518589d30ddf66f283c2670ed5"
+      },
+      {
+        "name": "@tsrx/prettier-plugin",
+        "version": "0.3.126",
+        "manifestSha256": "a9af04efc01e5fe8a2fd3eff167df3cbf81d7ed5a922f9ca3e13a208fdd8153b"
+      },
+      {
+        "name": "@tsrx/typescript-plugin",
+        "version": "0.3.126",
+        "manifestSha256": "2f710abd1bcd70d4a4744e9db51cea02b6a2c4c35164739f3a8d2d681c88b19b"
+      },
+      {
+        "name": "prettier",
+        "version": "3.9.6",
+        "manifestSha256": "b69988ff94407ccd6f9e1e66d92f54da25fdc5d14c219902fdb1ed17702f886b"
+      },
+      {
+        "name": "prettier-plugin-svelte",
+        "version": "4.1.1",
+        "manifestSha256": "a634c8ee71085f8edd14171b90ce67e6888811766cde54fefb4e98dbefc4212c"
+      },
+      {
+        "name": "octane",
+        "version": "0.1.48",
+        "manifestSha256": "2159b403afc4c8f8af9d1becf3cba41c5e9ca678458e8781f13ff0a6b4e7aa2a"
+      }
+    ]
+  },
+  "sourceIdentity": {
+    "baselineCommit": "cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+    "baselineSourceArchiveSha256": "df610b31e49a016a512f1ba926b1f07e6700659c6febe4900d99ac0a27e92147",
+    "baselineTestsArchiveSha256": "b9f26c66d55f1bfd9ea27294deb6e0407f90bdd3d170c27346d04bb7bfd1f361",
+    "baselineManifestSha256": "2a0e3e83b0454da5b3896552cbced92adcc49397e40bf79b2c3a37cf59645adf",
+    "frozenSnapshotReference": {
+      "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/result.json",
+      "sha256": "d7c7a6f424eb0fbe249f357c481f38eddfa153f05e5f65fe0306ebc7b55ff8f1",
+      "startedAt": "2026-08-27T20:40:44.947Z",
+      "finishedAt": "2026-08-27T20:40:59.501Z",
+      "sourceChangedDuringRun": [],
+      "sourceManifestSha256": "5491c5617ff82c5524d2cbb902b766065f14c02a46a3b6b5d613c00c3610eefc",
+      "sourceManifestEntryCount": 1076,
+      "selectedCurrentHashMismatches": [],
+      "note": "This final run directly captures the scoped typecheck and default development/production boundary outcomes reported below. Full source manifests before and after, exact invocations, and hashes of raw logs and dependency-load records are retained at the referenced local paths. Script hashes absent from this manifest were captured when this artifact was updated.",
+      "sourceManifestEncoding": "UTF-8 JSON.stringify(before) without indentation"
+    },
+    "files": [
+      {
+        "path": "packages/octane/src/compiler/volar.js",
+        "frozenCandidateSha256": "e986075d050ef0bb89f5395420c04c7c5ffbfb22193e092d0d550c2f9c4eddd9",
+        "baselineSha256": "9f8776350de4a5c3c9f75f3f655136ce3307d284dd2caa9b3a877a1cd9c04d51"
+      },
+      {
+        "path": "packages/octane/src/compiler/volar.d.ts",
+        "frozenCandidateSha256": "0905786c49b1de67ae9429cf88cecb9357afed487d05dfb781ef71e7108ce8a2",
+        "baselineSha256": "0905786c49b1de67ae9429cf88cecb9357afed487d05dfb781ef71e7108ce8a2"
+      },
+      {
+        "path": "packages/octane/src/compiler/index.js",
+        "frozenCandidateSha256": "c7ff03a70dee28acf8e971f3c80fa4dd3699cbf528426319e5f6e987870c5dba",
+        "baselineSha256": "c7ff03a70dee28acf8e971f3c80fa4dd3699cbf528426319e5f6e987870c5dba"
+      },
+      {
+        "path": "packages/octane/src/compiler/index.d.ts",
+        "frozenCandidateSha256": "34272ac1825e2011f0b0049e1bc7dfd38c76d0114d566d6874a1d61041e03382",
+        "baselineSha256": "34272ac1825e2011f0b0049e1bc7dfd38c76d0114d566d6874a1d61041e03382"
+      },
+      {
+        "path": "packages/octane/src/compiler/compile.js",
+        "frozenCandidateSha256": "9c0f6445561faa82c44aee82d62a90c4dc15f99058bb270f12ee597ecaa8a43d",
+        "baselineSha256": "c81c6ab2664dedb98a1a6499a0adf24c667d2d5b3ac7c209ba5d434bcfbd1a73"
+      },
+      {
+        "path": "packages/octane/src/compiler/vite.js",
+        "frozenCandidateSha256": "5b310833bb9ab4973264f0f99266e7b1fd177eb9055a1e05678565ade640da45",
+        "baselineSha256": "5b310833bb9ab4973264f0f99266e7b1fd177eb9055a1e05678565ade640da45"
+      },
+      {
+        "path": "packages/octane/src/compiler/native-read-diagnostics.js",
+        "frozenCandidateSha256": "87dcc1bcf0cc1e1afc5b07cfa448f1c326475d3dab47406456833d29afd60f6e",
+        "baselineSha256": "14090401ed07684a1123e7f19815dcf6dbadf3cb71b192863582dbde9c5959a2"
+      },
+      {
+        "path": "packages/octane/src/compiler/native-read-types.js",
+        "frozenCandidateSha256": "e56f948cad43bf776ee641476cf90768cce9d341d7a451fe6c8e2df9f347e370",
+        "baselineSha256": "dd9d59584603f9f358244f020004aabfdf3058f9c2d0440db2806231bfe0e137"
+      },
+      {
+        "path": "packages/octane/src/runtime.ts",
+        "frozenCandidateSha256": "c3d599109718adc8ccb1c70ababd34370ef72525fd541ac442f89cee638e23d7",
+        "baselineSha256": "72d8c0efdb97e7763b2cfa7e74a13e8c24bd57a48b2b19aed121f17bd0537d49"
+      },
+      {
+        "path": "packages/octane/src/runtime.server.ts",
+        "frozenCandidateSha256": "2ae910fea1105e32198b44fc883965f5574f1e4436d9695a5cc728232f8fc4c4",
+        "baselineSha256": "66d094c2ab47ae21c85a7d62c328edafa4230d8a778afa37a563759029360803"
+      },
+      {
+        "path": "packages/octane/src/signals/native-read-client.ts",
+        "frozenCandidateSha256": "0584da538e6ba5631479a81e78c29aa8665afb5cd15cf2f03d6afdd9fedf7048",
+        "baselineSha256": "60bbe148943897f242f7d0d4682a4d3846a161a9649e78092f8380937c42327b"
+      },
+      {
+        "path": "packages/octane/src/signals/native-read-collector.ts",
+        "frozenCandidateSha256": "da41ce3b9b2c0bec7a79a4b3efaaef1a47a105ca9b85261ac665c003938a9234",
+        "baselineSha256": "a89c9f39847ae4c30cc11d39f1fe75fb5a156649938620555017b59af868422b"
+      },
+      {
+        "path": "packages/octane/src/signals/native-read-server.ts",
+        "frozenCandidateSha256": "23c8b3abf7ba919dfd1ba8b1e30671d5cbf1f3a5179389292abece436d4fb614",
+        "baselineSha256": "23c8b3abf7ba919dfd1ba8b1e30671d5cbf1f3a5179389292abece436d4fb614"
+      },
+      {
+        "path": "packages/octane/src/index.ts",
+        "frozenCandidateSha256": "61248363056932245b73648cb977dc54c9769ffd95879052d3266d6e741434ee",
+        "baselineSha256": "61248363056932245b73648cb977dc54c9769ffd95879052d3266d6e741434ee"
+      },
+      {
+        "path": "packages/octane/src/jsx-runtime.d.ts",
+        "frozenCandidateSha256": "ca269c09cee81daf13491f3df36277a81f1f81fc6ec9ee6c2647efa3f243a40e",
+        "baselineSha256": "ca269c09cee81daf13491f3df36277a81f1f81fc6ec9ee6c2647efa3f243a40e"
+      },
+      {
+        "path": "packages/octane/scripts/bundle-volar.mjs",
+        "frozenCandidateSha256": "ec16bfd0a7b1e99565846774f2fdda833f1c1e57b47396961ee81f6c34750c27",
+        "baselineSha256": "ec16bfd0a7b1e99565846774f2fdda833f1c1e57b47396961ee81f6c34750c27"
+      },
+      {
+        "path": "packages/octane/tests/compiler/volar.test.ts",
+        "frozenCandidateSha256": "e17d0f3d62819c0bd963220fbec7df99cedbe0f0f7de8593c9a2044e03c5fae2",
+        "baselineSha256": "e614ba4c50045b6343c6c4cb365242c8316dcd7868e31c7994ebbefdf9dfac52"
+      },
+      {
+        "path": "packages/octane/tests/compiler/compiler-ast-immutability.test.ts",
+        "frozenCandidateSha256": "084342ebd848a680c603e4bb5fe22b9d0bfdd1cf4939fd305dcef6fed58d2332",
+        "baselineSha256": "084342ebd848a680c603e4bb5fe22b9d0bfdd1cf4939fd305dcef6fed58d2332"
+      },
+      {
+        "path": "packages/octane/tests/directive-value-position.test.ts",
+        "frozenCandidateSha256": "dbc617b1f1b8d2c6fe56fb8e1d9b3f2ad1fa43d703099478c294c586c491b5b5",
+        "baselineSha256": "dbc617b1f1b8d2c6fe56fb8e1d9b3f2ad1fa43d703099478c294c586c491b5b5"
+      },
+      {
+        "path": "packages/octane/tests/_fixtures/directive-value-position.tsrx",
+        "frozenCandidateSha256": "c39e7dfb300742944cd77ebaa49721b29a168550741fecb278507691a9be5b7b",
+        "baselineSha256": "c39e7dfb300742944cd77ebaa49721b29a168550741fecb278507691a9be5b7b"
+      },
+      {
+        "path": "packages/octane/tests/_fixtures/native-read-collection.tsrx",
+        "frozenCandidateSha256": "dbdc660905f799c486d8e6313f685713d2d8a849f9bb8f3d36047f09f5fd7acf"
+      },
+      {
+        "path": "packages/octane/tests/_fixtures/signals-native.tsrx",
+        "frozenCandidateSha256": "bda0a717b0102e40f2b29f8004ffca70c2200571d349c8545dd0218f68f8732e",
+        "baselineSha256": "9cb1a44828b4d51c138a6e1d0f5630fc8f33c5daf9fcc814e5af3e6c52ad3cdd"
+      },
+      {
+        "path": "packages/octane/tests/_fixtures/signals-hydration.tsrx",
+        "frozenCandidateSha256": "7a7010445c56e2210ca140902db8632a4da6971cda4edfee90bae2916e9eb479",
+        "baselineSha256": "c763e0bd9b87cc268a972df1dcce68cf70abe7937951c229406cb304b53b3c8e"
+      },
+      {
+        "path": "packages/octane/tests/native-read-collection.disabled.test.ts",
+        "frozenCandidateSha256": "8c4c1eb0a1209b436e4851d51d84d20841e642b6481953d6c12f57a185811def"
+      },
+      {
+        "path": "packages/octane/tests/suspense-preserves-dom.test.ts",
+        "frozenCandidateSha256": "8fea56bde2803b29a70826f6ad09ea0991512b45e7f8ee2f5c1dc714052141e2",
+        "baselineSha256": "8fea56bde2803b29a70826f6ad09ea0991512b45e7f8ee2f5c1dc714052141e2"
+      },
+      {
+        "path": "packages/octane/tests/_fixtures/suspense-preserves-dom.tsrx",
+        "frozenCandidateSha256": "4381b8021a8c21762ac0669a8e761ada4c02b3e8f65991b0ea9fd4ca8e461277",
+        "baselineSha256": "4381b8021a8c21762ac0669a8e761ada4c02b3e8f65991b0ea9fd4ca8e461277"
+      },
+      {
+        "path": "scripts/scoped-signals-projects.mjs",
+        "frozenCandidateSha256": "b22f354714fef855a8f3db1d15474ed7d4861758379e47626f5616a3f5674f44"
+      }
+    ],
+    "historicalFrozenSnapshotReference": {
+      "path": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T20-19-49.682Z-HboSZA/result.json",
+      "sha256": "821da2e9ea38f510796339cbf153f3cf0e745bf3d78976b52bb02e37e910f1c7",
+      "startedAt": "2026-08-27T20:19:50.003Z",
+      "finishedAt": "2026-08-27T20:21:53.864Z",
+      "sourceChangedDuringRun": [],
+      "sourceManifestSha256": "c56cd1a90d1815ee96d5e3805ad033d510969a58f2984b351f7b663ce6eeb40c",
+      "selectedCurrentHashMismatches": [],
+      "note": "This companion run supplies source identity only here; its test/browser outcomes are reported separately. Selected script hashes absent from its source manifest were captured when this artifact was written.",
+      "sourceManifestEncoding": "UTF-8 JSON.stringify(before) without indentation"
+    }
+  },
+  "harness": {
+    "current": {
+      "register.mjs": "7b715fa2432bbbba0c091b8cd972b5e3407363d1f73295f7873b22b650f45b3a",
+      "vitest.config.mjs": "e5ed8f77527af47f944bbae15766584a663971167cf05bdd9f86cc22dfc8f93d",
+      "run.mjs": "765871ac53ae2c537b8842b1cd47a4511a68a187b4bab7e54cbfa5f7ce191a44",
+      "native-volar-conformance.config.mjs": "3ac97728af451f9cec80da9706e5f7f09bebf41c47e56c69bf936dc5869df776",
+      "native-volar-baseline.config.mjs": "ff7f0e947ecbd011ab25a6fefe02ec48207d6fa2575fb148f0c539130a946fe8",
+      "native-visible-boundary-conformance.config.mjs": "e73f7c99612d5856435597b43d67d88dd8d099f54156c908fbbb64f3a774783e",
+      "tsconfig-native-fixtures.json": "7fee10e2aba5991b79417fd03038f3ec60cc49db6171059b2268475ae2d3595f",
+      "consumer-compiler/index.mjs": "838965e5d47fe13479052d88613ff92f67258de296b7221a4bcaf6a3d34f0b5b",
+      "consumer-compiler/package.json": "665cce9b8df92823da33091882a357a6579267f8f419b93df361c58118b24a10",
+      "public-source/packages/tsrx/src/transform/jsx/index.js": "6c4b6ef03851fbad271dc7a419bc3f8070dfc215ff18f24e60be0e424755e136",
+      "public-source/packages/typescript-plugin/src/tsc.js": "be117aab86c0df52d08888f1109065e57391825f1a2f53f90eba6cbb2250ad76",
+      "public-source/packages/typescript-plugin/src/language.js": "89f12a3e4a58fbf339c1675b826c293e2129937f9fbabc1b38c5c79c67c32846"
+    },
+    "legacyCommonHashesRecordedAt": "2026-08-27T20:12:40.032Z",
+    "legacyCommon": {
+      "run.mjs": "69313594e7d30ce68b8c077f3108a4ec80a24614df3801b74de19cd6746cec70",
+      "register.mjs": "1e913dd25f640f2c4797cf8a5fe5be45ab0e086edc3c6ba8d32df5e86f9110bc",
+      "vitest.config.mjs": "18c306b3b7f4f9bcbf83cd6bad93db127568d33da6e01b1e0908b34cbbacb809"
+    },
+    "note": "The specialized boundary configuration is unchanged, but its imported common configuration and resolver were later audited and updated. Current specialized-config hashes do not imply the older common harness used current bytes.",
+    "finalBoundaryRun": {
+      "hashes": {
+        "run-boundary-final.mjs": "86f40f2cd4dfb5105b88e1749e3af7ac5561f649239ebe350419d69df14046d1",
+        "register.mjs": "7b715fa2432bbbba0c091b8cd972b5e3407363d1f73295f7873b22b650f45b3a",
+        "vitest.config.mjs": "e5ed8f77527af47f944bbae15766584a663971167cf05bdd9f86cc22dfc8f93d",
+        "native-visible-boundary-conformance.config.mjs": "e73f7c99612d5856435597b43d67d88dd8d099f54156c908fbbb64f3a774783e",
+        "tsconfig-native-fixtures.json": "7fee10e2aba5991b79417fd03038f3ec60cc49db6171059b2268475ae2d3595f",
+        "consumer-compiler/index.mjs": "838965e5d47fe13479052d88613ff92f67258de296b7221a4bcaf6a3d34f0b5b",
+        "public-source/packages/typescript-plugin/src/tsc.js": "be117aab86c0df52d08888f1109065e57391825f1a2f53f90eba6cbb2250ad76"
+      },
+      "provenanceSha256": "c2a7a3413da743b296371698a87160f184869767d4dd568540445fd055b86e09",
+      "recordedAt": "2026-08-27T20:40:44.947Z"
+    }
+  },
+  "checks": {
+    "scopedNativeTypecheck": {
+      "status": "passed",
+      "command": "node --import /private/tmp/octane-native-source-compiler-NVcMdO/register.mjs /private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/typescript-plugin/src/tsc.js --noEmit -p /private/tmp/octane-native-source-compiler-NVcMdO/tsconfig-native-fixtures.json",
+      "exitCode": 0,
+      "diagnosticCount": 0,
+      "stdout": "",
+      "stderr": "",
+      "compilerOptions": {
+        "strict": true,
+        "skipLibCheck": true,
+        "noEmit": true,
+        "allowJs": true,
+        "checkJs": false
+      },
+      "includes": [
+        "packages/octane/tests/_fixtures/native-read-collection.tsrx",
+        "packages/octane/tests/_fixtures/signals-async-controls.ts",
+        "packages/octane/tests/_fixtures/signals-deferred-values.tsrx",
+        "packages/octane/tests/_fixtures/signals-hydration.tsrx",
+        "packages/octane/tests/_fixtures/signals-local.tsrx",
+        "packages/octane/tests/_fixtures/signals-memos.tsrx",
+        "packages/octane/tests/_fixtures/signals-native-readers.ts",
+        "packages/octane/tests/_fixtures/signals-native.tsrx",
+        "packages/octane/tests/_fixtures/signals-parallel-use.tsrx",
+        "packages/octane/tests/browser/signals-native-collection/*",
+        "benchmarks/scoped-signals/native-costs.tsrx"
+      ],
+      "wrapper": {
+        "package": "octane-native-source-validation",
+        "sha256": "838965e5d47fe13479052d88613ff92f67258de296b7221a4bcaf6a3d34f0b5b",
+        "options": {
+          "nativeReads": true
+        },
+        "behavior": "Forwards source, filename, and existing options to actual public compileToVolarMappings with nativeReads:true. The authored fixture import is unchanged; the wrapper does not rewrite source or filter diagnostics.",
+        "limitation": "The tagged tsrx-tsc plugin does not itself forward nativeReads. This explicit consumer wrapper validates the opted-in scope only, not unmodified plugin option forwarding or the canonical full workspace typecheck."
+      },
+      "extends": {
+        "path": "packages/octane/tsconfig.json",
+        "sha256": "3ff16e067d0d950320a1226b014c189ae932c093d031c597de55fabeb23550d7"
+      },
+      "currentHeadEvidence": true,
+      "evidence": {
+        "executable": "/opt/homebrew/Cellar/node/26.4.0/bin/node",
+        "arguments": [
+          "--import",
+          "/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs",
+          "/private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/typescript-plugin/src/tsc.js",
+          "--noEmit",
+          "-p",
+          "/private/tmp/octane-native-source-compiler-NVcMdO/tsconfig-native-fixtures.json"
+        ],
+        "workingDirectory": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+        "environment": {
+          "OCTANE_SOURCE_EVIDENCE_DIR": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/typecheck"
+        },
+        "exitCode": 0,
+        "signal": null,
+        "finishedAt": "2026-08-27T20:40:48.892Z",
+        "directory": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/typecheck",
+        "files": [
+          {
+            "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/typecheck/dependency-loads-84039.json",
+            "sha256": "873b4f6c1178331e24205e23ff5df77cefdf5437919f8a46fbe13f6bac9c0eed"
+          },
+          {
+            "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/typecheck/invocation.json",
+            "sha256": "4b56d2b11ca46e579e5c3553bd5bd8f02092c4c1570faf3d3ecff17d75f71da1"
+          },
+          {
+            "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/typecheck/stderr.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/typecheck/stdout.log",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ]
+      },
+      "sourceIdentity": "sourceIdentity.frozenSnapshotReference"
+    },
+    "duplicateSuspense": {
+      "contract": "An authored value import of Octane Suspense can coexist with @try/@pending while authored import/tag locations and real branch type errors remain mapped.",
+      "tests": [
+        "compileToVolarMappings > type-checks authored Suspense alongside pending directives (nativeReads: false)",
+        "compileToVolarMappings > type-checks authored Suspense alongside pending directives (nativeReads: true)"
+      ],
+      "red": {
+        "command": "env NODE_OPTIONS=--import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs node /private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs run --config /private/tmp/octane-native-source-compiler-NVcMdO/native-volar-baseline.config.mjs --project source-octane-volar packages/octane/tests/compiler/volar.test.ts -t 'type-checks authored Suspense'",
+        "exitCode": 1,
+        "passed": 0,
+        "failed": 2,
+        "skipped": 22,
+        "diagnostic": {
+          "code": 2300,
+          "message": "Duplicate identifier 'Suspense'."
+        },
+        "substitution": "The isolated Vite load hook supplies immutable cd9ed337 volar.js bytes while keeping the current canonical tests and all other candidate modules. It does not edit repository source or printed virtual TypeScript.",
+        "baselineVolarSha256": "9f8776350de4a5c3c9f75f3f655136ce3307d284dd2caa9b3a877a1cd9c04d51"
+      },
+      "green": {
+        "run": "nearbyVolar",
+        "selectedTestsPassed": 2,
+        "selectedTestsFailed": 0,
+        "coverage": [
+          "default and nativeReads modes",
+          "authored, aliased, and implicit imports",
+          "nested, repeated, empty pending boundaries and catch",
+          "compileToVolarMappings and compileTypesInspection",
+          "authored import/tag mapping",
+          "real TS2339 error in pending content mapped to its source"
+        ],
+        "oracle": "TypeScript syntactic/semantic diagnostics of the virtual fixture files against the real Octane declarations. The test does not type-check every Octane implementation dependency."
+      },
+      "residualScope": "The exact value-import fix does not address pre-existing upstream type-only import name collisions or local bindings that shadow the generated Suspense name."
+    },
+    "nearbyVolar": {
+      "command": "env NODE_PATH=/private/tmp/octane-native-source-compiler-NVcMdO/node_modules NODE_OPTIONS=--import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs node /private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs run --config /private/tmp/octane-native-source-compiler-NVcMdO/native-volar-conformance.config.mjs --project source-octane-volar",
+      "exitCode": 1,
+      "passed": 31,
+      "failed": 2,
+      "total": 33,
+      "files": [
+        {
+          "path": "packages/octane/tests/compiler/volar.test.ts",
+          "passed": 22,
+          "failed": 2
+        },
+        {
+          "path": "packages/octane/tests/compiler/compiler-ast-immutability.test.ts",
+          "passed": 9,
+          "failed": 0
+        }
+      ],
+      "failures": [
+        {
+          "name": "compileToVolarMappings > publishes the tested Volar dependency graph without duplicating Octane modules",
+          "message": "esbuild could not resolve @tsrx/core from src/compiler/volar.js:33. Explicit NODE_PATH did not resolve this source-toolchain bundle gap."
+        },
+        {
+          "name": "compileToVolarMappings > type-checks absent and optional host spread refs without weakening authored prop types",
+          "messages": [
+            "Cannot find module 'react' or its corresponding type declarations.",
+            "Cannot find name 'HTMLWebViewElement'. Did you mean 'HTMLVideoElement'? (two diagnostics)"
+          ],
+          "location": "packages/octane/src/jsx-runtime.d.ts",
+          "note": "The existing full-program test reaches missing peer declarations in this supplemental environment. Its assertions were not changed or suppressed."
+        }
+      ]
+    },
+    "directives": {
+      "command": "env NODE_OPTIONS=--import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs node /private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs run --config /private/tmp/octane-native-source-compiler-NVcMdO/native-volar-conformance.config.mjs --project source-volar-directives-dev --project source-volar-directives-prod",
+      "exitCode": 0,
+      "passed": 170,
+      "failed": 0,
+      "file": "packages/octane/tests/directive-value-position.test.ts",
+      "coverage": "Client rendering, SSR, hydration adoption, type-only output, callbacks, module-level directives, and authored diagnostics.",
+      "setupNote": "An initial attempt selected this runtime suite in a compiler-only project without the TSRX transform and failed during import analysis. These results are from corrected temporary routing with the actual Octane plugin; no source or assertions changed.",
+      "projects": ["source-volar-directives-dev", "source-volar-directives-prod"]
+    },
+    "historicalDefaultBoundaryAudit": {
+      "currentHeadEvidence": false,
+      "sourcePhase": "Working tree before the final visible-mode forwarding correction; full per-run source snapshot not captured.",
+      "configuration": "native-visible-boundary-conformance.config.mjs",
+      "candidateRuns": [
+        {
+          "command": "env NODE_OPTIONS=--import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs node /private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs run --config /private/tmp/octane-native-source-compiler-NVcMdO/native-visible-boundary-conformance.config.mjs --project source-default-dev",
+          "mode": "dev",
+          "exitCode": 1,
+          "passed": 140,
+          "failed": 1,
+          "total": 141,
+          "testFiles": 12
+        },
+        {
+          "command": "env NODE_OPTIONS=--import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs node /private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs run --config /private/tmp/octane-native-source-compiler-NVcMdO/native-visible-boundary-conformance.config.mjs --project source-default-prod",
+          "mode": "prod",
+          "exitCode": 1,
+          "passed": 140,
+          "failed": 1,
+          "total": 141,
+          "testFiles": 12
+        }
+      ],
+      "failure": {
+        "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+        "name": "Suspense preserves committed host DOM > keeps a nested portal hidden when the inner boundary resolves first",
+        "line": 278,
+        "expectedRefEvents": ["attach", "detach"],
+        "actualRefEvents": ["attach"]
+      },
+      "baselineComparison": {
+        "command": "env OCTANE_SOURCE_TEST_ROOT=/private/tmp/octane-native-consolidation-baseline-65kce0yk NODE_OPTIONS=--import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs node /private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs run --config /private/tmp/octane-native-source-compiler-NVcMdO/native-visible-boundary-conformance.config.mjs --project source-default-dev packages/octane/tests/suspense-preserves-dom.test.ts -t 'keeps a nested portal hidden'",
+        "baselineCommit": "cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+        "mode": "development",
+        "exitCode": 1,
+        "passed": 0,
+        "failed": 1,
+        "skipped": 18,
+        "selectedFailureMatchesCandidate": true,
+        "entire141CaseBaselineRun": false
+      }
+    },
+    "historicalScopedNativeTypecheck": {
+      "status": "passed",
+      "command": "node --import /private/tmp/octane-native-source-compiler-NVcMdO/register.mjs /private/tmp/octane-native-source-compiler-NVcMdO/public-source/packages/typescript-plugin/src/tsc.js --noEmit -p /private/tmp/octane-native-source-compiler-NVcMdO/tsconfig-native-fixtures.json",
+      "exitCode": 0,
+      "diagnosticCount": 0,
+      "stdout": "",
+      "stderr": "",
+      "compilerOptions": {
+        "strict": true,
+        "skipLibCheck": true,
+        "noEmit": true,
+        "allowJs": true,
+        "checkJs": false
+      },
+      "includes": [
+        "packages/octane/tests/_fixtures/native-read-collection.tsrx",
+        "packages/octane/tests/_fixtures/signals-async-controls.ts",
+        "packages/octane/tests/_fixtures/signals-deferred-values.tsrx",
+        "packages/octane/tests/_fixtures/signals-hydration.tsrx",
+        "packages/octane/tests/_fixtures/signals-local.tsrx",
+        "packages/octane/tests/_fixtures/signals-memos.tsrx",
+        "packages/octane/tests/_fixtures/signals-native-readers.ts",
+        "packages/octane/tests/_fixtures/signals-native.tsrx",
+        "packages/octane/tests/_fixtures/signals-parallel-use.tsrx",
+        "packages/octane/tests/browser/signals-native-collection/*",
+        "benchmarks/scoped-signals/native-costs.tsrx"
+      ],
+      "wrapper": {
+        "package": "octane-native-source-validation",
+        "sha256": "838965e5d47fe13479052d88613ff92f67258de296b7221a4bcaf6a3d34f0b5b",
+        "options": {
+          "nativeReads": true
+        },
+        "behavior": "Forwards source, filename, and existing options to actual public compileToVolarMappings with nativeReads:true. The authored fixture import is unchanged; the wrapper does not rewrite source or filter diagnostics.",
+        "limitation": "The tagged tsrx-tsc plugin does not itself forward nativeReads. This explicit consumer wrapper validates the opted-in scope only, not unmodified plugin option forwarding or the canonical full workspace typecheck."
+      },
+      "sourceIdentityLimitation": "The changed Volar and fixture sources were frozen, but this standalone invocation did not capture a full per-run source or dependency-load snapshot.",
+      "extends": {
+        "path": "packages/octane/tsconfig.json",
+        "sha256": "3ff16e067d0d950320a1226b014c189ae932c093d031c597de55fabeb23550d7"
+      }
+    },
+    "finalDefaultBoundaryAudit": {
+      "currentHeadEvidence": true,
+      "sourceIdentity": "sourceIdentity.frozenSnapshotReference",
+      "configuration": "native-visible-boundary-conformance.config.mjs",
+      "candidateRuns": [
+        {
+          "mode": "development",
+          "tests": {
+            "passed": 140,
+            "failed": 1,
+            "skipped": 0,
+            "total": 141
+          },
+          "testFiles": 12,
+          "evidence": {
+            "executable": "/opt/homebrew/Cellar/node/26.4.0/bin/node",
+            "arguments": [
+              "/private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs",
+              "run",
+              "--config",
+              "/private/tmp/octane-native-source-compiler-NVcMdO/native-visible-boundary-conformance.config.mjs",
+              "--project",
+              "source-default-dev",
+              "--reporter=verbose",
+              "--reporter=json",
+              "--outputFile=/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-dev/vitest.json"
+            ],
+            "workingDirectory": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+            "environment": {
+              "OCTANE_SOURCE_EVIDENCE_DIR": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-dev",
+              "NODE_OPTIONS": "--import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs"
+            },
+            "exitCode": 1,
+            "signal": null,
+            "finishedAt": "2026-08-27T20:40:59.433Z",
+            "directory": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-dev",
+            "files": [
+              {
+                "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-dev/dependency-loads-84037.json",
+                "sha256": "5360ea90c503af47f2ee893d8cb59c8f269aa2e96ff387232c3dfc5c1b4c0e53"
+              },
+              {
+                "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-dev/invocation.json",
+                "sha256": "27c3062d29b4a28643ef4b51995f5a3cd09061f8ee6710d541480d550bda903d"
+              },
+              {
+                "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-dev/stderr.log",
+                "sha256": "5926df7d5a7ce57bf7a3bbab28af3e4bb4f085adbf478026f1093e21cf880bf7"
+              },
+              {
+                "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-dev/stdout.log",
+                "sha256": "0318fe6b023c7294e54980f35e35b7907dbf79a56a8d5479043cb66e6d5ca5d4"
+              },
+              {
+                "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-dev/vitest.json",
+                "sha256": "0353e99bc42b271ef9ef09e00b0f0b205a5fbae3b8f835843e8b29e6a9aa1f1a"
+              }
+            ]
+          },
+          "failures": [
+            {
+              "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+              "name": "Suspense preserves committed host DOM keeps a nested portal hidden when the inner boundary resolves first",
+              "message": "AssertionError: expected [ 'attach' ] to deeply equal [ 'attach', 'detach' ]",
+              "line": 278
+            }
+          ]
+        },
+        {
+          "mode": "production",
+          "tests": {
+            "passed": 140,
+            "failed": 1,
+            "skipped": 0,
+            "total": 141
+          },
+          "testFiles": 12,
+          "evidence": {
+            "executable": "/opt/homebrew/Cellar/node/26.4.0/bin/node",
+            "arguments": [
+              "/private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs",
+              "run",
+              "--config",
+              "/private/tmp/octane-native-source-compiler-NVcMdO/native-visible-boundary-conformance.config.mjs",
+              "--project",
+              "source-default-prod",
+              "--reporter=verbose",
+              "--reporter=json",
+              "--outputFile=/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-prod/vitest.json"
+            ],
+            "workingDirectory": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+            "environment": {
+              "OCTANE_SOURCE_EVIDENCE_DIR": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-prod",
+              "NODE_OPTIONS": "--import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs"
+            },
+            "exitCode": 1,
+            "signal": null,
+            "finishedAt": "2026-08-27T20:40:59.282Z",
+            "directory": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-prod",
+            "files": [
+              {
+                "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-prod/dependency-loads-84038.json",
+                "sha256": "e89a8660f60ecbbdcdbaee8be849af3fc18a5a5c46fd263e098d53f0fb956772"
+              },
+              {
+                "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-prod/invocation.json",
+                "sha256": "72f8353b7593e2ae1f3ccfeda570d0fbd41c81851afdb9f3a13396f01bd9ee02"
+              },
+              {
+                "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-prod/stderr.log",
+                "sha256": "ce1c2bd95cbe1d79f26bcba068763a12a4d35c4717a7dfca10516ff64e098983"
+              },
+              {
+                "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-prod/stdout.log",
+                "sha256": "fc848f6dc87b600d7d9f6996457daa1474e5e14f3d9b58da39741bb18d89882d"
+              },
+              {
+                "path": "/private/tmp/octane-native-source-compiler-NVcMdO/boundary-final-mAbzfx/default-prod/vitest.json",
+                "sha256": "994ec50409d9e62e53b18866d0b3a974275b6b06dec9216be839649f2f1e56a7"
+              }
+            ]
+          },
+          "failures": [
+            {
+              "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+              "name": "Suspense preserves committed host DOM keeps a nested portal hidden when the inner boundary resolves first",
+              "message": "AssertionError: expected [ 'attach' ] to deeply equal [ 'attach', 'detach' ]",
+              "line": 278
+            }
+          ]
+        }
+      ],
+      "baselineComparison": {
+        "command": "env OCTANE_SOURCE_TEST_ROOT=/private/tmp/octane-native-consolidation-baseline-65kce0yk NODE_OPTIONS=--import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs node /private/tmp/octane-native-source-compiler-NVcMdO/node_modules/vitest/vitest.mjs run --config /private/tmp/octane-native-source-compiler-NVcMdO/native-visible-boundary-conformance.config.mjs --project source-default-dev packages/octane/tests/suspense-preserves-dom.test.ts -t 'keeps a nested portal hidden'",
+        "baselineCommit": "cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+        "mode": "development",
+        "exitCode": 1,
+        "passed": 0,
+        "failed": 1,
+        "skipped": 18,
+        "selectedFailureMatchesCandidate": true,
+        "entire141CaseBaselineRun": false,
+        "scope": "Earlier individual baseline development reproduction of this same portal assertion; not a full baseline suite or baseline production run."
+      },
+      "assertionsChangedForFinalRun": false
+    }
+  }
+}

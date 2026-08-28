@@ -1,0 +1,10 @@
+{
+  "operation": "One repository-style JSON formatting pass after the frozen-source public-entry bundle run",
+  "measurementStage": "frozen-source-public-entry",
+  "rawRunnerStatusPreserved": "preliminary",
+  "formatter": "prettier@3.9.6",
+  "rawOriginalLocalPath": "/private/tmp/octane-scoped-signals-original-reports-20260827/bundles-final.json",
+  "rawRunSha256": "040b8854c097e41c58704257489aa1f43c7cbfe057326171ac433811fd243401",
+  "formattedSha256": "1094bfd0c1707535cbd508619133b9c8dede3b180a62e0fc624f23b7fa7dd16c",
+  "parsedValuesUnchanged": true
+}

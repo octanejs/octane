@@ -46,3 +46,15 @@ export interface TextTypeProject {
  * pass the same snapshot to client and server compilation.
  */
 export function createTextTypeProject(options: TextTypeProjectOptions): TextTypeProject;
+
+/**
+ * Validate native signal names and known live reads in ordinary memo callbacks
+ * against the exact SourceFile in an existing TypeScript Program. The caller
+ * owns project lifetime and mapping diagnostics from virtual .tsrx files.
+ * Resolves the native SIGNAL_HANDLE brand by symbol; unrelated structural
+ * shapes and ordinary sampled values are not native capabilities.
+ */
+export function validateNativeSignalNames(
+	program: import('typescript').Program,
+	file: string | import('typescript').SourceFile,
+): import('./index.js').CompileDiagnostic[];

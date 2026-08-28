@@ -1,0 +1,218 @@
+{
+  "mode": "offline-v8-retainer-diagnostics",
+  "scopedBundleSha256": "ea6d0750dc07a3de225b5157755f5b6a62eefd3b4c3d9f14721b241a77fc68a7",
+  "method": "Scope instances identified by public prototype methods; strong paths exclude weak edges. Stored key discriminates the known workload owners in this recorded engine revision.",
+  "limitations": "One synchronous ownership workload. These snapshots do not establish async producer, DOM, native block, historical frame, or DevTools retention behavior.",
+  "rows": [
+    {
+      "name": "octane-scoped-continuous-0",
+      "cycle": 0,
+      "phase": "active",
+      "disposedOwners": 0,
+      "snapshot": "/private/tmp/octane-scoped-signals-retainers-20260827/octane-scoped-0-0-active.heapsnapshot",
+      "snapshotSha256": "5b333ecdd24a059442e80243bfa4f13511ca583386d5f0af4467dcf63e439b36",
+      "scopes": [
+        {
+          "scopeKey": "soak/octane-scoped/0/0/shared",
+          "className": "ye",
+          "selfBytes": 136,
+          "rootPath": [
+            {
+              "edge": "1",
+              "type": "synthetic",
+              "name": "(GC roots)"
+            },
+            {
+              "edge": "20",
+              "type": "synthetic",
+              "name": "(Stack roots)"
+            },
+            {
+              "edge": "33",
+              "type": "object",
+              "name": "Generator"
+            },
+            {
+              "edge": "4",
+              "type": "object",
+              "name": "Promise"
+            },
+            {
+              "edge": "reactions_or_result",
+              "type": "hidden",
+              "name": "system / PromiseReaction"
+            },
+            {
+              "edge": "1",
+              "type": "closure",
+              "name": ""
+            },
+            {
+              "edge": "context",
+              "type": "object",
+              "name": "system / Context"
+            },
+            {
+              "edge": "extension",
+              "type": "object",
+              "name": "Generator"
+            },
+            {
+              "edge": "context",
+              "type": "object",
+              "name": "system / Context"
+            },
+            {
+              "edge": "shared",
+              "type": "object",
+              "name": "ye"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "octane-scoped-continuous-0",
+      "cycle": 100,
+      "phase": "active",
+      "disposedOwners": 200,
+      "snapshot": "/private/tmp/octane-scoped-signals-retainers-20260827/octane-scoped-0-100-active.heapsnapshot",
+      "snapshotSha256": "7e75351168518b8c6c97f1303a856530fa5c26e0236ac4341f97ece74ec63e16",
+      "scopes": [
+        {
+          "scopeKey": "soak/octane-scoped/0/0/shared",
+          "className": "ye",
+          "selfBytes": 136,
+          "rootPath": [
+            {
+              "edge": "1",
+              "type": "synthetic",
+              "name": "(GC roots)"
+            },
+            {
+              "edge": "20",
+              "type": "synthetic",
+              "name": "(Stack roots)"
+            },
+            {
+              "edge": "33",
+              "type": "object",
+              "name": "Generator"
+            },
+            {
+              "edge": "4",
+              "type": "object",
+              "name": "Promise"
+            },
+            {
+              "edge": "reactions_or_result",
+              "type": "hidden",
+              "name": "system / PromiseReaction"
+            },
+            {
+              "edge": "1",
+              "type": "closure",
+              "name": ""
+            },
+            {
+              "edge": "context",
+              "type": "object",
+              "name": "system / Context"
+            },
+            {
+              "edge": "extension",
+              "type": "object",
+              "name": "Generator"
+            },
+            {
+              "edge": "context",
+              "type": "object",
+              "name": "system / Context"
+            },
+            {
+              "edge": "shared",
+              "type": "object",
+              "name": "ye"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "octane-scoped-continuous-0",
+      "cycle": 1000,
+      "phase": "active",
+      "disposedOwners": 2000,
+      "snapshot": "/private/tmp/octane-scoped-signals-retainers-20260827/octane-scoped-0-1000-active.heapsnapshot",
+      "snapshotSha256": "84e359f88bf7663ff8367de6c9cf52a5234f0bf6a67b100d91cbcbb4ce71c9c6",
+      "scopes": [
+        {
+          "scopeKey": "soak/octane-scoped/0/0/shared",
+          "className": "ye",
+          "selfBytes": 136,
+          "rootPath": [
+            {
+              "edge": "1",
+              "type": "synthetic",
+              "name": "(GC roots)"
+            },
+            {
+              "edge": "20",
+              "type": "synthetic",
+              "name": "(Stack roots)"
+            },
+            {
+              "edge": "33",
+              "type": "object",
+              "name": "Generator"
+            },
+            {
+              "edge": "4",
+              "type": "object",
+              "name": "Promise"
+            },
+            {
+              "edge": "reactions_or_result",
+              "type": "hidden",
+              "name": "system / PromiseReaction"
+            },
+            {
+              "edge": "1",
+              "type": "closure",
+              "name": ""
+            },
+            {
+              "edge": "context",
+              "type": "object",
+              "name": "system / Context"
+            },
+            {
+              "edge": "extension",
+              "type": "object",
+              "name": "Generator"
+            },
+            {
+              "edge": "context",
+              "type": "object",
+              "name": "system / Context"
+            },
+            {
+              "edge": "shared",
+              "type": "object",
+              "name": "ye"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "octane-scoped-continuous-0",
+      "cycle": 1000,
+      "phase": "retired",
+      "disposedOwners": 2000,
+      "snapshot": "/private/tmp/octane-scoped-signals-retainers-20260827/octane-scoped-0-1000-retired.heapsnapshot",
+      "snapshotSha256": "56b8db3361ba820dd178fb8e227053aa79a813daf52e7427e37a09b30bd1177a",
+      "scopes": []
+    }
+  ]
+}

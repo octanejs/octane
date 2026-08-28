@@ -226,6 +226,7 @@ internally, get their own baseline and guard namespace.
 | `recursive-context` | recursive-context | Octane + reference frameworks | context fan-out |
 | `spa-navigation` | spa-navigation | octane-tsrx, octane-jsx, react, solid, vue-vapor, inferno | full-page routed-subtree teardown/mount with shell/layout identity and production-work gates |
 | `signal-favoring` | signal-favoring | Octane + reference frameworks | cascade vs targeted |
+| `scoped-signals` | scoped-signals | none (Node-only) | same-version Alien 3.2.0/scoped-engine graphs, intermediate notification/value gates, and continuous partial disposal with unrelated live owners; optional separate heap diagnostics |
 | `news` | news | none (builds) | SSR + hydration, per-target |
 | `hydration-interactivity` | hydration-interactivity | none (builds) | real pre-hydration typing, controlled inputs, native event replay, and 1×/6× Chromium CPU throttling across Octane, React, Preact, Solid 2, Svelte, Vue Vapor, and Inferno |
 | `hydration-stress` | hydration-stress | none (builds) | withheld-chunk hydration, keyboard and pointer Send delivery, DOM adoption, and explicit replay/drop diagnostics at 6× CPU throttling |

@@ -1,0 +1,3780 @@
+{
+  "suite": "scoped-signals-retained-foreign-owners",
+  "mode": "deliberate-backlink-retention-fault",
+  "startedAt": "2026-08-27T20:33:34.930Z",
+  "request": [
+    "/opt/homebrew/Cellar/node/26.4.0/bin/node",
+    "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/run-foreign-retention.mjs",
+    "--tooling-root=/private/tmp/octane-scoped-signals-tooling.n1e5b0",
+    "--cycles=1000",
+    "--fault-leave-backlinks"
+  ],
+  "cycles": 1000,
+  "method": "A single live foreign producer outlives consumer scopes whose derived value first succeeds, then switches to a failing branch and retains that success. Each consumer is disposed and dropped before post-GC snapshots. One retained live consumer is a positive control; later checkpoints retire it and then the producer.",
+  "inspection": "Offline reachability excludes raw weak edges and promotes V8 WeakMap ephemeron values only when both their key and table are reachable. Public prototype methods identify scope and signal instances; known fixture labels classify intentionally live scopes.",
+  "limits": [
+    "No async attempts, historical frames, renderer, browser, or DevTools are created by this workload.",
+    "Heap bytes are diagnostic; retained owner/node counts and strong retainer paths are the leak controls.",
+    "Raw heaps stay in a separate local directory. Only known labels, metadata, hashes, and retainer paths are reported.",
+    "The deliberate fault modifies only the in-memory graph source supplied to its isolated bundle; repository source is never changed."
+  ],
+  "environment": {
+    "node": "v26.4.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpu": "Apple M5 Max",
+    "commit": "cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+    "dirty": true,
+    "toolingRoot": "/private/tmp/octane-scoped-signals-tooling.n1e5b0",
+    "dependencies": {
+      "alien": {
+        "name": "alien-signals",
+        "version": "3.2.0",
+        "root": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals",
+        "entry": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/cjs/index.cjs",
+        "manifestSha256": "246a6dc2e0b031c5a274df8fdd6f84d7880aa11d8d945a3579a6214a1afe8831",
+        "entrySha256": "4176a9035b7898debb4601fd0ba8076e279befc470816336260847bd44720299"
+      },
+      "esbuild": {
+        "name": "esbuild",
+        "version": "0.28.1",
+        "root": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild",
+        "entry": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js",
+        "manifestSha256": "d55d1d19fcc5b6079e4a71dd4111340c79c682bc36835ac7058a0c364c7db58a",
+        "entrySha256": "8331fe1d8b3a07381f33cc425fcfaa94776e263113653f80ec3ba433e9657e73"
+      }
+    },
+    "lockfileSha256": "8ea32857607beda8b520797b9885fbdb46fa30886edc2a7966186428cf36a912",
+    "runnerSha256": "900a5f0ed0404460ac035ab5d4a483bdd0fda24b81516ff538c33412f90a7ee2",
+    "workerSha256": "905b47b9a2e534a648903870c0a78f5206db4d7d29eea4935ecf997cca42e264",
+    "inspectorSha256": "d7ec5f16673a9340d09b43c82dfc2ec79ecd0dbd04a54a89431a12ea7a34243e",
+    "reachabilitySha256": "f6f8ca30bdce57a6f621bcfa5ecf1e349f445eb717cabc52375af80b4103487e"
+  },
+  "checkpoints": [
+    {
+      "cycle": 0,
+      "phase": "active-control",
+      "disposedConsumers": 0,
+      "liveScopeKeys": ["foreign-retention/producer", "foreign-retention/control"],
+      "expectedLiveSignals": 3,
+      "memory": {
+        "rss": 114196480,
+        "heapTotal": 7749632,
+        "heapUsed": 6464424,
+        "external": 3904617,
+        "arrayBuffers": 146745
+      },
+      "snapshot": "/var/folders/zr/_4f6yytj45z6l0cfjlchy5gc0000gn/T/octane-foreign-retention-fault-7VQ2vX/active-control-0.heapsnapshot",
+      "inspection": {
+        "snapshotSha256": "048058e4c16cddd218b6543228723bfc2df3409d7a3ab5def73ffb5887a672e0",
+        "snapshotBytes": 8160668,
+        "ephemeronPairCount": 3,
+        "ephemeronPromotions": 2,
+        "strongScopeCount": 2,
+        "retiredCycleScopeCount": 0,
+        "scopeSamples": [
+          {
+            "scopeKey": "foreign-retention/producer",
+            "className": "Te",
+            "selfBytes": 232,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/control",
+            "className": "Te",
+            "selfBytes": 232,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "control",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "scope",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          }
+        ],
+        "retiredCycleScopeSamples": [],
+        "strongSignalCount": 3,
+        "retiredCycleSignalCount": 0,
+        "signalSamples": [
+          {
+            "scopeKey": "foreign-retention/control",
+            "className": "q",
+            "selfBytes": 272,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "control",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "view$",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/producer",
+            "className": "q",
+            "selfBytes": 272,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "source$",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/control",
+            "className": "q",
+            "selfBytes": 272,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "control",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "view$",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "deps",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "dep",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          }
+        ],
+        "strongRequestCount": 0,
+        "retiredCycleRequestCount": 0,
+        "requestSamples": [],
+        "retainedAttemptRecords": 0,
+        "attemptAllocationTemplates": 0,
+        "activeAttemptRecords": 0,
+        "revokedAttemptRecords": 0,
+        "revokedAttemptsWithObjectEntry": 0,
+        "revokedAttemptsWithController": 0,
+        "revokedAttemptsWithIterator": 0,
+        "revokedAttemptSamples": [],
+        "externalProducerCounts": {
+          "promise": 0,
+          "stream-next": 0,
+          "stream-return": 0
+        },
+        "externalProducerSamples": [],
+        "strongStreamIteratorCount": 0,
+        "streamIteratorSamples": []
+      }
+    },
+    {
+      "cycle": 100,
+      "phase": "active-control",
+      "disposedConsumers": 100,
+      "liveScopeKeys": ["foreign-retention/producer", "foreign-retention/control"],
+      "expectedLiveSignals": 3,
+      "memory": {
+        "rss": 115834880,
+        "heapTotal": 7487488,
+        "heapUsed": 6882272,
+        "external": 3904657,
+        "arrayBuffers": 146745
+      },
+      "snapshot": "/var/folders/zr/_4f6yytj45z6l0cfjlchy5gc0000gn/T/octane-foreign-retention-fault-7VQ2vX/active-control-100.heapsnapshot",
+      "inspection": {
+        "snapshotSha256": "cee0325f790636c08ddc1581c7c1d907385a3c160d66ea70d3e37be15da410e2",
+        "snapshotBytes": 8490978,
+        "ephemeronPairCount": 4,
+        "ephemeronPromotions": 2,
+        "strongScopeCount": 102,
+        "retiredCycleScopeCount": 100,
+        "scopeSamples": [
+          {
+            "scopeKey": "foreign-retention/consumer-54",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "175",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-53",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "173",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-52",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "171",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-55",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "177",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-56",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "179",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-44",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "155",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-43",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "153",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-42",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "151",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          }
+        ],
+        "retiredCycleScopeSamples": [
+          {
+            "scopeKey": "foreign-retention/consumer-54",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "175",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-53",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "173",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-52",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "171",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-55",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "177",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-56",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "179",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-44",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "155",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-43",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "153",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-42",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "151",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          }
+        ],
+        "strongSignalCount": 103,
+        "retiredCycleSignalCount": 100,
+        "signalSamples": [
+          {
+            "scopeKey": "foreign-retention/control",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "control",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "view$",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-1",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "69",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-2",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "71",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-3",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "73",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-4",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "75",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-5",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "77",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-6",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "79",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-7",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "81",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          }
+        ],
+        "strongRequestCount": 0,
+        "retiredCycleRequestCount": 0,
+        "requestSamples": [],
+        "retainedAttemptRecords": 0,
+        "attemptAllocationTemplates": 0,
+        "activeAttemptRecords": 0,
+        "revokedAttemptRecords": 0,
+        "revokedAttemptsWithObjectEntry": 0,
+        "revokedAttemptsWithController": 0,
+        "revokedAttemptsWithIterator": 0,
+        "revokedAttemptSamples": [],
+        "externalProducerCounts": {
+          "promise": 0,
+          "stream-next": 0,
+          "stream-return": 0
+        },
+        "externalProducerSamples": [],
+        "strongStreamIteratorCount": 0,
+        "streamIteratorSamples": []
+      }
+    },
+    {
+      "cycle": 1000,
+      "phase": "active-control",
+      "disposedConsumers": 1000,
+      "liveScopeKeys": ["foreign-retention/producer", "foreign-retention/control"],
+      "expectedLiveSignals": 3,
+      "memory": {
+        "rss": 128057344,
+        "heapTotal": 10108928,
+        "heapUsed": 9217144,
+        "external": 3904657,
+        "arrayBuffers": 146745
+      },
+      "snapshot": "/var/folders/zr/_4f6yytj45z6l0cfjlchy5gc0000gn/T/octane-foreign-retention-fault-7VQ2vX/active-control-1000.heapsnapshot",
+      "inspection": {
+        "snapshotSha256": "8b327e6f460584c60f70114784d55a67038e12a0511865f44b792f7ed3523da5",
+        "snapshotBytes": 10710929,
+        "ephemeronPairCount": 4,
+        "ephemeronPromotions": 2,
+        "strongScopeCount": 1002,
+        "retiredCycleScopeCount": 1000,
+        "scopeSamples": [
+          {
+            "scopeKey": "foreign-retention/consumer-54",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "623",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-53",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "621",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-52",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "619",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-55",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "625",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-56",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "627",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-44",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "603",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-43",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "601",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-42",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "599",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          }
+        ],
+        "retiredCycleScopeSamples": [
+          {
+            "scopeKey": "foreign-retention/consumer-54",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "623",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-53",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "621",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-52",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "619",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-55",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "625",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-56",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "627",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-44",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "603",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-43",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "601",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-42",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "599",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          }
+        ],
+        "strongSignalCount": 1003,
+        "retiredCycleSignalCount": 1000,
+        "signalSamples": [
+          {
+            "scopeKey": "foreign-retention/consumer-91",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "697",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-92",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "699",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-93",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "701",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-94",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "703",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-95",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "705",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-96",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "707",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-97",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "709",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-98",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "711",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          }
+        ],
+        "strongRequestCount": 0,
+        "retiredCycleRequestCount": 0,
+        "requestSamples": [],
+        "retainedAttemptRecords": 0,
+        "attemptAllocationTemplates": 0,
+        "activeAttemptRecords": 0,
+        "revokedAttemptRecords": 0,
+        "revokedAttemptsWithObjectEntry": 0,
+        "revokedAttemptsWithController": 0,
+        "revokedAttemptsWithIterator": 0,
+        "revokedAttemptSamples": [],
+        "externalProducerCounts": {
+          "promise": 0,
+          "stream-next": 0,
+          "stream-return": 0
+        },
+        "externalProducerSamples": [],
+        "strongStreamIteratorCount": 0,
+        "streamIteratorSamples": []
+      }
+    },
+    {
+      "cycle": 1000,
+      "phase": "control-retired",
+      "disposedConsumers": 1000,
+      "liveScopeKeys": ["foreign-retention/producer"],
+      "expectedLiveSignals": 1,
+      "memory": {
+        "rss": 128106496,
+        "heapTotal": 10108928,
+        "heapUsed": 9153072,
+        "external": 3904657,
+        "arrayBuffers": 146745
+      },
+      "snapshot": "/var/folders/zr/_4f6yytj45z6l0cfjlchy5gc0000gn/T/octane-foreign-retention-fault-7VQ2vX/control-retired-1000.heapsnapshot",
+      "inspection": {
+        "snapshotSha256": "93c165be7491717a85c4749a8a015e843de81e2840601388c6c8b5a27eedf7e6",
+        "snapshotBytes": 10699223,
+        "ephemeronPairCount": 3,
+        "ephemeronPromotions": 2,
+        "strongScopeCount": 1002,
+        "retiredCycleScopeCount": 1001,
+        "scopeSamples": [
+          {
+            "scopeKey": "foreign-retention/consumer-54",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "623",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-53",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "621",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-52",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "619",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-55",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "625",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-56",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "627",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-44",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "603",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-43",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "601",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-42",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "599",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          }
+        ],
+        "retiredCycleScopeSamples": [
+          {
+            "scopeKey": "foreign-retention/consumer-54",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "623",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-53",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "621",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-52",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "619",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-55",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "625",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-56",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "627",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-44",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "603",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-43",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "601",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-42",
+            "className": "Te",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "599",
+                "type": "object",
+                "name": "q"
+              },
+              {
+                "edge": "owner",
+                "type": "object",
+                "name": "Te"
+              }
+            ]
+          }
+        ],
+        "strongSignalCount": 1002,
+        "retiredCycleSignalCount": 1001,
+        "signalSamples": [
+          {
+            "scopeKey": "foreign-retention/consumer-91",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "697",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-92",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "699",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-93",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "701",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-94",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "703",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-95",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "705",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-96",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "707",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-97",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "709",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          },
+          {
+            "scopeKey": "foreign-retention/consumer-98",
+            "className": "q",
+            "selfBytes": 176,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneForeignRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producer",
+                "type": "object",
+                "name": "Te"
+              },
+              {
+                "edge": "1 / part of key (Te @124323) -> value (Set @124325) pair in WeakMap (table @124321)",
+                "type": "object",
+                "name": "Set"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "711",
+                "type": "object",
+                "name": "q"
+              }
+            ]
+          }
+        ],
+        "strongRequestCount": 0,
+        "retiredCycleRequestCount": 0,
+        "requestSamples": [],
+        "retainedAttemptRecords": 0,
+        "attemptAllocationTemplates": 0,
+        "activeAttemptRecords": 0,
+        "revokedAttemptRecords": 0,
+        "revokedAttemptsWithObjectEntry": 0,
+        "revokedAttemptsWithController": 0,
+        "revokedAttemptsWithIterator": 0,
+        "revokedAttemptSamples": [],
+        "externalProducerCounts": {
+          "promise": 0,
+          "stream-next": 0,
+          "stream-return": 0
+        },
+        "externalProducerSamples": [],
+        "strongStreamIteratorCount": 0,
+        "streamIteratorSamples": []
+      }
+    },
+    {
+      "cycle": 1000,
+      "phase": "all-retired",
+      "disposedConsumers": 1000,
+      "liveScopeKeys": [],
+      "expectedLiveSignals": 0,
+      "memory": {
+        "rss": 125960192,
+        "heapTotal": 7487488,
+        "heapUsed": 6702672,
+        "external": 3904657,
+        "arrayBuffers": 146745
+      },
+      "snapshot": "/var/folders/zr/_4f6yytj45z6l0cfjlchy5gc0000gn/T/octane-foreign-retention-fault-7VQ2vX/all-retired-1000.heapsnapshot",
+      "inspection": {
+        "snapshotSha256": "1123d5e7e72b1e078d4948fa8704c60f1805c44e3eaab6d4788598f6a1cc306c",
+        "snapshotBytes": 8268682,
+        "ephemeronPairCount": 3,
+        "ephemeronPromotions": 1,
+        "strongScopeCount": 0,
+        "retiredCycleScopeCount": 0,
+        "scopeSamples": [],
+        "retiredCycleScopeSamples": [],
+        "strongSignalCount": 0,
+        "retiredCycleSignalCount": 0,
+        "signalSamples": [],
+        "strongRequestCount": 0,
+        "retiredCycleRequestCount": 0,
+        "requestSamples": [],
+        "retainedAttemptRecords": 0,
+        "attemptAllocationTemplates": 0,
+        "activeAttemptRecords": 0,
+        "revokedAttemptRecords": 0,
+        "revokedAttemptsWithObjectEntry": 0,
+        "revokedAttemptsWithController": 0,
+        "revokedAttemptsWithIterator": 0,
+        "revokedAttemptSamples": [],
+        "externalProducerCounts": {
+          "promise": 0,
+          "stream-next": 0,
+          "stream-return": 0
+        },
+        "externalProducerSamples": [],
+        "strongStreamIteratorCount": 0,
+        "streamIteratorSamples": []
+      }
+    }
+  ],
+  "bundle": {
+    "bytes": 30294,
+    "sha256": "a1840e7feacdfc132b9bd05247c5c8c88637e5012cb02dca3aacc13fea34075b",
+    "inputs": [
+      {
+        "path": "packages/octane/src/signals/errors.ts",
+        "absolutePath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/errors.ts",
+        "sha256": "6a9a9561a4e37085c76ae714f6ec774f19646d3c6ef0e0f5dbc44ae6e16ee451"
+      },
+      {
+        "path": "packages/octane/src/signals/encoding.ts",
+        "absolutePath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/encoding.ts",
+        "sha256": "57625f36035059cca2c473a5ac0e8038b27b4d57eaa422a3bcd185b9dc38d88c"
+      },
+      {
+        "path": "../../../../../private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs",
+        "absolutePath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs",
+        "sha256": "d6861e6d706a1f5c6de3446353e5424c8e82dd3576e6aac03b850edf51e9a8c5"
+      },
+      {
+        "path": "packages/octane/src/signals/read-protocol.ts",
+        "absolutePath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/read-protocol.ts",
+        "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417"
+      },
+      {
+        "path": "packages/octane/src/signals/graph.ts",
+        "absolutePath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/graph.ts",
+        "sha256": "f723fc4c3e8e0ab89f3639d85838cebcf54d6f611510a0ae4fdbeb70724580be",
+        "transformedSha256": "2208c808f58df0fb6d44aa7ba3f7ac86da88dc3058d50ea3d6a566a7cc224610"
+      },
+      {
+        "path": "packages/octane/src/signals/requests.ts",
+        "absolutePath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/requests.ts",
+        "sha256": "79e06c4b5d73ab42fd735be6ebeaecafc74d8726e1a548bcd7e24f64415c3d24"
+      },
+      {
+        "path": "packages/octane/src/signals/engine.ts",
+        "absolutePath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/engine.ts",
+        "sha256": "a21392b8b8d048d4194eab67b29ccd8a146668aa7f2a55d7fb4001ca290b626f"
+      },
+      {
+        "path": "packages/octane/src/signals/index.ts",
+        "absolutePath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/index.ts",
+        "sha256": "c4400e3eacea0f52049d3559b26be14dd3485a897135b54ec8cd5f2ad43de17d"
+      }
+    ]
+  },
+  "fault": {
+    "file": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/graph.ts",
+    "originalSha256": "f723fc4c3e8e0ab89f3639d85838cebcf54d6f611510a0ae4fdbeb70724580be",
+    "transformedSha256": "2208c808f58df0fb6d44aa7ba3f7ac86da88dc3058d50ea3d6a566a7cc224610",
+    "edit": "Replace the unique nodes?.delete(node) removal with void node, leaving owner tracking, payload erasure, and graph unlinking intact."
+  },
+  "workerCommand": [
+    "/opt/homebrew/Cellar/node/26.4.0/bin/node",
+    "--expose-gc",
+    "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/foreign-retention-worker.mjs",
+    "/var/folders/zr/_4f6yytj45z6l0cfjlchy5gc0000gn/T/octane-foreign-retention-fault-7VQ2vX/engine.mjs",
+    "/var/folders/zr/_4f6yytj45z6l0cfjlchy5gc0000gn/T/octane-foreign-retention-fault-7VQ2vX",
+    "1000"
+  ],
+  "sourceUnchanged": true,
+  "status": "expected-fault-detected",
+  "finishedAt": "2026-08-27T20:33:36.804Z",
+  "snapshotDirectory": "/var/folders/zr/_4f6yytj45z6l0cfjlchy5gc0000gn/T/octane-foreign-retention-fault-7VQ2vX"
+}

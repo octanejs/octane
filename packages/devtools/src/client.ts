@@ -22,6 +22,44 @@ export interface NodeDetail {
 	hooks: WireHookCell[];
 	context: Array<{ name: string; value: unknown }>;
 	effectCount: number;
+	/** Optional capability: older runtimes and scopes without native reads omit it. */
+	nativeReads?: NativeReadOwnerWire;
+}
+
+export interface NativeReadSourceWire {
+	scopeKey: string;
+	key: string;
+	read: 'value' | 'latest' | 'snapshot';
+	kind: 'signal' | 'derived' | 'async';
+	status: 'ready' | 'pending' | 'error' | 'unevaluated';
+	revision: number;
+	generation?: number;
+	epoch: number;
+	retired: boolean;
+	historical: boolean;
+	retained: boolean;
+	refreshing: boolean;
+	connection: 'none' | 'connecting' | 'open' | 'closed';
+	complete: boolean;
+	dependencies: readonly { scopeKey: string; key: string }[];
+}
+
+export interface NativeReadWire {
+	observedVersion: number | null;
+	currentVersion: number;
+	source: NativeReadSourceWire | null;
+}
+
+export interface NativeReadAttemptWire {
+	mixed: boolean;
+	reads: readonly NativeReadWire[];
+}
+
+export interface NativeReadOwnerWire {
+	ownerId: number;
+	committed: NativeReadAttemptWire | null;
+	pending: readonly NativeReadAttemptWire[];
+	retry: readonly NativeReadWire[];
 }
 export interface InspectRequest {
 	id: number;
@@ -70,6 +108,7 @@ type OctaneDevtoolsEventMap = {
 	tree: TreeSnapshot;
 	inspect: NodeDetail;
 	'inspect-request': InspectRequest;
+	'inspect-clear': InspectRequest;
 	profile: ProfileSnapshot;
 	transition: TransitionSnapshot;
 	// Panel → bridge: "send me a fresh snapshot now" (emitted when the panel

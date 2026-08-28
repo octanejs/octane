@@ -20,3 +20,7 @@ export const HOOK_NAMES = new Set([
 	'useFormStatus',
 	'useOptimistic',
 ]);
+
+// Optional integration hooks are recognized by import provenance only. A $
+// suffix does not add builtin semantics to unrelated functions or old bindings.
+export const NATIVE_SIGNAL_HOOK_NAMES = new Set(['useSignal$']);

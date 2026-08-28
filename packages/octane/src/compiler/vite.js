@@ -532,6 +532,9 @@ function assertProfilingDefineAvailable(definitions, enabled) {
 }
 
 export function octane(options = {}) {
+	if (options.nativeReads !== undefined && typeof options.nativeReads !== 'boolean') {
+		throw new TypeError('octane/compiler/vite: nativeReads must be a boolean when provided.');
+	}
 	if (options.strong !== undefined && typeof options.strong !== 'boolean') {
 		throw new TypeError('octane/compiler/vite: `strong` must be a boolean when provided.');
 	}
@@ -612,6 +615,7 @@ export function octane(options = {}) {
 		exclude: options.exclude,
 		profile: profileEnabled,
 		strong: options.strong,
+		nativeReads: options.nativeReads,
 		renderers: options.renderers,
 		requireDirective,
 		warn,
@@ -630,6 +634,7 @@ export function octane(options = {}) {
 			exclude: options.exclude,
 			profile: profileEnabled,
 			strong: options.strong,
+			nativeReads: options.nativeReads,
 			renderers: options.renderers,
 			requireDirective,
 			warn,

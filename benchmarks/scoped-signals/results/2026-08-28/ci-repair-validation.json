@@ -1,0 +1,478 @@
+{
+  "schemaVersion": 1,
+  "purpose": "CI repair behavioral failures and verified final source",
+  "parentCommit": "f16c0bc734c7e2408f73753cf9569a05ffe04ff0",
+  "candidateSourceHashes": {
+    "packages/cli/src/data/octane-data.json": "5276b579eddb87782e5a79be6fe13be0499cfe5903cb0afc7589be50eb2ee178",
+    "packages/devtools/src/panel/ComponentsTab.tsrx": "418388f31b6234f5153ad5dbaf064cef19ff9c600993d058a717477592e0a97f",
+    "packages/formisch/audit/react-parity.json": "d3bc6287f48add49b5f2919c7aa8cd0d70c0209527ea280250b8e62d0afff045",
+    "packages/octane-mcp-server/src/index.js": "4fffbc71b8c3f24545abc73e6daa1a0372bc2c3f4045915147d2bef0e96d8da6",
+    "packages/octane/error-codes/codes.json": "ef0ee6cf7500266fb2b48880f57ded27f722e09b439ee1e529bd84f792f4ab4b",
+    "packages/octane/src/compiler/bundler.js": "c4b477105dfd7755e4adf977369352150d487b6351ed1aa82934cea258f3347a",
+    "packages/octane/src/error-codes.client.generated.ts": "4f5423b6e82ee98892c8ea13f3a2d098ea2f32d36f35426e5f4fde14adbd46b9",
+    "packages/octane/src/error-codes.server.generated.ts": "1b9a7236728144615c9fc38febe8acb633425c18cc69b461314ce43ca809573f",
+    "packages/octane/src/runtime.server.ts": "1d4ecc33733e24335479b77475f2195e1b6a0d85dd653df1e752904bbb90a740",
+    "packages/octane/src/runtime.ts": "738d9417d4495a6058024a89bf8fb4519209f68ed4a932237f9b992734a6c839",
+    "packages/octane/src/signals/native-read-inspection.ts": "49054824626ef861f1b149f7ac72a990d50e2cf94b504ac2cb2f9619fd11aa0b",
+    "packages/octane/tests/_fixtures/provider-children-dialect.tsrx": "1dba98a47f23f619b2c6f5fc7f4868982b02c1ae03659ea3bf7cf323990731c7",
+    "packages/octane/tests/_fixtures/signals-local.tsrx": "e74ebe7035e3dc806bb5f9199da831b2f58a3877b4d60ad522756106c77f2971",
+    "packages/octane/tests/_fixtures/transition-held-urgent-resuspend.tsrx": "4795063549da097dd17f0595d48d6bbed99ddd9a066d92fd41306ed15e161f42",
+    "packages/octane/tests/production-error-bundle.test.ts": "dfe2ee254f91859a4860f69f3740b00507c930be374d95c7e43cbb39a9d0b022",
+    "packages/octane/tests/provider-children-dialect.test.ts": "0298087300eb13b6f52e4830a1fa04e7d39ef645ccbcb6d5694610f6437763ae",
+    "packages/octane/tests/public-exports.test.ts": "558cb05e1a61185f94684b13865bcf1fbda08f5ef631fd498ae9c4344235291a",
+    "packages/octane/tests/signals-devtools.test.tsrx": "e55e6b64dffca4c2f650deee60c00506dfe158bfe7eecc44e79ce3c24e8ae5f8",
+    "packages/octane/tests/suspense-preserves-dom.test.ts": "bbeeda0fa1624c89dfa29b222dae5f7dcbbb1ae4c6567ce6e06bcb349a2d3b1d",
+    "packages/octane/tests/transition-held-urgent-resuspend.test.ts": "e8b999bbabcd1097825eca698ca88c60cc859a0c58b7dca69a32fddc4aeb76c6",
+    "scripts/react-parity/formisch-manifest.mjs": "e7eafa5daf434a424d15dbf500f1fe464343fd78beed3f73d03d5a2d310cbb5b",
+    "scripts/react-parity/harness-lib.mjs": "21a3079cd0c002ac17e749e93a740ca7318d972817ad9ba3d56e9eae73cff8dd",
+    "scripts/react-parity/harness-lib.test.mjs": "f0e1998b166ce3074bcf356472ba6ffafc6a2c4cf62777f5a33f575c085357fa"
+  },
+  "limitations": [
+    "Supplemental public tagged TSRX compiler source and explicit cached dependencies; not a complete locked workspace installation or canonical CI run.",
+    "Per-run source snapshots establish exact available bytes, not that every snapshotted module was loaded.",
+    "The prior setup failures and the separate approved browser rerun are retained in final-correctness-summary.json.",
+    "All capture hashes refer to original local bytes; publication formatting has separate provenance."
+  ],
+  "behavioralRuns": [
+    {
+      "label": "native error catalog before repair",
+      "sourceRoot": "/private/tmp/octane-pr877-catalog-red-e0d31h7c",
+      "node": "v22.22.3",
+      "command": [
+        "run",
+        "--config",
+        "/private/tmp/octane-native-source-compiler-NVcMdO/ci-runtime-repair.config.mjs",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-24-00.222Z-caOhAx/vitest.json",
+        "packages/octane/tests/production-error-bundle.test.ts",
+        "--project",
+        "source-default-dev",
+        "-t",
+        "preserves native compiler"
+      ],
+      "startedAt": "2026-08-27T23:24:00.433Z",
+      "finishedAt": "2026-08-27T23:24:04.976Z",
+      "exitCode": 1,
+      "sourceFileCount": 1072,
+      "sourceChangedDuringRun": [],
+      "capturedManifestSha256": "756f21fb63c0c34236c06efc1c945203fb30dae76de60afb505ec944cfece7e8",
+      "manifestHashEncoding": "UTF-8 JSON with sorted keys and comma/colon separators, no trailing newline",
+      "keySourceHashes": {
+        "packages/octane/src/runtime.server.ts": "2ae910fea1105e32198b44fc883965f5574f1e4436d9695a5cc728232f8fc4c4",
+        "packages/octane/src/runtime.ts": "1d0a1656fd63506272e3c875f5221014c5f315d47f0f6831f0ea11983fca0eae",
+        "packages/octane/tests/_fixtures/provider-children-dialect.tsrx": "f22f0ea1f1e670057ac0f48515c384bc319011fd80757b83d47790ff3cba0afd",
+        "packages/octane/tests/_fixtures/transition-held-urgent-resuspend.tsrx": "9e3ef445defa772c2fc42afc1d5d7ac77a2d7ada0d58fbceb83346c38568ae37",
+        "packages/octane/tests/production-error-bundle.test.ts": "dfe2ee254f91859a4860f69f3740b00507c930be374d95c7e43cbb39a9d0b022",
+        "packages/octane/tests/provider-children-dialect.test.ts": "fdb972cae59569606254acb5c34b5310da061fbfa7f85b13118dca8e1aec91f5",
+        "packages/octane/tests/suspense-preserves-dom.test.ts": "8fea56bde2803b29a70826f6ad09ea0991512b45e7f8ee2f5c1dc714052141e2",
+        "packages/octane/tests/transition-held-urgent-resuspend.test.ts": "bd65ef757355c2eb42418e7f617881b07f12824e1e28ba5c016d5ec6bda6a111"
+      },
+      "rawReport": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-24-00.222Z-caOhAx/result.json",
+      "rawReportSha256": "62a078e56fa2e7c2cb8dd9b2cc45116933d7c67008b17d21dd83eecf1d866aaa",
+      "vitestReport": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-24-00.222Z-caOhAx/vitest.json",
+      "vitestReportSha256": "fff7f6323eb0b45d5e24171fc91d2c298042586cb19ed9c44cb59a9985067960",
+      "harness": {
+        "run-ci-repair.mjs": "2b4e64a1cbf0f5a890578907f50bddd49c88df417e1152b5bdbf617f5ce5dc9b",
+        "register.mjs": "7b715fa2432bbbba0c091b8cd972b5e3407363d1f73295f7873b22b650f45b3a",
+        "vitest.config.mjs": "e5ed8f77527af47f944bbae15766584a663971167cf05bdd9f86cc22dfc8f93d",
+        "ci-runtime-repair.config.mjs": "d8e038582946de1e8b2c08ff5836becf47494b9f962b4bb03839e8d2286cf1df"
+      },
+      "testFilesExecuted": 1,
+      "passed": 0,
+      "failed": 2,
+      "pending": 6,
+      "failures": [
+        {
+          "file": "packages/octane/tests/production-error-bundle.test.ts",
+          "test": "production error bundles preserves native compiler and hook diagnostics in client development and production bundles",
+          "messages": [
+            "AssertionError: expected an Octane error URL in \"Unsupported native-read compiler/runtime version.\": expected null not to be null\n    at decodedErrorUrl (/private/tmp/octane-pr877-catalog-red-e0d31h7c/packages/octane/tests/production-error-bundle.test.ts:294:82)\n    at /private/tmp/octane-pr877-catalog-red-e0d31h7c/packages/octane/tests/production-error-bundle.test.ts:315:17\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/production-error-bundle.test.ts",
+          "test": "production error bundles preserves native compiler and hook diagnostics in server development and production bundles",
+          "messages": [
+            "AssertionError: expected an Octane error URL in \"Unsupported native-read compiler/runtime version.\": expected null not to be null\n    at decodedErrorUrl (/private/tmp/octane-pr877-catalog-red-e0d31h7c/packages/octane/tests/production-error-bundle.test.ts:294:82)\n    at /private/tmp/octane-pr877-catalog-red-e0d31h7c/packages/octane/tests/production-error-bundle.test.ts:315:17\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "urgent supersession before repair, both resolution orders",
+      "sourceRoot": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+      "node": "v22.22.3",
+      "command": [
+        "run",
+        "--config",
+        "/private/tmp/octane-native-source-compiler-NVcMdO/ci-runtime-repair.config.mjs",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-31-51.132Z-E0NiUQ/vitest.json",
+        "packages/octane/tests/transition-held-urgent-resuspend.test.ts",
+        "--project",
+        "source-default-dev",
+        "-t",
+        "latest urgent child state"
+      ],
+      "startedAt": "2026-08-27T23:31:51.312Z",
+      "finishedAt": "2026-08-27T23:31:53.792Z",
+      "exitCode": 1,
+      "sourceFileCount": 1072,
+      "sourceChangedDuringRun": [],
+      "capturedManifestSha256": "f34b52513ae00cc11448038f86671da274064a8adcaa5e632900d63116bb9b1d",
+      "manifestHashEncoding": "UTF-8 JSON with sorted keys and comma/colon separators, no trailing newline",
+      "keySourceHashes": {
+        "packages/octane/src/runtime.server.ts": "0fb5c38db6130debef728045e5df27904ae05d85114911a7dc7c0c7db1ed17c1",
+        "packages/octane/src/runtime.ts": "d558359a53e2b61ddc3e2fd58792a1c4c88746925038b9a55a09bd1e0975b8e7",
+        "packages/octane/tests/_fixtures/provider-children-dialect.tsrx": "1dba98a47f23f619b2c6f5fc7f4868982b02c1ae03659ea3bf7cf323990731c7",
+        "packages/octane/tests/_fixtures/transition-held-urgent-resuspend.tsrx": "4795063549da097dd17f0595d48d6bbed99ddd9a066d92fd41306ed15e161f42",
+        "packages/octane/tests/production-error-bundle.test.ts": "dfe2ee254f91859a4860f69f3740b00507c930be374d95c7e43cbb39a9d0b022",
+        "packages/octane/tests/provider-children-dialect.test.ts": "0298087300eb13b6f52e4830a1fa04e7d39ef645ccbcb6d5694610f6437763ae",
+        "packages/octane/tests/suspense-preserves-dom.test.ts": "8fea56bde2803b29a70826f6ad09ea0991512b45e7f8ee2f5c1dc714052141e2",
+        "packages/octane/tests/transition-held-urgent-resuspend.test.ts": "a906b9e662051ba916f5cdbd1a889a0056e2bc622df57aaa6ebee1c269d06f56"
+      },
+      "rawReport": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-31-51.132Z-E0NiUQ/result.json",
+      "rawReportSha256": "d556f193e9a7348c8b2fb98caae207b2c42d7f32f979ef2e20ce2d15b8a8560f",
+      "vitestReport": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-31-51.132Z-E0NiUQ/vitest.json",
+      "vitestReportSha256": "7d1978230463d6ab99f69b5c2fca4ef01a63ee9cf546c98c6c5a51e96c97eb9e",
+      "harness": {
+        "run-ci-repair.mjs": "2b4e64a1cbf0f5a890578907f50bddd49c88df417e1152b5bdbf617f5ce5dc9b",
+        "register.mjs": "7b715fa2432bbbba0c091b8cd972b5e3407363d1f73295f7873b22b650f45b3a",
+        "vitest.config.mjs": "e5ed8f77527af47f944bbae15766584a663971167cf05bdd9f86cc22dfc8f93d",
+        "ci-runtime-repair.config.mjs": "f25e5a9925ffccf9d653dc57a089f3d16996d584354318c02d7201f4a3b013a4"
+      },
+      "testFilesExecuted": 1,
+      "passed": 0,
+      "failed": 2,
+      "pending": 4,
+      "failures": [
+        {
+          "file": "packages/octane/tests/transition-held-urgent-resuspend.test.ts",
+          "test": "transition-held boundary keeps prior content across an URGENT re-suspend (React parity) reveals the latest urgent child state when request 2 settles first",
+          "messages": [
+            "AssertionError: expected 'content-1' to be 'content-3' // Object.is equality\n    at /Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/transition-held-urgent-resuspend.test.ts:96:32\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/transition-held-urgent-resuspend.test.ts",
+          "test": "transition-held boundary keeps prior content across an URGENT re-suspend (React parity) reveals the latest urgent child state when request 3 settles first",
+          "messages": [
+            "AssertionError: expected 'content-1' to be 'content-3' // Object.is equality\n    at /Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/transition-held-urgent-resuspend.test.ts:92:32\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "provider cleanup before repair",
+      "sourceRoot": "/private/tmp/octane-provider-regression-red-rhxsjvf0/source",
+      "node": "v26.4.0",
+      "command": [
+        "run",
+        "--config",
+        "/private/tmp/octane-native-source-compiler-NVcMdO/ci-runtime-repair.config.mjs",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-31-23.215Z-gqe709/vitest.json",
+        "packages/octane/tests/provider-children-dialect.test.ts",
+        "--project=source-default-dev",
+        "--project=source-default-prod"
+      ],
+      "startedAt": "2026-08-27T23:31:23.336Z",
+      "finishedAt": "2026-08-27T23:31:27.250Z",
+      "exitCode": 1,
+      "sourceFileCount": 1034,
+      "sourceChangedDuringRun": [],
+      "capturedManifestSha256": "e3bf1dd2deab7af609975b4dc46a9a83624925e4dac343a40101c5809c88b68e",
+      "manifestHashEncoding": "UTF-8 JSON with sorted keys and comma/colon separators, no trailing newline",
+      "keySourceHashes": {
+        "packages/octane/src/runtime.server.ts": "0fb5c38db6130debef728045e5df27904ae05d85114911a7dc7c0c7db1ed17c1",
+        "packages/octane/src/runtime.ts": "d558359a53e2b61ddc3e2fd58792a1c4c88746925038b9a55a09bd1e0975b8e7",
+        "packages/octane/tests/_fixtures/provider-children-dialect.tsrx": "1dba98a47f23f619b2c6f5fc7f4868982b02c1ae03659ea3bf7cf323990731c7",
+        "packages/octane/tests/_fixtures/transition-held-urgent-resuspend.tsrx": "9e3ef445defa772c2fc42afc1d5d7ac77a2d7ada0d58fbceb83346c38568ae37",
+        "packages/octane/tests/production-error-bundle.test.ts": "b95ba9ab69fdbfecc437193a20ab2d96d75d52521a3fb787e6fada6448bce7d3",
+        "packages/octane/tests/provider-children-dialect.test.ts": "0298087300eb13b6f52e4830a1fa04e7d39ef645ccbcb6d5694610f6437763ae",
+        "packages/octane/tests/suspense-preserves-dom.test.ts": "8fea56bde2803b29a70826f6ad09ea0991512b45e7f8ee2f5c1dc714052141e2",
+        "packages/octane/tests/transition-held-urgent-resuspend.test.ts": "bd65ef757355c2eb42418e7f617881b07f12824e1e28ba5c016d5ec6bda6a111"
+      },
+      "rawReport": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-31-23.215Z-gqe709/result.json",
+      "rawReportSha256": "5a5bfcc2d1ab488393fa468f8fad7f0b274974e1c8e6887626b2e2e28d2e56f1",
+      "vitestReport": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-31-23.215Z-gqe709/vitest.json",
+      "vitestReportSha256": "3488aca6dc315f7ccb6ea40bb470700820c8459e484614bfe4128e14884dd43d",
+      "harness": {
+        "run-ci-repair.mjs": "2b4e64a1cbf0f5a890578907f50bddd49c88df417e1152b5bdbf617f5ce5dc9b",
+        "register.mjs": "7b715fa2432bbbba0c091b8cd972b5e3407363d1f73295f7873b22b650f45b3a",
+        "vitest.config.mjs": "e5ed8f77527af47f944bbae15766584a663971167cf05bdd9f86cc22dfc8f93d",
+        "ci-runtime-repair.config.mjs": "f25e5a9925ffccf9d653dc57a089f3d16996d584354318c02d7201f4a3b013a4"
+      },
+      "testFilesExecuted": 2,
+      "passed": 10,
+      "failed": 4,
+      "pending": 0,
+      "failures": [
+        {
+          "file": "packages/octane/tests/provider-children-dialect.test.ts",
+          "test": "context Provider — children dialect changes routes a cleanup that throws during the flip to the enclosing boundary",
+          "messages": [
+            "AssertionError: expected [ [ Error: cleanup-boom ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+expect@4.1.10/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+expect@4.1.10/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/chai@6.2.2/node_modules/chai/index.js:1700:25)\n    at /private/tmp/octane-provider-regression-red-rhxsjvf0/source/packages/octane/tests/provider-children-dialect.test.ts:80:82\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/provider-children-dialect.test.ts",
+          "test": "context Provider — children dialect changes reports the original cleanup error without connecting children abandoned by its catch",
+          "messages": [
+            "AssertionError: expected [ 'connect', 'cleanup', …(2) ] to deeply equal [ 'connect', 'cleanup' ]\n    at /private/tmp/octane-provider-regression-red-rhxsjvf0/source/packages/octane/tests/provider-children-dialect.test.ts:124:22\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/provider-children-dialect.test.ts",
+          "test": "context Provider — children dialect changes routes a cleanup that throws during the flip to the enclosing boundary",
+          "messages": [
+            "AssertionError: expected [ [ Error: cleanup-boom ] ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+expect@4.1.10/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+expect@4.1.10/node_modules/@vitest/expect/dist/index.js:1156:15)\n    at Proxy.methodWrapper (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/chai@6.2.2/node_modules/chai/index.js:1700:25)\n    at /private/tmp/octane-provider-regression-red-rhxsjvf0/source/packages/octane/tests/provider-children-dialect.test.ts:80:82\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/provider-children-dialect.test.ts",
+          "test": "context Provider — children dialect changes reports the original cleanup error without connecting children abandoned by its catch",
+          "messages": [
+            "AssertionError: expected [ 'connect', 'cleanup', …(2) ] to deeply equal [ 'connect', 'cleanup' ]\n    at /private/tmp/octane-provider-regression-red-rhxsjvf0/source/packages/octane/tests/provider-children-dialect.test.ts:124:22\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "nested portal cleanup before repair",
+      "sourceRoot": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+      "node": "v26.4.0",
+      "command": [
+        "run",
+        "--config",
+        "/private/tmp/octane-native-source-compiler-NVcMdO/ci-runtime-repair.config.mjs",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-37-31.534Z-8XC1gQ/vitest.json",
+        "packages/octane/tests/suspense-preserves-dom.test.ts",
+        "--project",
+        "source-default-dev",
+        "--project",
+        "source-default-prod"
+      ],
+      "startedAt": "2026-08-27T23:37:31.681Z",
+      "finishedAt": "2026-08-27T23:37:35.776Z",
+      "exitCode": 1,
+      "sourceFileCount": 1072,
+      "sourceChangedDuringRun": [],
+      "capturedManifestSha256": "102877f47c25cc66b0875452a513120b8d81119ffe2b1d9019aaf978d64d576f",
+      "manifestHashEncoding": "UTF-8 JSON with sorted keys and comma/colon separators, no trailing newline",
+      "keySourceHashes": {
+        "packages/octane/src/runtime.server.ts": "0fb5c38db6130debef728045e5df27904ae05d85114911a7dc7c0c7db1ed17c1",
+        "packages/octane/src/runtime.ts": "047578f86a287f3d37e890ab8c1b4805c5ee16f0a4d897c7edfcc9b895796051",
+        "packages/octane/tests/_fixtures/provider-children-dialect.tsrx": "1dba98a47f23f619b2c6f5fc7f4868982b02c1ae03659ea3bf7cf323990731c7",
+        "packages/octane/tests/_fixtures/transition-held-urgent-resuspend.tsrx": "4795063549da097dd17f0595d48d6bbed99ddd9a066d92fd41306ed15e161f42",
+        "packages/octane/tests/production-error-bundle.test.ts": "dfe2ee254f91859a4860f69f3740b00507c930be374d95c7e43cbb39a9d0b022",
+        "packages/octane/tests/provider-children-dialect.test.ts": "0298087300eb13b6f52e4830a1fa04e7d39ef645ccbcb6d5694610f6437763ae",
+        "packages/octane/tests/suspense-preserves-dom.test.ts": "bbeeda0fa1624c89dfa29b222dae5f7dcbbb1ae4c6567ce6e06bcb349a2d3b1d",
+        "packages/octane/tests/transition-held-urgent-resuspend.test.ts": "a906b9e662051ba916f5cdbd1a889a0056e2bc622df57aaa6ebee1c269d06f56"
+      },
+      "rawReport": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-37-31.534Z-8XC1gQ/result.json",
+      "rawReportSha256": "4010e53f0aa025d628051b36f7ea1faf39ce378645ee8a0f631fb7bf596b9357",
+      "vitestReport": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-37-31.534Z-8XC1gQ/vitest.json",
+      "vitestReportSha256": "48a4c6a2782d2eb299488dc974f8057502e99d55cc5ac4be9ed2b12e51993151",
+      "harness": {
+        "run-ci-repair.mjs": "2b4e64a1cbf0f5a890578907f50bddd49c88df417e1152b5bdbf617f5ce5dc9b",
+        "register.mjs": "7b715fa2432bbbba0c091b8cd972b5e3407363d1f73295f7873b22b650f45b3a",
+        "vitest.config.mjs": "e5ed8f77527af47f944bbae15766584a663971167cf05bdd9f86cc22dfc8f93d",
+        "ci-runtime-repair.config.mjs": "f25e5a9925ffccf9d653dc57a089f3d16996d584354318c02d7201f4a3b013a4"
+      },
+      "testFilesExecuted": 2,
+      "passed": 36,
+      "failed": 10,
+      "pending": 0,
+      "failures": [
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "test": "Suspense preserves committed host DOM keeps a nested portal hidden when the inner boundary resolves first",
+          "messages": [
+            "AssertionError: expected [ 'attach' ] to deeply equal [ 'attach', 'detach' ]\n    at /Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/suspense-preserves-dom.test.ts:324:78\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "test": "Suspense preserves committed host DOM keeps a nested portal hidden when the outer boundary resolves first",
+          "messages": [
+            "AssertionError: expected [ <button …(2)></button> ] to deeply equal [ <button …(2)></button>, null ]\n    at /Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/suspense-preserves-dom.test.ts:356:57\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "test": "Suspense preserves committed host DOM reconnects a nested portal once when both hidden boundaries resolve together",
+          "messages": [
+            "AssertionError: expected [ <button …(2)></button> ] to deeply equal [ <button …(2)></button>, null ]\n    at /Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/suspense-preserves-dom.test.ts:377:57\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "test": "Suspense preserves committed host DOM stops nested publication when the portal detach callback requests unmount",
+          "messages": [
+            "AssertionError: expected [ <button …(2)></button> ] to deeply equal [ <button …(2)></button>, null ]\n    at /Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/suspense-preserves-dom.test.ts:402:58\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "test": "Suspense preserves committed host DOM stops nested publication when the portal detach callback requests replace",
+          "messages": [
+            "AssertionError: expected [ <button …(2)></button> ] to deeply equal [ <button …(2)></button>, null ]\n    at /Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/suspense-preserves-dom.test.ts:402:58\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "test": "Suspense preserves committed host DOM keeps a nested portal hidden when the inner boundary resolves first",
+          "messages": [
+            "AssertionError: expected [ 'attach' ] to deeply equal [ 'attach', 'detach' ]\n    at /Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/suspense-preserves-dom.test.ts:324:78\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "test": "Suspense preserves committed host DOM keeps a nested portal hidden when the outer boundary resolves first",
+          "messages": [
+            "AssertionError: expected [ <button …(2)></button> ] to deeply equal [ <button …(2)></button>, null ]\n    at /Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/suspense-preserves-dom.test.ts:356:57\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "test": "Suspense preserves committed host DOM reconnects a nested portal once when both hidden boundaries resolve together",
+          "messages": [
+            "AssertionError: expected [ <button …(2)></button> ] to deeply equal [ <button …(2)></button>, null ]\n    at /Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/suspense-preserves-dom.test.ts:377:57\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "test": "Suspense preserves committed host DOM stops nested publication when the portal detach callback requests unmount",
+          "messages": [
+            "AssertionError: expected [ <button …(2)></button> ] to deeply equal [ <button …(2)></button>, null ]\n    at /Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/suspense-preserves-dom.test.ts:402:58\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "test": "Suspense preserves committed host DOM stops nested publication when the portal detach callback requests replace",
+          "messages": [
+            "AssertionError: expected [ <button …(2)></button> ] to deeply equal [ <button …(2)></button>, null ]\n    at /Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/suspense-preserves-dom.test.ts:402:58\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2027:60\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///Users/domgan/.codex/worktrees/octane-review-pr-866/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "combined final runtime checks",
+      "sourceRoot": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+      "node": "v22.22.3",
+      "command": [
+        "run",
+        "--config",
+        "/private/tmp/octane-native-source-compiler-NVcMdO/ci-runtime-repair.config.mjs",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-39-56.566Z-f52U2j/vitest.json",
+        "packages/octane/tests/suspense-preserves-dom.test.ts",
+        "packages/octane/tests/provider-children-dialect.test.ts",
+        "packages/octane/tests/transition-held-urgent-resuspend.test.ts",
+        "packages/tanstack-query/tests/conformance/transition-suspense.test.ts"
+      ],
+      "startedAt": "2026-08-27T23:39:57.207Z",
+      "finishedAt": "2026-08-27T23:40:26.362Z",
+      "exitCode": 0,
+      "sourceFileCount": 1072,
+      "sourceChangedDuringRun": [],
+      "capturedManifestSha256": "da795461b4bb3f84980e0a354abea9e5e53a72298e62c760cdef8c47aab5d21c",
+      "manifestHashEncoding": "UTF-8 JSON with sorted keys and comma/colon separators, no trailing newline",
+      "keySourceHashes": {
+        "packages/octane/src/runtime.server.ts": "1d4ecc33733e24335479b77475f2195e1b6a0d85dd653df1e752904bbb90a740",
+        "packages/octane/src/runtime.ts": "738d9417d4495a6058024a89bf8fb4519209f68ed4a932237f9b992734a6c839",
+        "packages/octane/tests/_fixtures/provider-children-dialect.tsrx": "1dba98a47f23f619b2c6f5fc7f4868982b02c1ae03659ea3bf7cf323990731c7",
+        "packages/octane/tests/_fixtures/transition-held-urgent-resuspend.tsrx": "4795063549da097dd17f0595d48d6bbed99ddd9a066d92fd41306ed15e161f42",
+        "packages/octane/tests/production-error-bundle.test.ts": "dfe2ee254f91859a4860f69f3740b00507c930be374d95c7e43cbb39a9d0b022",
+        "packages/octane/tests/provider-children-dialect.test.ts": "0298087300eb13b6f52e4830a1fa04e7d39ef645ccbcb6d5694610f6437763ae",
+        "packages/octane/tests/suspense-preserves-dom.test.ts": "bbeeda0fa1624c89dfa29b222dae5f7dcbbb1ae4c6567ce6e06bcb349a2d3b1d",
+        "packages/octane/tests/transition-held-urgent-resuspend.test.ts": "e8b999bbabcd1097825eca698ca88c60cc859a0c58b7dca69a32fddc4aeb76c6"
+      },
+      "rawReport": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-39-56.566Z-f52U2j/result.json",
+      "rawReportSha256": "4a41423ab77b036dde0d39e6427394b28ee8727089d42ff9d7c278dde5a3180e",
+      "vitestReport": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-39-56.566Z-f52U2j/vitest.json",
+      "vitestReportSha256": "ff70cd53b12d25fd38c5861dec07efddcc66931bf4659a1e3ee20666767aeb08",
+      "harness": {
+        "run-ci-repair.mjs": "2b4e64a1cbf0f5a890578907f50bddd49c88df417e1152b5bdbf617f5ce5dc9b",
+        "register.mjs": "7b715fa2432bbbba0c091b8cd972b5e3407363d1f73295f7873b22b650f45b3a",
+        "vitest.config.mjs": "e5ed8f77527af47f944bbae15766584a663971167cf05bdd9f86cc22dfc8f93d",
+        "ci-runtime-repair.config.mjs": "f25e5a9925ffccf9d653dc57a089f3d16996d584354318c02d7201f4a3b013a4"
+      },
+      "testFilesExecuted": 8,
+      "passed": 76,
+      "failed": 0,
+      "pending": 0,
+      "failures": []
+    },
+    {
+      "label": "final bundled native diagnostics with exact staged dependencies",
+      "sourceRoot": "/private/tmp/octane-pr877-final-error-source-fv0qv8ov",
+      "node": "v26.4.0",
+      "command": [
+        "run",
+        "--config",
+        "/private/tmp/octane-native-source-compiler-NVcMdO/ci-runtime-repair.config.mjs",
+        "--reporter=verbose",
+        "--reporter=json",
+        "--outputFile=/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-53-53.068Z-UdWwSf/vitest.json",
+        "packages/octane/tests/production-error-bundle.test.ts"
+      ],
+      "startedAt": "2026-08-27T23:53:53.131Z",
+      "finishedAt": "2026-08-27T23:54:01.128Z",
+      "exitCode": 0,
+      "sourceFileCount": 1072,
+      "sourceChangedDuringRun": [],
+      "capturedManifestSha256": "da795461b4bb3f84980e0a354abea9e5e53a72298e62c760cdef8c47aab5d21c",
+      "manifestHashEncoding": "UTF-8 JSON with sorted keys and comma/colon separators, no trailing newline",
+      "keySourceHashes": {
+        "packages/octane/src/runtime.server.ts": "1d4ecc33733e24335479b77475f2195e1b6a0d85dd653df1e752904bbb90a740",
+        "packages/octane/src/runtime.ts": "738d9417d4495a6058024a89bf8fb4519209f68ed4a932237f9b992734a6c839",
+        "packages/octane/tests/_fixtures/provider-children-dialect.tsrx": "1dba98a47f23f619b2c6f5fc7f4868982b02c1ae03659ea3bf7cf323990731c7",
+        "packages/octane/tests/_fixtures/transition-held-urgent-resuspend.tsrx": "4795063549da097dd17f0595d48d6bbed99ddd9a066d92fd41306ed15e161f42",
+        "packages/octane/tests/production-error-bundle.test.ts": "dfe2ee254f91859a4860f69f3740b00507c930be374d95c7e43cbb39a9d0b022",
+        "packages/octane/tests/provider-children-dialect.test.ts": "0298087300eb13b6f52e4830a1fa04e7d39ef645ccbcb6d5694610f6437763ae",
+        "packages/octane/tests/suspense-preserves-dom.test.ts": "bbeeda0fa1624c89dfa29b222dae5f7dcbbb1ae4c6567ce6e06bcb349a2d3b1d",
+        "packages/octane/tests/transition-held-urgent-resuspend.test.ts": "e8b999bbabcd1097825eca698ca88c60cc859a0c58b7dca69a32fddc4aeb76c6"
+      },
+      "rawReport": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-53-53.068Z-UdWwSf/result.json",
+      "rawReportSha256": "ba12f916a861a11b93e70fbbdb383e4d7873382cbec3acaac11dbb062e73c5bc",
+      "vitestReport": "/private/tmp/octane-native-source-compiler-NVcMdO/runs/2026-08-27T23-53-53.068Z-UdWwSf/vitest.json",
+      "vitestReportSha256": "dd928f7a8d647f9d85b0330bf3a08d30799dbb6879edc83cd6cc7b23809c6954",
+      "harness": {
+        "run-ci-repair.mjs": "2b4e64a1cbf0f5a890578907f50bddd49c88df417e1152b5bdbf617f5ce5dc9b",
+        "register.mjs": "7b715fa2432bbbba0c091b8cd972b5e3407363d1f73295f7873b22b650f45b3a",
+        "vitest.config.mjs": "e5ed8f77527af47f944bbae15766584a663971167cf05bdd9f86cc22dfc8f93d",
+        "ci-runtime-repair.config.mjs": "f25e5a9925ffccf9d653dc57a089f3d16996d584354318c02d7201f4a3b013a4"
+      },
+      "testFilesExecuted": 2,
+      "passed": 16,
+      "failed": 0,
+      "pending": 0,
+      "failures": []
+    }
+  ],
+  "broaderFinalChecks": {
+    "report": "final-correctness-summary.json",
+    "nonBrowserPassed": 1352,
+    "browserPassed": 4,
+    "browserWasSeparateApprovedRerun": true,
+    "sourceFileCount": 1144
+  },
+  "corpusRegeneration": {
+    "tasks": 19,
+    "onlyChangedFields": ["environment.overlayLockfileHash", "grader.graderDigest"],
+    "otherParsedValuesUnchanged": true,
+    "manifestSha256": "b1eed5fceb8f2c9b69dc36c02ea6e54ec78a344d93f6f39c1ec5d20e8f1ee919"
+  },
+  "generators": {
+    "report": "sync-reconciliation.json",
+    "rawReportSha256": "5a710ed78f6707a28d2d6310935ebfcb2ec12f690711d30964f07403735ad0b8"
+  }
+}

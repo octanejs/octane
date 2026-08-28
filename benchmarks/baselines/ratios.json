@@ -3559,5 +3559,21 @@
     "reference": "work-model",
     "maxRatio": 0,
     "note": "Reordering index-independent Strong rows must preserve output and DOM identity without repeating any author-asserted pure call shape."
+  },
+  {
+    "suite": "scoped-native-reads",
+    "op": "five_dependency_hit_calls",
+    "target": "current:native",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "An actual compiled component using use() with five stable factory dependencies must reuse its created resource while unrelated props update. Factory calls are counted outside the component AST, and every render checks the visible value."
+  },
+  {
+    "suite": "scoped-native-reads",
+    "op": "five_dependency_miss_calls",
+    "target": "current:native",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "Each of 32 changes cycling through all five use() factory dependencies must refresh the resource once and display the new value. This guards generic automatic caching without pinning private compiler helper names."
   }
 ]

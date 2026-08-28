@@ -63,7 +63,7 @@ import {
 	UNIVERSAL_THREAD_RUNTIME_IMPORTS,
 } from './compile-universal.js';
 import { compileValdi, VALDI_COMPILER_RUNTIME_IMPORTS } from './compile-valdi.js';
-import { HOOK_NAMES } from './hook-names.js';
+import { HOOK_NAMES, NATIVE_SIGNAL_HOOK_NAMES } from './hook-names.js';
 export { HOOK_NAMES } from './hook-names.js';
 import {
 	expandDomRendererRegionsAst,
@@ -79,6 +79,12 @@ import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { assertStrongMode } from './strong-mode.js';
+import { assertNativeReadDiagnostics, assertNativeReadOptions } from './native-read-diagnostics.js';
+import {
+	captureNativeReadWitness,
+	wrapNativeReadScope,
+	wrapNativeWarmScope,
+} from './native-read-codegen.js';
 import { createTextTypeFactsLookup } from './text-type-facts.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
@@ -1047,7 +1053,7 @@ function requireRuntimeForContext(ctx, name) {
 	const alias = ctx._universalRuntimeUnit?.generatedRuntimeAliases?.[name];
 	if (alias !== undefined) return alias;
 	ctx.runtimeNeeded.add(name);
-	if (HOOK_MEMO_RUNTIME_HELPERS.has(name)) {
+	if (HOOK_MEMO_RUNTIME_HELPERS.has(name) || NATIVE_READ_RUNTIME_HELPERS.has(name)) {
 		let local = ctx.privateRuntimeAliases?.get(name);
 		if (local === undefined) {
 			local = allocCompilerName(ctx, rtAlias(name));
@@ -1117,6 +1123,25 @@ const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 	'memoPublish',
 	'memoPublishAlways',
 ]);
+const NATIVE_READ_RUNTIME_HELPERS = new Set([
+	'enableNativeReadCollection',
+	'beginNativeReadScope',
+	'endNativeReadScope',
+	'beginNativeReadWitness',
+	'finishNativeReadWitness',
+	'validateNativeReadWitness',
+	'replayNativeReadWitness',
+	'nativePuMemo',
+	'nativePuTake0',
+	'nativePuTake1',
+	'nativePuTake2',
+	'nativePuTake3',
+	'nativePuTake4',
+	'nativePuPub',
+	'nativeWarmMemo',
+	'nativeCreateScopedValue',
+	'nativeCreateScopedElement',
+]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'replaceRef',
 	'queueOwnRefDetach',
@@ -1129,8 +1154,12 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'textHoleUpdate',
 	'childTextHoleUpdate',
 	...HOOK_MEMO_RUNTIME_HELPERS,
+	...NATIVE_READ_RUNTIME_HELPERS,
 ]);
-const INTERNAL_SERVER_RUNTIME_HELPERS = new Set(['ssrSpreadContent']);
+const INTERNAL_SERVER_RUNTIME_HELPERS = new Set([
+	'ssrSpreadContent',
+	...NATIVE_READ_RUNTIME_HELPERS,
+]);
 
 function runtimeImportModuleFor(ctx, fallback, imported, local) {
 	for (const route of ctx.runtimeImportRoutes ?? []) {
@@ -1919,6 +1948,10 @@ function classifyViewTransitionOwnership(astBody, production, ownComponents) {
 
 function hookRuntimeModulesForCompile(options, universalUnits = []) {
 	const modules = new Set(options?.__hookRuntimeModules || []);
+	if (options?.nativeReads === true) {
+		modules.add('octane/signals/client');
+		modules.add('octane/signals/server');
+	}
 	if (typeof options?.renderer?.module === 'string') modules.add(options.renderer.module);
 	for (const unit of options?.__universalUnits || []) {
 		if (typeof unit?.renderer?.module === 'string') modules.add(unit.renderer.module);
@@ -2896,6 +2929,7 @@ function rewriteAutoCalculation(
 						{
 							...b.id('useMemo'),
 							_octaneGenerated: true,
+							...(ctx.nativeReads ? { _octaneNativeAutoCalculation: true } : null),
 							...(immutableProjection === null
 								? null
 								: { _octaneImmutableArrayFilter: immutableProjection }),
@@ -2987,6 +3021,154 @@ function allocAutoMemoCell(ctx, dependencyCount) {
 	const init = base + dependencyCount;
 	ctx.currentAutoMemoOffset = init + 1;
 	return { base, init };
+}
+
+// Native automatic calculations have their own read evidence. They do not use
+// an authored useMemo dependency array as a subscription, and never change the
+// meaning of explicit/inferred hooks. The compiled-body tier uses existing
+// copy-on-write compiler cells; ordinary return-JSX functions keep the existing
+// path-aware memo slot and retain an immutable [value, witness] payload.
+function lowerNativeAutoCalculation(statement, ctx, componentName, scoped = true) {
+	const declaration = statement.declarations?.[0];
+	const call = declaration?.init;
+	if (call?.callee?._octaneNativeAutoCalculation !== true) return null;
+	const expression = call.arguments[0].body;
+	const dependencies = call.arguments[1].elements;
+	const immutable = call.callee._octaneImmutableArrayFilter;
+	const immutableGuard = () =>
+		b.call(
+			requireRuntimeForContext(ctx, 'compilerCacheImmutableArrayFilter'),
+			b.id(immutable.receiver),
+			b.literal(immutable.property),
+		);
+	if (!scoped && dependencies.length > 4) {
+		// Match the ordinary memo path above its fixed-arity helpers. Native
+		// evidence lives on the existing memo entry; the cache remains enabled.
+		const rawSlot = allocHookSymbol(
+			ctx,
+			`${componentName}.nativeCalculation#${ctx.nextHookSymId}`,
+			{
+				componentName,
+				name: declaration.id.name,
+				kind: 'useMemo',
+				node: declaration,
+			},
+			true,
+		);
+		const deps = b.array(dependencies);
+		const init = b.call(
+			requireRuntimeForContext(ctx, 'nativePuMemo'),
+			b.arrow([], withoutInferredMemoName(expression)),
+			immutable === undefined ? deps : b.conditional(immutableGuard(), deps, b.void0),
+			b.id(rawSlot),
+		);
+		return [
+			inheritOriginLoc({ ...statement, declarations: [{ ...declaration, init }] }, statement),
+		];
+	}
+	const result = b.id(allocCompilerName(ctx, '__nativeValue'));
+	const depNames = dependencies.map(() => allocCompilerName(ctx, '__nativeDep'));
+	const depDeclarations = dependencies.map((dependency, index) =>
+		b.const(depNames[index], dependency),
+	);
+	const capture = captureNativeReadWitness(
+		[b.stmt(b.assignment('=', result, withoutInferredMemoName(expression)))],
+		nativeReadNames(ctx),
+	);
+	const validate = requireRuntimeForContext(ctx, 'validateNativeReadWitness');
+	const replay = requireRuntimeForContext(ctx, 'replayNativeReadWitness');
+	const rebuilt = { ...statement, declarations: [{ ...declaration, init: result }] };
+	let region;
+	if (scoped) {
+		const cell = allocAutoMemoCell(ctx, dependencies.length + 2);
+		const cache = ctx.currentAutoMemoCacheName;
+		const at = (index) => b.member(b.id(cache), b.literal(index), true);
+		const witness = at(cell.base + dependencies.length);
+		const value = at(cell.base + dependencies.length + 1);
+		const misses = [
+			b.binary('!==', at(cell.init), b.literal(true)),
+			b.unary('!', b.call(validate, witness)),
+		];
+		for (let index = 0; index < depNames.length; index++)
+			misses.push(b.unary('!', hkObjectIs(ctx, at(cell.base + index), b.id(depNames[index]))));
+		if (immutable !== undefined) misses.push(b.unary('!', immutableGuard()));
+		region = b.block([
+			...depDeclarations,
+			b.if(
+				orChain(misses),
+				b.block([
+					...capture.statements,
+					b.if(
+						b.binary('===', b.id(cache), b.id(ctx.currentAutoMemoCommittedName)),
+						b.stmt(b.assignment('=', b.id(cache), b.call(b.member(b.id(cache), 'slice')))),
+						null,
+					),
+					...depNames.map((name, index) =>
+						b.stmt(b.assignment('=', at(cell.base + index), b.id(name))),
+					),
+					b.stmt(b.assignment('=', witness, capture.witness)),
+					b.stmt(b.assignment('=', value, result)),
+					b.stmt(b.assignment('=', at(cell.init), b.literal(true))),
+				]),
+				b.block([b.stmt(b.call(replay, witness)), b.stmt(b.assignment('=', result, value))]),
+			),
+		]);
+	} else {
+		const rawSlot = allocHookSymbol(
+			ctx,
+			`${componentName}.nativeCalculation#${ctx.nextHookSymId}`,
+			{
+				componentName,
+				name: declaration.id.name,
+				kind: 'useMemo',
+				node: declaration,
+			},
+			true,
+		);
+		const slot = b.id(allocCompilerName(ctx, '__nativeMemoSlot'));
+		const previous = b.id(allocCompilerName(ctx, '__nativePrevious'));
+		const previousPayload = b.member(previous, 'value');
+		const previousWitness = b.member(previousPayload, b.literal(1), true);
+		const misses = [
+			b.binary('===', previous, b.literal(null)),
+			b.unary('!', b.call(validate, previousWitness)),
+		];
+		if (immutable !== undefined) misses.push(b.unary('!', immutableGuard()));
+		region = b.block([
+			...depDeclarations,
+			b.const(
+				slot,
+				b.call(requireRuntimeForContext(ctx, 'memoSlot'), b.id(rawSlot), b.literal('useMemo')),
+			),
+			b.const(
+				previous,
+				b.call(
+					requireRuntimeForContext(ctx, `memoTake${depNames.length}`),
+					slot,
+					...depNames.map((name) => b.id(name)),
+				),
+			),
+			b.if(
+				orChain(misses),
+				b.block([
+					...capture.statements,
+					b.stmt(
+						b.call(
+							requireRuntimeForContext(ctx, 'memoPublish'),
+							slot,
+							b.array([result, capture.witness]),
+							...depNames.map((name) => b.id(name)),
+						),
+					),
+				]),
+				b.block([
+					b.stmt(b.call(replay, previousWitness)),
+					b.stmt(b.assignment('=', result, b.member(previousPayload, b.literal(0), true))),
+				]),
+			),
+		]);
+	}
+	return [b.let(result, null), region, rebuilt].map((node) => inheritOriginLoc(node, statement));
 }
 
 // An expression whose evaluation is side-effect free and whose value identity
@@ -8113,6 +8295,7 @@ export function compileForBundler(source, filename, options) {
 }
 
 function compileAuthored(source, filename, options, bundlerMetadata) {
+	assertNativeReadOptions(options);
 	const mode = (options && options.mode) || 'client';
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
@@ -8121,6 +8304,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	const analyzedAst = parseModule(source, cleanFilename);
 	analyzeTsrx(analyzedAst, cleanFilename);
 	adoptParserAst(analyzedAst);
+	assertNativeReadDiagnostics(analyzedAst, source, cleanFilename, options);
 	const strongModeEnabled =
 		assertStrongMode(analyzedAst, source, cleanFilename, options)?.enabled === true;
 	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = analyzedAst;
@@ -8165,6 +8349,7 @@ function compileInternal(
 	strongModeEnabled,
 ) {
 	const authoredSource = source;
+	assertNativeReadOptions(options);
 	const universalRuntime = normalizeUniversalRuntime(options?.universalRuntime);
 	if (!options?.__rendererBoundariesLowered) {
 		assertUniversalRuntimeTarget(universalRuntime, mode, options?.renderer);
@@ -8471,6 +8656,7 @@ function compileInternal(
 	let hookDepHelperNeeded = false;
 	ast = applyHookDependencies(ast, {
 		filename,
+		nativeReads: options?.nativeReads === true,
 		hookRuntimeModules: hookRuntimeModulesForCompile(
 			options,
 			rendererBoundaryPreparation?.universalUnits,
@@ -8549,6 +8735,8 @@ function compileInternal(
 		profile: profileEnabled,
 		autoMemo: autoMemoEnabled,
 		strongMemo: strongMemoEnabled,
+		nativeReads: options?.nativeReads === true,
+		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
 		// A split Hydrate query module is invoked as the existing server-rendered
 		// boundary body. Its sole component child must therefore keep the server's
 		// own component marker pair instead of borrowing the Hydrate block range.
@@ -9668,6 +9856,7 @@ function compileInternal(
 	// is minted only by DOM-client hook slotting, so mixed renderer modules never
 	// accidentally import DOM memo helpers for a universal renderer's scope.
 	let moduleBody = [
+		...nativeReadActivationNodes(ctx, moduleOrigin),
 		...vtHintNodes,
 		...delegateNodes,
 		...styleNodes,
@@ -9828,6 +10017,7 @@ function compileServer(
 	let hookDepHelperNeeded = false;
 	ast = applyHookDependencies(ast, {
 		filename,
+		nativeReads: options?.nativeReads === true,
 		hookRuntimeModules: hookRuntimeModulesForCompile(options),
 		onRuntimeHelper: () => {
 			hookDepHelperNeeded = true;
@@ -9838,6 +10028,8 @@ function compileServer(
 		usedCompilerNames: collectIdentifierNames(ast),
 		compilerNameSuffixes: null,
 		mode: 'server',
+		nativeReads: options?.nativeReads === true,
+		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
 		hmr: false, // SSR never hot-swaps in place; client/server production slot shapes stay aligned
 		dev: !!(options && options.dev),
 		// SSR MIRROR of the parallel-`use()` pipeline (docs/suspense-parallel-use-
@@ -9951,17 +10143,43 @@ function compileServer(
 		} else if (node.type === 'ExportNamedDeclaration' && isComponentFunction(node.declaration)) {
 			bodyNodes.push(...compileServerComponent({ ...node.declaration, export: true }, ctx));
 		} else if (isReturnJsxFunction(node)) {
+			if (ctx.nativeReads) {
+				bodyNodes.push(...compileReturnJsxFunction(node, ctx).nodes);
+				continue;
+			}
 			// A `function C() { return <jsx> }` form (no `@{}`). SSR it through the same
 			// component path as `@{}` so its host element + directives emit server markup
 			// (the client folds it; the two must agree for hydration).
 			bodyNodes.push(...compileServerComponent(node, ctx));
 		} else if (node.type === 'ExportNamedDeclaration' && isReturnJsxFunction(node.declaration)) {
-			bodyNodes.push(...compileServerComponent({ ...node.declaration, export: true }, ctx));
+			bodyNodes.push(
+				...(ctx.nativeReads
+					? compileReturnJsxFunction(node.declaration, ctx, { export: true }).nodes
+					: compileServerComponent({ ...node.declaration, export: true }, ctx)),
+			);
 		} else if (node.type === 'ExportDefaultDeclaration' && isReturnJsxFunction(node.declaration)) {
-			bodyNodes.push(...compileServerComponent({ ...node.declaration, default: true }, ctx));
+			bodyNodes.push(
+				...(ctx.nativeReads
+					? compileReturnJsxFunction(node.declaration, ctx, { default: true }).nodes
+					: compileServerComponent({ ...node.declaration, default: true }, ctx)),
+			);
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
 			// User imports from 'octane' resolve to the server runtime instead.
 			addUserImportSpecifiers(ctx, node);
+		} else if (
+			(node.type === 'ImportDeclaration' ||
+				node.type === 'ExportNamedDeclaration' ||
+				node.type === 'ExportAllDeclaration') &&
+			node.source?.value === 'octane/signals/client'
+		) {
+			bodyNodes.push({
+				...node,
+				source: {
+					...node.source,
+					value: 'octane/signals/server',
+					raw: JSON.stringify('octane/signals/server'),
+				},
+			});
 		} else {
 			bodyNodes.push(rewriteModuleJsxValues(node, ctx));
 		}
@@ -9970,12 +10188,13 @@ function compileServer(
 	// Assign deferred (server-only) slot ids BEFORE the import list is built:
 	// the flush may register `hookSlots` as a needed runtime import.
 	flushTailHookSymbols(ctx);
+	const nativeActivation = nativeReadActivationNodes(ctx, ctx._moduleOrigin);
 	const runtimeImportNodes = buildRuntimeImportNodes(ctx, 'octane/server', ctx._moduleOrigin);
 	const helperNodes = hoistedHelperNodes(ctx);
 	const program = {
 		type: 'Program',
 		sourceType: 'module',
-		body: [...runtimeImportNodes, ...helperNodes, ...bodyNodes],
+		body: [...runtimeImportNodes, ...nativeActivation, ...helperNodes, ...bodyNodes],
 		metadata: { path: [] },
 		start: ast.start,
 		end: ast.end,
@@ -10414,7 +10633,16 @@ function ssrCompileBodyWithMapTemps(
 			: ([...(node.params || []), ...(Array.isArray(node.body) ? node.body : [])].find(
 					(part) => part?.loc != null,
 				) ?? ctx._moduleOrigin);
-	return inheritOriginLoc(b.function_declaration(b.id(name), params, b.block(body)), origin);
+	return inheritOriginLoc(
+		b.function_declaration(
+			b.id(name),
+			params,
+			b.block(
+				ctx.nativeReads ? wrapNativeReadScope(body, b.id('__s'), nativeReadNames(ctx)) : body,
+			),
+		),
+		origin,
+	);
 }
 
 // Classify a normalized JSX child for TEXT-ADJACENCY purposes. Shared by the
@@ -12741,6 +12969,17 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
  * concatenated (`.red.tsrx-abc`) so the matched element only needs the
  * hash on its `class` attribute.
  */
+function hasModuleStyleMaps(body) {
+	return body.some((statement) => {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		return (
+			declaration?.type === 'VariableDeclaration' &&
+			declaration.declarations.some((declarator) => declarator.init?.type === 'JSXStyleElement')
+		);
+	});
+}
+
 // Copy-on-write: returns the (possibly rebuilt) statement; the input is never
 // modified. The core analyze/prepare pipeline mutates the sheet it is given,
 // so it runs over a clone of the (bounded) StyleSheet subtree.
@@ -13822,6 +14061,10 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 					}
 					return rewritten;
 				});
+				if (ctx.nativeReads)
+					workingStatements = workingStatements.flatMap(
+						(statement) => lowerNativeAutoCalculation(statement, ctx, name) ?? [statement],
+					);
 			}
 		}
 		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
@@ -14178,7 +14421,11 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	const emittedFunction = b.function_declaration(
 		b.id(name, node.id ?? node),
 		fnParams,
-		b.block(bodyStatements),
+		b.block(
+			ctx.nativeReads
+				? wrapNativeReadScope(bodyStatements, b.id('__s'), nativeReadNames(ctx))
+				: bodyStatements,
+		),
 	);
 	return inheritOriginLoc(
 		hookMemoOpaqueOwner
@@ -15056,7 +15303,11 @@ function makeCreationMemoCall(
 	}
 	// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
 	// SSRScope per pass makes client useMemo semantics useless there).
-	const memoHelper = ctx.mode === 'server' ? 'puMemo' : 'useMemo';
+	const memoHelper = ctx.nativeReads
+		? 'nativePuMemo'
+		: ctx.mode === 'server'
+			? 'puMemo'
+			: 'useMemo';
 	// When this body's pipeline ends in inlineHookMemoPass, most client sites
 	// are later lowered to puTake/puPub and never call _$useMemo — defer the
 	// import registration to the surviving sites (lowerPuMemoDecl re-adds
@@ -15065,7 +15316,7 @@ function makeCreationMemoCall(
 	// Pipelines that never lower (universal pass, server) keep the eager
 	// path — deferring there would emit a call with no import.
 	const memoAlias =
-		ctx._puInlineLowering === true
+		ctx._puInlineLowering === true && !ctx.nativeReads
 			? rtAlias(memoHelper)
 			: requireRuntimeForContext(ctx, memoHelper);
 	creations.push({ symVar, expr, deps, guards: [...guards], locals });
@@ -15717,7 +15968,7 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 				node: expr,
 			});
 			const deps = collectDepPaths(expr);
-			const memoAlias = requireRuntimeForContext(ctx, 'puMemo');
+			const memoAlias = requireRuntimeForContext(ctx, ctx.nativeReads ? 'nativePuMemo' : 'puMemo');
 			changed = true;
 			// The minted prop-memo wrapper maps to the authored prop expression.
 			return {
@@ -16038,7 +16289,10 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		// Statement scaffolding maps to the warmed construct it wraps.
 		return inheritOriginLoc(stmt, callExpr);
 	};
-	const warmMemoAlias = runtimeAliasForContext(ctx, 'warmMemo');
+	const warmMemoHelper = ctx.nativeReads ? 'nativeWarmMemo' : 'warmMemo';
+	const warmMemoAlias = ctx.nativeReads
+		? requireRuntimeForContext(ctx, warmMemoHelper)
+		: runtimeAliasForContext(ctx, warmMemoHelper);
 	const warmChildAlias = runtimeAliasForContext(ctx, 'warmChild');
 	const memoCall = (c) =>
 		inheritOriginLoc(
@@ -16084,16 +16338,18 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		);
 
 	if (warmMemos.length > 0 || warmKids.some((w) => w.props.some((p) => p.memo)))
-		requireRuntimeForContext(ctx, 'warmMemo');
+		requireRuntimeForContext(ctx, warmMemoHelper);
 	if (warmKids.length > 0) requireRuntimeForContext(ctx, 'warmChild');
 
 	// In-body warm thunk: children only — the body's own creations already ran
 	// as real memos by the time the batch throws.
+	const warmBody = (statements) =>
+		ctx.nativeReads ? wrapNativeWarmScope(statements, nativeReadNames(ctx)) : statements;
 	const thunk =
 		warmKids.length === 0
 			? null
 			: inheritOriginLoc(
-					b.arrow([], b.block(warmKids.map((w) => stmtFor(w.guards, childCall(w))))),
+					b.arrow([], b.block(warmBody(warmKids.map((w) => stmtFor(w.guards, childCall(w)))))),
 					node,
 				);
 
@@ -16116,7 +16372,7 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		warmNode = inheritOriginLoc(
 			b.arrow(
 				[b.id('__wp')],
-				b.block(destructureNode === null ? bodyStmts : [destructureNode, ...bodyStmts]),
+				b.block(warmBody(destructureNode === null ? bodyStmts : [destructureNode, ...bodyStmts])),
 			),
 			node,
 		);
@@ -16157,13 +16413,20 @@ function slotKeyedHookName(n, ctx) {
 		const shadowsImport =
 			(ctx.octaneImportLocals?.has(local) && imported === undefined) ||
 			ctx.foreignImportLocals?.has(local) === true;
-		if (imported !== undefined && HOOK_NAMES.has(imported)) return imported;
+		if (
+			imported !== undefined &&
+			(HOOK_NAMES.has(imported) || (ctx.nativeReads && NATIVE_SIGNAL_HOOK_NAMES.has(imported)))
+		)
+			return imported;
 		if (!shadowsImport && HOOK_NAMES.has(local)) return local;
 		if (/^use[A-Z]/.test(local) && local !== 'useContext') return local;
 		return null;
 	}
 	const imported = n._octaneImportedHook ?? n._octaneHookRuntimeImportedHook;
-	if (imported !== undefined && HOOK_NAMES.has(imported)) {
+	if (
+		imported !== undefined &&
+		(HOOK_NAMES.has(imported) || (ctx.nativeReads && NATIVE_SIGNAL_HOOK_NAMES.has(imported)))
+	) {
 		return imported;
 	}
 	if (
@@ -16314,6 +16577,7 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 	useImperativeHandle: 3,
 	useActionState: 3,
 	useOptimistic: 2,
+	useSignal$: 1,
 };
 
 function appendHookSlotArgument(name, args, slot, numeric, origin) {
@@ -16716,11 +16980,14 @@ function lowerPuMemoDecl(stmt, ctx) {
 	if (deps.length > 4) {
 		// Surviving runtime-form site: register the deferred _$useMemo import
 		// (see rewriteUseCall's deferred registration).
-		requireRuntimeForContext(ctx, 'useMemo');
+		requireRuntimeForContext(ctx, ctx.nativeReads ? 'nativePuMemo' : 'useMemo');
 		return null;
 	}
-	const takeAlias = requireRuntimeForContext(ctx, `puTake${deps.length}`);
-	const pubAlias = requireRuntimeForContext(ctx, 'puPub');
+	const takeAlias = requireRuntimeForContext(
+		ctx,
+		`${ctx.nativeReads ? 'nativePuTake' : 'puTake'}${deps.length}`,
+	);
+	const pubAlias = requireRuntimeForContext(ctx, ctx.nativeReads ? 'nativePuPub' : 'puPub');
 	const missAlias = requireRuntimeForContext(ctx, 'puMiss');
 	const temp = (i) => b.id(hookMemoTemp(ctx, i));
 	const body = [];
@@ -16737,18 +17004,36 @@ function lowerPuMemoDecl(stmt, ctx) {
 			hkAssign({ ...decl.id }, b.call(takeAlias, { ...slotId }, ...deps.map((_, i) => temp(i)))),
 		),
 	);
-	body.push(
-		b.if(
-			b.binary('===', { ...decl.id }, b.id(missAlias)),
+	let compute;
+	if (ctx.nativeReads) {
+		const capture = captureNativeReadWitness(
+			[hkExprStmt(hkAssign({ ...decl.id }, arrow.body))],
+			nativeReadNames(ctx),
+		);
+		compute = b.block([
+			...capture.statements,
 			hkExprStmt(
 				hkAssign(
 					{ ...decl.id },
-					b.call(pubAlias, { ...slotId }, arrow.body, ...deps.map((_, i) => temp(i))),
+					b.call(
+						pubAlias,
+						{ ...slotId },
+						{ ...decl.id },
+						capture.witness,
+						...deps.map((_, i) => temp(i)),
+					),
 				),
 			),
-			null,
-		),
-	);
+		]);
+	} else {
+		compute = hkExprStmt(
+			hkAssign(
+				{ ...decl.id },
+				b.call(pubAlias, { ...slotId }, arrow.body, ...deps.map((_, i) => temp(i))),
+			),
+		);
+	}
+	body.push(b.if(b.binary('===', { ...decl.id }, b.id(missAlias)), compute, null));
 	return [b.let(decl.id, null), b.block(body)];
 }
 
@@ -16970,7 +17255,10 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			// function named like one gets a harmless extra trailing argument (though
 			// inside a plain JS loop the convention is enforced: rejectHookInJsLoop).
 			const isBuiltin =
-				HOOK_NAMES.has(name) &&
+				(HOOK_NAMES.has(name) ||
+					(ctx.nativeReads &&
+						hookRuntimeImportedName !== undefined &&
+						NATIVE_SIGNAL_HOOK_NAMES.has(name))) &&
 				(generated ||
 					importedName !== undefined ||
 					hookRuntimeImportedName !== undefined ||
@@ -16998,6 +17286,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					(isBuiltin || isServerUse);
 				const forceSymbol = !numericSlot;
 				const getterHelper = stateGetterMarks.get(n) ? STATE_GETTER_HELPERS[name] : null;
+				const nativeMemo = ctx.nativeReads && n._octaneNativeInferredMemo === true;
 				// A builtin hook call site is USER code (the user's own identifier), so
 				// its import stays bare — EXCEPT compiler-inserted calls (auto-callback's
 				// `useCallback`), whose callee is renamed to the `_$` alias below so a
@@ -17008,6 +17297,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 						ctx.userRuntimeNames.add(localName === name ? name : `${name} as ${localName}`);
 					}
 					if (getterHelper !== null) requireRuntimeForContext(ctx, getterHelper);
+					if (nativeMemo) requireRuntimeForContext(ctx, 'nativePuMemo');
 				}
 				if (isServerUse)
 					ctx.userRuntimeNames.add(localName === name ? 'use' : `use as ${localName}`);
@@ -17074,8 +17364,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				return {
 					...n,
 					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
-					callee:
-						getterHelper !== null
+					callee: nativeMemo
+						? b.id(runtimeAliasForContext(ctx, 'nativePuMemo'))
+						: getterHelper !== null
 							? b.id(runtimeAliasForContext(ctx, getterHelper))
 							: n.callee._octaneGenerated
 								? b.id(runtimeAliasForContext(ctx, name))
@@ -17098,7 +17389,8 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			(n._octaneImportedHook !== undefined || n._octaneHookRuntimeImportedHook !== undefined)
 		) {
 			const name = n._octaneImportedHook ?? n._octaneHookRuntimeImportedHook;
-			const isBuiltin = HOOK_NAMES.has(name);
+			const isBuiltin =
+				HOOK_NAMES.has(name) || (ctx.nativeReads && NATIVE_SIGNAL_HOOK_NAMES.has(name));
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isServerUse) {
 				if (isBuiltin) {
@@ -17114,7 +17406,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				const annotatedOwner = ctx.profile ? ctx.profileOwnerMarks?.get(n) : null;
 				const profileOwner = annotatedOwner?.name || componentName;
 				const getterHelper = stateGetterMarks.get(n) ? STATE_GETTER_HELPERS[name] : null;
+				const nativeMemo = ctx.nativeReads && n._octaneNativeInferredMemo === true;
 				if (getterHelper !== null) requireRuntimeForContext(ctx, getterHelper);
+				if (nativeMemo) requireRuntimeForContext(ctx, 'nativePuMemo');
 				const numericSlot =
 					!ctx.hmr &&
 					!ctx.profile &&
@@ -17146,8 +17440,11 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				return {
 					...n,
 					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
-					callee:
-						getterHelper !== null ? b.id(runtimeAliasForContext(ctx, getterHelper)) : n.callee,
+					callee: nativeMemo
+						? b.id(runtimeAliasForContext(ctx, 'nativePuMemo'))
+						: getterHelper !== null
+							? b.id(runtimeAliasForContext(ctx, getterHelper))
+							: n.callee,
 					arguments: explicitMemoSlot
 						? args
 						: appendHookSlotArgument(name, args, slot, numericSlot, n),
@@ -17208,9 +17505,16 @@ function compileReturnJsxFunction(node, ctx, options) {
 	const name = node.id.name;
 	const hookMemoOpaqueOwner = ctx.inlineHookMemo && hasInlineMemoOpaqueDirective(node);
 	recordProfileComponent(ctx, node, name);
+	const beforeCss = ctx.cssInjections.length;
 	const scoping = applyCssScoping(node, ctx);
 	node = scoping.node;
 	const cssHash = scoping.cssHash;
+	const cssEntries =
+		ctx.mode === 'server'
+			? [...ctx.moduleCssInjections, ...ctx.cssInjections.slice(beforeCss)].sort(
+					(a, b) => a.order - b.order,
+				)
+			: [];
 	// A folded directive's branch helper functions (`__then$N`/`__else$N`) are
 	// collected here so they're emitted INSIDE this component function — preserving
 	// their closure over setup locals/props — and only their values + the control
@@ -17218,14 +17522,17 @@ function compileReturnJsxFunction(node, ctx, options) {
 	const compInlinedSubs = [];
 	// Fold a directive found at value position into a hoisted renderer owned by THIS
 	// body — the same fold the `@{}` body and the server emitter build.
-	const lowerBodyValueDirective = (directive) =>
-		lowerHostFragment(
-			setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
-			ctx,
-			compInlinedSubs,
-			'opaque',
-			cssHash,
-		);
+	const lowerBodyValueDirective =
+		ctx.mode === 'server'
+			? serverValueDirectiveFold(ctx, name, compInlinedSubs, cssHash)
+			: (directive) =>
+					lowerHostFragment(
+						setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
+						ctx,
+						compInlinedSubs,
+						'opaque',
+						cssHash,
+					);
 	// A `return <jsx>` body owns its returned JSX just as much as a `@{}` body owns
 	// its render output, so an attribute value or expression-container child in it
 	// can hold a directive this body must fold. Publishing the fold here is what
@@ -17256,7 +17563,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 		const renderReadNames = collectRenderReadNames(renderedRoots, ctx);
 		let autoCalculatedDeclarations = null;
 		let renderScopeEstablished = false;
-		newStatements = authoredStatements.map((sourceStatement) => {
+		newStatements = authoredStatements.flatMap((sourceStatement) => {
 			// Return-JSX functions keep their ordinary callable ABI. Introducing a
 			// cache into a hookless function would make an existing direct call
 			// require a render scope, so only declarations following an authored,
@@ -17278,6 +17585,20 @@ function compileReturnJsxFunction(node, ctx, options) {
 				renderScopeEstablished =
 					stableHookCallName(unwrapTsExpr(sourceStatement.expression)) !== null;
 			}
+			if (ctx.nativeReads) {
+				const nativeCalculation = lowerNativeAutoCalculation(calculated, ctx, name, false);
+				if (nativeCalculation !== null)
+					return nativeCalculation.map((statement) =>
+						rewriteJsxValues(
+							rewriteHookCalls(
+								lowerSetupValueDirectives(statement, lowerBodyValueDirective),
+								ctx,
+								name,
+							),
+							ctx,
+						),
+					);
+			}
 			// A return-based component's undefined output is ambiguous with the compiled
 			// void-body signal at runtime. Preserve JSX roots for the specialized lowering
 			// below, but normalize every other owned return to an explicit empty value.
@@ -17292,6 +17613,24 @@ function compileReturnJsxFunction(node, ctx, options) {
 			// The `return <jsx>` output → a compiled-fragment descriptor (reconcile path),
 			// not the host-string de-opt (rebuild). Other JSX in setup keeps value-lowering.
 			if (h.type === 'ReturnStatement' && h.argument && isJsxNode(h.argument)) {
+				// An ordinary function can return an element for later rendering or
+				// inspection. Native reads in that record must be sampled under its
+				// represented render scope, not captured into fragment props while
+				// the factory runs. Reuse value lowering in both emitters so its
+				// public type/props and deferred children also stay inspectable.
+				if (ctx.nativeReads) {
+					return {
+						...h,
+						argument: nativeReturnedJsxValue(
+							h.argument,
+							ctx,
+							name,
+							compInlinedSubs,
+							cssHash,
+							cssEntries,
+						),
+					};
+				}
 				if (autoCalculatedDeclarations !== null) {
 					// Unlike a JSXCodeBlock, a returned-JSX body's statement list also
 					// contains its output. Do not mistake that owned return for a setup
@@ -17351,14 +17690,29 @@ function compileReturnJsxFunction(node, ctx, options) {
 	// helper fns (compInlinedSubs — filled by the statement mapping above) are
 	// function DECLARATION nodes embedded at the top of the body, matching the
 	// historical after-the-`{` splice.
+	const returnBody = [
+		...mapTemps.map((temp) => inheritOriginLoc(b.let(temp), node)),
+		...compInlinedSubs,
+		...newStatements,
+	];
+	if (cssEntries.length > 0) {
+		ctx.runtimeNeeded.add('injectStyle');
+		returnBody.unshift(
+			...cssEntries.map((entry) => {
+				const origin = claimCssOrigins(ctx, entry) ?? node;
+				return inheritOriginLoc(
+					b.stmt(ssrCall('injectStyle', [b.literal(entry.hash), b.literal(entry.css)], origin)),
+					origin,
+				);
+			}),
+		);
+	}
 	const emittedFunction = b.function_declaration(
 		node.id,
 		node.params,
-		b.block([
-			...mapTemps.map((temp) => inheritOriginLoc(b.let(temp), node)),
-			...compInlinedSubs,
-			...newStatements,
-		]),
+		b.block(
+			ctx.nativeReads ? wrapNativeReadScope(returnBody, b.void0, nativeReadNames(ctx)) : returnBody,
+		),
 	);
 	const fn = inheritOriginLoc(
 		hookMemoOpaqueOwner
@@ -17394,6 +17748,78 @@ function compileReturnJsxFunction(node, ctx, options) {
 	}
 	if (options && options.export) return { nodes: [inheritOriginLoc(b.export(fn), node)] };
 	return { nodes: [fn] };
+}
+
+function nativeReturnedJsxValue(node, ctx, name, inlinedSubs, cssHash, cssEntries) {
+	let value;
+	if (requiresTemplateNormalization(node, 'html', true, ctx)) {
+		// Head resources, directive roots and other compiler-only syntax keep
+		// their existing fragment ABI. Defer its record so extracted expressions
+		// are read only when the stored subtree is interpreted. Return roots keep
+		// their established head namespace; nested components remain opaque.
+		const fragment =
+			ctx.mode === 'server'
+				? serverValueDirectiveFold(ctx, name, inlinedSubs, cssHash, false, 'html')(node)
+				: lowerReturnJsx(node, ctx, inlinedSubs, cssHash);
+		value = inheritOriginLoc(
+			b.call(requireRuntimeForContext(ctx, 'nativeCreateScopedValue'), b.arrow([], fragment)),
+			node,
+		);
+	} else {
+		value = rewriteJsxValues(node, ctx);
+	}
+	// A stored styled value may be constructed outside an SSR render. Its CSS
+	// enters the request collector when interpreted, not a global pending queue.
+	if (cssHash === null && !ctx.nativeModuleStyles) return value;
+	const scopedElement = runtimeAliasForContext(ctx, 'nativeCreateScopedElement');
+	const scopedValue = runtimeAliasForContext(ctx, 'nativeCreateScopedValue');
+	// A static styled fragment needs a reader too, even when it only owns a
+	// :global stylesheet and has no element children. Keep this shape aligned in
+	// both emitters; unstyled static fragment arrays remain unchanged.
+	if (
+		(node.type === 'Fragment' || node.type === 'JSXFragment') &&
+		value.callee?.name === rtAlias('positionalChildren')
+	) {
+		ctx.runtimeNeeded.add('Fragment');
+		value = inheritOriginLoc(
+			b.call(
+				requireRuntimeForContext(ctx, 'nativeCreateScopedElement'),
+				b.id(rtAlias('Fragment')),
+				b.object([]),
+				b.arrow([], value),
+			),
+			node,
+		);
+	}
+	if (cssEntries.length === 0) return value;
+	ctx.runtimeNeeded.add('injectStyle');
+	const css = cssEntries.map((entry) => {
+		const origin = claimCssOrigins(ctx, entry) ?? node;
+		return inheritOriginLoc(
+			b.stmt(ssrCall('injectStyle', [b.literal(entry.hash), b.literal(entry.css)], origin)),
+			origin,
+		);
+	});
+	const readerIndex =
+		value.callee?.name === scopedValue ? 0 : value.callee?.name === scopedElement ? 2 : -1;
+	if (readerIndex === -1) {
+		return inheritOriginLoc(
+			b.call(
+				requireRuntimeForContext(ctx, 'nativeCreateScopedValue'),
+				b.arrow([], b.block([...css, b.return(value)])),
+			),
+			node,
+		);
+	}
+	const args = value.arguments.slice();
+	const reader = args[readerIndex];
+	const statements =
+		reader.body.type === 'BlockStatement' ? reader.body.body : [b.return(reader.body)];
+	args[readerIndex] = inheritOriginLoc(
+		b.arrow(reader.params, b.block([...css, ...statements])),
+		reader,
+	);
+	return { ...value, arguments: args };
 }
 
 function hasJsxAttribute(node, name) {
@@ -18386,7 +18812,7 @@ function setupDirectiveFragment(directive) {
 	return inheritOriginLoc(b.jsx_fragment([directive]), directive);
 }
 
-function prepareSetupValueDirective(directive, ctx, componentName) {
+function prepareSetupValueDirective(directive, ctx, componentName, parentNs = 'opaque') {
 	// These descriptor-backed directives become synthetic branch bodies after the
 	// owning component's render-tree pass has already run. Give eligible @if/@try
 	// arms Pass A now (the walk deliberately retains its @for/@switch v1 exclusions)
@@ -18401,7 +18827,7 @@ function prepareSetupValueDirective(directive, ctx, componentName) {
 		// A first-class descriptor can be inserted under HTML, SVG, or MathML.
 		// Preserve that runtime namespace decision for ambiguous descendants such
 		// as <title>, exactly like returned descriptor-backed fragments do.
-		const opaque = rewriteOpaqueTitles(prepared, ctx, 'opaque');
+		const opaque = rewriteOpaqueTitles(prepared, ctx, parentNs);
 		if (opaque.type !== 'JSXCodeBlock') return opaque;
 		// Normalize child blocks now so the server does not mistake the code-block
 		// node for another setup value and recurse indefinitely. Render-only blocks
@@ -18529,7 +18955,14 @@ function liftDirectiveControl(ctx, directive) {
 // own list so the sub can close over setup values; module-level statements pass
 // the hoisted-helper list, where a module-level directive's only possible
 // references already live.
-function serverValueDirectiveFold(ctx, name, inlinedSubs, cssHash, freezeControl = false) {
+function serverValueDirectiveFold(
+	ctx,
+	name,
+	inlinedSubs,
+	cssHash,
+	freezeControl = false,
+	parentNs = 'opaque',
+) {
 	return (rawDirective) => {
 		// A module-level value is computed ONCE, where it is written. The client gets
 		// that for free — its fold lifts the control expression out as a hole
@@ -18539,7 +18972,7 @@ function serverValueDirectiveFold(ctx, name, inlinedSubs, cssHash, freezeControl
 		// a plain `const v = cond ? <A/> : <B/>` and React's module-level elements.
 		const frozen = freezeControl ? liftDirectiveControl(ctx, rawDirective) : null;
 		const directive = frozen === null ? rawDirective : frozen.directive;
-		const preparedDirective = prepareSetupValueDirective(directive, ctx, name);
+		const preparedDirective = prepareSetupValueDirective(directive, ctx, name, parentNs);
 		const wrapperName = allocCompilerName(ctx, `_sfrag$${ctx.nextFragId++}`);
 		// The sub is declared in the OWNING body, so it closes over that body's values
 		// lexically. A name introduced by an enclosing callback is not in scope there
@@ -18670,6 +19103,27 @@ function rewriteMapCallbackJsxValues(callback, ctx) {
 	return rewriteJsxValues(callback, ctx, true, unwrapTsExpr(callback));
 }
 
+function nativeValueFunction(node, authored, ctx) {
+	if (
+		!ctx.nativeReads ||
+		node._octaneNativeScope === true ||
+		!functionProducesJsx(authored) ||
+		node.body?.type === 'JSXCodeBlock'
+	)
+		return node;
+	rejectAsyncOrGenerator(authored, authored.id?.name ?? 'anonymous JSX function');
+	const statements = node.body.type === 'BlockStatement' ? node.body.body : [b.return(node.body)];
+	return {
+		...node,
+		...(node.type === 'ArrowFunctionExpression' ? { expression: false } : null),
+		body: inheritOriginLoc(
+			b.block(wrapNativeReadScope(statements, b.void0, nativeReadNames(ctx))),
+			node.body,
+		),
+		_octaneNativeScope: true,
+	};
+}
+
 /**
  * Lower a JSX COMPONENT element used at VALUE position (not as a component body's
  * rendered output) into a `createElement(Comp, props)` call, so JSX-as-a-value
@@ -18695,6 +19149,18 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 	if (lower != null) node = lowerSetupValueDirectives(node, lower);
 	return mapAst(node, (n) => {
 		const t = n && n.type;
+		if (
+			ctx.nativeReads &&
+			lower == null &&
+			isFunctionNode(n) &&
+			n._octaneNativeScope !== true &&
+			functionProducesJsx(n) &&
+			n.body?.type !== 'JSXCodeBlock'
+		) {
+			const body = rewriteJsxValues(n.body, ctx, eagerMapCallbackRoots, n);
+			const params = n.params.map((parameter) => rewriteJsxValues(parameter, ctx));
+			return nativeValueFunction({ ...n, body, params }, n, ctx);
+		}
 		if (t === 'CallExpression') {
 			const callee = n.callee;
 			const callback = unwrapTsExpr(n.arguments?.[0]);
@@ -18786,7 +19252,7 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 						out[key] = mapped;
 					}
 				}
-				return out;
+				return nativeValueFunction(out, n, ctx);
 			} finally {
 				ctx.currentComponentLocals = previousLocals;
 				ctx._valueDirectiveLowering = previousLower;
@@ -18884,10 +19350,13 @@ function lowerJsxChild(child, ctx) {
 		// A bare expression in a fragment has no parent element descriptor to
 		// defer it, so the fragment itself must own the represented render scope.
 		ctx.runtimeNeeded.add('Fragment');
-		ctx.runtimeNeeded.add('createScopedElement');
+		if (!ctx.nativeReads) ctx.runtimeNeeded.add('createScopedElement');
+		const scopedElement = ctx.nativeReads
+			? requireRuntimeForContext(ctx, 'nativeCreateScopedElement')
+			: rtAlias('createScopedElement');
 		return inheritOriginLoc(
 			b.call(
-				rtAlias('createScopedElement'),
+				scopedElement,
 				inheritOriginLoc(b.id(rtAlias('Fragment')), child),
 				inheritOriginLoc(b.object([]), child),
 				inheritOriginLoc(b.arrow([], children), child),
@@ -19249,7 +19718,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 			const childName = allocCompilerName(ctx, '__memoChild');
 			const memoizedDescriptor = inheritOriginLoc(
 				b.call(
-					requireRuntimeForContext(ctx, 'useMemo'),
+					requireRuntimeForContext(ctx, ctx.nativeReads ? 'nativePuMemo' : 'useMemo'),
 					b.arrow(
 						[],
 						b.sequence([b.assignment('=', b.id(freshName), b.literal(true)), childrenValue]),
@@ -19298,12 +19767,12 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 				node,
 			);
 		}
-		ctx.runtimeNeeded.add('createScopedElement');
+		if (!ctx.nativeReads) ctx.runtimeNeeded.add('createScopedElement');
+		const scopedElement = ctx.nativeReads
+			? requireRuntimeForContext(ctx, 'nativeCreateScopedElement')
+			: rtAlias('createScopedElement');
 		const readChildren = inheritOriginLoc(b.arrow([], memoizedChildrenBody ?? childrenValue), node);
-		descriptor = inheritOriginLoc(
-			b.call('_$createScopedElement', compNode, propsNode, readChildren),
-			node,
-		);
+		descriptor = inheritOriginLoc(b.call(scopedElement, compNode, propsNode, readChildren), node);
 	} else {
 		ctx.runtimeNeeded.add('createElement');
 		// Remaining scaffolding (callee, props object, spread/diagnostic wrappers,
@@ -19314,9 +19783,12 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		);
 	}
 	if (eagerRoot || !jsxValueRootNeedsRenderScope(node)) return descriptor;
-	ctx.runtimeNeeded.add('createScopedValue');
+	if (!ctx.nativeReads) ctx.runtimeNeeded.add('createScopedValue');
+	const scopedValue = ctx.nativeReads
+		? requireRuntimeForContext(ctx, 'nativeCreateScopedValue')
+		: rtAlias('createScopedValue');
 	return inheritOriginLoc(
-		b.call(rtAlias('createScopedValue'), inheritOriginLoc(b.arrow([], descriptor), node)),
+		b.call(scopedValue, inheritOriginLoc(b.arrow([], descriptor), node)),
 		node,
 	);
 }
@@ -20951,6 +21423,26 @@ function stripTsOnlyWrappers(node) {
 	return out ?? node;
 }
 
+function nativeReadActivationNodes(ctx, origin) {
+	// Install the graph-free driver before any authored root invocation, not
+	// after parameter evaluation inside a syntactically recognized component.
+	// Plain data modules do not pass through this renderer compilation path.
+	if (!ctx.nativeReads) return [];
+	return [
+		inheritOriginLoc(
+			b.stmt(b.call(requireRuntimeForContext(ctx, 'enableNativeReadCollection'), b.literal(1))),
+			origin,
+		),
+	];
+}
+
+function nativeReadNames(ctx) {
+	return {
+		alloc: (prefix) => allocCompilerName(ctx, prefix),
+		runtime: (name) => requireRuntimeForContext(ctx, name),
+	};
+}
+
 function emitAutoMemoRegion(
 	ctx,
 	dependencies,
@@ -20966,11 +21458,30 @@ function emitAutoMemoRegion(
 	strictEqualityDependencyIndex = -1,
 ) {
 	const witnessCount = publicationWitnesses?.length ?? 0;
-	const cell = allocAutoMemoCell(ctx, dependencies.length + (contextAware ? 1 : 0) + witnessCount);
+	const cell = allocAutoMemoCell(
+		ctx,
+		dependencies.length + (contextAware ? 1 : 0) + witnessCount + (ctx.nativeReads ? 1 : 0),
+	);
 	const contextIndex = contextAware ? cell.base + dependencies.length : null;
 	const witnessBase = cell.base + dependencies.length + (contextAware ? 1 : 0);
+	const nativeWitnessIndex = witnessBase + witnessCount;
 	const cache = ctx.currentAutoMemoCacheName;
 	const cacheAt = (i) => b.member(b.id(cache), b.literal(i), true);
+	const nativeCapture = ctx.nativeReads
+		? captureNativeReadWitness([statement], nativeReadNames(ctx))
+		: null;
+	const computeStatements = nativeCapture?.statements ?? [statement];
+	const replayNative =
+		nativeCapture === null
+			? []
+			: [
+					b.stmt(
+						b.call(
+							requireRuntimeForContext(ctx, 'replayNativeReadWitness'),
+							cacheAt(nativeWitnessIndex),
+						),
+					),
+				];
 	// Evaluate every dependency exactly once per render, before the miss test.
 	// The published snapshot is then the exact value the comparison (and the
 	// re-rendered region) observed: a live imported binding that moves while the
@@ -20990,6 +21501,16 @@ function emitAutoMemoRegion(
 	];
 	if (extraMiss !== null) misses.push(extraMiss);
 	misses.push(b.binary('!==', cacheAt(cell.init), b.literal(true)));
+	if (nativeCapture !== null)
+		misses.push(
+			b.unary(
+				'!',
+				b.call(
+					requireRuntimeForContext(ctx, 'validateNativeReadWitness'),
+					cacheAt(nativeWitnessIndex),
+				),
+			),
+		);
 	for (let index = 0; index < depNames.length; index++) {
 		misses.push(
 			sameValueDependencies && index !== strictEqualityDependencyIndex
@@ -21010,6 +21531,9 @@ function emitAutoMemoRegion(
 			// make the next equal-props render miss or skip the wrong publication.
 			b.stmt(b.assignment('=', cacheAt(witnessBase + index), b.id(name))),
 		),
+		...(nativeCapture === null
+			? []
+			: [b.stmt(b.assignment('=', cacheAt(nativeWitnessIndex), nativeCapture.witness))]),
 	];
 	const writable = () =>
 		b.if(
@@ -21024,7 +21548,11 @@ function emitAutoMemoRegion(
 	if (!contextAware) {
 		return b.block([
 			...depDecls,
-			b.if(orChain(misses), b.block([statement, writable(), ...publish(), markInit()]), null),
+			b.if(
+				orChain(misses),
+				b.block([...computeStatements, writable(), ...publish(), markInit()]),
+				replayNative.length === 0 ? null : b.block(replayNative),
+			),
 		]);
 	}
 	ctx.runtimeNeeded.add('compilerCacheContext');
@@ -21043,7 +21571,7 @@ function emitAutoMemoRegion(
 		b.if(
 			orChain(misses),
 			b.block([
-				statement,
+				...computeStatements,
 				b.const('_c', cacheContextCall()),
 				writable(),
 				...publish(),
@@ -21051,6 +21579,7 @@ function emitAutoMemoRegion(
 				markInit(),
 			]),
 			b.block([
+				...replayNative,
 				b.const('_c', cacheContextCall()),
 				b.if(
 					b.binary('!==', b.id('_c'), cacheAt(contextIndex)),

@@ -269,6 +269,29 @@ const SUITES = [
 		],
 	},
 	{
+		// Renderer-free Alien 3.2.0 versus scoped-engine graphs, plus one
+		// uninterrupted ownership lifetime with repeated partial disposal.
+		name: 'scoped-signals',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n, quick) => [String(n), ...(quick ? ['--quick'] : [])] }],
+	},
+	{
+		// Actual production compilation with ordinary/native read controls,
+		// plus deterministic five-dependency use() creation-cache guards.
+		name: 'scoped-native-reads',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [
+			{
+				script: 'run-native-costs.mjs',
+				args: (n, quick) => [`--samples=${n}`, ...(quick ? ['--quick'] : [])],
+			},
+		],
+	},
+	{
 		name: 'signal-favoring',
 		cwd: 'signal-favoring',
 		servers: [

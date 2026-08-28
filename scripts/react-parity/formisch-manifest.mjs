@@ -28,7 +28,6 @@ const runtimeSupport = (inventory) => [
 	evidence('packages/formisch/audit/adapted-react-source-fingerprints.json'),
 	evidence('scripts/react-parity/formisch-runtime-inventory.mjs'),
 	evidence('scripts/react-parity/formisch-upstream-lib.mjs'),
-	evidence('vitest.config.js'),
 	evidence('packages/formisch/audit/pristine-react-core-setup.ts'),
 	evidence('packages/formisch/upstream/packages/core/src/vitest/setup.ts'),
 	evidence('packages/formisch/upstream/frameworks/react/src/vitest/setup.ts'),

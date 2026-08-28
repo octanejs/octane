@@ -1,0 +1,2763 @@
+{
+  "suite": "scoped-signals-async-retention",
+  "mode": "heap-diagnostics",
+  "request": [
+    "/opt/homebrew/Cellar/node/26.4.0/bin/node",
+    "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/run-async-retention.mjs",
+    "--tooling-root=/private/tmp/octane-scoped-signals-tooling.n1e5b0",
+    "--snapshots=/private/tmp/octane-scoped-async-retainers-20260827",
+    "--cycles=1000"
+  ],
+  "startedAt": "2026-08-27T14:46:13.970Z",
+  "cycles": 1000,
+  "method": "One Node worker keeps unresolved producer promises externally reachable while disposing a promise owner and stream owner per cycle. Three explicit collections after event-loop turns precede each snapshot. A live scope remains as a positive control, then is retired and dropped before external promises are released.",
+  "inspectionMethod": "Offline V8 strong-edge traversal excludes weak edges. Scope/signal instances use public prototype methods; request and attempt records use the fields of the hashed source revision. Known workload labels distinguish owners. The private fields are diagnostic evidence, not public behavior assertions.",
+  "limitations": [
+    "Pending producer promises and revoked attempt shells are intentionally retained until the external producer array is cleared; total heap growth alone is not an owner leak.",
+    "This tests unresolved promises, pending stream next/return, and data-owner disposal. It does not establish DOM, browser, DevTools, or historical-frame retention.",
+    "No historical frames are created, so deliberately retained frame handles cannot confound the async retirement result.",
+    "Raw heaps stay local; the report includes only counts, known fixture labels, hashes, and strong retainer paths."
+  ],
+  "targets": [
+    {
+      "name": "active-control/0",
+      "meta": {
+        "cycle": 0,
+        "phase": "active-control",
+        "disposedCycleOwners": 0,
+        "expectedLiveScopes": 1,
+        "externallyRetainedProducers": 2,
+        "counters": {
+          "promiseStarts": 1,
+          "promiseAborts": 0,
+          "streamStarts": 1,
+          "streamAborts": 0,
+          "streamNexts": 1,
+          "streamReturns": 0
+        },
+        "memory": {
+          "rss": 60162048,
+          "heapTotal": 10108928,
+          "heapUsed": 6900736,
+          "external": 3908665,
+          "arrayBuffers": 146743
+        },
+        "snapshot": "/private/tmp/octane-scoped-async-retainers-20260827/active-control-0.heapsnapshot"
+      },
+      "inspection": {
+        "snapshotSha256": "881a6496201a0f0124f041dca49950ef2fb1c57405b1ef95643a4c67f3984b9c",
+        "snapshotBytes": 8204523,
+        "strongScopeCount": 1,
+        "retiredCycleScopeCount": 0,
+        "scopeSamples": [
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "ge",
+            "selfBytes": 232,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              }
+            ]
+          }
+        ],
+        "retiredCycleScopeSamples": [],
+        "strongSignalCount": 4,
+        "retiredCycleSignalCount": 0,
+        "signalSamples": [
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "R",
+            "selfBytes": 272,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "nodes",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "9",
+                "type": "object",
+                "name": "R"
+              }
+            ]
+          },
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "R",
+            "selfBytes": 272,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "nodes",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "12",
+                "type": "object",
+                "name": "R"
+              }
+            ]
+          },
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "R",
+            "selfBytes": 272,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "nodes",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "6",
+                "type": "object",
+                "name": "R"
+              }
+            ]
+          },
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "R",
+            "selfBytes": 272,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "nodes",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "15",
+                "type": "object",
+                "name": "R"
+              }
+            ]
+          }
+        ],
+        "strongRequestCount": 2,
+        "retiredCycleRequestCount": 0,
+        "requestSamples": [
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "pe",
+            "selfBytes": 152,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "requests",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "6",
+                "type": "object",
+                "name": "pe"
+              }
+            ]
+          },
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "pe",
+            "selfBytes": 152,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "requests",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "9",
+                "type": "object",
+                "name": "pe"
+              }
+            ]
+          }
+        ],
+        "retainedAttemptRecords": 2,
+        "activeAttemptRecords": 2,
+        "revokedAttemptRecords": 0,
+        "revokedAttemptsWithObjectEntry": 0,
+        "revokedAttemptsWithController": 0,
+        "revokedAttemptsWithIterator": 0,
+        "revokedAttemptSamples": [],
+        "externalProducerCounts": {
+          "promise": 1,
+          "stream-next": 1,
+          "stream-return": 0
+        },
+        "externalProducerSamples": [
+          {
+            "kind": "promise",
+            "origin": "async-retention/control-live",
+            "className": "Promise",
+            "selfBytes": 48,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "0",
+                "type": "object",
+                "name": "Promise"
+              }
+            ]
+          },
+          {
+            "kind": "stream-next",
+            "origin": "async-retention/control-live",
+            "className": "Promise",
+            "selfBytes": 48,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "1",
+                "type": "object",
+                "name": "Promise"
+              }
+            ]
+          }
+        ],
+        "strongStreamIteratorCount": 1,
+        "streamIteratorSamples": [
+          {
+            "origin": "async-retention/control-live",
+            "className": "RetentionStreamIterator",
+            "selfBytes": 96,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "requests",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "9",
+                "type": "object",
+                "name": "pe"
+              },
+              {
+                "edge": "attempt",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "iterator",
+                "type": "object",
+                "name": "RetentionStreamIterator"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "active-control/100",
+      "meta": {
+        "cycle": 100,
+        "phase": "active-control",
+        "disposedCycleOwners": 200,
+        "expectedLiveScopes": 1,
+        "externallyRetainedProducers": 302,
+        "counters": {
+          "promiseStarts": 101,
+          "promiseAborts": 100,
+          "streamStarts": 101,
+          "streamAborts": 100,
+          "streamNexts": 101,
+          "streamReturns": 100
+        },
+        "memory": {
+          "rss": 119160832,
+          "heapTotal": 11157504,
+          "heapUsed": 7028952,
+          "external": 3904655,
+          "arrayBuffers": 146743
+        },
+        "snapshot": "/private/tmp/octane-scoped-async-retainers-20260827/active-control-100.heapsnapshot"
+      },
+      "inspection": {
+        "snapshotSha256": "732522d52111a4a52dc816dcf66f3e4f7b9e278a3586cc66d9e459028e0ad11c",
+        "snapshotBytes": 8661800,
+        "strongScopeCount": 1,
+        "retiredCycleScopeCount": 0,
+        "scopeSamples": [
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "ge",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              }
+            ]
+          }
+        ],
+        "retiredCycleScopeSamples": [],
+        "strongSignalCount": 4,
+        "retiredCycleSignalCount": 0,
+        "signalSamples": [
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "R",
+            "selfBytes": 184,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "nodes",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "9",
+                "type": "object",
+                "name": "R"
+              }
+            ]
+          },
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "R",
+            "selfBytes": 184,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "nodes",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "12",
+                "type": "object",
+                "name": "R"
+              }
+            ]
+          },
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "R",
+            "selfBytes": 184,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "nodes",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "6",
+                "type": "object",
+                "name": "R"
+              }
+            ]
+          },
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "R",
+            "selfBytes": 184,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "nodes",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "15",
+                "type": "object",
+                "name": "R"
+              }
+            ]
+          }
+        ],
+        "strongRequestCount": 2,
+        "retiredCycleRequestCount": 0,
+        "requestSamples": [
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "pe",
+            "selfBytes": 64,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "requests",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "6",
+                "type": "object",
+                "name": "pe"
+              }
+            ]
+          },
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "pe",
+            "selfBytes": 64,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "requests",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "9",
+                "type": "object",
+                "name": "pe"
+              }
+            ]
+          }
+        ],
+        "retainedAttemptRecords": 203,
+        "activeAttemptRecords": 2,
+        "revokedAttemptRecords": 201,
+        "revokedAttemptsWithObjectEntry": 0,
+        "revokedAttemptsWithController": 0,
+        "revokedAttemptsWithIterator": 0,
+        "revokedAttemptSamples": [
+          {
+            "retainedByProducer": {
+              "kind": "promise",
+              "origin": "async-retention/promise/3"
+            },
+            "className": "Object",
+            "selfBytes": 72,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "8",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "Object"
+              }
+            ]
+          },
+          {
+            "retainedByProducer": {
+              "kind": "stream-next",
+              "origin": "async-retention/stream/2"
+            },
+            "className": "Object",
+            "selfBytes": 72,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "6",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "Object"
+              }
+            ]
+          },
+          {
+            "retainedByProducer": {
+              "kind": "promise",
+              "origin": "async-retention/promise/2"
+            },
+            "className": "Object",
+            "selfBytes": 72,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "5",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "Object"
+              }
+            ]
+          }
+        ],
+        "externalProducerCounts": {
+          "promise": 101,
+          "stream-next": 101,
+          "stream-return": 100
+        },
+        "externalProducerSamples": [
+          {
+            "kind": "promise",
+            "origin": "async-retention/promise/1",
+            "className": "Promise",
+            "selfBytes": 48,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "2",
+                "type": "object",
+                "name": "Promise"
+              }
+            ]
+          },
+          {
+            "kind": "stream-next",
+            "origin": "async-retention/stream/3",
+            "className": "Promise",
+            "selfBytes": 48,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "9",
+                "type": "object",
+                "name": "Promise"
+              }
+            ]
+          },
+          {
+            "kind": "stream-return",
+            "origin": "async-retention/stream/3",
+            "className": "Promise",
+            "selfBytes": 48,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "10",
+                "type": "object",
+                "name": "Promise"
+              }
+            ]
+          }
+        ],
+        "strongStreamIteratorCount": 101,
+        "streamIteratorSamples": [
+          {
+            "origin": "async-retention/stream/2",
+            "className": "RetentionStreamIterator",
+            "selfBytes": 32,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "7",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "RetentionStreamIterator"
+              }
+            ]
+          },
+          {
+            "origin": "async-retention/stream/1",
+            "className": "RetentionStreamIterator",
+            "selfBytes": 32,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "4",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "RetentionStreamIterator"
+              }
+            ]
+          },
+          {
+            "origin": "async-retention/stream/5",
+            "className": "RetentionStreamIterator",
+            "selfBytes": 32,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "16",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "RetentionStreamIterator"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "active-control/1000",
+      "meta": {
+        "cycle": 1000,
+        "phase": "active-control",
+        "disposedCycleOwners": 2000,
+        "expectedLiveScopes": 1,
+        "externallyRetainedProducers": 3002,
+        "counters": {
+          "promiseStarts": 1001,
+          "promiseAborts": 1000,
+          "streamStarts": 1001,
+          "streamAborts": 1000,
+          "streamNexts": 1001,
+          "streamReturns": 1000
+        },
+        "memory": {
+          "rss": 147668992,
+          "heapTotal": 26099712,
+          "heapUsed": 8747816,
+          "external": 3904655,
+          "arrayBuffers": 146743
+        },
+        "snapshot": "/private/tmp/octane-scoped-async-retainers-20260827/active-control-1000.heapsnapshot"
+      },
+      "inspection": {
+        "snapshotSha256": "d7d8526a4c3a97fd00e166ece16f405c7826dacbb52214e7ee1768ec815491a4",
+        "snapshotBytes": 11177629,
+        "strongScopeCount": 1,
+        "retiredCycleScopeCount": 0,
+        "scopeSamples": [
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "ge",
+            "selfBytes": 136,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              }
+            ]
+          }
+        ],
+        "retiredCycleScopeSamples": [],
+        "strongSignalCount": 4,
+        "retiredCycleSignalCount": 0,
+        "signalSamples": [
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "R",
+            "selfBytes": 184,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "nodes",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "9",
+                "type": "object",
+                "name": "R"
+              }
+            ]
+          },
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "R",
+            "selfBytes": 184,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "nodes",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "12",
+                "type": "object",
+                "name": "R"
+              }
+            ]
+          },
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "R",
+            "selfBytes": 184,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "nodes",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "6",
+                "type": "object",
+                "name": "R"
+              }
+            ]
+          },
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "R",
+            "selfBytes": 184,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "nodes",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "15",
+                "type": "object",
+                "name": "R"
+              }
+            ]
+          }
+        ],
+        "strongRequestCount": 2,
+        "retiredCycleRequestCount": 0,
+        "requestSamples": [
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "pe",
+            "selfBytes": 64,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "requests",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "6",
+                "type": "object",
+                "name": "pe"
+              }
+            ]
+          },
+          {
+            "scopeKey": "async-retention/control-live",
+            "className": "pe",
+            "selfBytes": 64,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "liveControl",
+                "type": "object",
+                "name": "ge"
+              },
+              {
+                "edge": "requests",
+                "type": "object",
+                "name": "Map"
+              },
+              {
+                "edge": "table",
+                "type": "array",
+                "name": ""
+              },
+              {
+                "edge": "9",
+                "type": "object",
+                "name": "pe"
+              }
+            ]
+          }
+        ],
+        "retainedAttemptRecords": 2003,
+        "activeAttemptRecords": 2,
+        "revokedAttemptRecords": 2001,
+        "revokedAttemptsWithObjectEntry": 0,
+        "revokedAttemptsWithController": 0,
+        "revokedAttemptsWithIterator": 0,
+        "revokedAttemptSamples": [
+          {
+            "retainedByProducer": {
+              "kind": "stream-next",
+              "origin": "async-retention/stream/483"
+            },
+            "className": "Object",
+            "selfBytes": 72,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "1449",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "Object"
+              }
+            ]
+          },
+          {
+            "retainedByProducer": {
+              "kind": "promise",
+              "origin": "async-retention/promise/483"
+            },
+            "className": "Object",
+            "selfBytes": 72,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "1448",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "Object"
+              }
+            ]
+          },
+          {
+            "retainedByProducer": {
+              "kind": "stream-next",
+              "origin": "async-retention/stream/482"
+            },
+            "className": "Object",
+            "selfBytes": 72,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "1446",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "Object"
+              }
+            ]
+          }
+        ],
+        "externalProducerCounts": {
+          "promise": 1001,
+          "stream-next": 1001,
+          "stream-return": 1000
+        },
+        "externalProducerSamples": [
+          {
+            "kind": "promise",
+            "origin": "async-retention/promise/193",
+            "className": "Promise",
+            "selfBytes": 48,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "578",
+                "type": "object",
+                "name": "Promise"
+              }
+            ]
+          },
+          {
+            "kind": "stream-next",
+            "origin": "async-retention/stream/192",
+            "className": "Promise",
+            "selfBytes": 48,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "576",
+                "type": "object",
+                "name": "Promise"
+              }
+            ]
+          },
+          {
+            "kind": "stream-return",
+            "origin": "async-retention/stream/192",
+            "className": "Promise",
+            "selfBytes": 48,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "577",
+                "type": "object",
+                "name": "Promise"
+              }
+            ]
+          }
+        ],
+        "strongStreamIteratorCount": 1001,
+        "streamIteratorSamples": [
+          {
+            "origin": "async-retention/stream/317",
+            "className": "RetentionStreamIterator",
+            "selfBytes": 32,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "952",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "RetentionStreamIterator"
+              }
+            ]
+          },
+          {
+            "origin": "async-retention/stream/483",
+            "className": "RetentionStreamIterator",
+            "selfBytes": 32,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "1450",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "RetentionStreamIterator"
+              }
+            ]
+          },
+          {
+            "origin": "async-retention/stream/482",
+            "className": "RetentionStreamIterator",
+            "selfBytes": 32,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "1447",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "RetentionStreamIterator"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "control-retired/1000",
+      "meta": {
+        "cycle": 1000,
+        "phase": "control-retired",
+        "disposedCycleOwners": 2000,
+        "expectedLiveScopes": 0,
+        "externallyRetainedProducers": 3003,
+        "counters": {
+          "promiseStarts": 1001,
+          "promiseAborts": 1001,
+          "streamStarts": 1001,
+          "streamAborts": 1001,
+          "streamNexts": 1001,
+          "streamReturns": 1001
+        },
+        "memory": {
+          "rss": 136413184,
+          "heapTotal": 9584640,
+          "heapUsed": 8544328,
+          "external": 3934862,
+          "arrayBuffers": 146743
+        },
+        "snapshot": "/private/tmp/octane-scoped-async-retainers-20260827/control-retired-1000.heapsnapshot"
+      },
+      "inspection": {
+        "snapshotSha256": "2c3830ba858d71f389289e3f7ebc81aae93c42c1371fd1f76d1df708e5849ee9",
+        "snapshotBytes": 11010778,
+        "strongScopeCount": 0,
+        "retiredCycleScopeCount": 0,
+        "scopeSamples": [],
+        "retiredCycleScopeSamples": [],
+        "strongSignalCount": 0,
+        "retiredCycleSignalCount": 0,
+        "signalSamples": [],
+        "strongRequestCount": 0,
+        "retiredCycleRequestCount": 0,
+        "requestSamples": [],
+        "retainedAttemptRecords": 2003,
+        "activeAttemptRecords": 0,
+        "revokedAttemptRecords": 2003,
+        "revokedAttemptsWithObjectEntry": 0,
+        "revokedAttemptsWithController": 0,
+        "revokedAttemptsWithIterator": 0,
+        "revokedAttemptSamples": [
+          {
+            "retainedByProducer": {
+              "kind": "stream-next",
+              "origin": "async-retention/stream/483"
+            },
+            "className": "Object",
+            "selfBytes": 72,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "1449",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "Object"
+              }
+            ]
+          },
+          {
+            "retainedByProducer": {
+              "kind": "promise",
+              "origin": "async-retention/promise/483"
+            },
+            "className": "Object",
+            "selfBytes": 72,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "1448",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "Object"
+              }
+            ]
+          },
+          {
+            "retainedByProducer": {
+              "kind": "stream-next",
+              "origin": "async-retention/stream/482"
+            },
+            "className": "Object",
+            "selfBytes": 72,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "1446",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "Object"
+              }
+            ]
+          }
+        ],
+        "externalProducerCounts": {
+          "promise": 1001,
+          "stream-next": 1001,
+          "stream-return": 1001
+        },
+        "externalProducerSamples": [
+          {
+            "kind": "promise",
+            "origin": "async-retention/promise/193",
+            "className": "Promise",
+            "selfBytes": 48,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "578",
+                "type": "object",
+                "name": "Promise"
+              }
+            ]
+          },
+          {
+            "kind": "stream-next",
+            "origin": "async-retention/stream/192",
+            "className": "Promise",
+            "selfBytes": 48,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "576",
+                "type": "object",
+                "name": "Promise"
+              }
+            ]
+          },
+          {
+            "kind": "stream-return",
+            "origin": "async-retention/stream/192",
+            "className": "Promise",
+            "selfBytes": 48,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "577",
+                "type": "object",
+                "name": "Promise"
+              }
+            ]
+          }
+        ],
+        "strongStreamIteratorCount": 1001,
+        "streamIteratorSamples": [
+          {
+            "origin": "async-retention/stream/317",
+            "className": "RetentionStreamIterator",
+            "selfBytes": 32,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "952",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "RetentionStreamIterator"
+              }
+            ]
+          },
+          {
+            "origin": "async-retention/stream/483",
+            "className": "RetentionStreamIterator",
+            "selfBytes": 32,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "1450",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "RetentionStreamIterator"
+              }
+            ]
+          },
+          {
+            "origin": "async-retention/stream/482",
+            "className": "RetentionStreamIterator",
+            "selfBytes": 32,
+            "rootPath": [
+              {
+                "edge": "2",
+                "type": "hidden",
+                "name": "system / NativeContext"
+              },
+              {
+                "edge": "global_object",
+                "type": "object",
+                "name": "global (global*)"
+              },
+              {
+                "edge": "__octaneAsyncRetention",
+                "type": "object",
+                "name": "Object"
+              },
+              {
+                "edge": "producers",
+                "type": "object",
+                "name": "Array"
+              },
+              {
+                "edge": "1447",
+                "type": "object",
+                "name": "Promise"
+              },
+              {
+                "edge": "reactions_or_result",
+                "type": "hidden",
+                "name": "system / PromiseReaction"
+              },
+              {
+                "edge": "1",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "t",
+                "type": "object",
+                "name": "RetentionStreamIterator"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "external-producers-released/1000",
+      "meta": {
+        "cycle": 1000,
+        "phase": "external-producers-released",
+        "disposedCycleOwners": 2000,
+        "expectedLiveScopes": 0,
+        "externallyRetainedProducers": 0,
+        "counters": {
+          "promiseStarts": 1001,
+          "promiseAborts": 1001,
+          "streamStarts": 1001,
+          "streamAborts": 1001,
+          "streamNexts": 1001,
+          "streamReturns": 1001
+        },
+        "memory": {
+          "rss": 136396800,
+          "heapTotal": 8536064,
+          "heapUsed": 6940912,
+          "external": 3934862,
+          "arrayBuffers": 146743
+        },
+        "snapshot": "/private/tmp/octane-scoped-async-retainers-20260827/external-producers-released-1000.heapsnapshot"
+      },
+      "inspection": {
+        "snapshotSha256": "d8005ec262ebdd46de12ab6e7280749c0ab6740434f077671039cf1688e74906",
+        "snapshotBytes": 8413861,
+        "strongScopeCount": 0,
+        "retiredCycleScopeCount": 0,
+        "scopeSamples": [],
+        "retiredCycleScopeSamples": [],
+        "strongSignalCount": 0,
+        "retiredCycleSignalCount": 0,
+        "signalSamples": [],
+        "strongRequestCount": 0,
+        "retiredCycleRequestCount": 0,
+        "requestSamples": [],
+        "retainedAttemptRecords": 1,
+        "activeAttemptRecords": 0,
+        "revokedAttemptRecords": 1,
+        "revokedAttemptsWithObjectEntry": 0,
+        "revokedAttemptsWithController": 0,
+        "revokedAttemptsWithIterator": 0,
+        "revokedAttemptSamples": [
+          {
+            "retainedByProducer": null,
+            "className": "Object",
+            "selfBytes": 72,
+            "rootPath": [
+              {
+                "edge": "1",
+                "type": "synthetic",
+                "name": "(GC roots)"
+              },
+              {
+                "edge": "20",
+                "type": "synthetic",
+                "name": "(Stack roots)"
+              },
+              {
+                "edge": "32",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "promiseQuery",
+                "type": "closure",
+                "name": ""
+              },
+              {
+                "edge": "context",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "previous",
+                "type": "object",
+                "name": "system / Context"
+              },
+              {
+                "edge": "He",
+                "type": "closure",
+                "name": "He"
+              },
+              {
+                "edge": "feedback_cell",
+                "type": "code",
+                "name": "system / FeedbackCell"
+              },
+              {
+                "edge": "value",
+                "type": "code",
+                "name": "system / FeedbackVector"
+              },
+              {
+                "edge": "6",
+                "type": "code",
+                "name": "system / AllocationSite"
+              },
+              {
+                "edge": "transition_info",
+                "type": "object",
+                "name": "Object"
+              }
+            ]
+          }
+        ],
+        "externalProducerCounts": {
+          "promise": 0,
+          "stream-next": 0,
+          "stream-return": 0
+        },
+        "externalProducerSamples": [],
+        "strongStreamIteratorCount": 0,
+        "streamIteratorSamples": []
+      }
+    }
+  ],
+  "environment": {
+    "commit": "ba9abbfb634786a1b081852f6eb51845f3d588fc",
+    "dirty": true,
+    "node": "v26.4.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpu": "Apple M5 Max",
+    "lockfileSha256": "b16bea53c010a4ab4a3b63511b5c0dff0f96c5623d9c53b4a21e1f11ad05e72e",
+    "packageManifestSha256": "e5e09d668387e3f480d0326dbd1ff4462cd4bb30b85ccd7f2bbe0efb13efecf4",
+    "toolingRoot": "/private/tmp/octane-scoped-signals-tooling.n1e5b0",
+    "dependencyMode": "explicit-tooling-root",
+    "dependencies": {
+      "esbuild": {
+        "name": "esbuild",
+        "version": "0.28.1",
+        "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/package.json",
+        "manifestSha256": "d55d1d19fcc5b6079e4a71dd4111340c79c682bc36835ac7058a0c364c7db58a",
+        "entry": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js",
+        "entrySha256": "8331fe1d8b3a07381f33cc425fcfaa94776e263113653f80ec3ba433e9657e73"
+      },
+      "alien": {
+        "name": "alien-signals",
+        "version": "3.2.0",
+        "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/package.json",
+        "manifestSha256": "246a6dc2e0b031c5a274df8fdd6f84d7880aa11d8d945a3579a6214a1afe8831",
+        "entry": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/cjs/index.cjs",
+        "entrySha256": "4176a9035b7898debb4601fd0ba8076e279befc470816336260847bd44720299"
+      }
+    },
+    "build": {
+      "options": {
+        "bundle": true,
+        "write": false,
+        "metafile": true,
+        "minify": true,
+        "treeShaking": true,
+        "format": "esm",
+        "platform": "node",
+        "target": "node22",
+        "tsconfigRaw": {
+          "compilerOptions": {}
+        },
+        "define": {
+          "__OCTANE_PROFILE_ENABLED__": "false",
+          "process.env.NODE_ENV": "\"production\""
+        }
+      },
+      "bytes": 28693,
+      "sha256": "9d64d01a030da099e5a4d5349c344ea6fe061b8a932cc8a7155731e73cd45db6",
+      "inputs": [
+        {
+          "path": "packages/octane/src/signals/errors.ts",
+          "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/errors.ts",
+          "sha256": "6a9a9561a4e37085c76ae714f6ec774f19646d3c6ef0e0f5dbc44ae6e16ee451",
+          "package": {
+            "name": "octane",
+            "version": "0.1.47",
+            "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+            "manifestSha256": "e5e09d668387e3f480d0326dbd1ff4462cd4bb30b85ccd7f2bbe0efb13efecf4"
+          }
+        },
+        {
+          "path": "packages/octane/src/signals/encoding.ts",
+          "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/encoding.ts",
+          "sha256": "57625f36035059cca2c473a5ac0e8038b27b4d57eaa422a3bcd185b9dc38d88c",
+          "package": {
+            "name": "octane",
+            "version": "0.1.47",
+            "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+            "manifestSha256": "e5e09d668387e3f480d0326dbd1ff4462cd4bb30b85ccd7f2bbe0efb13efecf4"
+          }
+        },
+        {
+          "path": "../../../../../private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs",
+          "physicalPath": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs",
+          "sha256": "d6861e6d706a1f5c6de3446353e5424c8e82dd3576e6aac03b850edf51e9a8c5",
+          "package": {
+            "name": "alien-signals",
+            "version": "3.2.0",
+            "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/package.json",
+            "manifestSha256": "246a6dc2e0b031c5a274df8fdd6f84d7880aa11d8d945a3579a6214a1afe8831"
+          }
+        },
+        {
+          "path": "packages/octane/src/signals/read-protocol.ts",
+          "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/read-protocol.ts",
+          "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417",
+          "package": {
+            "name": "octane",
+            "version": "0.1.47",
+            "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+            "manifestSha256": "e5e09d668387e3f480d0326dbd1ff4462cd4bb30b85ccd7f2bbe0efb13efecf4"
+          }
+        },
+        {
+          "path": "packages/octane/src/signals/graph.ts",
+          "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/graph.ts",
+          "sha256": "719371959354ca916d11a76bb162eac93fb4efacf056d14290d5768bfe9dc3a5",
+          "package": {
+            "name": "octane",
+            "version": "0.1.47",
+            "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+            "manifestSha256": "e5e09d668387e3f480d0326dbd1ff4462cd4bb30b85ccd7f2bbe0efb13efecf4"
+          }
+        },
+        {
+          "path": "packages/octane/src/signals/requests.ts",
+          "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/requests.ts",
+          "sha256": "0a26ea7d05796349f38ebd5212bc2e512f2a72c1342c3983a33c83ed129d00bf",
+          "package": {
+            "name": "octane",
+            "version": "0.1.47",
+            "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+            "manifestSha256": "e5e09d668387e3f480d0326dbd1ff4462cd4bb30b85ccd7f2bbe0efb13efecf4"
+          }
+        },
+        {
+          "path": "packages/octane/src/signals/engine.ts",
+          "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/engine.ts",
+          "sha256": "18eb70cbf0e4e44affa31adbf61d4adbfdfb1965aa975803e14f2ee3df2ac729",
+          "package": {
+            "name": "octane",
+            "version": "0.1.47",
+            "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+            "manifestSha256": "e5e09d668387e3f480d0326dbd1ff4462cd4bb30b85ccd7f2bbe0efb13efecf4"
+          }
+        },
+        {
+          "path": "packages/octane/src/signals/index.ts",
+          "physicalPath": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/index.ts",
+          "sha256": "c4400e3eacea0f52049d3559b26be14dd3485a897135b54ec8cd5f2ad43de17d",
+          "package": {
+            "name": "octane",
+            "version": "0.1.47",
+            "manifest": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/package.json",
+            "manifestSha256": "e5e09d668387e3f480d0326dbd1ff4462cd4bb30b85ccd7f2bbe0efb13efecf4"
+          }
+        },
+        {
+          "path": "async-retention-public-entry.mjs",
+          "sha256": "5d594802ac9415f9822c0467205d7f89ddfeaa8ce268715f7f96545906c4c1af",
+          "source": "export * from \"octane/signals\";\n"
+        }
+      ]
+    },
+    "snapshotDirectory": "/private/tmp/octane-scoped-async-retainers-20260827",
+    "workerCommand": [
+      "/opt/homebrew/Cellar/node/26.4.0/bin/node",
+      "--expose-gc",
+      "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/async-retention-worker.mjs",
+      "/private/tmp/octane-scoped-async-retainers-20260827/engine.mjs",
+      "/private/tmp/octane-scoped-async-retainers-20260827",
+      "1000"
+    ],
+    "runnerSha256": "53fccd0119166d8131fee18489f8d15193d74084182c245cb8b81561c8cc3028",
+    "workerSha256": "d8f33015c6ee577b6012d28c95a555b5d7943f8e7b6b354bdcf302b7250c9281",
+    "inspectorSha256": "1d10366ba43e6836e712227cc2fbefe5f930e0edc4418f3d2ac515f1c66ccc92",
+    "boundaryHelperSha256": "99f42a2549212d2bc6dfb244351724375ffe2448d9944a0e447a11c132c360fb"
+  },
+  "positiveControl": "passed",
+  "findings": [
+    "active-control/100: unexpected retained stream iterator",
+    "active-control/1000: unexpected retained stream iterator",
+    "control-retired/1000: unexpected retained stream iterator"
+  ],
+  "failed": "Error: active-control/100: unexpected retained stream iterator\nactive-control/1000: unexpected retained stream iterator\ncontrol-retired/1000: unexpected retained stream iterator\n    at file:///Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/run-async-retention.mjs:290:29\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+  "finishedAt": "2026-08-27T14:46:15.814Z"
+}

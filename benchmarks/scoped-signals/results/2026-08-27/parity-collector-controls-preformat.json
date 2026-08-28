@@ -1,0 +1,77 @@
+{
+  "status": "passed",
+  "method": "Execute the durable untimed control functions against the already-frozen positive and isolated fault collector bundles. These controls are supplementary, not full correctness evidence.",
+  "helper": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/benchmarks/scoped-signals/native-collector-controls.mjs",
+  "helperSha256": "eea98c09ab0c0b6a7c0e1cf441ab8a73fa494cde5609241b361c88b87ef928e6",
+  "results": [
+    {
+      "name": "none",
+      "file": "/private/tmp/octane-parity-collector-probe-xK1TuR/none.mjs",
+      "sha256": "7a04fda4315425cd3b941dd08b063a4923c22b45c07c82e14cd58520d7378ad9",
+      "checks": {
+        "observer": {
+          "passed": true,
+          "controls": {
+            "observerRestored": true,
+            "nestedReadCollected": true,
+            "enclosingObserverUsable": true
+          }
+        },
+        "guard": {
+          "passed": true,
+          "controls": {
+            "nestedScopeGuarded": true,
+            "readsCollected": true,
+            "enclosingWriteGuardRestored": true
+          }
+        }
+      }
+    },
+    {
+      "name": "observer-check",
+      "file": "/private/tmp/octane-parity-collector-probe-xK1TuR/observer-check.mjs",
+      "sha256": "adfadc6392ab174b82dfba424ad984b6fa12a974c00efa00867eb3a24563ef6c",
+      "checks": {
+        "observer": {
+          "passed": false,
+          "message": "A nested scope must collect its own read\n+ actual - expected\n\n+ []\n- [\n-   [\n-     {},\n-     {\n-       getVersion: [Function: getVersion]\n-     },\n-     7\n-   ]\n- ]\n"
+        },
+        "guard": {
+          "passed": true,
+          "controls": {
+            "nestedScopeGuarded": true,
+            "readsCollected": true,
+            "enclosingWriteGuardRestored": true
+          }
+        }
+      }
+    },
+    {
+      "name": "guard-check",
+      "file": "/private/tmp/octane-parity-collector-probe-xK1TuR/guard-check.mjs",
+      "sha256": "65dbbc369474aa7928f22618587cc870f52550f1eccb15157ff39689372a9c54",
+      "checks": {
+        "observer": {
+          "passed": true,
+          "controls": {
+            "observerRestored": true,
+            "nestedReadCollected": true,
+            "enclosingObserverUsable": true
+          }
+        },
+        "guard": {
+          "passed": false,
+          "message": "The nested scope must guard writes\n\nfalse !== true\n"
+        }
+      }
+    }
+  ],
+  "parityEvidence": {
+    "classification": "historical-preformat-control-verification",
+    "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/collector-controls-verification-01.json",
+    "rawResultSha256": "eabc2ff948d4868af2a7d1d8d12a16467ba8c2f90de882b146d2dab7b2b7dde2",
+    "removedMetadata": [],
+    "allTimingAndGcSamplesPreserved": true,
+    "sourceToolchainQualification": "Existing explicitly authorized supplemental public source toolchain; not locked-workspace, canonical CI, or browser performance evidence."
+  }
+}

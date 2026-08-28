@@ -11,6 +11,63 @@ import { OctaneDevtoolsEventClient } from '../src/client';
 afterEach(() => cleanup());
 
 describe('ComponentsTab', () => {
+	it('shows native ownership and stream metadata and clears a retired selection', async () => {
+		const client = new OctaneDevtoolsEventClient();
+		render(<ComponentsTab client={client} />);
+		client.emit('tree', {
+			nodes: [{ id: 1, name: 'NativeReader', kind: 'component', children: [] }],
+		});
+		(await screen.findByText('NativeReader')).click();
+		client.emit('inspect', {
+			id: 1,
+			name: 'NativeReader',
+			hooks: [],
+			context: [],
+			effectCount: 0,
+			nativeReads: {
+				ownerId: 2,
+				committed: {
+					mixed: false,
+					reads: [
+						{
+							observedVersion: 2,
+							currentVersion: 3,
+							source: {
+								scopeKey: 'tasks',
+								key: 'feed',
+								read: 'latest',
+								kind: 'async',
+								status: 'ready',
+								revision: 3,
+								epoch: 0,
+								retired: false,
+								historical: false,
+								retained: true,
+								refreshing: true,
+								connection: 'open',
+								complete: false,
+								dependencies: [{ scopeKey: 'tasks', key: 'filter' }],
+							},
+						},
+					],
+				},
+				pending: [],
+				retry: [],
+			},
+		});
+		expect(await screen.findByText('Native reads')).toBeInTheDocument();
+		expect(screen.getByText('Scheduled owner #2')).toBeInTheDocument();
+		expect(screen.getByText('tasks:feed')).toBeInTheDocument();
+		expect(screen.getByText('Read revision 2 → 3')).toBeInTheDocument();
+		expect(screen.getByText('retained value')).toBeInTheDocument();
+		expect(screen.getByText('refreshing')).toBeInTheDocument();
+		expect(screen.getByText('stream: open')).toBeInTheDocument();
+		expect(screen.getByText('Dependencies: tasks:filter')).toBeInTheDocument();
+		client.emit('inspect-clear', { id: 1 });
+		expect(await screen.findByText('Select a component.')).toBeInTheDocument();
+		expect(screen.queryByText('tasks:feed')).not.toBeInTheDocument();
+	});
+
 	it('renders the tree pushed over the client and inspects a selected node', async () => {
 		const client = new OctaneDevtoolsEventClient();
 		render(<ComponentsTab client={client} />);

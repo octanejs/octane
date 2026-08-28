@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Record formatting of the final CI repair artifacts without changing captured measurements or proof values",
+  "formatter": {
+    "prettier": "3.9.6",
+    "command": "node --import=/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs /private/tmp/octane-native-source-compiler-NVcMdO/format-changed.mjs --write <selected artifacts>",
+    "helperSha256": "266335fa938fa4eafa94ab7be559382230d6d1d56c2c4c7db35b1cde704db52d",
+    "repositoryConfigSha256": "12fecb39d7c5a5ef391437f7b94271134200e5f3d37e6285af3b555597638247",
+    "report": "/private/tmp/octane-pr877-ci-artifact-format.log",
+    "reportSha256": "17806bb5f58985289daf8d797482e4d4f02e06ce95ca4f8d9bc067269373a367",
+    "notLockedWorkspace": true,
+    "scope": "Per-file repository config; public tagged TSRX formatter; Markdown ignored by repository policy"
+  },
+  "sourceCheck": {
+    "manifest": "final-source-inputs.json",
+    "files": 1144,
+    "allMatchLiveSource": true,
+    "mismatches": []
+  },
+  "artifacts": [
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/sync-reconciliation.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/sync-reconciliation.json",
+      "beforeSha256": "5a710ed78f6707a28d2d6310935ebfcb2ec12f690711d30964f07403735ad0b8",
+      "publishedSha256": "5a710ed78f6707a28d2d6310935ebfcb2ec12f690711d30964f07403735ad0b8",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-source-recheck.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-source-recheck.json",
+      "beforeSha256": "52f2c0f278c5e4ed4900b3cf5314893a1b97a68a5c1c557bd5042467c6e2c833",
+      "publishedSha256": "52f2c0f278c5e4ed4900b3cf5314893a1b97a68a5c1c557bd5042467c6e2c833",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/public-bundles-02.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/public-bundles-02.json",
+      "beforeSha256": "48525d3ca08dc840bc107d8baf5a2a50dcc7360ccdd77b497d7f05882ffee094",
+      "publishedSha256": "5b8ccb505698e664b6b6e909e05190188bd2d425dce608f58f55e1df8f1ced2e",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-native-costs-01.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-native-costs-01.json",
+      "beforeSha256": "2944dcd3cc4116773c89de5f9d2ea98dbf4ef32a34c27cc0317f0e6c8eb87efa",
+      "publishedSha256": "d60b2e812f3da24b5da5730aa10abf58c3d4b91c585164407150699389cbe0a8",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-focused-01.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-focused-01.json",
+      "beforeSha256": "601a174bf24ce49988a7c59ac44823d1a2498cdb9994f9909537451296817168",
+      "publishedSha256": "d8136e1f211cb2c1ea8905fdf75b271cec7c4a93ab17fdc4dec6200277f61252",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-browser-vitest.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-browser-vitest.json",
+      "beforeSha256": "b402e5994ef4cf97f0e15de4abcd7c3c8be272516ba999415d77edcf35401b0b",
+      "publishedSha256": "116ce524338a05339bee03255ec786fc9a357f068b7e71406926c82b277396bd",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-source-inputs.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-source-inputs.json",
+      "beforeSha256": "fe3cae2cfdc6f92ad71e2e242d90683430a116e4b5a31fb66d3ea9d78e878c53",
+      "publishedSha256": "422fca3b6cdba5dfc0c8eb5e225696986ea66e6d0c54260e38dd81611e6bab9d",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-correctness-summary.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-correctness-summary.json",
+      "beforeSha256": "d78b1dc54a7568da15a54f88b37c2b263a43eff3469683d0561672ee74cb198f",
+      "publishedSha256": "92824231716024b8f0474b67b5f74f238bf091136e973e94f0bbba052c754820",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-source-freeze.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-source-freeze.json",
+      "beforeSha256": "89421a33bbc2c67ad931574327596101e3c5e684fd8d5998d596543e17fb8038",
+      "publishedSha256": "89421a33bbc2c67ad931574327596101e3c5e684fd8d5998d596543e17fb8038",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/ci-repair.md",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/ci-repair.md",
+      "beforeSha256": "47e4cca8971d508fa19433dcb585a1f3dcbf0521acb4ff4c6846ebdacdc6ffa0",
+      "publishedSha256": "47e4cca8971d508fa19433dcb585a1f3dcbf0521acb4ff4c6846ebdacdc6ffa0"
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-baseline-provenance.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-baseline-provenance.json",
+      "beforeSha256": "197d6ae2fd2e32ef72980445c1be4bad964201104ca25d9944e5a83007a35aa4",
+      "publishedSha256": "197d6ae2fd2e32ef72980445c1be4bad964201104ca25d9944e5a83007a35aa4",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-correctness-initial-topology-vitest.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-correctness-initial-topology-vitest.json",
+      "beforeSha256": "9640e15ee69e8d69e055e88ca5e744fe950849aeaab33f0231a619def4ccf5bf",
+      "publishedSha256": "daeea2995cf64fb0ceeb6ab67651e67ef70357673124b36ab6273ab10e0c483d",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/ci-format-f16c.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/ci-format-f16c.json",
+      "beforeSha256": "fbba4539a7d8e9644eb7a3303ac164a34f1d81cced5e3b73f9f991a14cf7a264",
+      "publishedSha256": "fbba4539a7d8e9644eb7a3303ac164a34f1d81cced5e3b73f9f991a14cf7a264",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-evidence-manifest.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-evidence-manifest.json",
+      "beforeSha256": "760304166cba204172766f3bed30db7dad5acc05661b6a05f13a1e25204e00bd",
+      "publishedSha256": "37642282dd76effbab20914a2390c185f3152518949dcb251fb8af7ca4d61510",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-validation-harness.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-validation-harness.json",
+      "beforeSha256": "5b4fb1b18e9aad8c9683744e175e3b01df6889c20fe2c0bec2dd4e81749a1a52",
+      "publishedSha256": "5447ac623f93d9845c4e6161764484efc1160455f2e64777fb7707a359109c37",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/ci-repair-validation.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/ci-repair-validation.json",
+      "beforeSha256": "7de088822a69497e693441f7f1cbffb686206fbc72bb0e06c94839a107e6b537",
+      "publishedSha256": "3050db2bcb9fe0f6dd30742d1a0d814da34b27878952ff64941f57b7b84bc25b",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-correctness-vitest.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-correctness-vitest.json",
+      "beforeSha256": "71c08670f8d83520f3e36abaaee07f00feefc12ee1023c07aa394262bb982515",
+      "publishedSha256": "89f52ca6415536abe26efc36c63e2cca01f3bf411d38aa181f6c8f5c09db978f",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/final-focused-02.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/final-focused-02.json",
+      "beforeSha256": "5b7ca1a4e68892c15fc71533699dd12cd4a82f08bb6f0cc7e92a9a7bd4e0a3a0",
+      "publishedSha256": "b088ad50f3d6c1cb97f0b102587c0f9bc27f633d4bf57bb79cf5397c1b857b73",
+      "parsedJsonUnchanged": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-28/public-bundles-01.json",
+      "originalCopy": "/private/tmp/octane-pr877-ci-artifact-before-format-o4_aclly/public-bundles-01.json",
+      "beforeSha256": "48d68c476f998a98651235438963f1c33e7fd240073e6172fc84a17412df77b3",
+      "publishedSha256": "101a53fa2a89ff98ab16d46f6eb087e14495c519958e4de694b52de6133403aa",
+      "parsedJsonUnchanged": true
+    }
+  ],
+  "limits": [
+    "beforeSha256 means bytes before this formatting pass; capture hashes inside each artifact retain their original meaning.",
+    "JSON objects and arrays are deeply equal before/after; no timing sample, source hash, or assertion result was removed or changed.",
+    "This provenance record is not self-hashed."
+  ],
+  "finalScopedFormatting": {
+    "report": "/private/tmp/octane-pr877-final-format-check.json",
+    "reportSha256": "7f081ef7db5396b934f931030f89e96dae805b424dcc3db971a531f0fd1b78b8",
+    "result": {
+      "mode": "check",
+      "prettier": "3.9.6",
+      "checked": 63,
+      "ignored": [
+        ".changeset/experimental-scoped-async-signals.md",
+        "benchmarks/scoped-signals/README.md",
+        "docs/experimental-scoped-signals-evidence.md",
+        "docs/plans/2026-08-27-experimental-scoped-async-signals-plan.md",
+        "packages/octane-evals/datasets/train/user-apps-v1/manifest.jsonl",
+        ".changeset/scoped-signal-benchmark-discovery.md",
+        "benchmarks/scoped-signals/results/2026-08-28/ci-repair.md"
+      ],
+      "changed": [],
+      "failed": []
+    }
+  },
+  "finalPrepushSync": {
+    "command": ["pnpm", "run", "sync"],
+    "environment": {
+      "pnpm_config_verify_deps_before_run": "warn"
+    },
+    "exitCode": 1,
+    "failure": "ERR_MODULE_NOT_FOUND: @tsrx/prettier-plugin during cli:data",
+    "log": "/private/tmp/octane-pr877-final-prepush-sync.log",
+    "logSha256": "71f3a6a7a42a4533e695a0c1cd8983bd04b5011bedf612f32bb45d190c6e3480",
+    "completedLockedSync": false,
+    "remainingCanonicalGenerators": "Passed separately against identical staged inputs; see sync-reconciliation.json"
+  }
+}

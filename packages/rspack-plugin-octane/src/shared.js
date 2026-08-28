@@ -41,6 +41,7 @@ const LOADER_OPTION_KEYS = new Set([
 	'dev',
 	'profile',
 	'strong',
+	'nativeReads',
 	'exclude',
 	'renderers',
 	'requireDirective',
@@ -208,6 +209,7 @@ function normalizeOptions(value, plugin) {
 	assertBooleanOption(options, 'dev');
 	assertBooleanOption(options, 'profile');
 	assertBooleanOption(options, 'strong');
+	assertBooleanOption(options, 'nativeReads');
 	assertBooleanOption(options, 'requireDirective');
 	if (
 		options.exclude !== undefined &&
@@ -239,6 +241,7 @@ function normalizeOptions(value, plugin) {
 		...(options.dev === undefined ? null : { dev: options.dev }),
 		...(options.profile === undefined ? null : { profile: options.profile }),
 		...(options.strong === undefined ? null : { strong: options.strong }),
+		...(options.nativeReads === undefined ? null : { nativeReads: options.nativeReads }),
 		...(options.exclude === undefined ? null : { exclude: [...options.exclude] }),
 		...(renderers === undefined ? null : { renderers }),
 		...(universalRuntime === undefined ? null : { universalRuntime }),

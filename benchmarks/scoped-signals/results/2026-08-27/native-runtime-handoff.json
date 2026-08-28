@@ -1,0 +1,150 @@
+{
+  "lane": "native-client-server-integration",
+  "sourceStatus": "frozen-for-parent-integration",
+  "worktree": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+  "sourceFiles": [
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/runtime.ts",
+      "sha256": "72d8c0efdb97e7763b2cfa7e74a13e8c24bd57a48b2b19aed121f17bd0537d49"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/runtime.server.ts",
+      "sha256": "66d094c2ab47ae21c85a7d62c328edafa4230d8a778afa37a563759029360803"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/read-protocol.ts",
+      "sha256": "bb6fae4da35c5dad8e980b9e96f6850f4d8b3e255b25aab3269657f30918b417"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-collector.ts",
+      "sha256": "a89c9f39847ae4c30cc11d39f1fe75fb5a156649938620555017b59af868422b"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-client.ts",
+      "sha256": "60bbe148943897f242f7d0d4682a4d3846a161a9649e78092f8380937c42327b"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-retry.ts",
+      "sha256": "40abc7188a0b07a3665b410889bf725fdd0ba82c90b3568456282fe243b95ac7"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-events.ts",
+      "sha256": "56c5018fa198b3e531693a82f6a3581354bd41e1af4e92d91cf34e32177f3c41"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-seeds.ts",
+      "sha256": "750748f153bf2e6fbf161cd772ecb452f2e67f90db13c08c65bd81c8538037c8"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/native-read-server.ts",
+      "sha256": "23c8b3abf7ba919dfd1ba8b1e30671d5cbf1f3a5179389292abece436d4fb614"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/client.ts",
+      "sha256": "f64cfce5c9d17567cca9e5621c14d7ebd4f09db217bb0b2ce89dd697c684aac5"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/signals/server.ts",
+      "sha256": "7dfa84a92f00259350fefd7df5e7c866f752e3dad31d2ff8862a709958f681fd"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/_server-fixture.ts",
+      "sha256": "c6765c3116aeec24f1a3c5785b5adb3ce9558730dc707259a3b3175dc8496ca3"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/_fixtures/signals-native-readers.ts",
+      "sha256": "19af447e01a35036a51de6ffa3f224ace1c5df43cd239e1a9f1730bf294210dc"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/_fixtures/signals-native.tsrx",
+      "sha256": "9cb1a44828b4d51c138a6e1d0f5630fc8f33c5daf9fcc814e5af3e6c52ad3cdd"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/_fixtures/signals-hydration.tsrx",
+      "sha256": "c763e0bd9b87cc268a972df1dcce68cf70abe7937951c229406cb304b53b3c8e"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/_fixtures/signals-local.tsrx",
+      "sha256": "d879bc52a6cf969059cfba5aafc205ba9c0e29dd7c3ac0f5ec966085c57b7788"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/signals-rendering.test.ts",
+      "sha256": "61fa08fd7593dbde905c6b27968e2c712ffd17f7c7adbf173d86daec2d43f2f8"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/signals-hydration.test.ts",
+      "sha256": "e97dc7019807ae67562a71e7a7b5663e94e6436bd62c6b43b4f50bb28549556a"
+    },
+    {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/tests/signals-local.test.ts",
+      "sha256": "31faf1d774435f3a4edcb0ff581770badaef0eca62d7a63b74d78f0d0b40f622"
+    }
+  ],
+  "sourceFileCount": 19,
+  "supportingFiles": [
+    "docs/plans/2026-08-27-experimental-scoped-async-signals-plan.md",
+    "benchmarks/scoped-signals/native-dom-smoke.mjs",
+    "benchmarks/scoped-signals/results/2026-08-27/native-dom-abi.json",
+    "benchmarks/scoped-signals/results/2026-08-27/native-dom-mutations.json"
+  ],
+  "completedChecks": {
+    "supplementalDomAbi": {
+      "passed": 27,
+      "total": 27,
+      "report": "benchmarks/scoped-signals/results/2026-08-27/native-dom-abi.json"
+    },
+    "separateSupersessionProbe": {
+      "passed": 5,
+      "total": 5
+    },
+    "strictPlainTypeScriptProgram": {
+      "diagnostics": 0,
+      "excludesTsrx": true
+    },
+    "whitespaceDiffCheck": "passed",
+    "representativeMutationTests": {
+      "guardMutationsKilled": 2,
+      "publicationGuardFailedCases": 4,
+      "serverOwnerIdentityGuardFailedCases": 1,
+      "sharedSourceMutated": false
+    },
+    "formatting": {
+      "version": "3.9.6",
+      "files": 17,
+      "parsers": ["typescript", "babel"],
+      "tsrxParserUsed": false
+    }
+  },
+  "commands": [
+    {
+      "cwd": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+      "command": "node benchmarks/scoped-signals/native-dom-smoke.mjs --tooling-root /private/tmp/octane-scoped-signals-tooling.n1e5b0 --output benchmarks/scoped-signals/results/2026-08-27/native-dom-abi.json"
+    },
+    {
+      "cwd": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+      "command": "node /private/tmp/octane-native-runtime-check.cjs packages/octane/src/runtime.ts packages/octane/src/runtime.server.ts packages/octane/src/signals/client.ts packages/octane/src/signals/server.ts"
+    },
+    {
+      "cwd": "/private/tmp/octane-scoped-signals-tooling.n1e5b0",
+      "command": "node node_modules/vitest/vitest.mjs run --config native-supersession-probe.config.mjs"
+    },
+    {
+      "cwd": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment",
+      "command": "git diff --check"
+    }
+  ],
+  "authoredCanonicalCases": {
+    "signals-rendering.test.ts": 22,
+    "signals-hydration.test.ts": 12,
+    "signals-local.test.ts": 4,
+    "total": 38,
+    "executed": false
+  },
+  "limitations": [
+    "The locked @tsrx compiler/typechecker/prettier packages remain unavailable (registry HTTP 403); canonical .tsrx tests and .tsrx formatting/typechecking are unexecuted.",
+    "jsdom/manual ABI checks do not establish real-browser native-event, focus/selection, rendering performance, retained heaps, or canonical CI.",
+    "Suspense fallback deactivation now follows candidate acceptance and detached catch/timeout work enters the existing root journal; existing refs/effects/Activity/transition/hydration conformance must be rerun when the canonical compiler is available.",
+    "useSignal$ is implemented; useDerived$ is deliberately deferred under the accepted proof gate, and local async producer hooks remain excluded.",
+    "No branch, commit, dependency installation, sync, push, or PR was performed by this lane."
+  ]
+}

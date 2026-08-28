@@ -19,6 +19,7 @@ import {
 	textTypeSourceVersion,
 } from './text-type-facts.js';
 import { compileToVolarMappings } from './volar.js';
+export { validateNativeSignalNames } from './native-read-types.js';
 
 /** @typedef {import('typescript').SourceFile} SourceFile */
 /** @typedef {import('typescript').Program} Program */

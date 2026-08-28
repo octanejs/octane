@@ -1,0 +1,18 @@
+PASS scoped-signals/independent/100: 9 matched production samples
+PASS scoped-signals/independent/1000: 9 matched production samples
+PASS scoped-signals/independent/10000: 9 matched production samples
+PASS scoped-signals/fanout/100: 9 matched production samples
+PASS scoped-signals/fanout/1000: 9 matched production samples
+PASS scoped-signals/fanout/10000: 9 matched production samples
+PASS scoped-signals/chain/100: 9 matched production samples
+PASS scoped-signals/chain/1000: 9 matched production samples
+PASS scoped-signals/chain/10000: 9 matched production samples
+PASS scoped-signals/diamond/100: 9 matched production samples
+PASS scoped-signals/diamond/1000: 9 matched production samples
+PASS scoped-signals/diamond/10000: 9 matched production samples
+PASS scoped-signals/dynamic/100: 9 matched production samples
+PASS scoped-signals/dynamic/1000: 9 matched production samples
+PASS scoped-signals/dynamic/10000: 9 matched production samples
+PASS scoped-signals/continuous/0: 1000 consecutive cycles per owner lifetime
+PASS scoped-signals/continuous/100: 1000 consecutive cycles per owner lifetime
+PASS scoped-signals/continuous/1000: 1000 consecutive cycles per owner lifetime

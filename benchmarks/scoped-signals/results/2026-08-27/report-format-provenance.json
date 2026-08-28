@@ -1,0 +1,49 @@
+{
+  "operation": "One repository-style JSON formatting pass authorized after measurement",
+  "formatter": "prettier@3.9.6",
+  "rawOriginalsLocalDirectory": "/private/tmp/octane-scoped-signals-original-reports-20260827",
+  "reports": [
+    {
+      "name": "engine-full.json",
+      "rawRunSha256": "45107d27e5964bf8417ec81d22bcd4d26ed57b4c4bbf1aec6c31750f2416abb3",
+      "formattedSha256": "441181f0e2b3a46f346e522f19d24a044a70c841f48544d3ce03510b1825cdb6",
+      "parsedValuesUnchanged": true
+    },
+    {
+      "name": "engine-refined.json",
+      "rawRunSha256": "09b21a1e335f388e783f1217ddce3ec80c194a8226b6064fee86e83859992e01",
+      "formattedSha256": "9df7e481dc23265f6743b563e4f121d02ff533fca53ab567d00f018912fe50d3",
+      "parsedValuesUnchanged": true
+    },
+    {
+      "name": "engine-heap.json",
+      "rawRunSha256": "4b5ff7fc679c25ec890b08f99fd1a573f2d13b23ff4fd989dc9b98dbe3b6194a",
+      "formattedSha256": "4ad758bd6a01831fa062033b10c11c9afd6e01e3028ffd0c05e71bbbcbbb568d",
+      "parsedValuesUnchanged": true
+    },
+    {
+      "name": "engine-retainers.json",
+      "rawRunSha256": "23ed90358852543398d806d9d27012ab5e16198e9ca95e9865b464ba6485f458",
+      "formattedSha256": "4833cd469ef902cf1ce2e26755670bcda4cb803613a88f7c1a87e70bd833cc04",
+      "parsedValuesUnchanged": true
+    },
+    {
+      "name": "engine-retainer-analysis.json",
+      "rawRunSha256": "a7eefefc23a2e7c65c0013a7f07656c5799b76e14cf7ccdaac5ab41a982de4b8",
+      "formattedSha256": "a7eefefc23a2e7c65c0013a7f07656c5799b76e14cf7ccdaac5ab41a982de4b8",
+      "parsedValuesUnchanged": true
+    },
+    {
+      "name": "bundles-preliminary.json",
+      "rawRunSha256": "75460346e170c28379c14633bc5a97289f3cf752827ea0c5602bbf203d956fe8",
+      "formattedSha256": "74b1cae610ac6cf7e665caa3f2d83d184c0d24f4592aae97eb9127050bbc6440",
+      "parsedValuesUnchanged": true
+    },
+    {
+      "name": "bundles-lazy-server.json",
+      "rawRunSha256": "8c81d67f2c3e97e235192771c5d510c60b045dce1c275b883591c931ad5feca4",
+      "formattedSha256": "a5aab3f4309d534e5f01128cfdecfef96bcea916c0f06035bb374c577793d882",
+      "parsedValuesUnchanged": true
+    }
+  ]
+}

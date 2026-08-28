@@ -34,6 +34,7 @@ import {
 import { buildFatSegments, decodeSourceMappings } from './fat-segments.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { analyzeStrongMode } from './strong-mode.js';
+import { analyzeNativeReadDiagnostics } from './native-read-diagnostics.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
 import {
 	DOM_RENDERER_MODULE,
@@ -99,6 +100,36 @@ const OCTANE_PLATFORM = {
 };
 
 const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
+const octaneTransformWithAuthoredSuspense = createJsxTransform({
+	...OCTANE_PLATFORM,
+	hooks: {
+		createPendingBoundary(_content, _fallback, context) {
+			// Reuse the authored value binding without replacing its mapped import.
+			// Returning null keeps the shared boundary lowering; only its redundant
+			// helper import is suppressed. Other directive imports remain unchanged.
+			context.needs_suspense = false;
+			return null;
+		},
+	},
+});
+
+/** @param {import('@tsrx/core/types').AST.Program} ast */
+function selectOctaneTransform(ast) {
+	const hasSuspenseImport = ast.body.some(
+		(statement) =>
+			statement.type === 'ImportDeclaration' &&
+			statement.importKind !== 'type' &&
+			statement.source.value === OCTANE_PLATFORM.imports.suspense &&
+			statement.specifiers.some(
+				(specifier) =>
+					specifier.type === 'ImportSpecifier' &&
+					specifier.importKind !== 'type' &&
+					specifier.local.name === 'Suspense' &&
+					(specifier.imported.name ?? specifier.imported.value) === 'Suspense',
+			),
+	);
+	return hasSuspenseImport ? octaneTransformWithAuthoredSuspense : octaneTransform;
+}
 
 /**
  * Does the parsed file carry an authored `@jsxImportSource` pragma in its
@@ -196,7 +227,7 @@ function markNativeTemplateBodies(root) {
  * `intrinsics`; when present, the virtual TSX gets a file-local pragma so host
  * element types cannot leak into files owned by another renderer.
  *
- * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean }} [options]
+ * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean, nativeReads?: boolean }} [options]
  * @returns {import('./index.js').VolarCompileResult}
  */
 export function compileToVolarMappings(source, filename, options) {
@@ -232,6 +263,13 @@ export function compileToVolarMappings(source, filename, options) {
 			? analyzeStrongMode(ast, source, filename, options).diagnostics
 			: null;
 	if (strongDiagnostics !== null) diagnostics.push(...strongDiagnostics);
+	const nativeReadDiagnostics = analyzeNativeReadDiagnostics(ast, source, filename, {
+		...options,
+		renderer,
+		rendererBoundaries: rendererConfig.boundaries,
+		rendererRegistry: rendererConfig.registry,
+	});
+	diagnostics.push(...nativeReadDiagnostics);
 	// The renderer pragma belongs to the semantic comment set consumed by
 	// @tsrx/core's type-only Program print. This keeps code and mappings in one
 	// coordinate system instead of prepending text and shifting every mapping.
@@ -245,7 +283,8 @@ export function compileToVolarMappings(source, filename, options) {
 	// @tsrx/core: `ast` (passed below as `ast_from_source`) stays the
 	// original parse, and replacement nodes keep authored locations so
 	// mappings/hover still work.
-	const transformed = octaneTransform(ast, source, filename, {
+	const transform = selectOctaneTransform(ast);
+	const transformed = transform(ast, source, filename, {
 		collect: true,
 		loose: !!options?.loose,
 		// @tsrx/core routes `typeOnly: true` to its TSX esrap language with
@@ -255,8 +294,8 @@ export function compileToVolarMappings(source, filename, options) {
 		errors,
 		comments: printComments,
 	});
-	if (strongDiagnostics !== null) {
-		for (const diagnostic of strongDiagnostics) {
+	if (strongDiagnostics !== null || nativeReadDiagnostics.length > 0) {
+		for (const diagnostic of [...(strongDiagnostics ?? []), ...nativeReadDiagnostics]) {
 			collectCompileError(
 				diagnostic.message,
 				diagnostic.filename ?? null,
@@ -483,7 +522,8 @@ export function compileTypesInspection(source, filename, options) {
 	const rendererPragma = hasAuthoredLeadingPragma(ast, comments)
 		? null
 		: createRendererTypePragma(renderer, ast);
-	const transformed = octaneTransform(ast, source, filename, {
+	const transform = selectOctaneTransform(ast);
+	const transformed = transform(ast, source, filename, {
 		collect: true,
 		loose: true,
 		typeOnly: true,

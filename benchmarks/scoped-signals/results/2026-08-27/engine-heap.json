@@ -1,0 +1,412 @@
+{
+  "suite": "scoped-signals",
+  "iterations": 1,
+  "targets": [
+    {
+      "name": "alien-3.2.0-continuous-0",
+      "ops": {},
+      "meta": {
+        "cycles": 1000,
+        "width": 32,
+        "unrelated": 0,
+        "lateNotifications": 0,
+        "finalValue": 3000,
+        "checkpoints": [
+          {
+            "cycle": 0,
+            "disposedOwners": 0,
+            "lateNotifications": 0,
+            "rss": 79396864,
+            "heapTotal": 17448960,
+            "heapUsed": 8314520,
+            "external": 4275740,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 100,
+            "disposedOwners": 200,
+            "lateNotifications": 0,
+            "rss": 80314368,
+            "heapTotal": 18235392,
+            "heapUsed": 8340432,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 1000,
+            "disposedOwners": 2000,
+            "lateNotifications": 0,
+            "rss": 81346560,
+            "heapTotal": 18497536,
+            "heapUsed": 8412040,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 1000,
+            "phase": "retired",
+            "lateNotifications": 0,
+            "rss": 81330176,
+            "heapTotal": 18235392,
+            "heapUsed": 8294704,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          }
+        ],
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "octane-scoped-continuous-0",
+      "ops": {},
+      "meta": {
+        "cycles": 1000,
+        "width": 32,
+        "unrelated": 0,
+        "lateNotifications": 0,
+        "finalValue": 3000,
+        "checkpoints": [
+          {
+            "cycle": 0,
+            "disposedOwners": 0,
+            "lateNotifications": 0,
+            "rss": 81330176,
+            "heapTotal": 18235392,
+            "heapUsed": 8305176,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 100,
+            "disposedOwners": 200,
+            "lateNotifications": 0,
+            "rss": 92684288,
+            "heapTotal": 26624000,
+            "heapUsed": 8345832,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 1000,
+            "disposedOwners": 2000,
+            "lateNotifications": 0,
+            "rss": 152682496,
+            "heapTotal": 76431360,
+            "heapUsed": 8419144,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 1000,
+            "phase": "retired",
+            "lateNotifications": 0,
+            "rss": 152682496,
+            "heapTotal": 76431360,
+            "heapUsed": 8308192,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          }
+        ],
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "alien-3.2.0-continuous-100",
+      "ops": {},
+      "meta": {
+        "cycles": 1000,
+        "width": 32,
+        "unrelated": 100,
+        "lateNotifications": 0,
+        "finalValue": 3000,
+        "checkpoints": [
+          {
+            "cycle": 0,
+            "disposedOwners": 0,
+            "lateNotifications": 0,
+            "rss": 152682496,
+            "heapTotal": 76693504,
+            "heapUsed": 8430992,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 100,
+            "disposedOwners": 200,
+            "lateNotifications": 0,
+            "rss": 152682496,
+            "heapTotal": 76693504,
+            "heapUsed": 8447080,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 1000,
+            "disposedOwners": 2000,
+            "lateNotifications": 0,
+            "rss": 152731648,
+            "heapTotal": 76955648,
+            "heapUsed": 8514064,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 1000,
+            "phase": "retired",
+            "lateNotifications": 0,
+            "rss": 152731648,
+            "heapTotal": 76955648,
+            "heapUsed": 8405032,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          }
+        ],
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "octane-scoped-continuous-100",
+      "ops": {},
+      "meta": {
+        "cycles": 1000,
+        "width": 32,
+        "unrelated": 100,
+        "lateNotifications": 0,
+        "finalValue": 3000,
+        "checkpoints": [
+          {
+            "cycle": 0,
+            "disposedOwners": 0,
+            "lateNotifications": 0,
+            "rss": 152731648,
+            "heapTotal": 76955648,
+            "heapUsed": 8700112,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 100,
+            "disposedOwners": 200,
+            "lateNotifications": 0,
+            "rss": 152780800,
+            "heapTotal": 76955648,
+            "heapUsed": 8768176,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 1000,
+            "disposedOwners": 2000,
+            "lateNotifications": 0,
+            "rss": 173211648,
+            "heapTotal": 76955648,
+            "heapUsed": 8836760,
+            "external": 4244070,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 1000,
+            "phase": "retired",
+            "lateNotifications": 0,
+            "rss": 173211648,
+            "heapTotal": 76955648,
+            "heapUsed": 8411400,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          }
+        ],
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "alien-3.2.0-continuous-1000",
+      "ops": {},
+      "meta": {
+        "cycles": 1000,
+        "width": 32,
+        "unrelated": 1000,
+        "lateNotifications": 0,
+        "finalValue": 3000,
+        "checkpoints": [
+          {
+            "cycle": 0,
+            "disposedOwners": 0,
+            "lateNotifications": 0,
+            "rss": 173244416,
+            "heapTotal": 76955648,
+            "heapUsed": 9404064,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 100,
+            "disposedOwners": 200,
+            "lateNotifications": 0,
+            "rss": 173244416,
+            "heapTotal": 76955648,
+            "heapUsed": 9432656,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 1000,
+            "disposedOwners": 2000,
+            "lateNotifications": 0,
+            "rss": 173244416,
+            "heapTotal": 78004224,
+            "heapUsed": 9435664,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 1000,
+            "phase": "retired",
+            "lateNotifications": 0,
+            "rss": 173244416,
+            "heapTotal": 76955648,
+            "heapUsed": 8419528,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          }
+        ],
+        "correctness": "pass"
+      }
+    },
+    {
+      "name": "octane-scoped-continuous-1000",
+      "ops": {},
+      "meta": {
+        "cycles": 1000,
+        "width": 32,
+        "unrelated": 1000,
+        "lateNotifications": 0,
+        "finalValue": 3000,
+        "checkpoints": [
+          {
+            "cycle": 0,
+            "disposedOwners": 0,
+            "lateNotifications": 0,
+            "rss": 173244416,
+            "heapTotal": 79314944,
+            "heapUsed": 11248560,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 100,
+            "disposedOwners": 200,
+            "lateNotifications": 0,
+            "rss": 173244416,
+            "heapTotal": 79314944,
+            "heapUsed": 11296840,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 1000,
+            "disposedOwners": 2000,
+            "lateNotifications": 0,
+            "rss": 176783360,
+            "heapTotal": 79577088,
+            "heapUsed": 11363536,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          },
+          {
+            "cycle": 1000,
+            "phase": "retired",
+            "lateNotifications": 0,
+            "rss": 176783360,
+            "heapTotal": 77217792,
+            "heapUsed": 8420960,
+            "external": 4243002,
+            "arrayBuffers": 277835
+          }
+        ],
+        "correctness": "pass"
+      }
+    }
+  ],
+  "environment": {
+    "commit": "ba9abbfb634786a1b081852f6eb51845f3d588fc",
+    "dirty": true,
+    "node": "v26.4.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "cpu": "Apple M5 Max",
+    "lockfileSha256": "0b2fcc89ecac2590ccd05b32609900418f03cf60bc31b113fb1072b0b9157826",
+    "fixtureSha256": "e8b48017058ff7b37b35b1632b0e1679a727665f508e53aaeeb2c44877dc3e07",
+    "runnerSha256": "5f529a6deaf7d87c485d501aab80820e8df4a2b6f51c616de2694ece928fd240",
+    "alienVersion": "3.2.0",
+    "dependencies": {
+      "mode": "explicit-tooling-root",
+      "toolingRoot": "/private/tmp/octane-scoped-signals-tooling.n1e5b0",
+      "esbuild": {
+        "name": "esbuild",
+        "version": "0.28.1",
+        "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/package.json",
+        "manifestSha256": "d55d1d19fcc5b6079e4a71dd4111340c79c682bc36835ac7058a0c364c7db58a",
+        "entry": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/lib/main.js",
+        "entrySha256": "8331fe1d8b3a07381f33cc425fcfaa94776e263113653f80ec3ba433e9657e73"
+      },
+      "alien": {
+        "name": "alien-signals",
+        "version": "3.2.0",
+        "manifest": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/package.json",
+        "manifestSha256": "246a6dc2e0b031c5a274df8fdd6f84d7880aa11d8d945a3579a6214a1afe8831",
+        "entry": "/private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/index.mjs",
+        "entrySha256": "78d23f1156ecace885370cbe01948d623af9084a099f0b419be800bd0efb7288"
+      }
+    },
+    "builds": {
+      "raw": {
+        "bytes": 4991,
+        "sha256": "3e2f75ec8fdc63f84a2d0b1b15f24c216390d8277bc81c2023990b3a02336d33",
+        "inputs": [
+          "../../../../../private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs",
+          "../../../../../private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/index.mjs",
+          "packages/octane/alien-benchmark-entry.mjs"
+        ],
+        "inputSha256": {
+          "../../../../../private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs": "d6861e6d706a1f5c6de3446353e5424c8e82dd3576e6aac03b850edf51e9a8c5",
+          "../../../../../private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/index.mjs": "78d23f1156ecace885370cbe01948d623af9084a099f0b419be800bd0efb7288",
+          "packages/octane/alien-benchmark-entry.mjs": "8bcf050862a532bdb3f599c29e8466409a78735c5a01f6586a4a8f1b7768a92d"
+        }
+      },
+      "scoped": {
+        "bytes": 27568,
+        "sha256": "ea6d0750dc07a3de225b5157755f5b6a62eefd3b4c3d9f14721b241a77fc68a7",
+        "inputs": [
+          "packages/octane/src/signals/errors.ts",
+          "packages/octane/src/signals/encoding.ts",
+          "../../../../../private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs",
+          "packages/octane/src/signals/read-protocol.ts",
+          "packages/octane/src/signals/graph.ts",
+          "packages/octane/src/signals/requests.ts",
+          "packages/octane/src/signals/engine.ts",
+          "packages/octane/src/signals/index.ts",
+          "packages/octane/scoped-benchmark-entry.mjs"
+        ],
+        "inputSha256": {
+          "packages/octane/src/signals/errors.ts": "6a9a9561a4e37085c76ae714f6ec774f19646d3c6ef0e0f5dbc44ae6e16ee451",
+          "packages/octane/src/signals/encoding.ts": "98edf53e87e92e43f865f718c9dc44881d5f49bf6554356d6fccdc51ddf356e5",
+          "../../../../../private/tmp/octane-scoped-signals-tooling.n1e5b0/node_modules/.pnpm/alien-signals@3.2.0/node_modules/alien-signals/esm/system.mjs": "d6861e6d706a1f5c6de3446353e5424c8e82dd3576e6aac03b850edf51e9a8c5",
+          "packages/octane/src/signals/read-protocol.ts": "9192b4df66bf279f630ee9033b76003c41bf7a3bac328d7756fe19ff09fdff70",
+          "packages/octane/src/signals/graph.ts": "cee1720e96665cf05c7ea1cca1230e9eaaec0d27349f769c1d29130e8e25bd46",
+          "packages/octane/src/signals/requests.ts": "070c2d05f1fc6b99553169ac467d33500783fc1f1a835b8f6efedcd0a6e47c69",
+          "packages/octane/src/signals/engine.ts": "64da3742b900d459854368eaac9b58b2bf55c6f51d7fcaa963b3fd3207c31ac5",
+          "packages/octane/src/signals/index.ts": "c4400e3eacea0f52049d3559b26be14dd3485a897135b54ec8cd5f2ad43de17d",
+          "packages/octane/scoped-benchmark-entry.mjs": "18f65125c98a4922c86d4dae951379a7c368986b060ac0af0400feb1cf17c8cf"
+        }
+      }
+    },
+    "mode": "heap-diagnostics",
+    "options": {
+      "iterations": 1,
+      "scales": [100, 1000, 10000],
+      "rounds": 32,
+      "cycles": 1000,
+      "unrelatedScales": [0, 100, 1000]
+    }
+  }
+}

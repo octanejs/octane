@@ -60,7 +60,15 @@ await build({
 
 await buildPackageCommonjs({
 	packageDir: pkgDir,
-	entries: ['src/index.ts', 'src/server/index.ts'],
+	entries: [
+		'src/index.ts',
+		'src/server/index.ts',
+		'src/internal/client.ts',
+		'src/internal/server.ts',
+		'src/signals/index.ts',
+		'src/signals/client.ts',
+		'src/signals/server.ts',
+	],
 	outdir: 'dist/cjs',
 	sourceRoot: 'src',
 });

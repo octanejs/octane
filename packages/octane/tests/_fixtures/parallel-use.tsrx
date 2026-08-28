@@ -5,6 +5,35 @@ import {
 	useImportedPair,
 } from './parallel-use-custom-hook.ts';
 
+interface DriftedWarmProps {
+	gate: Promise<string>;
+	record: { version: number };
+	load: (version: number) => Promise<string>;
+}
+
+function DriftedWarmChild(props: { version: number; load: DriftedWarmProps['load'] }) @{
+	const value = use(props.load(props.version));
+	<p class="drifted-warm-value">{value as string}</p>
+}
+
+export function DriftedWarmParent(props: DriftedWarmProps) @{
+	const label = use(props.gate);
+	<section>
+		<p>{label as string}</p>
+		<DriftedWarmChild version={props.record.version} load={props.load} />
+	</section>
+}
+
+export function DriftedWarmBoundary(props: DriftedWarmProps) @{
+	<>
+		@try {
+			<DriftedWarmParent gate={props.gate} record={props.record} load={props.load} />
+		} @pending {
+			<p class="fallback">loading</p>
+		}
+	</>
+}
+
 // Fixtures for the parallel-use pipeline (docs/suspense-parallel-use-plan.md).
 // These exercise the compiler's unconditional memoize/hoist/batch transforms
 // and fetch-tree warming.

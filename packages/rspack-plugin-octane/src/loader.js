@@ -118,6 +118,7 @@ export default function octaneLoader(source, inputSourceMap) {
 			root,
 			profile,
 			...(options.strong === undefined ? null : { strong: options.strong }),
+			...(options.nativeReads === undefined ? null : { nativeReads: options.nativeReads }),
 			...(options.exclude === undefined ? null : { exclude: options.exclude }),
 			...(compilerOptions.renderers === undefined
 				? null

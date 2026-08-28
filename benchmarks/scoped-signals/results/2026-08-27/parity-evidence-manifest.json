@@ -1,0 +1,358 @@
+{
+  "scope": "Performance follow-up on compiled TSRX @{}; all measured samples and earlier rejected/noisy runs preserved. No ordinary-return optimization claim.",
+  "finalRuntimeInputs": {
+    "packages/octane/src/runtime.ts": "1d0a1656fd63506272e3c875f5221014c5f315d47f0f6831f0ea11983fca0eae",
+    "packages/octane/src/signals/native-read-collector.ts": "070c54d2fa80dd79f49124f0e1a652c67a9dc73fad0711bab9b3a45835c7f0c3",
+    "packages/octane/src/signals/native-read-client.ts": "5266fce49bb217e7a3c73aedf5aeed5aff0a8dfda37f001a649181022df01288"
+  },
+  "files": [
+    {
+      "file": "parity-reproduce-native-costs.json",
+      "classification": "unchanged422-full-reproduction",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/reproduce-01/result.json",
+      "rawResultSha256": "7123aedf749c43e08823b1e7bec1bece506953e75f3488141a5907b66495c334",
+      "removedMetadata": [],
+      "publishedSha256": "8fd5ef4a56ba1309873b1c061b10a3097c4670497d27bdcc399a83a84edd40b4",
+      "publishedBytes": 745837,
+      "beforeFormattingSha256": "b2d32d93d0c69a19aee126b08ebb2688a388e43207f3046797220915cea0b01d",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-focused-original-smoke.json",
+      "classification": "original-focused-harness-smoke-not-timing",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/focused-baseline-smoke/result.json",
+      "rawResultSha256": "224a3ce94793cd4732d72b3e517ecd75cd4bdc9668a4841a53b202321656bad4",
+      "removedMetadata": [
+        "hostBefore.resourceUsage",
+        "hostBefore.freeMemory",
+        "hostAfter.resourceUsage",
+        "hostAfter.freeMemory"
+      ],
+      "publishedSha256": "a80510615ae3c4a4c661072d0a1d4c58af15b46d50d18b27b9e30c7cd3e31a06",
+      "publishedBytes": 293612,
+      "beforeFormattingSha256": "bd338dadc187a76812b57b4114dd8f3a6122d320ef5f54b4e795775e85aaad72",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-focused-baseline.json",
+      "classification": "unchanged422-focused-reproduction",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/focused-baseline-01/result.json",
+      "rawResultSha256": "ef294656797b6ba28f3f33c2cedddf22b1bf0969a3d41ff96c7b5daf31df0096",
+      "removedMetadata": [
+        "hostBefore.resourceUsage",
+        "hostBefore.freeMemory",
+        "hostAfter.resourceUsage",
+        "hostAfter.freeMemory"
+      ],
+      "publishedSha256": "0cdb27789ebd35cb459373137fada73066c6c45e7efb66ddf9c557da0b88ad5d",
+      "publishedBytes": 619570,
+      "beforeFormattingSha256": "d29a62415ffe903b30b1e797c43655867213905a0acfcc8ccf5b814609a951af",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-focused-rejected-vs422.json",
+      "classification": "rejected-first-candidate",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/focused-candidate-vs422-01/result.json",
+      "rawResultSha256": "02afff58db7736d27da784873eabf23f09df41b31de6e3a2502743a731366ba8",
+      "removedMetadata": [
+        "hostBefore.resourceUsage",
+        "hostBefore.freeMemory",
+        "hostAfter.resourceUsage",
+        "hostAfter.freeMemory"
+      ],
+      "publishedSha256": "2ac7cd62fdcae5c664b92b6d0c671e5219747a896f26172fc83109bae9cb644b",
+      "publishedBytes": 607486,
+      "beforeFormattingSha256": "9d1bb84b203f61941c9ff291fa4a01f3d31d226db3191e01822268a9a96e3427",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-focused-rejected-vscd9.json",
+      "classification": "rejected-first-candidate",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/focused-candidate-vscd9-01/result.json",
+      "rawResultSha256": "8c396446f558db2fc2bd933e628b0f5bcc523b4c0281b0b6be80ddb5e8f7291b",
+      "removedMetadata": [
+        "hostBefore.resourceUsage",
+        "hostBefore.freeMemory",
+        "hostAfter.resourceUsage",
+        "hostAfter.freeMemory"
+      ],
+      "publishedSha256": "8e7daf2bf322c0554d4b1c639f1fffe0e8dd6e274cb8c8659710d818a49e889e",
+      "publishedBytes": 608140,
+      "beforeFormattingSha256": "6fb3117fdb6ea9934f91e894e9edde3c33cd0218362e5b0146947647ae7b0c0a",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-focused-durable-smoke.json",
+      "classification": "durable-focused-harness-smoke-not-timing",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/durable-baseline-smoke/result.json",
+      "rawResultSha256": "eb5fb07ff61da239654b52a644f57362a5dea51977569491071521c820b9f1f7",
+      "removedMetadata": [
+        "hostBefore.resourceUsage",
+        "hostBefore.freeMemory",
+        "hostAfter.resourceUsage",
+        "hostAfter.freeMemory"
+      ],
+      "publishedSha256": "0a7bf3c70770655129eeba3b6e8c4c697117471916dab2a31544625d7466eb69",
+      "publishedBytes": 293726,
+      "beforeFormattingSha256": "a564ede787223f612d880f3e9cf37aad66bb99ad29432f671f07856d330e9548",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-focused-vs422-01.json",
+      "classification": "final-corrected-source-focused-timing",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/final-focused-vs422-01/result.json",
+      "rawResultSha256": "235b60a5729843a790725993587c257b4f2d9571986c6b9ed939ddf4b29ad3aa",
+      "removedMetadata": [
+        "hostBefore.resourceUsage",
+        "hostBefore.freeMemory",
+        "hostAfter.resourceUsage",
+        "hostAfter.freeMemory"
+      ],
+      "publishedSha256": "edbad0ab522fe29b548ef7f63c5f1287ead225289fa3c20e982c976b504077b7",
+      "publishedBytes": 605727,
+      "beforeFormattingSha256": "a61046c70b95470fea0f972cd8e1409f2033a0d8a88a68b400c4541582da2489",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-focused-vs422-02.json",
+      "classification": "final-corrected-source-focused-timing",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/final-focused-vs422-02/result.json",
+      "rawResultSha256": "1a3fe7106df309639b37f1d6b876280eefa49da83575a005050d313ac82a54c9",
+      "removedMetadata": [
+        "hostBefore.resourceUsage",
+        "hostBefore.freeMemory",
+        "hostAfter.resourceUsage",
+        "hostAfter.freeMemory"
+      ],
+      "publishedSha256": "540a99c2efb98ec2058527a8cdfd4a561e8b1de615d0371940830cdca269f249",
+      "publishedBytes": 607605,
+      "beforeFormattingSha256": "45e6afe3946eace973806600e06eef69d99f7cfc9ef708af2f507ba2fa680aa8",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-focused-vscd9-01.json",
+      "classification": "final-corrected-source-focused-timing",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/final-focused-vscd9-01/result.json",
+      "rawResultSha256": "a9d4a8a943904f47f57fe53e95a5b58892de06ff578bfa3c4749beca809c626d",
+      "removedMetadata": [
+        "hostBefore.resourceUsage",
+        "hostBefore.freeMemory",
+        "hostAfter.resourceUsage",
+        "hostAfter.freeMemory"
+      ],
+      "publishedSha256": "2fb41d9baab1a84ab0ff2871a0492118da13c65142faf939ff34867e6e80af09",
+      "publishedBytes": 609689,
+      "beforeFormattingSha256": "df1661d11824994ce07387caf1d40bff8d55b11d975373e6f86ed561e0d75c4e",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-focused-vscd9-02.json",
+      "classification": "final-corrected-source-focused-timing",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/final-focused-vscd9-02/result.json",
+      "rawResultSha256": "819ab80d85cefaa0cfe36f5f741b5e0fab27d95dbb04f94e98e3858e1cf31267",
+      "removedMetadata": [
+        "hostBefore.resourceUsage",
+        "hostBefore.freeMemory",
+        "hostAfter.resourceUsage",
+        "hostAfter.freeMemory"
+      ],
+      "publishedSha256": "1ea240d2434b18a0b5e2da8dbf1a77eeda52146e28b4f0f73dc3467aaf147f18",
+      "publishedBytes": 610266,
+      "beforeFormattingSha256": "2775345d2f221820a6da7f850a691693c641fac2c939af5a2cde11d4d69f769e",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-native-costs.json",
+      "classification": "final-corrected-source-mixed-timing",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/final-native-costs/result.json",
+      "rawResultSha256": "acb5af2437ef273bf5a54fce6d0c4b2ab2c7c2ff4e4e1867109d95a3ae6a97d2",
+      "removedMetadata": [],
+      "publishedSha256": "6cd80f6a95da04c916bbc512bf9af8b754d025cc3c577f2b8684c898b28918c1",
+      "publishedBytes": 748801,
+      "beforeFormattingSha256": "982130bbdca54dace1ee2f769be1d5bcca86142ad05610b0ae69eca4ff3f9c78",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-bundles.json",
+      "classification": "final-corrected-source-bundle-checks",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/final-bundles/result.json",
+      "rawResultSha256": "9124ea549c9f9bef5c5ac761b3892f52dd2efd6b125870cba38c91aac54ed6ba",
+      "removedMetadata": [],
+      "publishedSha256": "2d8d35e1adcaa0cc3cf21976537326f5155dab0149fef209eb7b9be2c3591ef6",
+      "publishedBytes": 182432,
+      "beforeFormattingSha256": "a707a2afde3bc6dabc47a6bd959bdedc50b0bb7738651f07c184ac35e0f7ddf9",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-foreign-retention.json",
+      "classification": "final-unchanged-engine-retention",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/final-foreign-retention/result.json",
+      "rawResultSha256": "d4740c7d0d9ab9bf3b914f616242218d6ba84c3fba57720424fd916b3e67f886",
+      "removedMetadata": [],
+      "publishedSha256": "eba1f76e75f78e9103eb11d3eac530664b561817d251b23fbe8f2995732d7f06",
+      "publishedBytes": 30558,
+      "beforeFormattingSha256": "ddba5279a04af9a6f153935862d85f116317de733463cefa6e773f159f15cc39",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-collector-controls-preformat.json",
+      "classification": "historical-preformat-control-verification",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/collector-controls-verification-01.json",
+      "rawResultSha256": "eabc2ff948d4868af2a7d1d8d12a16467ba8c2f90de882b146d2dab7b2b7dde2",
+      "removedMetadata": [],
+      "publishedSha256": "4594bcba24690e907cfecdd0e36a41b773a38443208bb9073ad5843ce4baa038",
+      "publishedBytes": 2971,
+      "beforeFormattingSha256": "4594bcba24690e907cfecdd0e36a41b773a38443208bb9073ad5843ce4baa038",
+      "formattingPreservedEveryJsonValue": true
+    },
+    {
+      "file": "parity-collector-controls.json",
+      "classification": "current-durable-control-verification",
+      "rawLocalResult": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/collector-controls-verification-02.json",
+      "rawResultSha256": "51f4f433b054ee93c5ea12152d8ef260b875aac1623eeea4c8ad1b41fd144eeb",
+      "removedMetadata": [],
+      "publishedSha256": "a79a58e4147fa4fab82b90539a96dec3e868ab783702d93b6dc8d2d6ef02d233",
+      "publishedBytes": 3470,
+      "beforeFormattingSha256": "a79a58e4147fa4fab82b90539a96dec3e868ab783702d93b6dc8d2d6ef02d233",
+      "formattingPreservedEveryJsonValue": true
+    }
+  ],
+  "finalFiveRendererBundlesIdenticalAcrossFourFocusedRunsAndFullRunner": true,
+  "authoredFixtureSha256": "4e48f2fe1d292a833244c69ccb58b9a2d9a951721d76777a1fb88bb0b11768e4",
+  "factorySha256": "403f8cd28095db8b0fa127c55e6353ff8e37ca50587b456147a40b4af6c8f583",
+  "statsSha256": "50aece53e529b11d096cde638acfd8927ded4372d5ab2b6dbd0fc0ac2792c176",
+  "fullRunnerSha256": "ae28dcf260a1f05a1b867c58bb49d9c6c253c11f18d80f98d701f1eb249c3c57",
+  "focusedRunnerSha256": "5b6e57c70111da5c72704c4fbbecb28b1c5dd4ced510a07aa8da1b78b17afc93",
+  "collectorControlsSha256": "13ff8f3a35c4fce0b388d6757e3e96981629af93248bcd5ef9c6adae1f61868d",
+  "rejectedRuntimeSnapshot": {
+    "qualification": "Rejected first optimization: broader deferred-value correctness suite failed. Timing only; not accepted performance.",
+    "baseRef": "422c2c937784af835c64d6fae5a39162143c7a44",
+    "baselineTarSha256": "f329b154346ea20d9eda791982a89d1b03c8dab4d286726bc62292278b6f2abe",
+    "changedRuntimeInputs": {
+      "packages/octane/src/signals/native-read-client.ts": "5266fce49bb217e7a3c73aedf5aeed5aff0a8dfda37f001a649181022df01288",
+      "packages/octane/src/signals/native-read-collector.ts": "070c54d2fa80dd79f49124f0e1a652c67a9dc73fad0711bab9b3a45835c7f0c3"
+    },
+    "scope": "Exact benchmark/runtime/compiler inputs from the frozen422 archive plus two recorded-hash candidate source edits. Test changes and later collector controls are not included."
+  },
+  "baselineArchives": [
+    {
+      "ref": "cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+      "sha256": "df610b31e49a016a512f1ba926b1f07e6700659c6febe4900d99ac0a27e92147"
+    },
+    {
+      "ref": "422c2c937784af835c64d6fae5a39162143c7a44",
+      "sha256": "f329b154346ea20d9eda791982a89d1b03c8dab4d286726bc62292278b6f2abe"
+    }
+  ],
+  "harnessProvenance": {
+    "file": "parity-harness-provenance.json",
+    "rawResultSha256": "c21e936c7159de2205a0ac5b15ee275021722bbc6abea42fb66e2d0357c7400b",
+    "publishedSha256": "eb5ebd9a7f9a0cef5c8bad42f1ca47fcc8890e210c3b122088388fe2b4abcc43",
+    "formattingPreservedEveryJsonValue": true
+  },
+  "authoredFiles": [
+    {
+      "file": "benchmarks/scoped-signals/run-native-props.mjs",
+      "sha256": "5b6e57c70111da5c72704c4fbbecb28b1c5dd4ced510a07aa8da1b78b17afc93"
+    },
+    {
+      "file": "benchmarks/scoped-signals/run-native-costs.mjs",
+      "sha256": "ae28dcf260a1f05a1b867c58bb49d9c6c253c11f18d80f98d701f1eb249c3c57"
+    },
+    {
+      "file": "benchmarks/scoped-signals/native-collector-controls.mjs",
+      "sha256": "13ff8f3a35c4fce0b388d6757e3e96981629af93248bcd5ef9c6adae1f61868d"
+    },
+    {
+      "file": "benchmarks/scoped-signals/README.md",
+      "sha256": "c0e4ddcdf815cb66a6e85fd5c08e4f4a02aeb640b32137035c69cd3bee6e3bb8"
+    },
+    {
+      "file": "benchmarks/scoped-signals/results/2026-08-27/parity-performance.md",
+      "sha256": "2591271d0df34d06c18c62772bb101aa823691eb824cac137ee06ebea8fe6a83"
+    },
+    {
+      "file": "benchmarks/scoped-signals/results/2026-08-27/parity-focused-original-runner.mjs.txt",
+      "sha256": "833b7c1247cc4d2599ab885780363854f7be24e4aa0caef965425c22d3c8c6e1"
+    }
+  ],
+  "formatting": {
+    "tool": "Existing audited source format-changed.mjs using resolved per-file repo config and verified source TSRX/Svelte plugins.",
+    "canonicalStatus": "Canonical Prettier CLI could not resolve the locked @tsrx/prettier-plugin package; this scoped source formatting is supplemental.",
+    "sourceFormatReport": "/private/tmp/octane-tsrx-parity-422c-DGLjhq/publication-format-01.json",
+    "sourceFormatReportSha256": "a99df16752d9fcc9d6d5f53e05c92e03cf43010da176eab0d56de4ff014027c5",
+    "jsonValuesPreserved": true,
+    "markdownIgnoredByRepoConfiguration": true,
+    "exactOriginalRunnerSnapshotNotReformatted": true
+  },
+  "publicationPolicy": "Raw results remain at their recorded local paths. Published JSON adds a qualification and removes only recorded host process-resource/free-memory metadata. All timing, CPU, GC, emitted-bundle, and retention sample values are unchanged. No raw process listings or heap snapshots are included.",
+  "fullRunnerBaselineRef": "cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+  "pairedRunnerBaselines": [
+    "cd9ed33754bfc3eeb144ba256dc9b437614e3e92",
+    "422c2c937784af835c64d6fae5a39162143c7a44"
+  ],
+  "trueByteIdenticalTimingControls": "The unread collection-off renderer bundles match only within the vs422 comparisons. The cd9 ordinary baseline has a different bundle.",
+  "compiledNativeFixtureDeltasVs422": [
+    {
+      "case": "unread-block",
+      "mode": "client",
+      "rawBytes": 74,
+      "gzipBytes": 47,
+      "brotliBytes": 86
+    },
+    {
+      "case": "single-block",
+      "mode": "client",
+      "rawBytes": 50,
+      "gzipBytes": 25,
+      "brotliBytes": -41
+    },
+    {
+      "case": "repeated-block",
+      "mode": "client",
+      "rawBytes": 50,
+      "gzipBytes": 25,
+      "brotliBytes": -43
+    },
+    {
+      "case": "distinct-block",
+      "mode": "client",
+      "rawBytes": 50,
+      "gzipBytes": 25,
+      "brotliBytes": 26
+    },
+    {
+      "case": "unread-block",
+      "mode": "server",
+      "rawBytes": 53,
+      "gzipBytes": 28,
+      "brotliBytes": 3
+    },
+    {
+      "case": "single-block",
+      "mode": "server",
+      "rawBytes": 29,
+      "gzipBytes": 16,
+      "brotliBytes": 47
+    },
+    {
+      "case": "repeated-block",
+      "mode": "server",
+      "rawBytes": 29,
+      "gzipBytes": 16,
+      "brotliBytes": -23
+    },
+    {
+      "case": "distinct-block",
+      "mode": "server",
+      "rawBytes": 29,
+      "gzipBytes": 16,
+      "brotliBytes": 52
+    }
+  ],
+  "foreignRetentionPriorEvidenceUnchanged": {
+    "engineBundleSha256": "50ee2bae2d36202f144cff2be8cb5b7b2b4621920e2829c5514c6385329a3b49",
+    "runnerWorkerInspectorAndReachabilityHashesMatch": true,
+    "priorFaultEvidence": "consolidation-foreign-retention-fault.json"
+  }
+}

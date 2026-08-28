@@ -34,6 +34,7 @@ import { formatCompileDiagnostic } from './native-change-diagnostics.js';
 import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
 import { rewriteServerRuntimeRequests } from './runtime-requests.js';
 import { assertStrongMode } from './strong-mode.js';
+import { assertNativeReadDiagnostics, assertNativeReadOptions } from './native-read-diagnostics.js';
 import { findCssModuleImportRequests } from './css-module-imports.js';
 import {
 	assertNoLiveClientOnlyImports,
@@ -114,13 +115,17 @@ export function canonicalModuleId(id, projectRoot) {
 }
 
 export function resolveOctaneRuntimeRequest(request, environment) {
-	if (request !== 'octane') return null;
+	if (request !== 'octane' && request !== 'octane/signals/client') return null;
 	if (environment !== 'client' && environment !== 'server') {
 		throw new Error(
 			`Unknown Octane environment ${JSON.stringify(environment)} — expected 'client' or 'server'.`,
 		);
 	}
-	return OCTANE_RUNTIME_REQUESTS[environment];
+	return request === 'octane/signals/client'
+		? environment === 'server'
+			? 'octane/signals/server'
+			: request
+		: OCTANE_RUNTIME_REQUESTS[environment];
 }
 
 function packageUsesOctane(pkg) {
@@ -472,6 +477,7 @@ export function findDescriptorChildrenImports(source, id) {
 
 class OctaneBundlerCompiler {
 	constructor(options) {
+		assertNativeReadOptions(options);
 		if (options.strong !== undefined && typeof options.strong !== 'boolean') {
 			throw new TypeError('Octane compiler `strong` must be a boolean when provided.');
 		}
@@ -489,6 +495,7 @@ class OctaneBundlerCompiler {
 			profile: options.profile === true,
 			inlineHookMemo: options.inlineHookMemo !== false,
 			strong: options.strong === true,
+			nativeReads: options.nativeReads === true,
 			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
@@ -726,7 +733,7 @@ class OctaneBundlerCompiler {
 	 */
 	_warnUnmarkedOctaneImport(code, filename) {
 		if (this.warn === null || this.warnedOwnership.has(filename)) return;
-		if (!/from\s*['"]octane['"]/.test(code)) return;
+		if (!/from\s*['"]octane(?:\/signals\/(?:client|server))?['"]/.test(code)) return;
 		this.warnedOwnership.add(filename);
 		this.warn(
 			`${filename} imports from 'octane' but has no leading /** @jsxImportSource octane */ pragma — with requireDirective enabled, Octane will not compile or transform it. Add the pragma at the top of the module if Octane should own it.`,
@@ -1006,6 +1013,7 @@ class OctaneBundlerCompiler {
 	}
 
 	transform(code, id, options = {}) {
+		assertNativeReadOptions(options);
 		const file = cleanModuleId(id);
 		const hydrateBoundaryPath = hydrateBoundaryPathFromId(id);
 		const collected = {
@@ -1029,6 +1037,7 @@ class OctaneBundlerCompiler {
 		// byte identical even when a shared client/server bundler configuration opts in.
 		const profile = environment === 'client' && (options.profile ?? this.defaults.profile) === true;
 		const inlineHookMemo = (options.inlineHookMemo ?? this.defaults.inlineHookMemo) !== false;
+		const nativeReads = (options.nativeReads ?? this.defaults.nativeReads) === true;
 		// An application's global policy never leaks into installed or linked
 		// compatibility packages, including workspace packages nested inside the
 		// project root. Modules may still opt themselves in with their own
@@ -1132,6 +1141,7 @@ class OctaneBundlerCompiler {
 				profileFilename,
 				...(inlineHookMemo ? null : { inlineHookMemo: false }),
 				...(strong ? { strong: true } : null),
+				...(nativeReads ? { nativeReads: true } : null),
 				...(universalRuntime === undefined ? null : { universalRuntime }),
 				// Keep the established DOM compiler call byte-for-byte equivalent. A
 				// renderer descriptor is an orthogonal compiler input only for the
@@ -1215,7 +1225,14 @@ class OctaneBundlerCompiler {
 				}
 				return passThrough();
 			}
-			if (!/from\s*['"]octane['"]/.test(code)) return passThrough();
+			const nativeHookImport = /from\s*['"]octane\/signals\/(?:client|server)['"]/.test(code);
+			if (
+				!/from\s*['"]octane['"]/.test(code) &&
+				!(nativeReads && /from\s*['"]octane\/server['"]/.test(code)) &&
+				!nativeHookImport &&
+				!(nativeReads && /from\s*['"]octane\/signals['"]/.test(code))
+			)
+				return passThrough();
 			if (!this._isInstalledOctaneSource(file, collected)) {
 				return passThrough();
 			}
@@ -1237,15 +1254,25 @@ class OctaneBundlerCompiler {
 				renderer.target === 'dom' &&
 				universalRuntime === undefined;
 			if (manualSlots && !inlinePlainMemo) {
+				const authoredSource = code;
+				if (nativeReads || nativeHookImport)
+					assertNativeReadDiagnostics(
+						parseModule(authoredSource, filename),
+						authoredSource,
+						filename,
+						{
+							nativeReads,
+							renderer,
+						},
+					);
 				// Hand-slotted bindings still own their authored policy. Opting one
 				// module in must not require changing its established slot ABI.
 				if (strong || code.includes('use strong')) {
-					const authoredSource = code;
 					assertStrongMode(parseModule(authoredSource, filename), authoredSource, filename, {
 						strong,
 					});
 				}
-				return passThrough();
+				if (!nativeReads) return passThrough();
 			}
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const specializeVoidRoot =
@@ -1263,6 +1290,7 @@ class OctaneBundlerCompiler {
 				inlineHookMemo: inlinePlainMemo,
 				...(manualSlots ? { manualSlots: true } : null),
 				...(strong ? { strong: true } : null),
+				...(nativeReads ? { nativeReads: true, renderer } : null),
 				...(specializeVoidRoot
 					? {
 							isVoidComponentImport: options.isVoidComponentImport,

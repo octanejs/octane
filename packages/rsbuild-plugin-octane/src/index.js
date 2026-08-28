@@ -135,8 +135,9 @@ function hasRoutes(config) {
 /**
  * @param {import('@octanejs/app-core').ResolvedOctaneConfig} config
  * @param {boolean | undefined} strongOverride
+ * @param {boolean | undefined} nativeReadsOverride
  */
-function configSignature(config, strongOverride) {
+function configSignature(config, strongOverride, nativeReadsOverride) {
 	return JSON.stringify({
 		build: config.build,
 		routes: config.router.routes.map((route) =>
@@ -156,6 +157,7 @@ function configSignature(config, strongOverride) {
 		compiler: {
 			renderers: config.compiler.renderers.signature,
 			strong: strongOverride ?? config.compiler.strong,
+			nativeReads: nativeReadsOverride ?? config.compiler.nativeReads,
 		},
 	});
 }
@@ -237,6 +239,7 @@ function assertRootPublicPaths(config, clientEnvironment) {
  *   cssModuleConstants?: import('@octanejs/rspack-plugin').OctaneRspackPluginOptions['cssModuleConstants'],
  *   profile?: boolean,
  *   strong?: boolean,
+ *   nativeReads?: boolean,
  *   exclude?: string[],
  *   requireDirective?: boolean,
  *   clientEnvironment?: string,
@@ -245,6 +248,9 @@ function assertRootPublicPaths(config, clientEnvironment) {
  * @returns {import('@rsbuild/core').RsbuildPlugin}
  */
 export function pluginOctane(inlineOptions = {}) {
+	if (inlineOptions.nativeReads !== undefined && typeof inlineOptions.nativeReads !== 'boolean') {
+		throw new TypeError('[@octanejs/rsbuild-plugin] nativeReads must be a boolean.');
+	}
 	if (inlineOptions.strong !== undefined && typeof inlineOptions.strong !== 'boolean') {
 		throw new TypeError('[@octanejs/rsbuild-plugin] `strong` must be a boolean.');
 	}
@@ -266,17 +272,22 @@ export function pluginOctane(inlineOptions = {}) {
 				: null;
 			const initialConfig = initialLoaded?.config ?? null;
 			const strong = inlineOptions.strong ?? initialConfig?.compiler.strong;
+			const nativeReads = inlineOptions.nativeReads ?? initialConfig?.compiler.nativeReads;
 			const appEnabled = hasRoutes(initialConfig);
 			const buildTargetPlan =
 				initialConfig?.build.target === undefined
 					? null
 					: createBuildTargetPlan(initialConfig.build.target);
 			const neutralCompiler = appEnabled
-				? createOctaneCompiler({ root, ...(strong === undefined ? null : { strong }) })
+				? createOctaneCompiler({
+						root,
+						...(strong === undefined ? null : { strong }),
+						...(nativeReads === undefined ? null : { nativeReads }),
+					})
 				: null;
 			let currentConfig = initialConfig;
 			let lastConfigSignature = initialLoaded
-				? configSignature(initialLoaded.config, inlineOptions.strong)
+				? configSignature(initialLoaded.config, inlineOptions.strong, inlineOptions.nativeReads)
 				: '';
 			let configNeedsReload = false;
 			/** @type {import('@rsbuild/core').RsbuildDevServer | null} */
@@ -324,7 +335,11 @@ export function pluginOctane(inlineOptions = {}) {
 					throw error;
 				}
 				registerConfigDependencies(context, loaded);
-				const signature = configSignature(loaded.config, inlineOptions.strong);
+				const signature = configSignature(
+					loaded.config,
+					inlineOptions.strong,
+					inlineOptions.nativeReads,
+				);
 				if (lastConfigSignature && signature !== lastConfigSignature) configNeedsReload = true;
 				lastConfigSignature = signature;
 				currentConfig = loaded.config;
@@ -553,6 +568,7 @@ export function pluginOctane(inlineOptions = {}) {
 							? null
 							: { cssModuleConstants: inlineOptions.cssModuleConstants }),
 						...(strong === undefined ? null : { strong }),
+						...(nativeReads === undefined ? null : { nativeReads }),
 						...(inlineOptions.hmr === undefined ? null : { hmr: inlineOptions.hmr }),
 						...(inlineOptions.profile === undefined
 							? null
