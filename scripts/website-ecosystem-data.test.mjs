@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,11 @@ import {
 	validateBindingCatalogData,
 	validateFrameworkIntegrationCatalogData,
 } from './workspace-packages.mjs';
+import {
+	assembleWebsiteEcosystemData,
+	loadWebsiteEcosystemInputs,
+	writeWebsiteEcosystemData,
+} from './generate-website-ecosystem-data.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -115,5 +121,104 @@ test('integration catalog validation requires unique guide metadata', () => {
 		validateFrameworkIntegrationCatalogData(duplicateAnchor, packages).some((error) =>
 			error.includes('entry 2 duplicates guide anchor "astro"'),
 		),
+	);
+});
+
+test('website ecosystem assembly emits every typed entity in authored order', () => {
+	const input = loadWebsiteEcosystemInputs();
+	const records = assembleWebsiteEcosystemData(input);
+	const bindingCount = input.bindingCategories.reduce(
+		(total, category) => total + category.packages.length,
+		0,
+	);
+
+	assert.equal(records.length, bindingCount + input.frameworkIntegrations.length);
+	assert.equal(new Set(records.map((record) => record.id)).size, records.length);
+	assert.equal(
+		records.some((record) => record.packageName === 'octane'),
+		false,
+	);
+	assert.equal(
+		records.some((record) => record.packageName === '@octanejs/cli'),
+		false,
+	);
+	assert.deepEqual(
+		records.slice(0, input.frameworkIntegrations.length).map((record) => record.kind),
+		input.frameworkIntegrations.map(() => 'framework-integration'),
+	);
+	assert.deepEqual(
+		records.map((record) => record.order),
+		records.map((_, index) => index),
+	);
+
+	const router = records.find((record) => record.packageName === '@octanejs/tanstack-router');
+	assert.deepEqual(router, {
+		kind: 'library-binding',
+		id: 'binding-tanstack-router',
+		title: 'TanStack Router',
+		packageName: '@octanejs/tanstack-router',
+		upstreamPackage: '@tanstack/react-router',
+		category: 'AI, data, and routing',
+		categoryId: 'ai-data-and-routing',
+		description: router.description,
+		searchTerms: ['TanStack React Router'],
+		order: router.order,
+	});
+
+	const start = records.find((record) => record.packageName === '@octanejs/tanstack-start');
+	assert.deepEqual(start, {
+		kind: 'framework-integration',
+		id: 'integration-tanstack-start',
+		title: 'TanStack Start',
+		packageName: '@octanejs/tanstack-start',
+		model: 'Full-stack framework',
+		description:
+			'Build file-routed Octane applications with server functions, streaming SSR, hydration, and Vite development and production builds.',
+		searchTerms: ['TanStack Start', 'full stack', 'file routing'],
+		guideAnchor: 'tanstack-start',
+		order: start.order,
+	});
+});
+
+test('website ecosystem assembly rejects missing package and status data', () => {
+	const input = loadWebsiteEcosystemInputs();
+	const missingPackage = {
+		...input,
+		packages: input.packages.filter((pkg) => pkg.name !== '@octanejs/tanstack-router'),
+	};
+	assert.throws(
+		() => assembleWebsiteEcosystemData(missingPackage),
+		/missing workspace package @octanejs\/tanstack-router/,
+	);
+
+	const missingStatus = {
+		...input,
+		packages: input.packages.map((pkg) =>
+			pkg.name === '@octanejs/tanstack-router' ? { ...pkg, status: undefined } : pkg,
+		),
+	};
+	assert.throws(
+		() => assembleWebsiteEcosystemData(missingStatus),
+		/@octanejs\/tanstack-router is missing website status data/,
+	);
+});
+
+test('website ecosystem write and check modes compare formatted bytes', async (context) => {
+	const directory = mkdtempSync(path.join(os.tmpdir(), 'octane-ecosystem-data-'));
+	context.after(() => rmSync(directory, { recursive: true }));
+	const outputPath = path.join(directory, 'ecosystem-index.json');
+	const input = loadWebsiteEcosystemInputs();
+
+	const written = await writeWebsiteEcosystemData({ input, outputPath });
+	assert.equal(written.changed, true);
+	assert.equal(existsSync(outputPath), true);
+
+	const checked = await writeWebsiteEcosystemData({ input, outputPath, check: true });
+	assert.equal(checked.changed, false);
+
+	writeFileSync(outputPath, '{}\n');
+	await assert.rejects(
+		writeWebsiteEcosystemData({ input, outputPath, check: true }),
+		/ecosystem-index\.json is stale/,
 	);
 });
