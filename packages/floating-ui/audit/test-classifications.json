@@ -22,6 +22,11 @@
       "reason": "Port-authored component, portal, focus, composite, and transition coverage under Octane."
     },
     {
+      "path": "packages/floating-ui/tests/nodes.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Port-authored floating-tree navigation coverage for the Octane binding's internal helper behavior."
+    },
+    {
       "path": "packages/floating-ui/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
       "oracle": "Runs the TwoTooltips fixture against pinned @floating-ui/react@0.27.19 and @octanejs/floating-ui."

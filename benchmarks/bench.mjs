@@ -407,6 +407,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Floating UI's virtual nested-menu routing: exact previous behavior versus
+		// production on deep and branching trees, with deterministic node-read counts.
+		name: 'floating-tree-navigation',
+		cwd: 'floating-tree-navigation',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Shared-compiler watched-path invalidation after nearest-package
 		// decisions have been cached for small and large source trees.
 		name: 'manifest-cache-invalidation',

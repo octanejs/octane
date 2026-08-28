@@ -244,6 +244,7 @@ internally, get their own baseline and guard namespace.
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
 | `router-dispatch` | router-dispatch | none (Node-only) | app-core static, wrong-method, and dynamic matching across 1,000-route tables |
+| `floating-tree-navigation` | floating-tree-navigation | none (Node-only) | Floating UI deepest-open-node lookup on deep chains, equal-depth forks, and a root-only control, with exact previous-behavior and deterministic node-read gates |
 | `manifest-cache-invalidation` | manifest-cache-invalidation | none (Node-only) | shared-compiler source invalidation across 129 and 5,001 cached nearest-manifest decisions, plus a required manifest-scan control |
 | `vite-client-assets` | vite-client-assets | none (Node-only) | route asset mapping across 100 and 1,000 entries sharing a 500-chunk manifest graph, plus a shallow control |
 | `effectful-list` | effectful-list | Octane + reference frameworks | effect/ref cleanup churn |

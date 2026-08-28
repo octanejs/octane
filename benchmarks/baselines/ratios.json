@@ -504,6 +504,30 @@
     "note": "Same-process lowercase method misses through 1,000 server routes, normalized per candidate. Re-normalizing the request method for every route measured at 0.31x the dynamic control; one dispatch-level normalization measured at 0.07x. The 0.2 ceiling leaves timing headroom while catching repeated method normalization."
   },
   {
+    "suite": "floating-tree-navigation",
+    "op": "node_reads",
+    "target": "indexed-deep-chain",
+    "reference": "previous-deep-chain",
+    "maxRatio": 0.01,
+    "note": "Deterministic indexed reads for the production deepest-open-node lookup versus the exact previous recursive descendant expansion. The full 16-node chain measured 32 reads versus 1,048,576; the 0.01 ceiling leaves more than 300x headroom while requiring work to remain linear on the virtual-keyboard-navigation path."
+  },
+  {
+    "suite": "floating-tree-navigation",
+    "op": "node_reads",
+    "target": "indexed-equal-depth-fork",
+    "reference": "previous-equal-depth-fork",
+    "maxRatio": 0.05,
+    "note": "Deterministic indexed reads for two equal-depth open branches, with node identity pinned to the first tree-order leaf. The full fixture measured 33 reads versus 17,373; the 0.05 ceiling leaves more than 26x headroom while catching repeated all-descendant expansion."
+  },
+  {
+    "suite": "floating-tree-navigation",
+    "op": "lookup",
+    "target": "indexed-deep-chain",
+    "reference": "previous-deep-chain",
+    "maxRatio": 0.25,
+    "note": "Same-process warmed lookup time for production versus the exact previous algorithm on a 16-node open chain. One full run measured 0.000848 ms versus 7.419794 ms; the deterministic node-read guard is primary, and the 0.25 ceiling leaves broad timing headroom while requiring the indexed traversal's advantage to remain visible."
+  },
+  {
     "suite": "vite-client-assets",
     "op": "asset_map",
     "target": "routes-1000-deep",
