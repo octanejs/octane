@@ -15,7 +15,11 @@ interface TerminalEntry {
 	message: string;
 }
 
-function Counter(props: { paused: boolean; onLog: (message: string) => void }) @{
+function Counter(props: {
+	paused: boolean;
+	onIncrement: () => void;
+	onLog: (message: string) => void;
+}) @{
 	const [count, setCount] = useState(0);
 
 	if (!props.paused) {
@@ -27,7 +31,14 @@ function Counter(props: { paused: boolean; onLog: (message: string) => void }) @
 
 	// Scoped styles are per-component, so the button's CSS lives HERE: in
 	// HeroDemo's <style> the hashed selector would never match this node.
-	<button type="button" class="demo-count" onClick={() => setCount(count + 1)}>
+	<button
+		type="button"
+		class="demo-count"
+		onClick={() => {
+			props.onIncrement();
+			setCount(count + 1);
+		}}
+	>
 		<span class="demo-count-label">Count</span>
 		<span class="demo-count-value">{`${count}`}</span>
 
@@ -118,7 +129,7 @@ export function HeroDemo() @{
 	<div class="demo-shell">
 		<div class="demo">
 			<span class="demo-badge">Live</span>
-			<Counter paused={paused} onLog={appendLog} />
+			<Counter paused={paused} onIncrement={jumpToLatest} onLog={appendLog} />
 			<label class="demo-toggle">
 				<input
 					type="checkbox"
@@ -129,12 +140,12 @@ export function HeroDemo() @{
 			</label>
 		</div>
 
-		<section class="demo-terminal" aria-label="Effect console">
+		<section class="demo-terminal" aria-label="Console">
 			<header class="demo-terminal-header">
-				<span class="demo-terminal-title">Effect console</span>
+				<span class="demo-terminal-title">Console</span>
 				<span class={['demo-terminal-status', paused ? 'paused' : 'running']}>{(paused
-					? 'Paused'
-					: 'Running') as string}</span>
+					? 'Effect paused'
+					: 'Effect active') as string}</span>
 				@if (!followingTail) {
 					<button type="button" class="demo-terminal-jump" onClick={jumpToLatest}>
 						Latest ↓
@@ -205,7 +216,7 @@ export function HeroDemo() @{
 				display: flex;
 				align-items: center;
 				gap: 0.55rem;
-				min-height: 1.8rem;
+				height: 2rem;
 				padding: 0.35rem 0.85rem;
 				border-bottom: 1px solid rgba(255, 255, 255, 0.055);
 			}
@@ -240,13 +251,15 @@ export function HeroDemo() @{
 				box-shadow: none;
 			}
 			.demo-terminal-jump {
-				padding: 0.12rem 0.42rem;
+				height: 1.25rem;
+				padding: 0 0.42rem;
 				border: 1px solid var(--border);
 				border-radius: 9999px;
 				background: var(--surface);
 				color: var(--text-secondary);
 				font: inherit;
 				font-size: 0.62rem;
+				line-height: 1;
 				cursor: pointer;
 			}
 			.demo-terminal-jump:hover {
@@ -263,11 +276,29 @@ export function HeroDemo() @{
 				overflow-y: auto;
 				overscroll-behavior: contain;
 				scrollbar-gutter: stable;
+				scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+				scrollbar-width: thin;
 				padding: 0.45rem 0.85rem;
 				color: #d6deeb;
 				font-family: ui-monospace, Menlo, Consolas, monospace;
 				font-size: 0.72rem;
 				line-height: 1.55;
+			}
+			.demo-terminal-body::-webkit-scrollbar {
+				width: 0.65rem;
+			}
+			.demo-terminal-body::-webkit-scrollbar-track {
+				background: transparent;
+			}
+			.demo-terminal-body::-webkit-scrollbar-thumb {
+				border: 3px solid transparent;
+				border-radius: 9999px;
+				background: rgba(255, 255, 255, 0.2);
+				background-clip: padding-box;
+			}
+			.demo-terminal-body::-webkit-scrollbar-thumb:hover {
+				background: rgba(255, 255, 255, 0.34);
+				background-clip: padding-box;
 			}
 			.demo-terminal-line {
 				display: flex;

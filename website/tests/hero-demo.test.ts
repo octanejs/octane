@@ -58,7 +58,7 @@ describe('hero live counter', () => {
 		await waitFor(() => expect(logLines().at(-1)).toBe('›count is now 1'));
 
 		fireEvent.click(paused);
-		await waitFor(() => expect(terminalStatus()).toBe('Paused'));
+		await waitFor(() => expect(terminalStatus()).toBe('Effect paused'));
 
 		// The conditional effect is gone, but useState below it still counts.
 		fireEvent.click(button);
@@ -67,7 +67,7 @@ describe('hero live counter', () => {
 
 		// Unpausing brings the effect back, and it reports the current count.
 		fireEvent.click(paused);
-		await waitFor(() => expect(terminalStatus()).toBe('Running'));
+		await waitFor(() => expect(terminalStatus()).toBe('Effect active'));
 		await waitFor(() => expect(logLines().at(-1)).toBe('›count is now 2'));
 	});
 
@@ -90,7 +90,7 @@ describe('hero live counter', () => {
 		expect(demoLogs()).toEqual([]);
 	});
 
-	it('follows new output until the reader scrolls back', async () => {
+	it('returns to the latest output when Count or Latest is clicked', async () => {
 		const { button, jumpToLatest, logLines, terminal } = mountDemo();
 
 		await waitFor(() => expect(logLines().at(-1)).toBe('›count is now 0'));
@@ -109,8 +109,12 @@ describe('hero live counter', () => {
 
 		fireEvent.click(button);
 		await waitFor(() => expect(logLines().at(-1)).toBe('›count is now 2'));
-		expect(terminal.scrollTop).toBe(40);
+		expect(terminal.scrollTop).toBe(240);
+		expect(jumpToLatest()).toBeNull();
 
+		terminal.scrollTop = 40;
+		fireEvent.scroll(terminal);
+		await waitFor(() => expect(jumpToLatest()).toBeTruthy());
 		fireEvent.click(jumpToLatest()!);
 		expect(terminal.scrollTop).toBe(240);
 		expect(jumpToLatest()).toBeNull();
