@@ -1,0 +1,489 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-27T23:22:37.157Z",
+  "purpose": "Formatting-only repair for the 25 files rejected by the ready PR lint job. This records byte changes without relabelling prior measurements as reruns.",
+  "originalCommit": "f16c0bc734c7e2408f73753cf9569a05ffe04ff0",
+  "ci": {
+    "runId": 33124927617,
+    "headSha": "f16c0bc734c7e2408f73753cf9569a05ffe04ff0",
+    "lint": {
+      "jobId": 98700735665,
+      "conclusion": "failure",
+      "failingStep": "Check formatting",
+      "command": "pnpm format:check",
+      "reportedFileCount": 25,
+      "exitCode": 1,
+      "url": "https://github.com/octanejs/octane/actions/runs/33124927617/job/98700735665"
+    },
+    "typecheck": {
+      "jobId": 98700735685,
+      "conclusion": "success",
+      "completedAt": "2026-08-27T23:12:01Z",
+      "commands": ["pnpm typecheck", "pnpm examples:static:check"],
+      "url": "https://github.com/octanejs/octane/actions/runs/33124927617/job/98700735685"
+    },
+    "scope": "These conclusions apply to the original f16c head. They do not claim that a later formatting/fix commit passed CI."
+  },
+  "historicalReportPolicy": {
+    "parsedJsonFilesUnchanged": 21,
+    "originalGitBytesVerified": 25,
+    "originalArchive": "/private/tmp/octane-ci-format-f16c-YsGP49/original",
+    "immutableOriginalRecipe": "git show f16c0bc734c7e2408f73753cf9569a05ffe04ff0:<path>",
+    "note": "All historical JSON values, including old source identities, hashes, timestamps, results and limitations, are preserved. Old hashes retain their original meanings. This report maps the exact f16c Git bytes to the formatting-only successors; no benchmark or historical test was rerun for this repair."
+  },
+  "formatter": {
+    "node": "v26.4.0",
+    "prettierVersion": "3.9.6",
+    "tsrxPluginVersion": "0.3.126",
+    "repositoryConfigSha256": "12fecb39d7c5a5ef391437f7b94271134200e5f3d37e6285af3b555597638247",
+    "stagedConfigSha256": "c0c20d4e0e26fd4e2782705e0d3bc026df5ba45d8419c3caa82b06983ed8ee72",
+    "registerSha256": "7b715fa2432bbbba0c091b8cd972b5e3407363d1f73295f7873b22b650f45b3a",
+    "tsrxPluginEntrySha256": "062cd3f523a1b13f5ba9a99fb4281ef771bad11ffcd2698e920f2a14480c501a",
+    "configEquivalentExceptResolvedPluginPaths": true,
+    "mode": "supplemental-public-tagged-source",
+    "lockedWorkspace": false,
+    "publicRepository": "https://github.com/tsrx-org/tsrx",
+    "publicCommit": "7cb01278dff7aebfd25cbf5abcd2d47c6da7d81a",
+    "publicAuthoringToolsArchiveSha256": "b65b399be3e3c66127056c8947afb49ac46cef45bffd2c80047a038a39d7ca1a",
+    "method": "Resolve each file using the real repository .prettierrc, then substitute only the two staged absolute plugin paths. This preserves repository-relative override matching.",
+    "resolvedJsonUseTabs": false,
+    "command": {
+      "executable": "/opt/homebrew/Cellar/node/26.4.0/bin/node",
+      "arguments": [
+        "--import",
+        "/private/tmp/octane-native-source-compiler-NVcMdO/register.mjs",
+        "/private/tmp/octane-ci-format-f16c-YsGP49/format-resolved.mjs"
+      ],
+      "workingDirectory": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment"
+    },
+    "initialStagedConfigLimitation": "A config stored outside the repository did not match the repository-relative **/*.json override; that initial pass was not treated as canonical formatting evidence.",
+    "limitation": "Local frozen-lockfile installation remained blocked by registry HTTP 403 after an approved retry. These staged tools provide local formatting evidence, not the locked CI gate. The original CI jobs did install from the lockfile successfully."
+  },
+  "sourceEquivalence": {
+    "compiler": {
+      "path": "/Users/domgan/.codex/worktrees/octane-scoped-async-signals-experiment/packages/octane/src/compiler/compile.js",
+      "sha256": "9c0f6445561faa82c44aee82d62a90c4dc15f99058bb270f12ee597ecaa8a43d"
+    },
+    "dependencies": [
+      {
+        "name": "@tsrx/core",
+        "version": "0.1.61",
+        "manifestSha256": "b465034e98de9dd9bf314444a6050ec5b7c537b8dd25a1982455a519306d2955"
+      },
+      {
+        "name": "acorn",
+        "version": "8.17.0",
+        "manifestSha256": "fa3612cc9493702b7520947eec276d7b4a73001dafd68c4a9dcb58791a4145c6"
+      },
+      {
+        "name": "esbuild",
+        "version": "0.28.1",
+        "manifestSha256": "d55d1d19fcc5b6079e4a71dd4111340c79c682bc36835ac7058a0c364c7db58a"
+      }
+    ],
+    "method": "Compare emitted production client/server JavaScript with fixed compiler options and filename, after esbuild removes formatting/comments without syntax or identifier minification; compare the TypeScript-only file after equivalent type erasure. Diagnostic content is compared without source locations.",
+    "esbuildOptions": {
+      "minifyWhitespace": true,
+      "minifyIdentifiers": false,
+      "minifySyntax": false,
+      "sourcemap": false,
+      "legalComments": "none",
+      "target": "esnext"
+    },
+    "exactAfterTypeErasureAndWhitespaceNormalization": 4,
+    "sourceChecks": [
+      {
+        "path": "packages/devtools/src/panel/ComponentsTab.tsrx",
+        "mode": "client",
+        "options": {
+          "mode": "client",
+          "nativeReads": false,
+          "dev": false,
+          "hmr": false,
+          "profile": false
+        },
+        "originalOutputSha256": "699c54cf3d6acb0dc4bc089f21a4ccfd83b543e16be7aff1f147d6d051740178",
+        "formattedOutputSha256": "699c54cf3d6acb0dc4bc089f21a4ccfd83b543e16be7aff1f147d6d051740178",
+        "equal": true,
+        "diagnosticContentEqual": true,
+        "diagnosticCount": 0
+      },
+      {
+        "path": "packages/devtools/src/panel/ComponentsTab.tsrx",
+        "mode": "server",
+        "options": {
+          "mode": "server",
+          "nativeReads": false,
+          "dev": false,
+          "hmr": false,
+          "profile": false
+        },
+        "originalOutputSha256": "21d94f2d193c3cf62295279724342699191afc1ef54ad3077a95932a868365a8",
+        "formattedOutputSha256": "8da83571933d85f2c45ab632ef6075c0009fe1648ec562f457c689ddf9d659f8",
+        "equal": false,
+        "diagnosticContentEqual": true,
+        "diagnosticCount": 0
+      },
+      {
+        "path": "packages/octane/src/signals/native-read-inspection.ts",
+        "mode": "typescript",
+        "options": {
+          "minifyWhitespace": true,
+          "minifyIdentifiers": false,
+          "minifySyntax": false,
+          "sourcemap": false,
+          "legalComments": "none",
+          "target": "esnext",
+          "loader": "ts"
+        },
+        "originalOutputSha256": "ad46563ed765049ee8f189f5afd4d5d7ae5bb381e5142a94d8d4d3e75ede5620",
+        "formattedOutputSha256": "ad46563ed765049ee8f189f5afd4d5d7ae5bb381e5142a94d8d4d3e75ede5620",
+        "equal": true
+      },
+      {
+        "path": "packages/octane/tests/_fixtures/signals-local.tsrx",
+        "mode": "client",
+        "options": {
+          "mode": "client",
+          "nativeReads": true,
+          "dev": false,
+          "hmr": false,
+          "profile": false
+        },
+        "originalOutputSha256": "c8c20e4cfd649b3150c352560158fbfa741ac052e7d5d6396b24c436a165f200",
+        "formattedOutputSha256": "c8c20e4cfd649b3150c352560158fbfa741ac052e7d5d6396b24c436a165f200",
+        "equal": true,
+        "diagnosticContentEqual": true,
+        "diagnosticCount": 0
+      },
+      {
+        "path": "packages/octane/tests/_fixtures/signals-local.tsrx",
+        "mode": "server",
+        "options": {
+          "mode": "server",
+          "nativeReads": true,
+          "dev": false,
+          "hmr": false,
+          "profile": false
+        },
+        "originalOutputSha256": "22ad62cce40c9dea398c0785733f49c3d14cd1ec3cc7f73041e4cf054cf58b5e",
+        "formattedOutputSha256": "203b11b59eccf115bd35a2c84e5b0db144e692becbfc6b58a54a22a3df47ea16",
+        "equal": false,
+        "diagnosticContentEqual": true,
+        "diagnosticCount": 0
+      },
+      {
+        "path": "packages/octane/tests/signals-devtools.test.tsrx",
+        "mode": "client",
+        "options": {
+          "mode": "client",
+          "nativeReads": true,
+          "dev": false,
+          "hmr": false,
+          "profile": false
+        },
+        "originalOutputSha256": "47e4d051da3de478f1160dd415d052a037b44d7eb0f5daef64e63c7d6b7b8d36",
+        "formattedOutputSha256": "47e4d051da3de478f1160dd415d052a037b44d7eb0f5daef64e63c7d6b7b8d36",
+        "equal": true,
+        "diagnosticContentEqual": true,
+        "diagnosticCount": 0
+      },
+      {
+        "path": "packages/octane/tests/signals-devtools.test.tsrx",
+        "mode": "server",
+        "options": {
+          "mode": "server",
+          "nativeReads": true,
+          "dev": false,
+          "hmr": false,
+          "profile": false
+        },
+        "originalOutputSha256": "e072863c2036d4995dcf3b442052052c840cfa51f0d6706e4988198d243a5585",
+        "formattedOutputSha256": "4af059ea8274da60ec2b0fd45c885095d2df4cc59b186b7d13fdcf3cf0daf7d0",
+        "equal": false,
+        "diagnosticContentEqual": true,
+        "diagnosticCount": 0
+      }
+    ],
+    "serverSourceIds": {
+      "method": "Parse both emitted outputs with Acorn and compare complete AST values after removing parser locations/raw spellings and consistently renaming only string site IDs passed to imported octane/server ssrControl and ssrTry helpers. The same ID always keeps the same canonical replacement; reuse and helper order must match.",
+      "sourcePositionContract": {
+        "path": "packages/octane/src/compiler/compile.js",
+        "function": "ssrControlKey(kind, node)",
+        "line": 12833,
+        "implementation": "Hashes kind and node.start (or source line:column fallback); formatting therefore changes generated SSR control IDs."
+      },
+      "results": [
+        {
+          "path": "packages/devtools/src/panel/ComponentsTab.tsrx",
+          "equalApartFromSourceIds": true,
+          "sourceIdUses": 24,
+          "uniqueSourceIds": 24,
+          "idReusePreserved": true,
+          "normalizedAstSha256": "aa9d877755b67465491ba703532e2125c03ef866c2f74cb53b942b7e823a6e80"
+        },
+        {
+          "path": "packages/octane/tests/_fixtures/signals-local.tsrx",
+          "equalApartFromSourceIds": true,
+          "sourceIdUses": 1,
+          "uniqueSourceIds": 1,
+          "idReusePreserved": true,
+          "normalizedAstSha256": "9f0512f97ee20d8cfe10c3da8ca72fe1e459493326ac730a9e0b12027fb5d08c"
+        },
+        {
+          "path": "packages/octane/tests/signals-devtools.test.tsrx",
+          "equalApartFromSourceIds": true,
+          "sourceIdUses": 1,
+          "uniqueSourceIds": 1,
+          "idReusePreserved": true,
+          "normalizedAstSha256": "129c354f22baec9ac1b91fc2c7f9337a18162ea3a5ade874428616b524ec83ab"
+        }
+      ],
+      "note": "All three server outputs differ only in generated source-position IDs: 26 uses total. The complete AST comparison preserves every other value, the helper call order and repeated-ID relationships. Raw server output hashes above remain distinct rather than being reported as identical."
+    },
+    "limitations": [
+      "Supplemental public tagged-source compiler dependencies, not the locked CI installation.",
+      "This is a source-format equivalence check, not an execution test or a benchmark rerun.",
+      "Development, HMR and profiling metadata intentionally contain changed source locations and are outside this comparison."
+    ]
+  },
+  "localVerification": {
+    "ownedFiles": 25,
+    "formattingChecksPassed": 25,
+    "originalAndCurrentCanonicalFormatEqual": 25,
+    "parsedJsonDeepEqual": 21,
+    "sourceDiffReview": "Only line wrapping, indentation and trailing commas were changed in the four source files."
+  },
+  "helperArtifacts": [
+    {
+      "path": "/private/tmp/octane-ci-format-f16c-YsGP49/before.json",
+      "sha256": "3f2024e43fad670d16e6ca6ac03fa68b3400f31e23d63ec0f809008ad705ba1b"
+    },
+    {
+      "path": "/private/tmp/octane-ci-format-f16c-YsGP49/format-resolved.mjs",
+      "sha256": "102986943f3c84d28a36f7bfa4a522b9172e73a3905c3e0dc71485396406623c"
+    },
+    {
+      "path": "/private/tmp/octane-ci-format-f16c-YsGP49/format-resolved-result.json",
+      "sha256": "cacb59227005ad64fd5a903d8f37785e527d27ccc369d97ab314cea4f01b49cd"
+    },
+    {
+      "path": "/private/tmp/octane-ci-format-f16c-YsGP49/verify-source-format.mjs",
+      "sha256": "78e0015af8aa4e310e668d0020e06999bda3e3558994fc00047f0bdd58e3aee1"
+    },
+    {
+      "path": "/private/tmp/octane-ci-format-f16c-YsGP49/source-format-result.json",
+      "sha256": "dd733bc4077de9ceae128de4742d65c31b7e6c5c9e032155496e9bc749831ed6"
+    },
+    {
+      "path": "/private/tmp/octane-ci-format-f16c-YsGP49/verify-server-source-ids.mjs",
+      "sha256": "1dc563c0590b25b0817f3b6f97222cde238abe7e170cc9d2db797768e698d8f8"
+    },
+    {
+      "path": "/private/tmp/octane-ci-format-f16c-YsGP49/server-source-id-result.json",
+      "sha256": "889d13112613dcdd083226cf697f15c16fe088986c7b4a956e81158d63b07949"
+    },
+    {
+      "path": "/private/tmp/octane-ci-format-f16c-YsGP49/write-ci-format-report.mjs",
+      "sha256": "2c8ae9dd356a3c8dc4485ffbcc365d6ef4104806ec3d54e057b91710df4cca53"
+    }
+  ],
+  "files": [
+    {
+      "path": "benchmarks/scoped-signals/package.json",
+      "originalSha256": "06175864cb127d77ebe532478ea94eb3d496a91fb710a6dee0d5dba8062f224d",
+      "formattedSha256": "d61766c3458109c0c8d8927a543d558ffb9d2974d0acb764f4e2f35433c4ea56",
+      "originalBytes": 370,
+      "formattedBytes": 387,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/async-retention-before-fix-analysis.json",
+      "originalSha256": "ddf837c53271e5e2f91da768e83bc02f60bb758aa7c20146bd8b12f6c775f201",
+      "formattedSha256": "d5922df00fd1352cb36b08e89603e982319ea4dffee85636e850f04e0f8cc491",
+      "originalBytes": 54419,
+      "formattedBytes": 71769,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/async-retention-final-format-provenance.json",
+      "originalSha256": "c82089849a75b67f6ac05b479ab256a4c5881f5b0d233b5e3d6887e92c3f3e1f",
+      "formattedSha256": "fc666de8984db8610c8697711086298143dd2d71dff6bfeb154849bec453f385",
+      "originalBytes": 459,
+      "formattedBytes": 465,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/async-retention-final.json",
+      "originalSha256": "a52ecb3c01a13f0d37d33e92e7dcfad7cbb2248163c6bf2039c3b95a5a78b181",
+      "formattedSha256": "cfbe62e0c469c283c0815b506577c3ad60e7520c64b29afb74a72e74cf709679",
+      "originalBytes": 55916,
+      "formattedBytes": 71297,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/async-retention-fixed.json",
+      "originalSha256": "3263a4fa9ba85a65a2edf4c5dbbadaea04ef45ea1d2e35214bb7fb038b089b6b",
+      "formattedSha256": "931e93df0b1d21166abbbc3dda091ef96f41557809d5c63b1a7ecea3e965475c",
+      "originalBytes": 55920,
+      "formattedBytes": 71301,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/async-retention-format-provenance.json",
+      "originalSha256": "293b25041f5189ed3fa17e662c37e53db67f92380c0cbe259bf169629e3747ac",
+      "formattedSha256": "8a088b1e9913e04f84a144332c45d1a1a9e28e522a7012e616ef32bb4aea21d2",
+      "originalBytes": 1029,
+      "formattedBytes": 1082,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/async-retention.json",
+      "originalSha256": "835329acc4178bc61f9d6fa101c8d5ed99b3cfd15c7f306fe0f5289c5f18c4ff",
+      "formattedSha256": "705b5e663add7f5415426e772fd4bd2932d6c2d335c69fe18e8150f7ad0055b4",
+      "originalBytes": 65142,
+      "formattedBytes": 83650,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/bundles-final-format-provenance.json",
+      "originalSha256": "73d3e17da90b521b9bbdaa3851537ce223a6f4fe9d73ed38809d76c24cc29599",
+      "formattedSha256": "fea2b4965f8a775aa73e2c542c6aaea16a19e52f4b093ad718a052e0949aaaa0",
+      "originalBytes": 550,
+      "formattedBytes": 558,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/bundles-final.json",
+      "originalSha256": "1094bfd0c1707535cbd508619133b9c8dede3b180a62e0fc624f23b7fa7dd16c",
+      "formattedSha256": "b0a009b77084a83cb550108fca7e7d86a43dfa9bc02509e95c2c319e01a458ab",
+      "originalBytes": 153588,
+      "formattedBytes": 172794,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/bundles-lazy-server.json",
+      "originalSha256": "a5aab3f4309d534e5f01128cfdecfef96bcea916c0f06035bb374c577793d882",
+      "formattedSha256": "ba3b3c6a2a8083fb286e8a5a69c287045e46fd0d584dbbeea575f6d020bd52cb",
+      "originalBytes": 152960,
+      "formattedBytes": 172166,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/bundles-preliminary.json",
+      "originalSha256": "74b1cae610ac6cf7e665caa3f2d83d184c0d24f4592aae97eb9127050bbc6440",
+      "formattedSha256": "954fa7ddaf76e1e62b77318773871c84838fcde4b6ec2bc72946a292ff3ca5ae",
+      "originalBytes": 152975,
+      "formattedBytes": 172181,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/engine-final-format-provenance.json",
+      "originalSha256": "47b148fbf22f415201ae44b12d2455144262448d583061986ad2552ef8f97026",
+      "formattedSha256": "64194054b26324a55efcb63ac88dd54a53e6da176b159cadaed7041be3cb923c",
+      "originalBytes": 667,
+      "formattedBytes": 684,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/engine-final.json",
+      "originalSha256": "40613c171569e7264e345e49a54235c8d7635e2877e77560237f738bf34cc393",
+      "formattedSha256": "7146ce5f42f915e83c6ccc5b5d2a65d140909136a95395c652a44c7b58592c70",
+      "originalBytes": 88814,
+      "formattedBytes": 102855,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/engine-full.json",
+      "originalSha256": "441181f0e2b3a46f346e522f19d24a044a70c841f48544d3ce03510b1825cdb6",
+      "formattedSha256": "ef67bad8d04345bf8f40e00cfaf9d7d46f5a7929e061184aee3d296cbc1c19d0",
+      "originalBytes": 88732,
+      "formattedBytes": 102773,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/engine-heap.json",
+      "originalSha256": "4ad758bd6a01831fa062033b10c11c9afd6e01e3028ffd0c05e71bbbcbbb568d",
+      "formattedSha256": "a1658594917c95bb4d1ed6dc7596168191487961c9b0bd474d946d19227bd9a8",
+      "originalBytes": 11834,
+      "formattedBytes": 13815,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/engine-refined.json",
+      "originalSha256": "9df7e481dc23265f6743b563e4f121d02ff533fca53ab567d00f018912fe50d3",
+      "formattedSha256": "0ad19544fc8cc9719849dd40737565079acf40b72978bc021125b48b9b643c2c",
+      "originalBytes": 88767,
+      "formattedBytes": 102808,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/engine-retainer-analysis.json",
+      "originalSha256": "a7eefefc23a2e7c65c0013a7f07656c5799b76e14cf7ccdaac5ab41a982de4b8",
+      "formattedSha256": "360552a45f3dcef0eb59638f7e27321088575d273c34be82680a717c0d7da68b",
+      "originalBytes": 5131,
+      "formattedBytes": 6335,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/engine-retainers.json",
+      "originalSha256": "4833cd469ef902cf1ce2e26755670bcda4cb803613a88f7c1a87e70bd833cc04",
+      "formattedSha256": "983f44cd8aec21a2adcb17f11c3eaa633135b23e8a23213335e7c51d22cdf5d0",
+      "originalBytes": 8080,
+      "formattedBytes": 8989,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/native-dom-mutations.json",
+      "originalSha256": "68bcfe7bf0bdb84b971b09b8d1d52839bb532ae1017d20eb19cd1fd833ad650e",
+      "formattedSha256": "24337d8e560787bde3b11ee6731acb035249288449ac745ba9c50b1191e3ec14",
+      "originalBytes": 2115,
+      "formattedBytes": 2099,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/native-runtime-handoff.json",
+      "originalSha256": "31159beaadc5fb4a1533c43d896b455eae084c1a068df67a19379809a50061e5",
+      "formattedSha256": "a1e64e838462a4b8a4a3a6335ab0a391b5efd29f14344c39360c960e0f92ca07",
+      "originalBytes": 7656,
+      "formattedBytes": 7632,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "benchmarks/scoped-signals/results/2026-08-27/report-format-provenance.json",
+      "originalSha256": "6b2c0d0149eba509ed5691f704a6e897fd06afc9e01ab6e03879b6ad188248b8",
+      "formattedSha256": "88abeaff1dc317116a35e7cd7c406043433ea3d463e678ff0e9c42d6825e3b03",
+      "originalBytes": 2022,
+      "formattedBytes": 2139,
+      "parsedJsonEqual": true
+    },
+    {
+      "path": "packages/devtools/src/panel/ComponentsTab.tsrx",
+      "originalSha256": "ef78a2b02dabeeb15b62e81cf66391e329ae238516b2108c2e7eb0336d642ac8",
+      "formattedSha256": "418388f31b6234f5153ad5dbaf064cef19ff9c600993d058a717477592e0a97f",
+      "originalBytes": 5948,
+      "formattedBytes": 6191
+    },
+    {
+      "path": "packages/octane/src/signals/native-read-inspection.ts",
+      "originalSha256": "83a05cd237aec68a18ce0ae37d265e4ddd5bf68d4e258c0584ab1f2eb9dcd8c2",
+      "formattedSha256": "49054824626ef861f1b149f7ac72a990d50e2cf94b504ac2cb2f9619fd11aa0b",
+      "originalBytes": 1099,
+      "formattedBytes": 1106
+    },
+    {
+      "path": "packages/octane/tests/_fixtures/signals-local.tsrx",
+      "originalSha256": "d879bc52a6cf969059cfba5aafc205ba9c0e29dd7c3ac0f5ec966085c57b7788",
+      "formattedSha256": "e74ebe7035e3dc806bb5f9199da831b2f58a3877b4d60ad522756106c77f2971",
+      "originalBytes": 1112,
+      "formattedBytes": 1116
+    },
+    {
+      "path": "packages/octane/tests/signals-devtools.test.tsrx",
+      "originalSha256": "53aba42e32eca8bd745010f79705f660dd12d328388b30504f61a99294c75c10",
+      "formattedSha256": "e55e6b64dffca4c2f650deee60c00506dfe158bfe7eecc44e79ce3c24e8ae5f8",
+      "originalBytes": 4796,
+      "formattedBytes": 5019
+    }
+  ]
+}

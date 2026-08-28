@@ -160,6 +160,9 @@ function factoryExpression(name, fn, original) {
 export function analyzeInlineMemoCall(call, options = {}) {
 	call = unwrapValue(call);
 	if (call?.type !== 'CallExpression' || call.optional) return null;
+	// This cache also owns a native-read witness. The ordinary flat/slot memo
+	// lowering only knows lexical dependencies and must not erase that evidence.
+	if (call._octaneNativeInferredMemo === true) return null;
 	const canonical = options.canonicalHookName?.(call);
 	if (canonical === null) return null;
 	const imported = canonical ?? call._octaneImportedHook ?? call._octaneHookRuntimeImportedHook;

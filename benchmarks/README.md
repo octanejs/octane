@@ -226,6 +226,7 @@ internally, get their own baseline and guard namespace.
 | `recursive-context` | recursive-context | Octane + reference frameworks | context fan-out |
 | `spa-navigation` | spa-navigation | octane-tsrx, octane-jsx, react, solid, vue-vapor, inferno | full-page routed-subtree teardown/mount with shell/layout identity and production-work gates |
 | `signal-favoring` | signal-favoring | Octane + reference frameworks | cascade vs targeted |
+| `scoped-signals` | scoped-signals | none (Node-only) | same-version Alien 3.2.0/scoped-engine graphs, intermediate notification/value gates, and continuous partial disposal with unrelated live owners; optional separate heap diagnostics |
 | `news` | news | none (builds) | SSR + hydration, per-target |
 | `hydration-interactivity` | hydration-interactivity | none (builds) | real pre-hydration typing, controlled inputs, native event replay, and 1×/6× Chromium CPU throttling across Octane, React, Preact, Solid 2, Svelte, Vue Vapor, and Inferno |
 | `hydration-stress` | hydration-stress | none (builds) | withheld-chunk hydration, keyboard and pointer Send delivery, DOM adoption, and explicit replay/drop diagnostics at 6× CPU throttling |
@@ -244,6 +245,7 @@ internally, get their own baseline and guard namespace.
 | `application-composition` | application-composition | none (builds) | lifecycle resources, large forms, store fan-out, async recovery, form submission, and navigation teardown in one app |
 | `scaling-curves` | scaling-curves | none (builds) | independently correctness-gated controlled updates at 8, 32, 96, 256, and 512 components |
 | `router-dispatch` | router-dispatch | none (Node-only) | app-core static, wrong-method, and dynamic matching across 1,000-route tables |
+| `floating-tree-navigation` | floating-tree-navigation | none (Node-only) | Floating UI deepest-open-node lookup on deep chains, equal-depth forks, and a root-only control, with exact previous-behavior and deterministic node-read gates |
 | `manifest-cache-invalidation` | manifest-cache-invalidation | none (Node-only) | shared-compiler source invalidation across 129 and 5,001 cached nearest-manifest decisions, plus a required manifest-scan control |
 | `vite-client-assets` | vite-client-assets | none (Node-only) | route asset mapping across 100 and 1,000 entries sharing a 500-chunk manifest graph, plus a shallow control |
 | `effectful-list` | effectful-list | Octane + reference frameworks | effect/ref cleanup churn |
@@ -275,6 +277,7 @@ internally, get their own baseline and guard namespace.
 | `tsrx-component-graph` | tsrx-component-graph | none (Node-only) | 2,400-component live-import propagation with dependent-first vs dependency-first declarations |
 | `tsrx-jsx-return-branches` | tsrx-jsx-return-branches | none (Node-only) | client/server compile and bundler classification for 120/480 conditional-return components, with lowering/export controls and a same-sized ineligible parse/print control |
 | `tsrx-nesting-diagnostics` | tsrx-nesting-diagnostics | none (Node-only) | development TSRX compilation at 500 and 2,000 invalid HTML sites, with parsed diagnostic count/order controls and a per-diagnostic scaling guard |
+| `tsrx-native-change-analysis` | tsrx-native-change-analysis | none (Node-only) | native-onChange analysis plus client/server compilation for 500/4,000 hostless JSX sites, paired with an AST-identical marker control that conservatively forces the scan |
 | `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, and weather-app, normalized minify, raw/gzip/brotli |
 | `bundle-reachability` | bundle-size | none (builds and executes in jsdom) | isolated public feature imports, exact production-bundle behavior, forbidden-module reachability, and committed raw/gzip/brotli budgets |
 | `three-renderer` | three | Octane Three, R3F, plain Three | 1,000-object lifecycle, reconstruction/disposal, frame subscribers, and raycast events |

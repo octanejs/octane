@@ -177,6 +177,7 @@ function createDiscoveryCompiler(options, root, profile, specialization) {
 		root,
 		profile,
 		...(options.strong === undefined ? null : { strong: options.strong }),
+		...(options.nativeReads === undefined ? null : { nativeReads: options.nativeReads }),
 		...(options.exclude === undefined ? null : { exclude: options.exclude }),
 		...(renderers === undefined ? null : { renderers }),
 		...(universalRuntime === undefined ? null : { universalRuntime }),
@@ -367,6 +368,7 @@ export class OctaneRspackPlugin {
 			dev,
 			profile,
 			strong: this.options.strong === true,
+			nativeReads: this.options.nativeReads === true,
 			exclude: this.options.exclude ?? [],
 			renderers: this.options.renderers?.signature,
 			runtime: this.options.runtime,
@@ -407,6 +409,9 @@ export class OctaneRspackPlugin {
 			environment,
 			profile,
 			...(this.options.strong === undefined ? null : { strong: this.options.strong }),
+			...(this.options.nativeReads === undefined
+				? null
+				: { nativeReads: this.options.nativeReads }),
 			...(this.options.hmr === undefined ? null : { hmr: this.options.hmr }),
 			...(this.options.dev === undefined ? null : { dev: this.options.dev }),
 			...(this.options.exclude === undefined ? null : { exclude: this.options.exclude }),

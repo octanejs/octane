@@ -33,6 +33,8 @@ export interface OctaneRsbuildPluginOptions {
 	 * in with `"use strong"`.
 	 */
 	strong?: boolean;
+	/** Experimental native signal reads in DOM client/server render scopes. */
+	nativeReads?: boolean;
 	/**
 	 * Ad-hoc path fragments skipped by the plain TypeScript/JavaScript
 	 * hook-slot pass. With `requireDirective`, excluded paths are exempt from

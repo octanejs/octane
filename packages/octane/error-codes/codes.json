@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 58,
+  "nextCode": 60,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -341,6 +341,18 @@
     "57": {
       "message": "prerenderToNodeStream requires a Node.js runtime with process.getBuiltinModule; use prerender() in non-Node environments.",
       "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "58": {
+      "message": "Unsupported native-read compiler/runtime version.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "59": {
+      "message": "%s requires an active server component.",
+      "argumentCount": 1,
       "runtime": ["server"],
       "status": "active"
     }

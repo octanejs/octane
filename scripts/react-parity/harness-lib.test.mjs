@@ -818,6 +818,25 @@ test('rejects broad file patterns, regex skips, and raw shell commands', () => {
 	assert.throws(() => validateManifest(value), /unknown key "command"/);
 });
 
+test('rejects root Vitest config hashes as support evidence', () => {
+	for (const path of ['vitest.config.js', './vitest.config.js']) {
+		const value = manifest();
+		value.lanes[0].files.push({ path, role: 'support', sha256: sha256('config') });
+		assert.throws(
+			() => validateManifest(value),
+			/cannot hash root vitest\.config\.js as support evidence/,
+		);
+	}
+
+	const supported = manifest();
+	supported.lanes[0].files.push({
+		path: 'packages/example/vitest.setup.ts',
+		role: 'support',
+		sha256: sha256('setup'),
+	});
+	assert.doesNotThrow(() => validateManifest(supported));
+});
+
 test('requires complete immutable provenance and environment identity', () => {
 	for (const field of [
 		'repo',

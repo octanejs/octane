@@ -271,6 +271,29 @@ const SUITES = [
 		],
 	},
 	{
+		// Renderer-free Alien 3.2.0 versus scoped-engine graphs, plus one
+		// uninterrupted ownership lifetime with repeated partial disposal.
+		name: 'scoped-signals',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n, quick) => [String(n), ...(quick ? ['--quick'] : [])] }],
+	},
+	{
+		// Actual production compilation with ordinary/native read controls,
+		// plus deterministic five-dependency use() creation-cache guards.
+		name: 'scoped-native-reads',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [
+			{
+				script: 'run-native-costs.mjs',
+				args: (n, quick) => [`--samples=${n}`, ...(quick ? ['--quick'] : [])],
+			},
+		],
+	},
+	{
 		name: 'signal-favoring',
 		cwd: 'signal-favoring',
 		servers: [
@@ -404,6 +427,15 @@ const SUITES = [
 		// and dynamic route tables with cost normalized per candidate route.
 		name: 'router-dispatch',
 		cwd: 'router-dispatch',
+		servers: [],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Floating UI's virtual nested-menu routing: exact previous behavior versus
+		// production on deep and branching trees, with deterministic node-read counts.
+		name: 'floating-tree-navigation',
+		cwd: 'floating-tree-navigation',
 		servers: [],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -851,6 +883,15 @@ const SUITES = [
 		cwd: 'tsrx-nesting-diagnostics',
 		servers: [],
 		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Native onChange analysis on hostless TSRX at two sizes, paired with an
+		// AST-identical large source whose ignored marker conservatively forces the scan.
+		name: 'tsrx-native-change-analysis',
+		cwd: 'tsrx-native-change-analysis',
+		servers: [],
+		iter: { normal: 7, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{

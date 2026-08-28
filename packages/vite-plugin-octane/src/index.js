@@ -221,7 +221,7 @@ function collect_hydrate_module_paths(config) {
  * it). An explicit `profile` (true or false) always takes precedence over
  * `devtools`.
  *
- * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, strong?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions, cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'] }} [inlineOptions]
+ * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, strong?: boolean, nativeReads?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions, cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'] }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -881,6 +881,7 @@ export function octane(inlineOptions = {}) {
 	 *   hmr?: boolean,
 	 *   profile?: boolean | 'auto',
 	 *   strong?: boolean,
+	 *   nativeReads?: boolean,
 	 *   exclude?: string[],
 	 *   requireDirective?: boolean,
 	 *   renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions,
@@ -894,6 +895,8 @@ export function octane(inlineOptions = {}) {
 	if (inlineOptions.profile !== undefined) compilerOptions.profile = inlineOptions.profile;
 	else if (inlineOptions.devtools === true) compilerOptions.profile = 'auto';
 	if (inlineOptions.strong !== undefined) compilerOptions.strong = inlineOptions.strong;
+	if (inlineOptions.nativeReads !== undefined)
+		compilerOptions.nativeReads = inlineOptions.nativeReads;
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
 	if (inlineOptions.requireDirective !== undefined) {
 		compilerOptions.requireDirective = inlineOptions.requireDirective;
@@ -909,7 +912,11 @@ export function octane(inlineOptions = {}) {
 			const projectRoot = userConfig.root ? path.resolve(userConfig.root) : process.cwd();
 			// Both inline compiler options override app config independently. Preserve
 			// the synchronous path when neither needs to read octane.config.ts.
-			if (inlineOptions.renderers !== undefined && inlineOptions.strong !== undefined) {
+			if (
+				inlineOptions.renderers !== undefined &&
+				inlineOptions.strong !== undefined &&
+				inlineOptions.nativeReads !== undefined
+			) {
 				compilerConfigWatchFiles.clear();
 				return compilerConfigHook.call(this, userConfig, env);
 			}
@@ -918,6 +925,7 @@ export function octane(inlineOptions = {}) {
 			if (!octaneConfigExists(projectRoot)) {
 				if (inlineOptions.renderers === undefined) delete compilerOptions.renderers;
 				if (inlineOptions.strong === undefined) delete compilerOptions.strong;
+				if (inlineOptions.nativeReads === undefined) delete compilerOptions.nativeReads;
 				compilerConfigWatchFiles.clear();
 				// A new app config can introduce Strong mode or renderer rules.
 				compilerConfigWatchFiles.add(path.resolve(configPath));
@@ -931,6 +939,9 @@ export function octane(inlineOptions = {}) {
 				}
 				if (inlineOptions.strong === undefined) {
 					compilerOptions.strong = config.config.compiler.strong;
+				}
+				if (inlineOptions.nativeReads === undefined) {
+					compilerOptions.nativeReads = config.config.compiler.nativeReads;
 				}
 				compilerConfigWatchFiles.clear();
 				for (const file of [...config.dependencies, ...config.missingDependencies]) {

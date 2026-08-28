@@ -11,6 +11,7 @@ packages:
   - benchmarks/spa-navigation/*
   - benchmarks/signal-favoring
   - benchmarks/signal-favoring/*
+  - benchmarks/scoped-signals
   - benchmarks/dbmon
   - benchmarks/dbmon/*
   - benchmarks/effectful-list
