@@ -16,6 +16,12 @@ export function ShowToggle(props: { toggle: Signal<boolean> }) {
 	});
 }
 
+export function ShowBlockChildren(props: { toggle: Signal<boolean> }) @{
+	<Show when={props.toggle}>
+		<p>Showing block</p>
+	</Show>
+}
+
 export function ForList(props: { items: Signal<string[]> }) {
 	return createElement(For, {
 		each: props.items,
@@ -24,6 +30,12 @@ export function ForList(props: { items: Signal<string[]> }) {
 			return createElement('li', {}, String(value));
 		},
 	});
+}
+
+export function ForBlockChildren(props: { items: Signal<string[]> }) @{
+	<For each={props.items}>
+		<li>Block item</li>
+	</For>
 }
 
 export function LiveCount(props: { count: number; logs: string[] }) {

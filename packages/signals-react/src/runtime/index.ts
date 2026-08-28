@@ -150,23 +150,26 @@ function createEffectStore(_usage: EffectStoreUsage, componentName?: string): Ef
 		},
 		{ name: componentName || 'Component' },
 	);
+	const usedFallback = effectInstance == null;
 	if (effectInstance == null) {
 		effectInstance = createEffectInstance(componentName);
 	}
-	assignEffectCallback(effectInstance, function notify() {
+	const trackingEffect = effectInstance;
+	assignEffectCallback(trackingEffect, function notify() {
 		version = (version + 1) | 0;
 		if (onChangeNotifyReact) onChangeNotifyReact();
 	});
 
 	return {
 		_usage,
-		effect: effectInstance,
+		effect: trackingEffect,
 		subscribe: function subscribe(onStoreChange) {
 			onChangeNotifyReact = onStoreChange;
 			return function unsubscribeStore() {
 				version = (version + 1) | 0;
 				onChangeNotifyReact = undefined;
 				unsubscribe();
+				if (usedFallback) disposeEffect(trackingEffect);
 			};
 		},
 		getSnapshot: function getSnapshot() {

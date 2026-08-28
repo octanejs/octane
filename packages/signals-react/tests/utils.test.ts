@@ -3,7 +3,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup, render } from '@octanejs/testing-library';
 import { createElement as h } from 'octane';
 import { signal } from '@preact/signals-core';
-import { ForList, LiveCount, ShowToggle, SignalRefProbe } from './_fixtures/utils.tsrx';
+import {
+	ForBlockChildren,
+	ForList,
+	LiveCount,
+	ShowBlockChildren,
+	ShowToggle,
+	SignalRefProbe,
+} from './_fixtures/utils.tsrx';
 
 afterEach(cleanup);
 
@@ -21,6 +28,11 @@ describe('Show', function showSuite() {
 		});
 		expect(visibleHTML(view.container)).toBe('<p>Showing</p>');
 	});
+
+	it('renders compiled block children without invoking them as a render prop', function block() {
+		const view = render(h(ShowBlockChildren, { toggle: signal(true) }));
+		expect(visibleHTML(view.container)).toBe('<p>Showing block</p>');
+	});
 });
 
 describe('For', function forSuite() {
@@ -32,6 +44,11 @@ describe('For', function forSuite() {
 			items.value = [];
 		});
 		expect(visibleHTML(view.container)).toBe('<p>empty</p>');
+	});
+
+	it('renders compiled block children without passing each item into the block', function block() {
+		const view = render(h(ForBlockChildren, { items: signal(['a']) }));
+		expect(visibleHTML(view.container)).toBe('<li>Block item</li>');
 	});
 });
 

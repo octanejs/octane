@@ -1,4 +1,4 @@
-import type { OctaneNode } from 'octane';
+import { isChildrenBlock, type OctaneNode } from 'octane';
 import type { AnyVariables } from '@urql/core';
 
 import type {
@@ -16,7 +16,7 @@ export type SubscriptionProps<
 	Variables extends AnyVariables = AnyVariables,
 > = UseSubscriptionArgs<Variables, Data> & {
 	handler?: SubscriptionHandler<Data, Result>;
-	children(arg: SubscriptionState<Result, Variables>): OctaneNode;
+	children: OctaneNode | ((arg: SubscriptionState<Result, Variables>) => OctaneNode);
 };
 
 export interface SubscriptionState<
@@ -38,8 +38,11 @@ export function Subscription<
 		subSlot(slot, 'subscription'),
 	);
 
-	return props.children({
-		...subscription[0],
-		executeSubscription: subscription[1],
-	});
+	const children = props.children;
+	return typeof children === 'function' && !isChildrenBlock(children)
+		? children({
+				...subscription[0],
+				executeSubscription: subscription[1],
+			})
+		: children;
 }

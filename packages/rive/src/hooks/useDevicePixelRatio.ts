@@ -21,7 +21,7 @@ export default function useDevicePixelRatio(...rawArgs: unknown[]) {
 
 	useEffect(
 		function listenForDpr() {
-			const canListen = typeof window !== 'undefined' && 'matchMedia' in window;
+			const canListen = typeof window !== 'undefined' && typeof window.matchMedia === 'function';
 			if (!canListen) {
 				return;
 			}

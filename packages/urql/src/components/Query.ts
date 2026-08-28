@@ -1,4 +1,4 @@
-import type { OctaneNode } from 'octane';
+import { isChildrenBlock, type OctaneNode } from 'octane';
 import type { AnyVariables } from '@urql/core';
 
 import type { UseQueryArgs, UseQueryState, UseQueryExecute } from '../hooks';
@@ -9,7 +9,7 @@ export type QueryProps<Data = any, Variables extends AnyVariables = AnyVariables
 	Variables,
 	Data
 > & {
-	children(arg: QueryState<Data, Variables>): OctaneNode;
+	children: OctaneNode | ((arg: QueryState<Data, Variables>) => OctaneNode);
 };
 
 export interface QueryState<
@@ -25,5 +25,8 @@ export function Query<Data = any, Variables extends AnyVariables = AnyVariables>
 ): OctaneNode {
 	const [, slot] = splitSlot(rest);
 	const query = useQuery<Data, Variables>(props, subSlot(slot, 'query'));
-	return props.children({ ...query[0], executeQuery: query[1] });
+	const children = props.children;
+	return typeof children === 'function' && !isChildrenBlock(children)
+		? children({ ...query[0], executeQuery: query[1] })
+		: children;
 }

@@ -374,12 +374,11 @@ describe('useQuery', function () {
 
 			fireEvent.click(retryButton);
 
-			// OCTANE DIVERGENCE: ErrorBoundary reset re-renders the same child
-			// instance, so the wonka source is reused and `onStart` does not
-			// fire a second request. The observable contract is the retry
-			// control returning to the error UI.
+			// ErrorBoundary resets remount the failed body, matching React's
+			// forceUnmountCurrentAndReconcile behavior, so the query starts again
+			// before returning to the error UI.
 			expect(await screen.findByRole('button', { name: 'Try again' })).toBeTruthy();
-			expect(requestsBeforeRetry).toBe(requests);
+			expect(requests).toBe(requestsBeforeRetry + 1);
 		} finally {
 			window.removeEventListener('error', preventQueryError);
 		}

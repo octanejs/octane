@@ -1,5 +1,12 @@
 import { type ReadonlySignal, Signal, signal } from '@preact/signals-core';
-import { createElement, Fragment, useEffect, useLayoutEffect, useMemo } from 'octane';
+import {
+	createElement,
+	Fragment,
+	isChildrenBlock,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+} from 'octane';
 import type { OctaneNode } from 'octane';
 import { useSignal } from '../index.ts';
 import { useSignals } from '../runtime/index.ts';
@@ -13,7 +20,7 @@ interface ShowProps<T = boolean> {
 
 function Item(props: { v: unknown; i?: Signal<number>; children: unknown }) {
 	useSignals();
-	if (typeof props.children === 'function') {
+	if (typeof props.children === 'function' && !isChildrenBlock(props.children)) {
 		return (props.children as (value: unknown, index?: number) => OctaneNode)(
 			props.v,
 			props.i ? props.i.value : undefined,
@@ -28,7 +35,7 @@ export function Show<T = boolean>(props: ShowProps<T>, ...rest: unknown[]): Octa
 	const value = typeof props.when === 'function' ? props.when() : props.when.value;
 	if (!value) {
 		const fallback = props.fallback;
-		if (typeof fallback === 'function') {
+		if (typeof fallback === 'function' && !isChildrenBlock(fallback)) {
 			return fallback();
 		}
 		return fallback ?? null;
@@ -42,7 +49,7 @@ interface ForProps<T> {
 	each: ForEach<T> | (() => ForEach<T>);
 	fallback?: OctaneNode | (() => OctaneNode);
 	getKey?: (item: T, index: number) => string | number;
-	children: (value: T, index: number) => OctaneNode;
+	children: OctaneNode | ((value: T, index: number) => OctaneNode);
 }
 
 export function For<T>(props: ForProps<T>, ...rest: unknown[]): OctaneNode {
@@ -61,7 +68,7 @@ export function For<T>(props: ForProps<T>, ...rest: unknown[]): OctaneNode {
 
 	if (!listValue.length) {
 		const fallback = props.fallback;
-		if (typeof fallback === 'function') {
+		if (typeof fallback === 'function' && !isChildrenBlock(fallback)) {
 			return fallback();
 		}
 		return fallback ?? null;

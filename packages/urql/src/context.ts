@@ -1,4 +1,4 @@
-import { createContext, useContext, type OctaneNode } from 'octane';
+import { createContext, isChildrenBlock, useContext, type OctaneNode } from 'octane';
 import type { Client } from '@urql/core';
 import { splitSlot } from './internal';
 
@@ -23,12 +23,13 @@ export const Provider = Context.Provider;
  * `children(client)`.
  */
 export function Consumer(
-	props: { children: (client: Client) => OctaneNode },
+	props: { children: OctaneNode | ((client: Client) => OctaneNode) },
 	...rest: unknown[]
 ): OctaneNode {
 	splitSlot(rest);
 	const client = useClient();
-	return props.children(client);
+	const children = props.children;
+	return typeof children === 'function' && !isChildrenBlock(children) ? children(client) : children;
 }
 
 /** Hook returning a {@link Client} from {@link Context}. */
